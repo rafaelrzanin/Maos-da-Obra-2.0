@@ -94,6 +94,12 @@ export interface Material {
   stepId?: string; // Optional link to a specific step
 }
 
+export interface StandardMaterial {
+  category: string;
+  name: string;
+  unit: string;
+}
+
 export interface WorkPhoto {
   id: string;
   workId: string;
@@ -152,4 +158,26 @@ export interface ContractTemplate {
   title: string;
   description: string;
   contentTemplate: string; // Text with placeholders
+}
+
+// --- TEAM & SUPPLIERS ---
+export interface Supplier {
+  id: string;
+  userId: string;
+  name: string;
+  category: string;
+  phone: string;
+  email?: string;
+  address?: string;
+  notes?: string;
+}
+
+export interface Worker {
+  id: string;
+  userId: string;
+  name: string;
+  role: string;
+  phone: string;
+  dailyRate?: number;
+  notes?: string;
 }

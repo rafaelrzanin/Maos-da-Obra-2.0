@@ -1,6 +1,5 @@
 
 
-
 // Standard Libraries for Construction Management
 
 export interface PhaseCategory {
@@ -135,75 +134,105 @@ export const CALCULATORS = {
 };
 
 export interface MaterialCatalog {
-  [category: string]: {
-    [subcategory: string]: string[];
-  };
+  category: string;
+  items: {name: string, unit: string}[];
 }
 
-export const STANDARD_MATERIAL_CATALOG: MaterialCatalog = {
-  'Estrutura': {
-    'Concreto': [
-      'Cimento CP-II',
-      'Areia média',
-      'Brita 1',
-      'Brita 2',
-      'Aditivo plastificante'
-    ],
-    'Armadura': [
-      'Aço CA50 8mm',
-      'Aço CA50 10mm',
-      'Vergalhão',
-      'Arame recozido'
+// FULL BACKUP CATALOG (Used when Supabase table is not reachable or as fallback)
+export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
+  {
+    category: 'Fundação',
+    items: [
+      { name: 'Cimento CP-II', unit: 'sacos' },
+      { name: 'Areia Média', unit: 'm³' },
+      { name: 'Brita 1', unit: 'm³' },
+      { name: 'Pedra de Mão (Rachão)', unit: 'm³' },
+      { name: 'Vergalhão 3/8 (10mm)', unit: 'barras' },
+      { name: 'Vergalhão 5/16 (8mm)', unit: 'barras' },
+      { name: 'Estribo 4.2mm (Pronto)', unit: 'un' },
+      { name: 'Arame Recozido', unit: 'kg' },
+      { name: 'Tábua de Pinus (Caixaria)', unit: 'dz' },
+      { name: 'Prego 17x21 (Cabeça dupla)', unit: 'kg' },
+      { name: 'Impermeabilizante betuminoso', unit: 'latas' }
     ]
   },
-  'Alvenaria': {
-    'Blocos': [
-      'Bloco cerâmico',
-      'Bloco de concreto',
-      'Tijolo maciço'
-    ],
-    'Argamassa': [
-        'Argamassa Assentamento',
-        'Cal Hidratada',
-        'Areia fina'
+  {
+    category: 'Alvenaria',
+    items: [
+      { name: 'Tijolo Cerâmico 8 furos', unit: 'milheiro' },
+      { name: 'Bloco de Concreto Estrutural', unit: 'un' },
+      { name: 'Cimento CP-II', unit: 'sacos' },
+      { name: 'Cal Hidratada (Liga)', unit: 'sacos' },
+      { name: 'Areia Média', unit: 'm³' },
+      { name: 'Ferro para Vergas (Cabelo)', unit: 'barras' },
+      { name: 'Aditivo Plastificante', unit: 'litros' }
     ]
   },
-  'Hidráulica': {
-    'Água Fria': [
-      'Tubo PVC',
-      'Joelho 90',
-      'Luva',
-      'Registro de pressão',
-      'Adesivo PVC'
+  {
+    category: 'Telhado',
+    items: [
+      { name: 'Telha Cerâmica/Concreto', unit: 'un' },
+      { name: 'Viga de Madeira (Peroba/Garapeira)', unit: 'm' },
+      { name: 'Caibros', unit: 'm' },
+      { name: 'Ripas', unit: 'm' },
+      { name: 'Prego de Telheiro', unit: 'kg' },
+      { name: 'Manta Térmica (Subcobertura)', unit: 'rolos' },
+      { name: 'Caixa D\'água', unit: 'un' }
     ]
   },
-  'Elétrica': {
-    'Fiação': [
-      'Cabo 2.5mm',
-      'Cabo 4mm',
-      'Cabo 6mm',
-      'Conduíte flexível'
-    ],
-    'Acabamento': [
-      'Tomada',
-      'Interruptor',
-      'Disjuntor'
+  {
+    category: 'Elétrica',
+    items: [
+      { name: 'Eletroduto Corrugado Amarelo (Flexível)', unit: 'rolos' },
+      { name: 'Caixa de Luz 4x2 (Parede)', unit: 'un' },
+      { name: 'Caixa de Luz 4x4', unit: 'un' },
+      { name: 'Cabo Flexível 2.5mm (Tomadas)', unit: 'rolos' },
+      { name: 'Cabo Flexível 1.5mm (Iluminação)', unit: 'rolos' },
+      { name: 'Cabo Flexível 6mm (Chuveiro)', unit: 'm' },
+      { name: 'Disjuntor Monopolar', unit: 'un' },
+      { name: 'Quadro de Distribuição', unit: 'un' },
+      { name: 'Fita Isolante', unit: 'un' }
     ]
   },
-  'Acabamento': {
-      'Geral': ['Porcelanato', 'Rejunte', 'Tinta Acrílica', 'Massa Corrida', 'Lixa']
+  {
+    category: 'Hidráulica',
+    items: [
+      { name: 'Tubo PVC Soldável 25mm (Água)', unit: 'barras' },
+      { name: 'Tubo Esgoto 100mm', unit: 'barras' },
+      { name: 'Tubo Esgoto 40mm', unit: 'barras' },
+      { name: 'Joelho 90 graus 25mm', unit: 'un' },
+      { name: 'Luva de correr', unit: 'un' },
+      { name: 'Cola para PVC', unit: 'tubo' },
+      { name: 'Registro de Gaveta (Geral)', unit: 'un' },
+      { name: 'Registro de Pressão (Chuveiro)', unit: 'un' },
+      { name: 'Caixa Sifonada', unit: 'un' }
+    ]
+  },
+  {
+    category: 'Acabamento',
+    items: [
+      { name: 'Piso / Porcelanato', unit: 'm²' },
+      { name: 'Argamassa AC-II ou AC-III', unit: 'sacos' },
+      { name: 'Rejunte', unit: 'kg' },
+      { name: 'Espaçadores / Niveladores', unit: 'pct' },
+      { name: 'Rodapé', unit: 'm' }
+    ]
+  },
+  {
+    category: 'Pintura',
+    items: [
+      { name: 'Lixa de Parede 120/150', unit: 'folhas' },
+      { name: 'Selador Acrílico', unit: 'latas' },
+      { name: 'Massa Corrida (Interna)', unit: 'latas' },
+      { name: 'Tinta Acrílica Fosca/Acetinada', unit: 'latas' },
+      { name: 'Rolo de Lã', unit: 'un' },
+      { name: 'Pincel / Trincha', unit: 'un' },
+      { name: 'Fita Crepe', unit: 'rolos' },
+      { name: 'Lona Plástica (Proteção)', unit: 'm' }
+    ]
   }
-};
+];
 
-export const STANDARD_EXPENSE_CATALOG: MaterialCatalog = {
-  'Mão de Obra': {
-    'Profissionais': ['Pedreiro', 'Ajudante', 'Eletricista', 'Encanador', 'Pintor', 'Mestre de Obras']
-  },
-  'Material': {
-    'Básico': ['Cimento', 'Areia', 'Pedra', 'Tijolo', 'Ferro', 'Madeira'],
-    'Acabamento': ['Piso', 'Revestimento', 'Argamassa', 'Rejunte', 'Tinta', 'Gesso']
-  }
-};
 
 // --- LIFETIME BONUSES ---
 export const LIFETIME_BONUSES = [
@@ -284,6 +313,24 @@ Data: ____/____/______
 
 _________________________
 Assinatura Contratante`
+  },
+  {
+    id: 'RECIBO',
+    title: 'Recibo de Pagamento Simples',
+    description: 'Para comprovar pagamentos a prestadores.',
+    contentTemplate: `RECIBO DE PAGAMENTO
+
+VALOR: R$ [Valor]
+
+Recebi de [Seu Nome], a quantia de R$ [Valor por extenso], referente aos serviços de [Descrever serviço] realizados na obra [Endereço da Obra].
+
+Para clareza e verdade, firmo o presente recibo.
+
+Data: ____/____/______
+
+_________________________
+Assinatura do Recebedor
+CPF: [CPF do Recebedor]`
   }
 ];
 

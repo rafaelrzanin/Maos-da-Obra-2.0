@@ -1,8 +1,11 @@
+
+
 import { 
   User, Work, Step, Expense, Material, WorkPhoto, WorkFile,
-  PlanType, WorkStatus, StepStatus, Notification
+  PlanType, WorkStatus, StepStatus, Notification, StandardMaterial,
+  Supplier, Worker
 } from '../types';
-import { STANDARD_PHASES } from './standards';
+import { STANDARD_PHASES, FULL_MATERIAL_PACKAGES } from './standards';
 import { supabase } from './supabase';
 
 // --- LOCAL STORAGE FALLBACK CONSTANTS ---
@@ -20,6 +23,8 @@ interface DbSchema {
   photos: WorkPhoto[];
   files: WorkFile[]; 
   notifications: Notification[];
+  suppliers: Supplier[];
+  workers: Worker[];
 }
 
 const initialDb: DbSchema = {
@@ -32,7 +37,9 @@ const initialDb: DbSchema = {
   materials: [],
   photos: [],
   files: [], 
-  notifications: []
+  notifications: [],
+  suppliers: [],
+  workers: []
 };
 
 // --- LOCAL STORAGE HELPERS (SYNC) ---
@@ -44,6 +51,8 @@ const getLocalDb = (): DbSchema => {
   }
   const db = JSON.parse(stored);
   if (!db.files) db.files = [];
+  if (!db.suppliers) db.suppliers = [];
+  if (!db.workers) db.workers = [];
   return db;
 };
 
@@ -66,15 +75,11 @@ export const dbService = {
         });
         
         if (error) {
-             // Fallback for demo without password if enabled or just fail
              console.error("Supabase Login Error:", error);
-             // Try fetching profile by email if using magic link or similar logic?
-             // For now, let's assume if Supabase fails, we return null
              return null;
         }
 
         if (data.user) {
-            // Fetch profile
             const { data: profile } = await supabase.from('profiles').select('*').eq('id', data.user.id).single();
             if (profile) return profile as User;
         }
@@ -91,7 +96,7 @@ export const dbService = {
                 } else {
                     resolve(null);
                 }
-            }, 500); // Simulate network
+            }, 500); 
         });
     }
   },
@@ -111,8 +116,6 @@ export const dbService = {
             return null;
         }
         
-        // Profile is created by Trigger in SQL usually, or we can force it here if trigger fails
-        // Wait a bit for trigger
         await new Promise(r => setTimeout(r, 1000));
         
         const { data: profile } = await supabase.from('profiles').select('*').eq('id', data.user.id).single();
@@ -182,8 +185,6 @@ export const dbService = {
   getWorks: async (userId: string): Promise<Work[]> => {
     if (supabase) {
         const { data } = await supabase.from('works').select('*').eq('user_id', userId);
-        // Map snake_case to camelCase if needed, but we used matched names mostly.
-        // Need to map keys manually if SQL is snake_case and Types are camelCase
         return (data || []).map(w => ({
             ...w,
             userId: w.user_id,
@@ -216,7 +217,6 @@ export const dbService = {
 
   createWork: async (work: Omit<Work, 'id' | 'status'>, useStandardTemplate: boolean = false): Promise<Work> => {
     if (supabase) {
-        // 1. Insert Work
         const { data: newWork, error } = await supabase.from('works').insert({
             user_id: work.userId,
             name: work.name,
@@ -262,7 +262,6 @@ export const dbService = {
                 });
             });
         } else {
-            // Standard fallback
             const standardSteps = ['Aprovação', 'Fundação', 'Alvenaria', 'Telhado', 'Hidráulica', 'Elétrica', 'Acabamento', 'Pintura'];
             stepsPayload = standardSteps.map((name, idx) => {
                 const start = new Date(work.startDate);
@@ -294,9 +293,6 @@ export const dbService = {
         };
         db.works.push(newWork);
 
-        // Template generation logic for Local (Same as before)
-        // ... (Skipping full repetition for brevity, logic remains same as original db.ts)
-        // Basic template generation:
         const standardSteps = ['Fundação', 'Alvenaria', 'Telhado', 'Acabamento'];
         const steps = standardSteps.map((name) => ({
              id: Math.random().toString(36).substr(2, 9),
@@ -362,10 +358,6 @@ export const dbService = {
             end_date: step.endDate,
             status: step.status
         }).eq('id', step.id);
-        
-        // Update Work Status Logic (Simple Check)
-        // Requires fetching all steps to calculate, might be heavy. 
-        // For Supabase, usually triggers or simple client logic.
     } else {
         const db = getLocalDb();
         const idx = db.steps.findIndex(s => s.id === step.id);
@@ -477,26 +469,144 @@ export const dbService = {
       }
   },
 
+  // --- STANDARD MATERIAL PACKAGES IMPORT ---
+  importMaterialPackage: async (workId: string, category: string): Promise<number> => {
+    let itemsToImport: StandardMaterial[] = [];
+
+    if (supabase) {
+        const { data, error } = await supabase.from('standard_materials').select('*').eq('category', category);
+        if (!error && data && data.length > 0) {
+            itemsToImport = data.map(d => ({ category: d.category, name: d.name, unit: d.unit }));
+        }
+    }
+    
+    if (itemsToImport.length === 0) {
+        const pkg = FULL_MATERIAL_PACKAGES.find(p => p.category === category);
+        if (pkg) {
+            itemsToImport = pkg.items.map(i => ({ category: pkg.category, name: i.name, unit: i.unit }));
+        }
+    }
+
+    if (itemsToImport.length === 0) return 0;
+
+    if (supabase) {
+        const payload = itemsToImport.map(item => ({
+            work_id: workId,
+            name: item.name,
+            planned_qty: 0,
+            purchased_qty: 0,
+            unit: item.unit
+        }));
+        await supabase.from('materials').insert(payload);
+    } else {
+        const db = getLocalDb();
+        const payload = itemsToImport.map(item => ({
+            id: Math.random().toString(36).substr(2, 9),
+            workId: workId,
+            name: item.name,
+            plannedQty: 0,
+            purchasedQty: 0,
+            unit: item.unit
+        }));
+        db.materials.push(...payload);
+        saveLocalDb(db);
+    }
+
+    return itemsToImport.length;
+  },
+
+  // --- SUPPLIERS & WORKERS ---
+  getSuppliers: async (userId: string): Promise<Supplier[]> => {
+    if (supabase) {
+        const { data } = await supabase.from('suppliers').select('*').eq('user_id', userId);
+        return (data || []).map(s => ({ ...s, userId: s.user_id }));
+    } else {
+        const db = getLocalDb();
+        return Promise.resolve(db.suppliers.filter(s => s.userId === userId));
+    }
+  },
+
+  addSupplier: async (supplier: Omit<Supplier, 'id'>) => {
+    if (supabase) {
+        await supabase.from('suppliers').insert({
+            user_id: supplier.userId,
+            name: supplier.name,
+            category: supplier.category,
+            phone: supplier.phone,
+            email: supplier.email,
+            address: supplier.address,
+            notes: supplier.notes
+        });
+    } else {
+        const db = getLocalDb();
+        db.suppliers.push({ ...supplier, id: Math.random().toString(36).substr(2, 9) });
+        saveLocalDb(db);
+    }
+  },
+
+  deleteSupplier: async (id: string) => {
+    if (supabase) await supabase.from('suppliers').delete().eq('id', id);
+    else {
+        const db = getLocalDb();
+        db.suppliers = db.suppliers.filter(s => s.id !== id);
+        saveLocalDb(db);
+    }
+  },
+
+  getWorkers: async (userId: string): Promise<Worker[]> => {
+    if (supabase) {
+        const { data } = await supabase.from('workers').select('*').eq('user_id', userId);
+        return (data || []).map(w => ({ 
+            ...w, 
+            userId: w.user_id, 
+            dailyRate: w.daily_rate 
+        }));
+    } else {
+        const db = getLocalDb();
+        return Promise.resolve(db.workers.filter(w => w.userId === userId));
+    }
+  },
+
+  addWorker: async (worker: Omit<Worker, 'id'>) => {
+    if (supabase) {
+        await supabase.from('workers').insert({
+            user_id: worker.userId,
+            name: worker.name,
+            role: worker.role,
+            phone: worker.phone,
+            daily_rate: worker.dailyRate,
+            notes: worker.notes
+        });
+    } else {
+        const db = getLocalDb();
+        db.workers.push({ ...worker, id: Math.random().toString(36).substr(2, 9) });
+        saveLocalDb(db);
+    }
+  },
+
+  deleteWorker: async (id: string) => {
+    if (supabase) await supabase.from('workers').delete().eq('id', id);
+    else {
+        const db = getLocalDb();
+        db.workers = db.workers.filter(w => w.id !== id);
+        saveLocalDb(db);
+    }
+  },
+
+
   // --- Notifications (Smart Logic) ---
-  // Keeping this simplified for Hybrid
   getNotifications: async (userId: string): Promise<Notification[]> => {
-      // In a real app, you'd fetch from a notifications table
-      // For now, let's keep using LocalStorage for notifications even in Supabase mode
-      // or implement a simple table. For safety, stick to local for notifications
-      // to avoid SQL complexities in this step.
       const db = getLocalDb();
       return Promise.resolve(db.notifications.filter(n => n.userId === userId));
   },
 
   generateSmartNotifications: async (userId: string, workId: string) => {
-      // Fetch fresh data
       const expenses = await dbService.getExpenses(workId);
       const steps = await dbService.getSteps(workId);
       const work = await dbService.getWorkById(workId);
 
       if (!work) return;
       
-      // We still store notifications locally for this version to simplify
       const db = getLocalDb();
       const today = new Date().toISOString().split('T')[0];
       const lastCheckKey = `${NOTIFICATION_CHECK_KEY}_${workId}`;
@@ -507,7 +617,6 @@ export const dbService = {
       const totalSpent = expenses.reduce((acc, curr) => acc + (curr.paidAmount ?? curr.amount), 0);
       const percentage = work.budgetPlanned > 0 ? (totalSpent / work.budgetPlanned) : 0;
       
-      // Logic from previous step...
       if (percentage >= 0.8) {
            db.notifications.push({
               id: Math.random().toString(36).substr(2, 9),
@@ -520,7 +629,6 @@ export const dbService = {
           });
       }
       
-      // Check delays
       const now = new Date();
       steps.forEach(step => {
           if (step.status !== StepStatus.COMPLETED && new Date(step.endDate) < now) {

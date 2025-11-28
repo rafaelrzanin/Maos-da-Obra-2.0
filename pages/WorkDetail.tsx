@@ -1,9 +1,12 @@
+
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { dbService } from '../services/db';
-import { Work, Step, Expense, Material, StepStatus, ExpenseCategory } from '../types';
+import { Work, Step, Expense, Material, StepStatus, ExpenseCategory, PlanType, Supplier, Worker } from '../types';
 import { Recharts } from '../components/RechartsWrapper';
-import { CALCULATORS, CONTRACT_TEMPLATES, STANDARD_CHECKLISTS } from '../services/standards';
+import { CALCULATORS, CONTRACT_TEMPLATES, STANDARD_CHECKLISTS, FULL_MATERIAL_PACKAGES } from '../services/standards';
+import { useAuth } from '../App';
 
 // --- Shared Components ---
 
@@ -180,10 +183,6 @@ const StepsTab: React.FC<{ workId: string, refreshWork: () => void }> = ({ workI
   };
 
   const handleDeleteStep = async () => {
-      // Assuming a delete method on DB service in future update, for now simplified
-      // In a real app we'd add deleteStep to dbService
-      // await dbService.deleteStep(confirmDelete.stepId);
-      
       setConfirmDelete({isOpen: false, stepId: ''});
       setEditingStep(null);
       loadSteps();
@@ -362,11 +361,8 @@ const StepsTab: React.FC<{ workId: string, refreshWork: () => void }> = ({ workI
 const MaterialsTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ workId, onUpdate }) => {
   const [materials, setMaterials] = useState<Material[]>([]);
   const [showAddForm, setShowAddForm] = useState(false);
-  const [showCalculator, setShowCalculator] = useState(false);
-  const [calcType, setCalcType] = useState('PISO');
-  const [calcArea, setCalcArea] = useState('');
-  const [calcResult, setCalcResult] = useState<{qty: number, msg: string} | null>(null);
-
+  const [showPackageModal, setShowPackageModal] = useState(false); // Modal for packages
+  
   const [newMat, setNewMat] = useState({ name: '', qty: '', unit: 'un' });
   const [confirmModal, setConfirmModal] = useState<{isOpen: boolean, title: string, message: string, onConfirm: () => void}>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
 
@@ -388,31 +384,6 @@ const MaterialsTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ work
     onUpdate(); // Refresh parent stats
   };
 
-  const calculateMaterial = () => {
-      const calc = CALCULATORS[calcType as keyof typeof CALCULATORS];
-      if (calc && Number(calcArea) > 0) {
-          const qty = calc.calculate(Number(calcArea));
-          setCalcResult({ qty, msg: calc.message(qty) });
-      }
-  };
-
-  const saveCalculation = async () => {
-      if (!calcResult) return;
-      const calc = CALCULATORS[calcType as keyof typeof CALCULATORS];
-      await dbService.addMaterial({
-          workId,
-          name: calc.label,
-          plannedQty: calcResult.qty,
-          purchasedQty: 0,
-          unit: calc.unit
-      });
-      setShowCalculator(false);
-      setCalcResult(null);
-      setCalcArea('');
-      loadMaterials();
-      onUpdate(); // Refresh parent stats
-  };
-
   const handleDeleteClick = (id: string) => {
     setConfirmModal({
         isOpen: true,
@@ -427,6 +398,18 @@ const MaterialsTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ work
     });
   }
 
+  const handleImportPackage = async (category: string) => {
+    setShowPackageModal(false);
+    const count = await dbService.importMaterialPackage(workId, category);
+    if (count > 0) {
+        alert(`${count} itens foram adicionados à sua lista!`);
+        loadMaterials();
+        onUpdate();
+    } else {
+        alert("Não encontramos itens para esta categoria ou houve um erro.");
+    }
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       <SectionHeader 
@@ -434,19 +417,21 @@ const MaterialsTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ work
           subtitle="O que eu preciso comprar."
       />
 
-      <div className="flex gap-3 mb-4">
-          <button 
-            onClick={() => setShowAddForm(true)}
-            className="flex-1 py-4 rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-700 text-text-muted hover:text-primary hover:border-primary transition-all font-bold flex items-center justify-center gap-2 bg-slate-50 dark:bg-slate-800/50"
-          >
-              <i className="fa-solid fa-plus"></i> Novo Item
-          </button>
-          <button 
-            onClick={() => setShowCalculator(true)}
-            className="flex-1 py-4 rounded-xl bg-primary text-white font-bold flex items-center justify-center gap-2 shadow-lg shadow-primary/20 hover:bg-primary-dark transition-all"
-          >
-              <i className="fa-solid fa-calculator"></i> Ajuda para calcular
-          </button>
+      <div className="flex flex-col gap-3 mb-4">
+        <div className="flex gap-3">
+            <button 
+                onClick={() => setShowAddForm(true)}
+                className="w-full py-4 rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-700 text-text-muted hover:text-primary hover:border-primary transition-all font-bold flex items-center justify-center gap-2 bg-slate-50 dark:bg-slate-800/50"
+            >
+                <i className="fa-solid fa-plus"></i> Novo Item
+            </button>
+        </div>
+        <button 
+            onClick={() => setShowPackageModal(true)}
+            className="w-full py-3 rounded-xl bg-purple-100 dark:bg-purple-900/30 text-premium font-bold flex items-center justify-center gap-2 hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-colors"
+        >
+            <i className="fa-solid fa-wand-magic-sparkles"></i> Sugestões por Etapa
+        </button>
       </div>
 
       {showAddForm && (
@@ -495,52 +480,27 @@ const MaterialsTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ work
           </div>
       )}
 
-      {showCalculator && (
+      {showPackageModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in">
               <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-sm p-6 shadow-2xl">
-                   <h3 className="text-lg font-bold text-text-main dark:text-white mb-4"><i className="fa-solid fa-wand-magic-sparkles text-primary mr-2"></i>Eu ajudo a calcular</h3>
-                   {!calcResult ? (
-                       <div className="space-y-4">
-                           <div>
-                               <label className="block text-xs font-bold text-text-muted mb-1">O que vamos calcular?</label>
-                               <select 
-                                 value={calcType} 
-                                 onChange={e => setCalcType(e.target.value)}
-                                 className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 bg-surface dark:bg-slate-800 text-text-main dark:text-white rounded-xl outline-none"
-                               >
-                                   {Object.entries(CALCULATORS).map(([key, val]) => (
-                                       <option key={key} value={key}>{val.label}</option>
-                                   ))}
-                               </select>
-                           </div>
-                           <div>
-                               <label className="block text-xs font-bold text-text-muted mb-1">Qual o tamanho da área? (m²)</label>
-                               <input 
-                                  type="number" 
-                                  autoFocus
-                                  value={calcArea}
-                                  onChange={e => setCalcArea(e.target.value)}
-                                  placeholder="Ex: 25"
-                                  className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 bg-surface dark:bg-slate-800 text-text-main dark:text-white rounded-xl outline-none"
-                               />
-                           </div>
-                           <button onClick={calculateMaterial} className="w-full py-3 bg-primary text-white font-bold rounded-xl shadow-lg mt-2">
-                               Ver quantidade sugerida
-                           </button>
-                           <button onClick={() => setShowCalculator(false)} className="w-full py-2 text-text-muted font-bold text-sm">Fechar</button>
-                       </div>
-                   ) : (
-                       <div className="text-center">
-                           <div className="bg-surface dark:bg-slate-800 p-4 rounded-xl mb-4">
-                               <p className="text-3xl font-bold text-primary mb-1">{calcResult.qty} <span className="text-sm text-text-muted">{CALCULATORS[calcType as keyof typeof CALCULATORS].unit}</span></p>
-                               <p className="text-sm text-text-muted">{calcResult.msg}</p>
-                           </div>
-                           <button onClick={saveCalculation} className="w-full py-3 bg-success text-white font-bold rounded-xl shadow-lg mb-2">
-                               Adicionar à minha lista
-                           </button>
-                           <button onClick={() => setCalcResult(null)} className="w-full py-2 text-text-muted font-bold text-sm">Calcular outro</button>
-                       </div>
-                   )}
+                  <h3 className="text-lg font-bold text-text-main dark:text-white mb-2">Pacotes Prontos</h3>
+                  <p className="text-sm text-text-muted dark:text-slate-400 mb-4">Selecione uma etapa para adicionar todos os materiais recomendados de uma vez só.</p>
+                  
+                  <div className="grid grid-cols-2 gap-3 mb-6">
+                      {FULL_MATERIAL_PACKAGES.map((pkg, idx) => (
+                          <button
+                            key={idx}
+                            onClick={() => handleImportPackage(pkg.category)}
+                            className="p-3 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-primary hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors text-sm font-bold text-text-body dark:text-slate-300"
+                          >
+                              {pkg.category}
+                          </button>
+                      ))}
+                  </div>
+                  
+                  <button onClick={() => setShowPackageModal(false)} className="w-full py-3 bg-slate-100 dark:bg-slate-800 text-text-main dark:text-white font-bold rounded-xl">
+                      Cancelar
+                  </button>
               </div>
           </div>
       )}
@@ -716,7 +676,88 @@ const ExpensesTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ workI
   );
 };
 
-// 5. MAIS MENU - TOOLS SUBVIEWS (Remains mostly sync except where data needed)
+// 5. MAIS MENU - TOOLS SUBVIEWS (Refactored)
+
+const CalculatorView: React.FC<{ workId: string, onBack: () => void }> = ({ workId, onBack }) => {
+    const [calcType, setCalcType] = useState('PISO');
+    const [calcArea, setCalcArea] = useState('');
+    const [calcResult, setCalcResult] = useState<{qty: number, msg: string} | null>(null);
+
+    const calculateMaterial = () => {
+        const calc = CALCULATORS[calcType as keyof typeof CALCULATORS];
+        if (calc && Number(calcArea) > 0) {
+            const qty = calc.calculate(Number(calcArea));
+            setCalcResult({ qty, msg: calc.message(qty) });
+        }
+    };
+
+    const saveCalculation = async () => {
+        if (!calcResult) return;
+        const calc = CALCULATORS[calcType as keyof typeof CALCULATORS];
+        await dbService.addMaterial({
+            workId,
+            name: calc.label,
+            plannedQty: calcResult.qty,
+            purchasedQty: 0,
+            unit: calc.unit
+        });
+        alert('Material adicionado à lista de compras!');
+        onBack();
+    };
+
+    return (
+        <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
+             <button onClick={onBack} className="mb-4 text-sm font-bold text-primary hover:underline flex items-center gap-2">
+                <i className="fa-solid fa-arrow-left"></i> Voltar
+             </button>
+             <h3 className="font-bold text-lg text-text-main dark:text-white mb-4">Calculadora de Materiais</h3>
+             <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 shadow-sm border border-slate-200 dark:border-slate-800">
+                {!calcResult ? (
+                    <div className="space-y-4">
+                        <div>
+                            <label className="block text-xs font-bold text-text-muted mb-1">O que vamos calcular?</label>
+                            <select 
+                                value={calcType} 
+                                onChange={e => setCalcType(e.target.value)}
+                                className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 bg-surface dark:bg-slate-800 text-text-main dark:text-white rounded-xl outline-none"
+                            >
+                                {Object.entries(CALCULATORS).map(([key, val]) => (
+                                    <option key={key} value={key}>{val.label}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-text-muted mb-1">Qual o tamanho da área? (m²)</label>
+                            <input 
+                                type="number" 
+                                autoFocus
+                                value={calcArea}
+                                onChange={e => setCalcArea(e.target.value)}
+                                placeholder="Ex: 25"
+                                className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 bg-surface dark:bg-slate-800 text-text-main dark:text-white rounded-xl outline-none"
+                            />
+                        </div>
+                        <button onClick={calculateMaterial} className="w-full py-3 bg-primary text-white font-bold rounded-xl shadow-lg mt-2">
+                            Ver quantidade sugerida
+                        </button>
+                    </div>
+                ) : (
+                    <div className="text-center">
+                        <div className="bg-surface dark:bg-slate-800 p-4 rounded-xl mb-4">
+                            <p className="text-3xl font-bold text-primary mb-1">{calcResult.qty} <span className="text-sm text-text-muted">{CALCULATORS[calcType as keyof typeof CALCULATORS].unit}</span></p>
+                            <p className="text-sm text-text-muted">{calcResult.msg}</p>
+                        </div>
+                        <button onClick={saveCalculation} className="w-full py-3 bg-success text-white font-bold rounded-xl shadow-lg mb-2">
+                            Adicionar à minha lista
+                        </button>
+                        <button onClick={() => setCalcResult(null)} className="w-full py-2 text-text-muted font-bold text-sm">Calcular outro</button>
+                    </div>
+                )}
+             </div>
+        </div>
+    );
+};
+
 const ChecklistsView: React.FC = () => {
     const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({});
 
@@ -801,33 +842,196 @@ const ContractsView: React.FC = () => {
     );
 }
 
+const ContactsView: React.FC = () => {
+    const { user } = useAuth();
+    const [activeTab, setActiveTab] = useState<'WORKERS' | 'SUPPLIERS'>('WORKERS');
+    const [workers, setWorkers] = useState<Worker[]>([]);
+    const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+    const [showAdd, setShowAdd] = useState(false);
+    
+    // Form States
+    const [newName, setNewName] = useState('');
+    const [newRole, setNewRole] = useState('');
+    const [newPhone, setNewPhone] = useState('');
+    const [newNote, setNewNote] = useState('');
+
+    const loadData = async () => {
+        if (!user) return;
+        setWorkers(await dbService.getWorkers(user.id));
+        setSuppliers(await dbService.getSuppliers(user.id));
+    };
+
+    useEffect(() => { loadData(); }, [user]);
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!user) return;
+        
+        if (activeTab === 'WORKERS') {
+            await dbService.addWorker({
+                userId: user.id,
+                name: newName,
+                role: newRole,
+                phone: newPhone,
+                notes: newNote
+            });
+        } else {
+            await dbService.addSupplier({
+                userId: user.id,
+                name: newName,
+                category: newRole, // using role input as category
+                phone: newPhone,
+                notes: newNote
+            });
+        }
+        setShowAdd(false);
+        setNewName(''); setNewRole(''); setNewPhone(''); setNewNote('');
+        loadData();
+    };
+
+    const handleDelete = async (id: string) => {
+        if (confirm('Tem certeza que deseja remover este contato?')) {
+            if (activeTab === 'WORKERS') await dbService.deleteWorker(id);
+            else await dbService.deleteSupplier(id);
+            loadData();
+        }
+    }
+
+    const formatPhoneLink = (phone: string) => {
+        const clean = phone.replace(/\D/g, '');
+        return `https://wa.me/55${clean}`;
+    }
+
+    return (
+        <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
+            <h3 className="font-bold text-lg text-text-main dark:text-white mb-4">Meus Contatos</h3>
+            
+            <div className="flex p-1 bg-slate-100 dark:bg-slate-800 rounded-xl mb-6">
+                <button 
+                    onClick={() => setActiveTab('WORKERS')}
+                    className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${activeTab === 'WORKERS' ? 'bg-white dark:bg-slate-700 text-primary dark:text-white shadow-sm' : 'text-text-muted'}`}
+                >
+                    Equipe
+                </button>
+                <button 
+                    onClick={() => setActiveTab('SUPPLIERS')}
+                    className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${activeTab === 'SUPPLIERS' ? 'bg-white dark:bg-slate-700 text-primary dark:text-white shadow-sm' : 'text-text-muted'}`}
+                >
+                    Fornecedores
+                </button>
+            </div>
+
+            <button 
+                onClick={() => setShowAdd(true)}
+                className="w-full py-3 bg-primary text-white font-bold rounded-xl shadow-lg hover:bg-primary-dark transition-all flex items-center justify-center gap-2"
+            >
+                <i className="fa-solid fa-plus"></i> Novo {activeTab === 'WORKERS' ? 'Trabalhador' : 'Fornecedor'}
+            </button>
+
+            {showAdd && (
+                <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-lg animate-in slide-in-from-top-2">
+                    <form onSubmit={handleSubmit} className="space-y-4">
+                        <div>
+                            <label className="text-xs font-bold text-text-muted mb-1 block">Nome</label>
+                            <input required value={newName} onChange={e => setNewName(e.target.value)} className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 bg-surface dark:bg-slate-800 rounded-xl outline-none" placeholder="Ex: João da Silva" />
+                        </div>
+                        <div>
+                            <label className="text-xs font-bold text-text-muted mb-1 block">{activeTab === 'WORKERS' ? 'Profissão' : 'Categoria'}</label>
+                            <input required value={newRole} onChange={e => setNewRole(e.target.value)} className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 bg-surface dark:bg-slate-800 rounded-xl outline-none" placeholder={activeTab === 'WORKERS' ? "Ex: Pedreiro" : "Ex: Material de Construção"} />
+                        </div>
+                        <div>
+                            <label className="text-xs font-bold text-text-muted mb-1 block">WhatsApp / Telefone</label>
+                            <input required value={newPhone} onChange={e => setNewPhone(e.target.value)} className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 bg-surface dark:bg-slate-800 rounded-xl outline-none" placeholder="Ex: 11999999999" type="tel" />
+                        </div>
+                         <div>
+                            <label className="text-xs font-bold text-text-muted mb-1 block">Observação (Opcional)</label>
+                            <input value={newNote} onChange={e => setNewNote(e.target.value)} className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 bg-surface dark:bg-slate-800 rounded-xl outline-none" placeholder="..." />
+                        </div>
+                        <div className="flex gap-3 pt-2">
+                            <button type="button" onClick={() => setShowAdd(false)} className="flex-1 py-3 text-text-muted bg-slate-100 dark:bg-slate-800 rounded-xl font-bold">Cancelar</button>
+                            <button type="submit" className="flex-1 py-3 text-white bg-primary rounded-xl font-bold">Salvar</button>
+                        </div>
+                    </form>
+                </div>
+            )}
+
+            <div className="space-y-3">
+                {(activeTab === 'WORKERS' ? workers : suppliers).map((item: any) => (
+                    <div key={item.id} className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-100 dark:border-slate-800 shadow-sm flex items-center justify-between">
+                        <div>
+                            <h4 className="font-bold text-text-main dark:text-white">{item.name}</h4>
+                            <p className="text-sm text-text-muted dark:text-slate-500">{item.role || item.category}</p>
+                            {item.notes && <p className="text-xs text-text-muted dark:text-slate-600 mt-1 italic">{item.notes}</p>}
+                        </div>
+                        <div className="flex gap-2">
+                             <a 
+                                href={formatPhoneLink(item.phone)} 
+                                target="_blank"
+                                className="w-10 h-10 rounded-lg bg-success text-white flex items-center justify-center hover:bg-success-dark transition-colors shadow-sm"
+                             >
+                                 <i className="fa-brands fa-whatsapp text-lg"></i>
+                             </a>
+                             <button 
+                                onClick={() => handleDelete(item.id)}
+                                className="w-10 h-10 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-400 hover:text-danger flex items-center justify-center transition-colors"
+                             >
+                                 <i className="fa-solid fa-trash"></i>
+                             </button>
+                        </div>
+                    </div>
+                ))}
+                {(activeTab === 'WORKERS' ? workers : suppliers).length === 0 && !showAdd && (
+                    <div className="text-center py-10 text-text-muted dark:text-slate-500">
+                        Nenhum contato cadastrado.
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
 // 5. MAIS MENU MAIN
 const MoreMenuTab: React.FC<{ 
     onNavigate: (view: string) => void,
-    activeSubView: string | null 
-}> = ({ onNavigate, activeSubView }) => {
+    activeSubView: string | null,
+    workId: string
+}> = ({ onNavigate, activeSubView, workId }) => {
+    const { user } = useAuth();
+    const navigate = useNavigate();
 
-    const menuItems = [
+    const standardItems = [
+        { id: 'CONTACTS', label: 'Equipe e Fornecedores', icon: 'fa-address-book', color: 'text-blue-500', desc: 'Sua lista de contatos.' },
         { id: 'PHOTOS', label: 'Minhas Fotos', icon: 'fa-camera', color: 'text-purple-500', desc: 'Guarde o antes e depois da obra.' },
-        { id: 'FILES', label: 'Meus Projetos (PDF)', icon: 'fa-folder-open', color: 'text-blue-500', desc: 'Plantas e documentos importantes.' },
-        { id: 'CHECKLISTS', label: 'Checklists', icon: 'fa-list-check', color: 'text-success', desc: 'Não esqueça de nada importante.' },
-        { id: 'CONTRACTS', label: 'Contratos', icon: 'fa-file-signature', color: 'text-orange-500', desc: 'Modelos prontos para usar.' },
+        { id: 'FILES', label: 'Meus Projetos (PDF)', icon: 'fa-folder-open', color: 'text-indigo-500', desc: 'Plantas e documentos importantes.' },
         { id: 'REPORTS', label: 'Relatórios', icon: 'fa-file-pdf', color: 'text-red-500', desc: 'Para imprimir ou mandar para alguém.' },
     ];
+
+    const bonusItems = [
+        { id: 'CALCULATOR', label: 'Calculadora da Obra', icon: 'fa-calculator', color: 'text-primary', desc: 'Calcule pisos, tijolos e tintas.' },
+        { id: 'CHECKLISTS', label: 'Checklists', icon: 'fa-list-check', color: 'text-success', desc: 'Não esqueça de nada importante.' },
+        { id: 'CONTRACTS', label: 'Contratos e Recibos', icon: 'fa-file-signature', color: 'text-orange-500', desc: 'Modelos prontos para usar.' },
+    ];
+
+    const isLifetime = user?.plan === PlanType.VITALICIO;
 
     if (activeSubView) {
         return (
             <div className="animate-in fade-in slide-in-from-right-4 duration-300">
-                <button 
-                    onClick={() => onNavigate('')} 
-                    className="mb-4 text-sm font-bold text-text-muted hover:text-primary flex items-center gap-2"
-                >
-                    <i className="fa-solid fa-arrow-left"></i> Voltar ao Menu
-                </button>
+                {activeSubView !== 'CALCULATOR' && activeSubView !== 'CONTRACTS' && (
+                    <button 
+                        onClick={() => onNavigate('')} 
+                        className="mb-4 text-sm font-bold text-text-muted hover:text-primary flex items-center gap-2"
+                    >
+                        <i className="fa-solid fa-arrow-left"></i> Voltar ao Menu
+                    </button>
+                )}
+                
+                {activeSubView === 'CONTACTS' && <ContactsView />}
                 {activeSubView === 'PHOTOS' && <div className="p-10 text-center bg-white dark:bg-slate-900 rounded-2xl text-text-muted border border-slate-200 dark:border-slate-800">Galeria de Fotos (Em breve)</div>}
                 {activeSubView === 'FILES' && <div className="p-10 text-center bg-white dark:bg-slate-900 rounded-2xl text-text-muted border border-slate-200 dark:border-slate-800">Gerenciador de Arquivos (Em breve)</div>}
                 {activeSubView === 'CHECKLISTS' && <ChecklistsView />}
                 {activeSubView === 'CONTRACTS' && <ContractsView />}
+                {activeSubView === 'CALCULATOR' && <CalculatorView workId={workId} onBack={() => onNavigate('')} />}
                 {activeSubView === 'REPORTS' && (
                     <div className="p-8 bg-white dark:bg-slate-900 rounded-2xl text-center border border-slate-200 dark:border-slate-800">
                         <i className="fa-solid fa-print text-4xl text-slate-300 mb-4"></i>
@@ -843,11 +1047,12 @@ const MoreMenuTab: React.FC<{
         <div className="space-y-6 animate-in fade-in duration-300">
             <SectionHeader 
                 title="Mais Coisas" 
-                subtitle="Ferramentas extras para ajudar."
+                subtitle="Ferramentas e extras da sua obra."
             />
             
+            {/* Standard Tools */}
             <div className="grid grid-cols-1 gap-4">
-                {menuItems.map(item => (
+                {standardItems.map(item => (
                     <button 
                         key={item.id}
                         onClick={() => onNavigate(item.id)}
@@ -864,6 +1069,58 @@ const MoreMenuTab: React.FC<{
                     </button>
                 ))}
             </div>
+
+            {/* Bonus Section Header */}
+            <div className="pt-4 pb-2 border-t border-slate-200 dark:border-slate-800 mt-2">
+                <h3 className="font-bold text-lg text-text-main dark:text-white flex items-center gap-2">
+                    <i className="fa-solid fa-gift text-premium"></i> Bônus Vitalício
+                </h3>
+                <p className="text-xs text-text-muted dark:text-slate-400">Exclusivo para membros do plano completo.</p>
+            </div>
+
+            {/* Bonus Items */}
+            <div className="grid grid-cols-1 gap-4">
+                {bonusItems.map(item => (
+                    <button 
+                        key={item.id}
+                        onClick={() => isLifetime && onNavigate(item.id)}
+                        disabled={!isLifetime}
+                        className={`p-5 rounded-2xl border shadow-sm transition-all text-left flex items-center gap-4 group relative overflow-hidden ${
+                            isLifetime 
+                            ? 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 hover:shadow-md cursor-pointer' 
+                            : 'bg-slate-50 dark:bg-slate-800/50 border-slate-100 dark:border-slate-800 opacity-60 cursor-not-allowed'
+                        }`}
+                    >
+                        <div className={`w-10 h-10 rounded-xl bg-surface dark:bg-slate-800 flex items-center justify-center text-lg ${item.color}`}>
+                            <i className={`fa-solid ${item.icon}`}></i>
+                        </div>
+                        <div>
+                            <h3 className="font-bold text-base text-text-main dark:text-white">{item.label}</h3>
+                            <p className="text-xs text-text-muted dark:text-slate-400">{item.desc}</p>
+                        </div>
+                        {!isLifetime ? (
+                             <i className="fa-solid fa-lock ml-auto text-slate-400"></i>
+                        ) : (
+                             <i className="fa-solid fa-chevron-right ml-auto text-slate-300 group-hover:text-primary transition-colors"></i>
+                        )}
+                    </button>
+                ))}
+            </div>
+
+            {/* Unlock Banner for Non-Lifetime */}
+            {!isLifetime && (
+                <div className="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-2xl p-6 text-white shadow-lg shadow-purple-500/30 text-center mt-4">
+                    <i className="fa-solid fa-crown text-3xl mb-2 text-yellow-300"></i>
+                    <h3 className="font-bold text-lg mb-1">Desbloquear Bônus</h3>
+                    <p className="text-sm opacity-90 mb-4">Tenha acesso vitalício à calculadora, contratos e checklists exclusivos.</p>
+                    <button 
+                        onClick={() => navigate('/settings')}
+                        className="bg-white text-purple-600 font-bold py-3 px-6 rounded-xl w-full hover:bg-purple-50 transition-colors"
+                    >
+                        Quero ser Vitalício
+                    </button>
+                </div>
+            )}
         </div>
     );
 };
@@ -936,6 +1193,7 @@ const WorkDetail: React.FC = () => {
             <MoreMenuTab 
                 onNavigate={(view) => setMoreSubView(view)} 
                 activeSubView={moreSubView} 
+                workId={work.id}
             />
         )}
       </div>
