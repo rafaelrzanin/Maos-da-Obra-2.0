@@ -386,7 +386,8 @@ export const dbService = {
             ...e,
             workId: e.work_id,
             paidAmount: e.paid_amount,
-            stepId: e.step_id
+            stepId: e.step_id,
+            workerId: e.worker_id
         }));
     } else {
         const db = getLocalDb();
@@ -404,12 +405,34 @@ export const dbService = {
               quantity: expense.quantity,
               category: expense.category,
               date: expense.date,
-              step_id: expense.stepId
+              step_id: expense.stepId,
+              worker_id: expense.workerId
           });
       } else {
           const db = getLocalDb();
           db.expenses.push({ ...expense, id: Math.random().toString(36).substr(2, 9) });
           saveLocalDb(db);
+      }
+  },
+
+  updateExpense: async (expense: Expense) => {
+      if (supabase) {
+          await supabase.from('expenses').update({
+              description: expense.description,
+              amount: expense.amount,
+              paid_amount: expense.paidAmount,
+              category: expense.category,
+              date: expense.date,
+              step_id: expense.stepId,
+              worker_id: expense.workerId
+          }).eq('id', expense.id);
+      } else {
+          const db = getLocalDb();
+          const idx = db.expenses.findIndex(e => e.id === expense.id);
+          if (idx > -1) {
+              db.expenses[idx] = expense;
+              saveLocalDb(db);
+          }
       }
   },
 
@@ -431,7 +454,8 @@ export const dbService = {
               workId: m.work_id,
               plannedQty: m.planned_qty,
               purchasedQty: m.purchased_qty,
-              stepId: m.step_id 
+              stepId: m.step_id,
+              category: m.category
           }));
       } else {
           const db = getLocalDb();

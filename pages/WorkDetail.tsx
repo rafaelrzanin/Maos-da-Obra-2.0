@@ -686,22 +686,35 @@ const MaterialsTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ work
 
 // 4. FINANCEIRO (Refactored for Step Grouping)
 const ExpensesTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ workId, onUpdate }) => {
+  const { user } = useAuth();
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [steps, setSteps] = useState<Step[]>([]);
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [newExp, setNewExp] = useState<{
+  const [workers, setWorkers] = useState<Worker[]>([]); // New: Workers List
+  
+  // UI States
+  const [showForm, setShowForm] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+
+  // Form State
+  const [formData, setFormData] = useState<{
       description: string, 
       amount: string, 
+      paidAmount: string, // New: Separate Paid vs Total
       category: ExpenseCategory, 
       date: string,
-      stepId?: string
+      stepId?: string,
+      workerId?: string // New: Worker Selection
   }>({ 
       description: '', 
       amount: '', 
+      paidAmount: '',
       category: ExpenseCategory.MATERIAL, 
       date: new Date().toISOString().split('T')[0],
-      stepId: undefined
+      stepId: undefined,
+      workerId: undefined
   });
+  
   const [confirmModal, setConfirmModal] = useState<{isOpen: boolean, title: string, message: string, onConfirm: () => void}>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
 
   const loadData = async () => {
@@ -711,24 +724,69 @@ const ExpensesTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ workI
       ]);
       setExpenses(expData);
       setSteps(stepsData.sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()));
+      
+      // Load workers if user exists
+      if (user) {
+          const w = await dbService.getWorkers(user.id);
+          setWorkers(w);
+      }
   };
 
-  useEffect(() => { loadData(); }, [workId]);
+  useEffect(() => { loadData(); }, [workId, user]);
 
-  const handleAdd = async (e: React.FormEvent) => {
+  const resetForm = () => {
+      setFormData({ 
+          description: '', 
+          amount: '', 
+          paidAmount: '',
+          category: ExpenseCategory.MATERIAL, 
+          date: new Date().toISOString().split('T')[0], 
+          stepId: undefined,
+          workerId: undefined
+      });
+      setIsEditing(false);
+      setEditingId(null);
+      setShowForm(false);
+  }
+
+  const handleEditClick = (exp: Expense) => {
+      setFormData({
+          description: exp.description,
+          amount: exp.amount.toString(),
+          paidAmount: (exp.paidAmount || exp.amount).toString(),
+          category: exp.category,
+          date: exp.date,
+          stepId: exp.stepId,
+          workerId: exp.workerId
+      });
+      setIsEditing(true);
+      setEditingId(exp.id);
+      setShowForm(true);
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await dbService.addExpense({
+    const payload = {
       workId,
-      description: newExp.description,
-      amount: Number(newExp.amount),
-      paidAmount: Number(newExp.amount), 
+      description: formData.description,
+      amount: Number(formData.amount),
+      paidAmount: Number(formData.paidAmount), 
       quantity: 1,
-      category: newExp.category,
-      date: newExp.date,
-      stepId: newExp.stepId
-    });
-    setNewExp({ description: '', amount: '', category: ExpenseCategory.MATERIAL, date: new Date().toISOString().split('T')[0], stepId: undefined });
-    setShowAddForm(false);
+      category: formData.category,
+      date: formData.date,
+      stepId: formData.stepId,
+      workerId: formData.workerId
+    };
+
+    if (isEditing && editingId) {
+        // Update
+        await dbService.updateExpense({ ...payload, id: editingId });
+    } else {
+        // Create
+        await dbService.addExpense(payload);
+    }
+    
+    resetForm();
     loadData();
     onUpdate();
   };
@@ -747,10 +805,19 @@ const ExpensesTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ workI
       });
   };
 
+  // Logic to auto-fill description when selecting worker
+  const handleWorkerSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
+      const wId = e.target.value;
+      const worker = workers.find(w => w.id === wId);
+      setFormData(prev => ({
+          ...prev, 
+          workerId: wId,
+          description: worker ? `${prev.description || 'Pagamento:'} ${worker.name}` : prev.description
+      }));
+  };
+
   // Group Expenses by Step
   const groupedExpenses: Record<string, Expense[]> = { 'GERAL': [] };
-  
-  // Initialize groups for all steps so they appear even if empty (optional, but good for structure)
   steps.forEach(s => { groupedExpenses[s.id] = [] });
 
   expenses.forEach(exp => {
@@ -761,8 +828,7 @@ const ExpensesTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ workI
       }
   });
 
-  // Calculate totals per group
-  const getGroupTotal = (groupExps: Expense[]) => groupExps.reduce((acc, curr) => acc + (curr.amount || 0), 0);
+  const getGroupTotal = (groupExps: Expense[]) => groupExps.reduce((acc, curr) => acc + (curr.paidAmount || curr.amount || 0), 0);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
@@ -771,36 +837,54 @@ const ExpensesTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ workI
           subtitle="Tudo o que saiu do seu bolso, organizado."
       />
 
-      {!showAddForm ? (
+      {!showForm ? (
           <button 
-            onClick={() => setShowAddForm(true)}
+            onClick={() => setShowForm(true)}
             className="w-full py-4 rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-700 text-text-muted hover:text-primary hover:border-primary transition-all font-bold flex items-center justify-center gap-2 bg-slate-50 dark:bg-slate-800/50"
           >
               <i className="fa-solid fa-plus"></i> Anotar gasto
           </button>
       ) : (
         <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-lg border border-slate-100 dark:border-slate-800 animate-in slide-in-from-top-2">
-            <h3 className="font-bold text-text-main dark:text-white mb-4">O que eu paguei?</h3>
-            <form onSubmit={handleAdd} className="space-y-4">
+            <h3 className="font-bold text-text-main dark:text-white mb-4">{isEditing ? 'Editar Despesa' : 'Novo Gasto'}</h3>
+            <form onSubmit={handleSubmit} className="space-y-4">
                 {/* 1. Category (Tipo do Gasto) */}
                 <div>
                     <label className="text-xs font-bold text-text-muted mb-1 block">No que foi gasto?</label>
                     <select 
                         className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-text-main dark:text-white rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary"
-                        value={newExp.category}
-                        onChange={e => setNewExp({...newExp, category: e.target.value as ExpenseCategory})}
+                        value={formData.category}
+                        onChange={e => setFormData({...formData, category: e.target.value as ExpenseCategory})}
                     >
                         {Object.values(ExpenseCategory).map(c => <option key={c} value={c}>{c}</option>)}
                     </select>
                 </div>
+
+                {/* 1.5 Worker Selection (Only if Category is Labor) */}
+                {formData.category === ExpenseCategory.LABOR && (
+                    <div className="animate-in fade-in slide-in-from-top-1">
+                        <label className="text-xs font-bold text-primary mb-1 block">Qual profissional?</label>
+                        <select 
+                            className="w-full px-4 py-3 border-2 border-primary/20 bg-primary/5 text-text-main dark:text-white rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary"
+                            value={formData.workerId || ''}
+                            onChange={handleWorkerSelect}
+                        >
+                            <option value="">Selecione da equipe...</option>
+                            {workers.map(w => <option key={w.id} value={w.id}>{w.name} ({w.role})</option>)}
+                        </select>
+                        {workers.length === 0 && (
+                            <p className="text-[10px] text-red-500 mt-1">Nenhum trabalhador cadastrado em Contatos.</p>
+                        )}
+                    </div>
+                )}
 
                 {/* 2. Step Selection */}
                 <div>
                     <label className="text-xs font-bold text-text-muted mb-1 block">Em qual etapa da obra?</label>
                     <select 
                         className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-text-main dark:text-white rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary"
-                        value={newExp.stepId || ''}
-                        onChange={e => setNewExp({...newExp, stepId: e.target.value || undefined})}
+                        value={formData.stepId || ''}
+                        onChange={e => setFormData({...formData, stepId: e.target.value || undefined})}
                     >
                         <option value="">Geral / Obra Toda</option>
                         {steps.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
@@ -813,28 +897,43 @@ const ExpensesTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ workI
                     <input 
                         placeholder="Ex: Cimento, Diária Pedreiro..." 
                         required
-                        value={newExp.description}
-                        onChange={e => setNewExp({...newExp, description: e.target.value})}
+                        value={formData.description}
+                        onChange={e => setFormData({...formData, description: e.target.value})}
                         className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-text-main dark:text-white rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary"
                     />
                 </div>
 
-                {/* 4. Amount */}
-                <div>
-                    <label className="text-xs font-bold text-text-muted mb-1 block">Valor Pago (R$)</label>
-                    <input 
-                        type="number" 
-                        placeholder="0,00" 
-                        required
-                        value={newExp.amount}
-                        onChange={e => setNewExp({...newExp, amount: e.target.value})}
-                        className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-text-main dark:text-white rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary"
-                    />
+                {/* 4. Amount - Total vs Paid */}
+                <div className="flex gap-4">
+                    <div className="flex-1">
+                        <label className="text-xs font-bold text-text-muted mb-1 block">Valor Total (R$)</label>
+                        <input 
+                            type="number" 
+                            placeholder="0,00" 
+                            required
+                            value={formData.amount}
+                            onChange={e => setFormData({...formData, amount: e.target.value})}
+                            className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-text-main dark:text-white rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary"
+                        />
+                    </div>
+                    <div className="flex-1">
+                        <label className="text-xs font-bold text-text-muted mb-1 block">Valor Pago (R$)</label>
+                        <input 
+                            type="number" 
+                            placeholder="0,00" 
+                            value={formData.paidAmount}
+                            onChange={e => setFormData({...formData, paidAmount: e.target.value})}
+                            className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-text-main dark:text-white rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary"
+                        />
+                        <p className="text-[10px] text-text-muted mt-1">Se for parcelado, coloque quanto pagou hoje.</p>
+                    </div>
                 </div>
                 
                 <div className="flex gap-3 pt-2">
-                   <button type="button" onClick={() => setShowAddForm(false)} className="flex-1 py-3 font-bold text-text-muted bg-slate-100 dark:bg-slate-800 rounded-xl">Cancelar</button>
-                   <button type="submit" className="flex-1 py-3 font-bold text-white bg-primary rounded-xl hover:bg-primary-dark">Salvar</button>
+                   <button type="button" onClick={resetForm} className="flex-1 py-3 font-bold text-text-muted bg-slate-100 dark:bg-slate-800 rounded-xl">Cancelar</button>
+                   <button type="submit" className="flex-1 py-3 font-bold text-white bg-primary rounded-xl hover:bg-primary-dark">
+                       {isEditing ? 'Atualizar' : 'Salvar'}
+                   </button>
                  </div>
             </form>
         </div>
@@ -850,25 +949,38 @@ const ExpensesTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ workI
                           <h3 className="font-bold text-text-main dark:text-white uppercase tracking-wider text-sm">Geral / Obra Toda</h3>
                       </div>
                       <span className="text-xs font-bold text-text-main dark:text-white bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-lg">
-                          Total: R$ {getGroupTotal(groupedExpenses['GERAL']).toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                          Pago: R$ {getGroupTotal(groupedExpenses['GERAL']).toLocaleString('pt-BR', {minimumFractionDigits: 2})}
                       </span>
                 </div>
                 <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 overflow-hidden shadow-sm">
                         <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                            {groupedExpenses['GERAL'].map(exp => (
+                            {groupedExpenses['GERAL'].map(exp => {
+                                const isPartial = (exp.paidAmount || 0) < exp.amount;
+                                return (
                                 <div key={exp.id} className="p-4 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                                    <div>
+                                    <div className="cursor-pointer flex-1" onClick={() => handleEditClick(exp)}>
                                         <p className="font-bold text-text-main dark:text-white">{exp.description}</p>
-                                        <p className="text-xs text-text-muted dark:text-slate-500">{new Date(exp.date).toLocaleDateString('pt-BR')} • {exp.category}</p>
+                                        <div className="flex items-center gap-2 text-xs text-text-muted dark:text-slate-500">
+                                            <span>{new Date(exp.date).toLocaleDateString('pt-BR')}</span>
+                                            <span>•</span>
+                                            <span>{exp.category}</span>
+                                            {isPartial && <span className="text-orange-500 font-bold bg-orange-100 dark:bg-orange-900 px-1.5 rounded">Parcial</span>}
+                                        </div>
                                     </div>
                                     <div className="flex items-center gap-4">
-                                        <span className="font-bold text-text-body dark:text-slate-300">R$ {exp.amount.toFixed(2)}</span>
-                                        <button onClick={() => handleDeleteClick(exp.id)} className="text-slate-300 hover:text-danger">
+                                        <div className="text-right">
+                                            <span className="font-bold text-text-body dark:text-slate-300 block">R$ {(exp.paidAmount || exp.amount).toFixed(2)}</span>
+                                            {isPartial && <span className="text-[10px] text-text-muted line-through block">Total: R$ {exp.amount.toFixed(2)}</span>}
+                                        </div>
+                                        <button onClick={() => handleDeleteClick(exp.id)} className="text-slate-300 hover:text-danger p-2">
                                             <i className="fa-solid fa-trash"></i>
+                                        </button>
+                                        <button onClick={() => handleEditClick(exp)} className="text-slate-300 hover:text-primary p-2">
+                                            <i className="fa-solid fa-pen"></i>
                                         </button>
                                     </div>
                                 </div>
-                            ))}
+                            )})}
                         </div>
                 </div>
              </div>
@@ -887,25 +999,38 @@ const ExpensesTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ workI
                             <h3 className="font-bold text-text-main dark:text-white uppercase tracking-wider text-sm truncate max-w-[200px]">{step.name}</h3>
                         </div>
                         <span className="text-xs font-bold text-text-main dark:text-white bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-lg">
-                            Total: R$ {groupTotal.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                            Pago: R$ {groupTotal.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
                         </span>
                     </div>
                     <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 overflow-hidden shadow-sm">
                         <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                            {groupExps.map(exp => (
+                             {groupExps.map(exp => {
+                                const isPartial = (exp.paidAmount || 0) < exp.amount;
+                                return (
                                 <div key={exp.id} className="p-4 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                                    <div>
+                                    <div className="cursor-pointer flex-1" onClick={() => handleEditClick(exp)}>
                                         <p className="font-bold text-text-main dark:text-white">{exp.description}</p>
-                                        <p className="text-xs text-text-muted dark:text-slate-500">{new Date(exp.date).toLocaleDateString('pt-BR')} • {exp.category}</p>
+                                        <div className="flex items-center gap-2 text-xs text-text-muted dark:text-slate-500">
+                                            <span>{new Date(exp.date).toLocaleDateString('pt-BR')}</span>
+                                            <span>•</span>
+                                            <span>{exp.category}</span>
+                                            {isPartial && <span className="text-orange-500 font-bold bg-orange-100 dark:bg-orange-900 px-1.5 rounded">Parcial</span>}
+                                        </div>
                                     </div>
                                     <div className="flex items-center gap-4">
-                                        <span className="font-bold text-text-body dark:text-slate-300">R$ {exp.amount.toFixed(2)}</span>
-                                        <button onClick={() => handleDeleteClick(exp.id)} className="text-slate-300 hover:text-danger">
+                                        <div className="text-right">
+                                            <span className="font-bold text-text-body dark:text-slate-300 block">R$ {(exp.paidAmount || exp.amount).toFixed(2)}</span>
+                                            {isPartial && <span className="text-[10px] text-text-muted line-through block">Total: R$ {exp.amount.toFixed(2)}</span>}
+                                        </div>
+                                        <button onClick={() => handleDeleteClick(exp.id)} className="text-slate-300 hover:text-danger p-2">
                                             <i className="fa-solid fa-trash"></i>
+                                        </button>
+                                        <button onClick={() => handleEditClick(exp)} className="text-slate-300 hover:text-primary p-2">
+                                            <i className="fa-solid fa-pen"></i>
                                         </button>
                                     </div>
                                 </div>
-                            ))}
+                            )})}
                         </div>
                     </div>
                 </div>
