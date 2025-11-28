@@ -21,28 +21,30 @@ interface ConfirmModalProps {
   isOpen: boolean;
   title: string;
   message: string;
+  confirmText?: string;
+  cancelText?: string;
   onConfirm: () => void;
   onCancel: () => void;
 }
 
-const ConfirmModal: React.FC<ConfirmModalProps> = ({ isOpen, title, message, onConfirm, onCancel }) => {
+const ConfirmModal: React.FC<ConfirmModalProps> = ({ isOpen, title, message, confirmText = "Confirmar", cancelText = "Cancelar", onConfirm, onCancel }) => {
   if (!isOpen) return null;
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200 print:hidden">
       <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-sm p-6 shadow-2xl border border-slate-200 dark:border-slate-700 transform scale-100 transition-all">
         <div className="mb-4 text-center">
-          <div className="w-12 h-12 bg-warning/20 text-warning rounded-full flex items-center justify-center mx-auto mb-4">
-             <i className="fa-solid fa-triangle-exclamation text-xl"></i>
+          <div className="w-12 h-12 bg-primary/10 text-primary rounded-full flex items-center justify-center mx-auto mb-4">
+             <i className="fa-solid fa-bell text-xl"></i>
           </div>
           <h3 className="text-lg font-bold text-text-main dark:text-white mb-2">{title}</h3>
           <p className="text-text-muted dark:text-slate-400 text-sm">{message}</p>
         </div>
         <div className="flex gap-3">
           <button onClick={onCancel} className="flex-1 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-text-muted font-bold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
-            Cancelar
+            {cancelText}
           </button>
           <button onClick={onConfirm} className="flex-1 py-2.5 rounded-xl bg-primary text-white font-bold hover:bg-primary-dark transition-colors shadow-lg shadow-primary/20">
-            Confirmar
+            {confirmText}
           </button>
         </div>
       </div>
@@ -138,6 +140,10 @@ const StepsTab: React.FC<{ workId: string, refreshWork: () => void }> = ({ workI
   const [newStepDate, setNewStepDate] = useState('');
   const [editingStep, setEditingStep] = useState<Step | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<{isOpen: boolean, stepId: string}>({isOpen: false, stepId: ''});
+  
+  // States for Smart Material Import Logic
+  const [pendingStartStep, setPendingStartStep] = useState<Step | null>(null);
+  const [foundPackage, setFoundPackage] = useState<string | null>(null);
 
   const loadSteps = async () => {
     const s = await dbService.getSteps(workId);
@@ -148,13 +154,58 @@ const StepsTab: React.FC<{ workId: string, refreshWork: () => void }> = ({ workI
 
   const toggleStatus = async (step: Step) => {
       let newStatus = StepStatus.IN_PROGRESS;
+      
+      // Determine next status
       if (step.status === StepStatus.NOT_STARTED) newStatus = StepStatus.IN_PROGRESS;
       else if (step.status === StepStatus.IN_PROGRESS) newStatus = StepStatus.COMPLETED;
       else newStatus = StepStatus.NOT_STARTED;
       
-      await dbService.updateStep({ ...step, status: newStatus });
+      // SMART IMPORT LOGIC:
+      // If user is starting the task (Not Started -> In Progress), check for material packages
+      if (step.status === StepStatus.NOT_STARTED && newStatus === StepStatus.IN_PROGRESS) {
+          const matchPkg = FULL_MATERIAL_PACKAGES.find(p => step.name.toLowerCase().includes(p.category.toLowerCase()));
+          
+          if (matchPkg) {
+              // Found a matching package! Ask user.
+              setPendingStartStep(step);
+              setFoundPackage(matchPkg.category);
+              return; // Stop here, wait for modal confirmation
+          }
+      }
+
+      // Default behavior (no match or other status change)
+      await updateStepStatus(step, newStatus);
+  };
+  
+  const updateStepStatus = async (step: Step, status: StepStatus) => {
+      await dbService.updateStep({ ...step, status });
       loadSteps();
       refreshWork();
+  }
+
+  const handleConfirmImport = async () => {
+      if (pendingStartStep && foundPackage) {
+          // 1. Import Materials
+          const count = await dbService.importMaterialPackage(workId, foundPackage);
+          
+          // 2. Update Status
+          await updateStepStatus(pendingStartStep, StepStatus.IN_PROGRESS);
+          
+          // 3. Cleanup
+          setPendingStartStep(null);
+          setFoundPackage(null);
+          
+          if (count > 0) alert(`${count} materiais sugeridos foram adicionados à lista de compras!`);
+      }
+  };
+
+  const handleCancelImport = async () => {
+      // Just update status, don't import
+      if (pendingStartStep) {
+          await updateStepStatus(pendingStartStep, StepStatus.IN_PROGRESS);
+          setPendingStartStep(null);
+          setFoundPackage(null);
+      }
   };
   
   const handleCreateStep = async (e: React.FormEvent) => {
@@ -346,12 +397,24 @@ const StepsTab: React.FC<{ workId: string, refreshWork: () => void }> = ({ workI
           </div>
       )}
 
+      {/* CONFIRM MODAL FOR DELETE STEP */}
       <ConfirmModal 
         isOpen={confirmDelete.isOpen}
         title="Excluir Etapa"
         message="Tem certeza? Isso não pode ser desfeito."
         onConfirm={handleDeleteStep}
         onCancel={() => setConfirmDelete({isOpen: false, stepId: ''})}
+      />
+
+      {/* CONFIRM MODAL FOR SMART MATERIAL IMPORT */}
+      <ConfirmModal 
+        isOpen={!!pendingStartStep}
+        title="Iniciar com Compras?"
+        message={`Você está iniciando a fase de ${foundPackage}. Deseja adicionar a lista de materiais padrão para essa fase automaticamente?`}
+        confirmText="Sim, adicionar"
+        cancelText="Não, só iniciar"
+        onConfirm={handleConfirmImport}
+        onCancel={handleCancelImport}
       />
     </div>
   );
