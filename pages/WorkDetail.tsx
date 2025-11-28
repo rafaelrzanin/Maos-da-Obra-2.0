@@ -704,6 +704,7 @@ const ExpensesTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ workI
       category: ExpenseCategory, 
       date: string,
       stepId?: string,
+      role?: string, // Added for UI control
   }>({ 
       description: '', 
       amount: '', 
@@ -711,6 +712,7 @@ const ExpensesTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ workI
       category: ExpenseCategory.MATERIAL, 
       date: new Date().toISOString().split('T')[0],
       stepId: undefined,
+      role: '' // Added
   });
   
   const [confirmModal, setConfirmModal] = useState<{isOpen: boolean, title: string, message: string, onConfirm: () => void}>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
@@ -736,6 +738,7 @@ const ExpensesTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ workI
           category: ExpenseCategory.MATERIAL, 
           date: new Date().toISOString().split('T')[0], 
           stepId: undefined,
+          role: '' // Reset role
       });
       setIsEditing(false);
       setEditingId(null);
@@ -743,17 +746,23 @@ const ExpensesTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ workI
   }
 
   const handleEditClick = (exp: Expense) => {
+      // Try to find if a role is part of the description to pre-fill the select
+      const foundRole = jobRoles.find(r => exp.description.toLowerCase().includes(r.toLowerCase())) || '';
+
       setFormData({
           description: exp.description,
           amount: exp.amount.toString(),
-          paidAmount: (exp.paidAmount || exp.amount).toString(),
+          paidAmount: (exp.paidAmount ?? exp.amount).toString(), 
           category: exp.category,
           date: exp.date,
           stepId: exp.stepId,
+          role: foundRole // Pre-fill found role
       });
       setIsEditing(true);
       setEditingId(exp.id);
       setShowForm(true);
+      // Scroll to form so user sees it
+      window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -802,6 +811,7 @@ const ExpensesTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ workI
       const role = e.target.value;
       setFormData(prev => ({
           ...prev,
+          role: role,
           description: role ? `Serviço de ${role}` : prev.description
       }));
   }
@@ -819,6 +829,79 @@ const ExpensesTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ workI
   });
 
   const getGroupTotal = (groupExps: Expense[]) => groupExps.reduce((acc, curr) => acc + (curr.paidAmount || curr.amount || 0), 0);
+
+  // Reusable Expense Card
+  const ExpenseCard: React.FC<{ exp: Expense }> = ({ exp }) => {
+      const paid = exp.paidAmount ?? 0;
+      const total = exp.amount;
+      
+      let status = 'PAGO';
+      if (paid === 0) status = 'PENDENTE';
+      else if (paid < total) status = 'PARCIAL';
+
+      return (
+        <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col gap-3 relative overflow-hidden group hover:shadow-md transition-all">
+            {/* Status Stripe */}
+            <div className={`absolute left-0 top-0 bottom-0 w-1 ${
+                status === 'PENDENTE' ? 'bg-danger' :
+                status === 'PARCIAL' ? 'bg-orange-500' :
+                'bg-success'
+            }`}></div>
+
+            <div className="flex justify-between items-start pl-3">
+                <div className="flex-1 cursor-pointer" onClick={() => handleEditClick(exp)}>
+                    <div className="flex items-center gap-2 mb-1">
+                        <span className="text-[10px] font-bold text-text-muted dark:text-slate-500 uppercase tracking-wider bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">{exp.category}</span>
+                        <span className="text-[10px] text-text-muted dark:text-slate-500">• {new Date(exp.date).toLocaleDateString('pt-BR')}</span>
+                    </div>
+                    <h4 className="font-bold text-text-main dark:text-white text-base leading-tight">{exp.description}</h4>
+                </div>
+                <div className="flex gap-1 ml-2">
+                    <button onClick={() => handleEditClick(exp)} className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-50 dark:bg-slate-800 text-slate-400 hover:text-primary transition-colors">
+                        <i className="fa-solid fa-pen text-xs"></i>
+                    </button>
+                    <button onClick={() => handleDeleteClick(exp.id)} className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-50 dark:bg-slate-800 text-slate-400 hover:text-danger transition-colors">
+                        <i className="fa-solid fa-trash text-xs"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div className="flex items-end justify-between pl-3 mt-1 border-t border-slate-50 dark:border-slate-800 pt-3">
+                <div>
+                    {status === 'PENDENTE' && (
+                        <span className="inline-flex items-center px-2 py-1 rounded bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 text-[10px] font-bold uppercase">
+                            <i className="fa-regular fa-clock mr-1"></i> Pendente
+                        </span>
+                    )}
+                    {status === 'PARCIAL' && (
+                        <span className="inline-flex items-center px-2 py-1 rounded bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 text-[10px] font-bold uppercase">
+                            <i className="fa-solid fa-chart-pie mr-1"></i> Parcial
+                        </span>
+                    )}
+                    {status === 'PAGO' && (
+                        <span className="inline-flex items-center px-2 py-1 rounded bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 text-[10px] font-bold uppercase">
+                            <i className="fa-solid fa-check mr-1"></i> Pago
+                        </span>
+                    )}
+                </div>
+                <div className="text-right">
+                    <div className="flex flex-col items-end">
+                        <span className="text-[10px] text-text-muted dark:text-slate-500 font-medium">Valor Total</span>
+                        <span className="text-sm font-bold text-text-main dark:text-white">R$ {total.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                    </div>
+                    {status !== 'PAGO' && (
+                        <div className="flex flex-col items-end mt-1">
+                            <span className="text-[10px] text-text-muted">Pago até agora</span>
+                            <span className={`text-xs font-bold ${status === 'PENDENTE' ? 'text-danger' : 'text-orange-500'}`}>
+                                R$ {paid.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                            </span>
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+      );
+  }
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
@@ -858,7 +941,7 @@ const ExpensesTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ workI
                             <select 
                                 className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-text-main dark:text-white rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary"
                                 onChange={handleRoleSelect}
-                                defaultValue=""
+                                value={formData.role || ''}
                             >
                                 <option value="" disabled>Selecione a profissão...</option>
                                 {jobRoles.map(role => <option key={role} value={role}>{role}</option>)}
@@ -941,36 +1024,8 @@ const ExpensesTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ workI
                           Pago: R$ {getGroupTotal(groupedExpenses['GERAL']).toLocaleString('pt-BR', {minimumFractionDigits: 2})}
                       </span>
                 </div>
-                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 overflow-hidden shadow-sm">
-                        <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                            {groupedExpenses['GERAL'].map(exp => {
-                                const isPartial = (exp.paidAmount || 0) < exp.amount;
-                                return (
-                                <div key={exp.id} className="p-4 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                                    <div className="cursor-pointer flex-1" onClick={() => handleEditClick(exp)}>
-                                        <p className="font-bold text-text-main dark:text-white">{exp.description}</p>
-                                        <div className="flex items-center gap-2 text-xs text-text-muted dark:text-slate-500">
-                                            <span>{new Date(exp.date).toLocaleDateString('pt-BR')}</span>
-                                            <span>•</span>
-                                            <span>{exp.category}</span>
-                                            {isPartial && <span className="text-orange-500 font-bold bg-orange-100 dark:bg-orange-900 px-1.5 rounded">Parcial</span>}
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-4">
-                                        <div className="text-right">
-                                            <span className="font-bold text-text-body dark:text-slate-300 block">R$ {(exp.paidAmount || exp.amount).toFixed(2)}</span>
-                                            {isPartial && <span className="text-[10px] text-text-muted line-through block">Total: R$ {exp.amount.toFixed(2)}</span>}
-                                        </div>
-                                        <button onClick={() => handleDeleteClick(exp.id)} className="text-slate-300 hover:text-danger p-2">
-                                            <i className="fa-solid fa-trash"></i>
-                                        </button>
-                                        <button onClick={() => handleEditClick(exp)} className="text-slate-300 hover:text-primary p-2">
-                                            <i className="fa-solid fa-pen"></i>
-                                        </button>
-                                    </div>
-                                </div>
-                            )})}
-                        </div>
+                <div className="space-y-3">
+                    {groupedExpenses['GERAL'].map(exp => <ExpenseCard key={exp.id} exp={exp} />)}
                 </div>
              </div>
           )}
@@ -991,36 +1046,8 @@ const ExpensesTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ workI
                             Pago: R$ {groupTotal.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
                         </span>
                     </div>
-                    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 overflow-hidden shadow-sm">
-                        <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                             {groupExps.map(exp => {
-                                const isPartial = (exp.paidAmount || 0) < exp.amount;
-                                return (
-                                <div key={exp.id} className="p-4 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                                    <div className="cursor-pointer flex-1" onClick={() => handleEditClick(exp)}>
-                                        <p className="font-bold text-text-main dark:text-white">{exp.description}</p>
-                                        <div className="flex items-center gap-2 text-xs text-text-muted dark:text-slate-500">
-                                            <span>{new Date(exp.date).toLocaleDateString('pt-BR')}</span>
-                                            <span>•</span>
-                                            <span>{exp.category}</span>
-                                            {isPartial && <span className="text-orange-500 font-bold bg-orange-100 dark:bg-orange-900 px-1.5 rounded">Parcial</span>}
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-4">
-                                        <div className="text-right">
-                                            <span className="font-bold text-text-body dark:text-slate-300 block">R$ {(exp.paidAmount || exp.amount).toFixed(2)}</span>
-                                            {isPartial && <span className="text-[10px] text-text-muted line-through block">Total: R$ {exp.amount.toFixed(2)}</span>}
-                                        </div>
-                                        <button onClick={() => handleDeleteClick(exp.id)} className="text-slate-300 hover:text-danger p-2">
-                                            <i className="fa-solid fa-trash"></i>
-                                        </button>
-                                        <button onClick={() => handleEditClick(exp)} className="text-slate-300 hover:text-primary p-2">
-                                            <i className="fa-solid fa-pen"></i>
-                                        </button>
-                                    </div>
-                                </div>
-                            )})}
-                        </div>
+                    <div className="space-y-3">
+                         {groupExps.map(exp => <ExpenseCard key={exp.id} exp={exp} />)}
                     </div>
                 </div>
               );
