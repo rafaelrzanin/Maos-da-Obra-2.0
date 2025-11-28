@@ -2,6 +2,8 @@
 
 // Standard Libraries for Construction Management
 
+export const ZE_AVATAR = "/ze.png"; // Certifique-se de salvar a imagem na pasta public como ze.png
+
 export interface PhaseCategory {
   category: string;
   steps: string[];

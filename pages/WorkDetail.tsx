@@ -5,7 +5,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { dbService } from '../services/db';
 import { Work, Step, Expense, Material, StepStatus, ExpenseCategory, PlanType, Supplier, Worker } from '../types';
 import { Recharts } from '../components/RechartsWrapper';
-import { CALCULATORS, CONTRACT_TEMPLATES, STANDARD_CHECKLISTS, FULL_MATERIAL_PACKAGES } from '../services/standards';
+import { CALCULATORS, CONTRACT_TEMPLATES, STANDARD_CHECKLISTS, FULL_MATERIAL_PACKAGES, ZE_AVATAR } from '../services/standards';
 import { useAuth } from '../App';
 
 // --- Shared Components ---
@@ -226,6 +226,20 @@ const StepsTab: React.FC<{ workId: string, refreshWork: () => void }> = ({ workI
   const handleUpdateStep = async (e: React.FormEvent) => {
       e.preventDefault();
       if (editingStep) {
+          // INTERCEPTION LOGIC FOR EDIT FORM
+          const originalStep = steps.find(s => s.id === editingStep.id);
+          const isStarting = originalStep && originalStep.status === StepStatus.NOT_STARTED && editingStep.status === StepStatus.IN_PROGRESS;
+
+          if (isStarting) {
+              const matchPkg = FULL_MATERIAL_PACKAGES.find(p => editingStep.name.toLowerCase().includes(p.category.toLowerCase()));
+              if (matchPkg) {
+                  setPendingStartStep(editingStep); // Pass the edited object
+                  setFoundPackage(matchPkg.category);
+                  setEditingStep(null); // Close the edit modal
+                  return;
+              }
+          }
+          
           await dbService.updateStep(editingStep);
           setEditingStep(null);
           loadSteps();
@@ -406,16 +420,49 @@ const StepsTab: React.FC<{ workId: string, refreshWork: () => void }> = ({ workI
         onCancel={() => setConfirmDelete({isOpen: false, stepId: ''})}
       />
 
-      {/* CONFIRM MODAL FOR SMART MATERIAL IMPORT */}
-      <ConfirmModal 
-        isOpen={!!pendingStartStep}
-        title="Iniciar com Compras?"
-        message={`Você está iniciando a fase de ${foundPackage}. Deseja adicionar a lista de materiais padrão para essa fase automaticamente?`}
-        confirmText="Sim, adicionar"
-        cancelText="Não, só iniciar"
-        onConfirm={handleConfirmImport}
-        onCancel={handleCancelImport}
-      />
+      {/* ASSISTANT MODAL FOR SMART IMPORT (NEW UX) */}
+      {pendingStartStep && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-sm p-6 shadow-2xl border-2 border-primary/20 transform scale-100 transition-all">
+                <div className="flex gap-4">
+                    <div className="w-16 h-16 rounded-full bg-white border-2 border-primary p-0.5 shrink-0 shadow-lg overflow-hidden relative">
+                         <img 
+                            src={ZE_AVATAR} 
+                            alt="Zé da Obra" 
+                            className="w-full h-full object-cover rounded-full"
+                            onError={(e) => {
+                                e.currentTarget.src = 'https://ui-avatars.com/api/?name=Ze+Obra&background=1E3A45&color=fff';
+                            }}
+                         />
+                    </div>
+                    <div>
+                        <h3 className="text-lg font-bold text-text-main dark:text-white leading-tight mb-1">Oi, chefe!</h3>
+                        <p className="text-sm text-text-muted dark:text-slate-400">Vi que você vai começar a <strong>{foundPackage}</strong>.</p>
+                    </div>
+                </div>
+                
+                <div className="mt-4 mb-6 bg-slate-50 dark:bg-slate-800 p-4 rounded-xl text-sm text-text-body dark:text-slate-300 leading-relaxed">
+                    <p>Quer que eu adicione a lista de materiais padrão dessa fase na sua lista de compras?</p>
+                    <p className="mt-2 text-xs font-bold text-primary">Isso economiza uns 10 minutos de digitação! 😉</p>
+                </div>
+
+                <div className="flex flex-col gap-3">
+                    <button 
+                        onClick={handleConfirmImport} 
+                        className="w-full py-3.5 rounded-xl bg-primary text-white font-bold hover:bg-primary-dark transition-colors shadow-lg shadow-primary/20 flex items-center justify-center gap-2"
+                    >
+                        <i className="fa-solid fa-wand-magic-sparkles"></i> Sim, gerar lista agora
+                    </button>
+                    <button 
+                        onClick={handleCancelImport} 
+                        className="w-full py-3 rounded-xl border border-slate-200 dark:border-slate-700 text-text-muted font-bold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                    >
+                        Não, obrigado
+                    </button>
+                </div>
+            </div>
+        </div>
+      )}
     </div>
   );
 };
