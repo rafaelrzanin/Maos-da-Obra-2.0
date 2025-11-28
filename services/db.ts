@@ -58,6 +58,49 @@ const saveLocalDb = (db: DbSchema) => {
   localStorage.setItem(DB_KEY, JSON.stringify(db));
 };
 
+// --- HELPER: MATERIAL ESTIMATION LOGIC ---
+// Calculates approximate materials based on Area (m2) and Floors
+const calculateEstimatedMaterials = (area: number, floors: number = 1): Partial<Material>[] => {
+  if (!area || area <= 0) return [];
+  
+  const estimated: Partial<Material>[] = [];
+  const effectiveArea = area; // Total construction area
+  const roofArea = (area / floors) * 1.3; // Footprint * 30% pitch
+  const wallArea = area * 2.8; // Rough estimate of wall surface
+
+  // 1. FUNDAÇÃO (Estimate based on footprint)
+  const footprint = area / floors;
+  estimated.push({ category: 'Fundação', name: 'Cimento (Fundação)', unit: 'sacos', plannedQty: Math.ceil(footprint * 0.5) });
+  estimated.push({ category: 'Fundação', name: 'Areia (Fundação)', unit: 'm³', plannedQty: Math.ceil(footprint * 0.04) });
+  estimated.push({ category: 'Fundação', name: 'Brita (Fundação)', unit: 'm³', plannedQty: Math.ceil(footprint * 0.04) });
+  estimated.push({ category: 'Fundação', name: 'Vergalhão 3/8 (10mm)', unit: 'barras', plannedQty: Math.ceil(footprint * 0.4) });
+
+  // 2. ALVENARIA (Walls)
+  estimated.push({ category: 'Alvenaria', name: 'Tijolo/Bloco (8 furos)', unit: 'milheiro', plannedQty: Math.ceil((wallArea * 25) / 1000) });
+  estimated.push({ category: 'Alvenaria', name: 'Cimento (Assentamento)', unit: 'sacos', plannedQty: Math.ceil(wallArea * 0.15) });
+  estimated.push({ category: 'Alvenaria', name: 'Areia (Assentamento)', unit: 'm³', plannedQty: Math.ceil(wallArea * 0.02) });
+  estimated.push({ category: 'Alvenaria', name: 'Cal Hidratada', unit: 'sacos', plannedQty: Math.ceil(wallArea * 0.1) });
+
+  // 3. TELHADO
+  estimated.push({ category: 'Telhado', name: 'Telhas (Cerâmica/Concreto)', unit: 'un', plannedQty: Math.ceil(roofArea * 16) });
+  estimated.push({ category: 'Telhado', name: 'Madeiramento (Vigas/Caibros)', unit: 'm', plannedQty: Math.ceil(roofArea * 3) });
+
+  // 4. ACABAMENTO (Floors & Paint)
+  estimated.push({ category: 'Acabamento', name: 'Piso / Porcelanato', unit: 'm²', plannedQty: Math.ceil(area * 1.15) }); // +15% loss
+  estimated.push({ category: 'Acabamento', name: 'Argamassa', unit: 'sacos', plannedQty: Math.ceil(area * 0.25) });
+  
+  // 5. PINTURA
+  estimated.push({ category: 'Pintura', name: 'Tinta Acrílica (18L)', unit: 'latas', plannedQty: Math.ceil((wallArea * 2) / 200) }); // 2 coats, 200m2 yield approx per can
+  estimated.push({ category: 'Pintura', name: 'Massa Corrida', unit: 'latas', plannedQty: Math.ceil(wallArea / 40) });
+
+  // 6. ELÉTRICA/HIDRÁULICA (Rough Kits)
+  estimated.push({ category: 'Elétrica', name: 'Kit Tomadas/Interruptores', unit: 'un', plannedQty: Math.ceil(area / 10) }); // ~1 point per 10m2
+  estimated.push({ category: 'Elétrica', name: 'Cabo Flexível 2.5mm', unit: 'rolos', plannedQty: Math.ceil(area / 40) });
+  
+  return estimated;
+};
+
+
 // --- SERVICE LAYER (ASYNC INTERFACE) ---
 
 export const dbService = {
@@ -185,7 +228,8 @@ export const dbService = {
             userId: w.user_id,
             budgetPlanned: w.budget_planned,
             startDate: w.start_date,
-            endDate: w.end_date
+            endDate: w.end_date,
+            floors: w.floors || 1
         }));
     } else {
         const db = getLocalDb();
@@ -202,7 +246,8 @@ export const dbService = {
             userId: data.user_id,
             budgetPlanned: data.budget_planned,
             startDate: data.start_date,
-            endDate: data.end_date
+            endDate: data.end_date,
+            floors: data.floors || 1
         };
     } else {
         const db = getLocalDb();
@@ -211,6 +256,9 @@ export const dbService = {
   },
 
   createWork: async (work: Omit<Work, 'id' | 'status'>, useStandardTemplate: boolean = false): Promise<Work> => {
+    // 1. CREATE WORK
+    let newWorkId = '';
+    
     if (supabase) {
         const { data: newWork, error } = await supabase.from('works').insert({
             user_id: work.userId,
@@ -220,87 +268,76 @@ export const dbService = {
             start_date: work.startDate,
             end_date: work.endDate,
             area: work.area,
+            floors: work.floors || 1, // Save floors
             notes: work.notes,
             status: WorkStatus.PLANNING
         }).select().single();
 
         if (error || !newWork) throw new Error("Failed to create work");
-
-        const mappedWork = {
-            ...newWork,
-            userId: newWork.user_id,
-            budgetPlanned: newWork.budget_planned,
-            startDate: newWork.start_date,
-            endDate: newWork.end_date
-        };
-
-        let stepsPayload: any[] = [];
-
-        if (useStandardTemplate) {
-            let currentDateOffset = 0;
-            STANDARD_PHASES.forEach((phase) => {
-                phase.steps.forEach((stepName) => {
-                    const start = new Date(work.startDate);
-                    start.setDate(start.getDate() + currentDateOffset);
-                    const end = new Date(start);
-                    end.setDate(end.getDate() + 3);
-
-                    stepsPayload.push({
-                        work_id: newWork.id,
-                        name: `${phase.category} - ${stepName}`,
-                        start_date: start.toISOString().split('T')[0],
-                        end_date: end.toISOString().split('T')[0],
-                        status: StepStatus.NOT_STARTED
-                    });
-                    currentDateOffset += 2;
-                });
-            });
-        } else {
-            const standardSteps = ['Aprovação', 'Fundação', 'Alvenaria', 'Telhado', 'Hidráulica', 'Elétrica', 'Acabamento', 'Pintura'];
-            stepsPayload = standardSteps.map((name, idx) => {
-                const start = new Date(work.startDate);
-                start.setDate(start.getDate() + (idx * 7));
-                const end = new Date(start);
-                end.setDate(end.getDate() + 7);
-                return {
-                    work_id: newWork.id,
-                    name,
-                    start_date: start.toISOString().split('T')[0],
-                    end_date: end.toISOString().split('T')[0],
-                    status: StepStatus.NOT_STARTED
-                };
-            });
-        }
-
-        if (stepsPayload.length > 0) {
-            await supabase.from('steps').insert(stepsPayload);
-        }
-
-        return mappedWork;
+        newWorkId = newWork.id;
 
     } else {
         const db = getLocalDb();
-        const newWork: Work = {
+        const created: Work = {
             ...work,
             id: Math.random().toString(36).substr(2, 9),
             status: WorkStatus.PLANNING,
+            floors: work.floors || 1
         };
-        db.works.push(newWork);
-
-        const standardSteps = ['Fundação', 'Alvenaria', 'Telhado', 'Acabamento'];
-        const steps = standardSteps.map((name) => ({
-             id: Math.random().toString(36).substr(2, 9),
-             workId: newWork.id,
-             name,
-             startDate: work.startDate,
-             endDate: work.endDate,
-             status: StepStatus.NOT_STARTED,
-             isDelayed: false
-        }));
-        db.steps.push(...steps);
-
+        db.works.push(created);
         saveLocalDb(db);
-        return Promise.resolve(newWork);
+        newWorkId = created.id;
+    }
+
+    // 2. CREATE STEPS (Logic mostly handled in frontend now via individual calls, but support template logic here if needed)
+    // The previous implementation relied on the frontend calling addStep sequentially or this calling standard templates.
+    // For "Construction" with material calculation, we insert materials here.
+
+    if (work.notes === 'Casa inteira do zero' || useStandardTemplate) { // Heuristic: Construction
+        const estimatedMaterials = calculateEstimatedMaterials(work.area, work.floors || 1);
+        
+        if (estimatedMaterials.length > 0) {
+            if (supabase) {
+                const materialsPayload = estimatedMaterials.map(mat => ({
+                    work_id: newWorkId,
+                    name: mat.name,
+                    planned_qty: mat.plannedQty,
+                    purchased_qty: 0,
+                    unit: mat.unit,
+                    category: mat.category
+                }));
+                await supabase.from('materials').insert(materialsPayload);
+            } else {
+                const db = getLocalDb();
+                const materialsPayload = estimatedMaterials.map(mat => ({
+                    id: Math.random().toString(36).substr(2, 9),
+                    workId: newWorkId,
+                    name: mat.name!,
+                    plannedQty: mat.plannedQty!,
+                    purchasedQty: 0,
+                    unit: mat.unit!,
+                    category: mat.category
+                }));
+                db.materials.push(...materialsPayload);
+                saveLocalDb(db);
+            }
+        }
+    }
+
+    // Return the work object to the frontend
+    if (supabase) {
+        const { data } = await supabase.from('works').select('*').eq('id', newWorkId).single();
+         return {
+            ...data,
+            userId: data.user_id,
+            budgetPlanned: data.budget_planned,
+            startDate: data.start_date,
+            endDate: data.end_date,
+            floors: data.floors
+        };
+    } else {
+        const db = getLocalDb();
+        return db.works.find(w => w.id === newWorkId)!;
     }
   },
 
@@ -374,6 +411,16 @@ export const dbService = {
       } else {
           const db = getLocalDb();
           db.steps.push({ ...step, id: Math.random().toString(36).substr(2, 9), isDelayed: false });
+          saveLocalDb(db);
+      }
+  },
+
+  deleteStep: async (stepId: string) => {
+      if (supabase) {
+          await supabase.from('steps').delete().eq('id', stepId);
+      } else {
+          const db = getLocalDb();
+          db.steps = db.steps.filter(s => s.id !== stepId);
           saveLocalDb(db);
       }
   },

@@ -37,6 +37,7 @@ export interface Work {
   startDate: string;
   endDate: string;
   area: number; // m2
+  floors?: number; // Quantity of floors (pavimentos)
   notes: string;
   status: WorkStatus;
 }

@@ -20,6 +20,7 @@ const CreateWork: React.FC = () => {
     address: '',
     budgetPlanned: '',
     area: '',
+    floors: '1', // New field
     startDate: new Date().toISOString().split('T')[0],
   });
 
@@ -58,6 +59,7 @@ const CreateWork: React.FC = () => {
        if (!workCategory) { alert("Escolha entre Construção ou Reforma."); return false; }
        if (!selectedTemplateId) { alert("Selecione o tipo específico da obra."); return false; }
        if (!formData.startDate) { alert("Qual a data de início?"); return false; }
+       if (workCategory === 'CONSTRUCTION' && (!formData.floors || Number(formData.floors) < 1)) { alert("Informe a quantidade de pavimentos."); return false; }
     }
     return true;
   };
@@ -106,8 +108,9 @@ const CreateWork: React.FC = () => {
           startDate: formData.startDate,
           endDate: end.toISOString().split('T')[0],
           area: Number(formData.area) || 0,
+          floors: Number(formData.floors) || 1,
           notes: selectedTemplate?.label || ''
-        }, false); 
+        }, workCategory === 'CONSTRUCTION'); // Pass flag to trigger calculations
 
         // Add Selected Steps Manually (since we allowed custom unchecking)
         const finalSteps = suggestedSteps.filter(s => s.checked).map(s => s.name);
@@ -168,7 +171,7 @@ const CreateWork: React.FC = () => {
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-xs font-bold text-text-muted uppercase mb-1 min-h-[2rem] flex items-end">Tamanho (m²)</label>
+                                    <label className="block text-xs font-bold text-text-muted uppercase mb-1 min-h-[2rem] flex items-end">Tamanho Total (m²)</label>
                                     <input 
                                     name="area" 
                                     type="number" 
@@ -290,11 +293,26 @@ const CreateWork: React.FC = () => {
                         
                         {/* If Construction, we just show the summary card of what was auto-selected */}
                         {workCategory === 'CONSTRUCTION' && (
-                             <div className="mb-6 p-4 bg-surface dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 flex items-center gap-4">
-                                 <i className="fa-solid fa-house-chimney text-3xl text-primary"></i>
-                                 <div>
-                                     <h3 className="font-bold text-text-main dark:text-white">Construção Completa</h3>
-                                     <p className="text-sm text-text-muted dark:text-slate-400">Inclui fundação, alvenaria, elétrica, hidráulica e acabamentos.</p>
+                             <div className="mb-6 p-4 bg-surface dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
+                                 <div className="flex items-center gap-4 mb-4">
+                                     <i className="fa-solid fa-house-chimney text-3xl text-primary"></i>
+                                     <div>
+                                         <h3 className="font-bold text-text-main dark:text-white">Construção Completa</h3>
+                                         <p className="text-sm text-text-muted dark:text-slate-400">Calcularemos os materiais baseados na sua área.</p>
+                                     </div>
+                                 </div>
+                                 <div className="border-t border-slate-200 dark:border-slate-700 pt-4">
+                                     <label className="block text-xs font-bold text-text-muted uppercase mb-1">Quantos pavimentos (andares)?</label>
+                                     <div className="flex items-center gap-3">
+                                         <button type="button" onClick={() => setFormData({...formData, floors: String(Math.max(1, Number(formData.floors) - 1))})} className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-700 text-text-main dark:text-white font-bold">-</button>
+                                         <input 
+                                            type="number"
+                                            value={formData.floors}
+                                            onChange={(e) => setFormData({...formData, floors: e.target.value})}
+                                            className="w-full text-center px-4 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-xl font-bold"
+                                         />
+                                         <button type="button" onClick={() => setFormData({...formData, floors: String(Number(formData.floors) + 1)})} className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-700 text-text-main dark:text-white font-bold">+</button>
+                                     </div>
                                  </div>
                              </div>
                         )}
@@ -337,8 +355,17 @@ const CreateWork: React.FC = () => {
                            ))}
                         </div>
                         
+                        {workCategory === 'CONSTRUCTION' && (
+                            <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl mb-4 border border-blue-100 dark:border-blue-900">
+                                <p className="text-sm text-blue-800 dark:text-blue-200">
+                                    <i className="fa-solid fa-robot mr-2"></i>
+                                    <strong>Engenheiro Virtual:</strong> Vou calcular automaticamente os materiais (tijolos, cimento, telhas) baseado nos seus <strong>{formData.area}m²</strong> e <strong>{formData.floors} andares</strong>.
+                                </p>
+                            </div>
+                        )}
+                        
                         <div className="text-center text-xs text-text-muted">
-                            <p>Fique tranquilo, você pode mudar isso depois.</p>
+                            <p>Fique tranquilo, você pode mudar tudo depois.</p>
                         </div>
                     </div>
                 </div>
@@ -400,7 +427,7 @@ const CreateWork: React.FC = () => {
                 >
                     {loading ? (
                         <>
-                           <i className="fa-solid fa-circle-notch fa-spin"></i> Criando...
+                           <i className="fa-solid fa-circle-notch fa-spin"></i> Calculando...
                         </>
                     ) : (
                         <>

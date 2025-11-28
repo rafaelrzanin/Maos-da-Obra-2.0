@@ -2,8 +2,12 @@
 <html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <meta name="theme-color" content="#1E3A45" />
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>MÃOS DA OBRA</title>
+    <link rel="manifest" href="/manifest.json">
     <!-- Tailwind via CDN is useful for quick previews, but PostCSS/Vite will handle the build version via CSS generation -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -107,5 +111,14 @@
   <body class="bg-surface dark:bg-slate-950 transition-colors duration-200">
     <div id="root"></div>
     <script type="module" src="./index.tsx"></script>
+    <script>
+      // Simple service worker registration for PWA functionality
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+           // We are not creating a complex sw.js file here to avoid conflicts, 
+           // but the manifest link above is enough for "Add to Homescreen" to work visually.
+        });
+      }
+    </script>
   </body>
 </html>

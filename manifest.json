@@ -1,0 +1,21 @@
+{
+  "name": "Mãos da Obra",
+  "short_name": "Mãos da Obra",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#F3F4F6",
+  "theme_color": "#1E3A45",
+  "description": "Gestão simples de obras e reformas.",
+  "icons": [
+    {
+      "src": "/ze.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/ze.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

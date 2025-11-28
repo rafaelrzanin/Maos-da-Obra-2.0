@@ -17,35 +17,60 @@ const SectionHeader: React.FC<{ title: string, subtitle: string }> = ({ title, s
     </div>
 );
 
-interface ConfirmModalProps {
+// --- ZÉ DA OBRA MODAL (SUBSTITUI O CONFIRM MODAL) ---
+interface ZeModalProps {
   isOpen: boolean;
   title: string;
   message: string;
   confirmText?: string;
   cancelText?: string;
+  type?: 'DANGER' | 'INFO' | 'SUCCESS';
   onConfirm: () => void;
   onCancel: () => void;
 }
 
-const ConfirmModal: React.FC<ConfirmModalProps> = ({ isOpen, title, message, confirmText = "Confirmar", cancelText = "Cancelar", onConfirm, onCancel }) => {
+const ZeModal: React.FC<ZeModalProps> = ({ isOpen, title, message, confirmText = "Sim, confirmar", cancelText = "Melhor não", type = 'DANGER', onConfirm, onCancel }) => {
   if (!isOpen) return null;
+  
+  const isDanger = type === 'DANGER';
+
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200 print:hidden">
-      <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-sm p-6 shadow-2xl border border-slate-200 dark:border-slate-700 transform scale-100 transition-all">
-        <div className="mb-4 text-center">
-          <div className="w-12 h-12 bg-primary/10 text-primary rounded-full flex items-center justify-center mx-auto mb-4">
-             <i className="fa-solid fa-bell text-xl"></i>
-          </div>
-          <h3 className="text-lg font-bold text-text-main dark:text-white mb-2">{title}</h3>
-          <p className="text-text-muted dark:text-slate-400 text-sm">{message}</p>
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300 print:hidden">
+      <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-sm p-6 shadow-2xl border-2 border-primary/20 transform scale-100 transition-all">
+        <div className="flex gap-4">
+            <div className="w-16 h-16 rounded-full bg-white border-2 border-primary p-0.5 shrink-0 shadow-lg overflow-hidden relative">
+                    <img 
+                    src={ZE_AVATAR} 
+                    alt="Zé da Obra" 
+                    className="w-full h-full object-cover rounded-full"
+                    onError={(e) => {
+                        e.currentTarget.src = 'https://ui-avatars.com/api/?name=Ze+Obra&background=1E3A45&color=fff';
+                    }}
+                    />
+            </div>
+            <div>
+                <h3 className="text-lg font-bold text-text-main dark:text-white leading-tight mb-1">Ei, Chefe!</h3>
+                <p className="text-sm font-medium text-text-main dark:text-white">{title}</p>
+            </div>
         </div>
-        <div className="flex gap-3">
-          <button onClick={onCancel} className="flex-1 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-text-muted font-bold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
-            {cancelText}
-          </button>
-          <button onClick={onConfirm} className="flex-1 py-2.5 rounded-xl bg-primary text-white font-bold hover:bg-primary-dark transition-colors shadow-lg shadow-primary/20">
-            {confirmText}
-          </button>
+        
+        <div className={`mt-4 mb-6 p-4 rounded-xl text-sm leading-relaxed ${isDanger ? 'bg-red-50 dark:bg-red-900/10 text-red-800 dark:text-red-200' : 'bg-slate-50 dark:bg-slate-800 text-text-body dark:text-slate-300'}`}>
+            <p>{message}</p>
+        </div>
+
+        <div className="flex flex-col gap-3">
+            <button 
+                onClick={onConfirm} 
+                className={`w-full py-3.5 rounded-xl text-white font-bold transition-colors shadow-lg flex items-center justify-center gap-2 ${isDanger ? 'bg-danger hover:bg-red-600 shadow-danger/20' : 'bg-primary hover:bg-primary-dark shadow-primary/20'}`}
+            >
+                {confirmText}
+            </button>
+            <button 
+                onClick={onCancel} 
+                className="w-full py-3 rounded-xl border border-slate-200 dark:border-slate-700 text-text-muted font-bold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+            >
+                {cancelText}
+            </button>
         </div>
       </div>
     </div>
@@ -139,7 +164,9 @@ const StepsTab: React.FC<{ workId: string, refreshWork: () => void }> = ({ workI
   const [newStepName, setNewStepName] = useState('');
   const [newStepDate, setNewStepDate] = useState('');
   const [editingStep, setEditingStep] = useState<Step | null>(null);
-  const [confirmDelete, setConfirmDelete] = useState<{isOpen: boolean, stepId: string}>({isOpen: false, stepId: ''});
+  
+  // Zé Modal State
+  const [zeModal, setZeModal] = useState<{isOpen: boolean, title: string, message: string, onConfirm: () => void}>({isOpen: false, title: '', message: '', onConfirm: () => {}});
   
   // States for Smart Material Import Logic
   const [pendingStartStep, setPendingStartStep] = useState<Step | null>(null);
@@ -247,11 +274,19 @@ const StepsTab: React.FC<{ workId: string, refreshWork: () => void }> = ({ workI
       }
   };
 
-  const handleDeleteStep = async () => {
-      setConfirmDelete({isOpen: false, stepId: ''});
-      setEditingStep(null);
-      loadSteps();
-      refreshWork();
+  const handleDeleteClick = (stepId: string) => {
+      setZeModal({
+          isOpen: true,
+          title: "Vou apagar essa etapa",
+          message: "Se você excluir, o histórico dela some para sempre. Se só quiser cancelar, talvez seja melhor mudar o nome ou data. Quer apagar mesmo?",
+          onConfirm: async () => {
+              await dbService.deleteStep(stepId);
+              setEditingStep(null);
+              setZeModal(prev => ({...prev, isOpen: false}));
+              loadSteps();
+              refreshWork();
+          }
+      });
   };
 
   return (
@@ -367,7 +402,7 @@ const StepsTab: React.FC<{ workId: string, refreshWork: () => void }> = ({ workI
               <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-sm p-6 shadow-2xl">
                   <div className="flex justify-between items-start mb-4">
                       <h3 className="text-lg font-bold text-text-main dark:text-white">Editar Etapa</h3>
-                      <button onClick={() => setConfirmDelete({isOpen: true, stepId: editingStep.id})} className="text-danger text-sm font-bold hover:underline">
+                      <button onClick={() => handleDeleteClick(editingStep.id)} className="text-danger text-sm font-bold hover:underline">
                           Excluir
                       </button>
                   </div>
@@ -411,13 +446,13 @@ const StepsTab: React.FC<{ workId: string, refreshWork: () => void }> = ({ workI
           </div>
       )}
 
-      {/* CONFIRM MODAL FOR DELETE STEP */}
-      <ConfirmModal 
-        isOpen={confirmDelete.isOpen}
-        title="Excluir Etapa"
-        message="Tem certeza? Isso não pode ser desfeito."
-        onConfirm={handleDeleteStep}
-        onCancel={() => setConfirmDelete({isOpen: false, stepId: ''})}
+      {/* ZE MODAL REPLACE */}
+      <ZeModal 
+        isOpen={zeModal.isOpen}
+        title={zeModal.title}
+        message={zeModal.message}
+        onConfirm={zeModal.onConfirm}
+        onCancel={() => setZeModal({isOpen: false, title: '', message: '', onConfirm: () => {}})}
       />
 
       {/* ASSISTANT MODAL FOR SMART IMPORT (NEW UX) */}
@@ -476,7 +511,7 @@ const MaterialsTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ work
   // Create / Edit
   const [editingMaterial, setEditingMaterial] = useState<Material | null>(null);
   const [newMat, setNewMat] = useState({ name: '', qty: '', unit: 'un', category: 'Geral' });
-  const [confirmModal, setConfirmModal] = useState<{isOpen: boolean, title: string, message: string, onConfirm: () => void}>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
+  const [zeModal, setZeModal] = useState<{isOpen: boolean, title: string, message: string, onConfirm: () => void}>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
   
   // NEW: Cost input for editing
   const [costInput, setCostInput] = useState('');
@@ -517,16 +552,16 @@ const MaterialsTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ work
   };
 
   const handleDeleteClick = (id: string) => {
-    setConfirmModal({
+    setZeModal({
         isOpen: true,
-        title: "Remover Item",
-        message: "Quer mesmo tirar este material da lista?",
+        title: "Tirar da lista?",
+        message: "Opa, vai remover esse material? Se já comprou, isso pode bagunçar seu controle. Posso apagar?",
         onConfirm: async () => {
             await dbService.deleteMaterial(id);
             setEditingMaterial(null);
             loadMaterials();
             onUpdate();
-            setConfirmModal(prev => ({ ...prev, isOpen: false }));
+            setZeModal(prev => ({ ...prev, isOpen: false }));
         }
     });
   }
@@ -783,12 +818,13 @@ const MaterialsTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ work
           </div>
       )}
 
-      <ConfirmModal 
-         isOpen={confirmModal.isOpen}
-         title={confirmModal.title}
-         message={confirmModal.message}
-         onConfirm={confirmModal.onConfirm}
-         onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+      {/* ZÉ MODAL */}
+      <ZeModal 
+         isOpen={zeModal.isOpen}
+         title={zeModal.title}
+         message={zeModal.message}
+         onConfirm={zeModal.onConfirm}
+         onCancel={() => setZeModal(prev => ({ ...prev, isOpen: false }))}
       />
     </div>
   );
@@ -825,7 +861,8 @@ const ExpensesTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ workI
       role: '' // Added
   });
   
-  const [confirmModal, setConfirmModal] = useState<{isOpen: boolean, title: string, message: string, onConfirm: () => void}>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
+  // Zé Modal
+  const [zeModal, setZeModal] = useState<{isOpen: boolean, title: string, message: string, onConfirm: () => void}>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
 
   const loadData = async () => {
       const [expData, stepsData, rolesData] = await Promise.all([
@@ -903,15 +940,15 @@ const ExpensesTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ workI
   };
 
   const handleDeleteClick = (id: string) => {
-      setConfirmModal({
+      setZeModal({
           isOpen: true,
-          title: "Excluir Despesa",
-          message: "Apagar este registro?",
+          title: "Apagar Gasto",
+          message: "Cuidado, chefe! Apagar gastos pode fazer a conta não fechar no final. Tem certeza?",
           onConfirm: async () => {
               await dbService.deleteExpense(id);
               loadData();
               onUpdate();
-              setConfirmModal(prev => ({ ...prev, isOpen: false }));
+              setZeModal(prev => ({ ...prev, isOpen: false }));
           }
       });
   };
@@ -1171,12 +1208,12 @@ const ExpensesTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ workI
           )}
       </div>
 
-      <ConfirmModal 
-         isOpen={confirmModal.isOpen}
-         title={confirmModal.title}
-         message={confirmModal.message}
-         onConfirm={confirmModal.onConfirm}
-         onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+      <ZeModal 
+         isOpen={zeModal.isOpen}
+         title={zeModal.title}
+         message={zeModal.message}
+         onConfirm={zeModal.onConfirm}
+         onCancel={() => setZeModal(prev => ({ ...prev, isOpen: false }))}
       />
     </div>
   );
@@ -1364,7 +1401,9 @@ const ContactsView: React.FC = () => {
     const [newRole, setNewRole] = useState('');
     const [newPhone, setNewPhone] = useState('');
     const [newNote, setNewNote] = useState('');
-    const [confirmModal, setConfirmModal] = useState({isOpen: false, id: '', type: ''});
+    
+    // Zé Modal
+    const [zeModal, setZeModal] = useState<{isOpen: boolean, title: string, message: string, onConfirm: () => void}>({isOpen: false, title: '', message: '', onConfirm: () => {}});
 
     const loadData = async () => {
         if (!user) return;
@@ -1404,12 +1443,18 @@ const ContactsView: React.FC = () => {
         loadData();
     };
 
-    const handleDelete = async () => {
-        const { id, type } = confirmModal;
-        if (type === 'WORKERS') await dbService.deleteWorker(id);
-        else await dbService.deleteSupplier(id);
-        setConfirmModal({isOpen: false, id: '', type: ''});
-        loadData();
+    const handleDelete = (id: string, type: 'WORKERS' | 'SUPPLIERS') => {
+        setZeModal({
+            isOpen: true,
+            title: "Apagar contato",
+            message: "Vai excluir mesmo? Se tiver contas pendentes com essa pessoa, o histórico pode ficar confuso.",
+            onConfirm: async () => {
+                if (type === 'WORKERS') await dbService.deleteWorker(id);
+                else await dbService.deleteSupplier(id);
+                setZeModal(prev => ({ ...prev, isOpen: false }));
+                loadData();
+            }
+        });
     }
 
     const formatPhoneLink = (phone: string) => {
@@ -1497,7 +1542,7 @@ const ContactsView: React.FC = () => {
                                  <i className="fa-brands fa-whatsapp text-lg"></i>
                              </a>
                              <button 
-                                onClick={() => setConfirmModal({isOpen: true, id: item.id, type: activeTab})}
+                                onClick={() => handleDelete(item.id, activeTab)}
                                 className="w-10 h-10 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-400 hover:text-danger flex items-center justify-center transition-colors"
                              >
                                  <i className="fa-solid fa-trash"></i>
@@ -1512,12 +1557,12 @@ const ContactsView: React.FC = () => {
                 )}
             </div>
 
-            <ConfirmModal 
-                isOpen={confirmModal.isOpen} 
-                title="Excluir Contato" 
-                message="Tem certeza?" 
-                onConfirm={handleDelete} 
-                onCancel={() => setConfirmModal({isOpen: false, id: '', type: ''})} 
+            <ZeModal 
+                isOpen={zeModal.isOpen} 
+                title={zeModal.title} 
+                message={zeModal.message} 
+                onConfirm={zeModal.onConfirm} 
+                onCancel={() => setZeModal({isOpen: false, title: '', message: '', onConfirm: () => {}})} 
             />
         </div>
     );
