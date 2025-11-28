@@ -49,6 +49,7 @@ const getLocalDb = (): DbSchema => {
   }
   const db = JSON.parse(stored);
   if (!db.files) db.files = [];
+  if (!db.photos) db.photos = [];
   if (!db.suppliers) db.suppliers = [];
   if (!db.workers) db.workers = [];
   return db;
@@ -99,6 +100,28 @@ const calculateEstimatedMaterials = (area: number, floors: number = 1): Partial<
   
   return estimated;
 };
+
+// --- HELPER: FILE UPLOAD ---
+const uploadToBucket = async (file: File, path: string): Promise<string | null> => {
+    if (!supabase) return null;
+    try {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
+        const filePath = `${path}/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+            .from('work_assets')
+            .upload(filePath, file);
+
+        if (uploadError) throw uploadError;
+
+        const { data } = supabase.storage.from('work_assets').getPublicUrl(filePath);
+        return data.publicUrl;
+    } catch (error) {
+        console.error("Upload Error:", error);
+        return null;
+    }
+}
 
 
 // --- SERVICE LAYER (ASYNC INTERFACE) ---
@@ -728,6 +751,113 @@ export const dbService = {
           if (data && data.length > 0) return data.map(d => d.name);
       }
       return STANDARD_SUPPLIER_CATEGORIES;
+  },
+  
+  // --- PHOTOS & FILES UPLOAD ---
+  getPhotos: async (workId: string): Promise<WorkPhoto[]> => {
+      if (supabase) {
+          const { data } = await supabase.from('work_photos').select('*').eq('work_id', workId).order('created_at', { ascending: false });
+          return (data || []).map(p => ({...p, workId: p.work_id, date: p.created_at}));
+      } else {
+          const db = getLocalDb();
+          return db.photos.filter(p => p.workId === workId);
+      }
+  },
+
+  uploadPhoto: async (workId: string, file: File, type: 'BEFORE' | 'AFTER' | 'PROGRESS'): Promise<WorkPhoto | null> => {
+      if (supabase) {
+          // 1. Upload
+          const publicUrl = await uploadToBucket(file, `${workId}/photos`);
+          if (!publicUrl) return null;
+
+          // 2. Insert DB
+          const { data, error } = await supabase.from('work_photos').insert({
+              work_id: workId,
+              url: publicUrl,
+              type: type,
+              description: file.name
+          }).select().single();
+
+          if (error || !data) return null;
+          return { ...data, workId: data.work_id, date: data.created_at };
+      } else {
+          // Local fallback (Fake Upload)
+          const db = getLocalDb();
+          const newPhoto: WorkPhoto = {
+              id: Math.random().toString(36).substr(2, 9),
+              workId,
+              url: URL.createObjectURL(file),
+              type,
+              description: file.name,
+              date: new Date().toISOString()
+          };
+          db.photos.push(newPhoto);
+          saveLocalDb(db);
+          return newPhoto;
+      }
+  },
+
+  deletePhoto: async (id: string) => {
+      if (supabase) await supabase.from('work_photos').delete().eq('id', id);
+      else {
+          const db = getLocalDb();
+          db.photos = db.photos.filter(p => p.id !== id);
+          saveLocalDb(db);
+      }
+  },
+
+  getFiles: async (workId: string): Promise<WorkFile[]> => {
+      if (supabase) {
+          const { data } = await supabase.from('work_files').select('*').eq('work_id', workId).order('created_at', { ascending: false });
+          return (data || []).map(f => ({...f, workId: f.work_id, date: f.created_at, type: f.file_type}));
+      } else {
+          const db = getLocalDb();
+          return db.files.filter(f => f.workId === workId);
+      }
+  },
+
+  uploadFile: async (workId: string, file: File, category: string): Promise<WorkFile | null> => {
+      if (supabase) {
+          // 1. Upload
+          const publicUrl = await uploadToBucket(file, `${workId}/files`);
+          if (!publicUrl) return null;
+
+          // 2. Insert DB
+          const fileType = file.name.split('.').pop() || 'file';
+          const { data, error } = await supabase.from('work_files').insert({
+              work_id: workId,
+              url: publicUrl,
+              name: file.name,
+              category: category,
+              file_type: fileType
+          }).select().single();
+
+          if (error || !data) return null;
+          return { ...data, workId: data.work_id, date: data.created_at, type: data.file_type };
+      } else {
+           const db = getLocalDb();
+           const newFile: WorkFile = {
+              id: Math.random().toString(36).substr(2, 9),
+              workId,
+              url: '#',
+              name: file.name,
+              category: category as any,
+              type: 'pdf',
+              date: new Date().toISOString()
+           };
+           db.files.push(newFile);
+           saveLocalDb(db);
+           return newFile;
+      }
+  },
+  
+  deleteFile: async (id: string) => {
+      if (supabase) await supabase.from('work_files').delete().eq('id', id);
+      else {
+          const db = getLocalDb();
+          db.files = db.files.filter(f => f.id !== id);
+          saveLocalDb(db);
+      }
   },
 
   // --- Notifications (Smart Logic) ---

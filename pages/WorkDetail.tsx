@@ -3,10 +3,11 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { dbService } from '../services/db';
-import { Work, Step, Expense, Material, StepStatus, ExpenseCategory, PlanType, Supplier, Worker } from '../types';
+import { Work, Step, Expense, Material, StepStatus, ExpenseCategory, PlanType, Supplier, Worker, WorkPhoto, WorkFile } from '../types';
 import { Recharts } from '../components/RechartsWrapper';
 import { CALCULATORS, CONTRACT_TEMPLATES, STANDARD_CHECKLISTS, FULL_MATERIAL_PACKAGES, ZE_AVATAR } from '../services/standards';
 import { useAuth } from '../App';
+import { aiService } from '../services/ai';
 
 // --- Shared Components ---
 
@@ -1568,6 +1569,245 @@ const ContactsView: React.FC = () => {
     );
 }
 
+const PhotosView: React.FC<{ workId: string }> = ({ workId }) => {
+    const [photos, setPhotos] = useState<WorkPhoto[]>([]);
+    const [uploading, setUploading] = useState(false);
+    const [zeModal, setZeModal] = useState<{isOpen: boolean, title: string, message: string, onConfirm: () => void}>({isOpen: false, title: '', message: '', onConfirm: () => {}});
+
+    useEffect(() => {
+        dbService.getPhotos(workId).then(setPhotos);
+    }, [workId]);
+
+    const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            setUploading(true);
+            const file = e.target.files[0];
+            await dbService.uploadPhoto(workId, file, 'PROGRESS');
+            setPhotos(await dbService.getPhotos(workId));
+            setUploading(false);
+        }
+    }
+
+    const handleDelete = (id: string) => {
+        setZeModal({
+            isOpen: true,
+            title: "Apagar foto",
+            message: "Essa foto vai sumir da galeria da obra. Tem certeza?",
+            onConfirm: async () => {
+                await dbService.deletePhoto(id);
+                setPhotos(await dbService.getPhotos(workId));
+                setZeModal(prev => ({...prev, isOpen: false}));
+            }
+        });
+    }
+
+    return (
+        <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
+            <h3 className="font-bold text-lg text-text-main dark:text-white mb-4">Galeria da Obra</h3>
+            
+            <label className={`w-full py-4 rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-primary hover:text-primary transition-all flex flex-col items-center justify-center gap-2 cursor-pointer ${uploading ? 'opacity-50 cursor-wait' : ''}`}>
+                <input type="file" accept="image/*" className="hidden" onChange={handleUpload} disabled={uploading} />
+                <i className={`fa-solid ${uploading ? 'fa-circle-notch fa-spin' : 'fa-camera'} text-2xl`}></i>
+                <span className="font-bold text-sm">{uploading ? 'Enviando...' : 'Tirar ou Escolher Foto'}</span>
+            </label>
+
+            <div className="grid grid-cols-2 gap-3">
+                {photos.map(p => (
+                    <div key={p.id} className="relative aspect-square rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-800 shadow-sm group">
+                        <img src={p.url} alt="Obra" className="w-full h-full object-cover" />
+                        <button 
+                            onClick={() => handleDelete(p.id)}
+                            className="absolute top-2 right-2 w-8 h-8 bg-black/50 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                            <i className="fa-solid fa-trash text-xs"></i>
+                        </button>
+                        <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/70 to-transparent">
+                            <p className="text-[10px] text-white font-medium truncate">{new Date(p.date).toLocaleDateString()}</p>
+                        </div>
+                    </div>
+                ))}
+            </div>
+            
+            {photos.length === 0 && !uploading && (
+                <div className="text-center py-10 text-text-muted dark:text-slate-500">
+                    Nenhuma foto ainda.
+                </div>
+            )}
+             <ZeModal 
+                isOpen={zeModal.isOpen} 
+                title={zeModal.title} 
+                message={zeModal.message} 
+                onConfirm={zeModal.onConfirm} 
+                onCancel={() => setZeModal({isOpen: false, title: '', message: '', onConfirm: () => {}})} 
+            />
+        </div>
+    );
+}
+
+const FilesView: React.FC<{ workId: string }> = ({ workId }) => {
+    const [files, setFiles] = useState<WorkFile[]>([]);
+    const [uploading, setUploading] = useState(false);
+    const [zeModal, setZeModal] = useState<{isOpen: boolean, title: string, message: string, onConfirm: () => void}>({isOpen: false, title: '', message: '', onConfirm: () => {}});
+
+    useEffect(() => {
+        dbService.getFiles(workId).then(setFiles);
+    }, [workId]);
+
+    const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            setUploading(true);
+            const file = e.target.files[0];
+            await dbService.uploadFile(workId, file, 'Geral');
+            setFiles(await dbService.getFiles(workId));
+            setUploading(false);
+        }
+    }
+    
+    const handleDelete = (id: string) => {
+        setZeModal({
+            isOpen: true,
+            title: "Apagar arquivo",
+            message: "Vai excluir o projeto? Cuidado se não tiver cópia.",
+            onConfirm: async () => {
+                await dbService.deleteFile(id);
+                setFiles(await dbService.getFiles(workId));
+                setZeModal(prev => ({...prev, isOpen: false}));
+            }
+        });
+    }
+
+    return (
+        <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
+            <h3 className="font-bold text-lg text-text-main dark:text-white mb-4">Projetos e Documentos</h3>
+            
+            <label className={`w-full py-4 rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-primary hover:text-primary transition-all flex flex-col items-center justify-center gap-2 cursor-pointer ${uploading ? 'opacity-50 cursor-wait' : ''}`}>
+                <input type="file" accept=".pdf,image/*" className="hidden" onChange={handleUpload} disabled={uploading} />
+                <i className={`fa-solid ${uploading ? 'fa-circle-notch fa-spin' : 'fa-cloud-arrow-up'} text-2xl`}></i>
+                <span className="font-bold text-sm">{uploading ? 'Enviando...' : 'Enviar PDF ou Imagem'}</span>
+            </label>
+
+            <div className="space-y-3">
+                {files.map(f => (
+                    <div key={f.id} className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-100 dark:border-slate-800 shadow-sm flex items-center justify-between">
+                        <div className="flex items-center gap-3 overflow-hidden">
+                            <div className="w-10 h-10 rounded-lg bg-red-100 dark:bg-red-900/30 text-red-500 flex items-center justify-center shrink-0">
+                                <i className="fa-solid fa-file-pdf text-xl"></i>
+                            </div>
+                            <div className="min-w-0">
+                                <h4 className="font-bold text-text-main dark:text-white truncate">{f.name}</h4>
+                                <p className="text-xs text-text-muted dark:text-slate-500">{new Date(f.date).toLocaleDateString()}</p>
+                            </div>
+                        </div>
+                        <div className="flex gap-2">
+                            <a href={f.url} target="_blank" rel="noreferrer" className="w-8 h-8 bg-slate-100 dark:bg-slate-800 text-primary rounded-full flex items-center justify-center">
+                                <i className="fa-solid fa-download text-xs"></i>
+                            </a>
+                            <button onClick={() => handleDelete(f.id)} className="w-8 h-8 bg-slate-100 dark:bg-slate-800 text-slate-400 hover:text-danger rounded-full flex items-center justify-center">
+                                <i className="fa-solid fa-trash text-xs"></i>
+                            </button>
+                        </div>
+                    </div>
+                ))}
+            </div>
+
+             {files.length === 0 && !uploading && (
+                <div className="text-center py-10 text-text-muted dark:text-slate-500">
+                    Nenhum projeto salvo.
+                </div>
+            )}
+             <ZeModal 
+                isOpen={zeModal.isOpen} 
+                title={zeModal.title} 
+                message={zeModal.message} 
+                onConfirm={zeModal.onConfirm} 
+                onCancel={() => setZeModal({isOpen: false, title: '', message: '', onConfirm: () => {}})} 
+            />
+        </div>
+    );
+}
+
+const AssistantView: React.FC = () => {
+    const { user } = useAuth();
+    const [messages, setMessages] = useState<{id: string, text: string, sender: 'USER' | 'AI'}[]>([]);
+    const [input, setInput] = useState('');
+    const [thinking, setThinking] = useState(false);
+
+    const handleSend = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if(!input.trim()) return;
+
+        const userMsg = { id: Date.now().toString(), text: input, sender: 'USER' as const };
+        setMessages(prev => [...prev, userMsg]);
+        setInput('');
+        setThinking(true);
+
+        try {
+            const aiResponse = await aiService.sendMessage(input);
+            setMessages(prev => [...prev, { id: (Date.now()+1).toString(), text: aiResponse, sender: 'AI' as const }]);
+        } catch (error) {
+            setMessages(prev => [...prev, { id: (Date.now()+1).toString(), text: "Desculpe chefe, deu um erro na minha cabeça aqui. Tenta de novo?", sender: 'AI' as const }]);
+        } finally {
+            setThinking(false);
+        }
+    };
+
+    return (
+        <div className="h-[600px] flex flex-col bg-slate-100 dark:bg-slate-900 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 animate-in fade-in slide-in-from-right-4">
+             <div className="bg-primary p-4 flex items-center gap-3 shadow-md">
+                 <div className="w-10 h-10 rounded-full bg-white border-2 border-white overflow-hidden">
+                     <img src={ZE_AVATAR} alt="Zé" className="w-full h-full object-cover" />
+                 </div>
+                 <div>
+                     <h3 className="font-bold text-white leading-tight">Zé da Obra</h3>
+                     <p className="text-xs text-blue-100 flex items-center gap-1">
+                         <span className="w-2 h-2 rounded-full bg-green-400"></span> Online
+                     </p>
+                 </div>
+             </div>
+
+             <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                 {messages.length === 0 && (
+                     <div className="text-center text-text-muted mt-10">
+                         <p>Pode perguntar qualquer coisa sobre obra, chefe!</p>
+                     </div>
+                 )}
+                 {messages.map(m => (
+                     <div key={m.id} className={`flex ${m.sender === 'USER' ? 'justify-end' : 'justify-start'}`}>
+                         <div className={`max-w-[80%] p-3 rounded-2xl text-sm ${
+                             m.sender === 'USER' 
+                             ? 'bg-primary text-white rounded-br-none' 
+                             : 'bg-white dark:bg-slate-800 text-text-body dark:text-slate-200 rounded-bl-none shadow-sm'
+                         }`}>
+                             {m.text}
+                         </div>
+                     </div>
+                 ))}
+                 {thinking && (
+                     <div className="flex justify-start">
+                         <div className="bg-white dark:bg-slate-800 p-3 rounded-2xl rounded-bl-none shadow-sm flex gap-1">
+                             <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"></div>
+                             <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce delay-75"></div>
+                             <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce delay-150"></div>
+                         </div>
+                     </div>
+                 )}
+             </div>
+
+             <form onSubmit={handleSend} className="p-3 bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 flex gap-2">
+                 <input 
+                    className="flex-1 bg-slate-100 dark:bg-slate-900 rounded-full px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-primary dark:text-white"
+                    placeholder="Digite sua dúvida..."
+                    value={input}
+                    onChange={e => setInput(e.target.value)}
+                 />
+                 <button type="submit" disabled={thinking} className="w-10 h-10 bg-primary text-white rounded-full flex items-center justify-center disabled:opacity-50">
+                     <i className="fa-solid fa-paper-plane"></i>
+                 </button>
+             </form>
+        </div>
+    );
+}
+
 // 5. MAIS MENU MAIN
 const MoreMenuTab: React.FC<{ 
     onNavigate: (view: string) => void,
@@ -1585,6 +1825,7 @@ const MoreMenuTab: React.FC<{
     ];
 
     const bonusItems = [
+        { id: 'AI_CHAT', label: 'IA do Zé (Assistente)', icon: 'fa-robot', color: 'text-blue-600', desc: 'Tire dúvidas técnicas na hora.' },
         { id: 'CALCULATOR', label: 'Calculadora da Obra', icon: 'fa-calculator', color: 'text-primary', desc: 'Calcule pisos, tijolos e tintas.' },
         { id: 'CHECKLISTS', label: 'Checklists', icon: 'fa-list-check', color: 'text-success', desc: 'Não esqueça de nada importante.' },
         { id: 'CONTRACTS', label: 'Contratos e Recibos', icon: 'fa-file-signature', color: 'text-orange-500', desc: 'Modelos prontos para usar.' },
@@ -1595,7 +1836,7 @@ const MoreMenuTab: React.FC<{
     if (activeSubView) {
         return (
             <div className="animate-in fade-in slide-in-from-right-4 duration-300">
-                {activeSubView !== 'CALCULATOR' && activeSubView !== 'CONTRACTS' && (
+                {activeSubView !== 'CALCULATOR' && activeSubView !== 'CONTRACTS' && activeSubView !== 'AI_CHAT' && (
                     <button 
                         onClick={() => onNavigate('')} 
                         className="mb-4 text-sm font-bold text-text-muted hover:text-primary flex items-center gap-2"
@@ -1605,11 +1846,19 @@ const MoreMenuTab: React.FC<{
                 )}
                 
                 {activeSubView === 'CONTACTS' && <ContactsView />}
-                {activeSubView === 'PHOTOS' && <div className="p-10 text-center bg-white dark:bg-slate-900 rounded-2xl text-text-muted border border-slate-200 dark:border-slate-800">Galeria de Fotos (Em breve)</div>}
-                {activeSubView === 'FILES' && <div className="p-10 text-center bg-white dark:bg-slate-900 rounded-2xl text-text-muted border border-slate-200 dark:border-slate-800">Gerenciador de Arquivos (Em breve)</div>}
+                {activeSubView === 'PHOTOS' && <PhotosView workId={workId} />}
+                {activeSubView === 'FILES' && <FilesView workId={workId} />}
                 {activeSubView === 'CHECKLISTS' && <ChecklistsView />}
                 {activeSubView === 'CONTRACTS' && <ContractsView />}
                 {activeSubView === 'CALCULATOR' && <CalculatorView workId={workId} onBack={() => onNavigate('')} />}
+                {activeSubView === 'AI_CHAT' && (
+                    <div>
+                         <button onClick={() => onNavigate('')} className="mb-4 text-sm font-bold text-primary hover:underline flex items-center gap-2">
+                            <i className="fa-solid fa-arrow-left"></i> Voltar
+                         </button>
+                         <AssistantView />
+                    </div>
+                )}
                 {activeSubView === 'REPORTS' && (
                     <div className="p-8 bg-white dark:bg-slate-900 rounded-2xl text-center border border-slate-200 dark:border-slate-800">
                         <i className="fa-solid fa-print text-4xl text-slate-300 mb-4"></i>

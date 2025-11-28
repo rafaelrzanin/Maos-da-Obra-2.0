@@ -17,6 +17,9 @@ const Dashboard: React.FC = () => {
   const [dailySummary, setDailySummary] = useState({ completedSteps: 0, delayedSteps: 0, pendingMaterials: 0, totalSteps: 0 });
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // Dropdown State
+  const [showWorkSelector, setShowWorkSelector] = useState(false);
 
   useEffect(() => {
     const loadDashboard = async () => {
@@ -26,37 +29,49 @@ const Dashboard: React.FC = () => {
             setWorks(data);
 
             if (data.length > 0) {
-                const currentWork = data[0];
-                setFocusWork(currentWork);
-                
-                // Fetch all stats async
-                const [workStats, summary, notifs] = await Promise.all([
-                    dbService.calculateWorkStats(currentWork.id),
-                    dbService.getDailySummary(currentWork.id),
-                    dbService.getNotifications(user.id)
-                ]);
-
-                setStats(workStats);
-                setDailySummary(summary);
-                setNotifications(notifs);
-
-                // Run smart check (fire and forget)
-                dbService.generateSmartNotifications(user.id, currentWork.id);
+                // Default to first work
+                handleSwitchWork(data[0]);
+            } else {
+                setLoading(false);
             }
-            setLoading(false);
         }
     };
     loadDashboard();
   }, [user]);
 
-  if (loading) return (
+  const handleSwitchWork = async (work: Work) => {
+      setFocusWork(work);
+      setShowWorkSelector(false);
+      setLoading(true);
+      
+      try {
+        const [workStats, summary, notifs] = await Promise.all([
+            dbService.calculateWorkStats(work.id),
+            dbService.getDailySummary(work.id),
+            dbService.getNotifications(user!.id)
+        ]);
+
+        setStats(workStats);
+        setDailySummary(summary);
+        setNotifications(notifs);
+
+        // Run smart check (fire and forget)
+        dbService.generateSmartNotifications(user!.id, work.id);
+      } catch (e) {
+          console.error(e);
+      } finally {
+          setLoading(false);
+      }
+  };
+
+  if (loading && !focusWork && works.length === 0) return (
       <div className="flex items-center justify-center h-screen text-primary">
           <i className="fa-solid fa-circle-notch fa-spin text-3xl"></i>
       </div>
   );
 
   // EMPTY STATE
-  if (!focusWork) {
+  if (!focusWork && !loading) {
       return (
         <div className="flex flex-col items-center justify-center min-h-[80vh] px-4 text-center">
             <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center text-primary mb-6">
@@ -75,6 +90,8 @@ const Dashboard: React.FC = () => {
         </div>
       );
   }
+
+  if (!focusWork) return null;
 
   // CALCULATIONS FOR UI
   const budgetUsage = focusWork.budgetPlanned > 0 ? (stats.totalSpent / focusWork.budgetPlanned) * 100 : 0;
@@ -105,21 +122,49 @@ const Dashboard: React.FC = () => {
     <div className="max-w-3xl mx-auto pb-24 pt-4 md:pt-8 px-4 md:px-0 font-sans">
       
       {/* Header */}
-      <div className="mb-6 flex items-end justify-between">
+      <div className="mb-6 flex items-end justify-between relative z-20">
           <div>
             <p className="text-sm text-text-muted dark:text-slate-400 font-medium mb-1">Olá, {user?.name.split(' ')[0]}</p>
             <h1 className="text-2xl md:text-3xl font-bold text-text-main dark:text-white leading-tight">
                 Painel da Obra
             </h1>
           </div>
-          {works.length > 1 && (
-             <button className="text-sm text-primary font-bold bg-primary/10 px-3 py-1.5 rounded-lg hover:bg-primary/20 transition-colors">
-                 Ver outra obra <i className="fa-solid fa-chevron-down ml-1"></i>
-             </button>
+          {works.length > 0 && (
+             <div className="relative">
+                 <button 
+                    onClick={() => setShowWorkSelector(!showWorkSelector)}
+                    className="text-sm text-primary font-bold bg-primary/10 px-3 py-1.5 rounded-lg hover:bg-primary/20 transition-colors flex items-center"
+                 >
+                     {works.length > 1 ? 'Trocar Obra' : 'Minhas Obras'} <i className={`fa-solid fa-chevron-down ml-1 transition-transform ${showWorkSelector ? 'rotate-180' : ''}`}></i>
+                 </button>
+                 
+                 {showWorkSelector && (
+                     <div className="absolute right-0 top-full mt-2 w-64 bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-100 dark:border-slate-800 overflow-hidden animate-in fade-in slide-in-from-top-2">
+                         {works.map(w => (
+                             <button
+                                key={w.id}
+                                onClick={() => handleSwitchWork(w)}
+                                className={`w-full text-left px-4 py-3 text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors border-b last:border-0 border-slate-100 dark:border-slate-800 ${focusWork.id === w.id ? 'text-primary bg-slate-50 dark:bg-slate-800' : 'text-text-body dark:text-slate-300'}`}
+                             >
+                                <div className="flex items-center justify-between">
+                                    <span className="truncate">{w.name}</span>
+                                    {focusWork.id === w.id && <i className="fa-solid fa-check text-primary text-xs"></i>}
+                                </div>
+                             </button>
+                         ))}
+                         <button
+                            onClick={() => navigate('/create')}
+                            className="w-full text-left px-4 py-3 text-sm font-bold text-primary hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex items-center gap-2"
+                         >
+                            <i className="fa-solid fa-plus"></i> Cadastrar Nova Obra
+                         </button>
+                     </div>
+                 )}
+             </div>
           )}
       </div>
       
-      {/* DICA DO ZE CARD (Test Image) */}
+      {/* DICA DO ZE CARD */}
       <div className="mb-6 bg-blue-50 dark:bg-blue-900/10 p-4 rounded-2xl border border-blue-100 dark:border-blue-800 flex items-center gap-4">
            <div className="w-14 h-14 rounded-full bg-white border-2 border-primary p-0.5 shrink-0 shadow-sm overflow-hidden relative">
                 <img 
@@ -140,7 +185,7 @@ const Dashboard: React.FC = () => {
       </div>
 
       {/* DAILY SUMMARY CARD */}
-      <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800 mb-6 overflow-hidden">
+      <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800 mb-6 overflow-hidden relative z-0">
           
           <div className="p-6 pb-2">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
@@ -237,7 +282,7 @@ const Dashboard: React.FC = () => {
           </div>
       </div>
 
-      {/* MAIN CTA - MOVED HERE */}
+      {/* MAIN CTA */}
       <button 
         onClick={() => navigate(`/work/${focusWork.id}`)}
         className="w-full mb-8 flex items-center justify-center gap-3 bg-primary hover:bg-primary-dark text-white text-lg font-bold py-4 rounded-2xl shadow-xl shadow-primary/25 transition-all active:scale-95 border-2 border-primary/20"
