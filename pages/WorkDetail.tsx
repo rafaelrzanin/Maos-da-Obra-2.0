@@ -1,10 +1,9 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { dbService } from '../services/db';
-import { Work, Step, Expense, Material, StepStatus, ExpenseCategory, WorkStatus } from '../types';
+import { Work, Step, Expense, Material, StepStatus, ExpenseCategory } from '../types';
 import { Recharts } from '../components/RechartsWrapper';
-import { STANDARD_PHASES, CALCULATORS, CONTRACT_TEMPLATES, STANDARD_CHECKLISTS } from '../services/standards';
+import { CALCULATORS, CONTRACT_TEMPLATES, STANDARD_CHECKLISTS } from '../services/standards';
 
 // --- Shared Components ---
 
@@ -386,6 +385,7 @@ const MaterialsTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ work
     setNewMat({ name: '', qty: '', unit: 'un' });
     setShowAddForm(false);
     loadMaterials();
+    onUpdate(); // Refresh parent stats
   };
 
   const calculateMaterial = () => {
@@ -410,6 +410,7 @@ const MaterialsTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ work
       setCalcResult(null);
       setCalcArea('');
       loadMaterials();
+      onUpdate(); // Refresh parent stats
   };
 
   const handleDeleteClick = (id: string) => {
@@ -420,6 +421,7 @@ const MaterialsTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ work
         onConfirm: async () => {
             await dbService.deleteMaterial(id);
             loadMaterials();
+            onUpdate(); // Refresh parent stats
             setConfirmModal(prev => ({ ...prev, isOpen: false }));
         }
     });
@@ -801,11 +803,9 @@ const ContractsView: React.FC = () => {
 
 // 5. MAIS MENU MAIN
 const MoreMenuTab: React.FC<{ 
-    work: Work, 
-    stats: any, 
     onNavigate: (view: string) => void,
     activeSubView: string | null 
-}> = ({ work, stats, onNavigate, activeSubView }) => {
+}> = ({ onNavigate, activeSubView }) => {
 
     const menuItems = [
         { id: 'PHOTOS', label: 'Minhas Fotos', icon: 'fa-camera', color: 'text-purple-500', desc: 'Guarde o antes e depois da obra.' },
@@ -934,10 +934,8 @@ const WorkDetail: React.FC = () => {
         {activeTab === 3 && <ExpensesTab workId={work.id} onUpdate={loadWork} />}
         {activeTab === 4 && (
             <MoreMenuTab 
-                work={work} 
-                stats={stats} 
-                activeSubView={moreSubView} 
                 onNavigate={(view) => setMoreSubView(view)} 
+                activeSubView={moreSubView} 
             />
         )}
       </div>

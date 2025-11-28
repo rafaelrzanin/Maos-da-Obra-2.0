@@ -1,4 +1,3 @@
-
 import { 
   User, Work, Step, Expense, Material, WorkPhoto, WorkFile,
   PlanType, WorkStatus, StepStatus, Notification
@@ -150,7 +149,6 @@ export const dbService = {
 
   updatePlan: async (userId: string, plan: PlanType) => {
      if (supabase) {
-        const now = new Date();
         const baseDate = new Date();
         if (plan === PlanType.MENSAL) baseDate.setMonth(baseDate.getMonth() + 1);
         if (plan === PlanType.SEMESTRAL) baseDate.setMonth(baseDate.getMonth() + 6);
@@ -300,7 +298,7 @@ export const dbService = {
         // ... (Skipping full repetition for brevity, logic remains same as original db.ts)
         // Basic template generation:
         const standardSteps = ['Fundação', 'Alvenaria', 'Telhado', 'Acabamento'];
-        const steps = standardSteps.map((name, idx) => ({
+        const steps = standardSteps.map((name) => ({
              id: Math.random().toString(36).substr(2, 9),
              workId: newWork.id,
              name,
