@@ -782,8 +782,21 @@ const ExpensesTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ workI
         <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-lg border border-slate-100 dark:border-slate-800 animate-in slide-in-from-top-2">
             <h3 className="font-bold text-text-main dark:text-white mb-4">O que eu paguei?</h3>
             <form onSubmit={handleAdd} className="space-y-4">
+                {/* 1. Category (Tipo do Gasto) */}
                 <div>
-                    <label className="text-xs font-bold text-text-muted mb-1 block">Onde foi gasto? (Etapa)</label>
+                    <label className="text-xs font-bold text-text-muted mb-1 block">No que foi gasto?</label>
+                    <select 
+                        className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-text-main dark:text-white rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary"
+                        value={newExp.category}
+                        onChange={e => setNewExp({...newExp, category: e.target.value as ExpenseCategory})}
+                    >
+                        {Object.values(ExpenseCategory).map(c => <option key={c} value={c}>{c}</option>)}
+                    </select>
+                </div>
+
+                {/* 2. Step Selection */}
+                <div>
+                    <label className="text-xs font-bold text-text-muted mb-1 block">Em qual etapa da obra?</label>
                     <select 
                         className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-text-main dark:text-white rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary"
                         value={newExp.stepId || ''}
@@ -793,8 +806,10 @@ const ExpensesTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ workI
                         {steps.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                     </select>
                 </div>
+
+                {/* 3. Description */}
                 <div>
-                    <label className="text-xs font-bold text-text-muted mb-1 block">Descrição</label>
+                    <label className="text-xs font-bold text-text-muted mb-1 block">Descrição do item</label>
                     <input 
                         placeholder="Ex: Cimento, Diária Pedreiro..." 
                         required
@@ -803,28 +818,18 @@ const ExpensesTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ workI
                         className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-text-main dark:text-white rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary"
                     />
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                    <div>
-                        <label className="text-xs font-bold text-text-muted mb-1 block">Tipo</label>
-                        <select 
-                            value={newExp.category}
-                            onChange={e => setNewExp({...newExp, category: e.target.value as ExpenseCategory})}
-                            className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-text-main dark:text-white rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary"
-                        >
-                            {Object.values(ExpenseCategory).map(c => <option key={c} value={c}>{c}</option>)}
-                        </select>
-                    </div>
-                    <div>
-                        <label className="text-xs font-bold text-text-muted mb-1 block">Valor (R$)</label>
-                        <input 
-                            type="number" 
-                            placeholder="0,00" 
-                            required
-                            value={newExp.amount}
-                            onChange={e => setNewExp({...newExp, amount: e.target.value})}
-                            className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-text-main dark:text-white rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary"
-                        />
-                    </div>
+
+                {/* 4. Amount */}
+                <div>
+                    <label className="text-xs font-bold text-text-muted mb-1 block">Valor Pago (R$)</label>
+                    <input 
+                        type="number" 
+                        placeholder="0,00" 
+                        required
+                        value={newExp.amount}
+                        onChange={e => setNewExp({...newExp, amount: e.target.value})}
+                        className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-text-main dark:text-white rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary"
+                    />
                 </div>
                 
                 <div className="flex gap-3 pt-2">
@@ -836,47 +841,44 @@ const ExpensesTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ workI
       )}
 
       <div className="space-y-6">
-          {/* GENERAL GROUP */}
-          <div className="space-y-2">
-             <div className="flex items-center justify-between px-1">
-                  <div className="flex items-center gap-2">
-                      <div className="h-4 w-1 bg-slate-400 rounded-full"></div>
-                      <h3 className="font-bold text-text-main dark:text-white uppercase tracking-wider text-sm">Geral / Obra Toda</h3>
-                  </div>
-                  <span className="text-xs font-bold text-text-main dark:text-white bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-lg">
-                      Total: R$ {getGroupTotal(groupedExpenses['GERAL']).toLocaleString('pt-BR', {minimumFractionDigits: 2})}
-                  </span>
-             </div>
-             <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 overflow-hidden shadow-sm">
-                 {groupedExpenses['GERAL'].length > 0 ? (
-                    <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                        {groupedExpenses['GERAL'].map(exp => (
-                            <div key={exp.id} className="p-4 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                                <div>
-                                    <p className="font-bold text-text-main dark:text-white">{exp.description}</p>
-                                    <p className="text-xs text-text-muted dark:text-slate-500">{new Date(exp.date).toLocaleDateString('pt-BR')} • {exp.category}</p>
+          {/* GENERAL GROUP (Only show if has items) */}
+          {groupedExpenses['GERAL'].length > 0 && (
+             <div className="space-y-2">
+                <div className="flex items-center justify-between px-1">
+                      <div className="flex items-center gap-2">
+                          <div className="h-4 w-1 bg-slate-400 rounded-full"></div>
+                          <h3 className="font-bold text-text-main dark:text-white uppercase tracking-wider text-sm">Geral / Obra Toda</h3>
+                      </div>
+                      <span className="text-xs font-bold text-text-main dark:text-white bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-lg">
+                          Total: R$ {getGroupTotal(groupedExpenses['GERAL']).toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                      </span>
+                </div>
+                <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 overflow-hidden shadow-sm">
+                        <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                            {groupedExpenses['GERAL'].map(exp => (
+                                <div key={exp.id} className="p-4 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                                    <div>
+                                        <p className="font-bold text-text-main dark:text-white">{exp.description}</p>
+                                        <p className="text-xs text-text-muted dark:text-slate-500">{new Date(exp.date).toLocaleDateString('pt-BR')} • {exp.category}</p>
+                                    </div>
+                                    <div className="flex items-center gap-4">
+                                        <span className="font-bold text-text-body dark:text-slate-300">R$ {exp.amount.toFixed(2)}</span>
+                                        <button onClick={() => handleDeleteClick(exp.id)} className="text-slate-300 hover:text-danger">
+                                            <i className="fa-solid fa-trash"></i>
+                                        </button>
+                                    </div>
                                 </div>
-                                <div className="flex items-center gap-4">
-                                    <span className="font-bold text-text-body dark:text-slate-300">R$ {exp.amount.toFixed(2)}</span>
-                                    <button onClick={() => handleDeleteClick(exp.id)} className="text-slate-300 hover:text-danger">
-                                        <i className="fa-solid fa-trash"></i>
-                                    </button>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                 ) : (
-                    <div className="p-4 text-center text-xs text-text-muted dark:text-slate-500 italic">
-                        Sem gastos gerais.
-                    </div>
-                 )}
+                            ))}
+                        </div>
+                </div>
              </div>
-          </div>
+          )}
 
           {/* STEP GROUPS */}
           {steps.map(step => {
-              const groupTotal = getGroupTotal(groupedExpenses[step.id]);
-              // Only show if there are expenses OR if user might want to see empty categories (let's show all for structure)
+              const groupExps = groupedExpenses[step.id] || [];
+              if (groupExps.length === 0) return null; // HIDE EMPTY STEPS
+              const groupTotal = getGroupTotal(groupExps);
               return (
                 <div key={step.id} className="space-y-2">
                     <div className="flex items-center justify-between px-1">
@@ -889,32 +891,33 @@ const ExpensesTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ workI
                         </span>
                     </div>
                     <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 overflow-hidden shadow-sm">
-                        {groupedExpenses[step.id] && groupedExpenses[step.id].length > 0 ? (
-                            <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                                {groupedExpenses[step.id].map(exp => (
-                                    <div key={exp.id} className="p-4 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                                        <div>
-                                            <p className="font-bold text-text-main dark:text-white">{exp.description}</p>
-                                            <p className="text-xs text-text-muted dark:text-slate-500">{new Date(exp.date).toLocaleDateString('pt-BR')} • {exp.category}</p>
-                                        </div>
-                                        <div className="flex items-center gap-4">
-                                            <span className="font-bold text-text-body dark:text-slate-300">R$ {exp.amount.toFixed(2)}</span>
-                                            <button onClick={() => handleDeleteClick(exp.id)} className="text-slate-300 hover:text-danger">
-                                                <i className="fa-solid fa-trash"></i>
-                                            </button>
-                                        </div>
+                        <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                            {groupExps.map(exp => (
+                                <div key={exp.id} className="p-4 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                                    <div>
+                                        <p className="font-bold text-text-main dark:text-white">{exp.description}</p>
+                                        <p className="text-xs text-text-muted dark:text-slate-500">{new Date(exp.date).toLocaleDateString('pt-BR')} • {exp.category}</p>
                                     </div>
-                                ))}
-                            </div>
-                        ) : (
-                            <div className="p-4 text-center text-xs text-text-muted dark:text-slate-500 italic">
-                                Nenhum gasto nesta etapa ainda.
-                            </div>
-                        )}
+                                    <div className="flex items-center gap-4">
+                                        <span className="font-bold text-text-body dark:text-slate-300">R$ {exp.amount.toFixed(2)}</span>
+                                        <button onClick={() => handleDeleteClick(exp.id)} className="text-slate-300 hover:text-danger">
+                                            <i className="fa-solid fa-trash"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 </div>
               );
           })}
+          
+          {/* Empty State if absolutely nothing exists */}
+          {expenses.length === 0 && (
+             <div className="text-center py-10 text-text-muted dark:text-slate-500">
+                <p>Nenhum gasto lançado ainda.</p>
+             </div>
+          )}
       </div>
 
       <ConfirmModal 
