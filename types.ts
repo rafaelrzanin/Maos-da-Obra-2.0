@@ -92,6 +92,7 @@ export interface Material {
   purchasedQty: number;
   unit: string;
   stepId?: string; // Optional link to a specific step
+  category?: string; // Visual grouping
 }
 
 export interface StandardMaterial {

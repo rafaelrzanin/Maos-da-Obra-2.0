@@ -1,11 +1,9 @@
-
-
 import { 
   User, Work, Step, Expense, Material, WorkPhoto, WorkFile,
   PlanType, WorkStatus, StepStatus, Notification, StandardMaterial,
-  Supplier, Worker
+  Supplier, Worker, ExpenseCategory
 } from '../types';
-import { STANDARD_PHASES, FULL_MATERIAL_PACKAGES } from './standards';
+import { STANDARD_PHASES, FULL_MATERIAL_PACKAGES, STANDARD_JOB_ROLES, STANDARD_SUPPLIER_CATEGORIES } from './standards';
 import { supabase } from './supabase';
 
 // --- LOCAL STORAGE FALLBACK CONSTANTS ---
@@ -61,17 +59,15 @@ const saveLocalDb = (db: DbSchema) => {
 };
 
 // --- SERVICE LAYER (ASYNC INTERFACE) ---
-// Now all methods return Promises to support future API calls
 
 export const dbService = {
   
   // --- Auth ---
   login: async (email: string, password?: string): Promise<User | null> => {
     if (supabase) {
-        // Real Supabase Login
         const { data, error } = await supabase.auth.signInWithPassword({
             email,
-            password: password || '123456' // In a real app, you need a password field
+            password: password || '123456' 
         });
         
         if (error) {
@@ -85,7 +81,6 @@ export const dbService = {
         }
         return null;
     } else {
-        // Local Mock
         return new Promise((resolve) => {
             setTimeout(() => {
                 const db = getLocalDb();
@@ -239,7 +234,6 @@ export const dbService = {
             endDate: newWork.end_date
         };
 
-        // 2. Generate Steps
         let stepsPayload: any[] = [];
 
         if (useStandardTemplate) {
@@ -436,7 +430,8 @@ export const dbService = {
               ...m,
               workId: m.work_id,
               plannedQty: m.planned_qty,
-              purchasedQty: m.purchased_qty
+              purchasedQty: m.purchased_qty,
+              stepId: m.step_id 
           }));
       } else {
           const db = getLocalDb();
@@ -451,12 +446,52 @@ export const dbService = {
               name: material.name,
               planned_qty: material.plannedQty,
               purchased_qty: material.purchasedQty,
-              unit: material.unit
+              unit: material.unit,
+              category: material.category || 'Geral'
           });
       } else {
           const db = getLocalDb();
-          db.materials.push({ ...material, id: Math.random().toString(36).substr(2, 9) });
+          db.materials.push({ 
+              ...material, 
+              id: Math.random().toString(36).substr(2, 9),
+              category: material.category || 'Geral'
+            });
           saveLocalDb(db);
+      }
+  },
+
+  updateMaterial: async (material: Material, cost?: number) => {
+      // 1. Update Material Record
+      if (supabase) {
+          await supabase.from('materials').update({
+              name: material.name,
+              planned_qty: material.plannedQty,
+              purchased_qty: material.purchasedQty,
+              category: material.category,
+              unit: material.unit
+          }).eq('id', material.id);
+      } else {
+          const db = getLocalDb();
+          const idx = db.materials.findIndex(m => m.id === material.id);
+          if (idx > -1) {
+              db.materials[idx] = material;
+              saveLocalDb(db);
+          }
+      }
+
+      // 2. If Cost provided, Add to Expenses automatically linked to the material/step
+      if (cost && cost > 0) {
+          const description = `Compra: ${material.name}`;
+          await dbService.addExpense({
+              workId: material.workId,
+              description: description,
+              amount: cost,
+              paidAmount: cost, // Assuming full payment for simplicity
+              quantity: 1,
+              category: ExpenseCategory.MATERIAL,
+              date: new Date().toISOString().split('T')[0],
+              stepId: material.stepId // LINKED TO STEP (Etapa)
+          });
       }
   },
 
@@ -473,6 +508,7 @@ export const dbService = {
   importMaterialPackage: async (workId: string, category: string): Promise<number> => {
     let itemsToImport: StandardMaterial[] = [];
 
+    // 1. Fetch Standard Items
     if (supabase) {
         const { data, error } = await supabase.from('standard_materials').select('*').eq('category', category);
         if (!error && data && data.length > 0) {
@@ -480,6 +516,7 @@ export const dbService = {
         }
     }
     
+    // Fallback
     if (itemsToImport.length === 0) {
         const pkg = FULL_MATERIAL_PACKAGES.find(p => p.category === category);
         if (pkg) {
@@ -489,13 +526,23 @@ export const dbService = {
 
     if (itemsToImport.length === 0) return 0;
 
+    // 2. Try to find a matching Step to link for alerts (Smart Link)
+    let relatedStepId = null;
+    const steps = await dbService.getSteps(workId);
+    // Simple matching: if step name contains the category name (e.g. "Fundação" in "Fase 1 - Fundação")
+    const matchStep = steps.find(s => s.name.toLowerCase().includes(category.toLowerCase()));
+    if (matchStep) relatedStepId = matchStep.id;
+
+    // 3. Insert
     if (supabase) {
         const payload = itemsToImport.map(item => ({
             work_id: workId,
             name: item.name,
             planned_qty: 0,
             purchased_qty: 0,
-            unit: item.unit
+            unit: item.unit,
+            category: category,
+            step_id: relatedStepId // Link to step if found
         }));
         await supabase.from('materials').insert(payload);
     } else {
@@ -506,7 +553,9 @@ export const dbService = {
             name: item.name,
             plannedQty: 0,
             purchasedQty: 0,
-            unit: item.unit
+            unit: item.unit,
+            category: category,
+            stepId: relatedStepId || undefined
         }));
         db.materials.push(...payload);
         saveLocalDb(db);
@@ -593,6 +642,22 @@ export const dbService = {
     }
   },
 
+  // --- PRE-REGISTERED LISTS ---
+  getJobRoles: async (): Promise<string[]> => {
+      if (supabase) {
+          const { data } = await supabase.from('job_roles').select('name').order('name');
+          if (data && data.length > 0) return data.map(d => d.name);
+      }
+      return STANDARD_JOB_ROLES;
+  },
+
+  getSupplierCategories: async (): Promise<string[]> => {
+      if (supabase) {
+          const { data } = await supabase.from('supplier_categories').select('name').order('name');
+          if (data && data.length > 0) return data.map(d => d.name);
+      }
+      return STANDARD_SUPPLIER_CATEGORIES;
+  },
 
   // --- Notifications (Smart Logic) ---
   getNotifications: async (userId: string): Promise<Notification[]> => {
@@ -603,6 +668,7 @@ export const dbService = {
   generateSmartNotifications: async (userId: string, workId: string) => {
       const expenses = await dbService.getExpenses(workId);
       const steps = await dbService.getSteps(workId);
+      const materials = await dbService.getMaterials(workId);
       const work = await dbService.getWorkById(workId);
 
       if (!work) return;
@@ -614,6 +680,7 @@ export const dbService = {
 
       if (lastCheck === today) return; 
 
+      // 1. Budget Check
       const totalSpent = expenses.reduce((acc, curr) => acc + (curr.paidAmount ?? curr.amount), 0);
       const percentage = work.budgetPlanned > 0 ? (totalSpent / work.budgetPlanned) : 0;
       
@@ -631,6 +698,7 @@ export const dbService = {
       
       const now = new Date();
       steps.forEach(step => {
+          // 2. Delay Check
           if (step.status !== StepStatus.COMPLETED && new Date(step.endDate) < now) {
                db.notifications.push({
                       id: Math.random().toString(36).substr(2, 9),
@@ -641,6 +709,31 @@ export const dbService = {
                       read: false,
                       date: new Date().toISOString()
                });
+          }
+
+          // 3. Upcoming Material Check (starts in <= 3 days)
+          const daysUntilStart = Math.ceil((new Date(step.startDate).getTime() - now.getTime()) / (1000 * 3600 * 24));
+          if (daysUntilStart >= 0 && daysUntilStart <= 3 && step.status === StepStatus.NOT_STARTED) {
+              // Check if materials linked to this step are missing
+              // Note: stepId might not be populated on older records, so we try category match as fallback
+              const linkedMaterials = materials.filter(m => 
+                 (m.stepId === step.id) || 
+                 (m.category && step.name.toLowerCase().includes(m.category.toLowerCase()))
+              );
+
+              const missingMaterials = linkedMaterials.filter(m => m.purchasedQty < m.plannedQty);
+
+              if (missingMaterials.length > 0) {
+                  db.notifications.push({
+                      id: Math.random().toString(36).substr(2, 9),
+                      userId,
+                      title: 'Compras Urgentes',
+                      message: `A etapa "${step.name}" começa em breve e faltam ${missingMaterials.length} materiais.`,
+                      type: 'WARNING',
+                      read: false,
+                      date: new Date().toISOString()
+                  });
+              }
           }
       });
 

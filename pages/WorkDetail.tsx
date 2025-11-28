@@ -361,12 +361,21 @@ const StepsTab: React.FC<{ workId: string, refreshWork: () => void }> = ({ workI
 const MaterialsTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ workId, onUpdate }) => {
   const [materials, setMaterials] = useState<Material[]>([]);
   const [showAddForm, setShowAddForm] = useState(false);
-  const [showPackageModal, setShowPackageModal] = useState(false); // Modal for packages
+  const [showPackageModal, setShowPackageModal] = useState(false);
   
-  const [newMat, setNewMat] = useState({ name: '', qty: '', unit: 'un' });
+  // Create / Edit
+  const [editingMaterial, setEditingMaterial] = useState<Material | null>(null);
+  const [newMat, setNewMat] = useState({ name: '', qty: '', unit: 'un', category: 'Geral' });
   const [confirmModal, setConfirmModal] = useState<{isOpen: boolean, title: string, message: string, onConfirm: () => void}>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
+  
+  // NEW: Cost input for editing
+  const [costInput, setCostInput] = useState('');
 
-  const loadMaterials = async () => setMaterials(await dbService.getMaterials(workId));
+  const loadMaterials = async () => {
+    const data = await dbService.getMaterials(workId);
+    setMaterials(data);
+  };
+  
   useEffect(() => { loadMaterials(); }, [workId]);
 
   const handleAdd = async (e: React.FormEvent) => {
@@ -376,12 +385,25 @@ const MaterialsTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ work
       name: newMat.name,
       plannedQty: Number(newMat.qty),
       purchasedQty: 0,
-      unit: newMat.unit
+      unit: newMat.unit,
+      category: newMat.category
     });
-    setNewMat({ name: '', qty: '', unit: 'un' });
+    setNewMat({ name: '', qty: '', unit: 'un', category: 'Geral' });
     setShowAddForm(false);
     loadMaterials();
-    onUpdate(); // Refresh parent stats
+    onUpdate();
+  };
+
+  const handleUpdate = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (editingMaterial) {
+          // Pass the cost input (if any) to the service
+          await dbService.updateMaterial(editingMaterial, Number(costInput));
+          setEditingMaterial(null);
+          setCostInput(''); // Reset cost input
+          loadMaterials();
+          onUpdate();
+      }
   };
 
   const handleDeleteClick = (id: string) => {
@@ -391,8 +413,9 @@ const MaterialsTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ work
         message: "Quer mesmo tirar este material da lista?",
         onConfirm: async () => {
             await dbService.deleteMaterial(id);
+            setEditingMaterial(null);
             loadMaterials();
-            onUpdate(); // Refresh parent stats
+            onUpdate();
             setConfirmModal(prev => ({ ...prev, isOpen: false }));
         }
     });
@@ -402,81 +425,116 @@ const MaterialsTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ work
     setShowPackageModal(false);
     const count = await dbService.importMaterialPackage(workId, category);
     if (count > 0) {
-        alert(`${count} itens foram adicionados à sua lista!`);
+        alert(`${count} itens foram adicionados em "${category}"!`);
         loadMaterials();
         onUpdate();
     } else {
-        alert("Não encontramos itens para esta categoria ou houve um erro.");
+        alert("Não encontramos itens para esta categoria.");
     }
   };
+
+  const openEditModal = (mat: Material) => {
+      setEditingMaterial(mat);
+      setCostInput(''); // Ensure it's empty so user enters NEW cost
+  };
+
+  // Grouping Logic
+  const groupedMaterials = materials.reduce((acc, mat) => {
+      const cat = mat.category || 'Geral';
+      if (!acc[cat]) acc[cat] = [];
+      acc[cat].push(mat);
+      return acc;
+  }, {} as Record<string, Material[]>);
+
+  // Categories Order (Standard First, then others)
+  const categoryOrder = FULL_MATERIAL_PACKAGES.map(p => p.category);
+  const sortedCategories = Object.keys(groupedMaterials).sort((a, b) => {
+      const idxA = categoryOrder.indexOf(a);
+      const idxB = categoryOrder.indexOf(b);
+      if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+      if (idxA !== -1) return -1;
+      if (idxB !== -1) return 1;
+      return a.localeCompare(b);
+  });
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       <SectionHeader 
           title="Lista de Compras" 
-          subtitle="O que eu preciso comprar."
+          subtitle="Toque em um item para editar quantidade."
       />
 
-      <div className="flex flex-col gap-3 mb-4">
-        <div className="flex gap-3">
-            <button 
-                onClick={() => setShowAddForm(true)}
-                className="w-full py-4 rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-700 text-text-muted hover:text-primary hover:border-primary transition-all font-bold flex items-center justify-center gap-2 bg-slate-50 dark:bg-slate-800/50"
-            >
-                <i className="fa-solid fa-plus"></i> Novo Item
-            </button>
-        </div>
+      <div className="flex flex-col gap-3 mb-6">
+        <button 
+            onClick={() => setShowAddForm(true)}
+            className="w-full py-4 rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-700 text-text-muted hover:text-primary hover:border-primary transition-all font-bold flex items-center justify-center gap-2 bg-slate-50 dark:bg-slate-800/50"
+        >
+            <i className="fa-solid fa-plus"></i> Novo Item Individual
+        </button>
         <button 
             onClick={() => setShowPackageModal(true)}
             className="w-full py-3 rounded-xl bg-purple-100 dark:bg-purple-900/30 text-premium font-bold flex items-center justify-center gap-2 hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-colors"
         >
-            <i className="fa-solid fa-wand-magic-sparkles"></i> Sugestões por Etapa
+            <i className="fa-solid fa-wand-magic-sparkles"></i> Adicionar Pacote por Etapa
         </button>
       </div>
 
       {showAddForm && (
-          <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-lg border border-slate-100 dark:border-slate-800 animate-in slide-in-from-top-2 mb-4">
-            <h3 className="font-bold text-text-main dark:text-white mb-4">O que vamos comprar?</h3>
-            <form onSubmit={handleAdd} className="space-y-4">
-                 <div>
-                   <label className="text-xs font-bold text-text-muted mb-1 block">Nome do Material</label>
-                   <input 
-                     placeholder="Ex: Cimento, Tijolo..." 
-                     className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-text-main dark:text-white rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary"
-                     value={newMat.name}
-                     onChange={e => setNewMat({...newMat, name: e.target.value})}
-                     required
-                   />
-                 </div>
-                 <div className="flex gap-4">
-                    <div className="flex-1">
-                        <label className="text-xs font-bold text-text-muted mb-1 block">Quantidade</label>
-                        <input 
-                        type="number" 
-                        placeholder="0" 
-                        className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-text-main dark:text-white rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary"
-                        value={newMat.qty}
-                        onChange={e => setNewMat({...newMat, qty: e.target.value})}
-                        required
-                        />
-                    </div>
-                    <div className="w-24">
-                        <label className="text-xs font-bold text-text-muted mb-1 block">Unidade</label>
-                        <input 
-                        type="text" 
-                        placeholder="un" 
-                        className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-text-main dark:text-white rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary"
-                        value={newMat.unit}
-                        onChange={e => setNewMat({...newMat, unit: e.target.value})}
-                        required
-                        />
-                    </div>
-                 </div>
-                 <div className="flex gap-3 pt-2">
-                   <button type="button" onClick={() => setShowAddForm(false)} className="flex-1 py-3 font-bold text-text-muted bg-slate-100 dark:bg-slate-800 rounded-xl">Cancelar</button>
-                   <button type="submit" className="flex-1 py-3 font-bold text-white bg-primary rounded-xl hover:bg-primary-dark">Adicionar</button>
-                 </div>
-            </form>
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in">
+              <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-sm p-6 shadow-2xl">
+                <h3 className="font-bold text-text-main dark:text-white mb-4">Novo Material</h3>
+                <form onSubmit={handleAdd} className="space-y-4">
+                     <div>
+                       <label className="text-xs font-bold text-text-muted mb-1 block">Nome do Material</label>
+                       <input 
+                         placeholder="Ex: Cimento, Tijolo..." 
+                         className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-text-main dark:text-white rounded-xl text-sm outline-none"
+                         value={newMat.name}
+                         onChange={e => setNewMat({...newMat, name: e.target.value})}
+                         required
+                       />
+                     </div>
+                     <div>
+                       <label className="text-xs font-bold text-text-muted mb-1 block">Categoria</label>
+                       <select 
+                         className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-text-main dark:text-white rounded-xl text-sm outline-none"
+                         value={newMat.category}
+                         onChange={e => setNewMat({...newMat, category: e.target.value})}
+                       >
+                           <option value="Geral">Geral</option>
+                           {FULL_MATERIAL_PACKAGES.map(p => <option key={p.category} value={p.category}>{p.category}</option>)}
+                       </select>
+                     </div>
+                     <div className="flex gap-4">
+                        <div className="flex-1">
+                            <label className="text-xs font-bold text-text-muted mb-1 block">Quantidade</label>
+                            <input 
+                            type="number" 
+                            placeholder="0" 
+                            className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-text-main dark:text-white rounded-xl text-sm outline-none"
+                            value={newMat.qty}
+                            onChange={e => setNewMat({...newMat, qty: e.target.value})}
+                            required
+                            />
+                        </div>
+                        <div className="w-24">
+                            <label className="text-xs font-bold text-text-muted mb-1 block">Unidade</label>
+                            <input 
+                            type="text" 
+                            placeholder="un" 
+                            className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-text-main dark:text-white rounded-xl text-sm outline-none"
+                            value={newMat.unit}
+                            onChange={e => setNewMat({...newMat, unit: e.target.value})}
+                            required
+                            />
+                        </div>
+                     </div>
+                     <div className="flex gap-3 pt-2">
+                       <button type="button" onClick={() => setShowAddForm(false)} className="flex-1 py-3 font-bold text-text-muted bg-slate-100 dark:bg-slate-800 rounded-xl">Cancelar</button>
+                       <button type="submit" className="flex-1 py-3 font-bold text-white bg-primary rounded-xl">Salvar</button>
+                     </div>
+                </form>
+              </div>
           </div>
       )}
 
@@ -484,9 +542,9 @@ const MaterialsTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ work
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in">
               <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-sm p-6 shadow-2xl">
                   <h3 className="text-lg font-bold text-text-main dark:text-white mb-2">Pacotes Prontos</h3>
-                  <p className="text-sm text-text-muted dark:text-slate-400 mb-4">Selecione uma etapa para adicionar todos os materiais recomendados de uma vez só.</p>
+                  <p className="text-sm text-text-muted dark:text-slate-400 mb-4">Escolha a categoria para preencher a lista automaticamente.</p>
                   
-                  <div className="grid grid-cols-2 gap-3 mb-6">
+                  <div className="grid grid-cols-2 gap-3 mb-6 max-h-[50vh] overflow-y-auto">
                       {FULL_MATERIAL_PACKAGES.map((pkg, idx) => (
                           <button
                             key={idx}
@@ -505,24 +563,115 @@ const MaterialsTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ work
           </div>
       )}
 
-      <div className="space-y-3">
-           {materials.map(mat => (
-               <div key={mat.id} className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-100 dark:border-slate-800 shadow-sm flex justify-between items-center group">
-                   <div>
-                       <p className="font-bold text-text-main dark:text-white">{mat.name}</p>
-                       <p className="text-sm text-text-muted dark:text-slate-500"><span className="font-bold text-primary">{mat.plannedQty} {mat.unit}</span> planejados</p>
+      {/* RENDER LIST GROUPED */}
+      <div className="space-y-6">
+          {sortedCategories.map(category => (
+              <div key={category} className="space-y-2">
+                   <div className="flex items-center gap-2 px-1">
+                       <div className="h-4 w-1 bg-primary rounded-full"></div>
+                       <h3 className="font-bold text-text-main dark:text-white uppercase tracking-wider text-sm">{category}</h3>
                    </div>
-                   <button onClick={() => handleDeleteClick(mat.id)} className="w-8 h-8 flex items-center justify-center text-slate-300 hover:text-danger rounded-lg transition-colors">
-                       <i className="fa-solid fa-trash"></i>
-                   </button>
-               </div>
-           ))}
-           {materials.length === 0 && !showAddForm && (
+                   {groupedMaterials[category].map(mat => (
+                        <div 
+                            key={mat.id} 
+                            onClick={() => openEditModal(mat)}
+                            className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-100 dark:border-slate-800 shadow-sm flex justify-between items-center group cursor-pointer hover:border-primary/30 transition-all"
+                        >
+                            <div>
+                                <p className="font-bold text-text-main dark:text-white">{mat.name}</p>
+                                <div className="text-sm flex gap-3 mt-1">
+                                    <span className="text-text-muted dark:text-slate-500">
+                                        Planejado: <strong>{mat.plannedQty}</strong> {mat.unit}
+                                    </span>
+                                    {mat.purchasedQty >= mat.plannedQty ? (
+                                        <span className="text-success font-bold text-xs bg-success/10 px-2 py-0.5 rounded-full">Comprado</span>
+                                    ) : (
+                                        <span className={`font-bold text-xs px-2 py-0.5 rounded-full ${mat.purchasedQty > 0 ? 'bg-orange-100 text-orange-600' : 'bg-slate-100 text-slate-500'}`}>
+                                            {mat.purchasedQty > 0 ? `Comprado: ${mat.purchasedQty}` : 'Não comprado'}
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                            <div className="w-8 h-8 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-300">
+                                <i className="fa-solid fa-pen text-xs"></i>
+                            </div>
+                        </div>
+                   ))}
+              </div>
+          ))}
+
+          {materials.length === 0 && (
                 <div className="text-center py-10 text-text-muted dark:text-slate-500">
-                    <p>Nada para comprar por enquanto.</p>
+                    <p>Sua lista está vazia. Adicione itens acima!</p>
                 </div>
            )}
       </div>
+
+      {/* EDIT MODAL */}
+      {editingMaterial && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in">
+              <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-sm p-6 shadow-2xl">
+                  <div className="flex justify-between items-start mb-4">
+                      <h3 className="text-lg font-bold text-text-main dark:text-white">Editar Material</h3>
+                      <button onClick={() => handleDeleteClick(editingMaterial.id)} className="text-danger text-sm font-bold hover:underline">
+                          Excluir
+                      </button>
+                  </div>
+                  <form onSubmit={handleUpdate} className="space-y-4">
+                      <div>
+                          <label className="block text-xs font-bold text-text-muted mb-1">Nome</label>
+                          <input 
+                             className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-surface dark:bg-slate-800 text-text-main dark:text-white outline-none"
+                             value={editingMaterial.name}
+                             onChange={e => setEditingMaterial({...editingMaterial, name: e.target.value})}
+                          />
+                      </div>
+                      <div>
+                       <label className="text-xs font-bold text-text-muted mb-1 block">Categoria</label>
+                       <select 
+                         className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-text-main dark:text-white rounded-xl text-sm outline-none"
+                         value={editingMaterial.category || 'Geral'}
+                         onChange={e => setEditingMaterial({...editingMaterial, category: e.target.value})}
+                       >
+                           <option value="Geral">Geral</option>
+                           {FULL_MATERIAL_PACKAGES.map(p => <option key={p.category} value={p.category}>{p.category}</option>)}
+                       </select>
+                     </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                            <label className="block text-xs font-bold text-text-muted mb-1">Planejado</label>
+                            <input type="number" className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-surface dark:bg-slate-800 text-text-main dark:text-white outline-none" value={editingMaterial.plannedQty} onChange={e => setEditingMaterial({...editingMaterial, plannedQty: Number(e.target.value)})} />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-text-muted mb-1">Já Comprado</label>
+                            <input type="number" className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-surface dark:bg-slate-800 text-text-main dark:text-white outline-none" value={editingMaterial.purchasedQty} onChange={e => setEditingMaterial({...editingMaterial, purchasedQty: Number(e.target.value)})} />
+                        </div>
+                      </div>
+
+                      <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700">
+                           <label className="block text-xs font-bold text-primary mb-1">
+                               <i className="fa-solid fa-money-bill-wave mr-1"></i> Valor desta Compra (R$)
+                           </label>
+                           <input 
+                                type="number" 
+                                placeholder="0,00"
+                                className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-text-main dark:text-white outline-none focus:ring-2 focus:ring-primary" 
+                                value={costInput} 
+                                onChange={e => setCostInput(e.target.value)} 
+                           />
+                           <p className="text-[10px] text-text-muted mt-1 leading-tight">
+                               Se você colocar um valor aqui, ele será adicionado automaticamente em <strong>Gastos</strong>.
+                           </p>
+                      </div>
+                      
+                      <div className="flex gap-3 pt-4">
+                          <button type="button" onClick={() => setEditingMaterial(null)} className="flex-1 py-3 rounded-xl border border-slate-200 dark:border-slate-700 font-bold text-text-muted">Cancelar</button>
+                          <button type="submit" className="flex-1 py-3 rounded-xl bg-primary text-white font-bold">Atualizar</button>
+                      </div>
+                  </form>
+              </div>
+          </div>
+      )}
 
       <ConfirmModal 
          isOpen={confirmModal.isOpen}
@@ -535,20 +684,36 @@ const MaterialsTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ work
   );
 };
 
-// 4. FINANCEIRO
+// 4. FINANCEIRO (Refactored for Step Grouping)
 const ExpensesTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ workId, onUpdate }) => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [steps, setSteps] = useState<Step[]>([]);
   const [showAddForm, setShowAddForm] = useState(false);
-  const [newExp, setNewExp] = useState({ 
+  const [newExp, setNewExp] = useState<{
+      description: string, 
+      amount: string, 
+      category: ExpenseCategory, 
+      date: string,
+      stepId?: string
+  }>({ 
       description: '', 
       amount: '', 
       category: ExpenseCategory.MATERIAL, 
-      date: new Date().toISOString().split('T')[0]
+      date: new Date().toISOString().split('T')[0],
+      stepId: undefined
   });
   const [confirmModal, setConfirmModal] = useState<{isOpen: boolean, title: string, message: string, onConfirm: () => void}>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
 
-  const loadExpenses = async () => setExpenses(await dbService.getExpenses(workId));
-  useEffect(() => { loadExpenses(); }, [workId]);
+  const loadData = async () => {
+      const [expData, stepsData] = await Promise.all([
+          dbService.getExpenses(workId),
+          dbService.getSteps(workId)
+      ]);
+      setExpenses(expData);
+      setSteps(stepsData.sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()));
+  };
+
+  useEffect(() => { loadData(); }, [workId]);
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -560,11 +725,11 @@ const ExpensesTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ workI
       quantity: 1,
       category: newExp.category,
       date: newExp.date,
-      stepId: undefined
+      stepId: newExp.stepId
     });
-    setNewExp({ description: '', amount: '', category: ExpenseCategory.MATERIAL, date: new Date().toISOString().split('T')[0] });
+    setNewExp({ description: '', amount: '', category: ExpenseCategory.MATERIAL, date: new Date().toISOString().split('T')[0], stepId: undefined });
     setShowAddForm(false);
-    loadExpenses();
+    loadData();
     onUpdate();
   };
 
@@ -575,18 +740,35 @@ const ExpensesTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ workI
           message: "Apagar este registro?",
           onConfirm: async () => {
               await dbService.deleteExpense(id);
-              loadExpenses();
+              loadData();
               onUpdate();
               setConfirmModal(prev => ({ ...prev, isOpen: false }));
           }
       });
   };
 
+  // Group Expenses by Step
+  const groupedExpenses: Record<string, Expense[]> = { 'GERAL': [] };
+  
+  // Initialize groups for all steps so they appear even if empty (optional, but good for structure)
+  steps.forEach(s => { groupedExpenses[s.id] = [] });
+
+  expenses.forEach(exp => {
+      if (exp.stepId && groupedExpenses[exp.stepId]) {
+          groupedExpenses[exp.stepId].push(exp);
+      } else {
+          groupedExpenses['GERAL'].push(exp);
+      }
+  });
+
+  // Calculate totals per group
+  const getGroupTotal = (groupExps: Expense[]) => groupExps.reduce((acc, curr) => acc + (curr.amount || 0), 0);
+
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
       <SectionHeader 
           title="Controle de Gastos" 
-          subtitle="Tudo o que saiu do seu bolso."
+          subtitle="Tudo o que saiu do seu bolso, organizado."
       />
 
       {!showAddForm ? (
@@ -601,6 +783,17 @@ const ExpensesTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ workI
             <h3 className="font-bold text-text-main dark:text-white mb-4">O que eu paguei?</h3>
             <form onSubmit={handleAdd} className="space-y-4">
                 <div>
+                    <label className="text-xs font-bold text-text-muted mb-1 block">Onde foi gasto? (Etapa)</label>
+                    <select 
+                        className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-text-main dark:text-white rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary"
+                        value={newExp.stepId || ''}
+                        onChange={e => setNewExp({...newExp, stepId: e.target.value || undefined})}
+                    >
+                        <option value="">Geral / Obra Toda</option>
+                        {steps.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                    </select>
+                </div>
+                <div>
                     <label className="text-xs font-bold text-text-muted mb-1 block">Descrição</label>
                     <input 
                         placeholder="Ex: Cimento, Diária Pedreiro..." 
@@ -610,27 +803,30 @@ const ExpensesTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ workI
                         className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-text-main dark:text-white rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary"
                     />
                 </div>
-                <div>
-                    <label className="text-xs font-bold text-text-muted mb-1 block">Tipo de Gasto</label>
-                    <select 
-                        value={newExp.category}
-                        onChange={e => setNewExp({...newExp, category: e.target.value as ExpenseCategory})}
-                        className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-text-main dark:text-white rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary"
-                    >
-                        {Object.values(ExpenseCategory).map(c => <option key={c} value={c}>{c}</option>)}
-                    </select>
+                <div className="grid grid-cols-2 gap-4">
+                    <div>
+                        <label className="text-xs font-bold text-text-muted mb-1 block">Tipo</label>
+                        <select 
+                            value={newExp.category}
+                            onChange={e => setNewExp({...newExp, category: e.target.value as ExpenseCategory})}
+                            className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-text-main dark:text-white rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary"
+                        >
+                            {Object.values(ExpenseCategory).map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="text-xs font-bold text-text-muted mb-1 block">Valor (R$)</label>
+                        <input 
+                            type="number" 
+                            placeholder="0,00" 
+                            required
+                            value={newExp.amount}
+                            onChange={e => setNewExp({...newExp, amount: e.target.value})}
+                            className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-text-main dark:text-white rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary"
+                        />
+                    </div>
                 </div>
-                <div>
-                    <label className="text-xs font-bold text-text-muted mb-1 block">Valor (R$)</label>
-                    <input 
-                        type="number" 
-                        placeholder="0,00" 
-                        required
-                        value={newExp.amount}
-                        onChange={e => setNewExp({...newExp, amount: e.target.value})}
-                        className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-text-main dark:text-white rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary"
-                    />
-                </div>
+                
                 <div className="flex gap-3 pt-2">
                    <button type="button" onClick={() => setShowAddForm(false)} className="flex-1 py-3 font-bold text-text-muted bg-slate-100 dark:bg-slate-800 rounded-xl">Cancelar</button>
                    <button type="submit" className="flex-1 py-3 font-bold text-white bg-primary rounded-xl hover:bg-primary-dark">Salvar</button>
@@ -639,30 +835,86 @@ const ExpensesTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ workI
         </div>
       )}
 
-      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 overflow-hidden shadow-sm">
-          {expenses.length > 0 ? (
-                <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                    {expenses.map(exp => (
-                        <div key={exp.id} className="p-4 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                            <div>
-                                <p className="font-bold text-text-main dark:text-white">{exp.description}</p>
-                                <p className="text-xs text-text-muted dark:text-slate-500">{new Date(exp.date).toLocaleDateString('pt-BR')} • {exp.category}</p>
+      <div className="space-y-6">
+          {/* GENERAL GROUP */}
+          <div className="space-y-2">
+             <div className="flex items-center justify-between px-1">
+                  <div className="flex items-center gap-2">
+                      <div className="h-4 w-1 bg-slate-400 rounded-full"></div>
+                      <h3 className="font-bold text-text-main dark:text-white uppercase tracking-wider text-sm">Geral / Obra Toda</h3>
+                  </div>
+                  <span className="text-xs font-bold text-text-main dark:text-white bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-lg">
+                      Total: R$ {getGroupTotal(groupedExpenses['GERAL']).toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                  </span>
+             </div>
+             <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 overflow-hidden shadow-sm">
+                 {groupedExpenses['GERAL'].length > 0 ? (
+                    <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                        {groupedExpenses['GERAL'].map(exp => (
+                            <div key={exp.id} className="p-4 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                                <div>
+                                    <p className="font-bold text-text-main dark:text-white">{exp.description}</p>
+                                    <p className="text-xs text-text-muted dark:text-slate-500">{new Date(exp.date).toLocaleDateString('pt-BR')} • {exp.category}</p>
+                                </div>
+                                <div className="flex items-center gap-4">
+                                    <span className="font-bold text-text-body dark:text-slate-300">R$ {exp.amount.toFixed(2)}</span>
+                                    <button onClick={() => handleDeleteClick(exp.id)} className="text-slate-300 hover:text-danger">
+                                        <i className="fa-solid fa-trash"></i>
+                                    </button>
+                                </div>
                             </div>
-                            <div className="flex items-center gap-4">
-                                <span className="font-bold text-text-body dark:text-slate-300">R$ {exp.amount.toFixed(2)}</span>
-                                <button onClick={() => handleDeleteClick(exp.id)} className="text-slate-300 hover:text-danger">
-                                    <i className="fa-solid fa-trash"></i>
-                                </button>
-                            </div>
+                        ))}
+                    </div>
+                 ) : (
+                    <div className="p-4 text-center text-xs text-text-muted dark:text-slate-500 italic">
+                        Sem gastos gerais.
+                    </div>
+                 )}
+             </div>
+          </div>
+
+          {/* STEP GROUPS */}
+          {steps.map(step => {
+              const groupTotal = getGroupTotal(groupedExpenses[step.id]);
+              // Only show if there are expenses OR if user might want to see empty categories (let's show all for structure)
+              return (
+                <div key={step.id} className="space-y-2">
+                    <div className="flex items-center justify-between px-1">
+                        <div className="flex items-center gap-2">
+                            <div className="h-4 w-1 bg-primary rounded-full"></div>
+                            <h3 className="font-bold text-text-main dark:text-white uppercase tracking-wider text-sm truncate max-w-[200px]">{step.name}</h3>
                         </div>
-                    ))}
+                        <span className="text-xs font-bold text-text-main dark:text-white bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-lg">
+                            Total: R$ {groupTotal.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                        </span>
+                    </div>
+                    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 overflow-hidden shadow-sm">
+                        {groupedExpenses[step.id] && groupedExpenses[step.id].length > 0 ? (
+                            <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                                {groupedExpenses[step.id].map(exp => (
+                                    <div key={exp.id} className="p-4 flex items-center justify-between hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                                        <div>
+                                            <p className="font-bold text-text-main dark:text-white">{exp.description}</p>
+                                            <p className="text-xs text-text-muted dark:text-slate-500">{new Date(exp.date).toLocaleDateString('pt-BR')} • {exp.category}</p>
+                                        </div>
+                                        <div className="flex items-center gap-4">
+                                            <span className="font-bold text-text-body dark:text-slate-300">R$ {exp.amount.toFixed(2)}</span>
+                                            <button onClick={() => handleDeleteClick(exp.id)} className="text-slate-300 hover:text-danger">
+                                                <i className="fa-solid fa-trash"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="p-4 text-center text-xs text-text-muted dark:text-slate-500 italic">
+                                Nenhum gasto nesta etapa ainda.
+                            </div>
+                        )}
+                    </div>
                 </div>
-          ) : (
-            <div className="p-12 text-center text-text-muted dark:text-slate-500">
-                <i className="fa-solid fa-receipt text-3xl mb-3 opacity-30"></i>
-                <p>Nenhum gasto anotado.</p>
-            </div>
-          )}
+              );
+          })}
       </div>
 
       <ConfirmModal 
@@ -849,16 +1101,23 @@ const ContactsView: React.FC = () => {
     const [suppliers, setSuppliers] = useState<Supplier[]>([]);
     const [showAdd, setShowAdd] = useState(false);
     
+    // Lists from DB
+    const [availableRoles, setAvailableRoles] = useState<string[]>([]);
+    const [availableCategories, setAvailableCategories] = useState<string[]>([]);
+    
     // Form States
     const [newName, setNewName] = useState('');
     const [newRole, setNewRole] = useState('');
     const [newPhone, setNewPhone] = useState('');
     const [newNote, setNewNote] = useState('');
+    const [confirmModal, setConfirmModal] = useState({isOpen: false, id: '', type: ''});
 
     const loadData = async () => {
         if (!user) return;
         setWorkers(await dbService.getWorkers(user.id));
         setSuppliers(await dbService.getSuppliers(user.id));
+        setAvailableRoles(await dbService.getJobRoles());
+        setAvailableCategories(await dbService.getSupplierCategories());
     };
 
     useEffect(() => { loadData(); }, [user]);
@@ -881,6 +1140,8 @@ const ContactsView: React.FC = () => {
                 name: newName,
                 category: newRole, // using role input as category
                 phone: newPhone,
+                email: '',
+                address: '',
                 notes: newNote
             });
         }
@@ -889,12 +1150,12 @@ const ContactsView: React.FC = () => {
         loadData();
     };
 
-    const handleDelete = async (id: string) => {
-        if (confirm('Tem certeza que deseja remover este contato?')) {
-            if (activeTab === 'WORKERS') await dbService.deleteWorker(id);
-            else await dbService.deleteSupplier(id);
-            loadData();
-        }
+    const handleDelete = async () => {
+        const { id, type } = confirmModal;
+        if (type === 'WORKERS') await dbService.deleteWorker(id);
+        else await dbService.deleteSupplier(id);
+        setConfirmModal({isOpen: false, id: '', type: ''});
+        loadData();
     }
 
     const formatPhoneLink = (phone: string) => {
@@ -937,7 +1198,17 @@ const ContactsView: React.FC = () => {
                         </div>
                         <div>
                             <label className="text-xs font-bold text-text-muted mb-1 block">{activeTab === 'WORKERS' ? 'Profissão' : 'Categoria'}</label>
-                            <input required value={newRole} onChange={e => setNewRole(e.target.value)} className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 bg-surface dark:bg-slate-800 rounded-xl outline-none" placeholder={activeTab === 'WORKERS' ? "Ex: Pedreiro" : "Ex: Material de Construção"} />
+                            <select 
+                                required 
+                                value={newRole} 
+                                onChange={e => setNewRole(e.target.value)} 
+                                className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 bg-surface dark:bg-slate-800 rounded-xl outline-none"
+                            >
+                                <option value="" disabled>Selecione uma opção</option>
+                                {(activeTab === 'WORKERS' ? availableRoles : availableCategories).map(item => (
+                                    <option key={item} value={item}>{item}</option>
+                                ))}
+                            </select>
                         </div>
                         <div>
                             <label className="text-xs font-bold text-text-muted mb-1 block">WhatsApp / Telefone</label>
@@ -972,7 +1243,7 @@ const ContactsView: React.FC = () => {
                                  <i className="fa-brands fa-whatsapp text-lg"></i>
                              </a>
                              <button 
-                                onClick={() => handleDelete(item.id)}
+                                onClick={() => setConfirmModal({isOpen: true, id: item.id, type: activeTab})}
                                 className="w-10 h-10 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-400 hover:text-danger flex items-center justify-center transition-colors"
                              >
                                  <i className="fa-solid fa-trash"></i>
@@ -986,6 +1257,14 @@ const ContactsView: React.FC = () => {
                     </div>
                 )}
             </div>
+
+            <ConfirmModal 
+                isOpen={confirmModal.isOpen} 
+                title="Excluir Contato" 
+                message="Tem certeza?" 
+                onConfirm={handleDelete} 
+                onCancel={() => setConfirmModal({isOpen: false, id: '', type: ''})} 
+            />
         </div>
     );
 }

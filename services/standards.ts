@@ -233,6 +233,19 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
   }
 ];
 
+// --- FALLBACK LISTS FOR CONTACTS ---
+export const STANDARD_JOB_ROLES = [
+  'Pedreiro', 'Ajudante', 'Mestre de Obras', 'Pintor', 'Eletricista', 
+  'Encanador', 'Gesseiro', 'Marceneiro', 'Serralheiro', 'Vidraceiro', 
+  'Arquiteto', 'Engenheiro', 'Outros'
+];
+
+export const STANDARD_SUPPLIER_CATEGORIES = [
+  'Material Básico', 'Elétrica', 'Hidráulica', 'Pisos e Revestimentos',
+  'Tintas', 'Madeiras', 'Vidraçaria', 'Marmoraria', 'Locação de Equipamentos',
+  'Caçamba', 'Outros'
+];
+
 
 // --- LIFETIME BONUSES ---
 export const LIFETIME_BONUSES = [
