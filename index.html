@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MÃOS DA OBRA</title>
+    <!-- Tailwind via CDN is useful for quick previews, but PostCSS/Vite will handle the build version via CSS generation -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            colors: {
+              primary: {
+                DEFAULT: '#1E3A45',
+                light: '#3B7C8C',
+                dark: '#152932',
+                50: '#E8F1F4',
+              },
+              secondary: '#3B7C8C',
+              success: {
+                DEFAULT: '#2BB86B',
+                light: '#D1FAE5',
+                dark: '#1F854D'
+              },
+              warning: {
+                DEFAULT: '#FACC15',
+                light: '#FEF9C3',
+                dark: '#A16207'
+              },
+              danger: {
+                DEFAULT: '#EF4444',
+                light: '#FEE2E2',
+                dark: '#B91C1C'
+              },
+              premium: {
+                DEFAULT: '#6D28D9',
+                light: '#EDE9FE',
+              },
+              surface: '#F3F4F6',
+              text: {
+                main: '#111827',
+                body: '#374151',
+                muted: '#9CA3AF',
+              }
+            },
+            fontFamily: {
+              sans: ['Inter', 'sans-serif'],
+              display: ['Inter', 'sans-serif'],
+            }
+          }
+        }
+      }
+    </script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
+    <style>
+      .material-symbols-outlined {
+        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+      }
+      body {
+        background-color: #F9FAFB; 
+        font-family: 'Inter', sans-serif;
+        color: #374151;
+      }
+      .dark body {
+        background-color: #0f172a;
+        color: #e2e8f0;
+      }
+      ::-webkit-scrollbar { width: 8px; height: 8px; }
+      ::-webkit-scrollbar-track { background: #f1f5f9; }
+      .dark ::-webkit-scrollbar-track { background: #1e293b; }
+      ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+      .dark ::-webkit-scrollbar-thumb { background: #475569; }
+      ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+      .hide-scrollbar::-webkit-scrollbar { display: none; }
+      .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+      @media print {
+        @page { margin: 1cm; size: A4 portrait; }
+        body, #root, main, div { overflow: visible !important; height: auto !important; min-height: auto !important; }
+        body, .dark body { background-color: white !important; color: black !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        ::-webkit-scrollbar { display: none; }
+        .grid { display: grid !important; }
+        .flex { display: flex !important; }
+        .dark .text-white { color: #111827 !important; }
+        .dark .bg-slate-900, .dark .bg-surface, .dark .bg-slate-800 { background-color: white !important; border-color: #e5e7eb !important; }
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react-router-dom": "https://aistudiocdn.com/react-router-dom@^7.9.6",
+    "recharts": "https://aistudiocdn.com/recharts@^3.5.0",
+    "vite": "https://aistudiocdn.com/vite@^7.2.4",
+    "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.1.1",
+    "@supabase/supabase-js": "https://aistudiocdn.com/@supabase/supabase-js@^2.86.0"
+  }
+}
+</script>
+</head>
+  <body class="bg-surface dark:bg-slate-950 transition-colors duration-200">
+    <div id="root"></div>
+    <script type="module" src="./index.tsx"></script>
+  </body>
+</html>
