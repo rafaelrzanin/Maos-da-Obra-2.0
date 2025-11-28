@@ -689,7 +689,7 @@ const ExpensesTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ workI
   const { user } = useAuth();
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [steps, setSteps] = useState<Step[]>([]);
-  const [workers, setWorkers] = useState<Worker[]>([]); // New: Workers List
+  const [jobRoles, setJobRoles] = useState<string[]>([]); // Standard roles
   
   // UI States
   const [showForm, setShowForm] = useState(false);
@@ -704,7 +704,6 @@ const ExpensesTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ workI
       category: ExpenseCategory, 
       date: string,
       stepId?: string,
-      workerId?: string // New: Worker Selection
   }>({ 
       description: '', 
       amount: '', 
@@ -712,24 +711,19 @@ const ExpensesTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ workI
       category: ExpenseCategory.MATERIAL, 
       date: new Date().toISOString().split('T')[0],
       stepId: undefined,
-      workerId: undefined
   });
   
   const [confirmModal, setConfirmModal] = useState<{isOpen: boolean, title: string, message: string, onConfirm: () => void}>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
 
   const loadData = async () => {
-      const [expData, stepsData] = await Promise.all([
+      const [expData, stepsData, rolesData] = await Promise.all([
           dbService.getExpenses(workId),
-          dbService.getSteps(workId)
+          dbService.getSteps(workId),
+          dbService.getJobRoles()
       ]);
       setExpenses(expData);
       setSteps(stepsData.sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()));
-      
-      // Load workers if user exists
-      if (user) {
-          const w = await dbService.getWorkers(user.id);
-          setWorkers(w);
-      }
+      setJobRoles(rolesData);
   };
 
   useEffect(() => { loadData(); }, [workId, user]);
@@ -742,7 +736,6 @@ const ExpensesTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ workI
           category: ExpenseCategory.MATERIAL, 
           date: new Date().toISOString().split('T')[0], 
           stepId: undefined,
-          workerId: undefined
       });
       setIsEditing(false);
       setEditingId(null);
@@ -757,7 +750,6 @@ const ExpensesTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ workI
           category: exp.category,
           date: exp.date,
           stepId: exp.stepId,
-          workerId: exp.workerId
       });
       setIsEditing(true);
       setEditingId(exp.id);
@@ -775,7 +767,7 @@ const ExpensesTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ workI
       category: formData.category,
       date: formData.date,
       stepId: formData.stepId,
-      workerId: formData.workerId
+      workerId: undefined // Removed explicit worker linking
     };
 
     if (isEditing && editingId) {
@@ -805,16 +797,14 @@ const ExpensesTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ workI
       });
   };
 
-  // Logic to auto-fill description when selecting worker
-  const handleWorkerSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
-      const wId = e.target.value;
-      const worker = workers.find(w => w.id === wId);
+  // Logic to auto-fill description when selecting Role
+  const handleRoleSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
+      const role = e.target.value;
       setFormData(prev => ({
-          ...prev, 
-          workerId: wId,
-          description: worker ? `${prev.description || 'Pagamento:'} ${worker.name}` : prev.description
+          ...prev,
+          description: role ? `Serviço de ${role}` : prev.description
       }));
-  };
+  }
 
   // Group Expenses by Step
   const groupedExpenses: Record<string, Expense[]> = { 'GERAL': [] };
@@ -860,21 +850,20 @@ const ExpensesTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ workI
                     </select>
                 </div>
 
-                {/* 1.5 Worker Selection (Only if Category is Labor) */}
+                {/* 1.5 Role Selection Logic */}
                 {formData.category === ExpenseCategory.LABOR && (
-                    <div className="animate-in fade-in slide-in-from-top-1">
-                        <label className="text-xs font-bold text-primary mb-1 block">Qual profissional?</label>
-                        <select 
-                            className="w-full px-4 py-3 border-2 border-primary/20 bg-primary/5 text-text-main dark:text-white rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary"
-                            value={formData.workerId || ''}
-                            onChange={handleWorkerSelect}
-                        >
-                            <option value="">Selecione da equipe...</option>
-                            {workers.map(w => <option key={w.id} value={w.id}>{w.name} ({w.role})</option>)}
-                        </select>
-                        {workers.length === 0 && (
-                            <p className="text-[10px] text-red-500 mt-1">Nenhum trabalhador cadastrado em Contatos.</p>
-                        )}
+                    <div className="animate-in fade-in slide-in-from-top-1 space-y-3 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700">
+                        <label className="text-xs font-bold text-primary block">Qual profissional?</label>
+                        <div>
+                            <select 
+                                className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-text-main dark:text-white rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary"
+                                onChange={handleRoleSelect}
+                                defaultValue=""
+                            >
+                                <option value="" disabled>Selecione a profissão...</option>
+                                {jobRoles.map(role => <option key={role} value={role}>{role}</option>)}
+                            </select>
+                        </div>
                     </div>
                 )}
 
