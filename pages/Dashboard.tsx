@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../App';
 import { dbService } from '../services/db';
 import { Work, Notification } from '../types';
+import { ZE_AVATAR } from '../services/standards';
 
 const Dashboard: React.FC = () => {
   const { user } = useAuth();
@@ -117,9 +118,29 @@ const Dashboard: React.FC = () => {
              </button>
           )}
       </div>
+      
+      {/* DICA DO ZE CARD (Test Image) */}
+      <div className="mb-6 bg-blue-50 dark:bg-blue-900/10 p-4 rounded-2xl border border-blue-100 dark:border-blue-800 flex items-center gap-4">
+           <div className="w-14 h-14 rounded-full bg-white border-2 border-primary p-0.5 shrink-0 shadow-sm overflow-hidden relative">
+                <img 
+                src={ZE_AVATAR} 
+                alt="Zé da Obra" 
+                className="w-full h-full object-cover rounded-full"
+                onError={(e) => {
+                    e.currentTarget.src = 'https://ui-avatars.com/api/?name=Ze+Obra&background=1E3A45&color=fff';
+                }}
+                />
+           </div>
+           <div>
+               <h3 className="font-bold text-primary dark:text-blue-200 text-sm mb-0.5">Dica do Zé</h3>
+               <p className="text-xs text-text-body dark:text-slate-400 leading-snug">
+                   Sempre peça nota fiscal dos materiais. Além da garantia, ajuda a controlar os gastos reais no app!
+               </p>
+           </div>
+      </div>
 
       {/* DAILY SUMMARY CARD */}
-      <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800 mb-8 overflow-hidden">
+      <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800 mb-6 overflow-hidden">
           
           <div className="p-6 pb-2">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
@@ -132,14 +153,6 @@ const Dashboard: React.FC = () => {
                           <p className="text-sm text-text-muted dark:text-slate-400 font-medium">{focusWork.name}</p>
                       </div>
                   </div>
-
-                  <button 
-                    onClick={() => navigate(`/work/${focusWork.id}`)}
-                    className="w-full md:w-auto flex items-center justify-center gap-2 bg-primary hover:bg-primary-dark text-white text-base font-bold py-3.5 px-6 rounded-xl shadow-lg shadow-primary/20 transition-all active:scale-95"
-                  >
-                    <span>Acessar Minha Obra</span>
-                    <i className="fa-solid fa-arrow-right-long mt-0.5"></i>
-                  </button>
               </div>
 
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-6">
@@ -223,6 +236,15 @@ const Dashboard: React.FC = () => {
               </div>
           </div>
       </div>
+
+      {/* MAIN CTA - MOVED HERE */}
+      <button 
+        onClick={() => navigate(`/work/${focusWork.id}`)}
+        className="w-full mb-8 flex items-center justify-center gap-3 bg-primary hover:bg-primary-dark text-white text-lg font-bold py-4 rounded-2xl shadow-xl shadow-primary/25 transition-all active:scale-95 border-2 border-primary/20"
+      >
+        <span>Acessar Minha Obra</span>
+        <i className="fa-solid fa-arrow-right-long mt-1"></i>
+      </button>
 
       {isPerfectWeek && (
           <div className="mb-8 p-5 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg shadow-purple-500/20 relative overflow-hidden animate-in fade-in slide-in-from-bottom-2">
