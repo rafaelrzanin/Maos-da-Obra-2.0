@@ -1727,7 +1727,7 @@ const FilesView: React.FC<{ workId: string }> = ({ workId }) => {
 }
 
 const AssistantView: React.FC = () => {
-    const { user } = useAuth();
+   // const { user } = useAuth();
     const [messages, setMessages] = useState<{id: string, text: string, sender: 'USER' | 'AI'}[]>([]);
     const [input, setInput] = useState('');
     const [thinking, setThinking] = useState(false);
