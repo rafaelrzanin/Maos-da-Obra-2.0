@@ -27,7 +27,7 @@ interface DbSchema {
 
 const initialDb: DbSchema = {
   users: [
-    { id: '1', name: 'Usuário Demo', email: 'demo@maos.com', whatsapp: '(11) 99999-9999', plan: PlanType.MENSAL, subscriptionExpiresAt: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString() }
+    { id: '1', name: 'Usuário Demo', email: 'demo@maos.com', whatsapp: '(11) 99999-9999', plan: PlanType.VITALICIO, subscriptionExpiresAt: new Date(new Date().setFullYear(new Date().getFullYear() + 100)).toISOString() }
   ],
   works: [],
   steps: [],
@@ -52,6 +52,14 @@ const getLocalDb = (): DbSchema => {
   if (!db.photos) db.photos = [];
   if (!db.suppliers) db.suppliers = [];
   if (!db.workers) db.workers = [];
+  
+  // Ensure demo user is always VITALICIO in local mode for testing
+  const demoUser = db.users.find((u: User) => u.email === 'demo@maos.com');
+  if (demoUser && demoUser.plan !== PlanType.VITALICIO) {
+      demoUser.plan = PlanType.VITALICIO;
+      saveLocalDb(db);
+  }
+  
   return db;
 };
 
@@ -539,7 +547,7 @@ export const dbService = {
               work_id: material.workId,
               name: material.name,
               planned_qty: material.plannedQty,
-              purchased_qty: material.purchasedQty,
+              purchased_qty: material.purchased_qty,
               unit: material.unit,
               category: material.category || 'Geral'
           });
