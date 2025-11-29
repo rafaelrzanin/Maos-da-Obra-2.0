@@ -66,7 +66,15 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
 
   useEffect(() => {
     const currentUser = dbService.getCurrentUser();
-    if (currentUser) setUser(currentUser);
+    if (currentUser) {
+        // --- FORÇAR VITALICIO SE JÁ ESTIVER LOGADO (MODO CONFIGURAÇÃO) ---
+        if (currentUser.plan !== PlanType.VITALICIO) {
+            currentUser.plan = PlanType.VITALICIO;
+            // Atualiza o cache local para não piscar
+            localStorage.setItem('maos_session_v1', JSON.stringify(currentUser));
+        }
+        setUser(currentUser);
+    }
   }, []);
 
   const login = async (email: string, password?: string) => {
