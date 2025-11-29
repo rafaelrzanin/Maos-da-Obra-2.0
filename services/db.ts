@@ -145,18 +145,14 @@ export const dbService = {
         if (data.user) {
             let { data: profile } = await supabase.from('profiles').select('*').eq('id', data.user.id).single();
             
-            // --- FORÇAR VITALICIO PARA TODOS (MODO CONFIGURAÇÃO) ---
+            // --- FORÇAR VITALICIO PARA TODOS (DEV MODE) ---
             if (profile && profile.plan !== PlanType.VITALICIO) {
                 await supabase.from('profiles').update({ plan: PlanType.VITALICIO }).eq('id', profile.id);
                 profile.plan = PlanType.VITALICIO;
             }
             // ----------------------------------------------
 
-            if (profile) {
-                // IMPORTANT: Persist session to local storage for app reloads
-                localStorage.setItem(SESSION_KEY, JSON.stringify(profile));
-                return profile as User;
-            }
+            if (profile) return profile as User;
         }
         return null;
     } else {
@@ -197,17 +193,12 @@ export const dbService = {
         
         await new Promise(r => setTimeout(r, 1000));
         
-        // --- FORÇAR VITALICIO AO CRIAR (MODO CONFIGURAÇÃO) ---
+        // --- FORÇAR VITALICIO AO CRIAR ---
         await supabase.from('profiles').update({ plan: PlanType.VITALICIO }).eq('id', data.user.id);
         // ---------------------------------
 
         const { data: profile } = await supabase.from('profiles').select('*').eq('id', data.user.id).single();
-        if (profile) {
-            // IMPORTANT: Persist session
-            localStorage.setItem(SESSION_KEY, JSON.stringify(profile));
-            return profile as User;
-        }
-        return null;
+        return profile as User;
 
     } else {
         return new Promise((resolve) => {
@@ -249,14 +240,6 @@ export const dbService = {
             plan, 
             subscription_expires_at: baseDate.toISOString() 
         }).eq('id', userId);
-        
-        // Update local session as well if it matches
-        const currentUser = dbService.getCurrentUser();
-        if (currentUser && currentUser.id === userId) {
-            currentUser.plan = plan;
-            localStorage.setItem(SESSION_KEY, JSON.stringify(currentUser));
-        }
-
      } else {
         const db = getLocalDb();
         const userIdx = db.users.findIndex(u => u.id === userId);
