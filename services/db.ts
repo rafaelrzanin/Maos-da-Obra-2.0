@@ -3,7 +3,7 @@ import {
   PlanType, WorkStatus, StepStatus, Notification, StandardMaterial,
   Supplier, Worker, ExpenseCategory
 } from '../types';
-import { FULL_MATERIAL_PACKAGES, STANDARD_JOB_ROLES, STANDARD_SUPPLIER_CATEGORIES } from './standards';
+import { STANDARD_PHASES, FULL_MATERIAL_PACKAGES, STANDARD_JOB_ROLES, STANDARD_SUPPLIER_CATEGORIES } from './standards';
 import { supabase } from './supabase';
 
 // --- LOCAL STORAGE FALLBACK CONSTANTS ---
@@ -65,7 +65,7 @@ const calculateEstimatedMaterials = (area: number, floors: number = 1): Partial<
   if (!area || area <= 0) return [];
   
   const estimated: Partial<Material>[] = [];
-  //const effectiveArea = area; // Total construction area
+  const effectiveArea = area; // Total construction area
   const roofArea = (area / floors) * 1.3; // Footprint * 30% pitch
   const wallArea = area * 2.8; // Rough estimate of wall surface
 
