@@ -27,8 +27,7 @@ interface DbSchema {
 
 const initialDb: DbSchema = {
   users: [
-    // FORÇADO VITALICIO PARA TESTES
-    { id: '1', name: 'Usuário Demo', email: 'demo@maos.com', whatsapp: '(11) 99999-9999', plan: PlanType.VITALICIO, subscriptionExpiresAt: new Date(new Date().setFullYear(new Date().getFullYear() + 99)).toISOString() }
+    { id: '1', name: 'Usuário Demo', email: 'demo@maos.com', whatsapp: '(11) 99999-9999', plan: PlanType.MENSAL, subscriptionExpiresAt: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString() }
   ],
   works: [],
   steps: [],
@@ -143,15 +142,7 @@ export const dbService = {
         }
 
         if (data.user) {
-            let { data: profile } = await supabase.from('profiles').select('*').eq('id', data.user.id).single();
-            
-            // --- FORÇAR VITALICIO PARA TODOS (DEV MODE) ---
-            if (profile && profile.plan !== PlanType.VITALICIO) {
-                await supabase.from('profiles').update({ plan: PlanType.VITALICIO }).eq('id', profile.id);
-                profile.plan = PlanType.VITALICIO;
-            }
-            // ----------------------------------------------
-
+            const { data: profile } = await supabase.from('profiles').select('*').eq('id', data.user.id).single();
             if (profile) return profile as User;
         }
         return null;
@@ -159,13 +150,8 @@ export const dbService = {
         return new Promise((resolve) => {
             setTimeout(() => {
                 const db = getLocalDb();
-                let user = db.users.find(u => u.email === email);
+                const user = db.users.find(u => u.email === email);
                 if (user) {
-                    // Force update local user to Vitalicio
-                    if (user.plan !== PlanType.VITALICIO) {
-                        user.plan = PlanType.VITALICIO;
-                        saveLocalDb(db);
-                    }
                     localStorage.setItem(SESSION_KEY, JSON.stringify(user));
                     resolve(user);
                 } else {
@@ -193,10 +179,6 @@ export const dbService = {
         
         await new Promise(r => setTimeout(r, 1000));
         
-        // --- FORÇAR VITALICIO AO CRIAR ---
-        await supabase.from('profiles').update({ plan: PlanType.VITALICIO }).eq('id', data.user.id);
-        // ---------------------------------
-
         const { data: profile } = await supabase.from('profiles').select('*').eq('id', data.user.id).single();
         return profile as User;
 
@@ -208,8 +190,8 @@ export const dbService = {
                 name,
                 email,
                 whatsapp,
-                plan: PlanType.VITALICIO, // Começa como VITALICIO
-                subscriptionExpiresAt: new Date(new Date().setFullYear(new Date().getFullYear() + 99)).toISOString()
+                plan: PlanType.MENSAL, 
+                subscriptionExpiresAt: new Date(new Date().setDate(new Date().getDate() + 30)).toISOString()
             };
             db.users.push(newUser);
             saveLocalDb(db);
