@@ -220,14 +220,24 @@ const Login: React.FC = () => {
                   </div>
               </div>
 
+              {/* PREMIUM SOCIAL BUTTONS */}
               <div className="grid grid-cols-2 gap-4">
-                  <button onClick={() => handleSocialLogin('google')} className="flex items-center justify-center gap-2 h-12 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors bg-white dark:bg-slate-900">
-                      <i className="fa-brands fa-google text-red-500"></i>
-                      <span className="text-sm font-medium text-text-main dark:text-white">Google</span>
+                  {/* Google Button */}
+                  <button 
+                      onClick={() => handleSocialLogin('google')} 
+                      className="group flex items-center justify-center gap-3 h-14 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all duration-300 shadow-sm hover:shadow-lg hover:-translate-y-0.5"
+                  >
+                      <i className="fa-brands fa-google text-xl text-slate-700 dark:text-white group-hover:text-red-500 transition-colors"></i>
+                      <span className="text-sm font-bold text-slate-700 dark:text-slate-200 group-hover:text-slate-900 dark:group-hover:text-white">Google</span>
                   </button>
-                  <button onClick={() => handleSocialLogin('apple')} className="flex items-center justify-center gap-2 h-12 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors bg-white dark:bg-slate-900">
-                      <i className="fa-brands fa-apple text-black dark:text-white"></i>
-                      <span className="text-sm font-medium text-text-main dark:text-white">Apple</span>
+
+                  {/* Apple Button */}
+                  <button 
+                      onClick={() => handleSocialLogin('apple')} 
+                      className="group flex items-center justify-center gap-3 h-14 rounded-xl bg-slate-900 dark:bg-white hover:bg-black dark:hover:bg-slate-200 text-white dark:text-black transition-all duration-300 shadow-md hover:shadow-lg hover:-translate-y-0.5"
+                  >
+                      <i className="fa-brands fa-apple text-xl mb-0.5 transition-transform group-hover:scale-110"></i>
+                      <span className="text-sm font-bold">Apple</span>
                   </button>
               </div>
 
