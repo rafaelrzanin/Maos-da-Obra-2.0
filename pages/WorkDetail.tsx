@@ -10,7 +10,7 @@ import { aiService } from '../services/ai';
 // --- Shared Components ---
 
 const SectionHeader: React.FC<{ title: string, subtitle: string }> = ({ title, subtitle }) => (
-    <div className="mb-8">
+    <div className="mb-6">
         <h2 className="text-2xl font-bold text-primary dark:text-white tracking-tight">{title}</h2>
         <p className="text-sm text-slate-500 dark:text-slate-400 font-medium mt-1">{subtitle}</p>
         <div className="h-1 w-10 bg-secondary rounded-full mt-3"></div>
@@ -45,7 +45,7 @@ const ZeModal: React.FC<ZeModalProps> = ({ isOpen, title, message, confirmText =
                 <div className="w-16 h-16 rounded-full p-1 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-800 shadow-lg shrink-0">
                     <img 
                     src={ZE_AVATAR} 
-                    alt="Zé" 
+                    alt="Zé da Obra" 
                     className="w-full h-full object-cover rounded-full border-2 border-white dark:border-slate-800"
                     onError={(e) => { e.currentTarget.src = 'https://ui-avatars.com/api/?name=Ze+Obra&background=0F172A&color=fff'; }}
                     />
@@ -441,7 +441,7 @@ const StepsTab: React.FC<{ workId: string, refreshWork: () => void }> = ({ workI
           </div>
       )}
 
-      {/* ZÉ MODAL */}
+      {/* ZÉ DA OBRA MODAL */}
       <ZeModal 
         isOpen={zeModal.isOpen}
         title={zeModal.title}
@@ -459,7 +459,7 @@ const StepsTab: React.FC<{ workId: string, refreshWork: () => void }> = ({ workI
                 <div className="relative z-10">
                     <div className="flex gap-5 mb-6">
                         <div className="w-16 h-16 rounded-full p-1 bg-gradient-to-br from-slate-100 to-slate-200 shadow-lg shrink-0">
-                             <img src={ZE_AVATAR} alt="Zé" className="w-full h-full object-cover rounded-full border-2 border-white" />
+                             <img src={ZE_AVATAR} alt="Zé da Obra" className="w-full h-full object-cover rounded-full border-2 border-white" />
                         </div>
                         <div>
                             <h3 className="text-xl font-bold text-primary dark:text-white leading-tight mb-1">Oi, chefe!</h3>
@@ -494,11 +494,573 @@ const StepsTab: React.FC<{ workId: string, refreshWork: () => void }> = ({ workI
   );
 };
 
+// --- Materials Tab ---
+const MaterialsTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ workId, onUpdate }) => {
+    const [materials, setMaterials] = useState<Material[]>([]);
+    const [isCreateOpen, setIsCreateOpen] = useState(false);
+    const [isImportOpen, setIsImportOpen] = useState(false);
+    const [editingMaterial, setEditingMaterial] = useState<Material | null>(null);
+    const [editCost, setEditCost] = useState<string>('');
+    const [newMaterial, setNewMaterial] = useState({ name: '', plannedQty: '', unit: 'un', category: 'Geral' });
+    
+    // Grouped
+    const [groupedMaterials, setGroupedMaterials] = useState<Record<string, Material[]>>({});
+
+    const load = async () => {
+        const data = await dbService.getMaterials(workId);
+        setMaterials(data);
+        
+        // Group by Category
+        const grouped: Record<string, Material[]> = {};
+        data.forEach(m => {
+            const cat = m.category || 'Geral';
+            if (!grouped[cat]) grouped[cat] = [];
+            grouped[cat].push(m);
+        });
+        setGroupedMaterials(grouped);
+        onUpdate();
+    };
+
+    useEffect(() => { load(); }, [workId]);
+
+    const handleAdd = async (e: React.FormEvent) => {
+        e.preventDefault();
+        await dbService.addMaterial({
+            workId,
+            name: newMaterial.name,
+            plannedQty: Number(newMaterial.plannedQty),
+            purchasedQty: 0,
+            unit: newMaterial.unit,
+            category: newMaterial.category
+        });
+        setNewMaterial({ name: '', plannedQty: '', unit: 'un', category: 'Geral' });
+        setIsCreateOpen(false);
+        load();
+    };
+
+    const handleImport = async (category: string) => {
+        const count = await dbService.importMaterialPackage(workId, category);
+        alert(`${count} materiais adicionados.`);
+        setIsImportOpen(false);
+        load();
+    };
+    
+    const handleUpdate = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if(editingMaterial) {
+            await dbService.updateMaterial(editingMaterial, Number(editCost));
+            setEditingMaterial(null);
+            setEditCost('');
+            load();
+        }
+    }
+
+    return (
+        <div className="animate-in fade-in duration-500 pb-20">
+            <div className="flex items-center justify-between mb-8">
+                <SectionHeader title="Materiais" subtitle="Controle de compras e estoque." />
+                <div className="flex gap-2">
+                     <button onClick={() => setIsImportOpen(true)} className="bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-secondary w-12 h-12 rounded-2xl flex items-center justify-center transition-all">
+                        <i className="fa-solid fa-cloud-arrow-down text-lg"></i>
+                    </button>
+                    <button onClick={() => setIsCreateOpen(true)} className="bg-primary text-white w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg transition-all">
+                        <i className="fa-solid fa-plus text-lg"></i>
+                    </button>
+                </div>
+            </div>
+
+            {Object.keys(groupedMaterials).sort().map(cat => (
+                <div key={cat} className="mb-8 last:mb-0">
+                     <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                        <i className="fa-solid fa-layer-group text-secondary"></i> {cat}
+                     </h3>
+                     <div className="space-y-3">
+                        {groupedMaterials[cat].map(m => {
+                            const isPurchased = m.purchasedQty >= m.plannedQty;
+                            const percentage = Math.min(100, Math.round((m.purchasedQty / m.plannedQty) * 100)) || 0;
+                            return (
+                                <div 
+                                  key={m.id} 
+                                  onClick={() => setEditingMaterial(m)}
+                                  className={`p-4 rounded-2xl border bg-white dark:bg-slate-900 cursor-pointer transition-all hover:border-secondary/50 hover:shadow-md ${isPurchased ? 'border-green-200 dark:border-green-900/30 opacity-60' : 'border-slate-100 dark:border-slate-800'}`}
+                                >
+                                    <div className="flex justify-between items-start mb-2">
+                                        <h4 className="font-bold text-primary dark:text-white">{m.name}</h4>
+                                        <div className={`text-[10px] font-bold px-2 py-0.5 rounded-md uppercase ${isPurchased ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}`}>
+                                            {isPurchased ? 'Comprado' : 'Pendente'}
+                                        </div>
+                                    </div>
+                                    <div className="flex items-end gap-2">
+                                        <div className="flex-1">
+                                            <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                                                <div className={`h-full rounded-full ${isPurchased ? 'bg-success' : 'bg-secondary'}`} style={{width: `${percentage}%`}}></div>
+                                            </div>
+                                        </div>
+                                        <div className="text-xs font-bold text-slate-500 whitespace-nowrap">
+                                            {m.purchasedQty} / {m.plannedQty} {m.unit}
+                                        </div>
+                                    </div>
+                                </div>
+                            )
+                        })}
+                     </div>
+                </div>
+            ))}
+            
+            {materials.length === 0 && (
+                 <div className="text-center py-12 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-3xl">
+                    <i className="fa-solid fa-cart-shopping text-4xl text-slate-200 dark:text-slate-700 mb-3"></i>
+                    <p className="text-slate-400 font-medium">Nenhum material na lista.</p>
+                 </div>
+            )}
+
+            {/* CREATE MODAL */}
+            {isCreateOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-8 shadow-2xl">
+                         <h3 className="text-xl font-bold text-primary dark:text-white mb-6">Novo Material</h3>
+                         <form onSubmit={handleAdd} className="space-y-4">
+                             <input placeholder="Nome do Material" className="w-full px-4 py-3 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 outline-none" value={newMaterial.name} onChange={e => setNewMaterial({...newMaterial, name: e.target.value})} />
+                             <div className="grid grid-cols-2 gap-3">
+                                <input type="number" placeholder="Qtd" className="w-full px-4 py-3 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 outline-none" value={newMaterial.plannedQty} onChange={e => setNewMaterial({...newMaterial, plannedQty: e.target.value})} />
+                                <input placeholder="Un (kg, m, un)" className="w-full px-4 py-3 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 outline-none" value={newMaterial.unit} onChange={e => setNewMaterial({...newMaterial, unit: e.target.value})} />
+                             </div>
+                             <input placeholder="Categoria (ex: Pintura)" className="w-full px-4 py-3 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 outline-none" value={newMaterial.category} onChange={e => setNewMaterial({...newMaterial, category: e.target.value})} />
+                             <div className="flex gap-3 pt-2">
+                                <button type="button" onClick={() => setIsCreateOpen(false)} className="flex-1 py-3 font-bold text-slate-500">Cancelar</button>
+                                <button type="submit" className="flex-1 py-3 bg-primary text-white rounded-xl font-bold">Salvar</button>
+                             </div>
+                         </form>
+                    </div>
+                </div>
+            )}
+            
+            {/* EDIT MODAL */}
+            {editingMaterial && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-8 shadow-2xl">
+                        <h3 className="text-xl font-bold text-primary dark:text-white mb-6">Atualizar Estoque</h3>
+                        <form onSubmit={handleUpdate} className="space-y-4">
+                            <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl mb-2">
+                                <p className="text-sm font-bold text-primary dark:text-white">{editingMaterial.name}</p>
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-[10px] uppercase font-bold text-slate-400">Planejado</label>
+                                    <input type="number" className="w-full px-3 py-2 rounded-xl border bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700" value={editingMaterial.plannedQty} onChange={e => setEditingMaterial({...editingMaterial, plannedQty: Number(e.target.value)})} />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] uppercase font-bold text-slate-400">Comprado</label>
+                                    <input type="number" className="w-full px-3 py-2 rounded-xl border bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700" value={editingMaterial.purchasedQty} onChange={e => setEditingMaterial({...editingMaterial, purchasedQty: Number(e.target.value)})} />
+                                </div>
+                            </div>
+                            <div>
+                                <label className="text-[10px] uppercase font-bold text-slate-400">Valor desta compra (Opcional)</label>
+                                <div className="relative">
+                                    <span className="absolute left-3 top-2.5 text-slate-400 text-sm">R$</span>
+                                    <input type="number" className="w-full pl-8 pr-4 py-2 rounded-xl border bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700" placeholder="0.00" value={editCost} onChange={e => setEditCost(e.target.value)} />
+                                </div>
+                                <p className="text-[10px] text-slate-400 mt-1">Se preencher, lança no financeiro automaticamente.</p>
+                            </div>
+                             <div className="flex gap-3 pt-4">
+                                <button type="button" onClick={() => { setEditingMaterial(null); setEditCost(''); }} className="flex-1 py-3 font-bold text-slate-500">Cancelar</button>
+                                <button type="submit" className="flex-1 py-3 bg-primary text-white rounded-xl font-bold">Salvar</button>
+                             </div>
+                             <button type="button" onClick={async () => { await dbService.deleteMaterial(editingMaterial.id); setEditingMaterial(null); load(); }} className="w-full py-2 text-red-500 text-xs font-bold uppercase tracking-wider">Excluir Material</button>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* IMPORT MODAL */}
+            {isImportOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-6 shadow-2xl h-[500px] flex flex-col">
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="text-lg font-bold text-primary dark:text-white">Pacotes Prontos</h3>
+                            <button onClick={() => setIsImportOpen(false)}><i className="fa-solid fa-xmark text-slate-400"></i></button>
+                        </div>
+                        <div className="flex-1 overflow-y-auto space-y-2 pr-2">
+                             {FULL_MATERIAL_PACKAGES.map(pkg => (
+                                 <button key={pkg.category} onClick={() => handleImport(pkg.category)} className="w-full p-4 rounded-xl border border-slate-100 dark:border-slate-800 hover:border-secondary hover:bg-slate-50 dark:hover:bg-slate-800 transition-all text-left group">
+                                     <h4 className="font-bold text-primary dark:text-white group-hover:text-secondary">{pkg.category}</h4>
+                                     <p className="text-xs text-slate-400">{pkg.items.length} itens sugeridos</p>
+                                 </button>
+                             ))}
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
+// --- Expenses Tab ---
+const ExpensesTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ workId, onUpdate }) => {
+    const [expenses, setExpenses] = useState<Expense[]>([]);
+    const [isCreateOpen, setIsCreateOpen] = useState(false);
+    const [groupedExpenses, setGroupedExpenses] = useState<Record<string, {total: number, items: Expense[]}>>({});
+    const [steps, setSteps] = useState<Step[]>([]);
+    
+    // Form
+    const [formData, setFormData] = useState<Partial<Expense>>({
+        date: new Date().toISOString().split('T')[0],
+        category: ExpenseCategory.MATERIAL,
+        amount: 0,
+        paidAmount: 0,
+        description: '',
+        stepId: 'geral' 
+    });
+    
+    // Edit Mode
+    const [editingId, setEditingId] = useState<string | null>(null);
+
+    const load = async () => {
+        const [exp, stp] = await Promise.all([
+            dbService.getExpenses(workId),
+            dbService.getSteps(workId)
+        ]);
+        setExpenses(exp);
+        setSteps(stp);
+
+        // Grouping
+        const grouped: Record<string, {total: number, items: Expense[]}> = {};
+        
+        // Helper to find step name
+        const getStepName = (id?: string) => {
+            if (!id || id === 'geral') return 'Geral / Obra Toda';
+            const s = stp.find(st => st.id === id);
+            return s ? s.name : 'Outros';
+        };
+
+        exp.forEach(e => {
+            const groupName = getStepName(e.stepId);
+            if (!grouped[groupName]) grouped[groupName] = { total: 0, items: [] };
+            grouped[groupName].items.push(e);
+            grouped[groupName].total += (e.paidAmount || 0); // Sum paid amount for total
+        });
+        
+        setGroupedExpenses(grouped);
+        onUpdate();
+    };
+
+    useEffect(() => { load(); }, [workId]);
+
+    const handleSave = async (e: React.FormEvent) => {
+        e.preventDefault();
+        const payload = {
+            workId,
+            description: formData.description!,
+            amount: Number(formData.amount),
+            paidAmount: Number(formData.paidAmount),
+            category: formData.category!,
+            date: formData.date!,
+            stepId: formData.stepId === 'geral' ? undefined : formData.stepId,
+            quantity: 1
+        };
+
+        if (editingId) {
+            await dbService.updateExpense({ ...payload, id: editingId } as Expense);
+        } else {
+            await dbService.addExpense(payload);
+        }
+
+        setIsCreateOpen(false);
+        setEditingId(null);
+        setFormData({
+            date: new Date().toISOString().split('T')[0],
+            category: ExpenseCategory.MATERIAL,
+            amount: 0,
+            paidAmount: 0,
+            description: '',
+            stepId: 'geral'
+        });
+        load();
+    };
+    
+    const handleEdit = (expense: Expense) => {
+        setEditingId(expense.id);
+        setFormData({
+            ...expense,
+            stepId: expense.stepId || 'geral'
+        });
+        setIsCreateOpen(true);
+    };
+
+    const handleDelete = async (id: string) => {
+        if(confirm("Excluir este gasto?")) {
+             await dbService.deleteExpense(id);
+             setIsCreateOpen(false);
+             load();
+        }
+    };
+
+    // Auto-fill description for Labor
+    useEffect(() => {
+        if (formData.category === ExpenseCategory.LABOR && !formData.description) {
+            // Optional: could add logic here
+        }
+    }, [formData.category]);
+
+    return (
+        <div className="animate-in fade-in duration-500 pb-20">
+             <div className="flex items-center justify-between mb-8">
+                <SectionHeader title="Gastos" subtitle="Controle financeiro detalhado." />
+                <button onClick={() => { setEditingId(null); setIsCreateOpen(true); }} className="bg-primary text-white w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg transition-all">
+                    <i className="fa-solid fa-plus text-lg"></i>
+                </button>
+            </div>
+
+            {Object.keys(groupedExpenses).sort().map(group => (
+                <div key={group} className="mb-8">
+                    <div className="flex justify-between items-end mb-4 border-b border-slate-100 dark:border-slate-800 pb-2">
+                        <h3 className="font-bold text-primary dark:text-white">{group}</h3>
+                        <span className="text-xs font-bold text-slate-500">R$ {groupedExpenses[group].total.toLocaleString('pt-BR')}</span>
+                    </div>
+                    <div className="space-y-3">
+                        {groupedExpenses[group].items.map(expense => {
+                             const isPaid = expense.paidAmount === expense.amount;
+                             const isPartial = (expense.paidAmount || 0) > 0 && (expense.paidAmount || 0) < expense.amount;
+                             
+                             return (
+                                 <div key={expense.id} onClick={() => handleEdit(expense)} className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-4 rounded-2xl shadow-sm hover:shadow-md transition-all cursor-pointer">
+                                     <div className="flex justify-between items-start mb-2">
+                                         <div className="flex items-center gap-3">
+                                             <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs ${
+                                                 expense.category === ExpenseCategory.MATERIAL ? 'bg-blue-50 text-blue-600' :
+                                                 expense.category === ExpenseCategory.LABOR ? 'bg-orange-50 text-orange-600' :
+                                                 'bg-slate-50 text-slate-600'
+                                             }`}>
+                                                 <i className={`fa-solid ${
+                                                     expense.category === ExpenseCategory.MATERIAL ? 'fa-box' :
+                                                     expense.category === ExpenseCategory.LABOR ? 'fa-helmet-safety' : 'fa-tag'
+                                                 }`}></i>
+                                             </div>
+                                             <div>
+                                                 <p className="font-bold text-sm text-primary dark:text-white">{expense.description}</p>
+                                                 <p className="text-[10px] text-slate-400">{new Date(expense.date).toLocaleDateString('pt-BR')}</p>
+                                             </div>
+                                         </div>
+                                         <div className="text-right">
+                                             <p className="font-bold text-primary dark:text-white">R$ {expense.amount.toLocaleString('pt-BR')}</p>
+                                             <div className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                                                 isPaid ? 'bg-green-100 text-green-700' : 
+                                                 isPartial ? 'bg-orange-100 text-orange-700' : 'bg-red-100 text-red-700'
+                                             }`}>
+                                                 {isPaid ? 'Pago' : isPartial ? 'Parcial' : 'Pendente'}
+                                             </div>
+                                         </div>
+                                     </div>
+                                 </div>
+                             )
+                        })}
+                    </div>
+                </div>
+            ))}
+            
+            {expenses.length === 0 && (
+                <div className="text-center py-12 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-3xl">
+                <i className="fa-solid fa-wallet text-4xl text-slate-200 dark:text-slate-700 mb-3"></i>
+                <p className="text-slate-400 font-medium">Nenhum gasto lançado.</p>
+                </div>
+            )}
+
+            {isCreateOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-8 shadow-2xl overflow-y-auto max-h-[90vh]">
+                        <h3 className="text-xl font-bold text-primary dark:text-white mb-6">{editingId ? 'Editar Gasto' : 'Novo Gasto'}</h3>
+                        <form onSubmit={handleSave} className="space-y-4">
+                            
+                            {/* 1. O QUE (Categoria) */}
+                            <div>
+                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Tipo de Gasto</label>
+                                <div className="grid grid-cols-2 gap-2">
+                                    {[ExpenseCategory.MATERIAL, ExpenseCategory.LABOR, ExpenseCategory.PERMITS, ExpenseCategory.OTHER].map(cat => (
+                                        <button 
+                                            key={cat}
+                                            type="button"
+                                            onClick={() => setFormData({...formData, category: cat})}
+                                            className={`p-2 rounded-xl text-xs font-bold border ${formData.category === cat ? 'bg-primary text-white border-primary' : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500'}`}
+                                        >
+                                            {cat}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* 2. ONDE (Etapa) */}
+                            <div>
+                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Etapa da Obra</label>
+                                <select 
+                                    className="w-full px-4 py-3 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 outline-none text-sm"
+                                    value={formData.stepId}
+                                    onChange={e => setFormData({...formData, stepId: e.target.value})}
+                                >
+                                    <option value="geral">Geral / Obra Toda</option>
+                                    {steps.map(s => (
+                                        <option key={s.id} value={s.id}>{s.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            {/* 3. DESCRIÇÃO */}
+                            {formData.category === ExpenseCategory.LABOR ? (
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Profissão / Serviço</label>
+                                    <select 
+                                        className="w-full px-4 py-3 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 outline-none text-sm"
+                                        value={formData.description}
+                                        onChange={e => setFormData({...formData, description: e.target.value})}
+                                    >
+                                        <option value="">Selecione...</option>
+                                        <option value="Serviço de Pedreiro">Pedreiro</option>
+                                        <option value="Serviço de Pintor">Pintor</option>
+                                        <option value="Serviço de Eletricista">Eletricista</option>
+                                        <option value="Serviço de Encanador">Encanador</option>
+                                        <option value="Serviço de Ajudante">Ajudante</option>
+                                        <option value="Empreita Global">Empreiteiro</option>
+                                    </select>
+                                </div>
+                            ) : (
+                                <input 
+                                    placeholder="Descrição (ex: Cimento, Taxa)" 
+                                    className="w-full px-4 py-3 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 outline-none text-sm" 
+                                    value={formData.description}
+                                    onChange={e => setFormData({...formData, description: e.target.value})}
+                                    required
+                                />
+                            )}
+
+                            {/* 4. VALORES */}
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Valor Total</label>
+                                    <input type="number" className="w-full px-4 py-3 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 outline-none" value={formData.amount} onChange={e => setFormData({...formData, amount: Number(e.target.value)})} />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Valor Pago</label>
+                                    <input type="number" className="w-full px-4 py-3 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 outline-none" value={formData.paidAmount} onChange={e => setFormData({...formData, paidAmount: Number(e.target.value)})} />
+                                </div>
+                            </div>
+
+                            <input type="date" className="w-full px-4 py-3 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 outline-none text-sm" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} />
+                            
+                            <div className="flex gap-3 pt-2">
+                                <button type="button" onClick={() => setIsCreateOpen(false)} className="flex-1 py-3 font-bold text-slate-500">Cancelar</button>
+                                <button type="submit" className="flex-1 py-3 bg-primary text-white rounded-xl font-bold shadow-lg">Salvar</button>
+                            </div>
+                            {editingId && (
+                                <button type="button" onClick={() => handleDelete(editingId)} className="w-full py-2 text-red-500 text-xs font-bold uppercase tracking-wider">Excluir</button>
+                            )}
+                        </form>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
+// --- More / Super Menu Tab ---
+const MoreMenuTab: React.FC<{ workId: string }> = ({ workId }) => {
+    const { user } = useAuth();
+    const isLifetime = user?.plan === PlanType.VITALICIO;
+    
+    // Sub-views state management would happen here ideally, or use modal overlays
+    // For simplicity in this structure, we'll use "alerts" for placeholders of sub-views 
+    // or we assume full implementation of ContactView etc. would be rendered if selected.
+    // In this premium version, let's keep it as a Grid Menu that "opens" sections.
+    
+    const [activeSection, setActiveSection] = useState<string | null>(null);
+
+    const sections = [
+        { id: 'TEAM', icon: 'fa-users', label: 'Equipe', color: 'bg-blue-500' },
+        { id: 'SUPPLIERS', icon: 'fa-truck', label: 'Fornecedores', color: 'bg-indigo-500' },
+        { id: 'REPORTS', icon: 'fa-chart-line', label: 'Relatórios', color: 'bg-emerald-500' },
+        { id: 'PHOTOS', icon: 'fa-camera', label: 'Galeria', color: 'bg-rose-500' },
+        { id: 'FILES', icon: 'fa-folder-open', label: 'Projetos', color: 'bg-orange-500' },
+    ];
+
+    const bonusFeatures = [
+        { id: 'AI', icon: 'fa-robot', label: 'IA do Zé da Obra', desc: 'Tire dúvidas 24h' },
+        { id: 'CALC', icon: 'fa-calculator', label: 'Calculadora', desc: 'Estimativa de material' },
+        { id: 'CONTRACTS', icon: 'fa-file-signature', label: 'Contratos', desc: 'Modelos prontos' },
+        { id: 'CHECKLISTS', icon: 'fa-list-check', label: 'Checklists', desc: 'Não esqueça nada' },
+    ];
+
+    // Placeholder Renderers for Sub-Views
+    if (activeSection === 'TEAM' || activeSection === 'SUPPLIERS') return (
+        <div className="animate-in fade-in slide-in-from-bottom-4">
+             <button onClick={() => setActiveSection(null)} className="mb-4 text-sm font-bold text-slate-400 hover:text-primary"><i className="fa-solid fa-arrow-left"></i> Voltar</button>
+             <div className="text-center py-20"><i className="fa-solid fa-hard-hat text-4xl text-slate-200 mb-4"></i><p>Gestão de Contatos em Breve</p></div>
+        </div>
+    );
+    // ... Implement other placeholders or full views as needed. For now, showing the menu structure.
+
+    return (
+        <div className="animate-in fade-in duration-500 pb-24">
+            <SectionHeader title="Mais Opções" subtitle="Gestão completa e ferramentas." />
+            
+            {/* MANAGEMENT GRID */}
+            <div className="grid grid-cols-3 gap-3 mb-8">
+                {sections.map(s => (
+                    <button 
+                        key={s.id}
+                        onClick={() => alert("Funcionalidade restaurada em breve! (Placeholders)")}
+                        className="flex flex-col items-center justify-center p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm hover:shadow-md transition-all active:scale-95"
+                    >
+                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-white mb-2 shadow-lg ${s.color}`}>
+                            <i className={`fa-solid ${s.icon}`}></i>
+                        </div>
+                        <span className="text-xs font-bold text-slate-600 dark:text-slate-300">{s.label}</span>
+                    </button>
+                ))}
+            </div>
+
+            {/* LIFETIME BONUS SECTION */}
+            <div className={`relative rounded-3xl p-6 overflow-hidden ${isLifetime ? 'bg-gradient-to-br from-slate-900 to-slate-800 text-white' : 'bg-slate-100 dark:bg-slate-800'}`}>
+                {!isLifetime && (
+                    <div className="absolute inset-0 bg-white/60 dark:bg-black/60 backdrop-blur-[2px] z-10 flex flex-col items-center justify-center text-center p-6">
+                        <i className="fa-solid fa-lock text-3xl text-slate-400 mb-3"></i>
+                        <h3 className="font-bold text-primary dark:text-white mb-1">Bônus Exclusivo</h3>
+                        <p className="text-xs text-slate-500 mb-4">Disponível no Plano Vitalício</p>
+                        <button onClick={() => window.location.hash = '#/settings'} className="bg-premium text-white px-6 py-2 rounded-xl font-bold shadow-lg shadow-purple-500/20 text-sm">
+                            Liberar Acesso
+                        </button>
+                    </div>
+                )}
+
+                <div className="relative z-0">
+                    <div className="flex items-center gap-3 mb-6">
+                         <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-white shadow-lg">
+                             <i className="fa-solid fa-crown"></i>
+                         </div>
+                         <div>
+                             <h3 className={`font-bold ${isLifetime ? 'text-white' : 'text-slate-700 dark:text-slate-200'}`}>Ferramentas Premium</h3>
+                             <p className={`text-xs ${isLifetime ? 'text-slate-400' : 'text-slate-500'}`}>Incluso no seu plano</p>
+                         </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                        {bonusFeatures.map(f => (
+                            <button key={f.id} onClick={() => isLifetime && alert("Abrindo " + f.label)} className={`p-4 rounded-xl text-left transition-all ${isLifetime ? 'bg-white/10 hover:bg-white/20 border border-white/5' : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700'}`}>
+                                <i className={`fa-solid ${f.icon} text-xl mb-2 ${isLifetime ? 'text-secondary' : 'text-slate-400'}`}></i>
+                                <h4 className={`font-bold text-sm mb-0.5 ${isLifetime ? 'text-white' : 'text-slate-600 dark:text-slate-300'}`}>{f.label}</h4>
+                                <p className={`text-[10px] leading-tight ${isLifetime ? 'text-slate-400' : 'text-slate-400'}`}>{f.desc}</p>
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// --- MAIN DETAIL COMPONENT ---
 const WorkDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [work, setWork] = useState<Work | null>(null);
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState('overview'); // overview, steps, materials, expenses, more
   const [stats, setStats] = useState({ totalSpent: 0, progress: 0, delayedSteps: 0 });
   const [loading, setLoading] = useState(true);
   
@@ -553,67 +1115,63 @@ const WorkDetail: React.FC = () => {
   );
 
   return (
-      <div className="max-w-6xl mx-auto pb-24 pt-6 px-4 md:px-0">
+      <div className="min-h-screen pb-24"> {/* Added padding for bottom bar */}
           
-          {/* Header */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-              <div>
-                  <button onClick={() => navigate('/')} className="text-xs font-bold text-slate-400 hover:text-primary mb-2 flex items-center gap-1 transition-colors">
-                      <i className="fa-solid fa-arrow-left"></i> Voltar
-                  </button>
-                  <h1 className="text-3xl font-extrabold text-primary dark:text-white flex items-center gap-3">
-                      {work.name}
-                      <span className={`text-xs px-2 py-1 rounded-lg border uppercase tracking-widest ${work.status === 'Planejamento' ? 'bg-blue-50 text-blue-600 border-blue-200' : 'bg-green-50 text-green-600 border-green-200'}`}>
-                          {work.status}
-                      </span>
-                  </h1>
-              </div>
-              <button 
+          {/* Top Header */}
+          <div className="sticky top-0 z-30 bg-surface/90 dark:bg-slate-950/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 px-4 py-4 flex justify-between items-center">
+               <div className="flex items-center gap-3">
+                   <button onClick={() => navigate('/')} className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500">
+                       <i className="fa-solid fa-arrow-left"></i>
+                   </button>
+                   <h1 className="font-bold text-primary dark:text-white truncate max-w-[200px]">{work.name}</h1>
+               </div>
+               <button 
                   onClick={() => setShowAiChat(true)}
-                  className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white px-5 py-3 rounded-xl font-bold shadow-lg shadow-orange-500/20 flex items-center gap-2 transition-all transform hover:scale-105"
+                  className="bg-secondary text-white w-8 h-8 rounded-full flex items-center justify-center shadow-lg shadow-orange-500/20"
               >
-                  <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center">
-                      <i className="fa-solid fa-robot text-xs"></i>
-                  </div>
-                  Falar com o Zé
+                  <i className="fa-solid fa-robot text-xs"></i>
               </button>
           </div>
 
-          {/* Navigation */}
-          <div className="flex overflow-x-auto gap-2 mb-8 pb-2 hide-scrollbar">
+          {/* Content Area */}
+          <div className="max-w-4xl mx-auto p-4 md:p-6">
+              {activeTab === 'overview' && <OverviewTab work={work} stats={stats} onGoToSteps={() => setActiveTab('steps')} />}
+              {activeTab === 'steps' && <StepsTab workId={work.id} refreshWork={loadWork} />}
+              {activeTab === 'materials' && <MaterialsTab workId={work.id} onUpdate={loadWork} />}
+              {activeTab === 'expenses' && <ExpensesTab workId={work.id} onUpdate={loadWork} />}
+              {activeTab === 'more' && <MoreMenuTab workId={work.id} />}
+          </div>
+
+          {/* Bottom Navigation Bar */}
+          <div className="fixed bottom-0 left-0 w-full bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 pb-safe pt-2 px-6 flex justify-between items-center z-40 shadow-[0_-5px_20px_rgba(0,0,0,0.05)]">
               {[
-                  { id: 'overview', icon: 'fa-chart-pie', label: 'Visão Geral' },
-                  { id: 'steps', icon: 'fa-list-check', label: 'Cronograma' },
+                  { id: 'overview', icon: 'fa-house', label: 'Geral' },
+                  { id: 'steps', icon: 'fa-calendar-days', label: 'Cronograma' },
+                  { id: 'materials', icon: 'fa-cart-shopping', label: 'Materiais' },
+                  { id: 'expenses', icon: 'fa-wallet', label: 'Gastos' },
+                  { id: 'more', icon: 'fa-bars', label: 'Mais' },
               ].map(tab => (
                   <button
                       key={tab.id}
                       onClick={() => setActiveTab(tab.id)}
-                      className={`flex items-center gap-2 px-5 py-3 rounded-xl font-bold text-sm transition-all whitespace-nowrap ${
-                          activeTab === tab.id 
-                          ? 'bg-primary text-white shadow-md' 
-                          : 'bg-white dark:bg-slate-900 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800'
+                      className={`flex flex-col items-center gap-1 min-w-[60px] transition-all duration-300 ${
+                          activeTab === tab.id ? 'text-secondary -translate-y-2' : 'text-slate-400 hover:text-slate-600'
                       }`}
                   >
-                      <i className={`fa-solid ${tab.icon}`}></i>
-                      {tab.label}
+                      <div className={`w-10 h-10 rounded-2xl flex items-center justify-center text-lg transition-all ${
+                          activeTab === tab.id ? 'bg-secondary text-white shadow-lg shadow-orange-500/30' : ''
+                      }`}>
+                          <i className={`fa-solid ${tab.icon}`}></i>
+                      </div>
+                      <span className={`text-[10px] font-bold ${activeTab === tab.id ? 'opacity-100' : 'opacity-0'}`}>{tab.label}</span>
                   </button>
               ))}
           </div>
 
-          {/* Content */}
-          <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 md:p-8 border border-slate-100 dark:border-slate-800 shadow-sm min-h-[400px]">
-              {activeTab === 'overview' && (
-                  <OverviewTab work={work} stats={stats} onGoToSteps={() => setActiveTab('steps')} />
-              )}
-              {activeTab === 'steps' && (
-                  <StepsTab workId={work.id} refreshWork={loadWork} />
-              )}
-          </div>
-
-          {/* Zé Chat */}
+          {/* Zé da Obra Chat Modal */}
           {showAiChat && (
-              <div className="fixed bottom-0 right-0 md:bottom-6 md:right-6 w-full md:w-[380px] h-[500px] bg-white dark:bg-slate-900 md:rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 z-50 flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-300">
-                  <div className="p-4 bg-primary text-white flex justify-between items-center shrink-0">
+              <div className="fixed inset-0 z-50 flex flex-col bg-white dark:bg-slate-900 animate-in slide-in-from-bottom duration-300 md:max-w-md md:right-4 md:bottom-20 md:left-auto md:top-auto md:h-[600px] md:rounded-3xl md:shadow-2xl md:border md:border-slate-200">
+                  <div className="p-4 bg-primary text-white flex justify-between items-center shrink-0 md:rounded-t-3xl">
                       <div className="flex items-center gap-3">
                           <div className="w-10 h-10 rounded-full bg-white/10 p-1">
                               <img src={ZE_AVATAR} className="w-full h-full object-cover rounded-full" />
@@ -653,7 +1211,7 @@ const WorkDetail: React.FC = () => {
                       )}
                   </div>
 
-                  <form onSubmit={handleAiSend} className="p-3 bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 flex gap-2 shrink-0">
+                  <form onSubmit={handleAiSend} className="p-3 bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 flex gap-2 shrink-0 md:rounded-b-3xl">
                       <input 
                           className="flex-1 bg-slate-100 dark:bg-slate-800 border-0 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-secondary/50 outline-none dark:text-white"
                           placeholder="Digite sua dúvida..."

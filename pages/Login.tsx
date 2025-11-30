@@ -104,14 +104,15 @@ const Login: React.FC = () => {
           </button>
 
           {/* Floating Card Container */}
-          <div className="w-full max-w-md bg-white/90 dark:bg-slate-900/80 backdrop-blur-xl p-8 lg:p-10 rounded-[2.5rem] shadow-2xl border border-white/50 dark:border-white/5 animate-in fade-in slide-in-from-bottom-8 duration-700">
+          <div className="w-full max-w-md bg-white/95 dark:bg-slate-900/80 backdrop-blur-xl p-8 lg:p-10 rounded-[2.5rem] shadow-2xl border border-white/50 dark:border-white/5 animate-in fade-in slide-in-from-bottom-8 duration-700">
               
               {/* Mobile Logo */}
               <div className="lg:hidden flex flex-col items-center mb-10">
                   <div className="w-16 h-16 bg-gradient-gold rounded-2xl flex items-center justify-center text-white text-2xl mb-4 shadow-glow">
                       <i className="fa-solid fa-helmet-safety"></i>
                   </div>
-                  <h1 className="text-2xl font-extrabold text-white tracking-tight">MÃOS DA OBRA</h1>
+                  {/* Changed text color to primary for contrast against white card */}
+                  <h1 className="text-2xl font-extrabold text-primary dark:text-white tracking-tight">MÃOS DA OBRA</h1>
               </div>
 
               <div className="mb-10 text-center lg:text-left">
@@ -211,7 +212,8 @@ const Login: React.FC = () => {
                       <div className="w-full border-t border-slate-200 dark:border-slate-800"></div>
                   </div>
                   <div className="relative flex justify-center text-xs uppercase tracking-widest font-bold">
-                      <span className="bg-white dark:bg-slate-900 px-4 text-slate-400">Ou entre com</span>
+                      {/* Changed bg and text color for better contrast */}
+                      <span className="bg-white dark:bg-slate-900 px-4 text-primary dark:text-slate-400">Ou entre com</span>
                   </div>
               </div>
 
