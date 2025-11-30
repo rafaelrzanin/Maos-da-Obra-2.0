@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth, useTheme } from '../App';
 import { useNavigate } from 'react-router-dom';
@@ -47,220 +46,206 @@ const Login: React.FC = () => {
   };
 
   return (
-    <div className="flex min-h-screen w-full bg-slate-50 dark:bg-slate-950 transition-colors duration-300 relative lg:overflow-hidden">
+    <div className="flex min-h-screen w-full bg-surface dark:bg-black relative overflow-hidden font-sans">
       
-      {/* BACKGROUND FOR MOBILE (Gradient + Blobs) */}
-      <div className="absolute inset-0 lg:hidden bg-gradient-to-br from-[#0F2933] to-[#1E3A45] z-0">
-          <div className="absolute top-[-10%] right-[-10%] w-[300px] h-[300px] bg-white/5 rounded-full blur-3xl pointer-events-none"></div>
-          <div className="absolute bottom-[-10%] left-[-10%] w-[200px] h-[200px] bg-[#3B7C8C]/20 rounded-full blur-3xl pointer-events-none"></div>
+      {/* MOBILE BACKGROUND (Premium Dark Gradient) */}
+      <div className="absolute inset-0 lg:hidden bg-gradient-premium z-0">
+          <div className="absolute top-[-20%] right-[-20%] w-[400px] h-[400px] bg-secondary/20 rounded-full blur-[100px] animate-pulse"></div>
+          <div className="absolute bottom-[-10%] left-[-10%] w-[300px] h-[300px] bg-primary-light/40 rounded-full blur-[80px]"></div>
       </div>
 
-      {/* LEFT SIDE - BRAND VISUAL (Desktop Only) */}
-      <div className="hidden lg:flex w-1/2 bg-gradient-to-br from-[#0F2933] to-[#1E3A45] relative overflow-hidden flex-col justify-between p-12 text-white z-10">
-          {/* Abstract Pattern */}
-          <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-white/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none"></div>
-          <div className="absolute bottom-0 left-0 w-[300px] h-[300px] bg-[#3B7C8C]/20 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2 pointer-events-none"></div>
+      {/* LEFT SIDE (Desktop Visual) */}
+      <div className="hidden lg:flex w-5/12 bg-gradient-premium relative overflow-hidden flex-col justify-between p-16 text-white z-10 border-r border-white/5">
+          {/* Decorative Orbs */}
+          <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-secondary/10 rounded-full blur-[120px] -translate-y-1/2 translate-x-1/2"></div>
+          <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-white/5 rounded-full blur-[100px] translate-y-1/2 -translate-x-1/2"></div>
           
           {/* Logo Area */}
-          <div className="relative z-10 flex items-center gap-3">
-              <div className="w-10 h-10 bg-white/10 backdrop-blur-sm rounded-xl flex items-center justify-center border border-white/20">
-                  <i className="fa-solid fa-helmet-safety text-white"></i>
+          <div className="relative z-10 flex items-center gap-4">
+              <div className="w-12 h-12 bg-gradient-gold rounded-2xl flex items-center justify-center shadow-glow">
+                  <i className="fa-solid fa-helmet-safety text-white text-xl"></i>
               </div>
-              <span className="font-bold text-xl tracking-wide">MÃOS DA OBRA</span>
+              <div>
+                  <h1 className="font-extrabold text-2xl tracking-tight leading-none">MÃOS DA<br/>OBRA</h1>
+              </div>
           </div>
 
-          {/* Hero Text */}
-          <div className="relative z-10 max-w-lg mb-20">
-              <h1 className="text-5xl font-bold leading-tight mb-6">
-                  Construa seu sonho <br/>
-                  <span className="text-[#8AD6E9]">sem pesadelos.</span>
-              </h1>
-              <p className="text-lg text-slate-300 leading-relaxed">
-                  A ferramenta definitiva para quem quer controle total sobre cronograma, orçamento e materiais. Simples, visual e profissional.
+          {/* Hero Copy */}
+          <div className="relative z-10 max-w-md">
+              <div className="inline-block px-3 py-1 mb-6 rounded-full bg-white/10 border border-white/10 backdrop-blur-md">
+                  <span className="text-xs font-bold text-secondary tracking-widest uppercase">Versão 2.0 Premium</span>
+              </div>
+              <h2 className="text-5xl font-bold leading-tight mb-6 tracking-tight">
+                  Construa com <br/>
+                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-secondary to-yellow-200">Maestria.</span>
+              </h2>
+              <p className="text-lg text-slate-300 leading-relaxed font-light border-l-2 border-secondary pl-6">
+                  Gestão profissional de obras simplificada para proprietários exigentes. Cronograma, custos e materiais em um só lugar.
               </p>
-              
-              <div className="mt-8 flex items-center gap-4">
-                  <div className="flex -space-x-3">
-                      <div className="w-10 h-10 rounded-full border-2 border-[#1E3A45] bg-slate-200 flex items-center justify-center overflow-hidden">
-                         <i className="fa-solid fa-user text-slate-400 mt-2"></i>
-                      </div>
-                      <div className="w-10 h-10 rounded-full border-2 border-[#1E3A45] bg-slate-300 flex items-center justify-center overflow-hidden">
-                         <i className="fa-solid fa-user text-slate-500 mt-2"></i>
-                      </div>
-                      <div className="w-10 h-10 rounded-full border-2 border-[#1E3A45] bg-slate-400 flex items-center justify-center overflow-hidden">
-                         <i className="fa-solid fa-user text-slate-600 mt-2"></i>
-                      </div>
-                  </div>
-                  <div className="text-sm font-medium">
-                      <span className="block text-white">Mais de 10.000 obras</span>
-                      <span className="text-slate-400">gerenciadas com sucesso.</span>
-                  </div>
-              </div>
           </div>
 
-          {/* Footer */}
-          <div className="relative z-10 text-xs text-slate-500">
-              © 2024 Mãos da Obra Inc. Todos os direitos reservados.
+          {/* Footer Info */}
+          <div className="relative z-10 flex items-center gap-6 text-xs font-medium text-slate-500 uppercase tracking-widest">
+              <span>© 2024 Mãos da Obra Inc.</span>
+              <div className="h-1 w-1 rounded-full bg-slate-600"></div>
+              <span>Privacidade & Termos</span>
           </div>
       </div>
 
-      {/* RIGHT SIDE - FORM CONTAINER */}
-      <div className="w-full lg:w-1/2 flex flex-col justify-center items-center p-4 lg:p-6 relative z-10">
+      {/* RIGHT SIDE (Form) */}
+      <div className="w-full lg:w-7/12 flex flex-col justify-center items-center p-6 lg:p-20 relative z-10">
           
-          {/* Theme Toggle (Absolute) */}
+          {/* Theme Toggle */}
           <button 
             onClick={toggleTheme}
-            className="absolute top-6 right-6 w-10 h-10 rounded-full lg:bg-slate-100 lg:dark:bg-slate-800 bg-white/10 backdrop-blur-md text-white lg:text-slate-500 lg:dark:text-slate-400 hover:text-primary transition-colors flex items-center justify-center border border-white/10 lg:border-transparent z-50"
+            className="absolute top-8 right-8 w-12 h-12 rounded-full bg-white dark:bg-slate-900 shadow-lg flex items-center justify-center text-slate-400 hover:text-secondary transition-colors"
           >
             <i className={`fa-solid ${theme === 'dark' ? 'fa-sun' : 'fa-moon'}`}></i>
           </button>
 
-          {/* MAIN CARD (White on Mobile, Transparent on Desktop) */}
-          <div className="w-full max-w-md animate-in fade-in slide-in-from-bottom-8 duration-700 bg-white dark:bg-slate-900 lg:bg-transparent lg:dark:bg-transparent p-8 lg:p-0 rounded-3xl shadow-2xl lg:shadow-none">
+          {/* Floating Card Container */}
+          <div className="w-full max-w-md bg-white/90 dark:bg-slate-900/80 backdrop-blur-xl p-8 lg:p-10 rounded-[2.5rem] shadow-2xl border border-white/50 dark:border-white/5 animate-in fade-in slide-in-from-bottom-8 duration-700">
               
-              {/* Mobile Header Logo */}
-              <div className="lg:hidden text-center mb-8">
-                  <div className="w-14 h-14 bg-primary rounded-2xl flex items-center justify-center text-white mx-auto mb-4 shadow-xl shadow-primary/30">
-                      <i className="fa-solid fa-helmet-safety text-2xl"></i>
+              {/* Mobile Logo */}
+              <div className="lg:hidden flex flex-col items-center mb-10">
+                  <div className="w-16 h-16 bg-gradient-gold rounded-2xl flex items-center justify-center text-white text-2xl mb-4 shadow-glow">
+                      <i className="fa-solid fa-helmet-safety"></i>
                   </div>
-                  <h1 className="text-xl font-bold text-primary dark:text-white tracking-wide">MÃOS DA OBRA</h1>
+                  <h1 className="text-2xl font-extrabold text-white tracking-tight">MÃOS DA OBRA</h1>
               </div>
 
-              <div className="text-center lg:text-left mb-8">
-                  <h2 className="text-3xl font-bold text-text-main dark:text-white mb-2 tracking-tight">
-                      {isLogin ? 'Bem-vindo de volta' : 'Comece sua jornada'}
+              <div className="mb-10 text-center lg:text-left">
+                  <h2 className="text-3xl font-bold text-primary dark:text-white mb-2 tracking-tight">
+                      {isLogin ? 'Bem-vindo de volta' : 'Crie sua conta'}
                   </h2>
-                  <p className="text-text-muted dark:text-slate-400">
-                      {isLogin ? 'Entre para gerenciar sua obra.' : 'Crie sua conta em segundos. É grátis.'}
+                  <p className="text-slate-500 dark:text-slate-400">
+                      {isLogin ? 'Acesse o painel de controle da sua obra.' : 'Comece a economizar tempo e dinheiro hoje.'}
                   </p>
               </div>
 
               <form onSubmit={handleSubmit} className="space-y-5">
                   
                   {!isLogin && (
-                    <div className="animate-in fade-in slide-in-from-top-2 duration-300">
-                        <label className="block text-xs font-bold text-text-main dark:text-slate-300 uppercase mb-1.5 ml-1">Nome Completo</label>
-                        <div className="relative group">
-                            <i className="fa-regular fa-user absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary transition-colors"></i>
+                    <div className="group animate-in fade-in slide-in-from-top-2">
+                        <div className="relative">
+                            <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
+                                <i className="fa-regular fa-user text-slate-400 group-focus-within:text-secondary transition-colors"></i>
+                            </div>
                             <input 
                                 type="text" 
                                 value={name}
                                 onChange={(e) => setName(e.target.value)}
-                                placeholder="Seu nome"
-                                className="w-full h-14 pl-11 pr-4 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all text-text-main dark:text-white placeholder:text-slate-400"
+                                placeholder="Nome Completo"
+                                className="block w-full pl-12 pr-4 py-4 bg-slate-50 dark:bg-black/50 border border-slate-200 dark:border-slate-800 rounded-2xl text-primary dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all outline-none"
                             />
                         </div>
                     </div>
                   )}
 
-                  <div>
-                      <label className="block text-xs font-bold text-text-main dark:text-slate-300 uppercase mb-1.5 ml-1">E-mail</label>
-                      <div className="relative group">
-                          <i className="fa-regular fa-envelope absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary transition-colors"></i>
+                  <div className="group">
+                      <div className="relative">
+                          <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
+                              <i className="fa-regular fa-envelope text-slate-400 group-focus-within:text-secondary transition-colors"></i>
+                          </div>
                           <input 
                               type="email" 
                               value={email}
                               onChange={(e) => setEmail(e.target.value)}
-                              placeholder="seu@email.com"
-                              className="w-full h-14 pl-11 pr-4 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all text-text-main dark:text-white placeholder:text-slate-400"
+                              placeholder="Seu melhor e-mail"
+                              className="block w-full pl-12 pr-4 py-4 bg-slate-50 dark:bg-black/50 border border-slate-200 dark:border-slate-800 rounded-2xl text-primary dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all outline-none"
                           />
                       </div>
                   </div>
 
                   {!isLogin && (
-                    <div className="animate-in fade-in slide-in-from-top-2 duration-300">
-                        <label className="block text-xs font-bold text-text-main dark:text-slate-300 uppercase mb-1.5 ml-1">WhatsApp</label>
-                        <div className="relative group">
-                            <i className="fa-brands fa-whatsapp absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary transition-colors"></i>
+                     <div className="group animate-in fade-in slide-in-from-top-2">
+                        <div className="relative">
+                            <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
+                                <i className="fa-brands fa-whatsapp text-slate-400 group-focus-within:text-secondary transition-colors"></i>
+                            </div>
                             <input 
                                 type="tel" 
                                 value={whatsapp}
                                 onChange={(e) => setWhatsapp(e.target.value)}
-                                placeholder="(00) 00000-0000"
-                                className="w-full h-14 pl-11 pr-4 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all text-text-main dark:text-white placeholder:text-slate-400"
+                                placeholder="WhatsApp (Opcional)"
+                                className="block w-full pl-12 pr-4 py-4 bg-slate-50 dark:bg-black/50 border border-slate-200 dark:border-slate-800 rounded-2xl text-primary dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all outline-none"
                             />
                         </div>
                     </div>
                   )}
 
-                  <div>
-                      <div className="flex justify-between items-center mb-1.5 ml-1">
-                          <label className="block text-xs font-bold text-text-main dark:text-slate-300 uppercase">Senha</label>
-                          {isLogin && <a className="text-xs font-medium text-primary hover:underline cursor-pointer">Esqueceu?</a>}
-                      </div>
-                      <div className="relative group">
-                          <i className="fa-solid fa-lock absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary transition-colors"></i>
+                  <div className="group">
+                      <div className="relative">
+                          <div className="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
+                              <i className="fa-solid fa-lock text-slate-400 group-focus-within:text-secondary transition-colors"></i>
+                          </div>
                           <input 
                               type="password" 
                               value={password}
                               onChange={(e) => setPassword(e.target.value)}
-                              placeholder="••••••••"
-                              className="w-full h-14 pl-11 pr-4 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all text-text-main dark:text-white placeholder:text-slate-400"
+                              placeholder="Sua senha secreta"
+                              className="block w-full pl-12 pr-4 py-4 bg-slate-50 dark:bg-black/50 border border-slate-200 dark:border-slate-800 rounded-2xl text-primary dark:text-white placeholder-slate-400 focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all outline-none"
                           />
                       </div>
                   </div>
 
+                  {isLogin && (
+                      <div className="flex justify-end">
+                          <a href="#" className="text-xs font-bold text-secondary hover:text-secondary-dark transition-colors">Esqueceu a senha?</a>
+                      </div>
+                  )}
+
                   <button 
                     onClick={handleSubmit}
                     disabled={loading}
-                    className="w-full h-14 bg-primary hover:bg-primary-dark text-white font-bold rounded-xl shadow-xl shadow-primary/30 transition-all active:scale-95 flex items-center justify-center gap-2 mt-4 disabled:opacity-70 disabled:cursor-wait text-lg"
+                    className="w-full py-4 bg-gradient-gold hover:bg-gradient-to-r from-amber-500 to-orange-600 text-white font-bold rounded-2xl shadow-lg shadow-orange-500/25 transform active:scale-[0.98] transition-all flex items-center justify-center gap-3 text-lg disabled:opacity-70 disabled:cursor-wait mt-4"
                   >
-                      {loading && <i className="fa-solid fa-circle-notch fa-spin"></i>}
-                      {isLogin ? 'Entrar Agora' : 'Criar Minha Conta'}
+                      {loading ? <i className="fa-solid fa-circle-notch fa-spin"></i> : (isLogin ? 'Acessar Painel' : 'Criar Conta Grátis')}
+                      {!loading && <i className="fa-solid fa-arrow-right"></i>}
                   </button>
 
               </form>
 
-              <div className="relative my-8">
+              <div className="relative my-10">
                   <div className="absolute inset-0 flex items-center">
-                      <div className="w-full border-t border-slate-200 dark:border-slate-700"></div>
+                      <div className="w-full border-t border-slate-200 dark:border-slate-800"></div>
                   </div>
-                  <div className="relative flex justify-center text-xs uppercase">
-                      <span className="bg-white dark:bg-slate-900 px-4 text-slate-400">Ou continue com</span>
+                  <div className="relative flex justify-center text-xs uppercase tracking-widest font-bold">
+                      <span className="bg-white dark:bg-slate-900 px-4 text-slate-400">Ou entre com</span>
                   </div>
               </div>
 
-              {/* PREMIUM SOCIAL BUTTONS */}
               <div className="grid grid-cols-2 gap-4">
-                  {/* Google Button */}
                   <button 
                       onClick={() => handleSocialLogin('google')} 
-                      className="group flex items-center justify-center gap-3 h-14 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all duration-300 shadow-sm hover:shadow-lg hover:-translate-y-0.5"
+                      className="flex items-center justify-center gap-3 h-14 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all hover:-translate-y-1 shadow-sm"
                   >
-                      <i className="fa-brands fa-google text-xl text-slate-700 dark:text-white group-hover:text-red-500 transition-colors"></i>
-                      <span className="text-sm font-bold text-slate-700 dark:text-slate-200 group-hover:text-slate-900 dark:group-hover:text-white">Google</span>
+                      <img src="https://www.svgrepo.com/show/475656/google-color.svg" className="w-6 h-6" alt="Google" />
+                      <span className="text-sm font-bold text-slate-700 dark:text-white">Google</span>
                   </button>
 
-                  {/* Apple Button */}
                   <button 
                       onClick={() => handleSocialLogin('apple')} 
-                      className="group flex items-center justify-center gap-3 h-14 rounded-xl bg-slate-900 dark:bg-white hover:bg-black dark:hover:bg-slate-200 text-white dark:text-black transition-all duration-300 shadow-md hover:shadow-lg hover:-translate-y-0.5"
+                      className="flex items-center justify-center gap-3 h-14 rounded-2xl bg-black dark:bg-white text-white dark:text-black hover:opacity-90 transition-all hover:-translate-y-1 shadow-lg"
                   >
-                      <i className="fa-brands fa-apple text-xl mb-0.5 transition-transform group-hover:scale-110"></i>
+                      <i className="fa-brands fa-apple text-xl mb-1"></i>
                       <span className="text-sm font-bold">Apple</span>
                   </button>
               </div>
 
-              <p className="text-center mt-8 text-sm text-text-muted dark:text-slate-400">
-                  {isLogin ? 'Novo por aqui?' : 'Já tem uma conta?'}
+              <p className="text-center mt-10 text-sm text-slate-500 dark:text-slate-400">
+                  {isLogin ? 'Ainda não tem conta?' : 'Já possui cadastro?'}
                   <button 
                     onClick={() => setIsLogin(!isLogin)}
-                    className="ml-2 font-bold text-primary hover:underline transition-all"
+                    className="ml-2 font-bold text-primary dark:text-white hover:text-secondary dark:hover:text-secondary transition-colors underline decoration-secondary decoration-2 underline-offset-4"
                   >
-                      {isLogin ? 'Crie uma conta' : 'Fazer Login'}
+                      {isLogin ? 'Cadastre-se' : 'Faça Login'}
                   </button>
               </p>
-
-              {isLogin && (
-                  <div className="mt-8 text-center bg-slate-50 dark:bg-slate-800/50 p-3 rounded-xl border border-dashed border-slate-200 dark:border-slate-700">
-                      <p className="text-xs text-slate-500">Conta de teste: <strong className="text-slate-700 dark:text-slate-300">demo@maos.com</strong> (sem senha)</p>
-                  </div>
-              )}
           </div>
-          
-          {/* Mobile Footer Text */}
-          <div className="lg:hidden mt-8 text-center opacity-60">
-              <p className="text-[10px] text-white/70">Mãos da Obra Inc © 2024</p>
+
+          <div className="mt-8 text-center opacity-50">
+               <p className="text-[10px] uppercase tracking-widest text-slate-500 dark:text-slate-400 font-bold">Demo: demo@maos.com / (sem senha)</p>
           </div>
       </div>
     </div>

@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { dbService } from '../services/db';
@@ -12,13 +10,14 @@ import { aiService } from '../services/ai';
 // --- Shared Components ---
 
 const SectionHeader: React.FC<{ title: string, subtitle: string }> = ({ title, subtitle }) => (
-    <div className="mb-6">
-        <h2 className="text-xl font-bold text-text-main dark:text-white">{title}</h2>
-        <p className="text-sm text-text-muted dark:text-slate-400">{subtitle}</p>
+    <div className="mb-8">
+        <h2 className="text-2xl font-bold text-primary dark:text-white tracking-tight">{title}</h2>
+        <p className="text-sm text-slate-500 dark:text-slate-400 font-medium mt-1">{subtitle}</p>
+        <div className="h-1 w-10 bg-secondary rounded-full mt-3"></div>
     </div>
 );
 
-// --- ZÉ DA OBRA MODAL (SUBSTITUI O CONFIRM MODAL) ---
+// --- ZÉ DA OBRA MODAL (Premium Style) ---
 interface ZeModalProps {
   isOpen: boolean;
   title: string;
@@ -30,135 +29,156 @@ interface ZeModalProps {
   onCancel: () => void;
 }
 
-const ZeModal: React.FC<ZeModalProps> = ({ isOpen, title, message, confirmText = "Sim, confirmar", cancelText = "Melhor não", type = 'DANGER', onConfirm, onCancel }) => {
+const ZeModal: React.FC<ZeModalProps> = ({ isOpen, title, message, confirmText = "Sim, confirmar", cancelText = "Cancelar", type = 'DANGER', onConfirm, onCancel }) => {
   if (!isOpen) return null;
   
   const isDanger = type === 'DANGER';
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300 print:hidden">
-      <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-sm p-6 shadow-2xl border-2 border-primary/20 transform scale-100 transition-all">
-        <div className="flex gap-4">
-            <div className="w-16 h-16 rounded-full bg-white border-2 border-primary p-0.5 shrink-0 shadow-lg overflow-hidden relative">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-primary/80 backdrop-blur-sm animate-in fade-in duration-300">
+      <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-6 shadow-2xl border border-white/20 transform scale-100 transition-all relative overflow-hidden">
+        {/* Glow Effect */}
+        <div className="absolute top-0 right-0 w-32 h-32 bg-secondary/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
+        
+        <div className="relative z-10">
+            <div className="flex gap-5 mb-6">
+                <div className="w-16 h-16 rounded-full p-1 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-800 shadow-lg shrink-0">
                     <img 
                     src={ZE_AVATAR} 
-                    alt="Zé da Obra" 
-                    className="w-full h-full object-cover rounded-full"
-                    onError={(e) => {
-                        e.currentTarget.src = 'https://ui-avatars.com/api/?name=Ze+Obra&background=1E3A45&color=fff';
-                    }}
+                    alt="Zé" 
+                    className="w-full h-full object-cover rounded-full border-2 border-white dark:border-slate-800"
+                    onError={(e) => { e.currentTarget.src = 'https://ui-avatars.com/api/?name=Ze+Obra&background=0F172A&color=fff'; }}
                     />
+                </div>
+                <div>
+                    <h3 className="text-xl font-bold text-primary dark:text-white leading-tight mb-1">Ei, Chefe!</h3>
+                    <p className="text-sm font-medium text-slate-500 dark:text-slate-400">{title}</p>
+                </div>
             </div>
-            <div>
-                <h3 className="text-lg font-bold text-text-main dark:text-white leading-tight mb-1">Ei, Chefe!</h3>
-                <p className="text-sm font-medium text-text-main dark:text-white">{title}</p>
+            
+            <div className={`mb-8 p-4 rounded-2xl text-sm leading-relaxed border ${isDanger ? 'bg-red-50 dark:bg-red-900/20 border-red-100 dark:border-red-900 text-red-800 dark:text-red-200' : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'}`}>
+                <p>{message}</p>
             </div>
-        </div>
-        
-        <div className={`mt-4 mb-6 p-4 rounded-xl text-sm leading-relaxed ${isDanger ? 'bg-red-50 dark:bg-red-900/10 text-red-800 dark:text-red-200' : 'bg-slate-50 dark:bg-slate-800 text-text-body dark:text-slate-300'}`}>
-            <p>{message}</p>
-        </div>
 
-        <div className="flex flex-col gap-3">
-            <button 
-                onClick={onConfirm} 
-                className={`w-full py-3.5 rounded-xl text-white font-bold transition-colors shadow-lg flex items-center justify-center gap-2 ${isDanger ? 'bg-danger hover:bg-red-600 shadow-danger/20' : 'bg-primary hover:bg-primary-dark shadow-primary/20'}`}
-            >
-                {confirmText}
-            </button>
-            <button 
-                onClick={onCancel} 
-                className="w-full py-3 rounded-xl border border-slate-200 dark:border-slate-700 text-text-muted font-bold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-            >
-                {cancelText}
-            </button>
+            <div className="flex flex-col gap-3">
+                <button 
+                    onClick={onConfirm} 
+                    className={`w-full py-4 rounded-xl text-white font-bold transition-all shadow-lg active:scale-[0.98] ${isDanger ? 'bg-danger hover:bg-red-700 shadow-red-500/20' : 'bg-primary hover:bg-slate-800 shadow-slate-500/20'}`}
+                >
+                    {confirmText}
+                </button>
+                <button 
+                    onClick={onCancel} 
+                    className="w-full py-3 rounded-xl text-slate-500 font-bold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                >
+                    {cancelText}
+                </button>
+            </div>
         </div>
       </div>
     </div>
   );
 };
 
-// --- TABS ---
+// --- TABS (Updated Styles) ---
 
-// 1. INÍCIO
 const OverviewTab: React.FC<{ work: Work, stats: any, onGoToSteps: () => void }> = ({ work, stats, onGoToSteps }) => {
   const budgetUsage = work.budgetPlanned > 0 ? (stats.totalSpent / work.budgetPlanned) * 100 : 0;
   
   const pieData = [
-    { name: 'Concluído', value: stats.progress, fill: '#2BB86B' }, 
-    { name: 'Pendente', value: 100 - stats.progress, fill: '#E2E8F0' } 
+    { name: 'Concluído', value: stats.progress, fill: '#059669' }, 
+    { name: 'Pendente', value: '#E2E8F0' } 
   ];
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-300">
+    <div className="animate-in fade-in duration-500">
       <SectionHeader 
-          title="Como estamos indo?" 
-          subtitle="O resumo mais importante da sua obra."
+          title="Visão Geral" 
+          subtitle="O pulso da sua obra em tempo real."
       />
       
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col items-center justify-center h-full relative">
-            <h3 className="absolute top-6 left-6 text-xs text-text-muted dark:text-slate-400 uppercase font-bold tracking-wider">Quanto já fiz</h3>
-            <div className="w-full h-40 relative">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+        {/* Progress Card */}
+        <div className="bg-white dark:bg-slate-900 p-8 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm relative overflow-hidden group">
+            <h3 className="absolute top-6 left-6 text-xs text-slate-400 uppercase font-bold tracking-widest">Avanço Físico</h3>
+            <div className="w-full h-48 relative flex items-center justify-center">
                 <Recharts.ResponsiveContainer width="100%" height="100%">
                     <Recharts.PieChart>
                         <Recharts.Pie
                             data={pieData}
                             cx="50%"
                             cy="50%"
-                            innerRadius={50}
-                            outerRadius={70}
+                            innerRadius={60}
+                            outerRadius={80}
                             startAngle={90}
                             endAngle={-270}
                             dataKey="value"
                             stroke="none"
+                            cornerRadius={10}
+                            paddingAngle={5}
                         >
-                             <Recharts.Label 
-                                value={`${stats.progress}%`} 
-                                position="center" 
-                                className="text-3xl font-bold fill-slate-800 dark:fill-white"
-                                style={{ fontSize: '28px', fontWeight: 'bold' }}
-                            />
                         </Recharts.Pie>
                     </Recharts.PieChart>
                 </Recharts.ResponsiveContainer>
+                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                    <span className="text-4xl font-extrabold text-primary dark:text-white">{stats.progress}%</span>
+                    <span className="text-xs text-slate-400 uppercase font-bold">Concluído</span>
+                </div>
             </div>
         </div>
 
-        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col justify-center h-full">
-             <div className="text-center mb-4">
-                 <p className="text-xs text-text-muted dark:text-slate-400 uppercase font-bold tracking-wider mb-2">Quanto já gastei do total</p>
-                 <p className="text-3xl font-bold text-text-main dark:text-white mb-1">R$ {stats.totalSpent.toLocaleString('pt-BR')}</p>
-                 <p className="text-sm text-text-muted dark:text-slate-500">Minha meta: R$ {work.budgetPlanned.toLocaleString('pt-BR')}</p>
-             </div>
-             <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-3 mb-2 overflow-hidden">
-                <div 
-                    className={`h-full rounded-full transition-all duration-1000 ${budgetUsage > 90 ? 'bg-danger' : 'bg-primary'}`} 
-                    style={{ width: `${Math.min(budgetUsage, 100)}%` }}
-                ></div>
+        {/* Budget Card */}
+        <div className="bg-gradient-to-br from-slate-900 to-primary p-8 rounded-3xl shadow-xl text-white flex flex-col justify-between relative overflow-hidden">
+             <div className="absolute top-0 right-0 w-40 h-40 bg-secondary/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
+             
+             <div className="relative z-10">
+                 <div className="flex items-center gap-3 mb-6">
+                     <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-secondary">
+                         <i className="fa-solid fa-wallet text-xl"></i>
+                     </div>
+                     <span className="text-xs text-slate-300 uppercase font-bold tracking-widest">Financeiro</span>
+                 </div>
+                 
+                 <div className="mb-8">
+                     <p className="text-4xl font-bold mb-1 tracking-tight">R$ {stats.totalSpent.toLocaleString('pt-BR')}</p>
+                     <p className="text-sm text-slate-400 font-medium">de R$ {work.budgetPlanned.toLocaleString('pt-BR')} planejado</p>
+                 </div>
+
+                 <div className="w-full bg-black/30 rounded-full h-2 mb-2 overflow-hidden backdrop-blur-sm">
+                    <div 
+                        className={`h-full rounded-full transition-all duration-1000 ${budgetUsage > 100 ? 'bg-red-500' : 'bg-secondary'}`} 
+                        style={{ width: `${Math.min(budgetUsage, 100)}%` }}
+                    ></div>
+                 </div>
+                 <div className="flex justify-between text-xs font-bold text-slate-400 uppercase tracking-wider">
+                     <span>0%</span>
+                     <span>{Math.round(budgetUsage)}% Usado</span>
+                 </div>
              </div>
         </div>
       </div>
 
-      <div 
+      <button 
           onClick={() => { if (stats.delayedSteps > 0) onGoToSteps(); }}
-          className={`bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm flex items-center justify-between transition-all ${stats.delayedSteps > 0 ? 'cursor-pointer border-l-4 border-l-danger hover:shadow-md' : 'border-l-4 border-l-success'}`}
+          className={`w-full bg-white dark:bg-slate-900 p-6 rounded-2xl border transition-all flex items-center justify-between group ${stats.delayedSteps > 0 ? 'border-red-200 dark:border-red-900/30 shadow-lg shadow-red-500/5 hover:-translate-y-1' : 'border-slate-100 dark:border-slate-800 hover:border-success/30'}`}
         >
-            <div>
-                <p className="text-xs text-text-muted dark:text-slate-400 uppercase font-bold tracking-wider mb-1">Prazos</p>
-                <h3 className={`text-xl font-bold ${stats.delayedSteps > 0 ? 'text-danger' : 'text-success'}`}>
-                    {stats.delayedSteps > 0 ? `${stats.delayedSteps} Tarefas Atrasadas` : 'Tudo no prazo'}
-                </h3>
+            <div className="flex items-center gap-4">
+                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-xl shadow-sm ${stats.delayedSteps > 0 ? 'bg-red-50 text-red-500' : 'bg-green-50 text-green-600'}`}>
+                     <i className={`fa-solid ${stats.delayedSteps > 0 ? 'fa-clock' : 'fa-check-circle'}`}></i>
+                </div>
+                <div>
+                    <h3 className={`text-lg font-bold ${stats.delayedSteps > 0 ? 'text-red-600 dark:text-red-400' : 'text-primary dark:text-white'}`}>
+                        {stats.delayedSteps > 0 ? `${stats.delayedSteps} Etapas Atrasadas` : 'Cronograma em dia'}
+                    </h3>
+                    <p className="text-sm text-slate-500">Status atual do cronograma</p>
+                </div>
             </div>
-            <div className={`w-10 h-10 rounded-full flex items-center justify-center ${stats.delayedSteps > 0 ? 'bg-danger/10 text-danger animate-pulse' : 'bg-success/10 text-success'}`}>
-                 <i className={`fa-solid ${stats.delayedSteps > 0 ? 'fa-exclamation' : 'fa-check'}`}></i>
-            </div>
-        </div>
+            {stats.delayedSteps > 0 && <i className="fa-solid fa-chevron-right text-slate-300 group-hover:text-red-500 transition-colors"></i>}
+        </button>
     </div>
   );
 };
 
-// 2. ETAPAS
 const StepsTab: React.FC<{ workId: string, refreshWork: () => void }> = ({ workId, refreshWork }) => {
   const [steps, setSteps] = useState<Step[]>([]);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -166,10 +186,7 @@ const StepsTab: React.FC<{ workId: string, refreshWork: () => void }> = ({ workI
   const [newStepDate, setNewStepDate] = useState('');
   const [editingStep, setEditingStep] = useState<Step | null>(null);
   
-  // Zé Modal State
   const [zeModal, setZeModal] = useState<{isOpen: boolean, title: string, message: string, onConfirm: () => void}>({isOpen: false, title: '', message: '', onConfirm: () => {}});
-  
-  // States for Smart Material Import Logic
   const [pendingStartStep, setPendingStartStep] = useState<Step | null>(null);
   const [foundPackage, setFoundPackage] = useState<string | null>(null);
 
@@ -182,26 +199,18 @@ const StepsTab: React.FC<{ workId: string, refreshWork: () => void }> = ({ workI
 
   const toggleStatus = async (step: Step) => {
       let newStatus = StepStatus.IN_PROGRESS;
-      
-      // Determine next status
       if (step.status === StepStatus.NOT_STARTED) newStatus = StepStatus.IN_PROGRESS;
       else if (step.status === StepStatus.IN_PROGRESS) newStatus = StepStatus.COMPLETED;
       else newStatus = StepStatus.NOT_STARTED;
       
-      // SMART IMPORT LOGIC:
-      // If user is starting the task (Not Started -> In Progress), check for material packages
       if (step.status === StepStatus.NOT_STARTED && newStatus === StepStatus.IN_PROGRESS) {
           const matchPkg = FULL_MATERIAL_PACKAGES.find(p => step.name.toLowerCase().includes(p.category.toLowerCase()));
-          
           if (matchPkg) {
-              // Found a matching package! Ask user.
               setPendingStartStep(step);
               setFoundPackage(matchPkg.category);
-              return; // Stop here, wait for modal confirmation
+              return;
           }
       }
-
-      // Default behavior (no match or other status change)
       await updateStepStatus(step, newStatus);
   };
   
@@ -213,22 +222,15 @@ const StepsTab: React.FC<{ workId: string, refreshWork: () => void }> = ({ workI
 
   const handleConfirmImport = async () => {
       if (pendingStartStep && foundPackage) {
-          // 1. Import Materials
           const count = await dbService.importMaterialPackage(workId, foundPackage);
-          
-          // 2. Update Status
           await updateStepStatus(pendingStartStep, StepStatus.IN_PROGRESS);
-          
-          // 3. Cleanup
           setPendingStartStep(null);
           setFoundPackage(null);
-          
-          if (count > 0) alert(`${count} materiais sugeridos foram adicionados à lista de compras!`);
+          if (count > 0) alert(`${count} materiais sugeridos foram adicionados!`);
       }
   };
 
   const handleCancelImport = async () => {
-      // Just update status, don't import
       if (pendingStartStep) {
           await updateStepStatus(pendingStartStep, StepStatus.IN_PROGRESS);
           setPendingStartStep(null);
@@ -254,20 +256,18 @@ const StepsTab: React.FC<{ workId: string, refreshWork: () => void }> = ({ workI
   const handleUpdateStep = async (e: React.FormEvent) => {
       e.preventDefault();
       if (editingStep) {
-          // INTERCEPTION LOGIC FOR EDIT FORM
           const originalStep = steps.find(s => s.id === editingStep.id);
           const isStarting = originalStep && originalStep.status === StepStatus.NOT_STARTED && editingStep.status === StepStatus.IN_PROGRESS;
 
           if (isStarting) {
               const matchPkg = FULL_MATERIAL_PACKAGES.find(p => editingStep.name.toLowerCase().includes(p.category.toLowerCase()));
               if (matchPkg) {
-                  setPendingStartStep(editingStep); // Pass the edited object
+                  setPendingStartStep(editingStep);
                   setFoundPackage(matchPkg.category);
-                  setEditingStep(null); // Close the edit modal
+                  setEditingStep(null);
                   return;
               }
           }
-          
           await dbService.updateStep(editingStep);
           setEditingStep(null);
           loadSteps();
@@ -278,8 +278,8 @@ const StepsTab: React.FC<{ workId: string, refreshWork: () => void }> = ({ workI
   const handleDeleteClick = (stepId: string) => {
       setZeModal({
           isOpen: true,
-          title: "Vou apagar essa etapa",
-          message: "Se você excluir, o histórico dela some para sempre. Se só quiser cancelar, talvez seja melhor mudar o nome ou data. Quer apagar mesmo?",
+          title: "Apagar Etapa",
+          message: "Tem certeza que quer remover essa etapa do cronograma?",
           onConfirm: async () => {
               await dbService.deleteStep(stepId);
               setEditingStep(null);
@@ -291,107 +291,104 @@ const StepsTab: React.FC<{ workId: string, refreshWork: () => void }> = ({ workI
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-300">
-      <div className="flex items-center justify-between mb-6">
-         <div>
-            <h2 className="text-xl font-bold text-text-main dark:text-white">Minhas Tarefas</h2>
-            <p className="text-sm text-text-muted dark:text-slate-400">Toque no círculo para avançar a etapa.</p>
-         </div>
+    <div className="animate-in fade-in duration-500">
+      <div className="flex items-center justify-between mb-8">
+         <SectionHeader title="Cronograma" subtitle="Toque para mudar o status." />
          <button 
             onClick={() => setIsCreateModalOpen(true)}
-            className="bg-primary hover:bg-primary-dark text-white px-4 py-2 rounded-xl text-sm font-bold shadow-md transition-all flex items-center gap-2"
+            className="bg-primary hover:bg-slate-800 text-white w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg hover:shadow-xl transition-all hover:scale-105 active:scale-95"
           >
-              <i className="fa-solid fa-plus"></i> Adicionar
+              <i className="fa-solid fa-plus text-lg"></i>
           </button>
       </div>
 
-      <div className="space-y-3">
-        {steps.map(step => {
+      <div className="space-y-4">
+        {steps.map((step, idx) => {
             const isComplete = step.status === StepStatus.COMPLETED;
             const isInProgress = step.status === StepStatus.IN_PROGRESS;
             const now = new Date();
             const endDate = new Date(step.endDate);
             const isLate = !isComplete && now > endDate;
 
-            let containerClass = "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 shadow-sm";
-            let textClass = "text-text-main dark:text-white";
-            let checkClass = "border-slate-300 text-transparent hover:border-primary";
-
-            if (isComplete) {
-                containerClass = "bg-slate-50 dark:bg-slate-900 border-slate-100 dark:border-slate-800 opacity-60";
-                textClass = "line-through text-text-muted";
-                checkClass = "bg-success border-success text-white";
-            } else if (isLate) {
-                containerClass = "bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-900 shadow-sm";
-                checkClass = "border-red-300 text-red-300"; 
-            } else if (isInProgress) {
-                containerClass = "bg-orange-50 dark:bg-orange-900/10 border-orange-200 dark:border-orange-800 shadow-sm";
-                checkClass = "border-orange-400 text-orange-500 bg-white dark:bg-slate-800";
-            }
-
             return (
-                <div key={step.id} className={`p-4 rounded-xl border flex items-center justify-between transition-all ${containerClass}`}>
-                    <div className="flex items-center gap-4 flex-1">
+                <div key={step.id} className={`group relative p-5 rounded-3xl border transition-all duration-300 ${
+                    isComplete ? 'bg-slate-50 dark:bg-slate-900 border-slate-100 dark:border-slate-800 opacity-60' : 
+                    isInProgress ? 'bg-white dark:bg-slate-800 border-secondary/30 ring-1 ring-secondary/20 shadow-lg shadow-secondary/5' :
+                    isLate ? 'bg-white dark:bg-slate-800 border-red-200 dark:border-red-900/30 shadow-sm' :
+                    'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 shadow-sm hover:shadow-md hover:border-slate-300'
+                }`}>
+                    {/* Connecting Line (except last) */}
+                    {idx < steps.length - 1 && (
+                        <div className="absolute left-9 bottom-[-20px] top-[60px] w-0.5 bg-slate-100 dark:bg-slate-800 z-0"></div>
+                    )}
+
+                    <div className="flex items-center gap-5 relative z-10">
+                        {/* Status Button */}
                         <button 
                           onClick={(e) => { e.stopPropagation(); toggleStatus(step); }}
-                          className={`w-8 h-8 rounded-full border-2 flex items-center justify-center transition-colors shrink-0 shadow-sm ${checkClass}`}
+                          className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300 shadow-sm border-2 ${
+                              isComplete ? 'bg-success border-success text-white' : 
+                              isInProgress ? 'bg-secondary border-secondary text-white' : 
+                              isLate ? 'bg-white border-red-300 text-red-500' :
+                              'bg-white border-slate-300 text-transparent hover:border-secondary'
+                          }`}
                         >
-                            {isComplete && <i className="fa-solid fa-check text-sm"></i>}
-                            {!isComplete && isInProgress && <i className="fa-solid fa-play text-[10px] ml-0.5"></i>}
-                            {!isComplete && !isInProgress && isLate && <i className="fa-solid fa-exclamation text-sm"></i>}
+                            <i className={`fa-solid ${isComplete ? 'fa-check' : isInProgress ? 'fa-play text-[10px]' : isLate ? 'fa-exclamation' : 'fa-check'}`}></i>
                         </button>
                         
                         <div onClick={() => setEditingStep(step)} className="cursor-pointer flex-1">
-                            <div className="flex items-center gap-2 mb-0.5">
-                                <p className={`font-bold leading-tight ${textClass}`}>
+                            <div className="flex justify-between items-start">
+                                <h4 className={`text-base font-bold mb-1 ${isComplete ? 'line-through text-slate-400' : 'text-primary dark:text-white'}`}>
                                     {step.name}
-                                </p>
+                                </h4>
+                                <div className="opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <i className="fa-solid fa-pen text-slate-300 hover:text-secondary"></i>
+                                </div>
                             </div>
                             
-                            <div className="flex items-center flex-wrap gap-2 text-xs">
-                                <span className="text-text-muted dark:text-slate-500">
-                                    {new Date(step.startDate).toLocaleDateString('pt-BR')} até {new Date(step.endDate).toLocaleDateString('pt-BR')}
+                            <div className="flex items-center flex-wrap gap-3 text-xs font-medium">
+                                <span className="text-slate-500 flex items-center gap-1 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md">
+                                    <i className="fa-regular fa-calendar"></i>
+                                    {new Date(step.endDate).toLocaleDateString('pt-BR')}
                                 </span>
-                                {isLate && <span className="font-bold bg-danger text-white px-2 py-0.5 rounded-full text-[10px] tracking-wide">ATRASADO</span>}
-                                {!isLate && isInProgress && <span className="font-bold bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-200 px-2 py-0.5 rounded-full text-[10px] tracking-wide">EM ANDAMENTO</span>}
+                                {isLate && <span className="text-red-600 bg-red-50 dark:bg-red-900/20 px-2 py-0.5 rounded-md uppercase tracking-wide font-bold">Atrasado</span>}
+                                {isInProgress && <span className="text-secondary bg-orange-50 dark:bg-orange-900/20 px-2 py-0.5 rounded-md uppercase tracking-wide font-bold">Em Andamento</span>}
                             </div>
                         </div>
                     </div>
-                    <button onClick={() => setEditingStep(step)} className="w-8 h-8 flex items-center justify-center text-slate-300 hover:text-primary">
-                        <i className="fa-solid fa-pen-to-square"></i>
-                    </button>
                 </div>
             )
         })}
         {steps.length === 0 && (
-             <div className="p-8 text-center text-text-muted bg-slate-50 dark:bg-slate-800/50 rounded-2xl border-dashed border-2 border-slate-200 dark:border-slate-700">
-                <p>Nenhuma etapa cadastrada.</p>
+             <div className="text-center py-12 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-3xl">
+                <i className="fa-solid fa-list-check text-4xl text-slate-200 dark:text-slate-700 mb-3"></i>
+                <p className="text-slate-400 font-medium">Nenhuma etapa cadastrada.</p>
              </div>
         )}
       </div>
 
       {isCreateModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-              <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-sm p-6 shadow-2xl">
-                  <h3 className="text-lg font-bold text-text-main dark:text-white mb-4">Nova Etapa</h3>
-                  <form onSubmit={handleCreateStep} className="space-y-4">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-primary/60 backdrop-blur-sm animate-in fade-in">
+              <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-8 shadow-2xl animate-in zoom-in-95">
+                  <h3 className="text-xl font-bold text-primary dark:text-white mb-6">Nova Etapa</h3>
+                  <form onSubmit={handleCreateStep} className="space-y-5">
                       <div>
-                          <label className="block text-xs font-bold text-text-muted mb-1">O que fazer?</label>
+                          <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Nome da Tarefa</label>
                           <input 
-                             placeholder="Ex: Instalar Piso, Pintar Quarto..."
-                             className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-surface dark:bg-slate-800 text-text-main dark:text-white outline-none"
+                             placeholder="Ex: Pintar Sala"
+                             className="w-full px-4 py-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/50"
                              value={newStepName}
                              onChange={e => setNewStepName(e.target.value)}
                              required
                           />
                       </div>
                       <div>
-                          <label className="block text-xs font-bold text-text-muted mb-1">Data Início</label>
-                          <input type="date" className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-surface dark:bg-slate-800 text-text-main dark:text-white outline-none" value={newStepDate} onChange={e => setNewStepDate(e.target.value)} required />
+                          <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Data Prevista</label>
+                          <input type="date" className="w-full px-4 py-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/50" value={newStepDate} onChange={e => setNewStepDate(e.target.value)} required />
                       </div>
-                      <div className="flex gap-3 pt-4">
-                          <button type="button" onClick={() => setIsCreateModalOpen(false)} className="flex-1 py-3 rounded-xl border border-slate-200 dark:border-slate-700 font-bold text-text-muted">Cancelar</button>
-                          <button type="submit" className="flex-1 py-3 rounded-xl bg-primary text-white font-bold">Salvar</button>
+                      <div className="flex gap-3 pt-2">
+                          <button type="button" onClick={() => setIsCreateModalOpen(false)} className="flex-1 py-4 rounded-xl font-bold text-slate-500 hover:bg-slate-50 transition-colors">Cancelar</button>
+                          <button type="submit" className="flex-1 py-4 rounded-xl bg-primary text-white font-bold hover:bg-slate-800 transition-colors shadow-lg">Salvar</button>
                       </div>
                   </form>
               </div>
@@ -399,420 +396,45 @@ const StepsTab: React.FC<{ workId: string, refreshWork: () => void }> = ({ workI
       )}
 
       {editingStep && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-              <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-sm p-6 shadow-2xl">
-                  <div className="flex justify-between items-start mb-4">
-                      <h3 className="text-lg font-bold text-text-main dark:text-white">Editar Etapa</h3>
-                      <button onClick={() => handleDeleteClick(editingStep.id)} className="text-danger text-sm font-bold hover:underline">
-                          Excluir
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-primary/60 backdrop-blur-sm animate-in fade-in">
+              <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-8 shadow-2xl animate-in zoom-in-95">
+                  <div className="flex justify-between items-center mb-6">
+                      <h3 className="text-xl font-bold text-primary dark:text-white">Editar Etapa</h3>
+                      <button onClick={() => handleDeleteClick(editingStep.id)} className="w-8 h-8 rounded-full bg-red-50 text-red-500 flex items-center justify-center hover:bg-red-100">
+                          <i className="fa-solid fa-trash text-sm"></i>
                       </button>
                   </div>
-                  <form onSubmit={handleUpdateStep} className="space-y-4">
-                      <div>
-                          <label className="block text-xs font-bold text-text-muted mb-1">Nome</label>
-                          <input 
-                             className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-surface dark:bg-slate-800 text-text-main dark:text-white outline-none"
-                             value={editingStep.name}
-                             onChange={e => setEditingStep({...editingStep, name: e.target.value})}
-                          />
-                      </div>
+                  <form onSubmit={handleUpdateStep} className="space-y-5">
+                      <input 
+                         className="w-full px-4 py-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white font-bold text-lg outline-none focus:ring-2 focus:ring-secondary/50"
+                         value={editingStep.name}
+                         onChange={e => setEditingStep({...editingStep, name: e.target.value})}
+                      />
                       <div className="grid grid-cols-2 gap-3">
                         <div>
-                            <label className="block text-xs font-bold text-text-muted mb-1">Início</label>
-                            <input type="date" className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-surface dark:bg-slate-800 text-text-main dark:text-white outline-none" value={editingStep.startDate} onChange={e => setEditingStep({...editingStep, startDate: e.target.value})} />
+                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Início</label>
+                            <input type="date" className="w-full px-3 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm outline-none" value={editingStep.startDate} onChange={e => setEditingStep({...editingStep, startDate: e.target.value})} />
                         </div>
                         <div>
-                            <label className="block text-xs font-bold text-text-muted mb-1">Fim</label>
-                            <input type="date" className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-surface dark:bg-slate-800 text-text-main dark:text-white outline-none" value={editingStep.endDate} onChange={e => setEditingStep({...editingStep, endDate: e.target.value})} />
+                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Fim</label>
+                            <input type="date" className="w-full px-3 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm outline-none" value={editingStep.endDate} onChange={e => setEditingStep({...editingStep, endDate: e.target.value})} />
                         </div>
                       </div>
                       <div>
-                          <label className="block text-xs font-bold text-text-muted mb-1">Status</label>
+                          <label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Status</label>
                           <select 
                             value={editingStep.status}
                             onChange={e => setEditingStep({...editingStep, status: e.target.value as StepStatus})}
-                            className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-surface dark:bg-slate-800 text-text-main dark:text-white outline-none"
+                            className="w-full px-4 py-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none"
                           >
                               <option value={StepStatus.NOT_STARTED}>A fazer</option>
                               <option value={StepStatus.IN_PROGRESS}>Em Andamento</option>
                               <option value={StepStatus.COMPLETED}>Concluído</option>
                           </select>
                       </div>
-                      <div className="flex gap-3 pt-4">
-                          <button type="button" onClick={() => setEditingStep(null)} className="flex-1 py-3 rounded-xl border border-slate-200 dark:border-slate-700 font-bold text-text-muted">Cancelar</button>
-                          <button type="submit" className="flex-1 py-3 rounded-xl bg-primary text-white font-bold">Atualizar</button>
-                      </div>
-                  </form>
-              </div>
-          </div>
-      )}
-
-      {/* ZE MODAL REPLACE */}
-      <ZeModal 
-        isOpen={zeModal.isOpen}
-        title={zeModal.title}
-        message={zeModal.message}
-        onConfirm={zeModal.onConfirm}
-        onCancel={() => setZeModal({isOpen: false, title: '', message: '', onConfirm: () => {}})}
-      />
-
-      {/* ASSISTANT MODAL FOR SMART IMPORT (NEW UX) */}
-      {pendingStartStep && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
-            <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-sm p-6 shadow-2xl border-2 border-primary/20 transform scale-100 transition-all">
-                <div className="flex gap-4">
-                    <div className="w-16 h-16 rounded-full bg-white border-2 border-primary p-0.5 shrink-0 shadow-lg overflow-hidden relative">
-                         <img 
-                            src={ZE_AVATAR} 
-                            alt="Zé da Obra" 
-                            className="w-full h-full object-cover rounded-full"
-                            onError={(e) => {
-                                e.currentTarget.src = 'https://ui-avatars.com/api/?name=Ze+Obra&background=1E3A45&color=fff';
-                            }}
-                         />
-                    </div>
-                    <div>
-                        <h3 className="text-lg font-bold text-text-main dark:text-white leading-tight mb-1">Oi, chefe!</h3>
-                        <p className="text-sm text-text-muted dark:text-slate-400">Vi que você vai começar a <strong>{foundPackage}</strong>.</p>
-                    </div>
-                </div>
-                
-                <div className="mt-4 mb-6 bg-slate-50 dark:bg-slate-800 p-4 rounded-xl text-sm text-text-body dark:text-slate-300 leading-relaxed">
-                    <p>Quer que eu adicione a lista de materiais padrão dessa fase na sua lista de compras?</p>
-                    <p className="mt-2 text-xs font-bold text-primary">Isso economiza uns 10 minutos de digitação! 😉</p>
-                </div>
-
-                <div className="flex flex-col gap-3">
-                    <button 
-                        onClick={handleConfirmImport} 
-                        className="w-full py-3.5 rounded-xl bg-primary text-white font-bold hover:bg-primary-dark transition-colors shadow-lg shadow-primary/20 flex items-center justify-center gap-2"
-                    >
-                        <i className="fa-solid fa-wand-magic-sparkles"></i> Sim, gerar lista agora
-                    </button>
-                    <button 
-                        onClick={handleCancelImport} 
-                        className="w-full py-3 rounded-xl border border-slate-200 dark:border-slate-700 text-text-muted font-bold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-                    >
-                        Não, obrigado
-                    </button>
-                </div>
-            </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-// 3. MATERIAIS
-const MaterialsTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ workId, onUpdate }) => {
-  const [materials, setMaterials] = useState<Material[]>([]);
-  const [showAddForm, setShowAddForm] = useState(false);
-  const [showPackageModal, setShowPackageModal] = useState(false);
-  
-  // Create / Edit
-  const [editingMaterial, setEditingMaterial] = useState<Material | null>(null);
-  const [newMat, setNewMat] = useState({ name: '', qty: '', unit: 'un', category: 'Geral' });
-  const [zeModal, setZeModal] = useState<{isOpen: boolean, title: string, message: string, onConfirm: () => void}>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
-  
-  // NEW: Cost input for editing
-  const [costInput, setCostInput] = useState('');
-
-  const loadMaterials = async () => {
-    const data = await dbService.getMaterials(workId);
-    setMaterials(data);
-  };
-  
-  useEffect(() => { loadMaterials(); }, [workId]);
-
-  const handleAdd = async (e: React.FormEvent) => {
-    e.preventDefault();
-    await dbService.addMaterial({
-      workId,
-      name: newMat.name,
-      plannedQty: Number(newMat.qty),
-      purchasedQty: 0,
-      unit: newMat.unit,
-      category: newMat.category
-    });
-    setNewMat({ name: '', qty: '', unit: 'un', category: 'Geral' });
-    setShowAddForm(false);
-    loadMaterials();
-    onUpdate();
-  };
-
-  const handleUpdate = async (e: React.FormEvent) => {
-      e.preventDefault();
-      if (editingMaterial) {
-          // Pass the cost input (if any) to the service
-          await dbService.updateMaterial(editingMaterial, Number(costInput));
-          setEditingMaterial(null);
-          setCostInput(''); // Reset cost input
-          loadMaterials();
-          onUpdate();
-      }
-  };
-
-  const handleDeleteClick = (id: string) => {
-    setZeModal({
-        isOpen: true,
-        title: "Tirar da lista?",
-        message: "Opa, vai remover esse material? Se já comprou, isso pode bagunçar seu controle. Posso apagar?",
-        onConfirm: async () => {
-            await dbService.deleteMaterial(id);
-            setEditingMaterial(null);
-            loadMaterials();
-            onUpdate();
-            setZeModal(prev => ({ ...prev, isOpen: false }));
-        }
-    });
-  }
-
-  const handleImportPackage = async (category: string) => {
-    setShowPackageModal(false);
-    const count = await dbService.importMaterialPackage(workId, category);
-    if (count > 0) {
-        alert(`${count} itens foram adicionados em "${category}"!`);
-        loadMaterials();
-        onUpdate();
-    } else {
-        alert("Não encontramos itens para esta categoria.");
-    }
-  };
-
-  const openEditModal = (mat: Material) => {
-      setEditingMaterial(mat);
-      setCostInput(''); // Ensure it's empty so user enters NEW cost
-  };
-
-  // Grouping Logic
-  const groupedMaterials = materials.reduce((acc, mat) => {
-      const cat = mat.category || 'Geral';
-      if (!acc[cat]) acc[cat] = [];
-      acc[cat].push(mat);
-      return acc;
-  }, {} as Record<string, Material[]>);
-
-  // Categories Order (Standard First, then others)
-  const categoryOrder = FULL_MATERIAL_PACKAGES.map(p => p.category);
-  const sortedCategories = Object.keys(groupedMaterials).sort((a, b) => {
-      const idxA = categoryOrder.indexOf(a);
-      const idxB = categoryOrder.indexOf(b);
-      if (idxA !== -1 && idxB !== -1) return idxA - idxB;
-      if (idxA !== -1) return -1;
-      if (idxB !== -1) return 1;
-      return a.localeCompare(b);
-  });
-
-  return (
-    <div className="space-y-6 animate-in fade-in duration-300">
-      <SectionHeader 
-          title="Lista de Compras" 
-          subtitle="Toque em um item para editar quantidade."
-      />
-
-      <div className="flex flex-col gap-3 mb-6">
-        <button 
-            onClick={() => setShowAddForm(true)}
-            className="w-full py-4 rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-700 text-text-muted hover:text-primary hover:border-primary transition-all font-bold flex items-center justify-center gap-2 bg-slate-50 dark:bg-slate-800/50"
-        >
-            <i className="fa-solid fa-plus"></i> Novo Item Individual
-        </button>
-        <button 
-            onClick={() => setShowPackageModal(true)}
-            className="w-full py-3 rounded-xl bg-purple-100 dark:bg-purple-900/30 text-premium font-bold flex items-center justify-center gap-2 hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-colors"
-        >
-            <i className="fa-solid fa-wand-magic-sparkles"></i> Adicionar Pacote por Etapa
-        </button>
-      </div>
-
-      {showAddForm && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in">
-              <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-sm p-6 shadow-2xl">
-                <h3 className="font-bold text-text-main dark:text-white mb-4">Novo Material</h3>
-                <form onSubmit={handleAdd} className="space-y-4">
-                     <div>
-                       <label className="text-xs font-bold text-text-muted mb-1 block">Nome do Material</label>
-                       <input 
-                         placeholder="Ex: Cimento, Tijolo..." 
-                         className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-text-main dark:text-white rounded-xl text-sm outline-none"
-                         value={newMat.name}
-                         onChange={e => setNewMat({...newMat, name: e.target.value})}
-                         required
-                       />
-                     </div>
-                     <div>
-                       <label className="text-xs font-bold text-text-muted mb-1 block">Categoria</label>
-                       <select 
-                         className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-text-main dark:text-white rounded-xl text-sm outline-none"
-                         value={newMat.category}
-                         onChange={e => setNewMat({...newMat, category: e.target.value})}
-                       >
-                           <option value="Geral">Geral</option>
-                           {FULL_MATERIAL_PACKAGES.map(p => <option key={p.category} value={p.category}>{p.category}</option>)}
-                       </select>
-                     </div>
-                     <div className="flex gap-4">
-                        <div className="flex-1">
-                            <label className="text-xs font-bold text-text-muted mb-1 block">Quantidade</label>
-                            <input 
-                            type="number" 
-                            placeholder="0" 
-                            className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-text-main dark:text-white rounded-xl text-sm outline-none"
-                            value={newMat.qty}
-                            onChange={e => setNewMat({...newMat, qty: e.target.value})}
-                            required
-                            />
-                        </div>
-                        <div className="w-24">
-                            <label className="text-xs font-bold text-text-muted mb-1 block">Unidade</label>
-                            <input 
-                            type="text" 
-                            placeholder="un" 
-                            className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-text-main dark:text-white rounded-xl text-sm outline-none"
-                            value={newMat.unit}
-                            onChange={e => setNewMat({...newMat, unit: e.target.value})}
-                            required
-                            />
-                        </div>
-                     </div>
-                     <div className="flex gap-3 pt-2">
-                       <button type="button" onClick={() => setShowAddForm(false)} className="flex-1 py-3 font-bold text-text-muted bg-slate-100 dark:bg-slate-800 rounded-xl">Cancelar</button>
-                       <button type="submit" className="flex-1 py-3 font-bold text-white bg-primary rounded-xl">Salvar</button>
-                     </div>
-                </form>
-              </div>
-          </div>
-      )}
-
-      {showPackageModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in">
-              <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-sm p-6 shadow-2xl">
-                  <h3 className="text-lg font-bold text-text-main dark:text-white mb-2">Pacotes Prontos</h3>
-                  <p className="text-sm text-text-muted dark:text-slate-400 mb-4">Escolha a categoria para preencher a lista automaticamente.</p>
-                  
-                  <div className="grid grid-cols-2 gap-3 mb-6 max-h-[50vh] overflow-y-auto">
-                      {FULL_MATERIAL_PACKAGES.map((pkg, idx) => (
-                          <button
-                            key={idx}
-                            onClick={() => handleImportPackage(pkg.category)}
-                            className="p-3 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-primary hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors text-sm font-bold text-text-body dark:text-slate-300"
-                          >
-                              {pkg.category}
-                          </button>
-                      ))}
-                  </div>
-                  
-                  <button onClick={() => setShowPackageModal(false)} className="w-full py-3 bg-slate-100 dark:bg-slate-800 text-text-main dark:text-white font-bold rounded-xl">
-                      Cancelar
-                  </button>
-              </div>
-          </div>
-      )}
-
-      {/* RENDER LIST GROUPED */}
-      <div className="space-y-6">
-          {sortedCategories.map(category => (
-              <div key={category} className="space-y-2">
-                   <div className="flex items-center gap-2 px-1">
-                       <div className="h-4 w-1 bg-primary rounded-full"></div>
-                       <h3 className="font-bold text-text-main dark:text-white uppercase tracking-wider text-sm">{category}</h3>
-                   </div>
-                   {groupedMaterials[category].map(mat => (
-                        <div 
-                            key={mat.id} 
-                            onClick={() => openEditModal(mat)}
-                            className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-100 dark:border-slate-800 shadow-sm flex justify-between items-center group cursor-pointer hover:border-primary/30 transition-all"
-                        >
-                            <div>
-                                <p className="font-bold text-text-main dark:text-white">{mat.name}</p>
-                                <div className="text-sm flex gap-3 mt-1">
-                                    <span className="text-text-muted dark:text-slate-500">
-                                        Planejado: <strong>{mat.plannedQty}</strong> {mat.unit}
-                                    </span>
-                                    {mat.purchasedQty >= mat.plannedQty ? (
-                                        <span className="text-success font-bold text-xs bg-success/10 px-2 py-0.5 rounded-full">Comprado</span>
-                                    ) : (
-                                        <span className={`font-bold text-xs px-2 py-0.5 rounded-full ${mat.purchasedQty > 0 ? 'bg-orange-100 text-orange-600' : 'bg-slate-100 text-slate-500'}`}>
-                                            {mat.purchasedQty > 0 ? `Comprado: ${mat.purchasedQty}` : 'Não comprado'}
-                                        </span>
-                                    )}
-                                </div>
-                            </div>
-                            <div className="w-8 h-8 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-300">
-                                <i className="fa-solid fa-pen text-xs"></i>
-                            </div>
-                        </div>
-                   ))}
-              </div>
-          ))}
-
-          {materials.length === 0 && (
-                <div className="text-center py-10 text-text-muted dark:text-slate-500">
-                    <p>Sua lista está vazia. Adicione itens acima!</p>
-                </div>
-           )}
-      </div>
-
-      {/* EDIT MODAL */}
-      {editingMaterial && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in">
-              <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-sm p-6 shadow-2xl">
-                  <div className="flex justify-between items-start mb-4">
-                      <h3 className="text-lg font-bold text-text-main dark:text-white">Editar Material</h3>
-                      <button onClick={() => handleDeleteClick(editingMaterial.id)} className="text-danger text-sm font-bold hover:underline">
-                          Excluir
-                      </button>
-                  </div>
-                  <form onSubmit={handleUpdate} className="space-y-4">
-                      <div>
-                          <label className="block text-xs font-bold text-text-muted mb-1">Nome</label>
-                          <input 
-                             className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-surface dark:bg-slate-800 text-text-main dark:text-white outline-none"
-                             value={editingMaterial.name}
-                             onChange={e => setEditingMaterial({...editingMaterial, name: e.target.value})}
-                          />
-                      </div>
-                      <div>
-                       <label className="text-xs font-bold text-text-muted mb-1 block">Categoria</label>
-                       <select 
-                         className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-text-main dark:text-white rounded-xl text-sm outline-none"
-                         value={editingMaterial.category || 'Geral'}
-                         onChange={e => setEditingMaterial({...editingMaterial, category: e.target.value})}
-                       >
-                           <option value="Geral">Geral</option>
-                           {FULL_MATERIAL_PACKAGES.map(p => <option key={p.category} value={p.category}>{p.category}</option>)}
-                       </select>
-                     </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                            <label className="block text-xs font-bold text-text-muted mb-1">Planejado</label>
-                            <input type="number" className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-surface dark:bg-slate-800 text-text-main dark:text-white outline-none" value={editingMaterial.plannedQty} onChange={e => setEditingMaterial({...editingMaterial, plannedQty: Number(e.target.value)})} />
-                        </div>
-                        <div>
-                            <label className="block text-xs font-bold text-text-muted mb-1">Já Comprado</label>
-                            <input type="number" className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-surface dark:bg-slate-800 text-text-main dark:text-white outline-none" value={editingMaterial.purchasedQty} onChange={e => setEditingMaterial({...editingMaterial, purchasedQty: Number(e.target.value)})} />
-                        </div>
-                      </div>
-
-                      <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700">
-                           <label className="block text-xs font-bold text-primary mb-1">
-                               <i className="fa-solid fa-money-bill-wave mr-1"></i> Valor desta Compra (R$)
-                           </label>
-                           <input 
-                                type="number" 
-                                placeholder="0,00"
-                                className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-text-main dark:text-white outline-none focus:ring-2 focus:ring-primary" 
-                                value={costInput} 
-                                onChange={e => setCostInput(e.target.value)} 
-                           />
-                           <p className="text-[10px] text-text-muted mt-1 leading-tight">
-                               Se você colocar um valor aqui, ele será adicionado automaticamente em <strong>Gastos</strong>.
-                           </p>
-                      </div>
-                      
-                      <div className="flex gap-3 pt-4">
-                          <button type="button" onClick={() => setEditingMaterial(null)} className="flex-1 py-3 rounded-xl border border-slate-200 dark:border-slate-700 font-bold text-text-muted">Cancelar</button>
-                          <button type="submit" className="flex-1 py-3 rounded-xl bg-primary text-white font-bold">Atualizar</button>
+                      <div className="flex gap-3 pt-2">
+                          <button type="button" onClick={() => setEditingStep(null)} className="flex-1 py-4 rounded-xl font-bold text-slate-500 hover:bg-slate-50 transition-colors">Cancelar</button>
+                          <button type="submit" className="flex-1 py-4 rounded-xl bg-primary text-white font-bold hover:bg-slate-800 transition-colors shadow-lg">Atualizar</button>
                       </div>
                   </form>
               </div>
@@ -821,1246 +443,230 @@ const MaterialsTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ work
 
       {/* ZÉ MODAL */}
       <ZeModal 
-         isOpen={zeModal.isOpen}
-         title={zeModal.title}
-         message={zeModal.message}
-         onConfirm={zeModal.onConfirm}
-         onCancel={() => setZeModal(prev => ({ ...prev, isOpen: false }))}
-      />
-    </div>
-  );
-};
-
-// 4. FINANCEIRO (Refactored for Step Grouping)
-const ExpensesTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ workId, onUpdate }) => {
-  const { user } = useAuth();
-  const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [steps, setSteps] = useState<Step[]>([]);
-  const [jobRoles, setJobRoles] = useState<string[]>([]); // Standard roles
-  
-  // UI States
-  const [showForm, setShowForm] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-
-  // Form State
-  const [formData, setFormData] = useState<{
-      description: string, 
-      amount: string, 
-      paidAmount: string, // New: Separate Paid vs Total
-      category: ExpenseCategory, 
-      date: string,
-      stepId?: string,
-      role?: string, // Added for UI control
-  }>({ 
-      description: '', 
-      amount: '', 
-      paidAmount: '',
-      category: ExpenseCategory.MATERIAL, 
-      date: new Date().toISOString().split('T')[0],
-      stepId: undefined,
-      role: '' // Added
-  });
-  
-  // Zé Modal
-  const [zeModal, setZeModal] = useState<{isOpen: boolean, title: string, message: string, onConfirm: () => void}>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
-
-  const loadData = async () => {
-      const [expData, stepsData, rolesData] = await Promise.all([
-          dbService.getExpenses(workId),
-          dbService.getSteps(workId),
-          dbService.getJobRoles()
-      ]);
-      setExpenses(expData);
-      setSteps(stepsData.sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()));
-      setJobRoles(rolesData);
-  };
-
-  useEffect(() => { loadData(); }, [workId, user]);
-
-  const resetForm = () => {
-      setFormData({ 
-          description: '', 
-          amount: '', 
-          paidAmount: '',
-          category: ExpenseCategory.MATERIAL, 
-          date: new Date().toISOString().split('T')[0], 
-          stepId: undefined,
-          role: '' // Reset role
-      });
-      setIsEditing(false);
-      setEditingId(null);
-      setShowForm(false);
-  }
-
-  const handleEditClick = (exp: Expense) => {
-      // Try to find if a role is part of the description to pre-fill the select
-      const foundRole = jobRoles.find(r => exp.description.toLowerCase().includes(r.toLowerCase())) || '';
-
-      setFormData({
-          description: exp.description,
-          amount: exp.amount.toString(),
-          paidAmount: (exp.paidAmount ?? exp.amount).toString(), 
-          category: exp.category,
-          date: exp.date,
-          stepId: exp.stepId,
-          role: foundRole // Pre-fill found role
-      });
-      setIsEditing(true);
-      setEditingId(exp.id);
-      setShowForm(true);
-      // Scroll to form so user sees it
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const payload = {
-      workId,
-      description: formData.description,
-      amount: Number(formData.amount),
-      paidAmount: Number(formData.paidAmount), 
-      quantity: 1,
-      category: formData.category,
-      date: formData.date,
-      stepId: formData.stepId,
-      workerId: undefined // Removed explicit worker linking
-    };
-
-    if (isEditing && editingId) {
-        // Update
-        await dbService.updateExpense({ ...payload, id: editingId });
-    } else {
-        // Create
-        await dbService.addExpense(payload);
-    }
-    
-    resetForm();
-    loadData();
-    onUpdate();
-  };
-
-  const handleDeleteClick = (id: string) => {
-      setZeModal({
-          isOpen: true,
-          title: "Apagar Gasto",
-          message: "Cuidado, chefe! Apagar gastos pode fazer a conta não fechar no final. Tem certeza?",
-          onConfirm: async () => {
-              await dbService.deleteExpense(id);
-              loadData();
-              onUpdate();
-              setZeModal(prev => ({ ...prev, isOpen: false }));
-          }
-      });
-  };
-
-  // Logic to auto-fill description when selecting Role
-  const handleRoleSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
-      const role = e.target.value;
-      setFormData(prev => ({
-          ...prev,
-          role: role,
-          description: role ? `Serviço de ${role}` : prev.description
-      }));
-  }
-
-  // Group Expenses by Step
-  const groupedExpenses: Record<string, Expense[]> = { 'GERAL': [] };
-  steps.forEach(s => { groupedExpenses[s.id] = [] });
-
-  expenses.forEach(exp => {
-      if (exp.stepId && groupedExpenses[exp.stepId]) {
-          groupedExpenses[exp.stepId].push(exp);
-      } else {
-          groupedExpenses['GERAL'].push(exp);
-      }
-  });
-
-  const getGroupTotal = (groupExps: Expense[]) => groupExps.reduce((acc, curr) => acc + (curr.paidAmount || curr.amount || 0), 0);
-
-  // Reusable Expense Card
-  const ExpenseCard: React.FC<{ exp: Expense }> = ({ exp }) => {
-      const paid = exp.paidAmount ?? 0;
-      const total = exp.amount;
-      
-      let status = 'PAGO';
-      if (paid === 0) status = 'PENDENTE';
-      else if (paid < total) status = 'PARCIAL';
-
-      return (
-        <div className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col gap-3 relative overflow-hidden group hover:shadow-md transition-all">
-            {/* Status Stripe */}
-            <div className={`absolute left-0 top-0 bottom-0 w-1 ${
-                status === 'PENDENTE' ? 'bg-danger' :
-                status === 'PARCIAL' ? 'bg-orange-500' :
-                'bg-success'
-            }`}></div>
-
-            <div className="flex justify-between items-start pl-3">
-                <div className="flex-1 cursor-pointer" onClick={() => handleEditClick(exp)}>
-                    <div className="flex items-center gap-2 mb-1">
-                        <span className="text-[10px] font-bold text-text-muted dark:text-slate-500 uppercase tracking-wider bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">{exp.category}</span>
-                        <span className="text-[10px] text-text-muted dark:text-slate-500">• {new Date(exp.date).toLocaleDateString('pt-BR')}</span>
-                    </div>
-                    <h4 className="font-bold text-text-main dark:text-white text-base leading-tight">{exp.description}</h4>
-                </div>
-                <div className="flex gap-1 ml-2">
-                    <button onClick={() => handleEditClick(exp)} className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-50 dark:bg-slate-800 text-slate-400 hover:text-primary transition-colors">
-                        <i className="fa-solid fa-pen text-xs"></i>
-                    </button>
-                    <button onClick={() => handleDeleteClick(exp.id)} className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-50 dark:bg-slate-800 text-slate-400 hover:text-danger transition-colors">
-                        <i className="fa-solid fa-trash text-xs"></i>
-                    </button>
-                </div>
-            </div>
-
-            <div className="flex items-end justify-between pl-3 mt-1 border-t border-slate-50 dark:border-slate-800 pt-3">
-                <div>
-                    {status === 'PENDENTE' && (
-                        <span className="inline-flex items-center px-2 py-1 rounded bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300 text-[10px] font-bold uppercase">
-                            <i className="fa-regular fa-clock mr-1"></i> Pendente
-                        </span>
-                    )}
-                    {status === 'PARCIAL' && (
-                        <span className="inline-flex items-center px-2 py-1 rounded bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 text-[10px] font-bold uppercase">
-                            <i className="fa-solid fa-chart-pie mr-1"></i> Parcial
-                        </span>
-                    )}
-                    {status === 'PAGO' && (
-                        <span className="inline-flex items-center px-2 py-1 rounded bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 text-[10px] font-bold uppercase">
-                            <i className="fa-solid fa-check mr-1"></i> Pago
-                        </span>
-                    )}
-                </div>
-                <div className="text-right">
-                    <div className="flex flex-col items-end">
-                        <span className="text-[10px] text-text-muted dark:text-slate-500 font-medium">Valor Total</span>
-                        <span className="text-sm font-bold text-text-main dark:text-white">R$ {total.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
-                    </div>
-                    {status !== 'PAGO' && (
-                        <div className="flex flex-col items-end mt-1">
-                            <span className="text-[10px] text-text-muted">Pago até agora</span>
-                            <span className={`text-xs font-bold ${status === 'PENDENTE' ? 'text-danger' : 'text-orange-500'}`}>
-                                R$ {paid.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
-                            </span>
-                        </div>
-                    )}
-                </div>
-            </div>
-        </div>
-      );
-  }
-
-  return (
-    <div className="space-y-6 animate-in fade-in duration-300">
-      <SectionHeader 
-          title="Controle de Gastos" 
-          subtitle="Tudo o que saiu do seu bolso, organizado."
+        isOpen={zeModal.isOpen}
+        title={zeModal.title}
+        message={zeModal.message}
+        onConfirm={zeModal.onConfirm}
+        onCancel={() => setZeModal({isOpen: false, title: '', message: '', onConfirm: () => {}})}
       />
 
-      {!showForm ? (
-          <button 
-            onClick={() => setShowForm(true)}
-            className="w-full py-4 rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-700 text-text-muted hover:text-primary hover:border-primary transition-all font-bold flex items-center justify-center gap-2 bg-slate-50 dark:bg-slate-800/50"
-          >
-              <i className="fa-solid fa-plus"></i> Anotar gasto
-          </button>
-      ) : (
-        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-lg border border-slate-100 dark:border-slate-800 animate-in slide-in-from-top-2">
-            <h3 className="font-bold text-text-main dark:text-white mb-4">{isEditing ? 'Editar Despesa' : 'Novo Gasto'}</h3>
-            <form onSubmit={handleSubmit} className="space-y-4">
-                {/* 1. Category (Tipo do Gasto) */}
-                <div>
-                    <label className="text-xs font-bold text-text-muted mb-1 block">No que foi gasto?</label>
-                    <select 
-                        className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-text-main dark:text-white rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary"
-                        value={formData.category}
-                        onChange={e => setFormData({...formData, category: e.target.value as ExpenseCategory})}
-                    >
-                        {Object.values(ExpenseCategory).map(c => <option key={c} value={c}>{c}</option>)}
-                    </select>
-                </div>
-
-                {/* 1.5 Role Selection Logic */}
-                {formData.category === ExpenseCategory.LABOR && (
-                    <div className="animate-in fade-in slide-in-from-top-1 space-y-3 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700">
-                        <label className="text-xs font-bold text-primary block">Qual profissional?</label>
-                        <div>
-                            <select 
-                                className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-text-main dark:text-white rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary"
-                                onChange={handleRoleSelect}
-                                value={formData.role || ''}
-                            >
-                                <option value="" disabled>Selecione a profissão...</option>
-                                {jobRoles.map(role => <option key={role} value={role}>{role}</option>)}
-                            </select>
-                        </div>
-                    </div>
-                )}
-
-                {/* 2. Step Selection */}
-                <div>
-                    <label className="text-xs font-bold text-text-muted mb-1 block">Em qual etapa da obra?</label>
-                    <select 
-                        className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-text-main dark:text-white rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary"
-                        value={formData.stepId || ''}
-                        onChange={e => setFormData({...formData, stepId: e.target.value || undefined})}
-                    >
-                        <option value="">Geral / Obra Toda</option>
-                        {steps.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                    </select>
-                </div>
-
-                {/* 3. Description */}
-                <div>
-                    <label className="text-xs font-bold text-text-muted mb-1 block">Descrição do item</label>
-                    <input 
-                        placeholder="Ex: Cimento, Diária Pedreiro..." 
-                        required
-                        value={formData.description}
-                        onChange={e => setFormData({...formData, description: e.target.value})}
-                        className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-text-main dark:text-white rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary"
-                    />
-                </div>
-
-                {/* 4. Amount - Total vs Paid */}
-                <div className="flex gap-4">
-                    <div className="flex-1">
-                        <label className="text-xs font-bold text-text-muted mb-1 block">Valor Total (R$)</label>
-                        <input 
-                            type="number" 
-                            placeholder="0,00" 
-                            required
-                            value={formData.amount}
-                            onChange={e => setFormData({...formData, amount: e.target.value})}
-                            className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-text-main dark:text-white rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary"
-                        />
-                    </div>
-                    <div className="flex-1">
-                        <label className="text-xs font-bold text-text-muted mb-1 block">Valor Pago (R$)</label>
-                        <input 
-                            type="number" 
-                            placeholder="0,00" 
-                            value={formData.paidAmount}
-                            onChange={e => setFormData({...formData, paidAmount: e.target.value})}
-                            className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-text-main dark:text-white rounded-xl text-sm outline-none focus:ring-2 focus:ring-primary"
-                        />
-                        <p className="text-[10px] text-text-muted mt-1">Se for parcelado, coloque quanto pagou hoje.</p>
-                    </div>
-                </div>
+      {/* ASSISTANT IMPORT MODAL */}
+      {pendingStartStep && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-primary/80 backdrop-blur-sm animate-in fade-in">
+            <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-6 shadow-2xl relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-32 h-32 bg-secondary/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
                 
-                <div className="flex gap-3 pt-2">
-                   <button type="button" onClick={resetForm} className="flex-1 py-3 font-bold text-text-muted bg-slate-100 dark:bg-slate-800 rounded-xl">Cancelar</button>
-                   <button type="submit" className="flex-1 py-3 font-bold text-white bg-primary rounded-xl hover:bg-primary-dark">
-                       {isEditing ? 'Atualizar' : 'Salvar'}
-                   </button>
-                 </div>
-            </form>
+                <div className="relative z-10">
+                    <div className="flex gap-5 mb-6">
+                        <div className="w-16 h-16 rounded-full p-1 bg-gradient-to-br from-slate-100 to-slate-200 shadow-lg shrink-0">
+                             <img src={ZE_AVATAR} alt="Zé" className="w-full h-full object-cover rounded-full border-2 border-white" />
+                        </div>
+                        <div>
+                            <h3 className="text-xl font-bold text-primary dark:text-white leading-tight mb-1">Oi, chefe!</h3>
+                            <p className="text-sm text-slate-500">Começando a <strong>{foundPackage}</strong>?</p>
+                        </div>
+                    </div>
+                    
+                    <div className="mb-6 bg-slate-50 dark:bg-slate-800 p-5 rounded-2xl text-sm text-slate-600 dark:text-slate-300 leading-relaxed border border-slate-100 dark:border-slate-700">
+                        <p>Posso adicionar a <strong>lista de materiais padrão</strong> dessa fase pra você agora mesmo.</p>
+                        <p className="mt-2 text-xs font-bold text-secondary uppercase tracking-wide">Economia de tempo: ~10 minutos</p>
+                    </div>
+
+                    <div className="flex flex-col gap-3">
+                        <button 
+                            onClick={handleConfirmImport} 
+                            className="w-full py-4 rounded-xl bg-secondary text-white font-bold hover:bg-amber-700 transition-colors shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2"
+                        >
+                            <i className="fa-solid fa-wand-magic-sparkles"></i> Gerar Lista Automática
+                        </button>
+                        <button 
+                            onClick={handleCancelImport} 
+                            className="w-full py-3 rounded-xl text-slate-400 font-bold hover:text-slate-600 transition-colors"
+                        >
+                            Não, obrigado
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
       )}
-
-      <div className="space-y-6">
-          {/* GENERAL GROUP (Only show if has items) */}
-          {groupedExpenses['GERAL'].length > 0 && (
-             <div className="space-y-2">
-                <div className="flex items-center justify-between px-1">
-                      <div className="flex items-center gap-2">
-                          <div className="h-4 w-1 bg-slate-400 rounded-full"></div>
-                          <h3 className="font-bold text-text-main dark:text-white uppercase tracking-wider text-sm">Geral / Obra Toda</h3>
-                      </div>
-                      <span className="text-xs font-bold text-text-main dark:text-white bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-lg">
-                          Pago: R$ {getGroupTotal(groupedExpenses['GERAL']).toLocaleString('pt-BR', {minimumFractionDigits: 2})}
-                      </span>
-                </div>
-                <div className="space-y-3">
-                    {groupedExpenses['GERAL'].map(exp => <ExpenseCard key={exp.id} exp={exp} />)}
-                </div>
-             </div>
-          )}
-
-          {/* STEP GROUPS */}
-          {steps.map(step => {
-              const groupExps = groupedExpenses[step.id] || [];
-              if (groupExps.length === 0) return null; // HIDE EMPTY STEPS
-              const groupTotal = getGroupTotal(groupExps);
-              return (
-                <div key={step.id} className="space-y-2">
-                    <div className="flex items-center justify-between px-1">
-                        <div className="flex items-center gap-2">
-                            <div className="h-4 w-1 bg-primary rounded-full"></div>
-                            <h3 className="font-bold text-text-main dark:text-white uppercase tracking-wider text-sm truncate max-w-[200px]">{step.name}</h3>
-                        </div>
-                        <span className="text-xs font-bold text-text-main dark:text-white bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-lg">
-                            Pago: R$ {groupTotal.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
-                        </span>
-                    </div>
-                    <div className="space-y-3">
-                         {groupExps.map(exp => <ExpenseCard key={exp.id} exp={exp} />)}
-                    </div>
-                </div>
-              );
-          })}
-          
-          {/* Empty State if absolutely nothing exists */}
-          {expenses.length === 0 && (
-             <div className="text-center py-10 text-text-muted dark:text-slate-500">
-                <p>Nenhum gasto lançado ainda.</p>
-             </div>
-          )}
-      </div>
-
-      <ZeModal 
-         isOpen={zeModal.isOpen}
-         title={zeModal.title}
-         message={zeModal.message}
-         onConfirm={zeModal.onConfirm}
-         onCancel={() => setZeModal(prev => ({ ...prev, isOpen: false }))}
-      />
     </div>
   );
 };
-
-// 5. MAIS MENU - TOOLS SUBVIEWS (Refactored)
-
-const CalculatorView: React.FC<{ workId: string, onBack: () => void }> = ({ workId, onBack }) => {
-    const [calcType, setCalcType] = useState('PISO');
-    const [calcArea, setCalcArea] = useState('');
-    const [calcResult, setCalcResult] = useState<{qty: number, msg: string} | null>(null);
-
-    const calculateMaterial = () => {
-        const calc = CALCULATORS[calcType as keyof typeof CALCULATORS];
-        if (calc && Number(calcArea) > 0) {
-            const qty = calc.calculate(Number(calcArea));
-            setCalcResult({ qty, msg: calc.message(qty) });
-        }
-    };
-
-    const saveCalculation = async () => {
-        if (!calcResult) return;
-        const calc = CALCULATORS[calcType as keyof typeof CALCULATORS];
-        await dbService.addMaterial({
-            workId,
-            name: calc.label,
-            plannedQty: calcResult.qty,
-            purchasedQty: 0,
-            unit: calc.unit
-        });
-        alert('Material adicionado à lista de compras!');
-        onBack();
-    };
-
-    return (
-        <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
-             <button onClick={onBack} className="mb-4 text-sm font-bold text-primary hover:underline flex items-center gap-2">
-                <i className="fa-solid fa-arrow-left"></i> Voltar
-             </button>
-             <h3 className="font-bold text-lg text-text-main dark:text-white mb-4">Calculadora de Materiais</h3>
-             <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 shadow-sm border border-slate-200 dark:border-slate-800">
-                {!calcResult ? (
-                    <div className="space-y-4">
-                        <div>
-                            <label className="block text-xs font-bold text-text-muted mb-1">O que vamos calcular?</label>
-                            <select 
-                                value={calcType} 
-                                onChange={e => setCalcType(e.target.value)}
-                                className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 bg-surface dark:bg-slate-800 text-text-main dark:text-white rounded-xl outline-none"
-                            >
-                                {Object.entries(CALCULATORS).map(([key, val]) => (
-                                    <option key={key} value={key}>{val.label}</option>
-                                ))}
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block text-xs font-bold text-text-muted mb-1">Qual o tamanho da área? (m²)</label>
-                            <input 
-                                type="number" 
-                                autoFocus
-                                value={calcArea}
-                                onChange={e => setCalcArea(e.target.value)}
-                                placeholder="Ex: 25"
-                                className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 bg-surface dark:bg-slate-800 text-text-main dark:text-white rounded-xl outline-none"
-                            />
-                        </div>
-                        <button onClick={calculateMaterial} className="w-full py-3 bg-primary text-white font-bold rounded-xl shadow-lg mt-2">
-                            Ver quantidade sugerida
-                        </button>
-                    </div>
-                ) : (
-                    <div className="text-center">
-                        <div className="bg-surface dark:bg-slate-800 p-4 rounded-xl mb-4">
-                            <p className="text-3xl font-bold text-primary mb-1">{calcResult.qty} <span className="text-sm text-text-muted">{CALCULATORS[calcType as keyof typeof CALCULATORS].unit}</span></p>
-                            <p className="text-sm text-text-muted">{calcResult.msg}</p>
-                        </div>
-                        <button onClick={saveCalculation} className="w-full py-3 bg-success text-white font-bold rounded-xl shadow-lg mb-2">
-                            Adicionar à minha lista
-                        </button>
-                        <button onClick={() => setCalcResult(null)} className="w-full py-2 text-text-muted font-bold text-sm">Calcular outro</button>
-                    </div>
-                )}
-             </div>
-        </div>
-    );
-};
-
-const ChecklistsView: React.FC = () => {
-    const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({});
-
-    const toggle = (id: string) => {
-        setCheckedItems(prev => ({ ...prev, [id]: !prev[id] }));
-    };
-
-    return (
-        <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
-            <h3 className="font-bold text-lg text-text-main dark:text-white mb-4">Checklists Prontos</h3>
-            <div className="space-y-4">
-                {STANDARD_CHECKLISTS.map((list, idx) => (
-                    <div key={idx} className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden">
-                        <div className="bg-slate-50 dark:bg-slate-800 px-4 py-3 border-b border-slate-200 dark:border-slate-700">
-                            <h4 className="font-bold text-primary dark:text-white">{list.category}</h4>
-                        </div>
-                        <div className="p-2">
-                            {list.items.map((item, itemIdx) => {
-                                const id = `${idx}-${itemIdx}`;
-                                return (
-                                    <div key={id} onClick={() => toggle(id)} className="flex items-center gap-3 p-3 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-lg transition-colors">
-                                        <div className={`w-5 h-5 rounded border flex items-center justify-center transition-colors ${checkedItems[id] ? 'bg-success border-success text-white' : 'border-slate-300 dark:border-slate-600'}`}>
-                                            {checkedItems[id] && <i className="fa-solid fa-check text-xs"></i>}
-                                        </div>
-                                        <span className={`text-sm ${checkedItems[id] ? 'text-text-muted line-through' : 'text-text-body dark:text-slate-300'}`}>{item}</span>
-                                    </div>
-                                )
-                            })}
-                        </div>
-                    </div>
-                ))}
-            </div>
-        </div>
-    );
-}
-
-const ContractsView: React.FC = () => {
-    const [selectedContract, setSelectedContract] = useState<string | null>(null);
-
-    if (selectedContract) {
-        const template = CONTRACT_TEMPLATES.find(c => c.id === selectedContract);
-        return (
-            <div className="animate-in fade-in slide-in-from-right-4">
-                 <button onClick={() => setSelectedContract(null)} className="mb-4 text-sm font-bold text-primary hover:underline">
-                    <i className="fa-solid fa-arrow-left mr-1"></i> Voltar
-                 </button>
-                 <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
-                     <h3 className="font-bold text-lg mb-2 text-text-main dark:text-white">{template?.title}</h3>
-                     <p className="text-xs text-text-muted mb-4 bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-200 p-2 rounded">
-                         Copie o texto abaixo e preencha os dados entre colchetes [ ].
-                     </p>
-                     <textarea 
-                        className="w-full h-96 p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 font-mono text-sm leading-relaxed outline-none focus:ring-2 focus:ring-primary text-text-body dark:text-slate-300"
-                        readOnly
-                        value={template?.contentTemplate}
-                     />
-                     <button 
-                        onClick={() => navigator.clipboard.writeText(template?.contentTemplate || '')}
-                        className="mt-4 w-full py-3 bg-primary text-white font-bold rounded-xl shadow-lg hover:bg-primary-dark transition-all"
-                    >
-                        Copiar Texto
-                    </button>
-                 </div>
-            </div>
-        )
-    }
-
-    return (
-        <div className="space-y-4 animate-in fade-in slide-in-from-right-4">
-            <h3 className="font-bold text-lg text-text-main dark:text-white mb-2">Modelos de Contrato</h3>
-            {CONTRACT_TEMPLATES.map(c => (
-                <button 
-                    key={c.id}
-                    onClick={() => setSelectedContract(c.id)}
-                    className="w-full text-left bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-primary transition-all group"
-                >
-                    <h4 className="font-bold text-text-main dark:text-white group-hover:text-primary transition-colors">{c.title}</h4>
-                    <p className="text-sm text-text-muted dark:text-slate-400">{c.description}</p>
-                </button>
-            ))}
-        </div>
-    );
-}
-
-const ContactsView: React.FC = () => {
-    const { user } = useAuth();
-    const [activeTab, setActiveTab] = useState<'WORKERS' | 'SUPPLIERS'>('WORKERS');
-    const [workers, setWorkers] = useState<Worker[]>([]);
-    const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-    const [showAdd, setShowAdd] = useState(false);
-    
-    // Lists from DB
-    const [availableRoles, setAvailableRoles] = useState<string[]>([]);
-    const [availableCategories, setAvailableCategories] = useState<string[]>([]);
-    
-    // Form States
-    const [newName, setNewName] = useState('');
-    const [newRole, setNewRole] = useState('');
-    const [newPhone, setNewPhone] = useState('');
-    const [newNote, setNewNote] = useState('');
-    
-    // Zé Modal
-    const [zeModal, setZeModal] = useState<{isOpen: boolean, title: string, message: string, onConfirm: () => void}>({isOpen: false, title: '', message: '', onConfirm: () => {}});
-
-    const loadData = async () => {
-        if (!user) return;
-        setWorkers(await dbService.getWorkers(user.id));
-        setSuppliers(await dbService.getSuppliers(user.id));
-        setAvailableRoles(await dbService.getJobRoles());
-        setAvailableCategories(await dbService.getSupplierCategories());
-    };
-
-    useEffect(() => { loadData(); }, [user]);
-
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!user) return;
-        
-        if (activeTab === 'WORKERS') {
-            await dbService.addWorker({
-                userId: user.id,
-                name: newName,
-                role: newRole,
-                phone: newPhone,
-                notes: newNote
-            });
-        } else {
-            await dbService.addSupplier({
-                userId: user.id,
-                name: newName,
-                category: newRole, // using role input as category
-                phone: newPhone,
-                email: '',
-                address: '',
-                notes: newNote
-            });
-        }
-        setShowAdd(false);
-        setNewName(''); setNewRole(''); setNewPhone(''); setNewNote('');
-        loadData();
-    };
-
-    const handleDelete = (id: string, type: 'WORKERS' | 'SUPPLIERS') => {
-        setZeModal({
-            isOpen: true,
-            title: "Apagar contato",
-            message: "Vai excluir mesmo? Se tiver contas pendentes com essa pessoa, o histórico pode ficar confuso.",
-            onConfirm: async () => {
-                if (type === 'WORKERS') await dbService.deleteWorker(id);
-                else await dbService.deleteSupplier(id);
-                setZeModal(prev => ({ ...prev, isOpen: false }));
-                loadData();
-            }
-        });
-    }
-
-    const formatPhoneLink = (phone: string) => {
-        const clean = phone.replace(/\D/g, '');
-        return `https://wa.me/55${clean}`;
-    }
-
-    return (
-        <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
-            <h3 className="font-bold text-lg text-text-main dark:text-white mb-4">Meus Contatos</h3>
-            
-            <div className="flex p-1 bg-slate-100 dark:bg-slate-800 rounded-xl mb-6">
-                <button 
-                    onClick={() => setActiveTab('WORKERS')}
-                    className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${activeTab === 'WORKERS' ? 'bg-white dark:bg-slate-700 text-primary dark:text-white shadow-sm' : 'text-text-muted'}`}
-                >
-                    Equipe
-                </button>
-                <button 
-                    onClick={() => setActiveTab('SUPPLIERS')}
-                    className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${activeTab === 'SUPPLIERS' ? 'bg-white dark:bg-slate-700 text-primary dark:text-white shadow-sm' : 'text-text-muted'}`}
-                >
-                    Fornecedores
-                </button>
-            </div>
-
-            <button 
-                onClick={() => setShowAdd(true)}
-                className="w-full py-3 bg-primary text-white font-bold rounded-xl shadow-lg hover:bg-primary-dark transition-all flex items-center justify-center gap-2"
-            >
-                <i className="fa-solid fa-plus"></i> Novo {activeTab === 'WORKERS' ? 'Trabalhador' : 'Fornecedor'}
-            </button>
-
-            {showAdd && (
-                <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-lg animate-in slide-in-from-top-2">
-                    <form onSubmit={handleSubmit} className="space-y-4">
-                        <div>
-                            <label className="text-xs font-bold text-text-muted mb-1 block">Nome</label>
-                            <input required value={newName} onChange={e => setNewName(e.target.value)} className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 bg-surface dark:bg-slate-800 rounded-xl outline-none" placeholder="Ex: João da Silva" />
-                        </div>
-                        <div>
-                            <label className="text-xs font-bold text-text-muted mb-1 block">{activeTab === 'WORKERS' ? 'Profissão' : 'Categoria'}</label>
-                            <select 
-                                required 
-                                value={newRole} 
-                                onChange={e => setNewRole(e.target.value)} 
-                                className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 bg-surface dark:bg-slate-800 rounded-xl outline-none"
-                            >
-                                <option value="" disabled>Selecione uma opção</option>
-                                {(activeTab === 'WORKERS' ? availableRoles : availableCategories).map(item => (
-                                    <option key={item} value={item}>{item}</option>
-                                ))}
-                            </select>
-                        </div>
-                        <div>
-                            <label className="text-xs font-bold text-text-muted mb-1 block">WhatsApp / Telefone</label>
-                            <input required value={newPhone} onChange={e => setNewPhone(e.target.value)} className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 bg-surface dark:bg-slate-800 rounded-xl outline-none" placeholder="Ex: 11999999999" type="tel" />
-                        </div>
-                         <div>
-                            <label className="text-xs font-bold text-text-muted mb-1 block">Observação (Opcional)</label>
-                            <input value={newNote} onChange={e => setNewNote(e.target.value)} className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 bg-surface dark:bg-slate-800 rounded-xl outline-none" placeholder="..." />
-                        </div>
-                        <div className="flex gap-3 pt-2">
-                            <button type="button" onClick={() => setShowAdd(false)} className="flex-1 py-3 text-text-muted bg-slate-100 dark:bg-slate-800 rounded-xl font-bold">Cancelar</button>
-                            <button type="submit" className="flex-1 py-3 text-white bg-primary rounded-xl font-bold">Salvar</button>
-                        </div>
-                    </form>
-                </div>
-            )}
-
-            <div className="space-y-3">
-                {(activeTab === 'WORKERS' ? workers : suppliers).map((item: any) => (
-                    <div key={item.id} className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-100 dark:border-slate-800 shadow-sm flex items-center justify-between">
-                        <div>
-                            <h4 className="font-bold text-text-main dark:text-white">{item.name}</h4>
-                            <p className="text-sm text-text-muted dark:text-slate-500">{item.role || item.category}</p>
-                            {item.notes && <p className="text-xs text-text-muted dark:text-slate-600 mt-1 italic">{item.notes}</p>}
-                        </div>
-                        <div className="flex gap-2">
-                             <a 
-                                href={formatPhoneLink(item.phone)} 
-                                target="_blank"
-                                className="w-10 h-10 rounded-lg bg-success text-white flex items-center justify-center hover:bg-success-dark transition-colors shadow-sm"
-                             >
-                                 <i className="fa-brands fa-whatsapp text-lg"></i>
-                             </a>
-                             <button 
-                                onClick={() => handleDelete(item.id, activeTab)}
-                                className="w-10 h-10 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-400 hover:text-danger flex items-center justify-center transition-colors"
-                             >
-                                 <i className="fa-solid fa-trash"></i>
-                             </button>
-                        </div>
-                    </div>
-                ))}
-                {(activeTab === 'WORKERS' ? workers : suppliers).length === 0 && !showAdd && (
-                    <div className="text-center py-10 text-text-muted dark:text-slate-500">
-                        Nenhum contato cadastrado.
-                    </div>
-                )}
-            </div>
-
-            <ZeModal 
-                isOpen={zeModal.isOpen} 
-                title={zeModal.title} 
-                message={zeModal.message} 
-                onConfirm={zeModal.onConfirm} 
-                onCancel={() => setZeModal({isOpen: false, title: '', message: '', onConfirm: () => {}})} 
-            />
-        </div>
-    );
-}
-
-const PhotosView: React.FC<{ workId: string }> = ({ workId }) => {
-    const [photos, setPhotos] = useState<WorkPhoto[]>([]);
-    const [uploading, setUploading] = useState(false);
-    const [zeModal, setZeModal] = useState<{isOpen: boolean, title: string, message: string, onConfirm: () => void}>({isOpen: false, title: '', message: '', onConfirm: () => {}});
-
-    useEffect(() => {
-        dbService.getPhotos(workId).then(setPhotos);
-    }, [workId]);
-
-    const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files[0]) {
-            setUploading(true);
-            const file = e.target.files[0];
-            await dbService.uploadPhoto(workId, file, 'PROGRESS');
-            setPhotos(await dbService.getPhotos(workId));
-            setUploading(false);
-        }
-    }
-
-    const handleDelete = (id: string) => {
-        setZeModal({
-            isOpen: true,
-            title: "Apagar foto",
-            message: "Essa foto vai sumir da galeria da obra. Tem certeza?",
-            onConfirm: async () => {
-                await dbService.deletePhoto(id);
-                setPhotos(await dbService.getPhotos(workId));
-                setZeModal(prev => ({...prev, isOpen: false}));
-            }
-        });
-    }
-
-    return (
-        <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
-            <h3 className="font-bold text-lg text-text-main dark:text-white mb-4">Galeria da Obra</h3>
-            
-            <label className={`w-full py-4 rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-primary hover:text-primary transition-all flex flex-col items-center justify-center gap-2 cursor-pointer ${uploading ? 'opacity-50 cursor-wait' : ''}`}>
-                <input type="file" accept="image/*" className="hidden" onChange={handleUpload} disabled={uploading} />
-                <i className={`fa-solid ${uploading ? 'fa-circle-notch fa-spin' : 'fa-camera'} text-2xl`}></i>
-                <span className="font-bold text-sm">{uploading ? 'Enviando...' : 'Tirar ou Escolher Foto'}</span>
-            </label>
-
-            <div className="grid grid-cols-2 gap-3">
-                {photos.map(p => (
-                    <div key={p.id} className="relative aspect-square rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-800 shadow-sm group">
-                        <img src={p.url} alt="Obra" className="w-full h-full object-cover" />
-                        <button 
-                            onClick={() => handleDelete(p.id)}
-                            className="absolute top-2 right-2 w-8 h-8 bg-black/50 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                        >
-                            <i className="fa-solid fa-trash text-xs"></i>
-                        </button>
-                        <div className="absolute bottom-0 left-0 right-0 p-2 bg-gradient-to-t from-black/70 to-transparent">
-                            <p className="text-[10px] text-white font-medium truncate">{new Date(p.date).toLocaleDateString()}</p>
-                        </div>
-                    </div>
-                ))}
-            </div>
-            
-            {photos.length === 0 && !uploading && (
-                <div className="text-center py-10 text-text-muted dark:text-slate-500">
-                    Nenhuma foto ainda.
-                </div>
-            )}
-             <ZeModal 
-                isOpen={zeModal.isOpen} 
-                title={zeModal.title} 
-                message={zeModal.message} 
-                onConfirm={zeModal.onConfirm} 
-                onCancel={() => setZeModal({isOpen: false, title: '', message: '', onConfirm: () => {}})} 
-            />
-        </div>
-    );
-}
-
-const FilesView: React.FC<{ workId: string }> = ({ workId }) => {
-    const [files, setFiles] = useState<WorkFile[]>([]);
-    const [uploading, setUploading] = useState(false);
-    const [zeModal, setZeModal] = useState<{isOpen: boolean, title: string, message: string, onConfirm: () => void}>({isOpen: false, title: '', message: '', onConfirm: () => {}});
-
-    useEffect(() => {
-        dbService.getFiles(workId).then(setFiles);
-    }, [workId]);
-
-    const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files[0]) {
-            setUploading(true);
-            const file = e.target.files[0];
-            await dbService.uploadFile(workId, file, 'Geral');
-            setFiles(await dbService.getFiles(workId));
-            setUploading(false);
-        }
-    }
-    
-    const handleDelete = (id: string) => {
-        setZeModal({
-            isOpen: true,
-            title: "Apagar arquivo",
-            message: "Vai excluir o projeto? Cuidado se não tiver cópia.",
-            onConfirm: async () => {
-                await dbService.deleteFile(id);
-                setFiles(await dbService.getFiles(workId));
-                setZeModal(prev => ({...prev, isOpen: false}));
-            }
-        });
-    }
-
-    return (
-        <div className="space-y-6 animate-in fade-in slide-in-from-right-4">
-            <h3 className="font-bold text-lg text-text-main dark:text-white mb-4">Projetos e Documentos</h3>
-            
-            <label className={`w-full py-4 rounded-xl border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-primary hover:text-primary transition-all flex flex-col items-center justify-center gap-2 cursor-pointer ${uploading ? 'opacity-50 cursor-wait' : ''}`}>
-                <input type="file" accept=".pdf,image/*" className="hidden" onChange={handleUpload} disabled={uploading} />
-                <i className={`fa-solid ${uploading ? 'fa-circle-notch fa-spin' : 'fa-cloud-arrow-up'} text-2xl`}></i>
-                <span className="font-bold text-sm">{uploading ? 'Enviando...' : 'Enviar PDF ou Imagem'}</span>
-            </label>
-
-            <div className="space-y-3">
-                {files.map(f => (
-                    <div key={f.id} className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-100 dark:border-slate-800 shadow-sm flex items-center justify-between">
-                        <div className="flex items-center gap-3 overflow-hidden">
-                            <div className="w-10 h-10 rounded-lg bg-red-100 dark:bg-red-900/30 text-red-500 flex items-center justify-center shrink-0">
-                                <i className="fa-solid fa-file-pdf text-xl"></i>
-                            </div>
-                            <div className="min-w-0">
-                                <h4 className="font-bold text-text-main dark:text-white truncate">{f.name}</h4>
-                                <p className="text-xs text-text-muted dark:text-slate-500">{new Date(f.date).toLocaleDateString()}</p>
-                            </div>
-                        </div>
-                        <div className="flex gap-2">
-                            <a href={f.url} target="_blank" rel="noreferrer" className="w-8 h-8 bg-slate-100 dark:bg-slate-800 text-primary rounded-full flex items-center justify-center">
-                                <i className="fa-solid fa-download text-xs"></i>
-                            </a>
-                            <button onClick={() => handleDelete(f.id)} className="w-8 h-8 bg-slate-100 dark:bg-slate-800 text-slate-400 hover:text-danger rounded-full flex items-center justify-center">
-                                <i className="fa-solid fa-trash text-xs"></i>
-                            </button>
-                        </div>
-                    </div>
-                ))}
-            </div>
-
-             {files.length === 0 && !uploading && (
-                <div className="text-center py-10 text-text-muted dark:text-slate-500">
-                    Nenhum projeto salvo.
-                </div>
-            )}
-             <ZeModal 
-                isOpen={zeModal.isOpen} 
-                title={zeModal.title} 
-                message={zeModal.message} 
-                onConfirm={zeModal.onConfirm} 
-                onCancel={() => setZeModal({isOpen: false, title: '', message: '', onConfirm: () => {}})} 
-            />
-        </div>
-    );
-}
-
-const AssistantView: React.FC = () => {
-    const { user } = useAuth();
-    const [messages, setMessages] = useState<{id: string, text: string, sender: 'USER' | 'AI'}[]>([]);
-    const [input, setInput] = useState('');
-    const [thinking, setThinking] = useState(false);
-
-    const handleSend = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if(!input.trim()) return;
-
-        const userMsg = { id: Date.now().toString(), text: input, sender: 'USER' as const };
-        setMessages(prev => [...prev, userMsg]);
-        setInput('');
-        setThinking(true);
-
-        try {
-            const aiResponse = await aiService.sendMessage(input);
-            setMessages(prev => [...prev, { id: (Date.now()+1).toString(), text: aiResponse, sender: 'AI' as const }]);
-        } catch (error) {
-            setMessages(prev => [...prev, { id: (Date.now()+1).toString(), text: "Desculpe chefe, deu um erro na minha cabeça aqui. Tenta de novo?", sender: 'AI' as const }]);
-        } finally {
-            setThinking(false);
-        }
-    };
-
-    return (
-        <div className="h-[600px] flex flex-col bg-slate-100 dark:bg-slate-900 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-800 animate-in fade-in slide-in-from-right-4">
-             <div className="bg-primary p-4 flex items-center gap-3 shadow-md">
-                 <div className="w-10 h-10 rounded-full bg-white border-2 border-white overflow-hidden">
-                     <img src={ZE_AVATAR} alt="Zé" className="w-full h-full object-cover" />
-                 </div>
-                 <div>
-                     <h3 className="font-bold text-white leading-tight">Zé da Obra</h3>
-                     <p className="text-xs text-blue-100 flex items-center gap-1">
-                         <span className="w-2 h-2 rounded-full bg-green-400"></span> Online
-                     </p>
-                 </div>
-             </div>
-
-             <div className="flex-1 overflow-y-auto p-4 space-y-4">
-                 {messages.length === 0 && (
-                     <div className="text-center text-text-muted mt-10">
-                         <p>Pode perguntar qualquer coisa sobre obra, chefe!</p>
-                     </div>
-                 )}
-                 {messages.map(m => (
-                     <div key={m.id} className={`flex ${m.sender === 'USER' ? 'justify-end' : 'justify-start'}`}>
-                         <div className={`max-w-[80%] p-3 rounded-2xl text-sm ${
-                             m.sender === 'USER' 
-                             ? 'bg-primary text-white rounded-br-none' 
-                             : 'bg-white dark:bg-slate-800 text-text-body dark:text-slate-200 rounded-bl-none shadow-sm'
-                         }`}>
-                             {m.text}
-                         </div>
-                     </div>
-                 ))}
-                 {thinking && (
-                     <div className="flex justify-start">
-                         <div className="bg-white dark:bg-slate-800 p-3 rounded-2xl rounded-bl-none shadow-sm flex gap-1">
-                             <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"></div>
-                             <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce delay-75"></div>
-                             <div className="w-2 h-2 bg-slate-400 rounded-full animate-bounce delay-150"></div>
-                         </div>
-                     </div>
-                 )}
-             </div>
-
-             <form onSubmit={handleSend} className="p-3 bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 flex gap-2">
-                 <input 
-                    className="flex-1 bg-slate-100 dark:bg-slate-900 rounded-full px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-primary dark:text-white"
-                    placeholder="Digite sua dúvida..."
-                    value={input}
-                    onChange={e => setInput(e.target.value)}
-                 />
-                 <button type="submit" disabled={thinking} className="w-10 h-10 bg-primary text-white rounded-full flex items-center justify-center disabled:opacity-50">
-                     <i className="fa-solid fa-paper-plane"></i>
-                 </button>
-             </form>
-        </div>
-    );
-}
-
-// 5. MAIS MENU MAIN
-const MoreMenuTab: React.FC<{ 
-    onNavigate: (view: string) => void,
-    activeSubView: string | null,
-    workId: string
-}> = ({ onNavigate, activeSubView, workId }) => {
-    const { user } = useAuth();
-    const navigate = useNavigate();
-
-    const standardItems = [
-        { id: 'CONTACTS', label: 'Equipe e Fornecedores', icon: 'fa-address-book', color: 'text-blue-500', desc: 'Sua lista de contatos.' },
-        { id: 'PHOTOS', label: 'Minhas Fotos', icon: 'fa-camera', color: 'text-purple-500', desc: 'Guarde o antes e depois da obra.' },
-        { id: 'FILES', label: 'Meus Projetos (PDF)', icon: 'fa-folder-open', color: 'text-indigo-500', desc: 'Plantas e documentos importantes.' },
-        { id: 'REPORTS', label: 'Relatórios', icon: 'fa-file-pdf', color: 'text-red-500', desc: 'Para imprimir ou mandar para alguém.' },
-    ];
-
-    const bonusItems = [
-        { id: 'AI_CHAT', label: 'IA do Zé (Assistente)', icon: 'fa-robot', color: 'text-blue-600', desc: 'Tire dúvidas técnicas na hora.' },
-        { id: 'CALCULATOR', label: 'Calculadora da Obra', icon: 'fa-calculator', color: 'text-primary', desc: 'Calcule pisos, tijolos e tintas.' },
-        { id: 'CHECKLISTS', label: 'Checklists', icon: 'fa-list-check', color: 'text-success', desc: 'Não esqueça de nada importante.' },
-        { id: 'CONTRACTS', label: 'Contratos e Recibos', icon: 'fa-file-signature', color: 'text-orange-500', desc: 'Modelos prontos para usar.' },
-    ];
-
-    const isLifetime = user?.plan === PlanType.VITALICIO;
-
-    if (activeSubView) {
-        return (
-            <div className="animate-in fade-in slide-in-from-right-4 duration-300">
-                {activeSubView !== 'CALCULATOR' && activeSubView !== 'CONTRACTS' && activeSubView !== 'AI_CHAT' && (
-                    <button 
-                        onClick={() => onNavigate('')} 
-                        className="mb-4 text-sm font-bold text-text-muted hover:text-primary flex items-center gap-2"
-                    >
-                        <i className="fa-solid fa-arrow-left"></i> Voltar ao Menu
-                    </button>
-                )}
-                
-                {activeSubView === 'CONTACTS' && <ContactsView />}
-                {activeSubView === 'PHOTOS' && <PhotosView workId={workId} />}
-                {activeSubView === 'FILES' && <FilesView workId={workId} />}
-                {activeSubView === 'CHECKLISTS' && <ChecklistsView />}
-                {activeSubView === 'CONTRACTS' && <ContractsView />}
-                {activeSubView === 'CALCULATOR' && <CalculatorView workId={workId} onBack={() => onNavigate('')} />}
-                {activeSubView === 'AI_CHAT' && (
-                    <div>
-                         <button onClick={() => onNavigate('')} className="mb-4 text-sm font-bold text-primary hover:underline flex items-center gap-2">
-                            <i className="fa-solid fa-arrow-left"></i> Voltar
-                         </button>
-                         <AssistantView />
-                    </div>
-                )}
-                {activeSubView === 'REPORTS' && (
-                    <div className="p-8 bg-white dark:bg-slate-900 rounded-2xl text-center border border-slate-200 dark:border-slate-800">
-                        <i className="fa-solid fa-print text-4xl text-slate-300 mb-4"></i>
-                        <p className="mb-4 text-text-main dark:text-white">Gerar relatório PDF da obra?</p>
-                        <button onClick={() => window.print()} className="bg-primary text-white px-6 py-2 rounded-xl font-bold hover:bg-primary-dark shadow-lg shadow-primary/20 transition-all">Imprimir Relatório</button>
-                    </div>
-                )}
-            </div>
-        );
-    }
-
-    return (
-        <div className="space-y-6 animate-in fade-in duration-300">
-            <SectionHeader 
-                title="Mais Coisas" 
-                subtitle="Ferramentas e extras da sua obra."
-            />
-            
-            {/* Standard Tools */}
-            <div className="grid grid-cols-1 gap-4">
-                {standardItems.map(item => (
-                    <button 
-                        key={item.id}
-                        onClick={() => onNavigate(item.id)}
-                        className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm hover:shadow-md transition-all text-left flex items-center gap-4 group"
-                    >
-                        <div className={`w-10 h-10 rounded-xl bg-surface dark:bg-slate-800 flex items-center justify-center text-lg ${item.color}`}>
-                            <i className={`fa-solid ${item.icon}`}></i>
-                        </div>
-                        <div>
-                            <h3 className="font-bold text-base text-text-main dark:text-white">{item.label}</h3>
-                            <p className="text-xs text-text-muted dark:text-slate-400">{item.desc}</p>
-                        </div>
-                        <i className="fa-solid fa-chevron-right ml-auto text-slate-300 group-hover:text-primary transition-colors"></i>
-                    </button>
-                ))}
-            </div>
-
-            {/* Bonus Section Header */}
-            <div className="pt-4 pb-2 border-t border-slate-200 dark:border-slate-800 mt-2">
-                <h3 className="font-bold text-lg text-text-main dark:text-white flex items-center gap-2">
-                    <i className="fa-solid fa-gift text-premium"></i> Bônus Vitalício
-                </h3>
-                <p className="text-xs text-text-muted dark:text-slate-400">Exclusivo para membros do plano completo.</p>
-            </div>
-
-            {/* Bonus Items */}
-            <div className="grid grid-cols-1 gap-4">
-                {bonusItems.map(item => (
-                    <button 
-                        key={item.id}
-                        onClick={() => isLifetime && onNavigate(item.id)}
-                        disabled={!isLifetime}
-                        className={`p-5 rounded-2xl border shadow-sm transition-all text-left flex items-center gap-4 group relative overflow-hidden ${
-                            isLifetime 
-                            ? 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 hover:shadow-md cursor-pointer' 
-                            : 'bg-slate-50 dark:bg-slate-800/50 border-slate-100 dark:border-slate-800 opacity-60 cursor-not-allowed'
-                        }`}
-                    >
-                        <div className={`w-10 h-10 rounded-xl bg-surface dark:bg-slate-800 flex items-center justify-center text-lg ${item.color}`}>
-                            <i className={`fa-solid ${item.icon}`}></i>
-                        </div>
-                        <div>
-                            <h3 className="font-bold text-base text-text-main dark:text-white">{item.label}</h3>
-                            <p className="text-xs text-text-muted dark:text-slate-400">{item.desc}</p>
-                        </div>
-                        {!isLifetime ? (
-                             <i className="fa-solid fa-lock ml-auto text-slate-400"></i>
-                        ) : (
-                             <i className="fa-solid fa-chevron-right ml-auto text-slate-300 group-hover:text-primary transition-colors"></i>
-                        )}
-                    </button>
-                ))}
-            </div>
-
-            {/* Unlock Banner for Non-Lifetime */}
-            {!isLifetime && (
-                <div className="bg-gradient-to-r from-purple-600 to-indigo-600 rounded-2xl p-6 text-white shadow-lg shadow-purple-500/30 text-center mt-4">
-                    <i className="fa-solid fa-crown text-3xl mb-2 text-yellow-300"></i>
-                    <h3 className="font-bold text-lg mb-1">Desbloquear Bônus</h3>
-                    <p className="text-sm opacity-90 mb-4">Tenha acesso vitalício à calculadora, contratos e checklists exclusivos.</p>
-                    <button 
-                        onClick={() => navigate('/settings')}
-                        className="bg-white text-purple-600 font-bold py-3 px-6 rounded-xl w-full hover:bg-purple-50 transition-colors"
-                    >
-                        Quero ser Vitalício
-                    </button>
-                </div>
-            )}
-        </div>
-    );
-};
-
-// --- MAIN PAGE ---
 
 const WorkDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [work, setWork] = useState<Work | undefined>();
-  const [activeTab, setActiveTab] = useState(0); 
-  const [moreSubView, setMoreSubView] = useState<string | null>(null);
+  const [work, setWork] = useState<Work | null>(null);
+  const [activeTab, setActiveTab] = useState('overview');
   const [stats, setStats] = useState({ totalSpent: 0, progress: 0, delayedSteps: 0 });
   const [loading, setLoading] = useState(true);
+  
+  // AI Chat State
+  const [showAiChat, setShowAiChat] = useState(false);
+  const [aiMessage, setAiMessage] = useState('');
+  const [aiHistory, setAiHistory] = useState<{sender: 'user'|'ze', text: string}[]>([]);
+  const [aiLoading, setAiLoading] = useState(false);
 
   const loadWork = async () => {
-    if (id) {
-        const w = await dbService.getWorkById(id);
-        if (w) {
+      if (!id) return;
+      setLoading(true);
+      const w = await dbService.getWorkById(id);
+      if (w) {
           setWork(w);
-          const st = await dbService.calculateWorkStats(id);
-          setStats(st);
-        } else {
-          navigate('/');
-        }
-        setLoading(false);
+          const s = await dbService.calculateWorkStats(id);
+          setStats(s);
       }
-  }
+      setLoading(false);
+  };
 
-  useEffect(() => { loadWork(); }, [id, navigate, activeTab]); 
+  useEffect(() => {
+      loadWork();
+  }, [id]);
 
-  if (loading || !work) return <div className="h-screen flex items-center justify-center"><i className="fa-solid fa-circle-notch fa-spin text-primary text-3xl"></i></div>;
+  const handleAiSend = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!aiMessage.trim()) return;
+      
+      const userMsg = aiMessage;
+      setAiHistory(prev => [...prev, { sender: 'user', text: userMsg }]);
+      setAiMessage('');
+      setAiLoading(true);
 
-  const tabs = [
-    { name: 'Resumo', icon: 'fa-house' },
-    { name: 'Tarefas', icon: 'fa-list-check' },
-    { name: 'Compras', icon: 'fa-box-open' },
-    { name: 'Gastos', icon: 'fa-sack-dollar' },
-  ];
+      const response = await aiService.sendMessage(userMsg);
+      
+      setAiHistory(prev => [...prev, { sender: 'ze', text: response }]);
+      setAiLoading(false);
+  };
+
+  if (loading) return (
+      <div className="min-h-screen flex items-center justify-center text-secondary">
+          <i className="fa-solid fa-circle-notch fa-spin text-3xl"></i>
+      </div>
+  );
+
+  if (!work) return (
+      <div className="min-h-screen flex flex-col items-center justify-center p-4 text-center">
+          <h2 className="text-xl font-bold text-slate-500 mb-4">Obra não encontrada</h2>
+          <button onClick={() => navigate('/')} className="text-primary hover:underline">Voltar ao Painel</button>
+      </div>
+  );
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6 pb-28 pt-2 px-2 md:px-0">
-      
-      <div className="flex items-center justify-between py-2 print:hidden bg-surface dark:bg-slate-950 sticky top-0 z-40">
-         <div className="flex items-center gap-3">
-             <button onClick={() => navigate('/')} className="w-10 h-10 flex items-center justify-center rounded-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-text-muted hover:text-primary transition-colors shadow-sm">
-               <i className="fa-solid fa-arrow-left"></i>
-             </button>
-             <div className="min-w-0">
-                <h1 className="text-lg font-bold text-text-main dark:text-white leading-tight truncate">{work.name}</h1>
-                <p className="text-xs text-text-muted dark:text-slate-400 truncate">{work.address || 'Sem endereço cadastrado'}</p>
-             </div>
-         </div>
-         
-         <button 
-            onClick={() => { setActiveTab(4); setMoreSubView(null); }}
-            className={`w-10 h-10 flex items-center justify-center rounded-full border transition-all shadow-sm ${activeTab === 4 ? 'bg-primary text-white border-primary' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-text-muted hover:text-primary'}`}
-            title="Mais Opções"
-         >
-            <i className="fa-solid fa-bars"></i>
-         </button>
-      </div>
+      <div className="max-w-6xl mx-auto pb-24 pt-6 px-4 md:px-0">
+          
+          {/* Header */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+              <div>
+                  <button onClick={() => navigate('/')} className="text-xs font-bold text-slate-400 hover:text-primary mb-2 flex items-center gap-1 transition-colors">
+                      <i className="fa-solid fa-arrow-left"></i> Voltar
+                  </button>
+                  <h1 className="text-3xl font-extrabold text-primary dark:text-white flex items-center gap-3">
+                      {work.name}
+                      <span className={`text-xs px-2 py-1 rounded-lg border uppercase tracking-widest ${work.status === 'Planejamento' ? 'bg-blue-50 text-blue-600 border-blue-200' : 'bg-green-50 text-green-600 border-green-200'}`}>
+                          {work.status}
+                      </span>
+                  </h1>
+              </div>
+              <button 
+                  onClick={() => setShowAiChat(true)}
+                  className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white px-5 py-3 rounded-xl font-bold shadow-lg shadow-orange-500/20 flex items-center gap-2 transition-all transform hover:scale-105"
+              >
+                  <div className="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center">
+                      <i className="fa-solid fa-robot text-xs"></i>
+                  </div>
+                  Falar com o Zé
+              </button>
+          </div>
 
-      <div className="min-h-[400px]">
-        {activeTab === 0 && <OverviewTab work={work} stats={stats} onGoToSteps={() => setActiveTab(1)} />}
-        {activeTab === 1 && <StepsTab workId={work.id} refreshWork={loadWork} />}
-        {activeTab === 2 && <MaterialsTab workId={work.id} onUpdate={loadWork} />}
-        {activeTab === 3 && <ExpensesTab workId={work.id} onUpdate={loadWork} />}
-        {activeTab === 4 && (
-            <MoreMenuTab 
-                onNavigate={(view) => setMoreSubView(view)} 
-                activeSubView={moreSubView} 
-                workId={work.id}
-            />
-        )}
-      </div>
+          {/* Navigation */}
+          <div className="flex overflow-x-auto gap-2 mb-8 pb-2 hide-scrollbar">
+              {[
+                  { id: 'overview', icon: 'fa-chart-pie', label: 'Visão Geral' },
+                  { id: 'steps', icon: 'fa-list-check', label: 'Cronograma' },
+              ].map(tab => (
+                  <button
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id)}
+                      className={`flex items-center gap-2 px-5 py-3 rounded-xl font-bold text-sm transition-all whitespace-nowrap ${
+                          activeTab === tab.id 
+                          ? 'bg-primary text-white shadow-md' 
+                          : 'bg-white dark:bg-slate-900 text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800'
+                      }`}
+                  >
+                      <i className={`fa-solid ${tab.icon}`}></i>
+                      {tab.label}
+                  </button>
+              ))}
+          </div>
 
-      <div className="fixed bottom-0 left-0 w-full bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 pb-safe pt-2 px-2 md:hidden z-50 flex justify-around items-center shadow-[0_-4px_10px_rgba(0,0,0,0.03)]">
-        {tabs.map((tab, idx) => {
-            const isActive = activeTab === idx;
-            return (
-                <button
-                    key={idx}
-                    onClick={() => { setActiveTab(idx); setMoreSubView(null); }}
-                    className={`flex flex-col items-center justify-center p-2 rounded-xl w-full transition-all duration-200 ${isActive ? 'text-primary dark:text-white translate-y-[-2px]' : 'text-slate-400 dark:text-slate-600'}`}
-                >
-                    <i className={`fa-solid ${tab.icon} text-xl mb-1 ${isActive ? 'scale-110' : ''} transition-transform`}></i>
-                    <span className={`text-[10px] font-bold ${isActive ? 'opacity-100' : 'opacity-80'}`}>{tab.name}</span>
-                </button>
-            )
-        })}
-      </div>
+          {/* Content */}
+          <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 md:p-8 border border-slate-100 dark:border-slate-800 shadow-sm min-h-[400px]">
+              {activeTab === 'overview' && (
+                  <OverviewTab work={work} stats={stats} onGoToSteps={() => setActiveTab('steps')} />
+              )}
+              {activeTab === 'steps' && (
+                  <StepsTab workId={work.id} refreshWork={loadWork} />
+              )}
+          </div>
 
-      <div className="hidden md:flex justify-center mb-8 print:hidden">
-        <div className="bg-white dark:bg-slate-900 p-1.5 rounded-full border border-slate-200 dark:border-slate-800 shadow-sm inline-flex">
-            {tabs.map((tab, idx) => (
-            <button
-                key={idx}
-                onClick={() => { setActiveTab(idx); setMoreSubView(null); }}
-                className={`flex items-center px-6 py-2.5 rounded-full text-sm font-bold transition-all ${
-                activeTab === idx 
-                    ? 'bg-primary text-white shadow-md' 
-                    : 'text-text-muted dark:text-slate-400 hover:text-text-main dark:hover:text-white hover:bg-slate-50 dark:hover:bg-slate-800'
-                }`}
-            >
-                <i className={`fa-solid ${tab.icon} mr-2 ${activeTab === idx ? 'text-white' : 'opacity-70'}`}></i>
-                {tab.name}
-            </button>
-            ))}
-        </div>
-      </div>
+          {/* Zé Chat */}
+          {showAiChat && (
+              <div className="fixed bottom-0 right-0 md:bottom-6 md:right-6 w-full md:w-[380px] h-[500px] bg-white dark:bg-slate-900 md:rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 z-50 flex flex-col overflow-hidden animate-in slide-in-from-bottom duration-300">
+                  <div className="p-4 bg-primary text-white flex justify-between items-center shrink-0">
+                      <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-white/10 p-1">
+                              <img src={ZE_AVATAR} className="w-full h-full object-cover rounded-full" />
+                          </div>
+                          <div>
+                              <h3 className="font-bold text-sm">Zé da Obra</h3>
+                              <p className="text-[10px] text-green-300 flex items-center gap-1"><span className="w-1.5 h-1.5 bg-green-300 rounded-full animate-pulse"></span> Online</p>
+                          </div>
+                      </div>
+                      <button onClick={() => setShowAiChat(false)} className="text-white/70 hover:text-white w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/10"><i className="fa-solid fa-xmark"></i></button>
+                  </div>
 
-    </div>
+                  <div className="flex-1 p-4 overflow-y-auto space-y-4 bg-slate-50 dark:bg-black/20">
+                      {aiHistory.length === 0 && (
+                          <div className="h-full flex flex-col items-center justify-center text-center opacity-40 p-6">
+                              <i className="fa-solid fa-comments text-4xl mb-3"></i>
+                              <p className="text-sm font-medium">"Fala chefe! Tô aqui pra ajudar. Pode perguntar sobre a obra, materiais ou pedir uma dica!"</p>
+                          </div>
+                      )}
+                      {aiHistory.map((msg, i) => (
+                          <div key={i} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+                              <div className={`max-w-[85%] p-3 rounded-2xl text-sm leading-relaxed ${msg.sender === 'user' ? 'bg-primary text-white rounded-tr-none' : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-tl-none shadow-sm'}`}>
+                                  {msg.text}
+                              </div>
+                          </div>
+                      ))}
+                      {aiLoading && (
+                          <div className="flex justify-start">
+                              <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl rounded-tl-none border border-slate-200 dark:border-slate-700 shadow-sm">
+                                  <div className="flex gap-1.5">
+                                      <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"></span>
+                                      <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce delay-75"></span>
+                                      <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce delay-150"></span>
+                                  </div>
+                              </div>
+                          </div>
+                      )}
+                  </div>
+
+                  <form onSubmit={handleAiSend} className="p-3 bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 flex gap-2 shrink-0">
+                      <input 
+                          className="flex-1 bg-slate-100 dark:bg-slate-800 border-0 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-secondary/50 outline-none dark:text-white"
+                          placeholder="Digite sua dúvida..."
+                          value={aiMessage}
+                          onChange={e => setAiMessage(e.target.value)}
+                      />
+                      <button type="submit" disabled={!aiMessage.trim() || aiLoading} className="w-12 h-12 rounded-xl bg-secondary text-white flex items-center justify-center hover:bg-amber-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                          <i className="fa-solid fa-paper-plane"></i>
+                      </button>
+                  </form>
+              </div>
+          )}
+      </div>
   );
 };
 

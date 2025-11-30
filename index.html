@@ -3,12 +3,12 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <meta name="theme-color" content="#1E3A45" />
+    <meta name="theme-color" content="#0F172A" />
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>MÃOS DA OBRA</title>
     <link rel="manifest" href="/manifest.json">
-    <!-- Tailwind via CDN is useful for quick previews, but PostCSS/Vite will handle the build version via CSS generation -->
+    <!-- Tailwind via CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
@@ -16,71 +16,97 @@
         theme: {
           extend: {
             colors: {
+              // Deep Navy Palette
               primary: {
-                DEFAULT: '#1E3A45',
-                light: '#3B7C8C',
-                dark: '#152932',
-                50: '#E8F1F4',
+                DEFAULT: '#0F172A', // Slate 900
+                light: '#1E293B',   // Slate 800
+                dark: '#020617',    // Slate 950
               },
-              secondary: '#3B7C8C',
+              // Architectural Bronze/Gold
+              secondary: {
+                DEFAULT: '#D97706', // Amber 600
+                light: '#F59E0B',   // Amber 500
+                dark: '#B45309',    // Amber 700
+              },
+              // Status Colors (Muted/Premium)
               success: {
-                DEFAULT: '#2BB86B',
+                DEFAULT: '#059669', // Emerald 600
                 light: '#D1FAE5',
-                dark: '#1F854D'
+                dark: '#064E3B'
               },
               warning: {
-                DEFAULT: '#FACC15',
-                light: '#FEF9C3',
-                dark: '#A16207'
+                DEFAULT: '#D97706', // Amber 600
+                light: '#FEF3C7',
+                dark: '#78350F'
               },
               danger: {
-                DEFAULT: '#EF4444',
+                DEFAULT: '#DC2626', // Red 600
                 light: '#FEE2E2',
-                dark: '#B91C1C'
+                dark: '#7F1D1D'
               },
+              // Luxury Purple for Lifetime
               premium: {
-                DEFAULT: '#6D28D9',
-                light: '#EDE9FE',
+                DEFAULT: '#7C3AED', // Violet 600
+                light: '#DDD6FE',
+                dark: '#4C1D95'
               },
-              surface: '#F3F4F6',
+              surface: '#F8FAFC', // Slate 50
               text: {
-                main: '#111827',
-                body: '#374151',
-                muted: '#9CA3AF',
+                main: '#0F172A', // Slate 900
+                body: '#334155', // Slate 700
+                muted: '#64748B', // Slate 500
               }
             },
             fontFamily: {
               sans: ['Inter', 'sans-serif'],
               display: ['Inter', 'sans-serif'],
+            },
+            backgroundImage: {
+              'gradient-premium': 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)',
+              'gradient-gold': 'linear-gradient(135deg, #D97706 0%, #B45309 100%)',
+            },
+            boxShadow: {
+              'glass': '0 8px 32px 0 rgba(31, 38, 135, 0.07)',
+              'glow': '0 0 15px rgba(217, 119, 6, 0.3)',
             }
           }
         }
       }
     </script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
     <style>
       .material-symbols-outlined {
         font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
       }
       body {
-        background-color: #F9FAFB; 
+        background-color: #F8FAFC; 
         font-family: 'Inter', sans-serif;
-        color: #374151;
+        color: #334155;
       }
       .dark body {
-        background-color: #0f172a;
-        color: #e2e8f0;
+        background-color: #020617;
+        color: #CBD5E1;
       }
-      ::-webkit-scrollbar { width: 8px; height: 8px; }
-      ::-webkit-scrollbar-track { background: #f1f5f9; }
-      .dark ::-webkit-scrollbar-track { background: #1e293b; }
-      ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
-      .dark ::-webkit-scrollbar-thumb { background: #475569; }
-      ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
-      .hide-scrollbar::-webkit-scrollbar { display: none; }
-      .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      /* Custom Scrollbar for Premium Feel */
+      ::-webkit-scrollbar { width: 6px; height: 6px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 10px; }
+      .dark ::-webkit-scrollbar-thumb { background: #334155; }
+      ::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
+
+      /* Glassmorphism Utilities */
+      .glass-panel {
+        background: rgba(255, 255, 255, 0.7);
+        backdrop-filter: blur(10px);
+        -webkit-backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.5);
+      }
+      .dark .glass-panel {
+        background: rgba(15, 23, 42, 0.6);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+      }
 
       @media print {
         @page { margin: 1cm; size: A4 portrait; }
@@ -109,15 +135,13 @@
 }
 </script>
 </head>
-  <body class="bg-surface dark:bg-slate-950 transition-colors duration-200">
+  <body class="bg-surface dark:bg-slate-950 transition-colors duration-300 antialiased selection:bg-secondary selection:text-white">
     <div id="root"></div>
     <script type="module" src="./index.tsx"></script>
     <script>
-      // Simple service worker registration for PWA functionality
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-           // We are not creating a complex sw.js file here to avoid conflicts, 
-           // but the manifest link above is enough for "Add to Homescreen" to work visually.
+           // PWA Service Worker placeholder
         });
       }
     </script>
