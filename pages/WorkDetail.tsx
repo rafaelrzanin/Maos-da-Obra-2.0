@@ -779,7 +779,7 @@ const MaterialsTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ work
             grouped[cat].push(m);
         });
         setGroupedMaterials(grouped);
-        onUpdate();
+        // Removed explicit onUpdate here to avoid loop
     };
 
     useEffect(() => { load(); }, [workId]);
@@ -796,14 +796,16 @@ const MaterialsTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ work
         });
         setNewMaterial({ name: '', plannedQty: '', unit: 'un', category: 'Geral' });
         setIsCreateOpen(false);
-        load();
+        await load();
+        onUpdate();
     };
 
     const handleImport = async (category: string) => {
         const count = await dbService.importMaterialPackage(workId, category);
         alert(`${count} materiais adicionados.`);
         setIsImportOpen(false);
-        load();
+        await load();
+        onUpdate();
     };
     
     const handleUpdate = async (e: React.FormEvent) => {
@@ -812,7 +814,8 @@ const MaterialsTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ work
             await dbService.updateMaterial(editingMaterial, Number(editCost));
             setEditingMaterial(null);
             setEditCost('');
-            load();
+            await load();
+            onUpdate();
         }
     }
 
@@ -927,7 +930,7 @@ const MaterialsTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ work
                                 <button type="button" onClick={() => { setEditingMaterial(null); setEditCost(''); }} className="flex-1 py-3 font-bold text-slate-500">Cancelar</button>
                                 <button type="submit" className="flex-1 py-3 bg-primary text-white rounded-xl font-bold">Salvar</button>
                              </div>
-                             <button type="button" onClick={async () => { await dbService.deleteMaterial(editingMaterial.id); setEditingMaterial(null); load(); }} className="w-full py-2 text-red-500 text-xs font-bold uppercase tracking-wider">Excluir Material</button>
+                             <button type="button" onClick={async () => { await dbService.deleteMaterial(editingMaterial.id); setEditingMaterial(null); await load(); onUpdate(); }} className="w-full py-2 text-red-500 text-xs font-bold uppercase tracking-wider">Excluir Material</button>
                         </form>
                     </div>
                 </div>
@@ -1002,7 +1005,7 @@ const ExpensesTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ workI
         });
         
         setGroupedExpenses(grouped);
-        onUpdate();
+        // Removed explicit onUpdate here to avoid loop
     };
 
     useEffect(() => { load(); }, [workId]);
@@ -1036,7 +1039,8 @@ const ExpensesTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ workI
             description: '',
             stepId: 'geral'
         });
-        load();
+        await load();
+        onUpdate();
     };
     
     const handleEdit = (expense: Expense) => {
@@ -1052,7 +1056,8 @@ const ExpensesTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ workI
         if(confirm("Excluir este gasto?")) {
              await dbService.deleteExpense(id);
              setIsCreateOpen(false);
-             load();
+             await load();
+             onUpdate();
         }
     };
 
