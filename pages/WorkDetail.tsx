@@ -80,6 +80,267 @@ const ZeModal: React.FC<ZeModalProps> = ({ isOpen, title, message, confirmText =
   );
 };
 
+// --- SUB-VIEWS FOR "MORE" TAB ---
+
+// 1. CONTACTS VIEW (TEAM & SUPPLIERS)
+const ContactsView: React.FC<{ workId: string, onBack: () => void }> = ({ workId, onBack }) => {
+    const { user } = useAuth();
+    const [tab, setTab] = useState<'TEAM' | 'SUPPLIERS'>('TEAM');
+    const [workers, setWorkers] = useState<Worker[]>([]);
+    const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+    const [isAddOpen, setIsAddOpen] = useState(false);
+    // Form States
+    const [newName, setNewName] = useState('');
+    const [newRole, setNewRole] = useState('');
+    const [newPhone, setNewPhone] = useState('');
+
+    const loadContacts = async () => {
+        if(user) {
+            const w = await dbService.getWorkers(user.id);
+            setWorkers(w);
+            const s = await dbService.getSuppliers(user.id);
+            setSuppliers(s);
+        }
+    };
+    useEffect(() => { loadContacts(); }, [user]);
+
+    const handleAdd = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if(user) {
+            if (tab === 'TEAM') {
+                await dbService.addWorker({ userId: user.id, name: newName, role: newRole, phone: newPhone });
+            } else {
+                await dbService.addSupplier({ userId: user.id, name: newName, category: newRole, phone: newPhone });
+            }
+            setIsAddOpen(false);
+            setNewName(''); setNewRole(''); setNewPhone('');
+            loadContacts();
+        }
+    };
+
+    const handleDelete = async (id: string) => {
+        if (confirm("Remover este contato?")) {
+            if (tab === 'TEAM') await dbService.deleteWorker(id);
+            else await dbService.deleteSupplier(id);
+            loadContacts();
+        }
+    }
+
+    return (
+        <div className="animate-in fade-in slide-in-from-right-4">
+            <button onClick={onBack} className="mb-4 text-sm font-bold text-slate-400 hover:text-primary"><i className="fa-solid fa-arrow-left"></i> Voltar</button>
+            <SectionHeader title="Meus Contatos" subtitle="Equipe e Fornecedores." />
+            
+            <div className="flex gap-2 mb-6 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl">
+                <button onClick={() => setTab('TEAM')} className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${tab === 'TEAM' ? 'bg-white dark:bg-slate-700 shadow-sm text-primary dark:text-white' : 'text-slate-500'}`}>Equipe</button>
+                <button onClick={() => setTab('SUPPLIERS')} className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${tab === 'SUPPLIERS' ? 'bg-white dark:bg-slate-700 shadow-sm text-primary dark:text-white' : 'text-slate-500'}`}>Fornecedores</button>
+            </div>
+
+            <div className="space-y-3">
+                {(tab === 'TEAM' ? workers : suppliers).map(item => (
+                    <div key={item.id} className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-100 dark:border-slate-800 flex justify-between items-center">
+                        <div className="flex items-center gap-3">
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white ${tab === 'TEAM' ? 'bg-blue-500' : 'bg-indigo-500'}`}>
+                                <i className={`fa-solid ${tab === 'TEAM' ? 'fa-helmet-safety' : 'fa-truck'}`}></i>
+                            </div>
+                            <div>
+                                <h4 className="font-bold text-primary dark:text-white">{item.name}</h4>
+                                <p className="text-xs text-slate-500">{(item as any).role || (item as any).category}</p>
+                            </div>
+                        </div>
+                        <div className="flex gap-2">
+                             <a href={`https://wa.me/55${item.phone.replace(/\D/g,'')}`} target="_blank" className="w-8 h-8 rounded-full bg-green-100 text-green-600 flex items-center justify-center hover:bg-green-200"><i className="fa-brands fa-whatsapp"></i></a>
+                             <button onClick={() => handleDelete(item.id)} className="w-8 h-8 rounded-full bg-red-50 text-red-500 flex items-center justify-center hover:bg-red-100"><i className="fa-solid fa-trash text-xs"></i></button>
+                        </div>
+                    </div>
+                ))}
+                {(tab === 'TEAM' ? workers : suppliers).length === 0 && <p className="text-center text-slate-400 py-4 text-sm">Nenhum contato cadastrado.</p>}
+            </div>
+
+            <button onClick={() => setIsAddOpen(true)} className="mt-6 w-full py-3 bg-primary text-white rounded-xl font-bold shadow-lg">Adicionar Novo</button>
+
+            {isAddOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+                    <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-sm p-6">
+                        <h3 className="text-lg font-bold mb-4 dark:text-white">Novo {tab === 'TEAM' ? 'Membro' : 'Fornecedor'}</h3>
+                        <form onSubmit={handleAdd} className="space-y-3">
+                            <input placeholder="Nome" value={newName} onChange={e => setNewName(e.target.value)} className="w-full p-3 rounded-xl border dark:border-slate-700 dark:bg-slate-800 dark:text-white" required />
+                            <input placeholder={tab === 'TEAM' ? "Profissão (ex: Pedreiro)" : "Categoria (ex: Elétrica)"} value={newRole} onChange={e => setNewRole(e.target.value)} className="w-full p-3 rounded-xl border dark:border-slate-700 dark:bg-slate-800 dark:text-white" required />
+                            <input placeholder="Telefone / WhatsApp" value={newPhone} onChange={e => setNewPhone(e.target.value)} className="w-full p-3 rounded-xl border dark:border-slate-700 dark:bg-slate-800 dark:text-white" required />
+                            <div className="flex gap-2 pt-2">
+                                <button type="button" onClick={() => setIsAddOpen(false)} className="flex-1 py-3 text-slate-500 font-bold">Cancelar</button>
+                                <button type="submit" className="flex-1 py-3 bg-primary text-white rounded-xl font-bold">Salvar</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+// 2. PHOTOS VIEW
+const PhotosView: React.FC<{ workId: string, onBack: () => void }> = ({ workId, onBack }) => {
+    const [photos, setPhotos] = useState<WorkPhoto[]>([]);
+    
+    const loadPhotos = async () => {
+        const p = await dbService.getPhotos(workId);
+        setPhotos(p);
+    };
+    useEffect(() => { loadPhotos(); }, [workId]);
+
+    const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            await dbService.uploadPhoto(workId, e.target.files[0], 'PROGRESS');
+            loadPhotos();
+        }
+    };
+
+    return (
+        <div className="animate-in fade-in slide-in-from-right-4">
+             <button onClick={onBack} className="mb-4 text-sm font-bold text-slate-400 hover:text-primary"><i className="fa-solid fa-arrow-left"></i> Voltar</button>
+             <div className="flex justify-between items-center mb-6">
+                <SectionHeader title="Galeria de Fotos" subtitle="Acompanhamento visual." />
+                <label className="bg-primary text-white w-10 h-10 rounded-xl flex items-center justify-center shadow-lg cursor-pointer">
+                    <i className="fa-solid fa-camera"></i>
+                    <input type="file" className="hidden" accept="image/*" onChange={handleUpload} />
+                </label>
+             </div>
+             
+             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                 {photos.map(p => (
+                     <div key={p.id} className="aspect-square rounded-xl overflow-hidden relative group">
+                         <img src={p.url} className="w-full h-full object-cover" />
+                         <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                             <button onClick={async () => { await dbService.deletePhoto(p.id); loadPhotos(); }} className="text-white hover:text-red-400"><i className="fa-solid fa-trash"></i></button>
+                         </div>
+                     </div>
+                 ))}
+             </div>
+             {photos.length === 0 && <p className="text-center text-slate-400 py-10">Nenhuma foto adicionada.</p>}
+        </div>
+    );
+};
+
+// 3. FILES VIEW
+const FilesView: React.FC<{ workId: string, onBack: () => void }> = ({ workId, onBack }) => {
+    const [files, setFiles] = useState<WorkFile[]>([]);
+    const loadFiles = async () => {
+        const f = await dbService.getFiles(workId);
+        setFiles(f);
+    };
+    useEffect(() => { loadFiles(); }, [workId]);
+
+    const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            await dbService.uploadFile(workId, e.target.files[0], 'Geral');
+            loadFiles();
+        }
+    };
+
+    return (
+        <div className="animate-in fade-in slide-in-from-right-4">
+             <button onClick={onBack} className="mb-4 text-sm font-bold text-slate-400 hover:text-primary"><i className="fa-solid fa-arrow-left"></i> Voltar</button>
+             <div className="flex justify-between items-center mb-6">
+                <SectionHeader title="Projetos e Arquivos" subtitle="Plantas e documentos." />
+                <label className="bg-primary text-white w-10 h-10 rounded-xl flex items-center justify-center shadow-lg cursor-pointer">
+                    <i className="fa-solid fa-upload"></i>
+                    <input type="file" className="hidden" onChange={handleUpload} />
+                </label>
+             </div>
+             <div className="space-y-3">
+                 {files.map(f => (
+                     <div key={f.id} className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-100 dark:border-slate-800 flex justify-between items-center">
+                         <div className="flex items-center gap-3">
+                             <div className="w-10 h-10 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center text-xl">
+                                 <i className="fa-solid fa-file-pdf"></i>
+                             </div>
+                             <div>
+                                 <h4 className="font-bold text-sm text-primary dark:text-white truncate max-w-[150px]">{f.name}</h4>
+                                 <p className="text-xs text-slate-500">{new Date(f.date).toLocaleDateString()}</p>
+                             </div>
+                         </div>
+                         <div className="flex gap-3">
+                             <a href={f.url} target="_blank" className="text-secondary font-bold text-sm">Abrir</a>
+                             <button onClick={async () => { await dbService.deleteFile(f.id); loadFiles(); }} className="text-slate-400 hover:text-red-500"><i className="fa-solid fa-trash"></i></button>
+                         </div>
+                     </div>
+                 ))}
+             </div>
+             {files.length === 0 && <p className="text-center text-slate-400 py-10">Nenhum arquivo.</p>}
+        </div>
+    );
+};
+
+// 4. REPORTS VIEW
+const ReportsView: React.FC<{ workId: string, onBack: () => void }> = ({ workId, onBack }) => {
+    const [expenses, setExpenses] = useState<Expense[]>([]);
+    
+    useEffect(() => {
+        dbService.getExpenses(workId).then(setExpenses);
+    }, [workId]);
+
+    const handlePrint = () => {
+        window.print();
+    };
+
+    const data = expenses.reduce((acc: any[], curr) => {
+        const existing = acc.find(a => a.name === curr.category);
+        if (existing) existing.value += curr.amount;
+        else acc.push({ name: curr.category, value: curr.amount });
+        return acc;
+    }, []);
+
+    return (
+        <div className="animate-in fade-in slide-in-from-right-4">
+             <button onClick={onBack} className="mb-4 text-sm font-bold text-slate-400 hover:text-primary print:hidden"><i className="fa-solid fa-arrow-left"></i> Voltar</button>
+             <div className="flex justify-between items-center mb-6">
+                <SectionHeader title="Relatórios" subtitle="Análise financeira." />
+                <button onClick={handlePrint} className="bg-slate-100 text-primary w-10 h-10 rounded-xl flex items-center justify-center shadow-sm print:hidden">
+                    <i className="fa-solid fa-print"></i>
+                </button>
+             </div>
+             
+             <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-800 mb-6">
+                 <h3 className="font-bold mb-4 dark:text-white">Gastos por Categoria</h3>
+                 <div className="h-64">
+                    <Recharts.ResponsiveContainer width="100%" height="100%">
+                        <Recharts.BarChart data={data}>
+                            <Recharts.CartesianGrid strokeDasharray="3 3" />
+                            <Recharts.XAxis dataKey="name" />
+                            <Recharts.YAxis />
+                            <Recharts.Tooltip />
+                            <Recharts.Bar dataKey="value" fill="#D97706" radius={[4, 4, 0, 0]} />
+                        </Recharts.BarChart>
+                    </Recharts.ResponsiveContainer>
+                 </div>
+             </div>
+
+             <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-800">
+                 <h3 className="font-bold mb-4 dark:text-white">Extrato Detalhado</h3>
+                 <table className="w-full text-sm text-left">
+                     <thead>
+                         <tr className="border-b dark:border-slate-700 text-slate-500">
+                             <th className="py-2">Data</th>
+                             <th className="py-2">Descrição</th>
+                             <th className="py-2 text-right">Valor</th>
+                         </tr>
+                     </thead>
+                     <tbody>
+                         {expenses.map(e => (
+                             <tr key={e.id} className="border-b dark:border-slate-800 last:border-0">
+                                 <td className="py-3 text-slate-500">{new Date(e.date).toLocaleDateString()}</td>
+                                 <td className="py-3 font-medium dark:text-slate-300">{e.description}</td>
+                                 <td className="py-3 text-right font-bold dark:text-white">R$ {e.amount.toLocaleString('pt-BR')}</td>
+                             </tr>
+                         ))}
+                     </tbody>
+                 </table>
+             </div>
+        </div>
+    );
+};
+
 // --- TABS (Updated Styles) ---
 
 const OverviewTab: React.FC<{ work: Work, stats: any, onGoToSteps: () => void }> = ({ work, stats, onGoToSteps }) => {
@@ -965,11 +1226,7 @@ const MoreMenuTab: React.FC<{ workId: string }> = ({ workId }) => {
     const { user } = useAuth();
     const isLifetime = user?.plan === PlanType.VITALICIO;
     
-    // Sub-views state management would happen here ideally, or use modal overlays
-    // For simplicity in this structure, we'll use "alerts" for placeholders of sub-views 
-    // or we assume full implementation of ContactView etc. would be rendered if selected.
-    // In this premium version, let's keep it as a Grid Menu that "opens" sections.
-    
+    // View State
     const [activeSection, setActiveSection] = useState<string | null>(null);
 
     const sections = [
@@ -987,14 +1244,11 @@ const MoreMenuTab: React.FC<{ workId: string }> = ({ workId }) => {
         { id: 'CHECKLISTS', icon: 'fa-list-check', label: 'Checklists', desc: 'Não esqueça nada' },
     ];
 
-    // Placeholder Renderers for Sub-Views
-    if (activeSection === 'TEAM' || activeSection === 'SUPPLIERS') return (
-        <div className="animate-in fade-in slide-in-from-bottom-4">
-             <button onClick={() => setActiveSection(null)} className="mb-4 text-sm font-bold text-slate-400 hover:text-primary"><i className="fa-solid fa-arrow-left"></i> Voltar</button>
-             <div className="text-center py-20"><i className="fa-solid fa-hard-hat text-4xl text-slate-200 mb-4"></i><p>Gestão de Contatos em Breve</p></div>
-        </div>
-    );
-    // ... Implement other placeholders or full views as needed. For now, showing the menu structure.
+    // Render Active Sub-View
+    if (activeSection === 'TEAM' || activeSection === 'SUPPLIERS') return <ContactsView workId={workId} onBack={() => setActiveSection(null)} />;
+    if (activeSection === 'PHOTOS') return <PhotosView workId={workId} onBack={() => setActiveSection(null)} />;
+    if (activeSection === 'FILES') return <FilesView workId={workId} onBack={() => setActiveSection(null)} />;
+    if (activeSection === 'REPORTS') return <ReportsView workId={workId} onBack={() => setActiveSection(null)} />;
 
     return (
         <div className="animate-in fade-in duration-500 pb-24">
@@ -1005,7 +1259,7 @@ const MoreMenuTab: React.FC<{ workId: string }> = ({ workId }) => {
                 {sections.map(s => (
                     <button 
                         key={s.id}
-                        onClick={() => alert("Funcionalidade restaurada em breve! (Placeholders)")}
+                        onClick={() => setActiveSection(s.id)}
                         className="flex flex-col items-center justify-center p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm hover:shadow-md transition-all active:scale-95"
                     >
                         <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-white mb-2 shadow-lg ${s.color}`}>
@@ -1042,7 +1296,7 @@ const MoreMenuTab: React.FC<{ workId: string }> = ({ workId }) => {
 
                     <div className="grid grid-cols-2 gap-3">
                         {bonusFeatures.map(f => (
-                            <button key={f.id} onClick={() => isLifetime && alert("Abrindo " + f.label)} className={`p-4 rounded-xl text-left transition-all ${isLifetime ? 'bg-white/10 hover:bg-white/20 border border-white/5' : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700'}`}>
+                            <button key={f.id} onClick={() => isLifetime && alert("Funcionalidade " + f.label + " será implementada em breve.")} className={`p-4 rounded-xl text-left transition-all ${isLifetime ? 'bg-white/10 hover:bg-white/20 border border-white/5' : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700'}`}>
                                 <i className={`fa-solid ${f.icon} text-xl mb-2 ${isLifetime ? 'text-secondary' : 'text-slate-400'}`}></i>
                                 <h4 className={`font-bold text-sm mb-0.5 ${isLifetime ? 'text-white' : 'text-slate-600 dark:text-slate-300'}`}>{f.label}</h4>
                                 <p className={`text-[10px] leading-tight ${isLifetime ? 'text-slate-400' : 'text-slate-400'}`}>{f.desc}</p>

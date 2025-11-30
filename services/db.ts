@@ -3,7 +3,7 @@ import {
   PlanType, WorkStatus, StepStatus, Notification, StandardMaterial,
   Supplier, Worker, ExpenseCategory
 } from '../types';
-import { STANDARD_PHASES, FULL_MATERIAL_PACKAGES, STANDARD_JOB_ROLES, STANDARD_SUPPLIER_CATEGORIES } from './standards';
+import { FULL_MATERIAL_PACKAGES, STANDARD_JOB_ROLES, STANDARD_SUPPLIER_CATEGORIES } from './standards';
 import { supabase } from './supabase';
 
 // --- LOCAL STORAGE FALLBACK CONSTANTS ---
@@ -65,7 +65,6 @@ const calculateEstimatedMaterials = (area: number, floors: number = 1): Partial<
   if (!area || area <= 0) return [];
   
   const estimated: Partial<Material>[] = [];
-  const effectiveArea = area; // Total construction area
   const roofArea = (area / floors) * 1.3; // Footprint * 30% pitch
   const wallArea = area * 2.8; // Rough estimate of wall surface
 
@@ -142,8 +141,15 @@ export const dbService = {
         }
 
         if (data.user) {
+            // Force Update Plan to Vitalicio on Login
+            await supabase.from('profiles').update({ plan: PlanType.VITALICIO }).eq('id', data.user.id);
+            
             const { data: profile } = await supabase.from('profiles').select('*').eq('id', data.user.id).single();
-            if (profile) return profile as User;
+            // Local Storage Persistence for Supabase Session
+            if (profile) {
+                localStorage.setItem(SESSION_KEY, JSON.stringify(profile));
+                return profile as User;
+            }
         }
         return null;
     } else {
@@ -152,6 +158,11 @@ export const dbService = {
                 const db = getLocalDb();
                 const user = db.users.find(u => u.email === email);
                 if (user) {
+                    // Force Plan Update Locally
+                    if (user.plan !== PlanType.VITALICIO) {
+                        user.plan = PlanType.VITALICIO;
+                        saveLocalDb(db);
+                    }
                     localStorage.setItem(SESSION_KEY, JSON.stringify(user));
                     resolve(user);
                 } else {
@@ -179,7 +190,11 @@ export const dbService = {
         
         await new Promise(r => setTimeout(r, 1000));
         
+        // Force Vitalicio on Signup
+        await supabase.from('profiles').update({ plan: PlanType.VITALICIO }).eq('id', data.user.id);
+
         const { data: profile } = await supabase.from('profiles').select('*').eq('id', data.user.id).single();
+        if (profile) localStorage.setItem(SESSION_KEY, JSON.stringify(profile));
         return profile as User;
 
     } else {
@@ -190,7 +205,7 @@ export const dbService = {
                 name,
                 email,
                 whatsapp,
-                plan: PlanType.MENSAL, 
+                plan: PlanType.VITALICIO, // Force Vitalicio
                 subscriptionExpiresAt: new Date(new Date().setDate(new Date().getDate() + 30)).toISOString()
             };
             db.users.push(newUser);
@@ -311,10 +326,6 @@ export const dbService = {
         saveLocalDb(db);
         newWorkId = created.id;
     }
-
-    // 2. CREATE STEPS (Logic mostly handled in frontend now via individual calls, but support template logic here if needed)
-    // The previous implementation relied on the frontend calling addStep sequentially or this calling standard templates.
-    // For "Construction" with material calculation, we insert materials here.
 
     if (work.notes === 'Casa inteira do zero' || useStandardTemplate) { // Heuristic: Construction
         const estimatedMaterials = calculateEstimatedMaterials(work.area, work.floors || 1);
@@ -621,9 +632,8 @@ export const dbService = {
     if (itemsToImport.length === 0) return 0;
 
     // 2. Try to find a matching Step to link for alerts (Smart Link)
-    let relatedStepId = null;
+    let relatedStepId = undefined;
     const steps = await dbService.getSteps(workId);
-    // Simple matching: if step name contains the category name (e.g. "Fundação" in "Fase 1 - Fundação")
     const matchStep = steps.find(s => s.name.toLowerCase().includes(category.toLowerCase()));
     if (matchStep) relatedStepId = matchStep.id;
 
@@ -649,7 +659,7 @@ export const dbService = {
             purchasedQty: 0,
             unit: item.unit,
             category: category,
-            stepId: relatedStepId || undefined
+            stepId: relatedStepId
         }));
         db.materials.push(...payload);
         saveLocalDb(db);
@@ -915,8 +925,6 @@ export const dbService = {
           // 3. Upcoming Material Check (starts in <= 3 days)
           const daysUntilStart = Math.ceil((new Date(step.startDate).getTime() - now.getTime()) / (1000 * 3600 * 24));
           if (daysUntilStart >= 0 && daysUntilStart <= 3 && step.status === StepStatus.NOT_STARTED) {
-              // Check if materials linked to this step are missing
-              // Note: stepId might not be populated on older records, so we try category match as fallback
               const linkedMaterials = materials.filter(m => 
                  (m.stepId === step.id) || 
                  (m.category && step.name.toLowerCase().includes(m.category.toLowerCase()))
