@@ -33,12 +33,10 @@ const Login: React.FC = () => {
   };
 
   const handleSocialLogin = async (provider: 'google' | 'apple') => {
-    // In a real app with Supabase, you would call supabase.auth.signInWithOAuth({ provider })
     const socialEmail = provider === 'google' ? 'usuario.google@gmail.com' : 'usuario.apple@icloud.com';
     const socialName = provider === 'google' ? 'Usuário Google' : 'Usuário Apple';
     
     setLoading(true);
-    // Simulating social logic mapping to our service
     const existingUser = await dbService.login(socialEmail);
     if (existingUser) {
       await login(socialEmail);
@@ -49,139 +47,211 @@ const Login: React.FC = () => {
   };
 
   return (
-    <div className="relative flex min-h-screen w-full flex-col items-center justify-center bg-surface dark:bg-slate-950 p-4 font-sans transition-colors duration-200">
+    <div className="flex min-h-screen w-full bg-slate-50 dark:bg-slate-950 transition-colors duration-300 relative lg:overflow-hidden">
       
-      <button 
-        onClick={toggleTheme}
-        className="absolute top-6 right-6 p-2 rounded-full bg-white dark:bg-slate-800 text-text-muted dark:text-slate-400 shadow-md hover:text-primary transition-all"
-        title="Mudar tema"
-      >
-        <i className={`fa-solid ${theme === 'dark' ? 'fa-sun' : 'fa-moon'}`}></i>
-      </button>
+      {/* BACKGROUND FOR MOBILE (Gradient + Blobs) */}
+      <div className="absolute inset-0 lg:hidden bg-gradient-to-br from-[#0F2933] to-[#1E3A45] z-0">
+          <div className="absolute top-[-10%] right-[-10%] w-[300px] h-[300px] bg-white/5 rounded-full blur-3xl pointer-events-none"></div>
+          <div className="absolute bottom-[-10%] left-[-10%] w-[200px] h-[200px] bg-[#3B7C8C]/20 rounded-full blur-3xl pointer-events-none"></div>
+      </div>
 
-      <div className="w-full max-w-md space-y-8">
-        
-        <div className="flex flex-col items-center justify-center">
-            <div className="w-16 h-16 bg-primary rounded-2xl flex items-center justify-center text-white mb-4 shadow-xl shadow-primary/30">
-                <i className="fa-solid fa-helmet-safety text-3xl"></i>
-            </div>
-        </div>
-
-        <h1 className="text-text-main dark:text-white tracking-tight text-3xl font-bold leading-tight text-center">
-            {isLogin ? 'Entrar na minha obra' : 'Criar meu cadastro'}
-        </h1>
-
-        <div className="space-y-6">
-          {!isLogin && (
-            <div className="flex flex-col">
-              <label className="text-text-main dark:text-slate-200 text-base font-medium leading-normal pb-2" htmlFor="name">Meu nome completo</label>
-              <input 
-                className="flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded-xl text-text-main dark:text-white focus:outline-0 focus:ring-2 focus:ring-primary border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 h-14 placeholder:text-text-muted dark:placeholder:text-slate-500 p-[15px] text-base font-normal leading-normal transition-colors" 
-                id="name" 
-                placeholder="Ex: Maria Silva" 
-                type="text" 
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
-            </div>
-          )}
-
-          <div className="flex flex-col">
-            <label className="text-text-main dark:text-slate-200 text-base font-medium leading-normal pb-2" htmlFor="email">Meu e-mail</label>
-            <input 
-              className="flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded-xl text-text-main dark:text-white focus:outline-0 focus:ring-2 focus:ring-primary border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 h-14 placeholder:text-text-muted dark:placeholder:text-slate-500 p-[15px] text-base font-normal leading-normal transition-colors" 
-              id="email" 
-              placeholder="Digite seu email aqui" 
-              type="text" 
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
-          </div>
-
-          {!isLogin && (
-            <div className="flex flex-col">
-              <label className="text-text-main dark:text-slate-200 text-base font-medium leading-normal pb-2" htmlFor="whatsapp">Meu WhatsApp</label>
-              <input 
-                className="flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded-xl text-text-main dark:text-white focus:outline-0 focus:ring-2 focus:ring-primary border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 h-14 placeholder:text-text-muted dark:placeholder:text-slate-500 p-[15px] text-base font-normal leading-normal transition-colors" 
-                id="whatsapp" 
-                placeholder="(11) 99999-9999" 
-                type="tel" 
-                value={whatsapp}
-                onChange={(e) => setWhatsapp(e.target.value)}
-              />
-            </div>
-          )}
-
-          <div className="flex flex-col">
-            <label className="text-text-main dark:text-slate-200 text-base font-medium leading-normal pb-2" htmlFor="password">Minha senha</label>
-            <div className="relative flex w-full items-center">
-              <input 
-                className="flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded-xl text-text-main dark:text-white focus:outline-0 focus:ring-2 focus:ring-primary border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 h-14 placeholder:text-text-muted dark:placeholder:text-slate-500 p-[15px] pr-12 text-base font-normal leading-normal transition-colors" 
-                id="password" 
-                placeholder="Digite sua senha" 
-                type="password" 
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-            </div>
-          </div>
-        </div>
-
-        <div className="space-y-4 pt-2">
-          <button 
-            onClick={handleSubmit}
-            disabled={loading}
-            className="flex w-full cursor-pointer items-center justify-center overflow-hidden rounded-xl h-14 px-5 bg-primary text-white text-base font-bold leading-normal tracking-[0.015em] shadow-lg shadow-primary/20 hover:bg-primary-dark transition-all focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-70 disabled:cursor-wait"
-          >
-            <span className="truncate">{loading ? 'Carregando...' : (isLogin ? 'Entrar agora' : 'Criar minha conta')}</span>
-          </button>
+      {/* LEFT SIDE - BRAND VISUAL (Desktop Only) */}
+      <div className="hidden lg:flex w-1/2 bg-gradient-to-br from-[#0F2933] to-[#1E3A45] relative overflow-hidden flex-col justify-between p-12 text-white z-10">
+          {/* Abstract Pattern */}
+          <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-white/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none"></div>
+          <div className="absolute bottom-0 left-0 w-[300px] h-[300px] bg-[#3B7C8C]/20 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2 pointer-events-none"></div>
           
-          {isLogin && (
-            <div className="text-center">
-                <a className="text-primary font-medium text-sm hover:underline cursor-pointer">Não lembro minha senha</a>
-            </div>
-          )}
-        </div>
+          {/* Logo Area */}
+          <div className="relative z-10 flex items-center gap-3">
+              <div className="w-10 h-10 bg-white/10 backdrop-blur-sm rounded-xl flex items-center justify-center border border-white/20">
+                  <i className="fa-solid fa-helmet-safety text-white"></i>
+              </div>
+              <span className="font-bold text-xl tracking-wide">MÃOS DA OBRA</span>
+          </div>
 
-        <div className="relative flex items-center py-2">
-          <div className="flex-grow border-t border-slate-300 dark:border-slate-700"></div>
-          <span className="flex-shrink mx-4 text-sm text-text-muted dark:text-slate-500">Ou use sua rede social</span>
-          <div className="flex-grow border-t border-slate-300 dark:border-slate-700"></div>
-        </div>
+          {/* Hero Text */}
+          <div className="relative z-10 max-w-lg mb-20">
+              <h1 className="text-5xl font-bold leading-tight mb-6">
+                  Construa seu sonho <br/>
+                  <span className="text-[#8AD6E9]">sem pesadelos.</span>
+              </h1>
+              <p className="text-lg text-slate-300 leading-relaxed">
+                  A ferramenta definitiva para quem quer controle total sobre cronograma, orçamento e materiais. Simples, visual e profissional.
+              </p>
+              
+              <div className="mt-8 flex items-center gap-4">
+                  <div className="flex -space-x-3">
+                      <div className="w-10 h-10 rounded-full border-2 border-[#1E3A45] bg-slate-200 flex items-center justify-center overflow-hidden">
+                         <i className="fa-solid fa-user text-slate-400 mt-2"></i>
+                      </div>
+                      <div className="w-10 h-10 rounded-full border-2 border-[#1E3A45] bg-slate-300 flex items-center justify-center overflow-hidden">
+                         <i className="fa-solid fa-user text-slate-500 mt-2"></i>
+                      </div>
+                      <div className="w-10 h-10 rounded-full border-2 border-[#1E3A45] bg-slate-400 flex items-center justify-center overflow-hidden">
+                         <i className="fa-solid fa-user text-slate-600 mt-2"></i>
+                      </div>
+                  </div>
+                  <div className="text-sm font-medium">
+                      <span className="block text-white">Mais de 10.000 obras</span>
+                      <span className="text-slate-400">gerenciadas com sucesso.</span>
+                  </div>
+              </div>
+          </div>
 
-        <div className="flex flex-col sm:flex-row gap-4">
+          {/* Footer */}
+          <div className="relative z-10 text-xs text-slate-500">
+              © 2024 Mãos da Obra Inc. Todos os direitos reservados.
+          </div>
+      </div>
+
+      {/* RIGHT SIDE - FORM CONTAINER */}
+      <div className="w-full lg:w-1/2 flex flex-col justify-center items-center p-4 lg:p-6 relative z-10">
+          
+          {/* Theme Toggle (Absolute) */}
           <button 
-            onClick={() => handleSocialLogin('google')}
-            disabled={loading}
-            className="flex flex-1 items-center justify-center gap-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 h-12 px-5 text-text-main dark:text-white text-sm font-medium hover:bg-surface dark:hover:bg-slate-700 transition-colors"
+            onClick={toggleTheme}
+            className="absolute top-6 right-6 w-10 h-10 rounded-full lg:bg-slate-100 lg:dark:bg-slate-800 bg-white/10 backdrop-blur-md text-white lg:text-slate-500 lg:dark:text-slate-400 hover:text-primary transition-colors flex items-center justify-center border border-white/10 lg:border-transparent z-50"
           >
-            <i className="fa-brands fa-google text-red-500 text-lg"></i>
-            <span>Google</span>
+            <i className={`fa-solid ${theme === 'dark' ? 'fa-sun' : 'fa-moon'}`}></i>
           </button>
-          <button 
-            onClick={() => handleSocialLogin('apple')}
-            disabled={loading}
-            className="flex flex-1 items-center justify-center gap-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 h-12 px-5 text-text-main dark:text-white text-sm font-medium hover:bg-surface dark:hover:bg-slate-700 transition-colors"
-          >
-            <i className="fa-brands fa-apple text-black dark:text-white text-lg"></i>
-            <span>Apple</span>
-          </button>
-        </div>
 
-        <div className="text-center pt-4">
-          <p className="text-sm text-text-muted dark:text-slate-400">
-            {isLogin ? 'Ainda não tem cadastro? ' : 'Já tenho conta. '}
-            <button onClick={() => setIsLogin(!isLogin)} className="font-bold text-primary hover:underline">
-              {isLogin ? 'Criar conta grátis' : 'Fazer login'}
-            </button>
-          </p>
-        </div>
+          {/* MAIN CARD (White on Mobile, Transparent on Desktop) */}
+          <div className="w-full max-w-md animate-in fade-in slide-in-from-bottom-8 duration-700 bg-white dark:bg-slate-900 lg:bg-transparent lg:dark:bg-transparent p-8 lg:p-0 rounded-3xl shadow-2xl lg:shadow-none">
+              
+              {/* Mobile Header Logo */}
+              <div className="lg:hidden text-center mb-8">
+                  <div className="w-14 h-14 bg-primary rounded-2xl flex items-center justify-center text-white mx-auto mb-4 shadow-xl shadow-primary/30">
+                      <i className="fa-solid fa-helmet-safety text-2xl"></i>
+                  </div>
+                  <h1 className="text-xl font-bold text-primary dark:text-white tracking-wide">MÃOS DA OBRA</h1>
+              </div>
 
-        {isLogin && (
-            <div className="mt-4 text-center text-xs text-text-muted dark:text-slate-500 bg-white dark:bg-slate-800 p-2 rounded border border-slate-200 dark:border-slate-700">
-                Para testar, use: <strong>demo@maos.com</strong> (sem senha)
-            </div>
-        )}
+              <div className="text-center lg:text-left mb-8">
+                  <h2 className="text-3xl font-bold text-text-main dark:text-white mb-2 tracking-tight">
+                      {isLogin ? 'Bem-vindo de volta' : 'Comece sua jornada'}
+                  </h2>
+                  <p className="text-text-muted dark:text-slate-400">
+                      {isLogin ? 'Entre para gerenciar sua obra.' : 'Crie sua conta em segundos. É grátis.'}
+                  </p>
+              </div>
+
+              <form onSubmit={handleSubmit} className="space-y-5">
+                  
+                  {!isLogin && (
+                    <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+                        <label className="block text-xs font-bold text-text-main dark:text-slate-300 uppercase mb-1.5 ml-1">Nome Completo</label>
+                        <div className="relative group">
+                            <i className="fa-regular fa-user absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary transition-colors"></i>
+                            <input 
+                                type="text" 
+                                value={name}
+                                onChange={(e) => setName(e.target.value)}
+                                placeholder="Seu nome"
+                                className="w-full h-14 pl-11 pr-4 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all text-text-main dark:text-white placeholder:text-slate-400"
+                            />
+                        </div>
+                    </div>
+                  )}
+
+                  <div>
+                      <label className="block text-xs font-bold text-text-main dark:text-slate-300 uppercase mb-1.5 ml-1">E-mail</label>
+                      <div className="relative group">
+                          <i className="fa-regular fa-envelope absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary transition-colors"></i>
+                          <input 
+                              type="email" 
+                              value={email}
+                              onChange={(e) => setEmail(e.target.value)}
+                              placeholder="seu@email.com"
+                              className="w-full h-14 pl-11 pr-4 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all text-text-main dark:text-white placeholder:text-slate-400"
+                          />
+                      </div>
+                  </div>
+
+                  {!isLogin && (
+                    <div className="animate-in fade-in slide-in-from-top-2 duration-300">
+                        <label className="block text-xs font-bold text-text-main dark:text-slate-300 uppercase mb-1.5 ml-1">WhatsApp</label>
+                        <div className="relative group">
+                            <i className="fa-brands fa-whatsapp absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary transition-colors"></i>
+                            <input 
+                                type="tel" 
+                                value={whatsapp}
+                                onChange={(e) => setWhatsapp(e.target.value)}
+                                placeholder="(00) 00000-0000"
+                                className="w-full h-14 pl-11 pr-4 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all text-text-main dark:text-white placeholder:text-slate-400"
+                            />
+                        </div>
+                    </div>
+                  )}
+
+                  <div>
+                      <div className="flex justify-between items-center mb-1.5 ml-1">
+                          <label className="block text-xs font-bold text-text-main dark:text-slate-300 uppercase">Senha</label>
+                          {isLogin && <a className="text-xs font-medium text-primary hover:underline cursor-pointer">Esqueceu?</a>}
+                      </div>
+                      <div className="relative group">
+                          <i className="fa-solid fa-lock absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary transition-colors"></i>
+                          <input 
+                              type="password" 
+                              value={password}
+                              onChange={(e) => setPassword(e.target.value)}
+                              placeholder="••••••••"
+                              className="w-full h-14 pl-11 pr-4 bg-slate-50 dark:bg-slate-800/50 border border-slate-200 dark:border-slate-700 rounded-xl outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all text-text-main dark:text-white placeholder:text-slate-400"
+                          />
+                      </div>
+                  </div>
+
+                  <button 
+                    onClick={handleSubmit}
+                    disabled={loading}
+                    className="w-full h-14 bg-primary hover:bg-primary-dark text-white font-bold rounded-xl shadow-xl shadow-primary/30 transition-all active:scale-95 flex items-center justify-center gap-2 mt-4 disabled:opacity-70 disabled:cursor-wait text-lg"
+                  >
+                      {loading && <i className="fa-solid fa-circle-notch fa-spin"></i>}
+                      {isLogin ? 'Entrar Agora' : 'Criar Minha Conta'}
+                  </button>
+
+              </form>
+
+              <div className="relative my-8">
+                  <div className="absolute inset-0 flex items-center">
+                      <div className="w-full border-t border-slate-200 dark:border-slate-700"></div>
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                      <span className="bg-white dark:bg-slate-900 px-4 text-slate-400">Ou continue com</span>
+                  </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                  <button onClick={() => handleSocialLogin('google')} className="flex items-center justify-center gap-2 h-12 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors bg-white dark:bg-slate-900">
+                      <i className="fa-brands fa-google text-red-500"></i>
+                      <span className="text-sm font-medium text-text-main dark:text-white">Google</span>
+                  </button>
+                  <button onClick={() => handleSocialLogin('apple')} className="flex items-center justify-center gap-2 h-12 border border-slate-200 dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors bg-white dark:bg-slate-900">
+                      <i className="fa-brands fa-apple text-black dark:text-white"></i>
+                      <span className="text-sm font-medium text-text-main dark:text-white">Apple</span>
+                  </button>
+              </div>
+
+              <p className="text-center mt-8 text-sm text-text-muted dark:text-slate-400">
+                  {isLogin ? 'Novo por aqui?' : 'Já tem uma conta?'}
+                  <button 
+                    onClick={() => setIsLogin(!isLogin)}
+                    className="ml-2 font-bold text-primary hover:underline transition-all"
+                  >
+                      {isLogin ? 'Crie uma conta' : 'Fazer Login'}
+                  </button>
+              </p>
+
+              {isLogin && (
+                  <div className="mt-8 text-center bg-slate-50 dark:bg-slate-800/50 p-3 rounded-xl border border-dashed border-slate-200 dark:border-slate-700">
+                      <p className="text-xs text-slate-500">Conta de teste: <strong className="text-slate-700 dark:text-slate-300">demo@maos.com</strong> (sem senha)</p>
+                  </div>
+              )}
+          </div>
+          
+          {/* Mobile Footer Text */}
+          <div className="lg:hidden mt-8 text-center opacity-60">
+              <p className="text-[10px] text-white/70">Mãos da Obra Inc © 2024</p>
+          </div>
       </div>
     </div>
   );
