@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { dbService } from '../services/db';
@@ -90,13 +91,14 @@ const ContactsView: React.FC<{ workId: string, mode: 'TEAM' | 'SUPPLIERS', onBac
     
     // Form States
     const [newName, setNewName] = useState('');
-    const [newRole, setNewRole] = useState('');
+    const [newRole, setNewRole] = useState(''); // Used for Role (Worker) or Category (Supplier)
     const [newPhone, setNewPhone] = useState('');
 
     const [zeModal, setZeModal] = useState<{isOpen: boolean, title: string, message: string, onConfirm: () => void}>({isOpen: false, title: '', message: '', onConfirm: () => {}});
 
     const loadData = async () => {
         if(user) {
+            setItems([]); // Clear before load
             if (mode === 'TEAM') {
                 const w = await dbService.getWorkers(user.id);
                 setItems(w);
@@ -107,6 +109,7 @@ const ContactsView: React.FC<{ workId: string, mode: 'TEAM' | 'SUPPLIERS', onBac
         }
     };
     
+    // Reload when mode changes
     useEffect(() => { loadData(); }, [user, mode]);
 
     const handleAdd = async (e: React.FormEvent) => {
@@ -141,7 +144,7 @@ const ContactsView: React.FC<{ workId: string, mode: 'TEAM' | 'SUPPLIERS', onBac
         <div className="animate-in fade-in slide-in-from-right-4">
             <button onClick={onBack} className="mb-4 text-sm font-bold text-slate-400 hover:text-primary"><i className="fa-solid fa-arrow-left"></i> Voltar</button>
             <SectionHeader 
-                title={mode === 'TEAM' ? "Minha Equipe" : "Fornecedores"} 
+                title={mode === 'TEAM' ? "Minha Equipe" : "Meus Fornecedores"} 
                 subtitle={mode === 'TEAM' ? "Profissionais cadastrados." : "Lojas e prestadores."} 
             />
             
@@ -798,7 +801,6 @@ const MaterialsTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ work
             grouped[cat].push(m);
         });
         setGroupedMaterials(grouped);
-        // Removed explicit onUpdate here to avoid loop
     };
 
     useEffect(() => { load(); }, [workId]);
@@ -1024,7 +1026,6 @@ const ExpensesTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ workI
         });
         
         setGroupedExpenses(grouped);
-        // Removed explicit onUpdate here to avoid loop
     };
 
     useEffect(() => { load(); }, [workId]);
@@ -1274,6 +1275,24 @@ const MoreMenuTab: React.FC<{ workId: string }> = ({ workId }) => {
     if (activeSection === 'PHOTOS') return <PhotosView workId={workId} onBack={() => setActiveSection(null)} />;
     if (activeSection === 'FILES') return <FilesView workId={workId} onBack={() => setActiveSection(null)} />;
     if (activeSection === 'REPORTS') return <ReportsView workId={workId} onBack={() => setActiveSection(null)} />;
+    if (activeSection === 'AI') {
+        // We will handle AI chat in the main component via state uplift or direct render here?
+        // Actually the main component handles the AI Chat modal.
+        // Let's just alert for now or direct the user.
+        // But wait, the user asked for AI Assistant View. Let's create a simple view wrapper.
+        return (
+            <div className="flex flex-col h-full">
+                <button onClick={() => setActiveSection(null)} className="mb-4 text-sm font-bold text-slate-400 hover:text-primary"><i className="fa-solid fa-arrow-left"></i> Voltar</button>
+                <div className="flex-1 flex flex-col items-center justify-center text-center p-6">
+                    <div className="w-20 h-20 rounded-full bg-secondary/10 flex items-center justify-center mb-4">
+                        <i className="fa-solid fa-robot text-4xl text-secondary"></i>
+                    </div>
+                    <h3 className="text-xl font-bold text-primary dark:text-white mb-2">IA do Zé da Obra</h3>
+                    <p className="text-slate-500 mb-6">Seu assistente está disponível no ícone de robô no topo da tela em qualquer lugar do app.</p>
+                </div>
+            </div>
+        )
+    }
 
     return (
         <div className="animate-in fade-in duration-500 pb-24">
@@ -1321,7 +1340,16 @@ const MoreMenuTab: React.FC<{ workId: string }> = ({ workId }) => {
 
                     <div className="grid grid-cols-2 gap-3">
                         {bonusFeatures.map(f => (
-                            <button key={f.id} onClick={() => isLifetime && alert("Funcionalidade " + f.label + " será implementada em breve.")} className={`p-4 rounded-xl text-left transition-all ${isLifetime ? 'bg-white/10 hover:bg-white/20 border border-white/5' : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700'}`}>
+                            <button 
+                                key={f.id} 
+                                onClick={() => {
+                                    if(isLifetime) {
+                                        if (f.id === 'AI') setActiveSection('AI');
+                                        else alert("Funcionalidade " + f.label + " será implementada em breve.");
+                                    }
+                                }} 
+                                className={`p-4 rounded-xl text-left transition-all ${isLifetime ? 'bg-white/10 hover:bg-white/20 border border-white/5' : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700'}`}
+                            >
                                 <i className={`fa-solid ${f.icon} text-xl mb-2 ${isLifetime ? 'text-secondary' : 'text-slate-400'}`}></i>
                                 <h4 className={`font-bold text-sm mb-0.5 ${isLifetime ? 'text-white' : 'text-slate-600 dark:text-slate-300'}`}>{f.label}</h4>
                                 <p className={`text-[10px] leading-tight ${isLifetime ? 'text-slate-400' : 'text-slate-400'}`}>{f.desc}</p>
