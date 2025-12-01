@@ -81,112 +81,167 @@ const uploadToBucket = async (file: File, path: string): Promise<string | null> 
     }
 }
 
-// --- ENGINE: CONSTRUCTION PLAN GENERATOR ---
-// This is the "Virtual Engineer" that generates specific steps and linked materials
+// --- ENGINE: CONSTRUCTION PLAN GENERATOR (ENGENHEIRO VIRTUAL 2.0) ---
 interface PlanItem {
     stepName: string;
     duration: number;
+    startOffset: number; // Dias após o início da obra
     materials: { name: string, unit: string, qty: number, category: string }[];
 }
 
 const generateConstructionPlan = (totalArea: number, floors: number): PlanItem[] => {
     const plan: PlanItem[] = [];
-    const floorArea = totalArea / Math.max(1, floors); // Area per floor (Footprint)
-    
-    // 1. FUNDAÇÃO (Baseada no footprint)
+    const footprint = totalArea / Math.max(1, floors); // Área por pavimento (projeção no chão)
+    let currentDay = 0;
+
+    // 0. CANTEIRO E PREPARAÇÃO
     plan.push({
-        stepName: "Fundação e Baldrames",
-        duration: 15,
+        stepName: "1. Serviços Preliminares (Canteiro)",
+        duration: 5,
+        startOffset: currentDay,
         materials: [
-            { category: 'Fundação', name: 'Cimento CP-II (Fundação)', unit: 'sacos', qty: Math.ceil(floorArea * 0.6) },
-            { category: 'Fundação', name: 'Areia Média', unit: 'm³', qty: Math.ceil(floorArea * 0.05) },
-            { category: 'Fundação', name: 'Brita 1', unit: 'm³', qty: Math.ceil(floorArea * 0.05) },
-            { category: 'Fundação', name: 'Pedra de Mão', unit: 'm³', qty: Math.ceil(floorArea * 0.03) },
-            { category: 'Fundação', name: 'Vergalhão 3/8 (10mm)', unit: 'barras', qty: Math.ceil(floorArea * 0.5) },
-            { category: 'Fundação', name: 'Vergalhão 5/16 (8mm)', unit: 'barras', qty: Math.ceil(floorArea * 0.3) },
-            { category: 'Fundação', name: 'Tábua de Pinus 30cm', unit: 'dz', qty: Math.ceil(floorArea / 20) },
-            { category: 'Fundação', name: 'Impermeabilizante', unit: 'latas', qty: Math.ceil(floorArea / 15) },
+            { category: 'Preparação', name: 'Tapume (Madeirite)', unit: 'chapas', qty: Math.ceil(Math.sqrt(footprint) * 4 / 2) }, // Perímetro estimado
+            { category: 'Preparação', name: 'Sarrasfo 2.5cm', unit: 'dz', qty: 2 },
+            { category: 'Preparação', name: 'Prego 17x21', unit: 'kg', qty: 2 },
+            { category: 'Preparação', name: 'Ligação Provisória Água/Luz', unit: 'vb', qty: 1 },
         ]
     });
+    currentDay += 5;
 
-    // 2. PAVIMENTOS (Loop for floors)
+    // 1. FUNDAÇÃO (Considerando área do footprint)
+    plan.push({
+        stepName: "2. Fundação e Baldrames",
+        duration: 20,
+        startOffset: currentDay,
+        materials: [
+            { category: 'Fundação', name: 'Cimento CP-II (Concreto)', unit: 'sacos', qty: Math.ceil(footprint * 0.8) },
+            { category: 'Fundação', name: 'Areia Média/Grossa', unit: 'm³', qty: Math.ceil(footprint * 0.08) },
+            { category: 'Fundação', name: 'Brita 1', unit: 'm³', qty: Math.ceil(footprint * 0.08) },
+            { category: 'Fundação', name: 'Pedra de Mão (Rachão)', unit: 'm³', qty: Math.ceil(footprint * 0.04) },
+            { category: 'Fundação', name: 'Vergalhão 3/8 (10mm)', unit: 'barras', qty: Math.ceil(footprint * 0.6) },
+            { category: 'Fundação', name: 'Vergalhão 5/16 (8mm)', unit: 'barras', qty: Math.ceil(footprint * 0.4) },
+            { category: 'Fundação', name: 'Estribos 4.2mm (Prontos)', unit: 'un', qty: Math.ceil(footprint * 4) },
+            { category: 'Fundação', name: 'Tábua de Pinus 30cm (Caixaria)', unit: 'dz', qty: Math.ceil(footprint / 15) },
+            { category: 'Fundação', name: 'Impermeabilizante Betuminoso', unit: 'latas', qty: Math.ceil(footprint / 12) },
+        ]
+    });
+    currentDay += 20;
+
+    // 2. ESTRUTURA E ALVENARIA (Loop por Andar)
     for (let i = 0; i < floors; i++) {
-        const floorName = i === 0 ? "Térreo" : `${i}º Pavimento`;
+        const floorLabel = i === 0 ? "Térreo" : `${i}º Pavimento`;
         
-        // A. PAREDES E ESTRUTURA
+        // A. Paredes e Colunas
         plan.push({
-            stepName: `Alvenaria e Estrutura (${floorName})`,
-            duration: 20,
+            stepName: `3.${i+1} Alvenaria e Colunas (${floorLabel})`,
+            duration: 25,
+            startOffset: currentDay,
             materials: [
-                { category: 'Alvenaria', name: `Tijolo/Bloco (${floorName})`, unit: 'milheiro', qty: Math.ceil((floorArea * 2.5 * 25) / 1000) }, // ~2.5m wall height, 25 blocks/m2
-                { category: 'Alvenaria', name: 'Cimento (Assentamento)', unit: 'sacos', qty: Math.ceil(floorArea * 0.2) },
-                { category: 'Alvenaria', name: 'Areia Média', unit: 'm³', qty: Math.ceil(floorArea * 0.04) },
-                { category: 'Alvenaria', name: 'Cal Hidratada', unit: 'sacos', qty: Math.ceil(floorArea * 0.15) },
-                { category: 'Alvenaria', name: 'Ferro 3/8 (Colunas)', unit: 'barras', qty: Math.ceil(floorArea * 0.25) },
+                { category: 'Alvenaria', name: `Tijolo/Bloco (${floorLabel})`, unit: 'milheiro', qty: Math.ceil((footprint * 3 * 25) / 1000) }, // Pé direito 3m
+                { category: 'Alvenaria', name: 'Cimento (Assentamento)', unit: 'sacos', qty: Math.ceil(footprint * 0.25) },
+                { category: 'Alvenaria', name: 'Cal Hidratada', unit: 'sacos', qty: Math.ceil(footprint * 0.3) },
+                { category: 'Alvenaria', name: 'Areia Média', unit: 'm³', qty: Math.ceil(footprint * 0.05) },
+                { category: 'Estrutura', name: 'Ferro 3/8 (Colunas/Vigas)', unit: 'barras', qty: Math.ceil(footprint * 0.4) },
+                { category: 'Estrutura', name: 'Ferro 5/16 (Complemento)', unit: 'barras', qty: Math.ceil(footprint * 0.2) },
+                { category: 'Estrutura', name: 'Tábua de Pinus (Vigas)', unit: 'dz', qty: Math.ceil(footprint / 20) },
             ]
         });
+        currentDay += 25;
 
-        // B. LAJE (Se não for o último andar ou se for laje de cobertura)
-        // Vamos assumir laje em todos os andares para simplificar (piso superior ou teto)
+        // B. Laje (Se não for telhado direto, ou seja, sempre tem laje, seja de piso ou forro)
         plan.push({
-            stepName: `Laje (${floorName})`,
-            duration: 10,
+            stepName: `3.${i+1} Laje Pré-Moldada (${floorLabel})`,
+            duration: 15,
+            startOffset: currentDay,
             materials: [
-                { category: 'Estrutura', name: `Vigota Trilho (${floorName})`, unit: 'm', qty: Math.ceil(floorArea * 3) },
-                { category: 'Estrutura', name: `Isopor/Lajota (${floorName})`, unit: 'un', qty: Math.ceil(floorArea * 3.5) },
-                { category: 'Estrutura', name: 'Malha Pop (Ferro)', unit: 'un', qty: Math.ceil(floorArea / 4) },
-                { category: 'Estrutura', name: 'Concreto Usinado', unit: 'm³', qty: Math.ceil(floorArea * 0.12) }, // 12cm thick avg
-                { category: 'Estrutura', name: 'Escoras de Eucalipto', unit: 'dz', qty: Math.ceil(floorArea / 10) },
+                { category: 'Estrutura', name: `Vigota Trilho (${floorLabel})`, unit: 'm', qty: Math.ceil(footprint * 3.2) },
+                { category: 'Estrutura', name: `Isopor/Lajota (${floorLabel})`, unit: 'un', qty: Math.ceil(footprint * 3.5) },
+                { category: 'Estrutura', name: 'Malha Pop 15x15', unit: 'un', qty: Math.ceil(footprint / 8) }, // Tamanho padrão tela
+                { category: 'Estrutura', name: 'Concreto Usinado FCK25', unit: 'm³', qty: Math.ceil(footprint * 0.1) }, // Capa de 5-7cm + vigotas
+                { category: 'Estrutura', name: 'Escoras de Eucalipto', unit: 'dz', qty: Math.ceil(footprint / 12) },
+                { category: 'Elétrica', name: 'Caixas de Luz de Laje (Octogonal)', unit: 'un', qty: Math.ceil(footprint / 15) },
+                { category: 'Elétrica', name: 'Eletroduto Corrugado (Laje)', unit: 'rolos', qty: Math.ceil(footprint / 40) },
             ]
         });
+        currentDay += 15;
     }
 
-    // 3. TELHADO
-    const roofArea = floorArea * 1.3; // 30% inclination
+    // 3. TELHADO E COBERTURA
     plan.push({
-        stepName: "Telhado e Cobertura",
-        duration: 10,
-        materials: [
-            { category: 'Telhado', name: 'Telhas', unit: 'un', qty: Math.ceil(roofArea * 16) }, // ~16 tiles/m2
-            { category: 'Telhado', name: 'Madeiramento (Vigas)', unit: 'm', qty: Math.ceil(roofArea * 3) },
-            { category: 'Telhado', name: 'Caibros e Ripas', unit: 'm', qty: Math.ceil(roofArea * 4) },
-            { category: 'Telhado', name: 'Manta Térmica', unit: 'rolos', qty: Math.ceil(roofArea / 50) },
-        ]
-    });
-
-    // 4. INSTALAÇÕES GERAIS
-    plan.push({
-        stepName: "Instalações (Elétrica/Hidráulica)",
-        duration: 15,
-        materials: [
-            { category: 'Elétrica', name: 'Eletrodutos Flexíveis', unit: 'rolos', qty: Math.ceil(totalArea / 20) },
-            { category: 'Elétrica', name: 'Cabos 2.5mm', unit: 'rolos', qty: Math.ceil(totalArea / 30) },
-            { category: 'Elétrica', name: 'Kit Tomadas', unit: 'un', qty: Math.ceil(totalArea / 10) },
-            { category: 'Hidráulica', name: 'Tubos PVC 25mm (Água)', unit: 'barras', qty: Math.ceil(totalArea / 10) },
-            { category: 'Hidráulica', name: 'Tubos Esgoto 100mm', unit: 'barras', qty: Math.ceil(floors * 2) },
-            { category: 'Hidráulica', name: 'Caixa D\'água 1000L', unit: 'un', qty: 1 },
-        ]
-    });
-
-    // 5. ACABAMENTOS GERAIS
-    plan.push({
-        stepName: "Acabamentos (Piso e Revestimento)",
+        stepName: "4. Telhado e Calhas",
         duration: 20,
+        startOffset: currentDay,
         materials: [
-            { category: 'Acabamento', name: 'Piso Cerâmico/Porcelanato', unit: 'm²', qty: Math.ceil(totalArea * 1.15) },
-            { category: 'Acabamento', name: 'Argamassa AC-II', unit: 'sacos', qty: Math.ceil(totalArea / 4) },
-            { category: 'Acabamento', name: 'Rejunte', unit: 'kg', qty: Math.ceil(totalArea / 10) },
+            { category: 'Telhado', name: 'Madeiramento (Vigas/Caibros)', unit: 'm³', qty: Math.ceil(footprint * 0.04) }, // Estimativa cubica
+            { category: 'Telhado', name: 'Telhas (Cerâmica/Concreto)', unit: 'milheiro', qty: Math.ceil((footprint * 1.4 * 16) / 1000) }, // Inclinação 40%
+            { category: 'Telhado', name: 'Caixa D\'água 1000L', unit: 'un', qty: 1 },
+            { category: 'Telhado', name: 'Calhas e Rufos', unit: 'm', qty: Math.ceil(Math.sqrt(footprint) * 2) },
+            { category: 'Telhado', name: 'Manta Térmica', unit: 'rolos', qty: Math.ceil(footprint / 45) },
         ]
     });
+    // Não incrementamos full time pois instalações começam em paralelo
+    currentDay += 10; 
 
-    // 6. PINTURA
+    // 4. INSTALAÇÕES (RASGOS E TUBULAÇÕES)
     plan.push({
-        stepName: "Pintura Final",
-        duration: 10,
+        stepName: "5. Instalações (Elétrica e Hidráulica)",
+        duration: 20,
+        startOffset: currentDay,
         materials: [
-            { category: 'Pintura', name: 'Massa Corrida', unit: 'latas', qty: Math.ceil(totalArea / 15) },
-            { category: 'Pintura', name: 'Tinta Acrílica (18L)', unit: 'latas', qty: Math.ceil(totalArea / 50) },
-            { category: 'Pintura', name: 'Selador', unit: 'latas', qty: Math.ceil(totalArea / 80) },
+            { category: 'Hidráulica', name: 'Tubos PVC 25mm (Água Fria)', unit: 'barras', qty: Math.ceil(totalArea / 8) },
+            { category: 'Hidráulica', name: 'Tubos Esgoto 100mm', unit: 'barras', qty: Math.ceil(floors * 3) },
+            { category: 'Hidráulica', name: 'Tubos Esgoto 40mm/50mm', unit: 'barras', qty: Math.ceil(totalArea / 10) },
+            { category: 'Hidráulica', name: 'Conexões Diversas (Kit)', unit: 'vb', qty: 1 },
+            { category: 'Hidráulica', name: 'Registros de Gaveta', unit: 'un', qty: Math.ceil(floors * 2) },
+            { category: 'Elétrica', name: 'Eletroduto Flexível (Parede)', unit: 'rolos', qty: Math.ceil(totalArea / 20) },
+            { category: 'Elétrica', name: 'Caixinhas 4x2', unit: 'un', qty: Math.ceil(totalArea / 8) },
+            { category: 'Elétrica', name: 'Quadro de Distribuição', unit: 'un', qty: floors },
+        ]
+    });
+    currentDay += 20;
+
+    // 5. REBOCO E CONTRAPISO
+    plan.push({
+        stepName: "6. Reboco e Contrapiso",
+        duration: 30,
+        startOffset: currentDay,
+        materials: [
+            { category: 'Alvenaria', name: 'Cimento (Reboco/Piso)', unit: 'sacos', qty: Math.ceil(totalArea * 0.4) }, // Parede interna/externa + piso
+            { category: 'Alvenaria', name: 'Areia Fina/Média', unit: 'm³', qty: Math.ceil(totalArea * 0.1) },
+            { category: 'Alvenaria', name: 'Cal Hidratada', unit: 'sacos', qty: Math.ceil(totalArea * 0.3) },
+            { category: 'Alvenaria', name: 'Aditivo (Vedalit/Similar)', unit: 'litros', qty: Math.ceil(totalArea / 20) },
+        ]
+    });
+    currentDay += 30;
+
+    // 6. ACABAMENTO FINO (PISO)
+    plan.push({
+        stepName: "7. Pisos e Revestimentos",
+        duration: 25,
+        startOffset: currentDay,
+        materials: [
+            { category: 'Acabamento', name: 'Piso Cerâmico/Porcelanato', unit: 'm²', qty: Math.ceil(totalArea * 1.15) }, // +15% quebra/rodapé
+            { category: 'Acabamento', name: 'Revestimento Parede (Banheiro/Cozinha)', unit: 'm²', qty: Math.ceil(totalArea * 0.4) }, 
+            { category: 'Acabamento', name: 'Argamassa AC-II/AC-III', unit: 'sacos', qty: Math.ceil(totalArea * 1.55 / 4) }, // ~4m2 por saco
+            { category: 'Acabamento', name: 'Rejunte', unit: 'kg', qty: Math.ceil(totalArea / 8) },
+            { category: 'Acabamento', name: 'Niveladores de Piso', unit: 'pct', qty: Math.ceil(totalArea / 30) },
+        ]
+    });
+    currentDay += 25;
+
+    // 7. PINTURA E FINALIZAÇÃO
+    plan.push({
+        stepName: "8. Pintura e Entrega",
+        duration: 20,
+        startOffset: currentDay,
+        materials: [
+            { category: 'Pintura', name: 'Massa Corrida/Acrílica', unit: 'latas', qty: Math.ceil(totalArea / 12) },
+            { category: 'Pintura', name: 'Selador Acrílico', unit: 'latas', qty: Math.ceil(totalArea / 60) },
+            { category: 'Pintura', name: 'Tinta Acrílica Premium (18L)', unit: 'latas', qty: Math.ceil(totalArea / 40) },
+            { category: 'Pintura', name: 'Lixas 150/220', unit: 'un', qty: 20 },
+            { category: 'Elétrica', name: 'Kit Tomadas e Interruptores', unit: 'un', qty: Math.ceil(totalArea / 8) },
+            { category: 'Elétrica', name: 'Cabos Flexíveis (1.5mm/2.5mm)', unit: 'rolos', qty: Math.ceil(totalArea / 25) },
+            { category: 'Acabamento', name: 'Louças e Metais', unit: 'vb', qty: 1 },
         ]
     });
 
@@ -322,7 +377,7 @@ export const dbService = {
             if (plan === PlanType.VITALICIO) baseDate.setFullYear(baseDate.getFullYear() + 99);
             
             db.users[userIdx].subscriptionExpiresAt = baseDate.toISOString();
-            saveLocalDb(db);
+            saveLocalDb(db); // FIX: Pass full DB, not just the user object
             localStorage.setItem(SESSION_KEY, JSON.stringify(db.users[userIdx]));
         }
      }
@@ -402,12 +457,12 @@ export const dbService = {
     if (isConstructionMode) {
         const plan = generateConstructionPlan(work.area, work.floors || 1);
         const startDate = new Date(work.startDate);
-        let currentOffset = 0;
 
+        // SEQUENTIAL INSERTION TO ENSURE ID LINKING
         for (const item of plan) {
             // Calculate dates
             const sDate = new Date(startDate);
-            sDate.setDate(sDate.getDate() + currentOffset);
+            sDate.setDate(sDate.getDate() + item.startOffset);
             const eDate = new Date(sDate);
             eDate.setDate(eDate.getDate() + item.duration);
 
@@ -447,7 +502,7 @@ export const dbService = {
                         purchased_qty: 0,
                         unit: m.unit,
                         category: m.category,
-                        step_id: stepId // VITAL: LINK TO STEP
+                        step_id: stepId // LINK TO STEP
                     }));
                     await supabase.from('materials').insert(matPayload);
                  } else {
@@ -466,8 +521,6 @@ export const dbService = {
                     saveLocalDb(db);
                  }
             }
-
-            currentOffset += (item.duration - 1);
         }
     }
 
