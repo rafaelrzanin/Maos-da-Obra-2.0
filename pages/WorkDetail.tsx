@@ -155,11 +155,29 @@ const ReportsView: React.FC<{ workId: string, onBack: () => void }> = ({ workId,
     }, [workId]);
     const handlePrint = () => { window.print(); };
     // Calculations
-    const financialData = expenses.reduce((acc: any[], curr) => { const existing = acc.find(a => a.name === curr.category); if (existing) existing.value += curr.amount; else acc.push({ name: curr.category, value: curr.amount }); return acc; }, []);
-    const totalSpent = expenses.reduce((acc, e) => acc + e.amount, 0); const totalPaid = expenses.reduce((acc, e) => acc + (e.paidAmount || 0), 0); const totalPending = totalSpent - totalPaid;
-    const purchasedMaterials = materials.filter(m => m.purchasedQty >= m.plannedQty).length; const materialChartData = [{ name: 'Comprado', value: purchasedMaterials, fill: '#059669' }, { name: 'Pendente', value: materials.length - purchasedMaterials, fill: '#E2E8F0' }];
-    const groupedMaterials: Record<string, Material[]> = {}; materials.forEach(m => { const cat = m.category || 'Geral'; if (!groupedMaterials[cat]) groupedMaterials[cat] = []; groupedMaterials[cat].push(m); });
-    const completedSteps = steps.filter(s => s.status === StepStatus.COMPLETED).length; const delayedSteps = steps.filter(s => s.isDelayed).length; const totalSteps = steps.length;
+    // Dados financeiros (por enquanto sem base em expenses; depois ligamos aos dados reais da aba de gastos)
+const financialData: { name: string; value: number }[] = [];
+
+// Totais financeiros (zerados temporariamente)
+const totalSpent = 0;
+const totalPaid = 0;
+const totalPending = 0;
+
+// Materiais (por enquanto sem base em materials; depois ligamos à aba de materiais)
+const purchasedMaterials = 0;
+const materialChartData = [
+  { name: 'Comprado', value: 0, fill: '#059669' },
+  { name: 'Pendente', value: 0, fill: '#E2E8F0' },
+];
+
+// Agrupamento de materiais (vazio por enquanto)
+const groupedMaterials: Record<string, Material[]> = {};
+
+// Esses três continuam funcionando porque usam "steps", que você já tem no estado do WorkDetail
+const completedSteps = steps.filter(s => s.status === StepStatus.COMPLETED).length;
+const delayedSteps = steps.filter(s => s.isDelayed).length;
+const totalSteps = steps.length;
+
 
     return (
         <div className="animate-in fade-in slide-in-from-right-4 bg-white dark:bg-slate-950 min-h-screen">
