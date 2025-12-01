@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { dbService } from '../services/db';
@@ -22,7 +21,7 @@ const SectionHeader: React.FC<{ title: string, subtitle: string }> = ({ title, s
 // --- SUB-VIEWS FOR "MORE" TAB ---
 
 // 1. CONTACTS VIEW (TEAM OR SUPPLIERS SEPARATED)
-const ContactsView: React.FC<{ workId: string, mode: 'TEAM' | 'SUPPLIERS', onBack: () => void }> = ({ mode, onBack }) => {
+const ContactsView: React.FC<{ mode: 'TEAM' | 'SUPPLIERS', onBack: () => void }> = ({ mode, onBack }) => {
     const { user } = useAuth();
     const [items, setItems] = useState<any[]>([]);
     const [isAddOpen, setIsAddOpen] = useState(false);
@@ -408,8 +407,6 @@ const StepsTab: React.FC<{ workId: string, refreshWork: () => void }> = ({ workI
   const [editingStep, setEditingStep] = useState<Step | null>(null);
   
   const [zeModal, setZeModal] = useState<{isOpen: boolean, title: string, message: string, onConfirm: () => void}>({isOpen: false, title: '', message: '', onConfirm: () => {}});
-  const [pendingStartStep, setPendingStartStep] = useState<Step | null>(null);
-  const [foundPackage, setFoundPackage] = useState<string | null>(null);
 
   const loadSteps = async () => {
     const s = await dbService.getSteps(workId);
@@ -424,14 +421,6 @@ const StepsTab: React.FC<{ workId: string, refreshWork: () => void }> = ({ workI
       else if (step.status === StepStatus.IN_PROGRESS) newStatus = StepStatus.COMPLETED;
       else newStatus = StepStatus.NOT_STARTED;
       
-      if (step.status === StepStatus.NOT_STARTED && newStatus === StepStatus.IN_PROGRESS) {
-          const matchPkg = FULL_MATERIAL_PACKAGES.find(p => step.name.toLowerCase().includes(p.category.toLowerCase()));
-          if (matchPkg) {
-              setPendingStartStep(step);
-              setFoundPackage(matchPkg.category);
-              return;
-          }
-      }
       await updateStepStatus(step, newStatus);
   };
   
@@ -440,24 +429,6 @@ const StepsTab: React.FC<{ workId: string, refreshWork: () => void }> = ({ workI
       loadSteps();
       refreshWork();
   }
-
-  const handleConfirmImport = async () => {
-      if (pendingStartStep && foundPackage) {
-          const count = await dbService.importMaterialPackage(workId, foundPackage);
-          await updateStepStatus(pendingStartStep, StepStatus.IN_PROGRESS);
-          setPendingStartStep(null);
-          setFoundPackage(null);
-          if (count > 0) alert(`${count} materiais sugeridos foram adicionados!`);
-      }
-  };
-
-  const handleCancelImport = async () => {
-      if (pendingStartStep) {
-          await updateStepStatus(pendingStartStep, StepStatus.IN_PROGRESS);
-          setPendingStartStep(null);
-          setFoundPackage(null);
-      }
-  };
   
   const handleCreateStep = async (e: React.FormEvent) => {
       e.preventDefault();
@@ -477,18 +448,6 @@ const StepsTab: React.FC<{ workId: string, refreshWork: () => void }> = ({ workI
   const handleUpdateStep = async (e: React.FormEvent) => {
       e.preventDefault();
       if (editingStep) {
-          const originalStep = steps.find(s => s.id === editingStep.id);
-          const isStarting = originalStep && originalStep.status === StepStatus.NOT_STARTED && editingStep.status === StepStatus.IN_PROGRESS;
-
-          if (isStarting) {
-              const matchPkg = FULL_MATERIAL_PACKAGES.find(p => editingStep.name.toLowerCase().includes(p.category.toLowerCase()));
-              if (matchPkg) {
-                  setPendingStartStep(editingStep);
-                  setFoundPackage(matchPkg.category);
-                  setEditingStep(null);
-                  return;
-              }
-          }
           await dbService.updateStep(editingStep);
           setEditingStep(null);
           loadSteps();
@@ -670,47 +629,6 @@ const StepsTab: React.FC<{ workId: string, refreshWork: () => void }> = ({ workI
         onConfirm={zeModal.onConfirm}
         onCancel={() => setZeModal({isOpen: false, title: '', message: '', onConfirm: () => {}})}
       />
-
-      {/* ASSISTANT IMPORT MODAL */}
-      {pendingStartStep && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-primary/80 backdrop-blur-sm animate-in fade-in">
-            <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-6 shadow-2xl relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-32 h-32 bg-secondary/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
-                
-                <div className="relative z-10">
-                    <div className="flex gap-5 mb-6">
-                        <div className="w-16 h-16 rounded-full p-1 bg-gradient-to-br from-slate-100 to-slate-200 shadow-lg shrink-0">
-                             <img src={ZE_AVATAR} alt="Zé da Obra" className="w-full h-full object-cover rounded-full border-2 border-white" />
-                        </div>
-                        <div>
-                            <h3 className="text-xl font-bold text-primary dark:text-white leading-tight mb-1">Oi, chefe!</h3>
-                            <p className="text-sm text-slate-500">Começando a <strong>{foundPackage}</strong>?</p>
-                        </div>
-                    </div>
-                    
-                    <div className="mb-6 bg-slate-50 dark:bg-slate-800 p-5 rounded-2xl text-sm text-slate-600 dark:text-slate-300 leading-relaxed border border-slate-100 dark:border-slate-700">
-                        <p>Posso adicionar a <strong>lista de materiais padrão</strong> dessa fase pra você agora mesmo.</p>
-                        <p className="mt-2 text-xs font-bold text-secondary uppercase tracking-wide">Economia de tempo: ~10 minutos</p>
-                    </div>
-
-                    <div className="flex flex-col gap-3">
-                        <button 
-                            onClick={handleConfirmImport} 
-                            className="w-full py-4 rounded-xl bg-secondary text-white font-bold hover:bg-amber-700 transition-colors shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2"
-                        >
-                            <i className="fa-solid fa-wand-magic-sparkles"></i> Gerar Lista Automática
-                        </button>
-                        <button 
-                            onClick={handleCancelImport} 
-                            className="w-full py-3 rounded-xl text-slate-400 font-bold hover:text-slate-600 transition-colors"
-                        >
-                            Não, obrigado
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
-      )}
     </div>
   );
 };
@@ -1233,8 +1151,8 @@ const MoreMenuTab: React.FC<{ workId: string }> = ({ workId }) => {
     ];
 
     // Render Active Sub-View
-    if (activeSection === 'TEAM') return <ContactsView workId={workId} mode="TEAM" onBack={() => setActiveSection(null)} />;
-    if (activeSection === 'SUPPLIERS') return <ContactsView workId={workId} mode="SUPPLIERS" onBack={() => setActiveSection(null)} />;
+    if (activeSection === 'TEAM') return <ContactsView mode="TEAM" onBack={() => setActiveSection(null)} />;
+    if (activeSection === 'SUPPLIERS') return <ContactsView mode="SUPPLIERS" onBack={() => setActiveSection(null)} />;
     if (activeSection === 'PHOTOS') return <PhotosView workId={workId} onBack={() => setActiveSection(null)} />;
     if (activeSection === 'FILES') return <FilesView workId={workId} onBack={() => setActiveSection(null)} />;
     if (activeSection === 'REPORTS') return <ReportsView workId={workId} onBack={() => setActiveSection(null)} />;
