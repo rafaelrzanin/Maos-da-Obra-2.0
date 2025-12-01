@@ -1,9 +1,11 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { dbService } from '../services/db';
-import { Work, Step, Expense, Material, StepStatus, ExpenseCategory, PlanType, WorkPhoto, WorkFile } from '../types';
+import { Work, Step, Expense, Material, StepStatus, ExpenseCategory, PlanType, Supplier, Worker, WorkPhoto, WorkFile } from '../types';
 import { Recharts } from '../components/RechartsWrapper';
-import { FULL_MATERIAL_PACKAGES, ZE_AVATAR } from '../services/standards';
+import { ZeModal } from '../components/ZeModal';
+import { CALCULATORS, CONTRACT_TEMPLATES, STANDARD_CHECKLISTS, FULL_MATERIAL_PACKAGES, ZE_AVATAR } from '../services/standards';
 import { useAuth } from '../App';
 import { aiService } from '../services/ai';
 
@@ -17,73 +19,10 @@ const SectionHeader: React.FC<{ title: string, subtitle: string }> = ({ title, s
     </div>
 );
 
-// --- ZÉ DA OBRA MODAL (Premium Style) ---
-interface ZeModalProps {
-  isOpen: boolean;
-  title: string;
-  message: string;
-  confirmText?: string;
-  cancelText?: string;
-  type?: 'DANGER' | 'INFO' | 'SUCCESS';
-  onConfirm: () => void;
-  onCancel: () => void;
-}
-
-const ZeModal: React.FC<ZeModalProps> = ({ isOpen, title, message, confirmText = "Sim, confirmar", cancelText = "Cancelar", type = 'DANGER', onConfirm, onCancel }) => {
-  if (!isOpen) return null;
-  
-  const isDanger = type === 'DANGER';
-
-  return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-primary/80 backdrop-blur-sm animate-in fade-in duration-300">
-      <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-6 shadow-2xl border border-white/20 transform scale-100 transition-all relative overflow-hidden">
-        {/* Glow Effect */}
-        <div className="absolute top-0 right-0 w-32 h-32 bg-secondary/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
-        
-        <div className="relative z-10">
-            <div className="flex gap-5 mb-6">
-                <div className="w-16 h-16 rounded-full p-1 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-800 shadow-lg shrink-0">
-                    <img 
-                    src={ZE_AVATAR} 
-                    alt="Zé da Obra" 
-                    className="w-full h-full object-cover rounded-full border-2 border-white dark:border-slate-800"
-                    onError={(e) => { e.currentTarget.src = 'https://ui-avatars.com/api/?name=Ze+Obra&background=0F172A&color=fff'; }}
-                    />
-                </div>
-                <div>
-                    <h3 className="text-xl font-bold text-primary dark:text-white leading-tight mb-1">Ei, Chefe!</h3>
-                    <p className="text-sm font-medium text-slate-500 dark:text-slate-400">{title}</p>
-                </div>
-            </div>
-            
-            <div className={`mb-8 p-4 rounded-2xl text-sm leading-relaxed border ${isDanger ? 'bg-red-50 dark:bg-red-900/20 border-red-100 dark:border-red-900 text-red-800 dark:text-red-200' : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'}`}>
-                <p>{message}</p>
-            </div>
-
-            <div className="flex flex-col gap-3">
-                <button 
-                    onClick={onConfirm} 
-                    className={`w-full py-4 rounded-xl text-white font-bold transition-all shadow-lg active:scale-[0.98] ${isDanger ? 'bg-danger hover:bg-red-700 shadow-red-500/20' : 'bg-primary hover:bg-slate-800 shadow-slate-500/20'}`}
-                >
-                    {confirmText}
-                </button>
-                <button 
-                    onClick={onCancel} 
-                    className="w-full py-3 rounded-xl text-slate-500 font-bold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-                >
-                    {cancelText}
-                </button>
-            </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
 // --- SUB-VIEWS FOR "MORE" TAB ---
 
 // 1. CONTACTS VIEW (TEAM OR SUPPLIERS SEPARATED)
-const ContactsView: React.FC<{ mode: 'TEAM' | 'SUPPLIERS', onBack: () => void }> = ({ mode, onBack }) => {
+const ContactsView: React.FC<{ workId: string, mode: 'TEAM' | 'SUPPLIERS', onBack: () => void }> = ({ workId, mode, onBack }) => {
     const { user } = useAuth();
     const [items, setItems] = useState<any[]>([]);
     const [isAddOpen, setIsAddOpen] = useState(false);
@@ -182,7 +121,7 @@ const ContactsView: React.FC<{ mode: 'TEAM' | 'SUPPLIERS', onBack: () => void }>
                             <input placeholder={mode === 'TEAM' ? "Profissão (ex: Pedreiro)" : "Categoria (ex: Elétrica)"} value={newRole} onChange={e => setNewRole(e.target.value)} className="w-full p-3 rounded-xl border dark:border-slate-700 dark:bg-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-primary" required />
                             <input placeholder="Telefone / WhatsApp" value={newPhone} onChange={e => setNewPhone(e.target.value)} className="w-full p-3 rounded-xl border dark:border-slate-700 dark:bg-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-primary" required />
                             <div className="flex gap-2 pt-2">
-                                <button type="button" onClick={() => setIsAddOpen(false)} className="flex-1 py-3 text-slate-500 font-bold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">Cancelar</button>
+                                <button type="button" onClick={() => setIsAddOpen(false)} className="flex-1 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl transition-colors">Cancelar</button>
                                 <button type="submit" className="flex-1 py-3 bg-primary text-white rounded-xl font-bold hover:bg-slate-800 transition-colors">Salvar</button>
                             </div>
                         </form>
@@ -1269,12 +1208,16 @@ const MoreMenuTab: React.FC<{ workId: string }> = ({ workId }) => {
     ];
 
     // Render Active Sub-View
-    if (activeSection === 'TEAM') return <ContactsView mode="TEAM" onBack={() => setActiveSection(null)} />;
-    if (activeSection === 'SUPPLIERS') return <ContactsView mode="SUPPLIERS" onBack={() => setActiveSection(null)} />;
+    if (activeSection === 'TEAM') return <ContactsView workId={workId} mode="TEAM" onBack={() => setActiveSection(null)} />;
+    if (activeSection === 'SUPPLIERS') return <ContactsView workId={workId} mode="SUPPLIERS" onBack={() => setActiveSection(null)} />;
     if (activeSection === 'PHOTOS') return <PhotosView workId={workId} onBack={() => setActiveSection(null)} />;
     if (activeSection === 'FILES') return <FilesView workId={workId} onBack={() => setActiveSection(null)} />;
     if (activeSection === 'REPORTS') return <ReportsView workId={workId} onBack={() => setActiveSection(null)} />;
     if (activeSection === 'AI') {
+        // We will handle AI chat in the main component via state uplift or direct render here?
+        // Actually the main component handles the AI Chat modal.
+        // Let's just alert for now or direct the user.
+        // But wait, the user asked for AI Assistant View. Let's create a simple view wrapper.
         return (
             <div className="flex flex-col h-full">
                 <button onClick={() => setActiveSection(null)} className="mb-4 text-sm font-bold text-slate-400 hover:text-primary"><i className="fa-solid fa-arrow-left"></i> Voltar</button>
@@ -1417,7 +1360,7 @@ const WorkDetail: React.FC = () => {
   );
 
   return (
-      <div className="min-h-screen pb-24">
+      <div className="min-h-screen pb-24"> {/* Added padding for bottom bar */}
           
           {/* Top Header */}
           <div className="sticky top-0 z-30 bg-surface/90 dark:bg-slate-950/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 px-4 py-4 flex justify-between items-center">
