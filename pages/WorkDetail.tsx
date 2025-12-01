@@ -729,9 +729,24 @@ const MaterialsTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ work
     const [newMaterial, setNewMaterial] = useState({ name: '', plannedQty: '', unit: 'un', category: 'Geral' });
     const [groupedMaterials, setGroupedMaterials] = useState<Record<string, Material[]>>({});
 
-    const load = async () => { const [matData, stepData] = await Promise.all([dbService.getMaterials(workId), dbService.getSteps(workId)]); setMaterials(matData); setSteps(stepData); const grouped: Record<string, Material[]> = {}; matData.forEach(m => { const cat = m.category || 'Geral'; if (!grouped[cat]) grouped[cat] = []; grouped[cat].push(m); }); setGroupedMaterials(grouped); };
-    useEffect(() => { load(); }, [workId]);
+    const load = async () => {
+    const [matData, stepData] = await Promise.all([
+        dbService.getMaterials(workId),
+        dbService.getSteps(workId)
+    ]);
 
+    setSteps(stepData);
+
+    const grouped: Record<string, Material[]> = {};
+    matData.forEach(m => {
+        const cat = m.category || 'Geral';
+        if (!grouped[cat]) grouped[cat] = [];
+        grouped[cat].push(m);
+    });
+    setGroupedMaterials(grouped);
+};
+
+    
     const handleAdd = async (e: React.FormEvent) => { e.preventDefault(); await dbService.addMaterial({ workId, name: newMaterial.name, plannedQty: Number(newMaterial.plannedQty), purchasedQty: 0, unit: newMaterial.unit, category: newMaterial.category }); setIsCreateOpen(false); await load(); onUpdate(); };
     const handleImport = async (category: string) => { const count = await dbService.importMaterialPackage(workId, category); alert(`${count} adicionados.`); setIsImportOpen(false); await load(); onUpdate(); };
     const handleUpdate = async (e: React.FormEvent) => { e.preventDefault(); if(editingMaterial) { await dbService.updateMaterial(editingMaterial, Number(editCost)); setEditingMaterial(null); setEditCost(''); await load(); onUpdate(); } }
