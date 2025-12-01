@@ -1,8 +1,9 @@
+
 import React, { useState } from 'react';
 import { useAuth } from '../App';
 import { PlanType } from '../types';
 import { gatewayService } from '../services/gateway';
-import { LIFETIME_BONUSES, type LifetimeBonus } from '../services/standards';
+import { LIFETIME_BONUSES } from '../services/standards';
 
 const Settings: React.FC = () => {
   const { user } = useAuth();
@@ -66,9 +67,7 @@ const Settings: React.FC = () => {
   return (
     <div className="max-w-6xl mx-auto pb-12 pt-4 px-4">
       <h1 className="text-3xl font-bold text-text-main dark:text-white mb-2">Minha Assinatura</h1>
-      <p className="text-text-body dark:text-slate-400 mb-10">
-        Escolha como prefere pagar. Todos os planos liberam <strong>tudo</strong> no app.
-      </p>
+      <p className="text-text-body dark:text-slate-400 mb-10">Escolha como prefere pagar. Todos os planos liberam <strong>tudo</strong> no app.</p>
       
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         {plans.map(plan => {
@@ -117,10 +116,7 @@ const Settings: React.FC = () => {
                     </li>
                     ))}
                     {isVitalicio && (
-                        <li
-                          className="flex items-start text-sm text-premium font-bold cursor-pointer hover:underline"
-                          onClick={() => setShowBonusModal(true)}
-                        >
+                        <li className="flex items-start text-sm text-premium font-bold cursor-pointer hover:underline" onClick={() => setShowBonusModal(true)}>
                             <i className="fa-solid fa-gift mt-0.5 mr-3"></i>
                             + 4 Bônus Exclusivos (Ver)
                         </li>
@@ -166,11 +162,8 @@ const Settings: React.FC = () => {
                 </div>
                 <div className="p-6">
                     <div className="space-y-4">
-                        {LIFETIME_BONUSES.map((bonus: LifetimeBonus, idx: number) => (
-                            <div
-                              key={idx}
-                              className="flex items-start gap-4 p-3 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-                            >
+                        {LIFETIME_BONUSES.map((bonus, idx) => (
+                            <div key={idx} className="flex items-start gap-4 p-3 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
                                 <div className="w-10 h-10 rounded-full bg-purple-100 dark:bg-purple-900/30 text-premium flex items-center justify-center shrink-0">
                                     <i className={`fa-solid ${bonus.icon}`}></i>
                                 </div>

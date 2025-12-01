@@ -1,296 +1,410 @@
-// services/standards.ts
+
 // Standard Libraries for Construction Management
 
-// Avatar do Zé da Obra
-// Coloque o arquivo "ze.png" na pasta /public da sua aplicação
-export const ZE_AVATAR = "/ze.png";
+export const ZE_AVATAR = "./ze.png"; 
 
-// --- FASES PADRÃO DA OBRA ---
 export interface PhaseCategory {
   category: string;
   steps: string[];
 }
 
 export const STANDARD_PHASES: PhaseCategory[] = [
-  { category: "Preparação", steps: ["Limpeza do terreno", "Demolição"] },
-  { category: "Estrutura", steps: ["Fundações", "Paredes", "Lajes", "Telhado"] },
-  { category: "Instalações", steps: ["Hidráulica", "Elétrica", "Ar Condicionado"] },
   {
-    category: "Acabamento",
-    steps: ["Reboco", "Pisos", "Gesso", "Pintura", "Louças e Metais"],
+    category: 'Preparação',
+    steps: ['Limpeza do terreno', 'Demolição', 'Retirada de entulho']
   },
+  {
+    category: 'Estrutura e Alvenaria',
+    steps: ['Fundações', 'Levantamento de paredes', 'Lajes e Vigas', 'Telhado']
+  },
+  {
+    category: 'Instalações',
+    steps: ['Rasgo de paredes', 'Tubulação de Água/Esgoto', 'Fiação Elétrica', 'Pontos de Ar Condicionado']
+  },
+  {
+    category: 'Acabamento Grosso',
+    steps: ['Chapisco e Reboco', 'Contrapiso', 'Gesso / Forro', 'Impermeabilização']
+  },
+  {
+    category: 'Acabamento Fino',
+    steps: ['Pisos e Revestimentos', 'Azulejos', 'Marmoraria (Bancadas)', 'Esquadrias (Janelas/Portas)']
+  },
+  {
+    category: 'Pintura e Finalização',
+    steps: ['Massa Corrida e Lixamento', 'Pintura Paredes/Tetos', 'Instalação de Louças e Metais', 'Instalação de Luminárias', 'Limpeza Final']
+  }
 ];
 
-// --- MODELOS DE OBRA (TEMPLATES) ---
+// --- WORK TEMPLATES ---
+
 export interface WorkTemplate {
   id: string;
   label: string;
-  icon: string; // classe do Font Awesome
+  icon: string;
   description: string;
-  defaultDurationDays: number;
-  includedSteps: string[]; // se vazio, o gerador usa STANDARD_PHASES
+  defaultDurationDays: number; 
+  includedSteps: string[];
 }
 
 export const WORK_TEMPLATES: WorkTemplate[] = [
   {
-    id: "CONSTRUCAO",
-    label: "Casa inteira do zero",
-    icon: "fa-house-chimney",
-    description: "Do terreno às chaves.",
+    id: 'CONSTRUCAO',
+    label: 'Casa inteira do zero',
+    icon: 'fa-house-chimney',
+    description: 'Começar do terreno vazio até a mudança.',
     defaultDurationDays: 180,
-    includedSteps: [], // lógica tratada pelo gerador
+    includedSteps: [
+      'Limpeza do terreno', 'Fundações', 'Levantamento de paredes', 'Lajes e Vigas', 'Telhado',
+      'Tubulação de Água/Esgoto', 'Fiação Elétrica', 'Chapisco e Reboco', 'Contrapiso',
+      'Pisos e Revestimentos', 'Gesso / Forro', 'Pintura Paredes/Tetos', 'Instalação de Louças e Metais'
+    ]
   },
   {
-    id: "REFORMA_APTO",
-    label: "Reforma de Apartamento",
-    icon: "fa-building",
-    description: "Piso, pintura, gesso e banheiro.",
+    id: 'REFORMA_APTO',
+    label: 'Reforma Completa (Casa/Apto)',
+    icon: 'fa-house-user',
+    description: 'Geral: pisos, pintura, gesso e elétrica.',
     defaultDurationDays: 60,
     includedSteps: [
-      "Demolição",
-      "Elétrica",
-      "Hidráulica",
-      "Pisos",
-      "Pintura",
-      "Limpeza",
-    ],
+      'Demolição', 'Retirada de entulho', 'Tubulação de Água/Esgoto', 'Fiação Elétrica',
+      'Gesso / Forro', 'Pisos e Revestimentos', 'Azulejos', 'Pintura Paredes/Tetos', 
+      'Instalação de Luminárias', 'Limpeza Final'
+    ]
   },
   {
-    id: "BANHEIRO",
-    label: "Reforma de Banheiro",
-    icon: "fa-bath",
-    description: "Troca de tudo.",
+    id: 'BANHEIRO',
+    label: 'Só o Banheiro',
+    icon: 'fa-bath',
+    description: 'Troca de piso, louças e impermeabilização.',
     defaultDurationDays: 15,
     includedSteps: [
-      "Demolição",
-      "Hidráulica",
-      "Impermeabilização",
-      "Revestimento",
-      "Louças",
-    ],
+      'Demolição', 'Tubulação de Água/Esgoto', 'Impermeabilização', 'Contrapiso', 
+      'Azulejos', 'Pisos e Revestimentos', 'Gesso / Forro', 'Instalação de Louças e Metais'
+    ]
   },
   {
-    id: "PINTURA",
-    label: "Pintura Geral",
-    icon: "fa-paint-roller",
-    description: "Renovar paredes.",
-    defaultDurationDays: 10,
-    includedSteps: ["Lixamento", "Pintura", "Limpeza"],
+    id: 'COZINHA',
+    label: 'Só a Cozinha',
+    icon: 'fa-kitchen-set',
+    description: 'Azulejos, bancadas e instalações.',
+    defaultDurationDays: 20,
+    includedSteps: [
+      'Demolição', 'Rasgo de paredes', 'Tubulação de Água/Esgoto', 'Fiação Elétrica',
+      'Azulejos', 'Pisos e Revestimentos', 'Marmoraria (Bancadas)', 'Instalação de Louças e Metais'
+    ]
   },
+  {
+    id: 'PINTURA',
+    label: 'Só Pintura',
+    icon: 'fa-paint-roller',
+    description: 'Renovar as paredes e tetos.',
+    defaultDurationDays: 10,
+    includedSteps: [
+      'Proteção do piso', 'Massa Corrida e Lixamento', 'Pintura Paredes/Tetos', 'Limpeza Final'
+    ]
+  }
 ];
 
-// --- CALCULADORAS ---
-export const CALCULATOR_LOGIC = {
-  FLOOR: (area: number) => ({
-    tiles: Math.ceil(area * 1.1), // +10% de perda
-    mortar: Math.ceil((area * 4) / 20), // média 4kg/m² sacos 20kg
-    grout: Math.ceil(area * 0.3), // 0,3kg/m²
-  }),
+// --- MATERIAL CALCULATORS LOGIC ---
 
+export const CALCULATOR_LOGIC = {
+  FLOOR: (area: number) => {
+    const margin = 1.10; 
+    return {
+      tiles: Math.ceil(area * margin),
+      mortar: Math.ceil((area * 4) / 20), 
+      grout: Math.ceil((area * 0.3)), 
+    };
+  },
   WALL: (width: number, height: number) => {
     const area = width * height;
     return {
-      area: Number(area.toFixed(2)),
-      bricks: Math.ceil(area * 25), // média de tijolos por m²
-      cement: Math.ceil(area * 0.15),
-      sand: Math.ceil(area * 0.02),
+      area: area.toFixed(2),
+      bricks: Math.ceil(area * 25),
+      cement: Math.ceil(area * 0.15), 
+      sand: Math.ceil(area * 0.02), 
     };
   },
-
   PAINT: (area: number) => {
-    const liters = Math.ceil(area / 5); // 1L / 5m² (duas demãos)
+    const liters = Math.ceil(area / 5);
+    const cans18 = Math.floor(liters / 18);
+    const remainder = liters % 18;
+    const gallons36 = Math.ceil(remainder / 3.6);
+    
     return {
-      cans18: Math.floor(liters / 18),
-      gallons36: Math.ceil((liters % 18) / 3.6),
-      spackle: Math.ceil(area / 12), // massa corrida
-      sealer: Math.ceil(area / 40),
+      litersTotal: liters,
+      cans18,
+      gallons36,
+      spackle: Math.ceil(area / 12), 
+      sealer: Math.ceil(area / 40), 
     };
   },
-
-  ESTIMATOR: (baths: number, rooms: number) => ({
-    toilets: baths,
-    sinks: baths + 1,
-    showers: baths,
-    outlets: rooms * 5 + baths * 2 + 6,
-    switches: rooms + baths + 2,
-    lightPoints: rooms + baths + 2,
-  }),
+  ESTIMATOR: (bathrooms: number, rooms: number) => {
+    return {
+      toilets: bathrooms,
+      sinks: bathrooms + 1, 
+      showers: bathrooms,
+      outlets: (rooms * 5) + (bathrooms * 2) + 6, 
+      switches: rooms + bathrooms + 2,
+      lightPoints: rooms + bathrooms + 2
+    };
+  }
 };
 
-// --- CATÁLOGO DE MATERIAIS ---
-export interface MaterialItem {
-  name: string;
-  unit: string;
-}
-
-export interface MaterialPackage {
+export interface MaterialCatalog {
   category: string;
-  items: MaterialItem[];
+  items: {name: string, unit: string}[];
 }
 
-export const FULL_MATERIAL_PACKAGES: MaterialPackage[] = [
+// FULL BACKUP CATALOG 
+export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
   {
-    category: "Fundação",
+    category: 'Fundação',
     items: [
-      { name: "Cimento", unit: "sc" },
-      { name: "Areia", unit: "m3" },
-      { name: "Brita", unit: "m3" },
-      { name: "Ferro 3/8", unit: "br" },
-      { name: "Ferro 5/16", unit: "br" },
-      { name: "Estribo", unit: "un" },
-      { name: "Tábua", unit: "dz" },
-      { name: "Impermeabilizante", unit: "lt" },
-    ],
+      { name: 'Cimento CP-II', unit: 'sacos' },
+      { name: 'Areia Média', unit: 'm³' },
+      { name: 'Brita 1', unit: 'm³' },
+      { name: 'Pedra de Mão (Rachão)', unit: 'm³' },
+      { name: 'Vergalhão 3/8 (10mm)', unit: 'barras' },
+      { name: 'Vergalhão 5/16 (8mm)', unit: 'barras' },
+      { name: 'Estribo 4.2mm (Pronto)', unit: 'un' },
+      { name: 'Arame Recozido', unit: 'kg' },
+      { name: 'Tábua de Pinus (Caixaria)', unit: 'dz' },
+      { name: 'Prego 17x21 (Cabeça dupla)', unit: 'kg' },
+      { name: 'Impermeabilizante betuminoso', unit: 'latas' }
+    ]
   },
   {
-    category: "Alvenaria",
+    category: 'Alvenaria',
     items: [
-      { name: "Tijolo", unit: "mil" },
-      { name: "Cimento", unit: "sc" },
-      { name: "Cal", unit: "sc" },
-      { name: "Areia", unit: "m3" },
-      { name: "Ferro Cabelo", unit: "br" },
-    ],
+      { name: 'Tijolo Cerâmico 8 furos', unit: 'milheiro' },
+      { name: 'Bloco de Concreto Estrutural', unit: 'un' },
+      { name: 'Cimento CP-II', unit: 'sacos' },
+      { name: 'Cal Hidratada (Liga)', unit: 'sacos' },
+      { name: 'Areia Média', unit: 'm³' },
+      { name: 'Ferro para Vergas (Cabelo)', unit: 'barras' },
+      { name: 'Aditivo Plastificante', unit: 'litros' }
+    ]
   },
   {
-    category: "Elétrica",
+    category: 'Telhado',
     items: [
-      { name: "Fio 2.5mm", unit: "rl" },
-      { name: "Fio 1.5mm", unit: "rl" },
-      { name: "Caixinha 4x2", unit: "un" },
-      { name: "Disjuntor", unit: "un" },
-      { name: "Eletroduto", unit: "rl" },
-    ],
+      { name: 'Telha Cerâmica/Concreto', unit: 'un' },
+      { name: 'Viga de Madeira (Peroba/Garapeira)', unit: 'm' },
+      { name: 'Caibros', unit: 'm' },
+      { name: 'Ripas', unit: 'm' },
+      { name: 'Prego de Telheiro', unit: 'kg' },
+      { name: 'Manta Térmica (Subcobertura)', unit: 'rolos' },
+      { name: 'Caixa D\'água', unit: 'un' }
+    ]
   },
   {
-    category: "Hidráulica",
+    category: 'Elétrica',
     items: [
-      { name: "Tubo 25mm", unit: "br" },
-      { name: "Tubo Esgoto 100mm", unit: "br" },
-      { name: "Tubo Esgoto 40mm", unit: "br" },
-      { name: "Conexões", unit: "un" },
-      { name: "Cola", unit: "tb" },
-    ],
+      { name: 'Eletroduto Corrugado Amarelo (Flexível)', unit: 'rolos' },
+      { name: 'Caixa de Luz 4x2 (Parede)', unit: 'un' },
+      { name: 'Caixa de Luz 4x4', unit: 'un' },
+      { name: 'Cabo Flexível 2.5mm (Tomadas)', unit: 'rolos' },
+      { name: 'Cabo Flexível 1.5mm (Iluminação)', unit: 'rolos' },
+      { name: 'Cabo Flexível 6mm (Chuveiro)', unit: 'm' },
+      { name: 'Disjuntor Monopolar', unit: 'un' },
+      { name: 'Quadro de Distribuição', unit: 'un' },
+      { name: 'Fita Isolante', unit: 'un' }
+    ]
   },
   {
-    category: "Acabamento",
+    category: 'Hidráulica',
     items: [
-      { name: "Piso", unit: "m2" },
-      { name: "Argamassa", unit: "sc" },
-      { name: "Rejunte", unit: "kg" },
-    ],
+      { name: 'Tubo PVC Soldável 25mm (Água)', unit: 'barras' },
+      { name: 'Tubo Esgoto 100mm', unit: 'barras' },
+      { name: 'Tubo Esgoto 40mm', unit: 'barras' },
+      { name: 'Joelho 90 graus 25mm', unit: 'un' },
+      { name: 'Luva de correr', unit: 'un' },
+      { name: 'Cola para PVC', unit: 'tubo' },
+      { name: 'Registro de Gaveta (Geral)', unit: 'un' },
+      { name: 'Registro de Pressão (Chuveiro)', unit: 'un' },
+      { name: 'Caixa Sifonada', unit: 'un' }
+    ]
   },
   {
-    category: "Pintura",
+    category: 'Acabamento',
     items: [
-      { name: "Tinta", unit: "lt" },
-      { name: "Massa Corrida", unit: "lt" },
-      { name: "Lixa", unit: "un" },
-      { name: "Rolo", unit: "un" },
-    ],
+      { name: 'Piso / Porcelanato', unit: 'm²' },
+      { name: 'Argamassa AC-II ou AC-III', unit: 'sacos' },
+      { name: 'Rejunte', unit: 'kg' },
+      { name: 'Espaçadores / Niveladores', unit: 'pct' },
+      { name: 'Rodapé', unit: 'm' }
+    ]
   },
+  {
+    category: 'Pintura',
+    items: [
+      { name: 'Lixa de Parede 120/150', unit: 'folhas' },
+      { name: 'Selador Acrílico', unit: 'latas' },
+      { name: 'Massa Corrida (Interna)', unit: 'latas' },
+      { name: 'Tinta Acrílica Fosca/Acetinada', unit: 'latas' },
+      { name: 'Rolo de Lã', unit: 'un' },
+      { name: 'Pincel / Trincha', unit: 'un' },
+      { name: 'Fita Crepe', unit: 'rolos' },
+      { name: 'Lona Plástica (Proteção)', unit: 'm' }
+    ]
+  }
 ];
 
-export const STANDARD_JOB_ROLES: string[] = [
-  "Pedreiro",
-  "Ajudante",
-  "Pintor",
-  "Eletricista",
-  "Encanador",
-  "Mestre de Obras",
+// --- FALLBACK LISTS FOR CONTACTS ---
+export const STANDARD_JOB_ROLES = [
+  'Pedreiro', 'Ajudante', 'Mestre de Obras', 'Pintor', 'Eletricista', 
+  'Encanador', 'Gesseiro', 'Marceneiro', 'Serralheiro', 'Vidraceiro', 
+  'Arquiteto', 'Engenheiro', 'Outros'
 ];
 
-export const STANDARD_SUPPLIER_CATEGORIES: string[] = [
-  "Material de Construção",
-  "Elétrica",
-  "Hidráulica",
-  "Tintas",
-  "Madeireira",
-  "Vidraçaria",
+export const STANDARD_SUPPLIER_CATEGORIES = [
+  'Material Básico', 'Elétrica', 'Hidráulica', 'Pisos e Revestimentos',
+  'Tintas', 'Madeiras', 'Vidraçaria', 'Marmoraria', 'Locação de Equipamentos',
+  'Caçamba', 'Outros'
 ];
 
-// --- CONTRATOS ---
-export interface ContractTemplate {
-  id: string;
-  title: string;
-  description: string;
-  contentTemplate: string;
+// --- LIFETIME BONUSES ---
+export interface LifetimeBonus {
+    title: string;
+    desc: string;
+    icon: string;
 }
 
-export const CONTRACT_TEMPLATES: ContractTemplate[] = [
+export const LIFETIME_BONUSES: LifetimeBonus[] = [
   {
-    id: "EMPREITA",
-    title: "Contrato de Empreitada",
-    description: "Serviço com valor fechado.",
-    contentTemplate: `CONTRATO DE EMPREITADA
-
-Contratante: [Nome]
-Contratado: [Nome]
-
-Objeto: Realização de [Descrever Serviço] no endereço [Endereço].
-
-Valor: R$ [Valor]
-Pagamento: [Forma de Pagamento]
-
-Data: __/__/____
-
-Assinaturas:`,
+    title: 'Planilha Mestra de Orçamento',
+    desc: 'Excel automatizado para controle detalhado.',
+    icon: 'fa-file-excel'
   },
   {
-    id: "DIARIA",
-    title: "Acordo de Diárias",
-    description: "Pagamento por dia trabalhado.",
-    contentTemplate: `ACORDO DE DIÁRIA
-
-Profissional: [Nome]
-Valor da Diária: R$ [Valor]
-Horário: 07:00 às 17:00
-
-O pagamento será feito semanalmente.`,
+    title: 'E-book: O Guia da Obra Sem Dor',
+    desc: 'Manual completo para evitar golpes e erros.',
+    icon: 'fa-book-open'
   },
   {
-    id: "RECIBO",
-    title: "Recibo Simples",
-    description: "Comprovante de pagamento.",
-    contentTemplate: `RECIBO
-
-Recebi de [Nome] a quantia de R$ [Valor] referente a [Serviço].
-
-Data: __/__/____
-Assinatura:`,
+    title: 'Grupo VIP de Mentoria',
+    desc: 'Tire dúvidas direto com engenheiros.',
+    icon: 'fa-users'
   },
+  {
+    title: 'Checklist de Vistoria de Entrega',
+    desc: 'O que olhar antes de aceitar as chaves.',
+    icon: 'fa-list-check'
+  }
 ];
 
-// --- CHECKLISTS (ANTI-DOR DE CABEÇA) ---
-export interface ChecklistCategory {
-  category: string;
-  items: string[];
-}
+// --- CONTRACT TEMPLATES ---
+export const CONTRACT_TEMPLATES = [
+  {
+    id: 'EMPREITA',
+    title: 'Contrato de Empreitada',
+    description: 'Serviços gerais com valor fechado.',
+    contentTemplate: `CONTRATO DE PRESTAÇÃO DE SERVIÇOS POR EMPREITADA
 
-export const STANDARD_CHECKLISTS: ChecklistCategory[] = [
-  {
-    category: "Evite Poças e Vazamentos",
-    items: [
-      "Caimento do Piso: Jogue um balde de água no box e na varanda. A água corre sozinha pro ralo? Se parar no meio, NÃO aceite.",
-      "Teste de Vazamento: Tampe o ralo do box e deixe com água por 24h. Olhe o teto do vizinho de baixo ou as paredes em volta.",
-      "Rodapé do Box: A impermeabilização subiu 30cm na parede? Só no chão não adianta.",
-      "Ralos Tapados: Durante a obra, os ralos estão fechados? Cimento no cano é entupimento na certa.",
-    ],
+CONTRATANTE: [Seu Nome], CPF: [000.000.000-00].
+CONTRATADO: [Nome do Profissional], CPF: [000.000.000-00].
+
+OBJETO DO CONTRATO:
+O CONTRATADO se compromete a realizar os seguintes serviços na obra localizada em [Endereço da Obra]:
+- [Descrever detalhadamente o serviço 1]
+- [Descrever detalhadamente o serviço 2]
+
+VALOR E PAGAMENTO:
+O valor total ajustado é de R$ [0,00].
+O pagamento será realizado da seguinte forma:
+- Entrada: R$ [0,00] na data [00/00/0000].
+- Parcelas: [Descrever pagamentos semanais ou quinzenais conforme entrega].
+
+PRAZOS:
+Início dos trabalhos: [Data]
+Previsão de término: [Data]
+
+OBRIGAÇÕES:
+O CONTRATADO deve executar o serviço com qualidade, seguindo normas técnicas, mantendo a limpeza do local e evitando desperdício de materiais.
+
+Data: ____/____/______
+
+_____________________________
+Assinatura do Contratante
+
+_____________________________
+Assinatura do Contratado`
   },
   {
-    category: "Elétrica Segura",
-    items: [
-      "110v ou 220v?: Marque com fita vermelha os fios 220v dentro da caixinha antes de pintar. Evita queimar a TV na mudança.",
-      "Fio Terra: Tem o fio verde em todas as tomadas? É a segurança da sua família.",
-      "Chuveiro Quente: O fio do chuveiro é grosso (6mm ou 10mm)? Fio fino derrete e gasta mais energia.",
-    ],
+    id: 'DIARIA',
+    title: 'Acordo de Diárias',
+    description: 'Para serviços pagos por dia.',
+    contentTemplate: `ACORDO DE PRESTAÇÃO DE SERVIÇO POR DIÁRIA
+
+CONTRATANTE: [Seu Nome].
+PROFISSIONAL: [Nome do Profissional].
+
+Fica ajustado que o PROFISSIONAL prestará serviços de [Pedreiro/Ajudante/Pintor] na obra localizada em [Endereço].
+
+VALOR DA DIÁRIA:
+R$ [Valor] por dia trabalhado (das [07:00] às [17:00]).
+Incluso transporte/alimentação: [Sim/Não].
+
+PAGAMENTO:
+O pagamento será realizado [Semanalmente/Quinzenalmente], toda [Sexta-feira].
+
+OBSERVAÇÕES:
+Faltas não justificadas não serão pagas. O profissional deve zelar pelas ferramentas e materiais.
+
+Data: ____/____/______
+
+_____________________________
+Assinatura do Contratante
+
+_____________________________
+Assinatura do Profissional`
   },
   {
-    category: "Acabamentos",
-    items: [
-      "Piso Oco: Bata com o cabo de uma chave em cada piso. Se o som for oco, vai soltar em breve.",
-      "Dente no Piso: Passe uma moeda entre dois pisos. Se travar, um está mais alto que o outro.",
-      "Porta Fantasma: Abra a porta e solte. Ela fica parada? Se fechar sozinha, está torta.",
-    ],
+    id: 'RECIBO_PAGAMENTO',
+    title: 'Recibo de Pagamento',
+    description: 'Comprovante para controle financeiro.',
+    contentTemplate: `RECIBO DE PAGAMENTO
+
+VALOR: R$ [Valor Numérico]
+
+Recebi de [Seu Nome], a importância supramencionada de ([Valor por Extenso]), referente ao pagamento de:
+[ ] Diárias (Período: __/__ a __/__)
+[ ] Adiantamento de Empreita (Etapa: __________)
+[ ] Saldo Final de Serviço
+[ ] Material (Reembolso)
+
+Serviço realizado na obra: [Nome/Endereço da Obra].
+
+Para clareza e verdade, firmo o presente recibo dando plena quitação do valor recebido.
+
+[Cidade/UF], [Data].
+
+_____________________________
+Assinatura do Recebedor
+Nome: [Nome do Profissional]
+CPF: [CPF do Profissional]`
   },
+  {
+    id: 'ENTREGA_OBRA',
+    title: 'Termo de Entrega de Serviço',
+    description: 'Formaliza que o serviço foi concluído.',
+    contentTemplate: `TERMO DE ENTREGA E ACEITE DE SERVIÇO
+
+Eu, [Seu Nome], CONTRATANTE, declaro para os devidos fins que recebi os serviços contratados de [Nome do Profissional/Empresa], referentes à:
+- [Descrever o que foi entregue, ex: Pintura completa da sala]
+
+Declaro que os serviços foram inspecionados e estão de acordo com o combinado, não havendo pendências visíveis nesta data.
+
+O pagamento final referente a este serviço foi realizado nesta data, dando-se plena quitação ao contrato.
+
+Local: [Cidade/UF]
+Data: ____/____/______
+
+_____________________________
+Assinatura do Contratante
+
+_____________________________
+Assinatura do Contratado`
+  }
 ];

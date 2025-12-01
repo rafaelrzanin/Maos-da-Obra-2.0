@@ -1,3 +1,4 @@
+
 import { 
   User, Work, Step, Expense, Material, WorkPhoto, WorkFile,
   PlanType, WorkStatus, StepStatus, Notification, StandardMaterial,
@@ -27,7 +28,7 @@ interface DbSchema {
 
 const initialDb: DbSchema = {
   users: [
-    { id: '1', name: 'Usuário Demo', email: 'demo@maos.com', whatsapp: '(11) 99999-9999', plan: PlanType.VITALICIO, subscriptionExpiresAt: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString() }
+    { id: '1', name: 'Usuário Demo', email: 'demo@maos.com', whatsapp: '(11) 99999-9999', plan: PlanType.MENSAL, subscriptionExpiresAt: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString() }
   ],
   works: [],
   steps: [],
@@ -229,23 +230,9 @@ const generateConstructionPlan = (totalArea: number, floors: number): PlanItem[]
     });
     currentDay += 25;
 
-    // 8. FIAÇÃO E ENFIAMENTO (Nova Etapa Separada)
+    // 8. PINTURA E FINALIZAÇÃO
     plan.push({
-        stepName: "Fiação e Cabos (Elétrica)",
-        duration: 10,
-        startOffset: currentDay,
-        materials: [
-            { category: 'Elétrica', name: 'Cabos Flexíveis (1.5mm Iluminação)', unit: 'rolos', qty: Math.ceil(totalArea / 30) },
-            { category: 'Elétrica', name: 'Cabos Flexíveis (2.5mm Tomadas)', unit: 'rolos', qty: Math.ceil(totalArea / 25) },
-            { category: 'Elétrica', name: 'Cabos 6mm (Chuveiro)', unit: 'm', qty: Math.ceil(floors * 15) },
-            { category: 'Elétrica', name: 'Fita Isolante/Guia', unit: 'kit', qty: 1 },
-        ]
-    });
-    currentDay += 10;
-
-    // 9. PINTURA GERAL (Apenas Pintura)
-    plan.push({
-        stepName: "Pintura Geral",
+        stepName: "Pintura e Entrega",
         duration: 20,
         startOffset: currentDay,
         materials: [
@@ -253,22 +240,9 @@ const generateConstructionPlan = (totalArea: number, floors: number): PlanItem[]
             { category: 'Pintura', name: 'Selador Acrílico', unit: 'latas', qty: Math.ceil(totalArea / 60) },
             { category: 'Pintura', name: 'Tinta Acrílica Premium (18L)', unit: 'latas', qty: Math.ceil(totalArea / 40) },
             { category: 'Pintura', name: 'Lixas 150/220', unit: 'un', qty: 20 },
-            { category: 'Pintura', name: 'Rolo de Lã e Pincéis', unit: 'kit', qty: 1 },
-        ]
-    });
-    currentDay += 20;
-
-    // 10. ACABAMENTOS FINAIS (Nova Etapa: Tomadas, Metais, etc)
-    plan.push({
-        stepName: "Acabamentos Finais (Elétrica/Hidráulica)",
-        duration: 10,
-        startOffset: currentDay,
-        materials: [
             { category: 'Elétrica', name: 'Kit Tomadas e Interruptores', unit: 'un', qty: Math.ceil(totalArea / 8) },
-            { category: 'Elétrica', name: 'Luminárias / Plafons', unit: 'un', qty: Math.ceil(totalArea / 12) },
-            { category: 'Hidráulica', name: 'Louças (Vaso/Pia)', unit: 'un', qty: Math.ceil(floors * 1.5) },
-            { category: 'Hidráulica', name: 'Metais (Torneiras/Registros)', unit: 'un', qty: Math.ceil(floors * 2) },
-            { category: 'Acabamento', name: 'Limpeza Final', unit: 'vb', qty: 1 },
+            { category: 'Elétrica', name: 'Cabos Flexíveis (1.5mm/2.5mm)', unit: 'rolos', qty: Math.ceil(totalArea / 25) },
+            { category: 'Acabamento', name: 'Louças e Metais', unit: 'vb', qty: 1 },
         ]
     });
 
@@ -520,48 +494,31 @@ export const dbService = {
             }
 
             // B. Create Linked Materials
-            if (item.materials.length > 0) {
-                 // Definir payload com StepID (se existir) e forçar a Categoria Visual
-                 const matPayload = item.materials.map(m => ({
-                    work_id: newWorkId,
-                    name: m.name,
-                    planned_qty: m.qty,
-                    purchased_qty: 0,
-                    unit: m.unit,
-                    category: item.stepName, // Garante agrupamento visual mesmo sem ID
-                    step_id: stepId || null // Tenta vincular ID, mas aceita null
-                 }));
-
+            if (stepId && item.materials.length > 0) {
                  if (supabase) {
-                    // Try insert via Supabase
-                    const { error } = await supabase.from('materials').insert(matPayload);
-                    if (error) {
-                        console.error("Erro ao inserir materiais automáticos:", error);
-                        // Se falhar por causa da coluna step_id inexistente, tentamos sem ela como fallback
-                        if (error.message.includes('step_id')) {
-                             const fallbackPayload = matPayload.map(({ step_id, ...rest }) => rest);
-                             await supabase.from('materials').insert(fallbackPayload);
-                        }
-                    }
+                    const matPayload = item.materials.map(m => ({
+                        work_id: newWorkId,
+                        name: m.name,
+                        planned_qty: m.qty,
+                        purchased_qty: 0,
+                        unit: m.unit,
+                        category: m.category,
+                        step_id: stepId // LINK TO STEP
+                    }));
+                    await supabase.from('materials').insert(matPayload);
                  } else {
                     const db = getLocalDb();
-                    const localPayload = matPayload.map(m => ({
-                        ...m,
+                    const matPayload = item.materials.map(m => ({
                         id: Math.random().toString(36).substr(2, 9),
-                        stepId: stepId // CamelCase for local
-                    }));
-                    // Remove snake_case keys for local
-                    const cleanPayload = localPayload.map(({ step_id, planned_qty, purchased_qty, work_id, ...rest }) => rest);
-                    
-                    // Add missing local keys
-                    const finalLocal = cleanPayload.map((m, i) => ({
-                        ...m,
                         workId: newWorkId,
-                        plannedQty: matPayload[i].planned_qty,
-                        purchasedQty: 0
+                        name: m.name,
+                        plannedQty: m.qty,
+                        purchasedQty: 0,
+                        unit: m.unit,
+                        category: m.category,
+                        stepId: stepId
                     }));
-
-                    db.materials.push(...finalLocal as Material[]);
+                    db.materials.push(...matPayload);
                     saveLocalDb(db);
                  }
             }
