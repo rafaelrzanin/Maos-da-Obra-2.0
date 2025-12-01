@@ -27,7 +27,7 @@ interface DbSchema {
 
 const initialDb: DbSchema = {
   users: [
-    { id: '1', name: 'Usuário Demo', email: 'demo@maos.com', whatsapp: '(11) 99999-9999', plan: PlanType.MENSAL, subscriptionExpiresAt: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString() }
+    { id: '1', name: 'Usuário Demo', email: 'demo@maos.com', whatsapp: '(11) 99999-9999', plan: PlanType.VITALICIO, subscriptionExpiresAt: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString() }
   ],
   works: [],
   steps: [],
@@ -493,33 +493,48 @@ export const dbService = {
             }
 
             // B. Create Linked Materials
-            if (stepId && item.materials.length > 0) {
+            if (item.materials.length > 0) {
+                 // Definir payload com StepID (se existir) e forçar a Categoria Visual
+                 const matPayload = item.materials.map(m => ({
+                    work_id: newWorkId,
+                    name: m.name,
+                    planned_qty: m.qty,
+                    purchased_qty: 0,
+                    unit: m.unit,
+                    category: item.stepName, // Garante agrupamento visual mesmo sem ID
+                    step_id: stepId || null // Tenta vincular ID, mas aceita null
+                 }));
+
                  if (supabase) {
-                    const matPayload = item.materials.map(m => ({
-                        work_id: newWorkId,
-                        name: m.name,
-                        planned_qty: m.qty,
-                        purchased_qty: 0,
-                        unit: m.unit,
-                        // CRITICAL FIX: Use stepName as category to group materials by activity visually
-                        category: item.stepName, 
-                        step_id: stepId 
-                    }));
-                    await supabase.from('materials').insert(matPayload);
+                    // Try insert via Supabase
+                    const { error } = await supabase.from('materials').insert(matPayload);
+                    if (error) {
+                        console.error("Erro ao inserir materiais automáticos:", error);
+                        // Se falhar por causa da coluna step_id inexistente, tentamos sem ela como fallback
+                        if (error.message.includes('step_id')) {
+                             const fallbackPayload = matPayload.map(({ step_id, ...rest }) => rest);
+                             await supabase.from('materials').insert(fallbackPayload);
+                        }
+                    }
                  } else {
                     const db = getLocalDb();
-                    const matPayload = item.materials.map(m => ({
+                    const localPayload = matPayload.map(m => ({
+                        ...m,
                         id: Math.random().toString(36).substr(2, 9),
-                        workId: newWorkId,
-                        name: m.name,
-                        plannedQty: m.qty,
-                        purchasedQty: 0,
-                        unit: m.unit,
-                        // CRITICAL FIX: Use stepName as category
-                        category: item.stepName,
-                        stepId: stepId
+                        stepId: stepId // CamelCase for local
                     }));
-                    db.materials.push(...matPayload);
+                    // Remove snake_case keys for local
+                    const cleanPayload = localPayload.map(({ step_id, planned_qty, purchased_qty, work_id, ...rest }) => rest);
+                    
+                    // Add missing local keys
+                    const finalLocal = cleanPayload.map((m, i) => ({
+                        ...m,
+                        workId: newWorkId,
+                        plannedQty: matPayload[i].planned_qty,
+                        purchasedQty: 0
+                    }));
+
+                    db.materials.push(...finalLocal as Material[]);
                     saveLocalDb(db);
                  }
             }
