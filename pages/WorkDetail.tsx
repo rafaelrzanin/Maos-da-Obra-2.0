@@ -415,7 +415,7 @@ const ReportsView: React.FC<{ workId: string, onBack: () => void }> = ({ workId,
                                  const isDone = step.status === StepStatus.COMPLETED;
                                  const isLate = !isDone && step.isDelayed;
                                  return (
-                                     <div key={step.id} className="p-4 flex justify-between items-center hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors break-inside-avoid">
+                                     <div key={step.id} className="p-4 flex justify_between items-center hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors break-inside-avoid">
                                          <div className="flex items-center gap-3">
                                              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs text-white ${isDone ? 'bg-green-500' : isLate ? 'bg-red-500' : 'bg-slate-300'}`}>
                                                  <i className={`fa-solid ${isDone ? 'fa-check' : isLate ? 'fa-exclamation' : 'fa-clock'}`}></i>
@@ -638,7 +638,7 @@ const MoreMenuTab: React.FC<{ workId: string }> = ({ workId }) => {
                 )}
 
                 <div className="relative z-0">
-                    <div className="flex items-center gap-3 mb-6">
+                    <div className="flex items_center gap-3 mb-6">
                          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-white shadow-lg">
                              <i className="fa-solid fa-crown"></i>
                          </div>
@@ -730,35 +730,281 @@ const MaterialsTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ work
     const [groupedMaterials, setGroupedMaterials] = useState<Record<string, Material[]>>({});
 
     const load = async () => {
-    const [matData, stepData] = await Promise.all([
-        dbService.getMaterials(workId),
-        dbService.getSteps(workId)
-    ]);
+        const [matData, stepData] = await Promise.all([
+            dbService.getMaterials(workId),
+            dbService.getSteps(workId)
+        ]);
 
-    setSteps(stepData);
+        setSteps(stepData);
 
-    const grouped: Record<string, Material[]> = {};
-    matData.forEach(m => {
-        const cat = m.category || 'Geral';
-        if (!grouped[cat]) grouped[cat] = [];
-        grouped[cat].push(m);
+        const grouped: Record<string, Material[]> = {};
+        matData.forEach(m => {
+            const cat = m.category || 'Geral';
+            if (!grouped[cat]) grouped[cat] = [];
+            grouped[cat].push(m);
+        });
+        setGroupedMaterials(grouped);
+    };
+
+    // ✅ CARREGAR MATERIAIS AO ENTRAR NA ABA
+    useEffect(() => {
+        load();
+    }, [workId]);
+
+    const handleAdd = async (e: React.FormEvent) => {
+        e.preventDefault();
+        await dbService.addMaterial({ workId, name: newMaterial.name, plannedQty: Number(newMaterial.plannedQty), purchasedQty: 0, unit: newMaterial.unit, category: newMaterial.category });
+        setIsCreateOpen(false);
+        await load();
+        onUpdate();
+    };
+
+    const handleImport = async (category: string) => {
+        const count = await dbService.importMaterialPackage(workId, category);
+        alert(`${count} adicionados.`);
+        setIsImportOpen(false);
+        await load();
+        onUpdate();
+    };
+
+    const handleUpdate = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if(editingMaterial) {
+            await dbService.updateMaterial(editingMaterial, Number(editCost));
+            setEditingMaterial(null);
+            setEditCost('');
+            await load();
+            onUpdate();
+        }
+    };
+
+    const sortedCategories = Object.keys(groupedMaterials).sort((a, b) => {
+        const getOrder = (cat: string) => {
+            const normalize = (str: string) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+            const normCat = normalize(cat);
+            const step = steps.find(s => {
+                const normStep = normalize(s.name);
+                return normStep.includes(normCat) || normCat.includes(normStep);
+            });
+            return step ? new Date(step.startDate).getTime() : 9999999999999;
+        };
+        return getOrder(a) - getOrder(b);
     });
-    setGroupedMaterials(grouped);
-};
-
-    
-    const handleAdd = async (e: React.FormEvent) => { e.preventDefault(); await dbService.addMaterial({ workId, name: newMaterial.name, plannedQty: Number(newMaterial.plannedQty), purchasedQty: 0, unit: newMaterial.unit, category: newMaterial.category }); setIsCreateOpen(false); await load(); onUpdate(); };
-    const handleImport = async (category: string) => { const count = await dbService.importMaterialPackage(workId, category); alert(`${count} adicionados.`); setIsImportOpen(false); await load(); onUpdate(); };
-    const handleUpdate = async (e: React.FormEvent) => { e.preventDefault(); if(editingMaterial) { await dbService.updateMaterial(editingMaterial, Number(editCost)); setEditingMaterial(null); setEditCost(''); await load(); onUpdate(); } }
-    const sortedCategories = Object.keys(groupedMaterials).sort((a, b) => { const getOrder = (cat: string) => { const normalize = (str: string) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase(); const normCat = normalize(cat); const step = steps.find(s => { const normStep = normalize(s.name); return normStep.includes(normCat) || normCat.includes(normStep); }); return step ? new Date(step.startDate).getTime() : 9999999999999; }; return getOrder(a) - getOrder(b); });
 
     return (
         <div className="animate-in fade-in duration-500 pb-20">
-            <div className="flex items-center justify-between mb-8"><SectionHeader title="Materiais" subtitle="Controle de estoque." /><div className="flex gap-2"><button onClick={() => setIsImportOpen(true)} className="bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-secondary w-12 h-12 rounded-2xl flex items-center justify-center transition-all"><i className="fa-solid fa-cloud-arrow-down text-lg"></i></button><button onClick={() => setIsCreateOpen(true)} className="bg-primary text-white w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg transition-all"><i className="fa-solid fa-plus text-lg"></i></button></div></div>
-            {sortedCategories.map(cat => (<div key={cat} className="mb-8 last:mb-0"><h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2"><i className="fa-solid fa-layer-group text-secondary"></i> {cat}</h3><div className="space-y-3">{groupedMaterials[cat].map(m => (<div key={m.id} onClick={() => setEditingMaterial(m)} className={`p-4 rounded-2xl border bg-white dark:bg-slate-900 cursor-pointer transition-all hover:border-secondary/50 hover:shadow-md ${m.purchasedQty >= m.plannedQty ? 'border-green-200 dark:border-green-900/30 opacity-60' : 'border-slate-100 dark:border-slate-800'}`}><div className="flex justify-between items-start mb-2"><h4 className="font-bold text-primary dark:text-white">{m.name}</h4><div className={`text-[10px] font-bold px-2 py-0.5 rounded-md uppercase ${m.purchasedQty >= m.plannedQty ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}`}>{m.purchasedQty >= m.plannedQty ? 'Comprado' : 'Pendente'}</div></div><div className="flex items-end gap-2"><div className="flex-1"><div className="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden"><div className={`h-full rounded-full ${m.purchasedQty >= m.plannedQty ? 'bg-success' : 'bg-secondary'}`} style={{width: `${Math.min(100, (m.purchasedQty / m.plannedQty) * 100)}%`}}></div></div></div><div className="text-xs font-bold text-slate-500 whitespace-nowrap">{m.purchasedQty} / {m.plannedQty} {m.unit}</div></div></div>))}</div></div>))}
-            {isCreateOpen && (<div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in"><div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-8 shadow-2xl"><h3 className="text-xl font-bold text-primary dark:text-white mb-6">Novo Material</h3><form onSubmit={handleAdd} className="space-y-4"><input placeholder="Nome" className="w-full px-4 py-3 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 outline-none" value={newMaterial.name} onChange={e => setNewMaterial({...newMaterial, name: e.target.value})} /><div className="grid grid-cols-2 gap-3"><input type="number" placeholder="Qtd" className="w-full px-4 py-3 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 outline-none" value={newMaterial.plannedQty} onChange={e => setNewMaterial({...newMaterial, plannedQty: e.target.value})} /><input placeholder="Un" className="w-full px-4 py-3 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 outline-none" value={newMaterial.unit} onChange={e => setNewMaterial({...newMaterial, unit: e.target.value})} /></div><input placeholder="Categoria" className="w-full px-4 py-3 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 outline-none" value={newMaterial.category} onChange={e => setNewMaterial({...newMaterial, category: e.target.value})} /><div className="flex gap-3 pt-2"><button type="button" onClick={() => setIsCreateOpen(false)} className="flex-1 py-3 font-bold text-slate-500">Cancelar</button><button type="submit" className="flex-1 py-3 bg-primary text-white rounded-xl font-bold">Salvar</button></div></form></div></div>)}
-            {editingMaterial && (<div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in"><div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-8 shadow-2xl"><h3 className="text-xl font-bold text-primary dark:text-white mb-6">Atualizar</h3><form onSubmit={handleUpdate} className="space-y-4"><div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl mb-2"><p className="text-sm font-bold text-primary dark:text-white">{editingMaterial.name}</p></div><div className="grid grid-cols-2 gap-3"><div><label className="text-[10px] uppercase font-bold text-slate-400">Planejado</label><input type="number" className="w-full px-3 py-2 rounded-xl border bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700" value={editingMaterial.plannedQty} onChange={e => setEditingMaterial({...editingMaterial, plannedQty: Number(e.target.value)})} /></div><div><label className="text-[10px] uppercase font-bold text-slate-400">Comprado</label><input type="number" className="w-full px-3 py-2 rounded-xl border bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700" value={editingMaterial.purchasedQty} onChange={e => setEditingMaterial({...editingMaterial, purchasedQty: Number(e.target.value)})} /></div></div><div><label className="text-[10px] uppercase font-bold text-slate-400">Valor Pago (Opcional)</label><input type="number" className="w-full pl-4 py-2 rounded-xl border bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700" placeholder="0.00" value={editCost} onChange={e => setEditCost(e.target.value)} /></div><div className="flex gap-3 pt-4"><button type="button" onClick={() => { setEditingMaterial(null); setEditCost(''); }} className="flex-1 py-3 font-bold text-slate-500">Cancelar</button><button type="submit" className="flex-1 py-3 bg-primary text-white rounded-xl font-bold">Salvar</button></div><button type="button" onClick={async () => { await dbService.deleteMaterial(editingMaterial.id); setEditingMaterial(null); await load(); onUpdate(); }} className="w-full py-2 text-red-500 text-xs font-bold uppercase tracking-wider">Excluir</button></form></div></div>)}
-            {isImportOpen && (<div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in"><div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-6 shadow-2xl h-[500px] flex flex-col"><div className="flex justify-between items-center mb-4"><h3 className="text-lg font-bold text-primary dark:text-white">Pacotes</h3><button onClick={() => setIsImportOpen(false)}><i className="fa-solid fa-xmark text-slate-400"></i></button></div><div className="flex-1 overflow-y-auto space-y-2 pr-2">{FULL_MATERIAL_PACKAGES.map(pkg => (<button key={pkg.category} onClick={() => handleImport(pkg.category)} className="w-full p-4 rounded-xl border border-slate-100 dark:border-slate-800 hover:border-secondary hover:bg-slate-50 dark:hover:bg-slate-800 transition-all text-left group"><h4 className="font-bold text-primary dark:text-white group-hover:text-secondary">{pkg.category}</h4><p className="text-xs text-slate-400">{pkg.items.length} itens</p></button>))}</div></div></div>)}
+            <div className="flex items-center justify-between mb-8">
+                <SectionHeader title="Materiais" subtitle="Controle de estoque." />
+                <div className="flex gap-2">
+                    <button onClick={() => setIsImportOpen(true)} className="bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-secondary w-12 h-12 rounded-2xl flex items-center justify-center transition-all">
+                        <i className="fa-solid fa-cloud-arrow-down text-lg"></i>
+                    </button>
+                    <button onClick={() => setIsCreateOpen(true)} className="bg-primary text-white w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg transition-all">
+                        <i className="fa-solid fa-plus text-lg"></i>
+                    </button>
+                </div>
+            </div>
+
+            {sortedCategories.map(cat => (
+                <div key={cat} className="mb-8 last:mb-0">
+                    <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                        <i className="fa-solid fa-layer-group text-secondary"></i> {cat}
+                    </h3>
+                    <div className="space-y-3">
+                        {groupedMaterials[cat].map(m => (
+                            <div
+                                key={m.id}
+                                onClick={() => setEditingMaterial(m)}
+                                className={`p-4 rounded-2xl border bg-white dark:bg-slate-900 cursor-pointer transition-all hover:border-secondary/50 hover:shadow-md ${
+                                    m.purchasedQty >= m.plannedQty
+                                        ? 'border-green-200 dark:border-green-900/30 opacity-60'
+                                        : 'border-slate-100 dark:border-slate-800'
+                                }`}
+                            >
+                                <div className="flex justify-between items-start mb-2">
+                                    <h4 className="font-bold text-primary dark:text-white">{m.name}</h4>
+                                    <div
+                                        className={`text-[10px] font-bold px-2 py-0.5 rounded-md uppercase ${
+                                            m.purchasedQty >= m.plannedQty ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'
+                                        }`}
+                                    >
+                                        {m.purchasedQty >= m.plannedQty ? 'Comprado' : 'Pendente'}
+                                    </div>
+                                </div>
+                                <div className="flex items-end gap-2">
+                                    <div className="flex-1">
+                                        <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                                            <div
+                                                className={`h-full rounded-full ${
+                                                    m.purchasedQty >= m.plannedQty ? 'bg-success' : 'bg-secondary'
+                                                }`}
+                                                style={{ width: `${Math.min(100, (m.purchasedQty / m.plannedQty) * 100)}%` }}
+                                            ></div>
+                                        </div>
+                                    </div>
+                                    <div className="text-xs font-bold text-slate-500 whitespace-nowrap">
+                                        {m.purchasedQty} / {m.plannedQty} {m.unit}
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            ))}
+
+            {isCreateOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-8 shadow-2xl">
+                        <h3 className="text-xl font-bold text-primary dark:text-white mb-6">Novo Material</h3>
+                        <form onSubmit={handleAdd} className="space-y-4">
+                            <input
+                                placeholder="Nome"
+                                className="w-full px-4 py-3 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 outline-none"
+                                value={newMaterial.name}
+                                onChange={e => setNewMaterial({ ...newMaterial, name: e.target.value })}
+                            />
+                            <div className="grid grid-cols-2 gap-3">
+                                <input
+                                    type="number"
+                                    placeholder="Qtd"
+                                    className="w-full px-4 py-3 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 outline-none"
+                                    value={newMaterial.plannedQty}
+                                    onChange={e => setNewMaterial({ ...newMaterial, plannedQty: e.target.value })}
+                                />
+                                <input
+                                    placeholder="Un"
+                                    className="w-full px-4 py-3 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 outline-none"
+                                    value={newMaterial.unit}
+                                    onChange={e => setNewMaterial({ ...newMaterial, unit: e.target.value })}
+                                />
+                            </div>
+                            <input
+                                placeholder="Categoria"
+                                className="w-full px-4 py-3 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 outline-none"
+                                value={newMaterial.category}
+                                onChange={e => setNewMaterial({ ...newMaterial, category: e.target.value })}
+                            />
+                            <div className="flex gap-3 pt-2">
+                                <button
+                                    type="button"
+                                    onClick={() => setIsCreateOpen(false)}
+                                    className="flex-1 py-3 font-bold text-slate-500"
+                                >
+                                    Cancelar
+                                </button>
+                                <button type="submit" className="flex-1 py-3 bg-primary text-white rounded-xl font-bold">
+                                    Salvar
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {editingMaterial && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-8 shadow-2xl">
+                        <h3 className="text-xl font-bold text-primary dark:text-white mb-6">Atualizar</h3>
+                        <form onSubmit={handleUpdate} className="space-y-4">
+                            <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl mb-2">
+                                <p className="text-sm font-bold text-primary dark:text-white">{editingMaterial.name}</p>
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-[10px] uppercase font-bold text-slate-400">Planejado</label>
+                                    <input
+                                        type="number"
+                                        className="w-full px-3 py-2 rounded-xl border bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700"
+                                        value={editingMaterial.plannedQty}
+                                        onChange={e =>
+                                            setEditingMaterial({
+                                                ...editingMaterial,
+                                                plannedQty: Number(e.target.value),
+                                            })
+                                        }
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] uppercase font-bold text-slate-400">Comprado</label>
+                                    <input
+                                        type="number"
+                                        className="w-full px-3 py-2 rounded-xl border bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700"
+                                        value={editingMaterial.purchasedQty}
+                                        onChange={e =>
+                                            setEditingMaterial({
+                                                ...editingMaterial,
+                                                purchasedQty: Number(e.target.value),
+                                            })
+                                        }
+                                    />
+                                </div>
+                            </div>
+                            <div>
+                                <label className="text-[10px] uppercase font-bold text-slate-400">Valor Pago (Opcional)</label>
+                                <input
+                                    type="number"
+                                    className="w-full pl-4 py-2 rounded-xl border bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700"
+                                    placeholder="0.00"
+                                    value={editCost}
+                                    onChange={e => setEditCost(e.target.value)}
+                                />
+                            </div>
+                            <div className="flex gap-3 pt-4">
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setEditingMaterial(null);
+                                        setEditCost('');
+                                    }}
+                                    className="flex-1 py-3 font-bold text-slate-500"
+                                >
+                                    Cancelar
+                                </button>
+                                <button type="submit" className="flex-1 py-3 bg-primary text-white rounded-xl font-bold">
+                                    Salvar
+                                </button>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={async () => {
+                                    await dbService.deleteMaterial(editingMaterial.id);
+                                    setEditingMaterial(null);
+                                    await load();
+                                    onUpdate();
+                                }}
+                                className="w-full py-2 text-red-500 text-xs font-bold uppercase tracking-wider"
+                            >
+                                Excluir
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {isImportOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-6 shadow-2xl h-[500px] flex flex-col">
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="text-lg font-bold text-primary dark:text-white">Pacotes</h3>
+                            <button onClick={() => setIsImportOpen(false)}>
+                                <i className="fa-solid fa-xmark text-slate-400"></i>
+                            </button>
+                        </div>
+                        <div className="flex-1 overflow-y-auto space-y-2 pr-2">
+                            {FULL_MATERIAL_PACKAGES.map(pkg => (
+                                <button
+                                    key={pkg.category}
+                                    onClick={() => handleImport(pkg.category)}
+                                    className="w-full p-4 rounded-xl border border-slate-100 dark:border-slate-800 hover:border-secondary hover:bg-slate-50 dark:hover:bg-slate-800 transition-all text-left group"
+                                >
+                                    <h4 className="font-bold text-primary dark:text-white group-hover:text-secondary">{pkg.category}</h4>
+                                    <p className="text-xs text-slate-400">{pkg.items.length} itens</p>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
