@@ -146,8 +146,8 @@ const FilesView: React.FC<{ workId: string, onBack: () => void }> = ({ workId, o
 // 4. REPORTS VIEW
 const ReportsView: React.FC<{ workId: string, onBack: () => void }> = ({ workId, onBack }) => {
     const [activeTab, setActiveTab] = useState<'FINANCIAL' | 'MATERIALS' | 'STEPS'>('FINANCIAL');
-    const [expenses, setExpenses] = useState<Expense[]>([]);
-    const [materials, setMaterials] = useState<Material[]>([]);
+    const [, setMaterials] = useState<Material[]>([]);
+    const [, setExpenses] = useState<Expense[]>([]);
     const [steps, setSteps] = useState<Step[]>([]);
     const [work, setWork] = useState<Work | undefined>();
     useEffect(() => {
