@@ -586,16 +586,31 @@ export const dbService = {
 
       // 2. If Cost provided, Add to Expenses automatically linked to the material/step
       if (cost && cost > 0) {
+          // SMART LINKING: Resolve Step ID
+          let finalStepId = material.stepId;
+
+          // If material is not explicitly linked to a step ID, try to find a step by Category Name
+          if (!finalStepId && material.category) {
+               // We need to fetch steps to find the ID
+               const steps = await dbService.getSteps(material.workId);
+               // loose matching
+               const match = steps.find(s => 
+                   s.name.toLowerCase().trim() === material.category?.toLowerCase().trim() ||
+                   s.name.toLowerCase().includes(material.category?.toLowerCase().trim())
+               );
+               if (match) finalStepId = match.id;
+          }
+
           const description = `Compra: ${material.name}`;
           await dbService.addExpense({
               workId: material.workId,
               description: description,
               amount: cost,
-              paidAmount: cost, // Assuming full payment for simplicity
+              paidAmount: cost, // Assuming full payment for simplicity in this quick action
               quantity: 1,
               category: ExpenseCategory.MATERIAL,
               date: new Date().toISOString().split('T')[0],
-              stepId: material.stepId // LINKED TO STEP (Etapa)
+              stepId: finalStepId // Pass the resolved ID (or undefined -> Geral)
           });
       }
   },
