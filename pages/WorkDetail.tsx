@@ -750,7 +750,6 @@ const MaterialsTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ work
 
 // --- Expenses Tab ---
 const ExpensesTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ workId, onUpdate }) => {
-    const [expenses, setExpenses] = useState<Expense[]>([]);
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [groupedExpenses, setGroupedExpenses] = useState<Record<string, {total: number, items: Expense[]}>>({});
     const [steps, setSteps] = useState<Step[]>([]);
