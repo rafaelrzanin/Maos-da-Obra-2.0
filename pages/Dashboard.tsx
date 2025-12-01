@@ -191,6 +191,26 @@ const Dashboard: React.FC = () => {
            </div>
       </div>
 
+      {/* Access Button (Floating CTA) - MOVED HERE */}
+      <button 
+        onClick={() => navigate(`/work/${focusWork.id}`)}
+        className="group w-full mb-8 relative overflow-hidden rounded-2xl bg-primary dark:bg-white text-white dark:text-primary shadow-2xl hover:shadow-glow transition-all active:scale-[0.98]"
+      >
+        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
+        <div className="flex items-center justify-between p-6">
+            <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-full bg-white/20 dark:bg-primary/10 flex items-center justify-center">
+                    <i className="fa-solid fa-arrow-right-to-bracket text-xl"></i>
+                </div>
+                <div className="text-left">
+                    <h3 className="text-lg font-bold">Acessar Minha Obra</h3>
+                    <p className="text-xs opacity-70 font-medium">Gerenciar etapas, compras e gastos</p>
+                </div>
+            </div>
+            <i className="fa-solid fa-chevron-right text-xl opacity-50 group-hover:translate-x-1 transition-transform"></i>
+        </div>
+      </button>
+
       {/* MAIN HUD (Heads Up Display) */}
       <div className="glass-panel rounded-3xl p-1 shadow-2xl mb-8 relative z-0">
           <div className="bg-white/50 dark:bg-black/40 rounded-[1.4rem] p-6 lg:p-8 backdrop-blur-xl">
@@ -285,26 +305,6 @@ const Dashboard: React.FC = () => {
               </div>
           </div>
       </div>
-
-      {/* Access Button (Floating CTA) */}
-      <button 
-        onClick={() => navigate(`/work/${focusWork.id}`)}
-        className="group w-full mb-10 relative overflow-hidden rounded-2xl bg-primary dark:bg-white text-white dark:text-primary shadow-2xl hover:shadow-glow transition-all active:scale-[0.98]"
-      >
-        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
-        <div className="flex items-center justify-between p-6">
-            <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-full bg-white/20 dark:bg-primary/10 flex items-center justify-center">
-                    <i className="fa-solid fa-arrow-right-to-bracket text-xl"></i>
-                </div>
-                <div className="text-left">
-                    <h3 className="text-lg font-bold">Acessar Minha Obra</h3>
-                    <p className="text-xs opacity-70 font-medium">Gerenciar etapas, compras e gastos</p>
-                </div>
-            </div>
-            <i className="fa-solid fa-chevron-right text-xl opacity-50 group-hover:translate-x-1 transition-transform"></i>
-        </div>
-      </button>
 
       {/* Notifications Section */}
       <div>
