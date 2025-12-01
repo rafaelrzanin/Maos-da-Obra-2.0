@@ -157,7 +157,7 @@ export interface MaterialCatalog {
   items: {name: string, unit: string}[];
 }
 
-// FULL BACKUP CATALOG (Used when Supabase table is not reachable or as fallback)
+// FULL BACKUP CATALOG
 export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
   {
     category: 'Fundação',
@@ -408,48 +408,48 @@ Assinatura do Contratado`
 // --- STANDARD CHECKLISTS (ANTI-DOR DE CABEÇA) ---
 export const STANDARD_CHECKLISTS = [
   {
-    category: 'Impermeabilização (Critico)',
+    category: 'Impermeabilização e Áreas Molhadas',
     items: [
-      'Teste de Estanqueidade: Fechar os ralos e deixar o piso do banheiro com 2cm de água por 72 horas. Se vazar embaixo, refazer antes de por piso.',
-      'Rodapé da Impermeabilização: Verificar se a manta/impermeabilizante sobe pelo menos 30cm na parede do box.',
-      'Caimento do Box: Jogar água e ver se ela corre sozinha para o ralo sem empoçar nos cantos.',
-      'Ralos: Verificar se estão protegidos para não cair entulho dentro do cano.'
-    ]
-  },
-  {
-    category: 'Elétrica & Segurança',
-    items: [
-      'Tomadas 110v vs 220v: Identificar claramente (com fita ou etiqueta) quais fios são 220v antes de fechar as caixinhas.',
-      'Fio Terra: Confirmar se o fio terra (verde) foi passado em TODAS as tomadas e chuveiros.',
-      'Disjuntor Correto: Verificar se o disjuntor do chuveiro é compatível com a potência (ex: chuveiro 7500w pede disjuntor de 40A e fio 6mm ou 10mm).',
-      'Posição das Tomadas: Conferir com o projeto de móveis. (Ex: a tomada da TV vai ficar atrás do painel? A da cabeceira vai ficar atrás da cama?)'
+      'Teste de Caimento (Poça d\'água): Jogue um balde d\'água no box e sacadas. A água deve ir sozinha para o ralo. Se empoçar, NÃO aceite o piso.',
+      'Teste de Estanqueidade: Tampe os ralos e deixe o banheiro com 2cm de água por 48h. Verifique o teto do andar de baixo ou umidade nas paredes vizinhas.',
+      'Rodapé da Impermeabilização: O produto deve subir pelo menos 30cm nas paredes do box, não só no chão.',
+      'Ralos Protegidos: Verifique se os ralos estão tapados durante a obra para não entrar cimento e entupir o cano.'
     ]
   },
   {
     category: 'Pisos e Revestimentos',
     items: [
-      'Teste do "Oco": Bater levemente com o cabo de uma vassoura ou chave em cada peça assentada. Som oco = peça solta que vai quebrar.',
-      'Nivelamento (Dente): Passar uma moeda entre dois pisos. Se ela travar, um piso está mais alto que o outro.',
-      'Recortes Escondidos: Verificar se os pedaços pequenos de piso (recortes) ficaram nos cantos menos visíveis (atrás da porta, embaixo do armário).',
-      'Proteção: Cobrir o piso pronto com papelão ou lona para não riscar na pintura.'
+      'Teste do Som Oco: Bata levemente com o cabo de uma chave em cada peça de piso. Som oco = peça solta que vai quebrar em breve.',
+      'Dente no Piso (Nivelamento): Passe uma moeda de 1 real entre dois pisos. Se ela travar no degrau, o nivelamento está ruim.',
+      'Recortes nos Cantos: Verifique se os pedaços pequenos de piso (recortes) ficaram escondidos (atrás da porta, embaixo de armários) e não na entrada.',
+      'Proteção Pós-Instalação: O piso novo deve ser coberto com papelão ondulado ou lona para não riscar na pintura.'
     ]
   },
   {
-    category: 'Hidráulica & Esgoto',
+    category: 'Instalações Elétricas',
     items: [
-      'Teste de Pressão: Abrir todas as torneiras e chuveiros ao mesmo tempo para ver se a água cai muito.',
-      'Mau Cheiro: Verificar se foi instalado "Sifão" ou "Caixa Sifonada" em todos os ralos e pias. Sem isso, o cheiro de esgoto volta.',
-      'Vazamento Oculto: Fechar todas as torneiras e olhar o relógio de água. Se o "pião" continuar girando, tem vazamento.',
-      'Registro Geral: Testar se o registro geral realmente corta a água da casa toda.'
+      'Identificação 110v/220v: As tomadas 220v estão marcadas (fita vermelha/etiqueta) dentro da caixinha? Isso evita queimar aparelhos na mudança.',
+      'Fio Terra: Abra uma tomada aleatória. O fio verde (terra) está lá e conectado? É essencial para segurança.',
+      'Aperto no Quadro: Peça para o eletricista reapertar todos os parafusos do quadro de luz no final. Fio solto causa incêndio.',
+      'Teste de Carga: Ligue o chuveiro e o secador juntos. O disjuntor não pode cair.'
     ]
   },
   {
-    category: 'Portas e Janelas',
+    category: 'Hidráulica e Esgoto',
     items: [
-      'Teste da Folha: Abrir a porta e soltar. Ela deve ficar parada. Se fechar ou abrir sozinha, está fora de prumo.',
-      'Fechaduras: Testar todas as chaves (trancar e destrancar) por dentro e por fora.',
-      'Vedações: Jogar água (mangueira) na janela fechada para garantir que não entra água pela lateral.',
-      'Arranhões: Conferir vidros contra a luz para ver se não foram riscados na limpeza.'
+      'Teste de Pressão: Abra todas as torneiras e chuveiros ao mesmo tempo. A água sai com força suficiente?',
+      'Mau Cheiro (Sifão): Verifique se embaixo de cada pia tem um sifão (aquele tubo curvo) com água parada na curva. Sem isso, o cheiro de esgoto volta.',
+      'Vazamento Relógio: Feche todas as torneiras e olhe o hidrômetro. Se o ponteiro/roleta girar, tem vazamento escondido.',
+      'Registro Geral: Feche o registro geral e veja se a água da casa realmente corta.'
+    ]
+  },
+  {
+    category: 'Portas, Janelas e Vidros',
+    items: [
+      'Teste da "Porta Fantasma": Abra a porta e solte. Ela deve ficar parada. Se abrir ou fechar sozinha, está fora de prumo.',
+      'Vedação de Janela: Jogue água com mangueira na janela fechada (de fora para dentro). Não pode entrar nenhuma gota.',
+      'Riscos nos Vidros: Olhe os vidros contra a luz do sol para ver se a limpeza da obra não riscou o material.',
+      'Chaves: Teste todas as chaves, trancando e destrancando por dentro e por fora.'
     ]
   }
 ];
