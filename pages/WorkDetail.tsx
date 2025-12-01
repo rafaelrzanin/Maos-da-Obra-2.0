@@ -1,11 +1,10 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { dbService } from '../services/db';
-import { Work, Step, Expense, Material, StepStatus, ExpenseCategory, PlanType, Supplier, Worker, WorkPhoto, WorkFile } from '../types';
+import { Work, Step, Expense, Material, StepStatus, ExpenseCategory, PlanType, WorkPhoto, WorkFile } from '../types';
 import { Recharts } from '../components/RechartsWrapper';
 import { ZeModal } from '../components/ZeModal';
-import { CALCULATORS, CONTRACT_TEMPLATES, STANDARD_CHECKLISTS, FULL_MATERIAL_PACKAGES, ZE_AVATAR } from '../services/standards';
+import { FULL_MATERIAL_PACKAGES, ZE_AVATAR } from '../services/standards';
 import { useAuth } from '../App';
 import { aiService } from '../services/ai';
 
@@ -22,7 +21,7 @@ const SectionHeader: React.FC<{ title: string, subtitle: string }> = ({ title, s
 // --- SUB-VIEWS FOR "MORE" TAB ---
 
 // 1. CONTACTS VIEW (TEAM OR SUPPLIERS SEPARATED)
-const ContactsView: React.FC<{ workId: string, mode: 'TEAM' | 'SUPPLIERS', onBack: () => void }> = ({ workId, mode, onBack }) => {
+const ContactsView: React.FC<{ workId: string, mode: 'TEAM' | 'SUPPLIERS', onBack: () => void }> = ({ mode, onBack }) => {
     const { user } = useAuth();
     const [items, setItems] = useState<any[]>([]);
     const [isAddOpen, setIsAddOpen] = useState(false);
@@ -789,10 +788,15 @@ const MaterialsTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ work
     const sortedCategories = Object.keys(groupedMaterials).sort((a, b) => {
         const getOrder = (cat: string) => {
             // Find a step that matches the category name (e.g., "Alvenaria" matches "Alvenaria Térreo")
-            const step = steps.find(s => 
-                s.name.toLowerCase().includes(cat.toLowerCase()) || 
-                cat.toLowerCase().includes(s.name.toLowerCase())
-            );
+            // Use rigorous normalization for better matching
+            const normalize = (str: string) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+            const normCat = normalize(cat);
+            
+            const step = steps.find(s => {
+                const normStep = normalize(s.name);
+                return normStep.includes(normCat) || normCat.includes(normStep);
+            });
+            
             return step ? new Date(step.startDate).getTime() : 9999999999999;
         };
         return getOrder(a) - getOrder(b);
