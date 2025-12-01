@@ -718,6 +718,8 @@ const ExpensesTab: React.FC<{ workId: string; onUpdate: () => void }> = ({
 
 // --- Main WorkDetail Component ---
 const WorkDetail: React.FC = () => {
+  const expenses: Expense[] = [];
+  const materials: Material[] = [];
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [work, setWork] = useState<Work | null>(null);
