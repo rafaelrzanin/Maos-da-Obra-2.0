@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { dbService } from '../services/db';
 import { Work, Step, Expense, Material, StepStatus, ExpenseCategory, PlanType, Supplier, Worker, WorkPhoto, WorkFile } from '../types';
 import { Recharts } from '../components/RechartsWrapper';
-import { FULL_MATERIAL_PACKAGES, ZE_AVATAR } from '../services/standards';
+import { CALCULATORS, CONTRACT_TEMPLATES, STANDARD_CHECKLISTS, FULL_MATERIAL_PACKAGES, ZE_AVATAR } from '../services/standards';
 import { useAuth } from '../App';
 import { aiService } from '../services/ai';
 
@@ -82,66 +82,75 @@ const ZeModal: React.FC<ZeModalProps> = ({ isOpen, title, message, confirmText =
 
 // --- SUB-VIEWS FOR "MORE" TAB ---
 
-// 1. CONTACTS VIEW (TEAM & SUPPLIERS)
-const ContactsView: React.FC<{ workId: string, onBack: () => void }> = ({ onBack }) => {
+// 1. CONTACTS VIEW (TEAM OR SUPPLIERS SEPARATED)
+const ContactsView: React.FC<{ workId: string, mode: 'TEAM' | 'SUPPLIERS', onBack: () => void }> = ({ workId, mode, onBack }) => {
     const { user } = useAuth();
-    const [tab, setTab] = useState<'TEAM' | 'SUPPLIERS'>('TEAM');
-    const [workers, setWorkers] = useState<Worker[]>([]);
-    const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+    const [items, setItems] = useState<any[]>([]);
     const [isAddOpen, setIsAddOpen] = useState(false);
+    
     // Form States
     const [newName, setNewName] = useState('');
     const [newRole, setNewRole] = useState('');
     const [newPhone, setNewPhone] = useState('');
 
-    const loadContacts = async () => {
+    const [zeModal, setZeModal] = useState<{isOpen: boolean, title: string, message: string, onConfirm: () => void}>({isOpen: false, title: '', message: '', onConfirm: () => {}});
+
+    const loadData = async () => {
         if(user) {
-            const w = await dbService.getWorkers(user.id);
-            setWorkers(w);
-            const s = await dbService.getSuppliers(user.id);
-            setSuppliers(s);
+            if (mode === 'TEAM') {
+                const w = await dbService.getWorkers(user.id);
+                setItems(w);
+            } else {
+                const s = await dbService.getSuppliers(user.id);
+                setItems(s);
+            }
         }
     };
-    useEffect(() => { loadContacts(); }, [user]);
+    
+    useEffect(() => { loadData(); }, [user, mode]);
 
     const handleAdd = async (e: React.FormEvent) => {
         e.preventDefault();
         if(user) {
-            if (tab === 'TEAM') {
+            if (mode === 'TEAM') {
                 await dbService.addWorker({ userId: user.id, name: newName, role: newRole, phone: newPhone });
             } else {
                 await dbService.addSupplier({ userId: user.id, name: newName, category: newRole, phone: newPhone });
             }
             setIsAddOpen(false);
             setNewName(''); setNewRole(''); setNewPhone('');
-            loadContacts();
+            loadData();
         }
     };
 
-    const handleDelete = async (id: string) => {
-        if (confirm("Remover este contato?")) {
-            if (tab === 'TEAM') await dbService.deleteWorker(id);
-            else await dbService.deleteSupplier(id);
-            loadContacts();
-        }
+    const handleDeleteClick = (id: string) => {
+        setZeModal({
+            isOpen: true,
+            title: mode === 'TEAM' ? "Remover Membro" : "Remover Fornecedor",
+            message: `Tem certeza que quer apagar este contato da sua lista de ${mode === 'TEAM' ? 'Equipe' : 'Fornecedores'}?`,
+            onConfirm: async () => {
+                if (mode === 'TEAM') await dbService.deleteWorker(id);
+                else await dbService.deleteSupplier(id);
+                setZeModal(prev => ({...prev, isOpen: false}));
+                loadData();
+            }
+        });
     }
 
     return (
         <div className="animate-in fade-in slide-in-from-right-4">
             <button onClick={onBack} className="mb-4 text-sm font-bold text-slate-400 hover:text-primary"><i className="fa-solid fa-arrow-left"></i> Voltar</button>
-            <SectionHeader title="Meus Contatos" subtitle="Equipe e Fornecedores." />
+            <SectionHeader 
+                title={mode === 'TEAM' ? "Minha Equipe" : "Fornecedores"} 
+                subtitle={mode === 'TEAM' ? "Profissionais cadastrados." : "Lojas e prestadores."} 
+            />
             
-            <div className="flex gap-2 mb-6 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl">
-                <button onClick={() => setTab('TEAM')} className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${tab === 'TEAM' ? 'bg-white dark:bg-slate-700 shadow-sm text-primary dark:text-white' : 'text-slate-500'}`}>Equipe</button>
-                <button onClick={() => setTab('SUPPLIERS')} className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${tab === 'SUPPLIERS' ? 'bg-white dark:bg-slate-700 shadow-sm text-primary dark:text-white' : 'text-slate-500'}`}>Fornecedores</button>
-            </div>
-
             <div className="space-y-3">
-                {(tab === 'TEAM' ? workers : suppliers).map(item => (
+                {items.map(item => (
                     <div key={item.id} className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-100 dark:border-slate-800 flex justify-between items-center">
                         <div className="flex items-center gap-3">
-                            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white ${tab === 'TEAM' ? 'bg-blue-500' : 'bg-indigo-500'}`}>
-                                <i className={`fa-solid ${tab === 'TEAM' ? 'fa-helmet-safety' : 'fa-truck'}`}></i>
+                            <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white ${mode === 'TEAM' ? 'bg-blue-500' : 'bg-indigo-500'}`}>
+                                <i className={`fa-solid ${mode === 'TEAM' ? 'fa-helmet-safety' : 'fa-truck'}`}></i>
                             </div>
                             <div>
                                 <h4 className="font-bold text-primary dark:text-white">{item.name}</h4>
@@ -150,31 +159,41 @@ const ContactsView: React.FC<{ workId: string, onBack: () => void }> = ({ onBack
                         </div>
                         <div className="flex gap-2">
                              <a href={`https://wa.me/55${item.phone.replace(/\D/g,'')}`} target="_blank" className="w-8 h-8 rounded-full bg-green-100 text-green-600 flex items-center justify-center hover:bg-green-200"><i className="fa-brands fa-whatsapp"></i></a>
-                             <button onClick={() => handleDelete(item.id)} className="w-8 h-8 rounded-full bg-red-50 text-red-500 flex items-center justify-center hover:bg-red-100"><i className="fa-solid fa-trash text-xs"></i></button>
+                             <button onClick={() => handleDeleteClick(item.id)} className="w-8 h-8 rounded-full bg-red-50 text-red-500 flex items-center justify-center hover:bg-red-100"><i className="fa-solid fa-trash text-xs"></i></button>
                         </div>
                     </div>
                 ))}
-                {(tab === 'TEAM' ? workers : suppliers).length === 0 && <p className="text-center text-slate-400 py-4 text-sm">Nenhum contato cadastrado.</p>}
+                {items.length === 0 && <p className="text-center text-slate-400 py-4 text-sm">Nenhum cadastro encontrado.</p>}
             </div>
 
-            <button onClick={() => setIsAddOpen(true)} className="mt-6 w-full py-3 bg-primary text-white rounded-xl font-bold shadow-lg">Adicionar Novo</button>
+            <button onClick={() => setIsAddOpen(true)} className="mt-6 w-full py-3 bg-primary text-white rounded-xl font-bold shadow-lg">
+                <i className="fa-solid fa-plus mr-2"></i>
+                Adicionar {mode === 'TEAM' ? 'Membro' : 'Fornecedor'}
+            </button>
 
             {isAddOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-                    <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-sm p-6">
-                        <h3 className="text-lg font-bold mb-4 dark:text-white">Novo {tab === 'TEAM' ? 'Membro' : 'Fornecedor'}</h3>
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+                    <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-sm p-6 shadow-2xl">
+                        <h3 className="text-lg font-bold mb-4 dark:text-white">Novo {mode === 'TEAM' ? 'Membro' : 'Fornecedor'}</h3>
                         <form onSubmit={handleAdd} className="space-y-3">
-                            <input placeholder="Nome" value={newName} onChange={e => setNewName(e.target.value)} className="w-full p-3 rounded-xl border dark:border-slate-700 dark:bg-slate-800 dark:text-white" required />
-                            <input placeholder={tab === 'TEAM' ? "Profissão (ex: Pedreiro)" : "Categoria (ex: Elétrica)"} value={newRole} onChange={e => setNewRole(e.target.value)} className="w-full p-3 rounded-xl border dark:border-slate-700 dark:bg-slate-800 dark:text-white" required />
-                            <input placeholder="Telefone / WhatsApp" value={newPhone} onChange={e => setNewPhone(e.target.value)} className="w-full p-3 rounded-xl border dark:border-slate-700 dark:bg-slate-800 dark:text-white" required />
+                            <input placeholder="Nome" value={newName} onChange={e => setNewName(e.target.value)} className="w-full p-3 rounded-xl border dark:border-slate-700 dark:bg-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-primary" required />
+                            <input placeholder={mode === 'TEAM' ? "Profissão (ex: Pedreiro)" : "Categoria (ex: Elétrica)"} value={newRole} onChange={e => setNewRole(e.target.value)} className="w-full p-3 rounded-xl border dark:border-slate-700 dark:bg-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-primary" required />
+                            <input placeholder="Telefone / WhatsApp" value={newPhone} onChange={e => setNewPhone(e.target.value)} className="w-full p-3 rounded-xl border dark:border-slate-700 dark:bg-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-primary" required />
                             <div className="flex gap-2 pt-2">
-                                <button type="button" onClick={() => setIsAddOpen(false)} className="flex-1 py-3 text-slate-500 font-bold">Cancelar</button>
-                                <button type="submit" className="flex-1 py-3 bg-primary text-white rounded-xl font-bold">Salvar</button>
+                                <button type="button" onClick={() => setIsAddOpen(false)} className="flex-1 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl transition-colors">Cancelar</button>
+                                <button type="submit" className="flex-1 py-3 bg-primary text-white rounded-xl font-bold hover:bg-slate-800 transition-colors">Salvar</button>
                             </div>
                         </form>
                     </div>
                 </div>
             )}
+             <ZeModal 
+                isOpen={zeModal.isOpen}
+                title={zeModal.title}
+                message={zeModal.message}
+                onConfirm={zeModal.onConfirm}
+                onCancel={() => setZeModal({isOpen: false, title: '', message: '', onConfirm: () => {}})}
+            />
         </div>
     );
 };
@@ -1250,7 +1269,8 @@ const MoreMenuTab: React.FC<{ workId: string }> = ({ workId }) => {
     ];
 
     // Render Active Sub-View
-    if (activeSection === 'TEAM' || activeSection === 'SUPPLIERS') return <ContactsView workId={workId} onBack={() => setActiveSection(null)} />;
+    if (activeSection === 'TEAM') return <ContactsView workId={workId} mode="TEAM" onBack={() => setActiveSection(null)} />;
+    if (activeSection === 'SUPPLIERS') return <ContactsView workId={workId} mode="SUPPLIERS" onBack={() => setActiveSection(null)} />;
     if (activeSection === 'PHOTOS') return <PhotosView workId={workId} onBack={() => setActiveSection(null)} />;
     if (activeSection === 'FILES') return <FilesView workId={workId} onBack={() => setActiveSection(null)} />;
     if (activeSection === 'REPORTS') return <ReportsView workId={workId} onBack={() => setActiveSection(null)} />;
