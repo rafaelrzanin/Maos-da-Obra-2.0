@@ -325,7 +325,6 @@ const StepsTab: React.FC<{ workId: string, refreshWork: () => void }> = ({ workI
 
 // --- TABS (MATERIALS) ---
 const MaterialsTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ workId, onUpdate }) => {
-    const [materials, setMaterials] = useState<Material[]>([]);
     const [steps, setSteps] = useState<Step[]>([]);
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [isImportOpen, setIsImportOpen] = useState(false);
@@ -355,14 +354,13 @@ const MaterialsTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ work
 
 // --- Expenses Tab ---
 const ExpensesTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ workId, onUpdate }) => {
-    const [expenses, setExpenses] = useState<Expense[]>([]);
-    const [isCreateOpen, setIsCreateOpen] = useState(false);
+   const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [groupedExpenses, setGroupedExpenses] = useState<Record<string, {total: number, items: Expense[]}>>({});
     const [steps, setSteps] = useState<Step[]>([]);
     const [formData, setFormData] = useState<Partial<Expense>>({ date: new Date().toISOString().split('T')[0], category: ExpenseCategory.MATERIAL, amount: 0, paidAmount: 0, description: '', stepId: 'geral' });
     const [editingId, setEditingId] = useState<string | null>(null);
 
-    const load = async () => { const [exp, stp] = await Promise.all([dbService.getExpenses(workId), dbService.getSteps(workId)]); setExpenses(exp); setSteps(stp); const grouped: Record<string, {total: number, items: Expense[]}> = {}; const getStepName = (id?: string) => { if (!id || id === 'geral') return 'Geral'; const s = stp.find(st => st.id === id); return s ? s.name : 'Outros'; }; exp.forEach(e => { const groupName = getStepName(e.stepId); if (!grouped[groupName]) grouped[groupName] = { total: 0, items: [] }; grouped[groupName].items.push(e); grouped[groupName].total += (e.paidAmount || 0); }); setGroupedExpenses(grouped); };
+    const load = async () => { const [exp, stp] = await Promise.all([dbService.getExpenses(workId), dbService.getSteps(workId)]); setSteps(stp); const grouped: Record<string, {total: number, items: Expense[]}> = {}; const getStepName = (id?: string) => { if (!id || id === 'geral') return 'Geral'; const s = stp.find(st => st.id === id); return s ? s.name : 'Outros'; }; exp.forEach(e => { const groupName = getStepName(e.stepId); if (!grouped[groupName]) grouped[groupName] = { total: 0, items: [] }; grouped[groupName].items.push(e); grouped[groupName].total += (e.paidAmount || 0); }); setGroupedExpenses(grouped); };
     useEffect(() => { load(); }, [workId]);
 
     const handleSave = async (e: React.FormEvent) => { e.preventDefault(); const payload = { workId, description: formData.description!, amount: Number(formData.amount), paidAmount: Number(formData.paidAmount), category: formData.category!, date: formData.date!, stepId: formData.stepId === 'geral' ? undefined : formData.stepId, quantity: 1 }; if (editingId) await dbService.updateExpense({ ...payload, id: editingId } as Expense); else await dbService.addExpense(payload); setIsCreateOpen(false); setEditingId(null); await load(); onUpdate(); };
