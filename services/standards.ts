@@ -1,8 +1,6 @@
-
-
 // Standard Libraries for Construction Management
 
-export const ZE_AVATAR = "/ze.png"; // Certifique-se de salvar a imagem na pasta public como ze.png
+export const ZE_AVATAR = "./ze.png"; // Certifique-se de salvar a imagem na pasta public como ze.png
 
 export interface PhaseCategory {
   category: string;
@@ -106,32 +104,51 @@ export const WORK_TEMPLATES: WorkTemplate[] = [
   }
 ];
 
-// --- MATERIAL CALCULATORS ---
+// --- MATERIAL CALCULATORS LOGIC ---
 
-export const CALCULATORS = {
-  PISO: {
-    label: 'Pisos e Revestimentos',
-    unit: 'm²',
-    calculate: (area: number) => Math.ceil(area * 1.10), // +10% loss
-    message: (qty: number) => `Você precisará de ${qty}m² (já considerando 10% de perda para recortes).`
+export const CALCULATOR_LOGIC = {
+  FLOOR: (area: number) => {
+    const margin = 1.10; // 10%
+    return {
+      tiles: Math.ceil(area * margin),
+      mortar: Math.ceil((area * 4) / 20), // ~4kg/m2, sacos de 20kg
+      grout: Math.ceil((area * 0.3)), // ~300g/m2 (kg)
+    };
   },
-  TIJOLO: {
-    label: 'Tijolos / Blocos',
-    unit: 'unidades',
-    calculate: (area: number) => Math.ceil(area * 25), // Avg 25 blocks per m2
-    message: (qty: number) => `Estimamos cerca de ${qty} blocos para cobrir essa área de parede.`
+  WALL: (width: number, height: number) => {
+    const area = width * height;
+    // Tijolo 8 furos (9x19x19) ~ 25 por m2 em pé ou deitado varia, usaremos média de 25
+    return {
+      area: area.toFixed(2),
+      bricks: Math.ceil(area * 25),
+      cement: Math.ceil(area * 0.15), // Estimativa sacos para assentamento
+      sand: Math.ceil(area * 0.02), // m3
+    };
   },
-  TINTA: {
-    label: 'Tinta (Paredes)',
-    unit: 'litros',
-    calculate: (area: number) => Math.ceil((area * 2) / 10), // 2 coats, ~10m2 per liter
-    message: (qty: number) => `Aproximadamente ${qty} litros de tinta para dar 2 demãos.`
+  PAINT: (area: number) => {
+    // Tinta rende ~10m2 por litro por demão. 2 demãos = 5m2/litro
+    const liters = Math.ceil(area / 5);
+    const cans18 = Math.floor(liters / 18);
+    const remainder = liters % 18;
+    const gallons36 = Math.ceil(remainder / 3.6);
+    
+    return {
+      litersTotal: liters,
+      cans18,
+      gallons36,
+      spackle: Math.ceil(area / 12), // Massa corrida latas
+      sealer: Math.ceil(area / 40), // Selador latas
+    };
   },
-  CIMENTO_CONTRAPISO: {
-    label: 'Cimento (Contrapiso)',
-    unit: 'sacos (50kg)',
-    calculate: (area: number) => Math.ceil(area * 0.25), // Rough estimate
-    message: (qty: number) => `Cerca de ${qty} sacos de cimento para um contrapiso padrão.`
+  ESTIMATOR: (bathrooms: number, rooms: number) => {
+    return {
+      toilets: bathrooms,
+      sinks: bathrooms + 1, // +1 cozinha
+      showers: bathrooms,
+      outlets: (rooms * 5) + (bathrooms * 2) + 6, // 5/quarto, 2/banheiro, 6 cozinha/sala
+      switches: rooms + bathrooms + 2,
+      lightPoints: rooms + bathrooms + 2
+    };
   }
 };
 
