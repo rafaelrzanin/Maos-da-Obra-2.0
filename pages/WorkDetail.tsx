@@ -721,7 +721,6 @@ const StepsTab: React.FC<{ workId: string, refreshWork: () => void }> = ({ workI
 
 // --- TABS (MATERIALS) ---
 const MaterialsTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ workId, onUpdate }) => {
-    const [materials, setMaterials] = useState<Material[]>([]);
     const [steps, setSteps] = useState<Step[]>([]);
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [isImportOpen, setIsImportOpen] = useState(false);
