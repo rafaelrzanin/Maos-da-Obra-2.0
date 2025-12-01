@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { dbService } from '../services/db';
 import { Work, Step, Expense, Material, StepStatus, ExpenseCategory, PlanType, Supplier, Worker, WorkPhoto, WorkFile } from '../types';
 import { Recharts } from '../components/RechartsWrapper';
-import { CALCULATORS, CONTRACT_TEMPLATES, STANDARD_CHECKLISTS, FULL_MATERIAL_PACKAGES, ZE_AVATAR } from '../services/standards';
+import { FULL_MATERIAL_PACKAGES, ZE_AVATAR } from '../services/standards';
 import { useAuth } from '../App';
 import { aiService } from '../services/ai';
 
@@ -83,7 +83,7 @@ const ZeModal: React.FC<ZeModalProps> = ({ isOpen, title, message, confirmText =
 // --- SUB-VIEWS FOR "MORE" TAB ---
 
 // 1. CONTACTS VIEW (TEAM & SUPPLIERS)
-const ContactsView: React.FC<{ workId: string, onBack: () => void }> = ({ workId, onBack }) => {
+const ContactsView: React.FC<{ workId: string, onBack: () => void }> = ({ onBack }) => {
     const { user } = useAuth();
     const [tab, setTab] = useState<'TEAM' | 'SUPPLIERS'>('TEAM');
     const [workers, setWorkers] = useState<Worker[]>([]);
