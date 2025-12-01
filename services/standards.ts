@@ -1,7 +1,8 @@
 
 // Standard Libraries for Construction Management
 
-export const ZE_AVATAR = "./ze.png"; 
+// Avatar Humanizado do Zé da Obra (Estilo Mestre de Obras Amigável)
+export const ZE_AVATAR = "https://api.dicebear.com/9.x/avataaars/svg?seed=ZeDaObra&clothing=overalls&top=hat&hatColor=blue02&facialHair=beardMedium&skinColor=light&eyes=happy&mouth=smile";
 
 export interface PhaseCategory {
   category: string;
