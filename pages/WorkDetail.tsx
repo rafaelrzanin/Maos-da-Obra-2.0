@@ -389,29 +389,331 @@ const MaterialsTab: React.FC<{ workId: string; onUpdate: () => void }> = ({ work
 }
 
 // --- Expenses Tab ---
-const ExpensesTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ workId, onUpdate }) => {
-    const [expenses, setExpenses] = useState<Expense[]>([]);
-    const [isCreateOpen, setIsCreateOpen] = useState(false);
-    const [groupedExpenses, setGroupedExpenses] = useState<Record<string, {total: number, items: Expense[]}>>({});
-    const [steps, setSteps] = useState<Step[]>([]);
-    const [formData, setFormData] = useState<Partial<Expense>>({ date: new Date().toISOString().split('T')[0], category: ExpenseCategory.MATERIAL, amount: 0, paidAmount: 0, description: '', stepId: 'geral' });
-    const [editingId, setEditingId] = useState<string | null>(null);
+const ExpensesTab: React.FC<{ workId: string; onUpdate: () => void }> = ({
+  workId,
+  onUpdate,
+}) => {
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [groupedExpenses, setGroupedExpenses] = useState<
+    Record<string, { total: number; items: Expense[] }>
+  >({});
+  const [steps, setSteps] = useState<Step[]>([]);
+  const [formData, setFormData] = useState<Partial<Expense>>({
+    date: new Date().toISOString().split("T")[0],
+    category: ExpenseCategory.MATERIAL,
+    amount: 0,
+    paidAmount: 0,
+    description: "",
+    stepId: "geral",
+  });
+  const [editingId, setEditingId] = useState<string | null>(null);
 
-    const load = async () => { const [exp, stp] = await Promise.all([dbService.getExpenses(workId), dbService.getSteps(workId)]); setExpenses(exp); setSteps(stp); const grouped: Record<string, {total: number, items: Expense[]}> = {}; const getStepName = (id?: string) => { if (!id || id === 'geral') return 'Geral'; const s = stp.find(st => st.id === id); return s ? s.name : 'Outros'; }; exp.forEach(e => { const groupName = getStepName(e.stepId); if (!grouped[groupName]) grouped[groupName] = { total: 0, items: [] }; grouped[groupName].items.push(e); grouped[groupName].total += (e.paidAmount || 0); }); setGroupedExpenses(grouped); };
-    useEffect(() => { load(); }, [workId]);
+  // Carrega despesas e etapas
+  const load = async () => {
+    const [expData, stp] = await Promise.all([
+      dbService.getExpenses(workId),
+      dbService.getSteps(workId),
+    ]);
 
-    const handleSave = async (e: React.FormEvent) => { e.preventDefault(); const payload = { workId, description: formData.description!, amount: Number(formData.amount), paidAmount: Number(formData.paidAmount), category: formData.category!, date: formData.date!, stepId: formData.stepId === 'geral' ? undefined : formData.stepId, quantity: 1 }; if (editingId) await dbService.updateExpense({ ...payload, id: editingId } as Expense); else await dbService.addExpense(payload); setIsCreateOpen(false); setEditingId(null); await load(); onUpdate(); };
-    const handleEdit = (expense: Expense) => { setEditingId(expense.id); setFormData({ ...expense, stepId: expense.stepId || 'geral' }); setIsCreateOpen(true); };
-    const handleDelete = async (id: string) => { if(confirm("Excluir?")) { await dbService.deleteExpense(id); setIsCreateOpen(false); await load(); onUpdate(); } };
+    setExpenses(expData);
+    setSteps(stp);
+  };
 
-    return (
-        <div className="animate-in fade-in duration-500 pb-20">
-             <div className="flex items-center justify-between mb-8"><SectionHeader title="Gastos" subtitle="Controle financeiro." /><button onClick={() => { setEditingId(null); setIsCreateOpen(true); }} className="bg-primary text-white w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg transition-all"><i className="fa-solid fa-plus text-lg"></i></button></div>
-            {Object.keys(groupedExpenses).sort().map(group => (<div key={group} className="mb-8"><div className="flex justify-between items-end mb-4 border-b border-slate-100 dark:border-slate-800 pb-2"><h3 className="font-bold text-primary dark:text-white">{group}</h3><span className="text-xs font-bold text-slate-500">R$ {groupedExpenses[group].total.toLocaleString('pt-BR')}</span></div><div className="space-y-3">{groupedExpenses[group].items.map(expense => (<div key={expense.id} onClick={() => handleEdit(expense)} className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-4 rounded-2xl shadow-sm hover:shadow-md transition-all cursor-pointer"><div className="flex justify-between items-start mb-2"><div className="flex items-center gap-3"><div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs bg-slate-50 text-slate-600`}><i className="fa-solid fa-tag"></i></div><div><p className="font-bold text-sm text-primary dark:text-white">{expense.description}</p><p className="text-[10px] text-slate-400">{new Date(expense.date).toLocaleDateString('pt-BR')}</p></div></div><div className="text-right"><p className="font-bold text-primary dark:text-white">R$ {expense.amount.toLocaleString('pt-BR')}</p><div className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase ${expense.paidAmount === expense.amount ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{expense.paidAmount === expense.amount ? 'Pago' : 'Pendente'}</div></div></div></div>))}</div></div>))}
-            {isCreateOpen && (<div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in"><div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-8 shadow-2xl overflow-y-auto max-h-[90vh]"><h3 className="text-xl font-bold text-primary dark:text-white mb-6">{editingId ? 'Editar' : 'Novo'}</h3><form onSubmit={handleSave} className="space-y-4"><div><label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Tipo</label><div className="grid grid-cols-2 gap-2">{[ExpenseCategory.MATERIAL, ExpenseCategory.LABOR, ExpenseCategory.PERMITS, ExpenseCategory.OTHER].map(cat => (<button key={cat} type="button" onClick={() => setFormData({...formData, category: cat})} className={`p-2 rounded-xl text-xs font-bold border ${formData.category === cat ? 'bg-primary text-white border-primary' : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500'}`}>{cat}</button>))}</div></div><div><label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Etapa</label><select className="w-full px-4 py-3 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 outline-none text-sm" value={formData.stepId} onChange={e => setFormData({...formData, stepId: e.target.value})}><option value="geral">Geral</option>{steps.map(s => (<option key={s.id} value={s.id}>{s.name}</option>))}</select></div><input placeholder="Descrição" className="w-full px-4 py-3 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 outline-none text-sm" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} required /><div className="grid grid-cols-2 gap-3"><input type="number" placeholder="Total" className="w-full px-4 py-3 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 outline-none" value={formData.amount} onChange={e => setFormData({...formData, amount: Number(e.target.value)})} /><input type="number" placeholder="Pago" className="w-full px-4 py-3 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 outline-none" value={formData.paidAmount} onChange={e => setFormData({...formData, paidAmount: Number(e.target.value)})} /></div><input type="date" className="w-full px-4 py-3 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 outline-none text-sm" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} /><div className="flex gap-3 pt-2"><button type="button" onClick={() => setIsCreateOpen(false)} className="flex-1 py-3 font-bold text-slate-500">Cancelar</button><button type="submit" className="flex-1 py-3 bg-primary text-white rounded-xl font-bold shadow-lg">Salvar</button></div>{editingId && (<button type="button" onClick={() => handleDelete(editingId)} className="w-full py-2 text-red-500 text-xs font-bold uppercase tracking-wider">Excluir</button>)}</form></div></div>)}
+  // Recarrega quando mudar a obra
+  useEffect(() => {
+    load();
+  }, [workId]);
+
+  // Sempre que expenses ou steps mudarem, recalcula o agrupamento
+  useEffect(() => {
+    const grouped: Record<string, { total: number; items: Expense[] }> = {};
+
+    const getStepName = (id?: string) => {
+      if (!id || id === "geral") return "Geral";
+      const s = steps.find((st) => st.id === id);
+      return s ? s.name : "Outros";
+    };
+
+    expenses.forEach((e) => {
+      const groupName = getStepName(e.stepId);
+      if (!grouped[groupName]) {
+        grouped[groupName] = { total: 0, items: [] };
+      }
+      grouped[groupName].items.push(e);
+      grouped[groupName].total += e.paidAmount || 0;
+    });
+
+    setGroupedExpenses(grouped);
+  }, [expenses, steps]);
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    const payload = {
+      workId,
+      description: formData.description!,
+      amount: Number(formData.amount),
+      paidAmount: Number(formData.paidAmount),
+      category: formData.category!,
+      date: formData.date!,
+      stepId: formData.stepId === "geral" ? undefined : formData.stepId,
+      quantity: 1,
+    };
+
+    if (editingId) {
+      await dbService.updateExpense({ ...payload, id: editingId } as Expense);
+    } else {
+      await dbService.addExpense(payload);
+    }
+
+    setIsCreateOpen(false);
+    setEditingId(null);
+    await load();
+    onUpdate();
+  };
+
+  const handleEdit = (expense: Expense) => {
+    setEditingId(expense.id);
+    setFormData({ ...expense, stepId: expense.stepId || "geral" });
+    setIsCreateOpen(true);
+  };
+
+  const handleDelete = async (id: string) => {
+    if (confirm("Excluir?")) {
+      await dbService.deleteExpense(id);
+      setIsCreateOpen(false);
+      await load();
+      onUpdate();
+    }
+  };
+
+  return (
+    <div className="animate-in fade-in duration-500 pb-20">
+      <div className="flex items-center justify-between mb-8">
+        <SectionHeader title="Gastos" subtitle="Controle financeiro." />
+        <button
+          onClick={() => {
+            setEditingId(null);
+            setFormData({
+              date: new Date().toISOString().split("T")[0],
+              category: ExpenseCategory.MATERIAL,
+              amount: 0,
+              paidAmount: 0,
+              description: "",
+              stepId: "geral",
+            });
+            setIsCreateOpen(true);
+          }}
+          className="bg-primary text-white w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg transition-all"
+        >
+          <i className="fa-solid fa-plus text-lg"></i>
+        </button>
+      </div>
+
+      {Object.keys(groupedExpenses)
+        .sort()
+        .map((group) => (
+          <div key={group} className="mb-8">
+            <div className="flex justify-between items-end mb-4 border-b border-slate-100 dark:border-slate-800 pb-2">
+              <h3 className="font-bold text-primary dark:text-white">{group}</h3>
+              <span className="text-xs font-bold text-slate-500">
+                R$ {groupedExpenses[group].total.toLocaleString("pt-BR")}
+              </span>
+            </div>
+
+            <div className="space-y-3">
+              {groupedExpenses[group].items.map((expense) => (
+                <div
+                  key={expense.id}
+                  onClick={() => handleEdit(expense)}
+                  className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-4 rounded-2xl shadow-sm hover:shadow-md transition-all cursor-pointer"
+                >
+                  <div className="flex justify-between items-start mb-2">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-lg flex items-center justify-center text-xs bg-slate-50 text-slate-600">
+                        <i className="fa-solid fa-tag"></i>
+                      </div>
+                      <div>
+                        <p className="font-bold text-sm text-primary dark:text-white">
+                          {expense.description}
+                        </p>
+                        <p className="text-[10px] text-slate-400">
+                          {new Date(expense.date).toLocaleDateString("pt-BR")}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="text-right">
+                      <p className="font-bold text-primary dark:text-white">
+                        R$ {expense.amount.toLocaleString("pt-BR")}
+                      </p>
+                      <div
+                        className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                          expense.paidAmount === expense.amount
+                            ? "bg-green-100 text-green-700"
+                            : "bg-red-100 text-red-700"
+                        }`}
+                      >
+                        {expense.paidAmount === expense.amount
+                          ? "Pago"
+                          : "Pendente"}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+
+      {isCreateOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-8 shadow-2xl overflow-y-auto max-h-[90vh]">
+            <h3 className="text-xl font-bold text-primary dark:text-white mb-6">
+              {editingId ? "Editar" : "Novo"}
+            </h3>
+
+            <form onSubmit={handleSave} className="space-y-4">
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">
+                  Tipo
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[ 
+                    ExpenseCategory.MATERIAL,
+                    ExpenseCategory.LABOR,
+                    ExpenseCategory.PERMITS,
+                    ExpenseCategory.OTHER,
+                  ].map((cat) => (
+                    <button
+                      key={cat}
+                      type="button"
+                      onClick={() =>
+                        setFormData({
+                          ...formData,
+                          category: cat,
+                        })
+                      }
+                      className={`p-2 rounded-xl text-xs font-bold border ${
+                        formData.category === cat
+                          ? "bg-primary text-white border-primary"
+                          : "bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500"
+                      }`}
+                    >
+                      {cat}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">
+                  Etapa
+                </label>
+                <select
+                  className="w-full px-4 py-3 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 outline-none text-sm"
+                  value={formData.stepId}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      stepId: e.target.value,
+                    })
+                  }
+                >
+                  <option value="geral">Geral</option>
+                  {steps.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <input
+                placeholder="Descrição"
+                className="w-full px-4 py-3 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 outline-none text-sm"
+                value={formData.description}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    description: e.target.value,
+                  })
+                }
+                required
+              />
+
+              <div className="grid grid-cols-2 gap-3">
+                <input
+                  type="number"
+                  placeholder="Total"
+                  className="w-full px-4 py-3 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 outline-none"
+                  value={formData.amount}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      amount: Number(e.target.value),
+                    })
+                  }
+                />
+                <input
+                  type="number"
+                  placeholder="Pago"
+                  className="w-full px-4 py-3 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 outline-none"
+                  value={formData.paidAmount}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      paidAmount: Number(e.target.value),
+                    })
+                  }
+                />
+              </div>
+
+              <input
+                type="date"
+                className="w-full px-4 py-3 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 outline-none text-sm"
+                value={formData.date}
+                onChange={(e) =>
+                  setFormData({
+                    ...formData,
+                    date: e.target.value,
+                  })
+                }
+              />
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsCreateOpen(false)}
+                  className="flex-1 py-3 font-bold text-slate-500"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 py-3 bg-primary text-white rounded-xl font-bold shadow-lg"
+                >
+                  Salvar
+                </button>
+              </div>
+
+              {editingId && (
+                <button
+                  type="button"
+                  onClick={() => handleDelete(editingId)}
+                  className="w-full py-2 text-red-500 text-xs font-bold uppercase tracking-wider"
+                >
+                  Excluir
+                </button>
+              )}
+            </form>
+          </div>
         </div>
-    );
-}
+      )}
+    </div>
+  );
+};
 
 // --- Main WorkDetail Component ---
 const WorkDetail: React.FC = () => {
