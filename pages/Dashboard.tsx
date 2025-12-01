@@ -1,9 +1,11 @@
+
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../App';
 import { dbService } from '../services/db';
 import { Work, Notification } from '../types';
 import { ZE_AVATAR } from '../services/standards';
+import { ZeModal } from '../components/ZeModal';
 
 const Dashboard: React.FC = () => {
   const { user } = useAuth();
@@ -19,6 +21,9 @@ const Dashboard: React.FC = () => {
   
   // Dropdown State
   const [showWorkSelector, setShowWorkSelector] = useState(false);
+  
+  // Delete Modal State
+  const [zeModal, setZeModal] = useState<{isOpen: boolean, title: string, message: string, workId?: string}>({isOpen: false, title: '', message: ''});
 
   useEffect(() => {
     const loadDashboard = async () => {
@@ -60,6 +65,37 @@ const Dashboard: React.FC = () => {
           console.error(e);
       } finally {
           setLoading(false);
+      }
+  };
+
+  const handleDeleteClick = (e: React.MouseEvent, workId: string, workName: string) => {
+      e.stopPropagation(); // Prevent switching work when clicking delete
+      setZeModal({
+          isOpen: true,
+          title: "Apagar Obra",
+          message: `Tem certeza, chefe? Ao apagar a obra "${workName}", você perde todo o histórico de gastos, compras e cronograma. Não tem volta!`,
+          workId: workId
+      });
+  };
+
+  const confirmDelete = async () => {
+      if (zeModal.workId) {
+          await dbService.deleteWork(zeModal.workId);
+          
+          // Refresh List
+          const updatedWorks = works.filter(w => w.id !== zeModal.workId);
+          setWorks(updatedWorks);
+          setZeModal({isOpen: false, title: '', message: ''});
+
+          // Handle Focus
+          if (focusWork && focusWork.id === zeModal.workId) {
+              if (updatedWorks.length > 0) {
+                  handleSwitchWork(updatedWorks[0]);
+              } else {
+                  setFocusWork(null);
+                  setLoading(false);
+              }
+          }
       }
   };
 
@@ -144,14 +180,22 @@ const Dashboard: React.FC = () => {
                              <p className="text-xs font-bold text-slate-500 uppercase">Minhas Obras</p>
                          </div>
                          {works.map(w => (
-                             <button
+                             <div
                                 key={w.id}
+                                className={`w-full px-5 py-4 text-sm font-medium border-b last:border-0 border-slate-50 dark:border-slate-800 flex items-center justify-between group hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer ${focusWork.id === w.id ? 'bg-slate-50 dark:bg-slate-800/50' : ''}`}
                                 onClick={() => handleSwitchWork(w)}
-                                className={`w-full text-left px-5 py-4 text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors border-b last:border-0 border-slate-50 dark:border-slate-800 flex items-center justify-between ${focusWork.id === w.id ? 'text-secondary bg-slate-50 dark:bg-slate-800/50' : 'text-slate-600 dark:text-slate-300'}`}
                              >
-                                <span>{w.name}</span>
-                                {focusWork.id === w.id && <i className="fa-solid fa-check text-secondary"></i>}
-                             </button>
+                                <span className={`flex-1 truncate ${focusWork.id === w.id ? 'text-secondary font-bold' : 'text-slate-600 dark:text-slate-300'}`}>{w.name}</span>
+                                <div className="flex items-center gap-3">
+                                    {focusWork.id === w.id && <i className="fa-solid fa-check text-secondary"></i>}
+                                    <button 
+                                        onClick={(e) => handleDeleteClick(e, w.id, w.name)}
+                                        className="w-6 h-6 rounded bg-slate-100 dark:bg-slate-700 text-slate-400 hover:bg-red-100 hover:text-red-500 flex items-center justify-center transition-colors"
+                                    >
+                                        <i className="fa-solid fa-trash text-xs"></i>
+                                    </button>
+                                </div>
+                             </div>
                          ))}
                          <button
                             onClick={() => navigate('/create')}
@@ -351,6 +395,16 @@ const Dashboard: React.FC = () => {
       >
         <i className="fa-solid fa-plus text-2xl"></i>
       </button>
+
+      {/* ZÉ DA OBRA MODAL (DELETE) */}
+      <ZeModal 
+        isOpen={zeModal.isOpen}
+        title={zeModal.title}
+        message={zeModal.message}
+        confirmText="Sim, apagar obra"
+        onConfirm={confirmDelete}
+        onCancel={() => setZeModal({isOpen: false, title: '', message: ''})}
+      />
 
     </div>
   );
