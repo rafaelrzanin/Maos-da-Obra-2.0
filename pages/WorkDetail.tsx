@@ -149,294 +149,26 @@ const ReportsView: React.FC<{ workId: string, onBack: () => void }> = ({ workId,
     const [materials, setMaterials] = useState<Material[]>([]);
     const [steps, setSteps] = useState<Step[]>([]);
     const [work, setWork] = useState<Work | undefined>();
-    
     useEffect(() => {
-        const loadAll = async () => {
-            const [exp, mat, stp, w] = await Promise.all([
-                dbService.getExpenses(workId),
-                dbService.getMaterials(workId),
-                dbService.getSteps(workId),
-                dbService.getWorkById(workId)
-            ]);
-            setExpenses(exp);
-            setMaterials(mat);
-            setSteps(stp.sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()));
-            setWork(w);
-        };
-        loadAll();
+        const loadAll = async () => { const [exp, mat, stp, w] = await Promise.all([dbService.getExpenses(workId), dbService.getMaterials(workId), dbService.getSteps(workId), dbService.getWorkById(workId)]); setExpenses(exp); setMaterials(mat); setSteps(stp.sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())); setWork(w); }; loadAll();
     }, [workId]);
-
-    const handlePrint = () => {
-        window.print();
-    };
-
+    const handlePrint = () => { window.print(); };
     // Calculations
-    const financialData = expenses.reduce((acc: any[], curr) => {
-        const existing = acc.find(a => a.name === curr.category);
-        if (existing) existing.value += curr.amount;
-        else acc.push({ name: curr.category, value: curr.amount });
-        return acc;
-    }, []);
-    const totalSpent = expenses.reduce((acc, e) => acc + e.amount, 0);
-    const totalPaid = expenses.reduce((acc, e) => acc + (e.paidAmount || 0), 0);
-    const totalPending = totalSpent - totalPaid;
-
-    const purchasedMaterials = materials.filter(m => m.purchasedQty >= m.plannedQty).length;
-    const totalMaterials = materials.length;
-    const pendingMaterials = totalMaterials - purchasedMaterials;
-    
-    const materialChartData = [
-        { name: 'Comprado', value: purchasedMaterials, fill: '#059669' },
-        { name: 'Pendente', value: materials.length - purchasedMaterials, fill: '#E2E8F0' }
-    ];
-    const groupedMaterials: Record<string, Material[]> = {};
-    materials.forEach(m => {
-        const cat = m.category || 'Geral';
-        if (!groupedMaterials[cat]) groupedMaterials[cat] = [];
-        groupedMaterials[cat].push(m);
-    });
-
-    const completedSteps = steps.filter(s => s.status === StepStatus.COMPLETED).length;
-    const delayedSteps = steps.filter(s => s.isDelayed).length;
-    const totalSteps = steps.length;
+    const financialData = expenses.reduce((acc: any[], curr) => { const existing = acc.find(a => a.name === curr.category); if (existing) existing.value += curr.amount; else acc.push({ name: curr.category, value: curr.amount }); return acc; }, []);
+    const totalSpent = expenses.reduce((acc, e) => acc + e.amount, 0); const totalPaid = expenses.reduce((acc, e) => acc + (e.paidAmount || 0), 0); const totalPending = totalSpent - totalPaid;
+    const purchasedMaterials = materials.filter(m => m.purchasedQty >= m.plannedQty).length; const materialChartData = [{ name: 'Comprado', value: purchasedMaterials, fill: '#059669' }, { name: 'Pendente', value: materials.length - purchasedMaterials, fill: '#E2E8F0' }];
+    const groupedMaterials: Record<string, Material[]> = {}; materials.forEach(m => { const cat = m.category || 'Geral'; if (!groupedMaterials[cat]) groupedMaterials[cat] = []; groupedMaterials[cat].push(m); });
+    const completedSteps = steps.filter(s => s.status === StepStatus.COMPLETED).length; const delayedSteps = steps.filter(s => s.isDelayed).length; const totalSteps = steps.length;
 
     return (
         <div className="animate-in fade-in slide-in-from-right-4 bg-white dark:bg-slate-950 min-h-screen">
-             {/* PRINT HEADER ONLY */}
-             <div className="hidden print:block mb-8 border-b-2 border-black pb-4">
-                 <h1 className="text-3xl font-bold uppercase">{work?.name || "Relatório de Obra"}</h1>
-                 <p className="text-sm">Gerado em: {new Date().toLocaleDateString()}</p>
-                 <p className="text-sm">Endereço: {work?.address}</p>
-             </div>
-
-             <div className="flex justify-between items-center mb-6 print:hidden">
-                <button onClick={onBack} className="text-sm font-bold text-slate-400 hover:text-primary flex items-center gap-2">
-                    <i className="fa-solid fa-arrow-left"></i> Voltar
-                </button>
-                <div className="flex gap-2">
-                    <button onClick={handlePrint} className="bg-primary text-white px-4 py-2 rounded-xl text-sm font-bold shadow-lg hover:bg-slate-800 transition-all flex items-center gap-2">
-                        <i className="fa-solid fa-print"></i> Exportar PDF
-                    </button>
-                </div>
-             </div>
-
+             <div className="hidden print:block mb-8 border-b-2 border-black pb-4"><h1 className="text-3xl font-bold uppercase">{work?.name || "Relatório"}</h1><p className="text-sm">Endereço: {work?.address}</p></div>
+             <div className="flex justify-between items-center mb-6 print:hidden"><button onClick={onBack} className="text-sm font-bold text-slate-400 hover:text-primary flex items-center gap-2"><i className="fa-solid fa-arrow-left"></i> Voltar</button><div className="flex gap-2"><button onClick={handlePrint} className="bg-primary text-white px-4 py-2 rounded-xl text-sm font-bold shadow-lg flex items-center gap-2"><i className="fa-solid fa-print"></i> PDF</button></div></div>
              <SectionHeader title="Relatórios Inteligentes" subtitle="Analise cada detalhe da sua obra." />
-             
-             {/* TABS (Hidden on Print) */}
-             <div className="flex p-1 bg-slate-100 dark:bg-slate-800/50 rounded-xl mb-6 print:hidden">
-                 {[
-                     { id: 'FINANCIAL', label: 'Financeiro', icon: 'fa-wallet' },
-                     { id: 'MATERIALS', label: 'Compras', icon: 'fa-cart-shopping' },
-                     { id: 'STEPS', label: 'Etapas', icon: 'fa-list-check' }
-                 ].map(tab => (
-                     <button
-                        key={tab.id}
-                        onClick={() => setActiveTab(tab.id as any)}
-                        className={`flex-1 py-3 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-all ${activeTab === tab.id ? 'bg-white dark:bg-slate-800 text-primary dark:text-white shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
-                     >
-                         <i className={`fa-solid ${tab.icon}`}></i> {tab.label}
-                     </button>
-                 ))}
-             </div>
-
-             {/* === TAB CONTENT === */}
-             
-             {/* 1. FINANCIAL REPORT */}
-             {activeTab === 'FINANCIAL' && (
-                 <div className="space-y-6 animate-in fade-in">
-                     {/* KPI CARDS */}
-                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                         <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 shadow-sm">
-                             <p className="text-xs font-bold text-slate-400 uppercase">Total Gasto</p>
-                             <p className="text-2xl font-bold text-primary dark:text-white">R$ {totalSpent.toLocaleString('pt-BR')}</p>
-                         </div>
-                         <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 shadow-sm">
-                             <p className="text-xs font-bold text-slate-400 uppercase">Valor Pago</p>
-                             <p className="text-2xl font-bold text-green-600">R$ {totalPaid.toLocaleString('pt-BR')}</p>
-                         </div>
-                         <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 shadow-sm">
-                             <p className="text-xs font-bold text-slate-400 uppercase">A Pagar (Pendente)</p>
-                             <p className="text-2xl font-bold text-red-500">R$ {totalPending.toLocaleString('pt-BR')}</p>
-                         </div>
-                     </div>
-
-                     {/* CHART */}
-                     <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm">
-                        <h3 className="font-bold mb-6 dark:text-white flex items-center gap-2"><i className="fa-solid fa-chart-pie text-secondary"></i> Distribuição de Gastos</h3>
-                        <div className="h-64">
-                            <Recharts.ResponsiveContainer width="100%" height="100%">
-                                <Recharts.BarChart data={financialData}>
-                                    <Recharts.CartesianGrid strokeDasharray="3 3" vertical={false} />
-                                    <Recharts.XAxis dataKey="name" tick={{fontSize: 10}} />
-                                    <Recharts.YAxis />
-                                    <Recharts.Tooltip 
-                                        contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1)'}}
-                                    />
-                                    <Recharts.Bar dataKey="value" fill="#D97706" radius={[6, 6, 0, 0]} barSize={40} />
-                                </Recharts.BarChart>
-                            </Recharts.ResponsiveContainer>
-                        </div>
-                     </div>
-
-                     {/* TABLE */}
-                     <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm">
-                        <h3 className="font-bold mb-4 dark:text-white">Extrato Detalhado</h3>
-                        <table className="w-full text-sm text-left">
-                            <thead>
-                                <tr className="border-b dark:border-slate-700 text-slate-500">
-                                    <th className="py-2 font-bold">Data</th>
-                                    <th className="py-2 font-bold">Descrição</th>
-                                    <th className="py-2 font-bold">Categoria</th>
-                                    <th className="py-2 font-bold text-right">Valor</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {expenses.map(e => (
-                                    <tr key={e.id} className="border-b dark:border-slate-800 last:border-0 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                                        <td className="py-3 text-slate-500">{new Date(e.date).toLocaleDateString()}</td>
-                                        <td className="py-3 font-medium dark:text-slate-300">{e.description}</td>
-                                        <td className="py-3 text-xs">
-                                            <span className="bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-md">{e.category}</span>
-                                        </td>
-                                        <td className="py-3 text-right font-bold dark:text-white">R$ {e.amount.toLocaleString('pt-BR')}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                     </div>
-                 </div>
-             )}
-
-             {/* 2. MATERIALS REPORT */}
-             {activeTab === 'MATERIALS' && (
-                 <div className="space-y-6 animate-in fade-in">
-                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                         {/* CHART CARD */}
-                         <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col items-center justify-center">
-                             <h3 className="font-bold mb-2 dark:text-white">Status de Compra</h3>
-                             <div className="w-40 h-40 relative">
-                                <Recharts.ResponsiveContainer width="100%" height="100%">
-                                    <Recharts.PieChart>
-                                        <Recharts.Pie
-                                            data={materialChartData}
-                                            cx="50%"
-                                            cy="50%"
-                                            innerRadius={40}
-                                            outerRadius={60}
-                                            paddingAngle={5}
-                                            dataKey="value"
-                                            cornerRadius={5}
-                                        />
-                                    </Recharts.PieChart>
-                                </Recharts.ResponsiveContainer>
-                                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                                    <span className="text-2xl font-bold text-primary dark:text-white">{purchasedMaterials}</span>
-                                    <span className="text-[10px] text-slate-400 uppercase">Comprados</span>
-                                </div>
-                             </div>
-                         </div>
-
-                         {/* SUMMARY CARD */}
-                         <div className="bg-gradient-to-br from-slate-800 to-slate-900 text-white p-6 rounded-3xl shadow-lg relative overflow-hidden flex flex-col justify-center">
-                             <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
-                             <div className="relative z-10">
-                                 <p className="text-slate-400 text-sm font-bold uppercase tracking-widest mb-1">Total de Itens</p>
-                                 <p className="text-4xl font-extrabold mb-6">{totalMaterials}</p>
-                                 <div className="space-y-2">
-                                     <div className="flex justify-between text-sm">
-                                         <span>Pendentes</span>
-                                         <span className="font-bold text-orange-400">{pendingMaterials} itens</span>
-                                     </div>
-                                     <div className="w-full bg-white/20 h-1.5 rounded-full overflow-hidden">
-                                         <div className="h-full bg-orange-400" style={{width: `${((materials.length - purchasedMaterials)/materials.length)*100}%`}}></div>
-                                     </div>
-                                 </div>
-                             </div>
-                         </div>
-                     </div>
-
-                     {/* LIST BY CATEGORY */}
-                     <div className="space-y-4">
-                         {Object.keys(groupedMaterials).sort().map(cat => (
-                             <div key={cat} className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 break-inside-avoid">
-                                 <h4 className="font-bold text-primary dark:text-white mb-4 border-b border-slate-100 dark:border-slate-800 pb-2">{cat}</h4>
-                                 <div className="grid grid-cols-1 gap-3">
-                                     {groupedMaterials[cat].map(m => {
-                                         const progress = Math.min(100, Math.round((m.purchasedQty / m.plannedQty) * 100));
-                                         const isDone = progress >= 100;
-                                         return (
-                                             <div key={m.id} className="flex items-center gap-4 text-sm">
-                                                 <div className={`w-2 h-2 rounded-full ${isDone ? 'bg-green-500' : 'bg-slate-300'}`}></div>
-                                                 <div className="flex-1">
-                                                     <div className="flex justify-between mb-1">
-                                                         <span className="font-medium dark:text-slate-200">{m.name}</span>
-                                                         <span className="text-slate-500 text-xs">{m.purchasedQty} / {m.plannedQty} {m.unit}</span>
-                                                     </div>
-                                                     <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                                                         <div className={`h-full rounded-full ${isDone ? 'bg-green-500' : 'bg-secondary'}`} style={{width: `${progress}%`}}></div>
-                                                     </div>
-                                                 </div>
-                                             </div>
-                                         )
-                                     })}
-                                 </div>
-                             </div>
-                         ))}
-                     </div>
-                 </div>
-             )}
-
-             {/* 3. STEPS REPORT */}
-             {activeTab === 'STEPS' && (
-                 <div className="space-y-6 animate-in fade-in">
-                     
-                     <div className="flex gap-4 mb-4 overflow-x-auto pb-2">
-                         <div className="flex-1 min-w-[120px] bg-green-50 dark:bg-green-900/20 p-4 rounded-xl border border-green-100 dark:border-green-900/30 text-center">
-                             <p className="text-2xl font-bold text-green-600 dark:text-green-400">{completedSteps}</p>
-                             <p className="text-xs font-bold text-green-700 dark:text-green-300 uppercase">Concluídas</p>
-                         </div>
-                         <div className="flex-1 min-w-[120px] bg-red-50 dark:bg-red-900/20 p-4 rounded-xl border border-red-100 dark:border-red-900/30 text-center">
-                             <p className="text-2xl font-bold text-red-600 dark:text-red-400">{delayedSteps}</p>
-                             <p className="text-xs font-bold text-red-700 dark:text-red-300 uppercase">Atrasadas</p>
-                         </div>
-                         <div className="flex-1 min-w-[120px] bg-slate-50 dark:bg-slate-800 p-4 rounded-xl border border-slate-100 dark:border-slate-700 text-center">
-                             <p className="text-2xl font-bold text-slate-600 dark:text-slate-300">{totalSteps}</p>
-                             <p className="text-xs font-bold text-slate-500 uppercase">Total Etapas</p>
-                         </div>
-                     </div>
-
-                     <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 overflow-hidden">
-                         <div className="p-4 bg-slate-50 dark:bg-slate-800 border-b border-slate-100 dark:border-slate-700 font-bold text-sm text-slate-500 flex justify-between">
-                             <span>Etapa</span>
-                             <span>Status & Prazo</span>
-                         </div>
-                         <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                             {steps.map(step => {
-                                 const isDone = step.status === StepStatus.COMPLETED;
-                                 const isLate = !isDone && step.isDelayed;
-                                 return (
-                                     <div key={step.id} className="p-4 flex justify_between items-center hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors break-inside-avoid">
-                                         <div className="flex items-center gap-3">
-                                             <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs text-white ${isDone ? 'bg-green-500' : isLate ? 'bg-red-500' : 'bg-slate-300'}`}>
-                                                 <i className={`fa-solid ${isDone ? 'fa-check' : isLate ? 'fa-exclamation' : 'fa-clock'}`}></i>
-                                             </div>
-                                             <div>
-                                                 <p className={`font-bold text-sm ${isDone ? 'text-slate-400 line-through' : 'text-primary dark:text-white'}`}>{step.name}</p>
-                                                 <p className="text-xs text-slate-400">Previsto: {new Date(step.startDate).toLocaleDateString()}</p>
-                                             </div>
-                                         </div>
-                                         <div className="text-right">
-                                             {isLate && <span className="bg-red-100 text-red-600 text-[10px] font-bold px-2 py-1 rounded-md uppercase">Atrasado</span>}
-                                             {isDone && <span className="bg-green-100 text-green-600 text-[10px] font-bold px-2 py-1 rounded-md uppercase">Feito</span>}
-                                             {!isLate && !isDone && <span className="bg-slate-100 text-slate-500 text-[10px] font-bold px-2 py-1 rounded-md uppercase">Em andamento</span>}
-                                         </div>
-                                     </div>
-                                 )
-                             })}
-                         </div>
-                     </div>
-                 </div>
-             )}
+             <div className="flex p-1 bg-slate-100 dark:bg-slate-800/50 rounded-xl mb-6 print:hidden">{[{ id: 'FINANCIAL', label: 'Financeiro', icon: 'fa-wallet' }, { id: 'MATERIALS', label: 'Compras', icon: 'fa-cart-shopping' }, { id: 'STEPS', label: 'Etapas', icon: 'fa-list-check' }].map(tab => (<button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`flex-1 py-3 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-all ${activeTab === tab.id ? 'bg-white dark:bg-slate-800 text-primary dark:text-white shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}><i className={`fa-solid ${tab.icon}`}></i> {tab.label}</button>))}</div>
+             {activeTab === 'FINANCIAL' && (<div className="space-y-6 animate-in fade-in"><div className="grid grid-cols-1 md:grid-cols-3 gap-4"><div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 shadow-sm"><p className="text-xs font-bold text-slate-400 uppercase">Total Gasto</p><p className="text-2xl font-bold text-primary dark:text-white">R$ {totalSpent.toLocaleString('pt-BR')}</p></div><div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 shadow-sm"><p className="text-xs font-bold text-slate-400 uppercase">Valor Pago</p><p className="text-2xl font-bold text-green-600">R$ {totalPaid.toLocaleString('pt-BR')}</p></div><div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 shadow-sm"><p className="text-xs font-bold text-slate-400 uppercase">A Pagar</p><p className="text-2xl font-bold text-red-500">R$ {totalPending.toLocaleString('pt-BR')}</p></div></div><div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm"><div className="h-64"><Recharts.ResponsiveContainer width="100%" height="100%"><Recharts.BarChart data={financialData}><Recharts.CartesianGrid strokeDasharray="3 3" vertical={false} /><Recharts.XAxis dataKey="name" tick={{fontSize: 10}} /><Recharts.YAxis /><Recharts.Tooltip /><Recharts.Bar dataKey="value" fill="#D97706" radius={[6, 6, 0, 0]} barSize={40} /></Recharts.BarChart></Recharts.ResponsiveContainer></div></div><div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm"><h3 className="font-bold mb-4 dark:text-white">Extrato Detalhado</h3><table className="w-full text-sm text-left"><thead><tr className="border-b dark:border-slate-700 text-slate-500"><th className="py-2 font-bold">Data</th><th className="py-2 font-bold">Descrição</th><th className="py-2 font-bold">Categoria</th><th className="py-2 font-bold text-right">Valor</th></tr></thead><tbody>{expenses.map(e => (<tr key={e.id} className="border-b dark:border-slate-800 last:border-0 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"><td className="py-3 text-slate-500">{new Date(e.date).toLocaleDateString()}</td><td className="py-3 font-medium dark:text-slate-300">{e.description}</td><td className="py-3 text-xs"><span className="bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-md">{e.category}</span></td><td className="py-3 text-right font-bold dark:text-white">R$ {e.amount.toLocaleString('pt-BR')}</td></tr>))}</tbody></table></div></div>)}
+             {activeTab === 'MATERIALS' && (<div className="space-y-6 animate-in fade-in"><div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col items-center justify-center"><div className="w-40 h-40 relative"><Recharts.ResponsiveContainer width="100%" height="100%"><Recharts.PieChart><Recharts.Pie data={materialChartData} cx="50%" cy="50%" innerRadius={40} outerRadius={60} paddingAngle={5} dataKey="value" cornerRadius={5} /></Recharts.PieChart></Recharts.ResponsiveContainer><div className="absolute inset-0 flex flex-col items-center justify-center"><span className="text-2xl font-bold text-primary dark:text-white">{purchasedMaterials}</span><span className="text-[10px] text-slate-400 uppercase">Comprados</span></div></div></div><div className="space-y-4">{Object.keys(groupedMaterials).sort().map(cat => (<div key={cat} className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 break-inside-avoid"><h4 className="font-bold text-primary dark:text-white mb-4 border-b border-slate-100 dark:border-slate-800 pb-2">{cat}</h4><div className="grid grid-cols-1 gap-3">{groupedMaterials[cat].map(m => (<div key={m.id} className="flex items-center gap-4 text-sm"><div className={`w-2 h-2 rounded-full ${m.purchasedQty >= m.plannedQty ? 'bg-green-500' : 'bg-slate-300'}`}></div><div className="flex-1"><div className="flex justify-between mb-1"><span className="font-medium dark:text-slate-200">{m.name}</span><span className="text-slate-500 text-xs">{m.purchasedQty} / {m.plannedQty} {m.unit}</span></div></div></div>))}</div></div>))}</div></div>)}
+             {activeTab === 'STEPS' && (<div className="space-y-6 animate-in fade-in"><div className="flex gap-4 mb-4 overflow-x-auto pb-2"><div className="flex-1 min-w-[120px] bg-green-50 dark:bg-green-900/20 p-4 rounded-xl border border-green-100 dark:border-green-900/30 text-center"><p className="text-2xl font-bold text-green-600 dark:text-green-400">{completedSteps}</p><p className="text-xs font-bold text-green-700 dark:text-green-300 uppercase">Concluídas</p></div><div className="flex-1 min-w-[120px] bg-red-50 dark:bg-red-900/20 p-4 rounded-xl border border-red-100 dark:border-red-900/30 text-center"><p className="text-2xl font-bold text-red-600 dark:text-red-400">{delayedSteps}</p><p className="text-xs font-bold text-red-700 dark:text-red-300 uppercase">Atrasadas</p></div><div className="flex-1 min-w-[120px] bg-slate-50 dark:bg-slate-800 p-4 rounded-xl border border-slate-100 dark:border-slate-700 text-center"><p className="text-2xl font-bold text-slate-600 dark:text-slate-300">{totalSteps}</p><p className="text-xs font-bold text-slate-500 uppercase">Total Etapas</p></div></div></div>)}
         </div>
     );
 };
@@ -638,7 +370,7 @@ const MoreMenuTab: React.FC<{ workId: string }> = ({ workId }) => {
                 )}
 
                 <div className="relative z-0">
-                    <div className="flex items_center gap-3 mb-6">
+                    <div className="flex items-center gap-3 mb-6">
                          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-white shadow-lg">
                              <i className="fa-solid fa-crown"></i>
                          </div>
@@ -721,6 +453,7 @@ const StepsTab: React.FC<{ workId: string, refreshWork: () => void }> = ({ workI
 
 // --- TABS (MATERIALS) ---
 const MaterialsTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ workId, onUpdate }) => {
+    const [materials, setMaterials] = useState<Material[]>([]);
     const [steps, setSteps] = useState<Step[]>([]);
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [isImportOpen, setIsImportOpen] = useState(false);
@@ -729,295 +462,87 @@ const MaterialsTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ work
     const [newMaterial, setNewMaterial] = useState({ name: '', plannedQty: '', unit: 'un', category: 'Geral' });
     const [groupedMaterials, setGroupedMaterials] = useState<Record<string, Material[]>>({});
 
-    const load = async () => {
-        const [matData, stepData] = await Promise.all([
-            dbService.getMaterials(workId),
-            dbService.getSteps(workId)
-        ]);
+    const load = async () => { const [matData, stepData] = await Promise.all([dbService.getMaterials(workId), dbService.getSteps(workId)]); setMaterials(matData); setSteps(stepData); const grouped: Record<string, Material[]> = {}; matData.forEach(m => { const cat = m.category || 'Geral'; if (!grouped[cat]) grouped[cat] = []; grouped[cat].push(m); }); setGroupedMaterials(grouped); };
+    useEffect(() => { load(); }, [workId]);
 
-        setSteps(stepData);
-
-        const grouped: Record<string, Material[]> = {};
-        matData.forEach(m => {
-            const cat = m.category || 'Geral';
-            if (!grouped[cat]) grouped[cat] = [];
-            grouped[cat].push(m);
-        });
-        setGroupedMaterials(grouped);
-    };
-
-    // ✅ CARREGAR MATERIAIS AO ENTRAR NA ABA
-    useEffect(() => {
-        load();
-    }, [workId]);
-
-    const handleAdd = async (e: React.FormEvent) => {
-        e.preventDefault();
-        await dbService.addMaterial({ workId, name: newMaterial.name, plannedQty: Number(newMaterial.plannedQty), purchasedQty: 0, unit: newMaterial.unit, category: newMaterial.category });
-        setIsCreateOpen(false);
-        await load();
-        onUpdate();
-    };
-
-    const handleImport = async (category: string) => {
-        const count = await dbService.importMaterialPackage(workId, category);
-        alert(`${count} adicionados.`);
-        setIsImportOpen(false);
-        await load();
-        onUpdate();
-    };
-
-    const handleUpdate = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if(editingMaterial) {
-            await dbService.updateMaterial(editingMaterial, Number(editCost));
-            setEditingMaterial(null);
-            setEditCost('');
-            await load();
-            onUpdate();
-        }
-    };
-
-    const sortedCategories = Object.keys(groupedMaterials).sort((a, b) => {
-        const getOrder = (cat: string) => {
-            const normalize = (str: string) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-            const normCat = normalize(cat);
-            const step = steps.find(s => {
-                const normStep = normalize(s.name);
-                return normStep.includes(normCat) || normCat.includes(normStep);
-            });
-            return step ? new Date(step.startDate).getTime() : 9999999999999;
-        };
-        return getOrder(a) - getOrder(b);
-    });
+    const handleAdd = async (e: React.FormEvent) => { e.preventDefault(); await dbService.addMaterial({ workId, name: newMaterial.name, plannedQty: Number(newMaterial.plannedQty), purchasedQty: 0, unit: newMaterial.unit, category: newMaterial.category }); setIsCreateOpen(false); await load(); onUpdate(); };
+    const handleImport = async (category: string) => { const count = await dbService.importMaterialPackage(workId, category); alert(`${count} adicionados.`); setIsImportOpen(false); await load(); onUpdate(); };
+    const handleUpdate = async (e: React.FormEvent) => { e.preventDefault(); if(editingMaterial) { await dbService.updateMaterial(editingMaterial, Number(editCost)); setEditingMaterial(null); setEditCost(''); await load(); onUpdate(); } }
+    const sortedCategories = Object.keys(groupedMaterials).sort((a, b) => { const getOrder = (cat: string) => { const normalize = (str: string) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase(); const normCat = normalize(cat); const step = steps.find(s => { const normStep = normalize(s.name); return normStep.includes(normCat) || normCat.includes(normStep); }); return step ? new Date(step.startDate).getTime() : 9999999999999; }; return getOrder(a) - getOrder(b); });
 
     return (
         <div className="animate-in fade-in duration-500 pb-20">
-            <div className="flex items-center justify-between mb-8">
-                <SectionHeader title="Materiais" subtitle="Controle de estoque." />
-                <div className="flex gap-2">
-                    <button onClick={() => setIsImportOpen(true)} className="bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-secondary w-12 h-12 rounded-2xl flex items-center justify-center transition-all">
-                        <i className="fa-solid fa-cloud-arrow-down text-lg"></i>
-                    </button>
-                    <button onClick={() => setIsCreateOpen(true)} className="bg-primary text-white w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg transition-all">
-                        <i className="fa-solid fa-plus text-lg"></i>
-                    </button>
-                </div>
-            </div>
-
-            {sortedCategories.map(cat => (
-                <div key={cat} className="mb-8 last:mb-0">
-                    <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-                        <i className="fa-solid fa-layer-group text-secondary"></i> {cat}
-                    </h3>
-                    <div className="space-y-3">
-                        {groupedMaterials[cat].map(m => (
-                            <div
-                                key={m.id}
-                                onClick={() => setEditingMaterial(m)}
-                                className={`p-4 rounded-2xl border bg-white dark:bg-slate-900 cursor-pointer transition-all hover:border-secondary/50 hover:shadow-md ${
-                                    m.purchasedQty >= m.plannedQty
-                                        ? 'border-green-200 dark:border-green-900/30 opacity-60'
-                                        : 'border-slate-100 dark:border-slate-800'
-                                }`}
-                            >
-                                <div className="flex justify-between items-start mb-2">
-                                    <h4 className="font-bold text-primary dark:text-white">{m.name}</h4>
-                                    <div
-                                        className={`text-[10px] font-bold px-2 py-0.5 rounded-md uppercase ${
-                                            m.purchasedQty >= m.plannedQty ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'
-                                        }`}
-                                    >
-                                        {m.purchasedQty >= m.plannedQty ? 'Comprado' : 'Pendente'}
-                                    </div>
-                                </div>
-                                <div className="flex items-end gap-2">
-                                    <div className="flex-1">
-                                        <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                                            <div
-                                                className={`h-full rounded-full ${
-                                                    m.purchasedQty >= m.plannedQty ? 'bg-success' : 'bg-secondary'
-                                                }`}
-                                                style={{ width: `${Math.min(100, (m.purchasedQty / m.plannedQty) * 100)}%` }}
-                                            ></div>
-                                        </div>
-                                    </div>
-                                    <div className="text-xs font-bold text-slate-500 whitespace-nowrap">
-                                        {m.purchasedQty} / {m.plannedQty} {m.unit}
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            ))}
-
-            {isCreateOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
-                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-8 shadow-2xl">
-                        <h3 className="text-xl font-bold text-primary dark:text-white mb-6">Novo Material</h3>
-                        <form onSubmit={handleAdd} className="space-y-4">
-                            <input
-                                placeholder="Nome"
-                                className="w-full px-4 py-3 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 outline-none"
-                                value={newMaterial.name}
-                                onChange={e => setNewMaterial({ ...newMaterial, name: e.target.value })}
-                            />
-                            <div className="grid grid-cols-2 gap-3">
-                                <input
-                                    type="number"
-                                    placeholder="Qtd"
-                                    className="w-full px-4 py-3 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 outline-none"
-                                    value={newMaterial.plannedQty}
-                                    onChange={e => setNewMaterial({ ...newMaterial, plannedQty: e.target.value })}
-                                />
-                                <input
-                                    placeholder="Un"
-                                    className="w-full px-4 py-3 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 outline-none"
-                                    value={newMaterial.unit}
-                                    onChange={e => setNewMaterial({ ...newMaterial, unit: e.target.value })}
-                                />
-                            </div>
-                            <input
-                                placeholder="Categoria"
-                                className="w-full px-4 py-3 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 outline-none"
-                                value={newMaterial.category}
-                                onChange={e => setNewMaterial({ ...newMaterial, category: e.target.value })}
-                            />
-                            <div className="flex gap-3 pt-2">
-                                <button
-                                    type="button"
-                                    onClick={() => setIsCreateOpen(false)}
-                                    className="flex-1 py-3 font-bold text-slate-500"
-                                >
-                                    Cancelar
-                                </button>
-                                <button type="submit" className="flex-1 py-3 bg-primary text-white rounded-xl font-bold">
-                                    Salvar
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
-
+            <div className="flex items-center justify-between mb-8"><SectionHeader title="Materiais" subtitle="Controle de estoque." /><div className="flex gap-2"><button onClick={() => setIsImportOpen(true)} className="bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-secondary w-12 h-12 rounded-2xl flex items-center justify-center transition-all"><i className="fa-solid fa-cloud-arrow-down text-lg"></i></button><button onClick={() => setIsCreateOpen(true)} className="bg-primary text-white w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg transition-all"><i className="fa-solid fa-plus text-lg"></i></button></div></div>
+            {sortedCategories.map(cat => (<div key={cat} className="mb-8 last:mb-0"><h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2"><i className="fa-solid fa-layer-group text-secondary"></i> {cat}</h3><div className="space-y-3">{groupedMaterials[cat].map(m => (<div key={m.id} onClick={() => setEditingMaterial(m)} className={`p-4 rounded-2xl border bg-white dark:bg-slate-900 cursor-pointer transition-all hover:border-secondary/50 hover:shadow-md ${m.purchasedQty >= m.plannedQty ? 'border-green-200 dark:border-green-900/30 opacity-60' : 'border-slate-100 dark:border-slate-800'}`}><div className="flex justify-between items-start mb-2"><h4 className="font-bold text-primary dark:text-white">{m.name}</h4><div className={`text-[10px] font-bold px-2 py-0.5 rounded-md uppercase ${m.purchasedQty >= m.plannedQty ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}`}>{m.purchasedQty >= m.plannedQty ? 'Comprado' : 'Pendente'}</div></div><div className="flex items-end gap-2"><div className="flex-1"><div className="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden"><div className={`h-full rounded-full ${m.purchasedQty >= m.plannedQty ? 'bg-success' : 'bg-secondary'}`} style={{width: `${Math.min(100, (m.purchasedQty / m.plannedQty) * 100)}%`}}></div></div></div><div className="text-xs font-bold text-slate-500 whitespace-nowrap">{m.purchasedQty} / {m.plannedQty} {m.unit}</div></div></div>))}</div></div>))}
+            {isCreateOpen && (<div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in"><div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-8 shadow-2xl"><h3 className="text-xl font-bold text-primary dark:text-white mb-6">Novo Material</h3><form onSubmit={handleAdd} className="space-y-4"><input placeholder="Nome" className="w-full px-4 py-3 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 outline-none" value={newMaterial.name} onChange={e => setNewMaterial({...newMaterial, name: e.target.value})} /><div className="grid grid-cols-2 gap-3"><input type="number" placeholder="Qtd" className="w-full px-4 py-3 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 outline-none" value={newMaterial.plannedQty} onChange={e => setNewMaterial({...newMaterial, plannedQty: e.target.value})} /><input placeholder="Un" className="w-full px-4 py-3 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 outline-none" value={newMaterial.unit} onChange={e => setNewMaterial({...newMaterial, unit: e.target.value})} /></div><input placeholder="Categoria" className="w-full px-4 py-3 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 outline-none" value={newMaterial.category} onChange={e => setNewMaterial({...newMaterial, category: e.target.value})} /><div className="flex gap-3 pt-2"><button type="button" onClick={() => setIsCreateOpen(false)} className="flex-1 py-3 font-bold text-slate-500">Cancelar</button><button type="submit" className="flex-1 py-3 bg-primary text-white rounded-xl font-bold">Salvar</button></div></form></div></div>)}
             {editingMaterial && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
                     <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-8 shadow-2xl">
-                        <h3 className="text-xl font-bold text-primary dark:text-white mb-6">Atualizar</h3>
+                        <h3 className="text-xl font-bold text-primary dark:text-white mb-6">Atualizar Estoque</h3>
                         <form onSubmit={handleUpdate} className="space-y-4">
-                            <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl mb-2">
-                                <p className="text-sm font-bold text-primary dark:text-white">{editingMaterial.name}</p>
+                            
+                            {/* EDIT NAME & CATEGORY */}
+                            <div className="space-y-3 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-700">
+                                <div>
+                                    <label className="text-[10px] uppercase font-bold text-slate-400 mb-1 block">Nome do Material</label>
+                                    <input 
+                                        className="w-full px-0 py-1 bg-transparent border-b border-slate-200 dark:border-slate-600 text-primary dark:text-white font-bold outline-none focus:border-secondary transition-colors" 
+                                        value={editingMaterial.name} 
+                                        onChange={e => setEditingMaterial({...editingMaterial, name: e.target.value})} 
+                                    />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] uppercase font-bold text-slate-400 mb-1 block">Categoria / Etapa</label>
+                                    <input 
+                                        className="w-full px-0 py-1 bg-transparent border-b border-slate-200 dark:border-slate-600 text-sm text-slate-600 dark:text-slate-300 outline-none focus:border-secondary transition-colors" 
+                                        value={editingMaterial.category || ''} 
+                                        onChange={e => setEditingMaterial({...editingMaterial, category: e.target.value})} 
+                                    />
+                                </div>
                             </div>
+
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
                                     <label className="text-[10px] uppercase font-bold text-slate-400">Planejado</label>
-                                    <input
-                                        type="number"
-                                        className="w-full px-3 py-2 rounded-xl border bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700"
-                                        value={editingMaterial.plannedQty}
-                                        onChange={e =>
-                                            setEditingMaterial({
-                                                ...editingMaterial,
-                                                plannedQty: Number(e.target.value),
-                                            })
-                                        }
-                                    />
+                                    <input type="number" className="w-full px-3 py-2 rounded-xl border bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700" value={editingMaterial.plannedQty} onChange={e => setEditingMaterial({...editingMaterial, plannedQty: Number(e.target.value)})} />
                                 </div>
                                 <div>
                                     <label className="text-[10px] uppercase font-bold text-slate-400">Comprado</label>
-                                    <input
-                                        type="number"
-                                        className="w-full px-3 py-2 rounded-xl border bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700"
-                                        value={editingMaterial.purchasedQty}
-                                        onChange={e =>
-                                            setEditingMaterial({
-                                                ...editingMaterial,
-                                                purchasedQty: Number(e.target.value),
-                                            })
-                                        }
-                                    />
+                                    <input type="number" className="w-full px-3 py-2 rounded-xl border bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700" value={editingMaterial.purchasedQty} onChange={e => setEditingMaterial({...editingMaterial, purchasedQty: Number(e.target.value)})} />
                                 </div>
                             </div>
                             <div>
-                                <label className="text-[10px] uppercase font-bold text-slate-400">Valor Pago (Opcional)</label>
-                                <input
-                                    type="number"
-                                    className="w-full pl-4 py-2 rounded-xl border bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700"
-                                    placeholder="0.00"
-                                    value={editCost}
-                                    onChange={e => setEditCost(e.target.value)}
-                                />
+                                <label className="text-[10px] uppercase font-bold text-slate-400">Valor desta compra (Opcional)</label>
+                                <div className="relative">
+                                    <span className="absolute left-3 top-2.5 text-slate-400 text-sm">R$</span>
+                                    <input type="number" className="w-full pl-8 pr-4 py-2 rounded-xl border bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700" placeholder="0.00" value={editCost} onChange={e => setEditCost(e.target.value)} />
+                                </div>
+                                <p className="text-[10px] text-slate-400 mt-1">Se preencher, lança no financeiro automaticamente.</p>
                             </div>
-                            <div className="flex gap-3 pt-4">
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        setEditingMaterial(null);
-                                        setEditCost('');
-                                    }}
-                                    className="flex-1 py-3 font-bold text-slate-500"
-                                >
-                                    Cancelar
-                                </button>
-                                <button type="submit" className="flex-1 py-3 bg-primary text-white rounded-xl font-bold">
-                                    Salvar
-                                </button>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={async () => {
-                                    await dbService.deleteMaterial(editingMaterial.id);
-                                    setEditingMaterial(null);
-                                    await load();
-                                    onUpdate();
-                                }}
-                                className="w-full py-2 text-red-500 text-xs font-bold uppercase tracking-wider"
-                            >
-                                Excluir
-                            </button>
+                             <div className="flex gap-3 pt-4">
+                                <button type="button" onClick={() => { setEditingMaterial(null); setEditCost(''); }} className="flex-1 py-3 font-bold text-slate-500">Cancelar</button>
+                                <button type="submit" className="flex-1 py-3 bg-primary text-white rounded-xl font-bold">Salvar</button>
+                             </div>
+                             <button type="button" onClick={async () => { await dbService.deleteMaterial(editingMaterial.id); setEditingMaterial(null); await load(); onUpdate(); }} className="w-full py-2 text-red-500 text-xs font-bold uppercase tracking-wider">Excluir Material</button>
                         </form>
                     </div>
                 </div>
             )}
-
-            {isImportOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
-                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-6 shadow-2xl h-[500px] flex flex-col">
-                        <div className="flex justify-between items-center mb-4">
-                            <h3 className="text-lg font-bold text-primary dark:text-white">Pacotes</h3>
-                            <button onClick={() => setIsImportOpen(false)}>
-                                <i className="fa-solid fa-xmark text-slate-400"></i>
-                            </button>
-                        </div>
-                        <div className="flex-1 overflow-y-auto space-y-2 pr-2">
-                            {FULL_MATERIAL_PACKAGES.map(pkg => (
-                                <button
-                                    key={pkg.category}
-                                    onClick={() => handleImport(pkg.category)}
-                                    className="w-full p-4 rounded-xl border border-slate-100 dark:border-slate-800 hover:border-secondary hover:bg-slate-50 dark:hover:bg-slate-800 transition-all text-left group"
-                                >
-                                    <h4 className="font-bold text-primary dark:text-white group-hover:text-secondary">{pkg.category}</h4>
-                                    <p className="text-xs text-slate-400">{pkg.items.length} itens</p>
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-            )}
+            {isImportOpen && (<div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in"><div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-6 shadow-2xl h-[500px] flex flex-col"><div className="flex justify-between items-center mb-4"><h3 className="text-lg font-bold text-primary dark:text-white">Pacotes</h3><button onClick={() => setIsImportOpen(false)}><i className="fa-solid fa-xmark text-slate-400"></i></button></div><div className="flex-1 overflow-y-auto space-y-2 pr-2">{FULL_MATERIAL_PACKAGES.map(pkg => (<button key={pkg.category} onClick={() => handleImport(pkg.category)} className="w-full p-4 rounded-xl border border-slate-100 dark:border-slate-800 hover:border-secondary hover:bg-slate-50 dark:hover:bg-slate-800 transition-all text-left group"><h4 className="font-bold text-primary dark:text-white group-hover:text-secondary">{pkg.category}</h4><p className="text-xs text-slate-400">{pkg.items.length} itens</p></button>))}</div></div></div>)}
         </div>
     );
 }
 
 // --- Expenses Tab ---
 const ExpensesTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ workId, onUpdate }) => {
+    const [expenses, setExpenses] = useState<Expense[]>([]);
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [groupedExpenses, setGroupedExpenses] = useState<Record<string, {total: number, items: Expense[]}>>({});
     const [steps, setSteps] = useState<Step[]>([]);
     const [formData, setFormData] = useState<Partial<Expense>>({ date: new Date().toISOString().split('T')[0], category: ExpenseCategory.MATERIAL, amount: 0, paidAmount: 0, description: '', stepId: 'geral' });
     const [editingId, setEditingId] = useState<string | null>(null);
 
-    const load = async () => { const [exp, stp] = await Promise.all([dbService.getExpenses(workId), dbService.getSteps(workId)]); setSteps(stp); const grouped: Record<string, {total: number, items: Expense[]}> = {}; const getStepName = (id?: string) => { if (!id || id === 'geral') return 'Geral'; const s = stp.find(st => st.id === id); return s ? s.name : 'Outros'; }; exp.forEach(e => { const groupName = getStepName(e.stepId); if (!grouped[groupName]) grouped[groupName] = { total: 0, items: [] }; grouped[groupName].items.push(e); grouped[groupName].total += (e.paidAmount || 0); }); setGroupedExpenses(grouped); };
+    const load = async () => { const [exp, stp] = await Promise.all([dbService.getExpenses(workId), dbService.getSteps(workId)]); setExpenses(exp); setSteps(stp); const grouped: Record<string, {total: number, items: Expense[]}> = {}; const getStepName = (id?: string) => { if (!id || id === 'geral') return 'Geral'; const s = stp.find(st => st.id === id); return s ? s.name : 'Outros'; }; exp.forEach(e => { const groupName = getStepName(e.stepId); if (!grouped[groupName]) grouped[groupName] = { total: 0, items: [] }; grouped[groupName].items.push(e); grouped[groupName].total += (e.paidAmount || 0); }); setGroupedExpenses(grouped); };
     useEffect(() => { load(); }, [workId]);
 
     const handleSave = async (e: React.FormEvent) => { e.preventDefault(); const payload = { workId, description: formData.description!, amount: Number(formData.amount), paidAmount: Number(formData.paidAmount), category: formData.category!, date: formData.date!, stepId: formData.stepId === 'geral' ? undefined : formData.stepId, quantity: 1 }; if (editingId) await dbService.updateExpense({ ...payload, id: editingId } as Expense); else await dbService.addExpense(payload); setIsCreateOpen(false); setEditingId(null); await load(); onUpdate(); };
