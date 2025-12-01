@@ -149,7 +149,6 @@ const generateConstructionPlan = (totalArea: number, floors: number): PlanItem[]
                 { name: 'Ferro 3/8 (Colunas)', unit: 'barras', qty: Math.ceil(footprint * 0.4) },
                 { name: 'Ferro 4.2 (Estribos)', unit: 'barras', qty: Math.ceil(footprint * 0.2) },
                 { name: 'Tábua de Pinus (Vigas)', unit: 'dz', qty: Math.ceil(footprint / 20) },
-                // IMPORTANTE: Caixinhas de luz embutidas na parede entram aqui
                 { name: 'Caixinhas de Luz 4x2 (Parede)', unit: 'un', qty: Math.ceil(footprint / 8) },
                 { name: 'Eletroduto Corrugado (Parede)', unit: 'rolos', qty: Math.ceil(footprint / 20) },
             ]
@@ -537,6 +536,7 @@ export const dbService = {
             }
 
             // B. Create Linked Materials
+            // CRITICAL FIX: Relaxed condition to ensure materials are created even if stepId is not immediately available
             if (item.materials.length > 0) {
                  // FIX: FORCE CATEGORY TO MATCH STEP NAME FOR VISUAL GROUPING
                  const matPayload = item.materials.map(m => ({
@@ -546,7 +546,7 @@ export const dbService = {
                     purchased_qty: 0,
                     unit: m.unit,
                     category: item.stepName, // CRITICAL: USE STEP NAME AS CATEGORY
-                    step_id: stepId || null
+                    step_id: stepId || null // Allow null if stepId is missing
                  }));
 
                  if (supabase) {
