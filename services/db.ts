@@ -229,9 +229,23 @@ const generateConstructionPlan = (totalArea: number, floors: number): PlanItem[]
     });
     currentDay += 25;
 
-    // 8. PINTURA E FINALIZAÇÃO
+    // 8. FIAÇÃO E ENFIAMENTO (Nova Etapa Separada)
     plan.push({
-        stepName: "Pintura e Entrega",
+        stepName: "Fiação e Cabos (Elétrica)",
+        duration: 10,
+        startOffset: currentDay,
+        materials: [
+            { category: 'Elétrica', name: 'Cabos Flexíveis (1.5mm Iluminação)', unit: 'rolos', qty: Math.ceil(totalArea / 30) },
+            { category: 'Elétrica', name: 'Cabos Flexíveis (2.5mm Tomadas)', unit: 'rolos', qty: Math.ceil(totalArea / 25) },
+            { category: 'Elétrica', name: 'Cabos 6mm (Chuveiro)', unit: 'm', qty: Math.ceil(floors * 15) },
+            { category: 'Elétrica', name: 'Fita Isolante/Guia', unit: 'kit', qty: 1 },
+        ]
+    });
+    currentDay += 10;
+
+    // 9. PINTURA GERAL (Apenas Pintura)
+    plan.push({
+        stepName: "Pintura Geral",
         duration: 20,
         startOffset: currentDay,
         materials: [
@@ -239,9 +253,22 @@ const generateConstructionPlan = (totalArea: number, floors: number): PlanItem[]
             { category: 'Pintura', name: 'Selador Acrílico', unit: 'latas', qty: Math.ceil(totalArea / 60) },
             { category: 'Pintura', name: 'Tinta Acrílica Premium (18L)', unit: 'latas', qty: Math.ceil(totalArea / 40) },
             { category: 'Pintura', name: 'Lixas 150/220', unit: 'un', qty: 20 },
+            { category: 'Pintura', name: 'Rolo de Lã e Pincéis', unit: 'kit', qty: 1 },
+        ]
+    });
+    currentDay += 20;
+
+    // 10. ACABAMENTOS FINAIS (Nova Etapa: Tomadas, Metais, etc)
+    plan.push({
+        stepName: "Acabamentos Finais (Elétrica/Hidráulica)",
+        duration: 10,
+        startOffset: currentDay,
+        materials: [
             { category: 'Elétrica', name: 'Kit Tomadas e Interruptores', unit: 'un', qty: Math.ceil(totalArea / 8) },
-            { category: 'Elétrica', name: 'Cabos Flexíveis (1.5mm/2.5mm)', unit: 'rolos', qty: Math.ceil(totalArea / 25) },
-            { category: 'Acabamento', name: 'Louças e Metais', unit: 'vb', qty: 1 },
+            { category: 'Elétrica', name: 'Luminárias / Plafons', unit: 'un', qty: Math.ceil(totalArea / 12) },
+            { category: 'Hidráulica', name: 'Louças (Vaso/Pia)', unit: 'un', qty: Math.ceil(floors * 1.5) },
+            { category: 'Hidráulica', name: 'Metais (Torneiras/Registros)', unit: 'un', qty: Math.ceil(floors * 2) },
+            { category: 'Acabamento', name: 'Limpeza Final', unit: 'vb', qty: 1 },
         ]
     });
 
