@@ -1,7 +1,6 @@
-
 // Standard Libraries for Construction Management
 
-export const ZE_AVATAR = "./ze.png"; 
+export const ZE_AVATAR = "./ze.png"; // Certifique-se de salvar a imagem na pasta public como ze.png
 
 export interface PhaseCategory {
   category: string;
@@ -42,8 +41,8 @@ export interface WorkTemplate {
   label: string;
   icon: string;
   description: string;
-  defaultDurationDays: number; 
-  includedSteps: string[];
+  defaultDurationDays: number; // Estimated duration
+  includedSteps: string[]; // List of step names from STANDARD_PHASES or custom
 }
 
 export const WORK_TEMPLATES: WorkTemplate[] = [
@@ -109,23 +108,25 @@ export const WORK_TEMPLATES: WorkTemplate[] = [
 
 export const CALCULATOR_LOGIC = {
   FLOOR: (area: number) => {
-    const margin = 1.10; 
+    const margin = 1.10; // 10%
     return {
       tiles: Math.ceil(area * margin),
-      mortar: Math.ceil((area * 4) / 20), 
-      grout: Math.ceil((area * 0.3)), 
+      mortar: Math.ceil((area * 4) / 20), // ~4kg/m2, sacos de 20kg
+      grout: Math.ceil((area * 0.3)), // ~300g/m2 (kg)
     };
   },
   WALL: (width: number, height: number) => {
     const area = width * height;
+    // Tijolo 8 furos (9x19x19) ~ 25 por m2 em pé ou deitado varia, usaremos média de 25
     return {
       area: area.toFixed(2),
       bricks: Math.ceil(area * 25),
-      cement: Math.ceil(area * 0.15), 
-      sand: Math.ceil(area * 0.02), 
+      cement: Math.ceil(area * 0.15), // Estimativa sacos para assentamento
+      sand: Math.ceil(area * 0.02), // m3
     };
   },
   PAINT: (area: number) => {
+    // Tinta rende ~10m2 por litro por demão. 2 demãos = 5m2/litro
     const liters = Math.ceil(area / 5);
     const cans18 = Math.floor(liters / 18);
     const remainder = liters % 18;
@@ -135,16 +136,16 @@ export const CALCULATOR_LOGIC = {
       litersTotal: liters,
       cans18,
       gallons36,
-      spackle: Math.ceil(area / 12), 
-      sealer: Math.ceil(area / 40), 
+      spackle: Math.ceil(area / 12), // Massa corrida latas
+      sealer: Math.ceil(area / 40), // Selador latas
     };
   },
   ESTIMATOR: (bathrooms: number, rooms: number) => {
     return {
       toilets: bathrooms,
-      sinks: bathrooms + 1, 
+      sinks: bathrooms + 1, // +1 cozinha
       showers: bathrooms,
-      outlets: (rooms * 5) + (bathrooms * 2) + 6, 
+      outlets: (rooms * 5) + (bathrooms * 2) + 6, // 5/quarto, 2/banheiro, 6 cozinha/sala
       switches: rooms + bathrooms + 2,
       lightPoints: rooms + bathrooms + 2
     };
@@ -156,7 +157,7 @@ export interface MaterialCatalog {
   items: {name: string, unit: string}[];
 }
 
-// FULL BACKUP CATALOG 
+// FULL BACKUP CATALOG (Used when Supabase table is not reachable or as fallback)
 export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
   {
     category: 'Fundação',
