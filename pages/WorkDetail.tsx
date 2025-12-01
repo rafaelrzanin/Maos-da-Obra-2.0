@@ -1,10 +1,9 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { dbService } from '../services/db';
-import { Work, Step, Expense, Material, StepStatus, ExpenseCategory, PlanType, Supplier, Worker, WorkPhoto, WorkFile } from '../types';
+import { Work, Step, Expense, Material, StepStatus, ExpenseCategory, PlanType, WorkPhoto, WorkFile } from '../types';
 import { Recharts } from '../components/RechartsWrapper';
-import { CALCULATORS, CONTRACT_TEMPLATES, STANDARD_CHECKLISTS, FULL_MATERIAL_PACKAGES, ZE_AVATAR } from '../services/standards';
+import { FULL_MATERIAL_PACKAGES, ZE_AVATAR } from '../services/standards';
 import { useAuth } from '../App';
 import { aiService } from '../services/ai';
 
@@ -84,7 +83,7 @@ const ZeModal: React.FC<ZeModalProps> = ({ isOpen, title, message, confirmText =
 // --- SUB-VIEWS FOR "MORE" TAB ---
 
 // 1. CONTACTS VIEW (TEAM OR SUPPLIERS SEPARATED)
-const ContactsView: React.FC<{ workId: string, mode: 'TEAM' | 'SUPPLIERS', onBack: () => void }> = ({ workId, mode, onBack }) => {
+const ContactsView: React.FC<{ mode: 'TEAM' | 'SUPPLIERS', onBack: () => void }> = ({ mode, onBack }) => {
     const { user } = useAuth();
     const [items, setItems] = useState<any[]>([]);
     const [isAddOpen, setIsAddOpen] = useState(false);
@@ -183,7 +182,7 @@ const ContactsView: React.FC<{ workId: string, mode: 'TEAM' | 'SUPPLIERS', onBac
                             <input placeholder={mode === 'TEAM' ? "Profissão (ex: Pedreiro)" : "Categoria (ex: Elétrica)"} value={newRole} onChange={e => setNewRole(e.target.value)} className="w-full p-3 rounded-xl border dark:border-slate-700 dark:bg-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-primary" required />
                             <input placeholder="Telefone / WhatsApp" value={newPhone} onChange={e => setNewPhone(e.target.value)} className="w-full p-3 rounded-xl border dark:border-slate-700 dark:bg-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-primary" required />
                             <div className="flex gap-2 pt-2">
-                                <button type="button" onClick={() => setIsAddOpen(false)} className="flex-1 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl transition-colors">Cancelar</button>
+                                <button type="button" onClick={() => setIsAddOpen(false)} className="flex-1 py-3 text-slate-500 font-bold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">Cancelar</button>
                                 <button type="submit" className="flex-1 py-3 bg-primary text-white rounded-xl font-bold hover:bg-slate-800 transition-colors">Salvar</button>
                             </div>
                         </form>
@@ -1270,16 +1269,12 @@ const MoreMenuTab: React.FC<{ workId: string }> = ({ workId }) => {
     ];
 
     // Render Active Sub-View
-    if (activeSection === 'TEAM') return <ContactsView workId={workId} mode="TEAM" onBack={() => setActiveSection(null)} />;
-    if (activeSection === 'SUPPLIERS') return <ContactsView workId={workId} mode="SUPPLIERS" onBack={() => setActiveSection(null)} />;
+    if (activeSection === 'TEAM') return <ContactsView mode="TEAM" onBack={() => setActiveSection(null)} />;
+    if (activeSection === 'SUPPLIERS') return <ContactsView mode="SUPPLIERS" onBack={() => setActiveSection(null)} />;
     if (activeSection === 'PHOTOS') return <PhotosView workId={workId} onBack={() => setActiveSection(null)} />;
     if (activeSection === 'FILES') return <FilesView workId={workId} onBack={() => setActiveSection(null)} />;
     if (activeSection === 'REPORTS') return <ReportsView workId={workId} onBack={() => setActiveSection(null)} />;
     if (activeSection === 'AI') {
-        // We will handle AI chat in the main component via state uplift or direct render here?
-        // Actually the main component handles the AI Chat modal.
-        // Let's just alert for now or direct the user.
-        // But wait, the user asked for AI Assistant View. Let's create a simple view wrapper.
         return (
             <div className="flex flex-col h-full">
                 <button onClick={() => setActiveSection(null)} className="mb-4 text-sm font-bold text-slate-400 hover:text-primary"><i className="fa-solid fa-arrow-left"></i> Voltar</button>
@@ -1422,7 +1417,7 @@ const WorkDetail: React.FC = () => {
   );
 
   return (
-      <div className="min-h-screen pb-24"> {/* Added padding for bottom bar */}
+      <div className="min-h-screen pb-24">
           
           {/* Top Header */}
           <div className="sticky top-0 z-30 bg-surface/90 dark:bg-slate-950/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 px-4 py-4 flex justify-between items-center">
