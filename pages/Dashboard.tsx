@@ -164,14 +164,23 @@ const Dashboard: React.FC = () => {
             </h1>
           </div>
           {works.length > 0 && (
-             <div className="relative">
+             <div className="relative flex items-center gap-2">
                  <button 
                     onClick={() => setShowWorkSelector(!showWorkSelector)}
-                    className="text-sm text-primary dark:text-white font-bold bg-white dark:bg-slate-800 px-4 py-2 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 hover:border-secondary transition-all flex items-center gap-2"
+                    className="text-sm text-primary dark:text-white font-bold bg-white dark:bg-slate-800 px-4 py-3 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 hover:border-secondary transition-all flex items-center gap-2"
                  >
                      <i className="fa-solid fa-building text-secondary"></i>
-                     <span className="max-w-[100px] truncate">{focusWork.name}</span> 
+                     <span className="max-w-[120px] truncate">{focusWork.name}</span> 
                      <i className={`fa-solid fa-chevron-down text-xs transition-transform ${showWorkSelector ? 'rotate-180' : ''}`}></i>
+                 </button>
+                 
+                 {/* Explicit Delete Button for Current Work */}
+                 <button 
+                    onClick={(e) => handleDeleteClick(e, focusWork.id, focusWork.name)}
+                    className="w-11 h-11 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-400 hover:text-red-500 hover:border-red-200 flex items-center justify-center shadow-sm transition-all"
+                    title="Excluir Obra Atual"
+                 >
+                     <i className="fa-solid fa-trash"></i>
                  </button>
                  
                  {showWorkSelector && (
@@ -190,7 +199,7 @@ const Dashboard: React.FC = () => {
                                     {focusWork.id === w.id && <i className="fa-solid fa-check text-secondary"></i>}
                                     <button 
                                         onClick={(e) => handleDeleteClick(e, w.id, w.name)}
-                                        className="w-6 h-6 rounded bg-slate-100 dark:bg-slate-700 text-slate-400 hover:bg-red-100 hover:text-red-500 flex items-center justify-center transition-colors"
+                                        className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-400 hover:bg-red-100 hover:text-red-500 flex items-center justify-center transition-colors"
                                     >
                                         <i className="fa-solid fa-trash text-xs"></i>
                                     </button>
@@ -235,7 +244,7 @@ const Dashboard: React.FC = () => {
            </div>
       </div>
 
-      {/* Access Button (Floating CTA) - MOVED HERE */}
+      {/* Access Button (Floating CTA) */}
       <button 
         onClick={() => navigate(`/work/${focusWork.id}`)}
         className="group w-full mb-8 relative overflow-hidden rounded-2xl bg-primary dark:bg-white text-white dark:text-primary shadow-2xl hover:shadow-glow transition-all active:scale-[0.98]"
