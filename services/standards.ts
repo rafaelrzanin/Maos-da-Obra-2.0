@@ -290,7 +290,7 @@ export const LIFETIME_BONUSES = [
   }
 ];
 
-// --- CONTRACT TEMPLATES & DOCUMENTS ---
+// --- CONTRACT TEMPLATES ---
 export const CONTRACT_TEMPLATES = [
   {
     id: 'EMPREITA',
@@ -405,35 +405,51 @@ Assinatura do Contratado`
   }
 ];
 
-// --- STANDARD CHECKLISTS ---
+// --- STANDARD CHECKLISTS (ANTI-DOR DE CABEÇA) ---
 export const STANDARD_CHECKLISTS = [
   {
-    category: 'Elétrica',
+    category: 'Impermeabilização (Critico)',
     items: [
-      'Definir posição das tomadas 110v e 220v',
-      'Comprar quadro de distribuição',
-      'Testar disjuntores',
-      'Verificar aterramento',
-      'Instalar luminárias'
+      'Teste de Estanqueidade: Fechar os ralos e deixar o piso do banheiro com 2cm de água por 72 horas. Se vazar embaixo, refazer antes de por piso.',
+      'Rodapé da Impermeabilização: Verificar se a manta/impermeabilizante sobe pelo menos 30cm na parede do box.',
+      'Caimento do Box: Jogar água e ver se ela corre sozinha para o ralo sem empoçar nos cantos.',
+      'Ralos: Verificar se estão protegidos para não cair entulho dentro do cano.'
     ]
   },
   {
-    category: 'Hidráulica',
+    category: 'Elétrica & Segurança',
     items: [
-      'Testar pressão da água',
-      'Verificar caimentos de ralos (teste com balde)',
-      'Instalar registros de gaveta',
-      'Verificar vazamentos em sifões',
-      'Limpar caixa d\'água'
+      'Tomadas 110v vs 220v: Identificar claramente (com fita ou etiqueta) quais fios são 220v antes de fechar as caixinhas.',
+      'Fio Terra: Confirmar se o fio terra (verde) foi passado em TODAS as tomadas e chuveiros.',
+      'Disjuntor Correto: Verificar se o disjuntor do chuveiro é compatível com a potência (ex: chuveiro 7500w pede disjuntor de 40A e fio 6mm ou 10mm).',
+      'Posição das Tomadas: Conferir com o projeto de móveis. (Ex: a tomada da TV vai ficar atrás do painel? A da cabeceira vai ficar atrás da cama?)'
     ]
   },
   {
-    category: 'Acabamentos',
+    category: 'Pisos e Revestimentos',
     items: [
-      'Conferir nível do piso',
-      'Proteger pisos prontos com papelão',
-      'Testar abertura de portas e janelas',
-      'Rejuntar todos os revestimentos'
+      'Teste do "Oco": Bater levemente com o cabo de uma vassoura ou chave em cada peça assentada. Som oco = peça solta que vai quebrar.',
+      'Nivelamento (Dente): Passar uma moeda entre dois pisos. Se ela travar, um piso está mais alto que o outro.',
+      'Recortes Escondidos: Verificar se os pedaços pequenos de piso (recortes) ficaram nos cantos menos visíveis (atrás da porta, embaixo do armário).',
+      'Proteção: Cobrir o piso pronto com papelão ou lona para não riscar na pintura.'
+    ]
+  },
+  {
+    category: 'Hidráulica & Esgoto',
+    items: [
+      'Teste de Pressão: Abrir todas as torneiras e chuveiros ao mesmo tempo para ver se a água cai muito.',
+      'Mau Cheiro: Verificar se foi instalado "Sifão" ou "Caixa Sifonada" em todos os ralos e pias. Sem isso, o cheiro de esgoto volta.',
+      'Vazamento Oculto: Fechar todas as torneiras e olhar o relógio de água. Se o "pião" continuar girando, tem vazamento.',
+      'Registro Geral: Testar se o registro geral realmente corta a água da casa toda.'
+    ]
+  },
+  {
+    category: 'Portas e Janelas',
+    items: [
+      'Teste da Folha: Abrir a porta e soltar. Ela deve ficar parada. Se fechar ou abrir sozinha, está fora de prumo.',
+      'Fechaduras: Testar todas as chaves (trancar e destrancar) por dentro e por fora.',
+      'Vedações: Jogar água (mangueira) na janela fechada para garantir que não entra água pela lateral.',
+      'Arranhões: Conferir vidros contra a luz para ver se não foram riscados na limpeza.'
     ]
   }
 ];
