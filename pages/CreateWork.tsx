@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../App';
@@ -92,6 +93,8 @@ const CreateWork: React.FC = () => {
 
     setLoading(true);
 
+    const isConstruction = workCategory === 'CONSTRUCTION';
+
     // Calculate end date based on template duration
     const duration = selectedTemplate?.defaultDurationDays || 90;
     const start = new Date(formData.startDate);
@@ -99,7 +102,7 @@ const CreateWork: React.FC = () => {
     end.setDate(end.getDate() + duration);
 
     try {
-        // Create Work (Async)
+        // 1. CREATE WORK (If Construction, DB Service handles Steps & Materials generation)
         const newWork = await dbService.createWork({
           userId: user.id,
           name: formData.name,
@@ -110,31 +113,33 @@ const CreateWork: React.FC = () => {
           area: Number(formData.area) || 0,
           floors: Number(formData.floors) || 1,
           notes: selectedTemplate?.label || ''
-        }, workCategory === 'CONSTRUCTION'); // Pass flag to trigger calculations
+        }, isConstruction); 
 
-        // Add Selected Steps Manually (since we allowed custom unchecking)
-        const finalSteps = suggestedSteps.filter(s => s.checked).map(s => s.name);
-        const stepDuration = Math.max(2, Math.floor(duration / finalSteps.length));
-        
-        let currentOffset = 0;
-        
-        // We do this loop in parallel or sequential? Sequential is safer for order.
-        for (const stepName of finalSteps) {
-            const sDate = new Date(start);
-            sDate.setDate(sDate.getDate() + currentOffset);
+        // 2. ADD STEPS MANUALLY **ONLY IF RENOVATION**
+        // If it's construction, the service already generated the intelligent plan.
+        if (!isConstruction) {
+            const finalSteps = suggestedSteps.filter(s => s.checked).map(s => s.name);
+            const stepDuration = Math.max(2, Math.floor(duration / finalSteps.length));
             
-            const eDate = new Date(sDate);
-            eDate.setDate(eDate.getDate() + stepDuration);
+            let currentOffset = 0;
+            
+            for (const stepName of finalSteps) {
+                const sDate = new Date(start);
+                sDate.setDate(sDate.getDate() + currentOffset);
+                
+                const eDate = new Date(sDate);
+                eDate.setDate(eDate.getDate() + stepDuration);
 
-            await dbService.addStep({
-                workId: newWork.id,
-                name: stepName,
-                startDate: sDate.toISOString().split('T')[0],
-                endDate: eDate.toISOString().split('T')[0],
-                status: StepStatus.NOT_STARTED
-            });
-            
-            currentOffset += (stepDuration - 1); 
+                await dbService.addStep({
+                    workId: newWork.id,
+                    name: stepName,
+                    startDate: sDate.toISOString().split('T')[0],
+                    endDate: eDate.toISOString().split('T')[0],
+                    status: StepStatus.NOT_STARTED
+                });
+                
+                currentOffset += (stepDuration - 1); 
+            }
         }
 
         navigate(`/work/${newWork.id}`);
@@ -336,30 +341,35 @@ const CreateWork: React.FC = () => {
                 <div className="animate-in fade-in slide-in-from-right-4 duration-300">
                     <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 shadow-sm border border-slate-100 dark:border-slate-800">
                         <h2 className="text-xl font-bold text-primary dark:text-white mb-1">O que vamos fazer?</h2>
-                        <p className="text-text-muted dark:text-slate-400 mb-6 text-sm">Eu sugeri estas etapas. Desmarque o que você NÃO vai fazer.</p>
+                        <p className="text-text-muted dark:text-slate-400 mb-6 text-sm">Confira as etapas abaixo.</p>
 
-                        <div className="space-y-2 mb-6 max-h-[400px] overflow-y-auto pr-2">
-                           {suggestedSteps.map((step, idx) => (
-                               <label key={idx} className={`flex items-center p-3 rounded-xl border cursor-pointer transition-all ${step.checked ? 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700' : 'opacity-50 border-transparent'}`}>
-                                   <div className={`w-6 h-6 rounded-md border flex items-center justify-center mr-3 transition-colors ${step.checked ? 'bg-primary border-primary text-white' : 'bg-white dark:bg-slate-900 border-slate-300'}`}>
-                                       {step.checked && <i className="fa-solid fa-check text-xs"></i>}
-                                   </div>
-                                   <input 
-                                      type="checkbox" 
-                                      className="hidden" 
-                                      checked={step.checked} 
-                                      onChange={() => handleStepToggle(idx)}
-                                   />
-                                   <span className="text-sm font-medium text-text-main dark:text-white">{step.name}</span>
-                               </label>
-                           ))}
-                        </div>
+                        {workCategory === 'RENOVATION' && (
+                             <div className="space-y-2 mb-6 max-h-[400px] overflow-y-auto pr-2">
+                               {suggestedSteps.map((step, idx) => (
+                                   <label key={idx} className={`flex items-center p-3 rounded-xl border cursor-pointer transition-all ${step.checked ? 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700' : 'opacity-50 border-transparent'}`}>
+                                       <div className={`w-6 h-6 rounded-md border flex items-center justify-center mr-3 transition-colors ${step.checked ? 'bg-primary border-primary text-white' : 'bg-white dark:bg-slate-900 border-slate-300'}`}>
+                                           {step.checked && <i className="fa-solid fa-check text-xs"></i>}
+                                       </div>
+                                       <input 
+                                          type="checkbox" 
+                                          className="hidden" 
+                                          checked={step.checked} 
+                                          onChange={() => handleStepToggle(idx)}
+                                       />
+                                       <span className="text-sm font-medium text-text-main dark:text-white">{step.name}</span>
+                                   </label>
+                               ))}
+                            </div>
+                        )}
                         
                         {workCategory === 'CONSTRUCTION' && (
-                            <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl mb-4 border border-blue-100 dark:border-blue-900">
-                                <p className="text-sm text-blue-800 dark:text-blue-200">
-                                    <i className="fa-solid fa-robot mr-2"></i>
-                                    <strong>Engenheiro Virtual:</strong> Vou calcular automaticamente os materiais (tijolos, cimento, telhas) baseado nos seus <strong>{formData.area}m²</strong> e <strong>{formData.floors} andares</strong>.
+                            <div className="bg-blue-50 dark:bg-blue-900/20 p-6 rounded-xl mb-4 border border-blue-100 dark:border-blue-900 text-center">
+                                <div className="w-16 h-16 bg-blue-100 dark:bg-blue-800 text-blue-600 dark:text-blue-200 rounded-full flex items-center justify-center mx-auto mb-4">
+                                     <i className="fa-solid fa-wand-magic-sparkles text-2xl"></i>
+                                </div>
+                                <h3 className="font-bold text-blue-900 dark:text-blue-100 mb-2">Cronograma Inteligente</h3>
+                                <p className="text-sm text-blue-800 dark:text-blue-200 leading-relaxed">
+                                    Nosso <strong>Engenheiro Virtual</strong> vai criar todas as etapas (Fundações, Paredes, Lajes, Telhado) na ordem certa e calcular os materiais para cada andar.
                                 </p>
                             </div>
                         )}
