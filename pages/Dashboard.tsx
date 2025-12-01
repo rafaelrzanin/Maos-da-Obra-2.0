@@ -99,6 +99,17 @@ const Dashboard: React.FC = () => {
       }
   };
 
+  const handleDismiss = async (id: string) => {
+      await dbService.dismissNotification(id);
+      setNotifications(prev => prev.filter(n => n.id !== id));
+  };
+
+  const handleClearAll = async () => {
+      if (!user) return;
+      await dbService.clearAllNotifications(user.id);
+      setNotifications([]);
+  };
+
   if (loading && !focusWork && works.length === 0) return (
       <div className="flex items-center justify-center h-screen text-secondary">
           <i className="fa-solid fa-circle-notch fa-spin text-3xl"></i>
@@ -361,14 +372,24 @@ const Dashboard: React.FC = () => {
 
       {/* Notifications Section */}
       <div>
-          <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-              <i className="fa-regular fa-bell"></i> Avisos Recentes
-          </h3>
+          <div className="flex justify-between items-center mb-4">
+              <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                  <i className="fa-regular fa-bell"></i> Avisos Recentes
+              </h3>
+              {notifications.length > 0 && (
+                  <button 
+                      onClick={handleClearAll}
+                      className="text-xs font-bold text-slate-400 hover:text-primary dark:hover:text-white transition-colors flex items-center gap-1"
+                  >
+                      Limpar tudo
+                  </button>
+              )}
+          </div>
           
           <div className="space-y-3">
               {notifications.length > 0 ? (
                   notifications.map(notif => (
-                      <div key={notif.id} className={`p-4 rounded-2xl border flex items-start gap-4 transition-all ${
+                      <div key={notif.id} className={`group relative p-4 rounded-2xl border flex items-start gap-4 transition-all ${
                           notif.type === 'WARNING' ? 'bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-900/30' :
                           'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800'
                       }`}>
@@ -380,12 +401,21 @@ const Dashboard: React.FC = () => {
                                   notif.type === 'WARNING' ? 'fa-bolt' : 'fa-info'
                               } text-sm`}></i>
                           </div>
-                          <div className="flex-1">
+                          <div className="flex-1 pr-6">
                               <h4 className="text-sm font-bold text-primary dark:text-white mb-0.5">{notif.title}</h4>
                               <p className="text-sm text-slate-600 dark:text-slate-400 leading-snug">
                                   {notif.message}
                               </p>
                           </div>
+                          
+                          {/* Dismiss Button */}
+                          <button 
+                              onClick={() => handleDismiss(notif.id)}
+                              className="absolute top-2 right-2 text-slate-300 hover:text-slate-500 dark:hover:text-slate-200 p-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                              title="Remover aviso"
+                          >
+                              <i className="fa-solid fa-xmark"></i>
+                          </button>
                       </div>
                   ))
               ) : (
