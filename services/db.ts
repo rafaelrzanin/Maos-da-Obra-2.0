@@ -1,3 +1,4 @@
+
 import { 
   User, Work, Step, Expense, Material, WorkPhoto, WorkFile,
   PlanType, WorkStatus, StepStatus, Notification, StandardMaterial,
@@ -94,9 +95,9 @@ const generateConstructionPlan = (totalArea: number, floors: number): PlanItem[]
     const footprint = totalArea / Math.max(1, floors); // Área por pavimento (projeção no chão)
     let currentDay = 0;
 
-    // 0. CANTEIRO E PREPARAÇÃO
+    // 1. SERVIÇOS PRELIMINARES
     plan.push({
-        stepName: "1. Serviços Preliminares (Canteiro)",
+        stepName: "Serviços Preliminares (Canteiro)",
         duration: 5,
         startOffset: currentDay,
         materials: [
@@ -108,9 +109,9 @@ const generateConstructionPlan = (totalArea: number, floors: number): PlanItem[]
     });
     currentDay += 5;
 
-    // 1. FUNDAÇÃO (Considerando área do footprint)
+    // 2. FUNDAÇÃO (Considerando área do footprint)
     plan.push({
-        stepName: "2. Fundação e Baldrames",
+        stepName: "Fundação e Baldrames",
         duration: 20,
         startOffset: currentDay,
         materials: [
@@ -127,13 +128,13 @@ const generateConstructionPlan = (totalArea: number, floors: number): PlanItem[]
     });
     currentDay += 20;
 
-    // 2. ESTRUTURA E ALVENARIA (Loop por Andar)
+    // 3. ESTRUTURA E ALVENARIA (Loop por Andar)
     for (let i = 0; i < floors; i++) {
         const floorLabel = i === 0 ? "Térreo" : `${i}º Pavimento`;
         
         // A. Paredes e Colunas
         plan.push({
-            stepName: `3.${i+1} Alvenaria e Colunas (${floorLabel})`,
+            stepName: `Estrutura e Alvenaria (${floorLabel})`,
             duration: 25,
             startOffset: currentDay,
             materials: [
@@ -150,7 +151,7 @@ const generateConstructionPlan = (totalArea: number, floors: number): PlanItem[]
 
         // B. Laje (Se não for telhado direto, ou seja, sempre tem laje, seja de piso ou forro)
         plan.push({
-            stepName: `3.${i+1} Laje Pré-Moldada (${floorLabel})`,
+            stepName: `Laje (${floorLabel})`,
             duration: 15,
             startOffset: currentDay,
             materials: [
@@ -166,9 +167,9 @@ const generateConstructionPlan = (totalArea: number, floors: number): PlanItem[]
         currentDay += 15;
     }
 
-    // 3. TELHADO E COBERTURA
+    // 4. TELHADO E COBERTURA
     plan.push({
-        stepName: "4. Telhado e Calhas",
+        stepName: "Telhado e Cobertura",
         duration: 20,
         startOffset: currentDay,
         materials: [
@@ -182,9 +183,9 @@ const generateConstructionPlan = (totalArea: number, floors: number): PlanItem[]
     // Não incrementamos full time pois instalações começam em paralelo
     currentDay += 10; 
 
-    // 4. INSTALAÇÕES (RASGOS E TUBULAÇÕES)
+    // 5. INSTALAÇÕES (RASGOS E TUBULAÇÕES)
     plan.push({
-        stepName: "5. Instalações (Elétrica e Hidráulica)",
+        stepName: "Instalações (Elétrica e Hidráulica)",
         duration: 20,
         startOffset: currentDay,
         materials: [
@@ -200,9 +201,9 @@ const generateConstructionPlan = (totalArea: number, floors: number): PlanItem[]
     });
     currentDay += 20;
 
-    // 5. REBOCO E CONTRAPISO
+    // 6. REBOCO E CONTRAPISO
     plan.push({
-        stepName: "6. Reboco e Contrapiso",
+        stepName: "Reboco e Contrapiso",
         duration: 30,
         startOffset: currentDay,
         materials: [
@@ -214,9 +215,9 @@ const generateConstructionPlan = (totalArea: number, floors: number): PlanItem[]
     });
     currentDay += 30;
 
-    // 6. ACABAMENTO FINO (PISO)
+    // 7. ACABAMENTO FINO (PISO)
     plan.push({
-        stepName: "7. Pisos e Revestimentos",
+        stepName: "Pisos e Revestimentos",
         duration: 25,
         startOffset: currentDay,
         materials: [
@@ -229,9 +230,9 @@ const generateConstructionPlan = (totalArea: number, floors: number): PlanItem[]
     });
     currentDay += 25;
 
-    // 7. PINTURA E FINALIZAÇÃO
+    // 8. PINTURA E FINALIZAÇÃO
     plan.push({
-        stepName: "8. Pintura e Entrega",
+        stepName: "Pintura e Entrega",
         duration: 20,
         startOffset: currentDay,
         materials: [
@@ -377,7 +378,7 @@ export const dbService = {
             if (plan === PlanType.VITALICIO) baseDate.setFullYear(baseDate.getFullYear() + 99);
             
             db.users[userIdx].subscriptionExpiresAt = baseDate.toISOString();
-            saveLocalDb(db); // FIX: Pass full DB, not just the user object
+            saveLocalDb(db); 
             localStorage.setItem(SESSION_KEY, JSON.stringify(db.users[userIdx]));
         }
      }
