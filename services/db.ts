@@ -81,36 +81,40 @@ const uploadToBucket = async (file: File, path: string): Promise<string | null> 
     }
 }
 
-// --- ENGINE: CONSTRUCTION PLAN GENERATOR (ENGENHEIRO VIRTUAL 2.0) ---
+// --- ENGINE: CONSTRUCTION PLAN GENERATOR (ENGENHEIRO VIRTUAL 3.0 - SEQUENCIAL) ---
 interface PlanItem {
     stepName: string;
     duration: number;
-    startOffset: number; // Dias após o início da obra
+    startOffset: number; 
     materials: { name: string, unit: string, qty: number, category?: string }[];
 }
 
 const generateConstructionPlan = (totalArea: number, floors: number): PlanItem[] => {
     const plan: PlanItem[] = [];
-    const footprint = totalArea / Math.max(1, floors); // Área por pavimento (projeção no chão)
+    const footprint = totalArea / Math.max(1, floors); // Área por pavimento
     let currentDay = 0;
+    let stepCount = 1;
+
+    const formatStep = (name: string) => `${stepCount.toString().padStart(2, '0')} - ${name}`;
 
     // 1. SERVIÇOS PRELIMINARES
     plan.push({
-        stepName: "01. Serviços Preliminares (Canteiro)",
+        stepName: formatStep("Serviços Preliminares (Canteiro)"),
         duration: 5,
         startOffset: currentDay,
         materials: [
-            { name: 'Tapume (Madeirite)', unit: 'chapas', qty: Math.ceil(Math.sqrt(footprint) * 4 / 2) }, // Perímetro estimado
+            { name: 'Tapume (Madeirite)', unit: 'chapas', qty: Math.ceil(Math.sqrt(footprint) * 4 / 2) },
             { name: 'Sarrasfo 2.5cm', unit: 'dz', qty: 2 },
             { name: 'Prego 17x21', unit: 'kg', qty: 2 },
             { name: 'Ligação Provisória Água/Luz', unit: 'vb', qty: 1 },
         ]
     });
     currentDay += 5;
+    stepCount++;
 
-    // 2. FUNDAÇÃO (Considerando área do footprint)
+    // 2. FUNDAÇÃO
     plan.push({
-        stepName: "02. Fundação e Baldrames",
+        stepName: formatStep("Fundação e Baldrames"),
         duration: 20,
         startOffset: currentDay,
         materials: [
@@ -126,125 +130,162 @@ const generateConstructionPlan = (totalArea: number, floors: number): PlanItem[]
         ]
     });
     currentDay += 20;
+    stepCount++;
 
-    // 3. ESTRUTURA E ALVENARIA (Loop por Andar)
+    // 3. ESTRUTURA (Loop por Andar)
     for (let i = 0; i < floors; i++) {
         const floorLabel = i === 0 ? "Térreo" : `${i}º Pavimento`;
-        const stepPrefix = 3 + i; // 03, 04, etc.
         
         // A. Paredes e Colunas
         plan.push({
-            stepName: `${stepPrefix.toString().padStart(2, '0')}. Estrutura e Alvenaria (${floorLabel})`,
+            stepName: formatStep(`Alvenaria e Estrutura (${floorLabel})`),
             duration: 20,
             startOffset: currentDay,
             materials: [
-                { name: `Tijolo/Bloco (${floorLabel})`, unit: 'milheiro', qty: Math.ceil((footprint * 3 * 25) / 1000) }, // Pé direito 3m
+                { name: `Tijolo/Bloco (${floorLabel})`, unit: 'milheiro', qty: Math.ceil((footprint * 3 * 25) / 1000) },
                 { name: 'Cimento (Assentamento)', unit: 'sacos', qty: Math.ceil(footprint * 0.25) },
                 { name: 'Cal Hidratada', unit: 'sacos', qty: Math.ceil(footprint * 0.3) },
                 { name: 'Areia Média', unit: 'm³', qty: Math.ceil(footprint * 0.05) },
-                { name: 'Ferro 3/8 (Colunas/Vigas)', unit: 'barras', qty: Math.ceil(footprint * 0.4) },
-                { name: 'Ferro 5/16 (Complemento)', unit: 'barras', qty: Math.ceil(footprint * 0.2) },
+                { name: 'Ferro 3/8 (Colunas)', unit: 'barras', qty: Math.ceil(footprint * 0.4) },
+                { name: 'Ferro 4.2 (Estribos)', unit: 'barras', qty: Math.ceil(footprint * 0.2) },
                 { name: 'Tábua de Pinus (Vigas)', unit: 'dz', qty: Math.ceil(footprint / 20) },
+                // IMPORTANTE: Caixinhas de luz embutidas na parede entram aqui
+                { name: 'Caixinhas de Luz 4x2 (Parede)', unit: 'un', qty: Math.ceil(footprint / 8) },
+                { name: 'Eletroduto Corrugado (Parede)', unit: 'rolos', qty: Math.ceil(footprint / 20) },
             ]
         });
         currentDay += 20;
+        stepCount++;
 
-        // B. Laje (Se não for telhado direto, ou seja, sempre tem laje, seja de piso ou forro)
+        // B. Laje
         plan.push({
-            stepName: `${stepPrefix.toString().padStart(2, '0')}. Laje (${floorLabel})`,
+            stepName: formatStep(`Laje e Cobertura (${floorLabel})`),
             duration: 15,
             startOffset: currentDay,
             materials: [
                 { name: `Vigota Trilho (${floorLabel})`, unit: 'm', qty: Math.ceil(footprint * 3.2) },
                 { name: `Isopor/Lajota (${floorLabel})`, unit: 'un', qty: Math.ceil(footprint * 3.5) },
-                { name: 'Malha Pop 15x15', unit: 'un', qty: Math.ceil(footprint / 8) }, // Tamanho padrão tela
-                { name: 'Concreto Usinado FCK25', unit: 'm³', qty: Math.ceil(footprint * 0.1) }, // Capa de 5-7cm + vigotas
+                { name: 'Malha Pop 15x15', unit: 'un', qty: Math.ceil(footprint / 8) },
+                { name: 'Concreto Usinado FCK25', unit: 'm³', qty: Math.ceil(footprint * 0.1) },
                 { name: 'Escoras de Eucalipto', unit: 'dz', qty: Math.ceil(footprint / 12) },
                 { name: 'Caixas de Luz de Laje (Octogonal)', unit: 'un', qty: Math.ceil(footprint / 15) },
-                { name: 'Eletroduto Corrugado (Laje)', unit: 'rolos', qty: Math.ceil(footprint / 40) },
+                { name: 'Eletroduto Corrugado Reforçado (Laje)', unit: 'rolos', qty: Math.ceil(footprint / 40) },
             ]
         });
         currentDay += 15;
+        stepCount++;
     }
 
-    const nextStepNum = 3 + floors;
-
-    // 4. TELHADO E COBERTURA
+    // 4. TELHADO
     plan.push({
-        stepName: `${nextStepNum.toString().padStart(2, '0')}. Telhado e Cobertura`,
+        stepName: formatStep("Telhado e Calhas"),
         duration: 15,
         startOffset: currentDay,
         materials: [
-            { name: 'Madeiramento (Vigas/Caibros)', unit: 'm³', qty: Math.ceil(footprint * 0.04) }, // Estimativa cubica
-            { name: 'Telhas (Cerâmica/Concreto)', unit: 'milheiro', qty: Math.ceil((footprint * 1.4 * 16) / 1000) }, // Inclinação 40%
+            { name: 'Madeiramento (Vigas/Caibros)', unit: 'm³', qty: Math.ceil(footprint * 0.04) },
+            { name: 'Telhas (Cerâmica/Concreto)', unit: 'milheiro', qty: Math.ceil((footprint * 1.4 * 16) / 1000) },
             { name: 'Caixa D\'água 1000L', unit: 'un', qty: 1 },
-            { name: 'Calhas e Rufos', unit: 'm', qty: Math.ceil(Math.sqrt(footprint) * 2) },
             { name: 'Manta Térmica', unit: 'rolos', qty: Math.ceil(footprint / 45) },
+            { name: 'Calhas e Rufos', unit: 'm', qty: Math.ceil(Math.sqrt(footprint) * 3) },
         ]
     });
-    // Não incrementamos full time pois instalações começam em paralelo
     currentDay += 10; 
+    stepCount++;
 
-    // 5. INSTALAÇÕES (RASGOS E TUBULAÇÕES)
+    // 5. INSTALAÇÕES HIDRÁULICAS
     plan.push({
-        stepName: `${(nextStepNum + 1).toString().padStart(2, '0')}. Instalações (Elétrica e Hidráulica)`,
-        duration: 15,
+        stepName: formatStep("Instalações Hidráulicas e Esgoto"),
+        duration: 10,
         startOffset: currentDay,
         materials: [
-            { name: 'Tubos PVC 25mm (Água Fria)', unit: 'barras', qty: Math.ceil(totalArea / 8) },
+            { name: 'Tubos PVC 25mm (Água)', unit: 'barras', qty: Math.ceil(totalArea / 8) },
             { name: 'Tubos Esgoto 100mm', unit: 'barras', qty: Math.ceil(floors * 3) },
             { name: 'Tubos Esgoto 40mm/50mm', unit: 'barras', qty: Math.ceil(totalArea / 10) },
             { name: 'Conexões Diversas (Kit)', unit: 'vb', qty: 1 },
             { name: 'Registros de Gaveta', unit: 'un', qty: Math.ceil(floors * 2) },
-            { name: 'Eletroduto Flexível (Parede)', unit: 'rolos', qty: Math.ceil(totalArea / 20) },
-            { name: 'Caixinhas 4x2', unit: 'un', qty: Math.ceil(totalArea / 8) },
-            { name: 'Quadro de Distribuição', unit: 'un', qty: floors },
+            { name: 'Cola PVC', unit: 'tubo', qty: 2 },
         ]
     });
-    currentDay += 15;
+    currentDay += 10;
+    stepCount++;
 
-    // 6. REBOCO E CONTRAPISO
+    // 6. REBOCO
     plan.push({
-        stepName: `${(nextStepNum + 2).toString().padStart(2, '0')}. Reboco e Contrapiso`,
-        duration: 20,
+        stepName: formatStep("Reboco e Contrapiso"),
+        duration: 25,
         startOffset: currentDay,
         materials: [
-            { name: 'Cimento (Reboco/Piso)', unit: 'sacos', qty: Math.ceil(totalArea * 0.4) }, // Parede interna/externa + piso
+            { name: 'Cimento (Reboco/Piso)', unit: 'sacos', qty: Math.ceil(totalArea * 0.4) },
             { name: 'Areia Fina/Média', unit: 'm³', qty: Math.ceil(totalArea * 0.1) },
             { name: 'Cal Hidratada', unit: 'sacos', qty: Math.ceil(totalArea * 0.3) },
-            { name: 'Aditivo (Vedalit/Similar)', unit: 'litros', qty: Math.ceil(totalArea / 20) },
+            { name: 'Aditivo Vedalit', unit: 'litros', qty: Math.ceil(totalArea / 20) },
         ]
     });
-    currentDay += 20;
+    currentDay += 25;
+    stepCount++;
 
-    // 7. ACABAMENTO FINO (PISO)
+    // 7. FIAÇÃO
     plan.push({
-        stepName: `${(nextStepNum + 3).toString().padStart(2, '0')}. Pisos e Revestimentos`,
+        stepName: formatStep("Fiação e Cabos Elétricos"),
+        duration: 7,
+        startOffset: currentDay,
+        materials: [
+            { name: 'Cabos 2.5mm (Tomadas)', unit: 'rolos', qty: Math.ceil(totalArea / 25) },
+            { name: 'Cabos 1.5mm (Iluminação)', unit: 'rolos', qty: Math.ceil(totalArea / 30) },
+            { name: 'Cabos 6mm (Chuveiro)', unit: 'm', qty: Math.ceil(floors * 15) },
+            { name: 'Quadro de Distribuição', unit: 'un', qty: floors },
+            { name: 'Disjuntores', unit: 'un', qty: Math.ceil(totalArea / 20) },
+            { name: 'Fita Isolante', unit: 'un', qty: 2 },
+        ]
+    });
+    currentDay += 7;
+    stepCount++;
+
+    // 8. PISOS
+    plan.push({
+        stepName: formatStep("Pisos e Revestimentos"),
         duration: 20,
         startOffset: currentDay,
         materials: [
-            { name: 'Piso Cerâmico/Porcelanato', unit: 'm²', qty: Math.ceil(totalArea * 1.15) }, // +15% quebra/rodapé
-            { name: 'Revestimento Parede (Banheiro/Cozinha)', unit: 'm²', qty: Math.ceil(totalArea * 0.4) }, 
-            { name: 'Argamassa AC-II/AC-III', unit: 'sacos', qty: Math.ceil(totalArea * 1.55 / 4) }, // ~4m2 por saco
+            { name: 'Piso Cerâmico/Porcelanato', unit: 'm²', qty: Math.ceil(totalArea * 1.15) },
+            { name: 'Argamassa AC-II/AC-III', unit: 'sacos', qty: Math.ceil(totalArea * 1.55 / 4) },
             { name: 'Rejunte', unit: 'kg', qty: Math.ceil(totalArea / 8) },
             { name: 'Niveladores de Piso', unit: 'pct', qty: Math.ceil(totalArea / 30) },
+            { name: 'Rodapés', unit: 'm', qty: Math.ceil(Math.sqrt(totalArea) * 4) },
         ]
     });
     currentDay += 20;
+    stepCount++;
 
-    // 8. PINTURA E FINALIZAÇÃO
+    // 9. PINTURA
     plan.push({
-        stepName: `${(nextStepNum + 4).toString().padStart(2, '0')}. Pintura e Entrega`,
+        stepName: formatStep("Pintura Geral"),
         duration: 15,
         startOffset: currentDay,
         materials: [
             { name: 'Massa Corrida/Acrílica', unit: 'latas', qty: Math.ceil(totalArea / 12) },
             { name: 'Selador Acrílico', unit: 'latas', qty: Math.ceil(totalArea / 60) },
-            { name: 'Tinta Acrílica Premium (18L)', unit: 'latas', qty: Math.ceil(totalArea / 40) },
+            { name: 'Tinta Acrílica (18L)', unit: 'latas', qty: Math.ceil(totalArea / 40) },
             { name: 'Lixas 150/220', unit: 'un', qty: 20 },
+            { name: 'Rolo de Lã e Pincel', unit: 'kit', qty: 1 },
+            { name: 'Fita Crepe', unit: 'rolos', qty: 3 },
+            { name: 'Lona Plástica', unit: 'm', qty: 20 },
+        ]
+    });
+    currentDay += 15;
+    stepCount++;
+
+    // 10. ACABAMENTOS FINAIS
+    plan.push({
+        stepName: formatStep("Acabamentos Finais e Entrega"),
+        duration: 10,
+        startOffset: currentDay,
+        materials: [
             { name: 'Kit Tomadas e Interruptores', unit: 'un', qty: Math.ceil(totalArea / 8) },
-            { name: 'Cabos Flexíveis (1.5mm/2.5mm)', unit: 'rolos', qty: Math.ceil(totalArea / 25) },
-            { name: 'Louças e Metais', unit: 'vb', qty: 1 },
+            { name: 'Luminárias / Plafons', unit: 'un', qty: Math.ceil(totalArea / 12) },
+            { name: 'Louças (Vaso/Pia)', unit: 'un', qty: Math.ceil(floors * 1.5) },
+            { name: 'Metais (Torneiras/Chuveiro)', unit: 'un', qty: Math.ceil(floors * 2) },
+            { name: 'Sifões e Engates', unit: 'un', qty: Math.ceil(floors * 3) },
         ]
     });
 
