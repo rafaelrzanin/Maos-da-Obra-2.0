@@ -182,6 +182,9 @@ const ReportsView: React.FC<{ workId: string, onBack: () => void }> = ({ workId,
     const totalPending = totalSpent - totalPaid;
 
     const purchasedMaterials = materials.filter(m => m.purchasedQty >= m.plannedQty).length;
+    const totalMaterials = materials.length;
+    const pendingMaterials = totalMaterials - purchasedMaterials;
+    
     const materialChartData = [
         { name: 'Comprado', value: purchasedMaterials, fill: '#059669' },
         { name: 'Pendente', value: materials.length - purchasedMaterials, fill: '#E2E8F0' }
