@@ -290,79 +290,118 @@ export const LIFETIME_BONUSES = [
   }
 ];
 
-// --- CONTRACT TEMPLATES ---
+// --- CONTRACT TEMPLATES & DOCUMENTS ---
 export const CONTRACT_TEMPLATES = [
   {
-    id: 'PEDREIRO',
-    title: 'Contrato de Empreitada (Pedreiro)',
-    description: 'Para serviços de alvenaria, reboco e pisos.',
-    contentTemplate: `CONTRATO DE PRESTAÇÃO DE SERVIÇOS DE PEDREIRO
+    id: 'EMPREITA',
+    title: 'Contrato de Empreitada',
+    description: 'Serviços gerais com valor fechado.',
+    contentTemplate: `CONTRATO DE PRESTAÇÃO DE SERVIÇOS POR EMPREITADA
 
-CONTRATANTE: [Seu Nome], portador do CPF [Seu CPF].
-CONTRATADO: [Nome do Pedreiro], portador do CPF [CPF dele].
+CONTRATANTE: [Seu Nome], CPF: [000.000.000-00].
+CONTRATADO: [Nome do Profissional], CPF: [000.000.000-00].
 
-OBJETO:
-O CONTRATADO realizará os serviços de [Descrever serviços, ex: levantar parede, rebocar] no endereço [Endereço da Obra].
+OBJETO DO CONTRATO:
+O CONTRATADO se compromete a realizar os seguintes serviços na obra localizada em [Endereço da Obra]:
+- [Descrever detalhadamente o serviço 1]
+- [Descrever detalhadamente o serviço 2]
 
 VALOR E PAGAMENTO:
-O valor total será de R$ [Valor Total].
-Forma de pagamento: [Ex: 30% na entrada, restante semanalmente conforme avanço].
+O valor total ajustado é de R$ [0,00].
+O pagamento será realizado da seguinte forma:
+- Entrada: R$ [0,00] na data [00/00/0000].
+- Parcelas: [Descrever pagamentos semanais ou quinzenais conforme entrega].
 
-PRAZO:
-Início: [Data Início]
-Previsão de término: [Data Término]
+PRAZOS:
+Início dos trabalhos: [Data]
+Previsão de término: [Data]
 
 OBRIGAÇÕES:
-O CONTRATADO deve prezar pela qualidade, limpeza e evitar desperdício de materiais.
+O CONTRATADO deve executar o serviço com qualidade, seguindo normas técnicas, mantendo a limpeza do local e evitando desperdício de materiais.
 
 Data: ____/____/______
 
-_________________________
-Assinatura Contratante
+_____________________________
+Assinatura do Contratante
 
-_________________________
-Assinatura Contratado`
+_____________________________
+Assinatura do Contratado`
   },
   {
-    id: 'PINTOR',
-    title: 'Contrato de Pintura',
-    description: 'Para serviços de pintura interna e externa.',
-    contentTemplate: `CONTRATO DE PRESTAÇÃO DE SERVIÇOS DE PINTURA
+    id: 'DIARIA',
+    title: 'Acordo de Diárias',
+    description: 'Para serviços pagos por dia.',
+    contentTemplate: `ACORDO DE PRESTAÇÃO DE SERVIÇO POR DIÁRIA
 
 CONTRATANTE: [Seu Nome].
-CONTRATADO: [Nome do Pintor].
+PROFISSIONAL: [Nome do Profissional].
 
-OBJETO:
-Pintura de [Descrever áreas: ex: 3 quartos e sala] incluindo lixamento e massa corrida.
+Fica ajustado que o PROFISSIONAL prestará serviços de [Pedreiro/Ajudante/Pintor] na obra localizada em [Endereço].
 
-VALOR: R$ [Valor] por m² ou empreitada total.
+VALOR DA DIÁRIA:
+R$ [Valor] por dia trabalhado (das [07:00] às [17:00]).
+Incluso transporte/alimentação: [Sim/Não].
 
-DETALHES:
-A tinta será fornecida pelo [CONTRATANTE].
-Materiais de uso pessoal (pincéis, rolos) são do [CONTRATADO].
+PAGAMENTO:
+O pagamento será realizado [Semanalmente/Quinzenalmente], toda [Sexta-feira].
+
+OBSERVAÇÕES:
+Faltas não justificadas não serão pagas. O profissional deve zelar pelas ferramentas e materiais.
 
 Data: ____/____/______
 
-_________________________
-Assinatura Contratante`
+_____________________________
+Assinatura do Contratante
+
+_____________________________
+Assinatura do Profissional`
   },
   {
-    id: 'RECIBO',
-    title: 'Recibo de Pagamento Simples',
-    description: 'Para comprovar pagamentos a prestadores.',
+    id: 'RECIBO_PAGAMENTO',
+    title: 'Recibo de Pagamento',
+    description: 'Comprovante para controle financeiro.',
     contentTemplate: `RECIBO DE PAGAMENTO
 
-VALOR: R$ [Valor]
+VALOR: R$ [Valor Numérico]
 
-Recebi de [Seu Nome], a quantia de R$ [Valor por extenso], referente aos serviços de [Descrever serviço] realizados na obra [Endereço da Obra].
+Recebi de [Seu Nome], a importância supramencionada de ([Valor por Extenso]), referente ao pagamento de:
+[ ] Diárias (Período: __/__ a __/__)
+[ ] Adiantamento de Empreita (Etapa: __________)
+[ ] Saldo Final de Serviço
+[ ] Material (Reembolso)
 
-Para clareza e verdade, firmo o presente recibo.
+Serviço realizado na obra: [Nome/Endereço da Obra].
 
+Para clareza e verdade, firmo o presente recibo dando plena quitação do valor recebido.
+
+[Cidade/UF], [Data].
+
+_____________________________
+Assinatura do Recebedor
+Nome: [Nome do Profissional]
+CPF: [CPF do Profissional]`
+  },
+  {
+    id: 'ENTREGA_OBRA',
+    title: 'Termo de Entrega de Serviço',
+    description: 'Formaliza que o serviço foi concluído.',
+    contentTemplate: `TERMO DE ENTREGA E ACEITE DE SERVIÇO
+
+Eu, [Seu Nome], CONTRATANTE, declaro para os devidos fins que recebi os serviços contratados de [Nome do Profissional/Empresa], referentes à:
+- [Descrever o que foi entregue, ex: Pintura completa da sala]
+
+Declaro que os serviços foram inspecionados e estão de acordo com o combinado, não havendo pendências visíveis nesta data.
+
+O pagamento final referente a este serviço foi realizado nesta data, dando-se plena quitação ao contrato.
+
+Local: [Cidade/UF]
 Data: ____/____/______
 
-_________________________
-Assinatura do Recebedor
-CPF: [CPF do Recebedor]`
+_____________________________
+Assinatura do Contratante
+
+_____________________________
+Assinatura do Contratado`
   }
 ];
 
