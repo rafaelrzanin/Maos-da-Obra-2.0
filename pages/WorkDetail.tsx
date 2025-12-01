@@ -8,7 +8,6 @@ import { ZeModal } from '../components/ZeModal';
 import { FULL_MATERIAL_PACKAGES, ZE_AVATAR, CALCULATOR_LOGIC, CONTRACT_TEMPLATES } from '../services/standards';
 import { useAuth } from '../App';
 import { aiService } from '../services/ai';
-import { Expense, Material } from '../types'; 
 
 // --- Shared Components ---
 
