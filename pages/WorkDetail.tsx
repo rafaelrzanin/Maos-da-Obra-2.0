@@ -326,18 +326,51 @@ const StepsTab: React.FC<{ workId: string, refreshWork: () => void }> = ({ workI
 };
 
 // --- TABS (MATERIALS) ---
-const MaterialsTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ workId, onUpdate }) => {
-    const [materials, setMaterials] = useState<Material[]>([]);
-    const [steps, setSteps] = useState<Step[]>([]);
-    const [isCreateOpen, setIsCreateOpen] = useState(false);
-    const [isImportOpen, setIsImportOpen] = useState(false);
-    const [editingMaterial, setEditingMaterial] = useState<Material | null>(null);
-    const [editCost, setEditCost] = useState<string>('');
-    const [newMaterial, setNewMaterial] = useState({ name: '', plannedQty: '', unit: 'un', category: 'Geral' });
-    const [groupedMaterials, setGroupedMaterials] = useState<Record<string, Material[]>>({});
+const MaterialsTab: React.FC<{ workId: string; onUpdate: () => void }> = ({ workId, onUpdate }) => {
+  const [materials, setMaterials] = useState<Material[]>([]);
+  const [steps, setSteps] = useState<Step[]>([]);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isImportOpen, setIsImportOpen] = useState(false);
+  const [editingMaterial, setEditingMaterial] = useState<Material | null>(null);
+  const [editCost, setEditCost] = useState<string>('');
+  const [newMaterial, setNewMaterial] = useState({
+    name: '',
+    plannedQty: '',
+    unit: 'un',
+    category: 'Geral',
+  });
+  const [groupedMaterials, setGroupedMaterials] = useState<Record<string, Material[]>>({});
 
-    const load = async () => { const [matData, stepData] = await Promise.all([dbService.getMaterials(workId), dbService.getSteps(workId)]); setMaterials(matData); setSteps(stepData); const grouped: Record<string, Material[]> = {}; matData.forEach(m => { const cat = m.category || 'Geral'; if (!grouped[cat]) grouped[cat] = []; grouped[cat].push(m); }); setGroupedMaterials(grouped); };
-    useEffect(() => { load(); }, [workId]);
+  // Carrega materiais e etapas da obra
+  const load = async () => {
+    const [matData, stepData] = await Promise.all([
+      dbService.getMaterials(workId),
+      dbService.getSteps(workId),
+    ]);
+
+    // salva a lista "bruta" de materiais
+    setMaterials(matData);
+    setSteps(stepData);
+  };
+
+  // Recarrega quando trocar de obra
+  useEffect(() => {
+    load();
+  }, [workId]);
+
+  // Sempre que "materials" mudar, recalcula os agrupamentos por categoria
+  useEffect(() => {
+    const grouped: Record<string, Material[]> = {};
+
+    materials.forEach((m) => {
+      const cat = m.category || 'Geral';
+      if (!grouped[cat]) grouped[cat] = [];
+      grouped[cat].push(m);
+    });
+
+    setGroupedMaterials(grouped);
+  }, [materials]);
+
 
     const handleAdd = async (e: React.FormEvent) => { e.preventDefault(); await dbService.addMaterial({ workId, name: newMaterial.name, plannedQty: Number(newMaterial.plannedQty), purchasedQty: 0, unit: newMaterial.unit, category: newMaterial.category }); setIsCreateOpen(false); await load(); onUpdate(); };
     const handleImport = async (category: string) => { const count = await dbService.importMaterialPackage(workId, category); alert(`${count} adicionados.`); setIsImportOpen(false); await load(); onUpdate(); };
