@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { dbService } from '../services/db';
@@ -154,7 +153,6 @@ const ReportsView: React.FC<{ workId: string, onBack: () => void }> = ({ workId,
         const loadAll = async () => { const [exp, mat, stp, w] = await Promise.all([dbService.getExpenses(workId), dbService.getMaterials(workId), dbService.getSteps(workId), dbService.getWorkById(workId)]); setExpenses(exp); setMaterials(mat); setSteps(stp.sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())); setWork(w); }; loadAll();
     }, [workId]);
     const handlePrint = () => { window.print(); };
-    // Calculations
     const financialData = expenses.reduce((acc: any[], curr) => { const existing = acc.find(a => a.name === curr.category); if (existing) existing.value += curr.amount; else acc.push({ name: curr.category, value: curr.amount }); return acc; }, []);
     const totalSpent = expenses.reduce((acc, e) => acc + e.amount, 0); const totalPaid = expenses.reduce((acc, e) => acc + (e.paidAmount || 0), 0); const totalPending = totalSpent - totalPaid;
     const purchasedMaterials = materials.filter(m => m.purchasedQty >= m.plannedQty).length; const materialChartData = [{ name: 'Comprado', value: purchasedMaterials, fill: '#059669' }, { name: 'Pendente', value: materials.length - purchasedMaterials, fill: '#E2E8F0' }];
