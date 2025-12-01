@@ -59,47 +59,6 @@ const saveLocalDb = (db: DbSchema) => {
   localStorage.setItem(DB_KEY, JSON.stringify(db));
 };
 
-// --- HELPER: MATERIAL ESTIMATION LOGIC ---
-// Calculates approximate materials based on Area (m2) and Floors
-const calculateEstimatedMaterials = (area: number, floors: number = 1): Partial<Material>[] => {
-  if (!area || area <= 0) return [];
-  
-  const estimated: Partial<Material>[] = [];
-  const roofArea = (area / floors) * 1.3; // Footprint * 30% pitch
-  const wallArea = area * 2.8; // Rough estimate of wall surface
-
-  // 1. FUNDAÇÃO (Estimate based on footprint)
-  const footprint = area / floors;
-  estimated.push({ category: 'Fundação', name: 'Cimento (Fundação)', unit: 'sacos', plannedQty: Math.ceil(footprint * 0.5) });
-  estimated.push({ category: 'Fundação', name: 'Areia (Fundação)', unit: 'm³', plannedQty: Math.ceil(footprint * 0.04) });
-  estimated.push({ category: 'Fundação', name: 'Brita (Fundação)', unit: 'm³', plannedQty: Math.ceil(footprint * 0.04) });
-  estimated.push({ category: 'Fundação', name: 'Vergalhão 3/8 (10mm)', unit: 'barras', plannedQty: Math.ceil(footprint * 0.4) });
-
-  // 2. ALVENARIA (Walls)
-  estimated.push({ category: 'Alvenaria', name: 'Tijolo/Bloco (8 furos)', unit: 'milheiro', plannedQty: Math.ceil((wallArea * 25) / 1000) });
-  estimated.push({ category: 'Alvenaria', name: 'Cimento (Assentamento)', unit: 'sacos', plannedQty: Math.ceil(wallArea * 0.15) });
-  estimated.push({ category: 'Alvenaria', name: 'Areia (Assentamento)', unit: 'm³', plannedQty: Math.ceil(wallArea * 0.02) });
-  estimated.push({ category: 'Alvenaria', name: 'Cal Hidratada', unit: 'sacos', plannedQty: Math.ceil(wallArea * 0.1) });
-
-  // 3. TELHADO
-  estimated.push({ category: 'Telhado', name: 'Telhas (Cerâmica/Concreto)', unit: 'un', plannedQty: Math.ceil(roofArea * 16) });
-  estimated.push({ category: 'Telhado', name: 'Madeiramento (Vigas/Caibros)', unit: 'm', plannedQty: Math.ceil(roofArea * 3) });
-
-  // 4. ACABAMENTO (Floors & Paint)
-  estimated.push({ category: 'Acabamento', name: 'Piso / Porcelanato', unit: 'm²', plannedQty: Math.ceil(area * 1.15) }); // +15% loss
-  estimated.push({ category: 'Acabamento', name: 'Argamassa', unit: 'sacos', plannedQty: Math.ceil(area * 0.25) });
-  
-  // 5. PINTURA
-  estimated.push({ category: 'Pintura', name: 'Tinta Acrílica (18L)', unit: 'latas', plannedQty: Math.ceil((wallArea * 2) / 200) }); // 2 coats, 200m2 yield approx per can
-  estimated.push({ category: 'Pintura', name: 'Massa Corrida', unit: 'latas', plannedQty: Math.ceil(wallArea / 40) });
-
-  // 6. ELÉTRICA/HIDRÁULICA (Rough Kits)
-  estimated.push({ category: 'Elétrica', name: 'Kit Tomadas/Interruptores', unit: 'un', plannedQty: Math.ceil(area / 10) }); // ~1 point per 10m2
-  estimated.push({ category: 'Elétrica', name: 'Cabo Flexível 2.5mm', unit: 'rolos', plannedQty: Math.ceil(area / 40) });
-  
-  return estimated;
-};
-
 // --- HELPER: FILE UPLOAD ---
 const uploadToBucket = async (file: File, path: string): Promise<string | null> => {
     if (!supabase) return null;
@@ -121,6 +80,118 @@ const uploadToBucket = async (file: File, path: string): Promise<string | null> 
         return null;
     }
 }
+
+// --- ENGINE: CONSTRUCTION PLAN GENERATOR ---
+// This is the "Virtual Engineer" that generates specific steps and linked materials
+interface PlanItem {
+    stepName: string;
+    duration: number;
+    materials: { name: string, unit: string, qty: number, category: string }[];
+}
+
+const generateConstructionPlan = (totalArea: number, floors: number): PlanItem[] => {
+    const plan: PlanItem[] = [];
+    const floorArea = totalArea / Math.max(1, floors); // Area per floor (Footprint)
+    
+    // 1. FUNDAÇÃO (Baseada no footprint)
+    plan.push({
+        stepName: "Fundação e Baldrames",
+        duration: 15,
+        materials: [
+            { category: 'Fundação', name: 'Cimento CP-II (Fundação)', unit: 'sacos', qty: Math.ceil(floorArea * 0.6) },
+            { category: 'Fundação', name: 'Areia Média', unit: 'm³', qty: Math.ceil(floorArea * 0.05) },
+            { category: 'Fundação', name: 'Brita 1', unit: 'm³', qty: Math.ceil(floorArea * 0.05) },
+            { category: 'Fundação', name: 'Pedra de Mão', unit: 'm³', qty: Math.ceil(floorArea * 0.03) },
+            { category: 'Fundação', name: 'Vergalhão 3/8 (10mm)', unit: 'barras', qty: Math.ceil(floorArea * 0.5) },
+            { category: 'Fundação', name: 'Vergalhão 5/16 (8mm)', unit: 'barras', qty: Math.ceil(floorArea * 0.3) },
+            { category: 'Fundação', name: 'Tábua de Pinus 30cm', unit: 'dz', qty: Math.ceil(floorArea / 20) },
+            { category: 'Fundação', name: 'Impermeabilizante', unit: 'latas', qty: Math.ceil(floorArea / 15) },
+        ]
+    });
+
+    // 2. PAVIMENTOS (Loop for floors)
+    for (let i = 0; i < floors; i++) {
+        const floorName = i === 0 ? "Térreo" : `${i}º Pavimento`;
+        
+        // A. PAREDES E ESTRUTURA
+        plan.push({
+            stepName: `Alvenaria e Estrutura (${floorName})`,
+            duration: 20,
+            materials: [
+                { category: 'Alvenaria', name: `Tijolo/Bloco (${floorName})`, unit: 'milheiro', qty: Math.ceil((floorArea * 2.5 * 25) / 1000) }, // ~2.5m wall height, 25 blocks/m2
+                { category: 'Alvenaria', name: 'Cimento (Assentamento)', unit: 'sacos', qty: Math.ceil(floorArea * 0.2) },
+                { category: 'Alvenaria', name: 'Areia Média', unit: 'm³', qty: Math.ceil(floorArea * 0.04) },
+                { category: 'Alvenaria', name: 'Cal Hidratada', unit: 'sacos', qty: Math.ceil(floorArea * 0.15) },
+                { category: 'Alvenaria', name: 'Ferro 3/8 (Colunas)', unit: 'barras', qty: Math.ceil(floorArea * 0.25) },
+            ]
+        });
+
+        // B. LAJE (Se não for o último andar ou se for laje de cobertura)
+        // Vamos assumir laje em todos os andares para simplificar (piso superior ou teto)
+        plan.push({
+            stepName: `Laje (${floorName})`,
+            duration: 10,
+            materials: [
+                { category: 'Estrutura', name: `Vigota Trilho (${floorName})`, unit: 'm', qty: Math.ceil(floorArea * 3) },
+                { category: 'Estrutura', name: `Isopor/Lajota (${floorName})`, unit: 'un', qty: Math.ceil(floorArea * 3.5) },
+                { category: 'Estrutura', name: 'Malha Pop (Ferro)', unit: 'un', qty: Math.ceil(floorArea / 4) },
+                { category: 'Estrutura', name: 'Concreto Usinado', unit: 'm³', qty: Math.ceil(floorArea * 0.12) }, // 12cm thick avg
+                { category: 'Estrutura', name: 'Escoras de Eucalipto', unit: 'dz', qty: Math.ceil(floorArea / 10) },
+            ]
+        });
+    }
+
+    // 3. TELHADO
+    const roofArea = floorArea * 1.3; // 30% inclination
+    plan.push({
+        stepName: "Telhado e Cobertura",
+        duration: 10,
+        materials: [
+            { category: 'Telhado', name: 'Telhas', unit: 'un', qty: Math.ceil(roofArea * 16) }, // ~16 tiles/m2
+            { category: 'Telhado', name: 'Madeiramento (Vigas)', unit: 'm', qty: Math.ceil(roofArea * 3) },
+            { category: 'Telhado', name: 'Caibros e Ripas', unit: 'm', qty: Math.ceil(roofArea * 4) },
+            { category: 'Telhado', name: 'Manta Térmica', unit: 'rolos', qty: Math.ceil(roofArea / 50) },
+        ]
+    });
+
+    // 4. INSTALAÇÕES GERAIS
+    plan.push({
+        stepName: "Instalações (Elétrica/Hidráulica)",
+        duration: 15,
+        materials: [
+            { category: 'Elétrica', name: 'Eletrodutos Flexíveis', unit: 'rolos', qty: Math.ceil(totalArea / 20) },
+            { category: 'Elétrica', name: 'Cabos 2.5mm', unit: 'rolos', qty: Math.ceil(totalArea / 30) },
+            { category: 'Elétrica', name: 'Kit Tomadas', unit: 'un', qty: Math.ceil(totalArea / 10) },
+            { category: 'Hidráulica', name: 'Tubos PVC 25mm (Água)', unit: 'barras', qty: Math.ceil(totalArea / 10) },
+            { category: 'Hidráulica', name: 'Tubos Esgoto 100mm', unit: 'barras', qty: Math.ceil(floors * 2) },
+            { category: 'Hidráulica', name: 'Caixa D\'água 1000L', unit: 'un', qty: 1 },
+        ]
+    });
+
+    // 5. ACABAMENTOS GERAIS
+    plan.push({
+        stepName: "Acabamentos (Piso e Revestimento)",
+        duration: 20,
+        materials: [
+            { category: 'Acabamento', name: 'Piso Cerâmico/Porcelanato', unit: 'm²', qty: Math.ceil(totalArea * 1.15) },
+            { category: 'Acabamento', name: 'Argamassa AC-II', unit: 'sacos', qty: Math.ceil(totalArea / 4) },
+            { category: 'Acabamento', name: 'Rejunte', unit: 'kg', qty: Math.ceil(totalArea / 10) },
+        ]
+    });
+
+    // 6. PINTURA
+    plan.push({
+        stepName: "Pintura Final",
+        duration: 10,
+        materials: [
+            { category: 'Pintura', name: 'Massa Corrida', unit: 'latas', qty: Math.ceil(totalArea / 15) },
+            { category: 'Pintura', name: 'Tinta Acrílica (18L)', unit: 'latas', qty: Math.ceil(totalArea / 50) },
+            { category: 'Pintura', name: 'Selador', unit: 'latas', qty: Math.ceil(totalArea / 80) },
+        ]
+    });
+
+    return plan;
+};
 
 
 // --- SERVICE LAYER (ASYNC INTERFACE) ---
@@ -293,8 +364,8 @@ export const dbService = {
     }
   },
 
-  createWork: async (work: Omit<Work, 'id' | 'status'>, useStandardTemplate: boolean = false): Promise<Work> => {
-    // 1. CREATE WORK
+  createWork: async (work: Omit<Work, 'id' | 'status'>, isConstructionMode: boolean = false): Promise<Work> => {
+    // 1. CREATE WORK RECORD
     let newWorkId = '';
     
     if (supabase) {
@@ -306,7 +377,7 @@ export const dbService = {
             start_date: work.startDate,
             end_date: work.endDate,
             area: work.area,
-            floors: work.floors || 1, // Save floors
+            floors: work.floors || 1,
             notes: work.notes,
             status: WorkStatus.PLANNING
         }).select().single();
@@ -327,34 +398,76 @@ export const dbService = {
         newWorkId = created.id;
     }
 
-    if (work.notes === 'Casa inteira do zero' || useStandardTemplate) { // Heuristic: Construction
-        const estimatedMaterials = calculateEstimatedMaterials(work.area, work.floors || 1);
-        
-        if (estimatedMaterials.length > 0) {
+    // 2. GENERATE INTELLIGENT PLAN (If Construction)
+    if (isConstructionMode) {
+        const plan = generateConstructionPlan(work.area, work.floors || 1);
+        const startDate = new Date(work.startDate);
+        let currentOffset = 0;
+
+        for (const item of plan) {
+            // Calculate dates
+            const sDate = new Date(startDate);
+            sDate.setDate(sDate.getDate() + currentOffset);
+            const eDate = new Date(sDate);
+            eDate.setDate(eDate.getDate() + item.duration);
+
+            // A. Create Step
+            let stepId = '';
             if (supabase) {
-                const materialsPayload = estimatedMaterials.map(mat => ({
+                 const { data: newStep } = await supabase.from('steps').insert({
                     work_id: newWorkId,
-                    name: mat.name,
-                    planned_qty: mat.plannedQty,
-                    purchased_qty: 0,
-                    unit: mat.unit,
-                    category: mat.category
-                }));
-                await supabase.from('materials').insert(materialsPayload);
+                    name: item.stepName,
+                    start_date: sDate.toISOString().split('T')[0],
+                    end_date: eDate.toISOString().split('T')[0],
+                    status: StepStatus.NOT_STARTED
+                 }).select().single();
+                 if (newStep) stepId = newStep.id;
             } else {
-                const db = getLocalDb();
-                const materialsPayload = estimatedMaterials.map(mat => ({
-                    id: Math.random().toString(36).substr(2, 9),
-                    workId: newWorkId,
-                    name: mat.name!,
-                    plannedQty: mat.plannedQty!,
-                    purchasedQty: 0,
-                    unit: mat.unit!,
-                    category: mat.category
-                }));
-                db.materials.push(...materialsPayload);
-                saveLocalDb(db);
+                 const db = getLocalDb();
+                 stepId = Math.random().toString(36).substr(2, 9);
+                 db.steps.push({
+                     id: stepId,
+                     workId: newWorkId,
+                     name: item.stepName,
+                     startDate: sDate.toISOString().split('T')[0],
+                     endDate: eDate.toISOString().split('T')[0],
+                     status: StepStatus.NOT_STARTED,
+                     isDelayed: false
+                 });
+                 saveLocalDb(db);
             }
+
+            // B. Create Linked Materials
+            if (stepId && item.materials.length > 0) {
+                 if (supabase) {
+                    const matPayload = item.materials.map(m => ({
+                        work_id: newWorkId,
+                        name: m.name,
+                        planned_qty: m.qty,
+                        purchased_qty: 0,
+                        unit: m.unit,
+                        category: m.category,
+                        step_id: stepId // VITAL: LINK TO STEP
+                    }));
+                    await supabase.from('materials').insert(matPayload);
+                 } else {
+                    const db = getLocalDb();
+                    const matPayload = item.materials.map(m => ({
+                        id: Math.random().toString(36).substr(2, 9),
+                        workId: newWorkId,
+                        name: m.name,
+                        plannedQty: m.qty,
+                        purchasedQty: 0,
+                        unit: m.unit,
+                        category: m.category,
+                        stepId: stepId
+                    }));
+                    db.materials.push(...matPayload);
+                    saveLocalDb(db);
+                 }
+            }
+
+            currentOffset += (item.duration - 1);
         }
     }
 
