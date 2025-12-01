@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { dbService } from '../services/db';
@@ -24,6 +25,7 @@ const SectionHeader: React.FC<{ title: string, subtitle: string }> = ({ title, s
 const ContactsView: React.FC<{ mode: 'TEAM' | 'SUPPLIERS', onBack: () => void }> = ({ mode, onBack }) => {
     const { user } = useAuth();
     const [items, setItems] = useState<any[]>([]);
+    const [options, setOptions] = useState<string[]>([]); // List of roles or categories
     const [isAddOpen, setIsAddOpen] = useState(false);
     
     // Form States
@@ -37,11 +39,19 @@ const ContactsView: React.FC<{ mode: 'TEAM' | 'SUPPLIERS', onBack: () => void }>
         if(user) {
             setItems([]); // Clear before load
             if (mode === 'TEAM') {
-                const w = await dbService.getWorkers(user.id);
+                const [w, r] = await Promise.all([
+                    dbService.getWorkers(user.id),
+                    dbService.getJobRoles()
+                ]);
                 setItems(w);
+                setOptions(r);
             } else {
-                const s = await dbService.getSuppliers(user.id);
+                const [s, c] = await Promise.all([
+                    dbService.getSuppliers(user.id),
+                    dbService.getSupplierCategories()
+                ]);
                 setItems(s);
+                setOptions(c);
             }
         }
     };
@@ -117,7 +127,20 @@ const ContactsView: React.FC<{ mode: 'TEAM' | 'SUPPLIERS', onBack: () => void }>
                         <h3 className="text-lg font-bold mb-4 dark:text-white">Novo {mode === 'TEAM' ? 'Membro' : 'Fornecedor'}</h3>
                         <form onSubmit={handleAdd} className="space-y-3">
                             <input placeholder="Nome" value={newName} onChange={e => setNewName(e.target.value)} className="w-full p-3 rounded-xl border dark:border-slate-700 dark:bg-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-primary" required />
-                            <input placeholder={mode === 'TEAM' ? "Profissão (ex: Pedreiro)" : "Categoria (ex: Elétrica)"} value={newRole} onChange={e => setNewRole(e.target.value)} className="w-full p-3 rounded-xl border dark:border-slate-700 dark:bg-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-primary" required />
+                            
+                            {/* REPLACED INPUT WITH SELECT */}
+                            <select 
+                                value={newRole} 
+                                onChange={e => setNewRole(e.target.value)} 
+                                className="w-full p-3 rounded-xl border dark:border-slate-700 dark:bg-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-primary appearance-none bg-no-repeat bg-[right_1rem_center]"
+                                required
+                            >
+                                <option value="">{mode === 'TEAM' ? "Selecione a Profissão" : "Selecione a Categoria"}</option>
+                                {options.map(opt => (
+                                    <option key={opt} value={opt}>{opt}</option>
+                                ))}
+                            </select>
+
                             <input placeholder="Telefone / WhatsApp" value={newPhone} onChange={e => setNewPhone(e.target.value)} className="w-full p-3 rounded-xl border dark:border-slate-700 dark:bg-slate-800 dark:text-white outline-none focus:ring-2 focus:ring-primary" required />
                             <div className="flex gap-2 pt-2">
                                 <button type="button" onClick={() => setIsAddOpen(false)} className="flex-1 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl transition-colors">Cancelar</button>
