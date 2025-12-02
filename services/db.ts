@@ -1,4 +1,3 @@
-
 import { 
   User, Work, Step, Expense, Material, WorkPhoto, WorkFile,
   PlanType, WorkStatus, StepStatus, Notification, StandardMaterial,
@@ -82,7 +81,7 @@ const uploadToBucket = async (file: File, path: string): Promise<string | null> 
     }
 }
 
-// --- ENGINE: CONSTRUCTION PLAN GENERATOR (ENGENHEIRO VIRTUAL 3.0 - SEQUENCIAL) ---
+// --- ENGINE: CONSTRUCTION PLAN GENERATOR (ENGENHEIRO VIRTUAL 4.0 - NUMERADO) ---
 interface PlanItem {
     stepName: string;
     duration: number;
@@ -96,6 +95,7 @@ const generateConstructionPlan = (totalArea: number, floors: number): PlanItem[]
     let currentDay = 0;
     let stepCount = 1;
 
+    // Helper para formatar "01 - Nome da Etapa"
     const formatStep = (name: string) => `${stepCount.toString().padStart(2, '0')} - ${name}`;
 
     // 1. SERVIÇOS PRELIMINARES
@@ -150,9 +150,9 @@ const generateConstructionPlan = (totalArea: number, floors: number): PlanItem[]
                 { name: 'Ferro 3/8 (Colunas)', unit: 'barras', qty: Math.ceil(footprint * 0.4) },
                 { name: 'Ferro 4.2 (Estribos)', unit: 'barras', qty: Math.ceil(footprint * 0.2) },
                 { name: 'Tábua de Pinus (Vigas)', unit: 'dz', qty: Math.ceil(footprint / 20) },
-                // IMPORTANTE: Caixinhas de luz embutidas na parede entram aqui
-                { name: 'Caixinhas de Luz 4x2 (Parede)', unit: 'un', qty: Math.ceil(footprint / 8) },
-                { name: 'Eletroduto Corrugado (Parede)', unit: 'rolos', qty: Math.ceil(footprint / 20) },
+                // Caixinhas de luz entram na alvenaria
+                { name: 'Caixinhas de Luz 4x2', unit: 'un', qty: Math.ceil(footprint / 8) },
+                { name: 'Eletroduto Corrugado', unit: 'rolos', qty: Math.ceil(footprint / 20) },
             ]
         });
         currentDay += 20;
@@ -169,8 +169,7 @@ const generateConstructionPlan = (totalArea: number, floors: number): PlanItem[]
                 { name: 'Malha Pop 15x15', unit: 'un', qty: Math.ceil(footprint / 8) },
                 { name: 'Concreto Usinado FCK25', unit: 'm³', qty: Math.ceil(footprint * 0.1) },
                 { name: 'Escoras de Eucalipto', unit: 'dz', qty: Math.ceil(footprint / 12) },
-                { name: 'Caixas de Luz de Laje (Octogonal)', unit: 'un', qty: Math.ceil(footprint / 15) },
-                { name: 'Eletroduto Corrugado Reforçado (Laje)', unit: 'rolos', qty: Math.ceil(footprint / 40) },
+                { name: 'Caixas de Luz de Laje', unit: 'un', qty: Math.ceil(footprint / 15) },
             ]
         });
         currentDay += 15;
@@ -201,7 +200,7 @@ const generateConstructionPlan = (totalArea: number, floors: number): PlanItem[]
         materials: [
             { name: 'Tubos PVC 25mm (Água)', unit: 'barras', qty: Math.ceil(totalArea / 8) },
             { name: 'Tubos Esgoto 100mm', unit: 'barras', qty: Math.ceil(floors * 3) },
-            { name: 'Tubos Esgoto 40mm/50mm', unit: 'barras', qty: Math.ceil(totalArea / 10) },
+            { name: 'Tubos Esgoto 40mm', unit: 'barras', qty: Math.ceil(totalArea / 10) },
             { name: 'Conexões Diversas (Kit)', unit: 'vb', qty: 1 },
             { name: 'Registros de Gaveta', unit: 'un', qty: Math.ceil(floors * 2) },
             { name: 'Cola PVC', unit: 'tubo', qty: 2 },
@@ -312,11 +311,8 @@ export const dbService = {
         }
 
         if (data.user) {
-            // Force Update Plan to Vitalicio on Login
             await supabase.from('profiles').update({ plan: PlanType.VITALICIO }).eq('id', data.user.id);
-            
             const { data: profile } = await supabase.from('profiles').select('*').eq('id', data.user.id).single();
-            // Local Storage Persistence for Supabase Session
             if (profile) {
                 localStorage.setItem(SESSION_KEY, JSON.stringify(profile));
                 return profile as User;
@@ -329,7 +325,6 @@ export const dbService = {
                 const db = getLocalDb();
                 const user = db.users.find(u => u.email === email);
                 if (user) {
-                    // Force Plan Update Locally
                     if (user.plan !== PlanType.VITALICIO) {
                         user.plan = PlanType.VITALICIO;
                         saveLocalDb(db);
@@ -349,9 +344,7 @@ export const dbService = {
         const { data, error } = await supabase.auth.signUp({
             email,
             password: password || '123456',
-            options: {
-                data: { name, whatsapp }
-            }
+            options: { data: { name, whatsapp } }
         });
         
         if (error || !data.user) {
@@ -360,8 +353,6 @@ export const dbService = {
         }
         
         await new Promise(r => setTimeout(r, 1000));
-        
-        // Force Vitalicio on Signup
         await supabase.from('profiles').update({ plan: PlanType.VITALICIO }).eq('id', data.user.id);
 
         const { data: profile } = await supabase.from('profiles').select('*').eq('id', data.user.id).single();
@@ -376,7 +367,7 @@ export const dbService = {
                 name,
                 email,
                 whatsapp,
-                plan: PlanType.VITALICIO, // Force Vitalicio
+                plan: PlanType.VITALICIO,
                 subscriptionExpiresAt: new Date(new Date().setDate(new Date().getDate() + 30)).toISOString()
             };
             db.users.push(newUser);
@@ -413,15 +404,7 @@ export const dbService = {
         const userIdx = db.users.findIndex(u => u.id === userId);
         if (userIdx > -1) {
             db.users[userIdx].plan = plan;
-            const now = new Date();
-            const currentExpiry = new Date(db.users[userIdx].subscriptionExpiresAt || now);
-            const baseDate = currentExpiry > now ? currentExpiry : now;
-            
-            if (plan === PlanType.MENSAL) baseDate.setMonth(baseDate.getMonth() + 1);
-            if (plan === PlanType.SEMESTRAL) baseDate.setMonth(baseDate.getMonth() + 6);
-            if (plan === PlanType.VITALICIO) baseDate.setFullYear(baseDate.getFullYear() + 99);
-            
-            db.users[userIdx].subscriptionExpiresAt = baseDate.toISOString();
+            db.users[userIdx].subscriptionExpiresAt = new Date().toISOString();
             saveLocalDb(db); 
             localStorage.setItem(SESSION_KEY, JSON.stringify(db.users[userIdx]));
         }
@@ -433,12 +416,7 @@ export const dbService = {
     if (supabase) {
         const { data } = await supabase.from('works').select('*').eq('user_id', userId);
         return (data || []).map(w => ({
-            ...w,
-            userId: w.user_id,
-            budgetPlanned: w.budget_planned,
-            startDate: w.start_date,
-            endDate: w.end_date,
-            floors: w.floors || 1
+            ...w, userId: w.user_id, budgetPlanned: w.budget_planned, startDate: w.start_date, endDate: w.end_date, floors: w.floors || 1
         }));
     } else {
         const db = getLocalDb();
@@ -450,14 +428,7 @@ export const dbService = {
     if (supabase) {
         const { data } = await supabase.from('works').select('*').eq('id', workId).single();
         if (!data) return undefined;
-        return {
-            ...data,
-            userId: data.user_id,
-            budgetPlanned: data.budget_planned,
-            startDate: data.start_date,
-            endDate: data.end_date,
-            floors: data.floors || 1
-        };
+        return { ...data, userId: data.user_id, budgetPlanned: data.budget_planned, startDate: data.start_date, endDate: data.end_date, floors: data.floors || 1 };
     } else {
         const db = getLocalDb();
         return Promise.resolve(db.works.find(w => w.id === workId));
@@ -465,133 +436,65 @@ export const dbService = {
   },
 
   createWork: async (work: Omit<Work, 'id' | 'status'>, isConstructionMode: boolean = false): Promise<Work> => {
-    // 1. CREATE WORK RECORD
     let newWorkId = '';
     
     if (supabase) {
         const { data: newWork, error } = await supabase.from('works').insert({
-            user_id: work.userId,
-            name: work.name,
-            address: work.address,
-            budget_planned: work.budgetPlanned,
-            start_date: work.startDate,
-            end_date: work.endDate,
-            area: work.area,
-            floors: work.floors || 1,
-            notes: work.notes,
-            status: WorkStatus.PLANNING
+            user_id: work.userId, name: work.name, address: work.address, budget_planned: work.budgetPlanned,
+            start_date: work.startDate, end_date: work.endDate, area: work.area, floors: work.floors || 1, notes: work.notes, status: WorkStatus.PLANNING
         }).select().single();
-
         if (error || !newWork) throw new Error("Failed to create work");
         newWorkId = newWork.id;
-
     } else {
         const db = getLocalDb();
-        const created: Work = {
-            ...work,
-            id: Math.random().toString(36).substr(2, 9),
-            status: WorkStatus.PLANNING,
-            floors: work.floors || 1
-        };
-        db.works.push(created);
-        saveLocalDb(db);
-        newWorkId = created.id;
+        const created: Work = { ...work, id: Math.random().toString(36).substr(2, 9), status: WorkStatus.PLANNING, floors: work.floors || 1 };
+        db.works.push(created); saveLocalDb(db); newWorkId = created.id;
     }
 
-    // 2. GENERATE INTELLIGENT PLAN (If Construction)
     if (isConstructionMode) {
         const plan = generateConstructionPlan(work.area, work.floors || 1);
         const startDate = new Date(work.startDate);
 
-        // SEQUENTIAL INSERTION TO ENSURE ID LINKING
         for (const item of plan) {
-            // Calculate dates
-            const sDate = new Date(startDate);
-            sDate.setDate(sDate.getDate() + item.startOffset);
-            const eDate = new Date(sDate);
-            eDate.setDate(eDate.getDate() + item.duration);
+            const sDate = new Date(startDate); sDate.setDate(sDate.getDate() + item.startOffset);
+            const eDate = new Date(sDate); eDate.setDate(eDate.getDate() + item.duration);
 
-            // A. Create Step
             let stepId = '';
             if (supabase) {
                  const { data: newStep } = await supabase.from('steps').insert({
-                    work_id: newWorkId,
-                    name: item.stepName,
-                    start_date: sDate.toISOString().split('T')[0],
-                    end_date: eDate.toISOString().split('T')[0],
-                    status: StepStatus.NOT_STARTED
+                    work_id: newWorkId, name: item.stepName, start_date: sDate.toISOString().split('T')[0], end_date: eDate.toISOString().split('T')[0], status: StepStatus.NOT_STARTED
                  }).select().single();
                  if (newStep) stepId = newStep.id;
             } else {
-                 const db = getLocalDb();
-                 stepId = Math.random().toString(36).substr(2, 9);
-                 db.steps.push({
-                     id: stepId,
-                     workId: newWorkId,
-                     name: item.stepName,
-                     startDate: sDate.toISOString().split('T')[0],
-                     endDate: eDate.toISOString().split('T')[0],
-                     status: StepStatus.NOT_STARTED,
-                     isDelayed: false
-                 });
+                 const db = getLocalDb(); stepId = Math.random().toString(36).substr(2, 9);
+                 db.steps.push({ id: stepId, workId: newWorkId, name: item.stepName, startDate: sDate.toISOString().split('T')[0], endDate: eDate.toISOString().split('T')[0], status: StepStatus.NOT_STARTED, isDelayed: false });
                  saveLocalDb(db);
             }
 
-            // B. Create Linked Materials
             if (item.materials.length > 0) {
-                 // FIX: FORCE CATEGORY TO MATCH STEP NAME FOR VISUAL GROUPING
-                 const matPayload = item.materials.map(m => ({
-                    work_id: newWorkId,
-                    name: m.name,
-                    planned_qty: m.qty,
-                    purchased_qty: 0,
-                    unit: m.unit,
-                    category: item.stepName, // CRITICAL: USE STEP NAME AS CATEGORY
-                    step_id: stepId || null // Allow null if stepId is missing
+                 // FORÇA CATEGORIA = NOME DA ETAPA (01 - NOME) PARA MANTER ORDEM
+                 const matPayloadRaw = item.materials.map(m => ({
+                    name: m.name, planned_qty: m.qty, purchased_qty: 0, unit: m.unit,
+                    category: item.stepName, // <--- VÍNCULO CHAVE
+                    step_id: stepId || null
                  }));
 
                  if (supabase) {
-                    // Try insert via Supabase
-                    const { error } = await supabase.from('materials').insert(matPayload);
-                    if (error) {
-                        console.error("Erro ao inserir materiais automáticos:", error);
-                        // Fallback if step_id column missing
-                        if (error.message.includes('step_id')) {
-                             const fallbackPayload = matPayload.map(({ step_id, ...rest }) => rest);
-                             await supabase.from('materials').insert(fallbackPayload);
-                        }
-                    }
+                    const matPayload = matPayloadRaw.map(m => ({ ...m, work_id: newWorkId }));
+                    await supabase.from('materials').insert(matPayload);
                  } else {
                     const db = getLocalDb();
-                    const localPayload = matPayload.map(m => ({
-                        ...m,
-                        id: Math.random().toString(36).substr(2, 9),
-                        stepId: stepId,
-                        plannedQty: m.planned_qty,
-                        purchasedQty: 0,
-                        workId: newWorkId
-                    }));
-                    // Cleanup snake_case for local
-                    const cleanPayload = localPayload.map(({ step_id, planned_qty, purchased_qty, work_id, ...rest }) => rest);
-                    
-                    db.materials.push(...cleanPayload as Material[]);
+                    const localPayload = matPayloadRaw.map(m => ({ ...m, id: Math.random().toString(36).substr(2, 9), workId: newWorkId, plannedQty: m.planned_qty, purchasedQty: 0, stepId: m.step_id }));
+                    db.materials.push(...localPayload as any);
                     saveLocalDb(db);
                  }
             }
         }
     }
 
-    // Return the work object to the frontend
     if (supabase) {
         const { data } = await supabase.from('works').select('*').eq('id', newWorkId).single();
-         return {
-            ...data,
-            userId: data.user_id,
-            budgetPlanned: data.budget_planned,
-            startDate: data.start_date,
-            endDate: data.end_date,
-            floors: data.floors
-        };
+         return { ...data, userId: data.user_id, budgetPlanned: data.budget_planned, startDate: data.start_date, endDate: data.end_date, floors: data.floors };
     } else {
         const db = getLocalDb();
         return db.works.find(w => w.id === newWorkId)!;
@@ -604,9 +507,6 @@ export const dbService = {
       } else {
           const db = getLocalDb();
           db.works = db.works.filter(w => w.id !== workId);
-          db.steps = db.steps.filter(s => s.workId !== workId);
-          db.expenses = db.expenses.filter(e => e.workId !== workId);
-          db.materials = db.materials.filter(m => m.workId !== workId);
           saveLocalDb(db);
       }
   },
@@ -619,13 +519,7 @@ export const dbService = {
         return (data || []).map(s => {
              const endDate = new Date(s.end_date);
              const isDelayed = (s.status !== StepStatus.COMPLETED) && (now > endDate);
-             return {
-                 ...s,
-                 workId: s.work_id,
-                 startDate: s.start_date,
-                 endDate: s.end_date,
-                 isDelayed
-             };
+             return { ...s, workId: s.work_id, startDate: s.start_date, endDate: s.end_date, isDelayed };
         });
     } else {
         const db = getLocalDb();
@@ -640,31 +534,17 @@ export const dbService = {
 
   updateStep: async (step: Step) => {
     if (supabase) {
-        await supabase.from('steps').update({
-            name: step.name,
-            start_date: step.startDate,
-            end_date: step.endDate,
-            status: step.status
-        }).eq('id', step.id);
+        await supabase.from('steps').update({ name: step.name, start_date: step.startDate, end_date: step.endDate, status: step.status }).eq('id', step.id);
     } else {
         const db = getLocalDb();
         const idx = db.steps.findIndex(s => s.id === step.id);
-        if (idx > -1) {
-            db.steps[idx] = step;
-            saveLocalDb(db);
-        }
+        if (idx > -1) { db.steps[idx] = step; saveLocalDb(db); }
     }
   },
 
   addStep: async (step: Omit<Step, 'id' | 'isDelayed'>) => {
       if (supabase) {
-          await supabase.from('steps').insert({
-              work_id: step.workId,
-              name: step.name,
-              start_date: step.startDate,
-              end_date: step.endDate,
-              status: step.status
-          });
+          await supabase.from('steps').insert({ work_id: step.workId, name: step.name, start_date: step.startDate, end_date: step.endDate, status: step.status });
       } else {
           const db = getLocalDb();
           db.steps.push({ ...step, id: Math.random().toString(36).substr(2, 9), isDelayed: false });
@@ -673,26 +553,15 @@ export const dbService = {
   },
 
   deleteStep: async (stepId: string) => {
-      if (supabase) {
-          await supabase.from('steps').delete().eq('id', stepId);
-      } else {
-          const db = getLocalDb();
-          db.steps = db.steps.filter(s => s.id !== stepId);
-          saveLocalDb(db);
-      }
+      if (supabase) await supabase.from('steps').delete().eq('id', stepId);
+      else { const db = getLocalDb(); db.steps = db.steps.filter(s => s.id !== stepId); saveLocalDb(db); }
   },
 
   // --- Expenses ---
   getExpenses: async (workId: string): Promise<Expense[]> => {
     if (supabase) {
         const { data } = await supabase.from('expenses').select('*').eq('work_id', workId);
-        return (data || []).map(e => ({
-            ...e,
-            workId: e.work_id,
-            paidAmount: e.paid_amount,
-            stepId: e.step_id,
-            workerId: e.worker_id
-        }));
+        return (data || []).map(e => ({ ...e, workId: e.work_id, paidAmount: e.paid_amount, stepId: e.step_id, workerId: e.worker_id }));
     } else {
         const db = getLocalDb();
         return Promise.resolve(db.expenses.filter(e => e.workId === workId));
@@ -702,15 +571,8 @@ export const dbService = {
   addExpense: async (expense: Omit<Expense, 'id'>) => {
       if (supabase) {
           await supabase.from('expenses').insert({
-              work_id: expense.workId,
-              description: expense.description,
-              amount: expense.amount,
-              paid_amount: expense.paidAmount,
-              quantity: expense.quantity,
-              category: expense.category,
-              date: expense.date,
-              step_id: expense.stepId,
-              worker_id: expense.workerId
+              work_id: expense.workId, description: expense.description, amount: expense.amount, paid_amount: expense.paidAmount,
+              quantity: expense.quantity, category: expense.category, date: expense.date, step_id: expense.stepId, worker_id: expense.workerId
           });
       } else {
           const db = getLocalDb();
@@ -722,45 +584,26 @@ export const dbService = {
   updateExpense: async (expense: Expense) => {
       if (supabase) {
           await supabase.from('expenses').update({
-              description: expense.description,
-              amount: expense.amount,
-              paid_amount: expense.paidAmount,
-              category: expense.category,
-              date: expense.date,
-              step_id: expense.stepId,
-              worker_id: expense.workerId
+              description: expense.description, amount: expense.amount, paid_amount: expense.paidAmount,
+              category: expense.category, date: expense.date, step_id: expense.stepId, worker_id: expense.workerId
           }).eq('id', expense.id);
       } else {
           const db = getLocalDb();
           const idx = db.expenses.findIndex(e => e.id === expense.id);
-          if (idx > -1) {
-              db.expenses[idx] = expense;
-              saveLocalDb(db);
-          }
+          if (idx > -1) { db.expenses[idx] = expense; saveLocalDb(db); }
       }
   },
 
   deleteExpense: async (id: string) => {
       if (supabase) await supabase.from('expenses').delete().eq('id', id);
-      else {
-          const db = getLocalDb();
-          db.expenses = db.expenses.filter(e => e.id !== id);
-          saveLocalDb(db);
-      }
+      else { const db = getLocalDb(); db.expenses = db.expenses.filter(e => e.id !== id); saveLocalDb(db); }
   },
 
   // --- Materials ---
   getMaterials: async (workId: string): Promise<Material[]> => {
       if (supabase) {
           const { data } = await supabase.from('materials').select('*').eq('work_id', workId);
-          return (data || []).map(m => ({
-              ...m,
-              workId: m.work_id,
-              plannedQty: m.planned_qty,
-              purchasedQty: m.purchased_qty,
-              stepId: m.step_id,
-              category: m.category
-          }));
+          return (data || []).map(m => ({ ...m, workId: m.work_id, plannedQty: m.planned_qty, purchasedQty: m.purchased_qty, stepId: m.step_id, category: m.category }));
       } else {
           const db = getLocalDb();
           return Promise.resolve(db.materials.filter(m => m.workId === workId));
@@ -770,147 +613,84 @@ export const dbService = {
   addMaterial: async (material: Omit<Material, 'id'>) => {
       if (supabase) {
           await supabase.from('materials').insert({
-              work_id: material.workId,
-              name: material.name,
-              planned_qty: material.plannedQty,
-              purchased_qty: material.purchasedQty,
-              unit: material.unit,
-              category: material.category || 'Geral'
+              work_id: material.workId, name: material.name, planned_qty: material.plannedQty,
+              purchased_qty: material.purchasedQty, unit: material.unit, category: material.category || 'Geral'
           });
       } else {
           const db = getLocalDb();
-          db.materials.push({ 
-              ...material, 
-              id: Math.random().toString(36).substr(2, 9),
-              category: material.category || 'Geral'
-            });
+          db.materials.push({ ...material, id: Math.random().toString(36).substr(2, 9), category: material.category || 'Geral' });
           saveLocalDb(db);
       }
   },
 
   updateMaterial: async (material: Material, cost?: number) => {
-      // 1. Update Material Record
       if (supabase) {
           await supabase.from('materials').update({
-              name: material.name,
-              planned_qty: material.plannedQty,
-              purchased_qty: material.purchasedQty,
-              category: material.category,
-              unit: material.unit
+              name: material.name, planned_qty: material.plannedQty, purchased_qty: material.purchasedQty, category: material.category, unit: material.unit
           }).eq('id', material.id);
       } else {
           const db = getLocalDb();
           const idx = db.materials.findIndex(m => m.id === material.id);
-          if (idx > -1) {
-              db.materials[idx] = material;
-              saveLocalDb(db);
-          }
+          if (idx > -1) { db.materials[idx] = material; saveLocalDb(db); }
       }
 
-      // 2. If Cost provided, Add to Expenses automatically linked to the material/step
       if (cost && cost > 0) {
-          // SMART LINKING: Resolve Step ID
+          // SMART LINKING EXPENSE
           let finalStepId = material.stepId;
-
-          // If material is not explicitly linked to a step ID, try to find a step by Category Name
           if (!finalStepId && material.category) {
-               // We need to fetch steps to find the ID
                const steps = await dbService.getSteps(material.workId);
-               
-               // Normalize Helper: remove accents, lowercase, trim
                const normalize = (str: string) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
                const targetCat = normalize(material.category);
-
-               // 1. Try Exact Normalized Match (e.g. "Fundacao" == "Fundação")
                let match = steps.find(s => normalize(s.name) === targetCat);
-
-               // 2. Try Contains Match (e.g. Category "Pintura" matches Step "Pintura e Acabamento")
-               if (!match) {
-                   match = steps.find(s => normalize(s.name).includes(targetCat) || targetCat.includes(normalize(s.name)));
-               }
-
+               if (!match) match = steps.find(s => normalize(s.name).includes(targetCat) || targetCat.includes(normalize(s.name)));
                if (match) finalStepId = match.id;
           }
 
-          const description = `Compra: ${material.name}`;
           await dbService.addExpense({
-              workId: material.workId,
-              description: description,
-              amount: cost,
-              paidAmount: cost, // Assuming full payment for simplicity in this quick action
-              quantity: 1,
-              category: ExpenseCategory.MATERIAL,
-              date: new Date().toISOString().split('T')[0],
-              stepId: finalStepId // Pass the resolved ID (or undefined -> Geral)
+              workId: material.workId, description: `Compra: ${material.name}`, amount: cost, paidAmount: cost, quantity: 1,
+              category: ExpenseCategory.MATERIAL, date: new Date().toISOString().split('T')[0], stepId: finalStepId
           });
       }
   },
 
   deleteMaterial: async (id: string) => {
       if (supabase) await supabase.from('materials').delete().eq('id', id);
-      else {
-          const db = getLocalDb();
-          db.materials = db.materials.filter(m => m.id !== id);
-          saveLocalDb(db);
-      }
+      else { const db = getLocalDb(); db.materials = db.materials.filter(m => m.id !== id); saveLocalDb(db); }
   },
 
-  // --- STANDARD MATERIAL PACKAGES IMPORT ---
+  // --- STANDARD MATERIAL PACKAGES IMPORT (MANUAL) ---
   importMaterialPackage: async (workId: string, category: string): Promise<number> => {
     let itemsToImport: StandardMaterial[] = [];
-
-    // 1. Fetch Standard Items
     if (supabase) {
-        const { data, error } = await supabase.from('standard_materials').select('*').eq('category', category);
-        if (!error && data && data.length > 0) {
-            itemsToImport = data.map(d => ({ category: d.category, name: d.name, unit: d.unit }));
-        }
+        const { data } = await supabase.from('standard_materials').select('*').eq('category', category);
+        if (data && data.length > 0) itemsToImport = data.map(d => ({ category: d.category, name: d.name, unit: d.unit }));
     }
-    
-    // Fallback
     if (itemsToImport.length === 0) {
         const pkg = FULL_MATERIAL_PACKAGES.find(p => p.category === category);
-        if (pkg) {
-            itemsToImport = pkg.items.map(i => ({ category: pkg.category, name: i.name, unit: i.unit }));
-        }
+        if (pkg) itemsToImport = pkg.items.map(i => ({ category: pkg.category, name: i.name, unit: i.unit }));
     }
-
     if (itemsToImport.length === 0) return 0;
 
-    // 2. Try to find a matching Step to link for alerts (Smart Link)
     let relatedStepId = undefined;
     const steps = await dbService.getSteps(workId);
     const matchStep = steps.find(s => s.name.toLowerCase().includes(category.toLowerCase()));
     if (matchStep) relatedStepId = matchStep.id;
+    
+    const catToUse = matchStep ? matchStep.name : category; // Use step name if found
 
-    // 3. Insert
     if (supabase) {
         const payload = itemsToImport.map(item => ({
-            work_id: workId,
-            name: item.name,
-            planned_qty: 0,
-            purchased_qty: 0,
-            unit: item.unit,
-            category: category,
-            step_id: relatedStepId // Link to step if found
+            work_id: workId, name: item.name, planned_qty: 0, purchased_qty: 0, unit: item.unit, category: catToUse, step_id: relatedStepId
         }));
         await supabase.from('materials').insert(payload);
     } else {
         const db = getLocalDb();
         const payload = itemsToImport.map(item => ({
-            id: Math.random().toString(36).substr(2, 9),
-            workId: workId,
-            name: item.name,
-            plannedQty: 0,
-            purchasedQty: 0,
-            unit: item.unit,
-            category: category,
-            stepId: relatedStepId
+            id: Math.random().toString(36).substr(2, 9), workId: workId, name: item.name, plannedQty: 0, purchasedQty: 0, unit: item.unit, category: catToUse, stepId: relatedStepId
         }));
         db.materials.push(...payload);
         saveLocalDb(db);
     }
-
     return itemsToImport.length;
   },
 
@@ -924,88 +704,37 @@ export const dbService = {
         return Promise.resolve(db.suppliers.filter(s => s.userId === userId));
     }
   },
-
   addSupplier: async (supplier: Omit<Supplier, 'id'>) => {
-    if (supabase) {
-        await supabase.from('suppliers').insert({
-            user_id: supplier.userId,
-            name: supplier.name,
-            category: supplier.category,
-            phone: supplier.phone,
-            email: supplier.email,
-            address: supplier.address,
-            notes: supplier.notes
-        });
-    } else {
-        const db = getLocalDb();
-        db.suppliers.push({ ...supplier, id: Math.random().toString(36).substr(2, 9) });
-        saveLocalDb(db);
-    }
+    if (supabase) await supabase.from('suppliers').insert({ user_id: supplier.userId, name: supplier.name, category: supplier.category, phone: supplier.phone });
+    else { const db = getLocalDb(); db.suppliers.push({ ...supplier, id: Math.random().toString(36).substr(2, 9) }); saveLocalDb(db); }
   },
-
   deleteSupplier: async (id: string) => {
     if (supabase) await supabase.from('suppliers').delete().eq('id', id);
-    else {
-        const db = getLocalDb();
-        db.suppliers = db.suppliers.filter(s => s.id !== id);
-        saveLocalDb(db);
-    }
+    else { const db = getLocalDb(); db.suppliers = db.suppliers.filter(s => s.id !== id); saveLocalDb(db); }
   },
-
   getWorkers: async (userId: string): Promise<Worker[]> => {
     if (supabase) {
         const { data } = await supabase.from('workers').select('*').eq('user_id', userId);
-        return (data || []).map(w => ({ 
-            ...w, 
-            userId: w.user_id, 
-            dailyRate: w.daily_rate 
-        }));
+        return (data || []).map(w => ({ ...w, userId: w.user_id, dailyRate: w.daily_rate }));
     } else {
         const db = getLocalDb();
         return Promise.resolve(db.workers.filter(w => w.userId === userId));
     }
   },
-
   addWorker: async (worker: Omit<Worker, 'id'>) => {
-    if (supabase) {
-        await supabase.from('workers').insert({
-            user_id: worker.userId,
-            name: worker.name,
-            role: worker.role,
-            phone: worker.phone,
-            daily_rate: worker.dailyRate,
-            notes: worker.notes
-        });
-    } else {
-        const db = getLocalDb();
-        db.workers.push({ ...worker, id: Math.random().toString(36).substr(2, 9) });
-        saveLocalDb(db);
-    }
+    if (supabase) await supabase.from('workers').insert({ user_id: worker.userId, name: worker.name, role: worker.role, phone: worker.phone });
+    else { const db = getLocalDb(); db.workers.push({ ...worker, id: Math.random().toString(36).substr(2, 9) }); saveLocalDb(db); }
   },
-
   deleteWorker: async (id: string) => {
     if (supabase) await supabase.from('workers').delete().eq('id', id);
-    else {
-        const db = getLocalDb();
-        db.workers = db.workers.filter(w => w.id !== id);
-        saveLocalDb(db);
-    }
+    else { const db = getLocalDb(); db.workers = db.workers.filter(w => w.id !== id); saveLocalDb(db); }
   },
-
-  // --- PRE-REGISTERED LISTS ---
   getJobRoles: async (): Promise<string[]> => {
-      if (supabase) {
-          const { data } = await supabase.from('job_roles').select('name').order('name');
-          if (data && data.length > 0) return data.map(d => d.name);
-      }
+      if (supabase) { const { data } = await supabase.from('job_roles').select('name'); if (data) return data.map(d => d.name); }
       return STANDARD_JOB_ROLES;
   },
-
   getSupplierCategories: async (): Promise<string[]> => {
-      if (supabase) {
-          const { data } = await supabase.from('supplier_categories').select('name').order('name');
-          if (data && data.length > 0) return data.map(d => d.name);
-      }
+      if (supabase) { const { data } = await supabase.from('supplier_categories').select('name'); if (data) return data.map(d => d.name); }
       return STANDARD_SUPPLIER_CATEGORIES;
   },
   
@@ -1019,101 +748,40 @@ export const dbService = {
           return db.photos.filter(p => p.workId === workId);
       }
   },
-
   uploadPhoto: async (workId: string, file: File, type: 'BEFORE' | 'AFTER' | 'PROGRESS'): Promise<WorkPhoto | null> => {
       if (supabase) {
-          // 1. Upload
           const publicUrl = await uploadToBucket(file, `${workId}/photos`);
           if (!publicUrl) return null;
-
-          // 2. Insert DB
-          const { data, error } = await supabase.from('work_photos').insert({
-              work_id: workId,
-              url: publicUrl,
-              type: type,
-              description: file.name
-          }).select().single();
-
-          if (error || !data) return null;
-          return { ...data, workId: data.work_id, date: data.created_at };
+          const { data } = await supabase.from('work_photos').insert({ work_id: workId, url: publicUrl, type: type, description: file.name }).select().single();
+          return data ? { ...data, workId: data.work_id, date: data.created_at } : null;
       } else {
-          // Local fallback (Fake Upload)
-          const db = getLocalDb();
-          const newPhoto: WorkPhoto = {
-              id: Math.random().toString(36).substr(2, 9),
-              workId,
-              url: URL.createObjectURL(file),
-              type,
-              description: file.name,
-              date: new Date().toISOString()
-          };
-          db.photos.push(newPhoto);
-          saveLocalDb(db);
-          return newPhoto;
+          const db = getLocalDb(); const newPhoto: WorkPhoto = { id: Math.random().toString(36).substr(2, 9), workId, url: URL.createObjectURL(file), type, description: file.name, date: new Date().toISOString() }; db.photos.push(newPhoto); saveLocalDb(db); return newPhoto;
       }
   },
-
   deletePhoto: async (id: string) => {
       if (supabase) await supabase.from('work_photos').delete().eq('id', id);
-      else {
-          const db = getLocalDb();
-          db.photos = db.photos.filter(p => p.id !== id);
-          saveLocalDb(db);
-      }
+      else { const db = getLocalDb(); db.photos = db.photos.filter(p => p.id !== id); saveLocalDb(db); }
   },
-
   getFiles: async (workId: string): Promise<WorkFile[]> => {
       if (supabase) {
           const { data } = await supabase.from('work_files').select('*').eq('work_id', workId).order('created_at', { ascending: false });
           return (data || []).map(f => ({...f, workId: f.work_id, date: f.created_at, type: f.file_type}));
-      } else {
-          const db = getLocalDb();
-          return db.files.filter(f => f.workId === workId);
-      }
+      } else { const db = getLocalDb(); return db.files.filter(f => f.workId === workId); }
   },
-
   uploadFile: async (workId: string, file: File, category: string): Promise<WorkFile | null> => {
       if (supabase) {
-          // 1. Upload
           const publicUrl = await uploadToBucket(file, `${workId}/files`);
           if (!publicUrl) return null;
-
-          // 2. Insert DB
           const fileType = file.name.split('.').pop() || 'file';
-          const { data, error } = await supabase.from('work_files').insert({
-              work_id: workId,
-              url: publicUrl,
-              name: file.name,
-              category: category,
-              file_type: fileType
-          }).select().single();
-
-          if (error || !data) return null;
-          return { ...data, workId: data.work_id, date: data.created_at, type: data.file_type };
+          const { data } = await supabase.from('work_files').insert({ work_id: workId, url: publicUrl, name: file.name, category: category, file_type: fileType }).select().single();
+          return data ? { ...data, workId: data.work_id, date: data.created_at, type: data.file_type } : null;
       } else {
-           const db = getLocalDb();
-           const newFile: WorkFile = {
-              id: Math.random().toString(36).substr(2, 9),
-              workId,
-              url: '#',
-              name: file.name,
-              category: category as any,
-              type: 'pdf',
-              date: new Date().toISOString()
-           };
-           db.files.push(newFile);
-           saveLocalDb(db);
-           return newFile;
+           const db = getLocalDb(); const newFile: WorkFile = { id: Math.random().toString(36).substr(2, 9), workId, url: '#', name: file.name, category: category as any, type: 'pdf', date: new Date().toISOString() }; db.files.push(newFile); saveLocalDb(db); return newFile;
       }
   },
-  
   deleteFile: async (id: string) => {
       if (supabase) await supabase.from('work_files').delete().eq('id', id);
-      else {
-          const db = getLocalDb();
-          db.files = db.files.filter(f => f.id !== id);
-          saveLocalDb(db);
-      }
+      else { const db = getLocalDb(); db.files = db.files.filter(f => f.id !== id); saveLocalDb(db); }
   },
 
   // --- Notifications (Smart Logic) ---
@@ -1121,89 +789,49 @@ export const dbService = {
       const db = getLocalDb();
       return Promise.resolve(db.notifications.filter(n => n.userId === userId));
   },
-  
   dismissNotification: async (id: string) => {
       const db = getLocalDb();
       db.notifications = db.notifications.filter(n => n.id !== id);
       saveLocalDb(db);
   },
-
   clearAllNotifications: async (userId: string) => {
       const db = getLocalDb();
       db.notifications = db.notifications.filter(n => n.userId !== userId);
       saveLocalDb(db);
   },
-
   generateSmartNotifications: async (userId: string, workId: string) => {
       const expenses = await dbService.getExpenses(workId);
       const steps = await dbService.getSteps(workId);
       const materials = await dbService.getMaterials(workId);
       const work = await dbService.getWorkById(workId);
-
       if (!work) return;
-      
       const db = getLocalDb();
       const today = new Date().toISOString().split('T')[0];
       const lastCheckKey = `${NOTIFICATION_CHECK_KEY}_${workId}`;
       const lastCheck = localStorage.getItem(lastCheckKey);
-
       if (lastCheck === today) return; 
 
-      // 1. Budget Check
       const totalSpent = expenses.reduce((acc, curr) => acc + (curr.paidAmount ?? curr.amount), 0);
       const percentage = work.budgetPlanned > 0 ? (totalSpent / work.budgetPlanned) : 0;
       
       if (percentage >= 0.8) {
-           db.notifications.push({
-              id: Math.random().toString(36).substr(2, 9),
-              userId,
-              title: 'Cuidado com o dinheiro',
-              message: 'Você já usou quase tudo que planejou (80%).',
-              type: 'WARNING',
-              read: false,
-              date: new Date().toISOString()
-          });
+           db.notifications.push({ id: Math.random().toString(36).substr(2, 9), userId, title: 'Cuidado com o dinheiro', message: 'Você já usou quase tudo que planejou (80%).', type: 'WARNING', read: false, date: new Date().toISOString() });
       }
       
       const now = new Date();
       steps.forEach(step => {
-          // 2. Delay Check
           if (step.status !== StepStatus.COMPLETED && new Date(step.endDate) < now) {
-               db.notifications.push({
-                      id: Math.random().toString(36).substr(2, 9),
-                      userId,
-                      title: 'Atraso detectado',
-                      message: `A tarefa "${step.name}" está atrasada.`,
-                      type: 'WARNING',
-                      read: false,
-                      date: new Date().toISOString()
-               });
+               db.notifications.push({ id: Math.random().toString(36).substr(2, 9), userId, title: 'Atraso detectado', message: `A tarefa "${step.name}" está atrasada.`, type: 'WARNING', read: false, date: new Date().toISOString() });
           }
-
-          // 3. Upcoming Material Check (starts in <= 3 days)
           const daysUntilStart = Math.ceil((new Date(step.startDate).getTime() - now.getTime()) / (1000 * 3600 * 24));
           if (daysUntilStart >= 0 && daysUntilStart <= 3 && step.status === StepStatus.NOT_STARTED) {
-              const linkedMaterials = materials.filter(m => 
-                 (m.stepId === step.id) || 
-                 (m.category && step.name.toLowerCase().includes(m.category.toLowerCase()))
-              );
-
+              const linkedMaterials = materials.filter(m => (m.stepId === step.id) || (m.category && step.name.toLowerCase().includes(m.category.toLowerCase())));
               const missingMaterials = linkedMaterials.filter(m => m.purchasedQty < m.plannedQty);
-
               if (missingMaterials.length > 0) {
-                  db.notifications.push({
-                      id: Math.random().toString(36).substr(2, 9),
-                      userId,
-                      title: 'Compras Urgentes',
-                      message: `A etapa "${step.name}" começa em breve e faltam ${missingMaterials.length} materiais.`,
-                      type: 'WARNING',
-                      read: false,
-                      date: new Date().toISOString()
-                  });
+                  db.notifications.push({ id: Math.random().toString(36).substr(2, 9), userId, title: 'Compras Urgentes', message: `A etapa "${step.name}" começa em breve e faltam ${missingMaterials.length} materiais.`, type: 'WARNING', read: false, date: new Date().toISOString() });
               }
           }
       });
-
       saveLocalDb(db);
       localStorage.setItem(lastCheckKey, today);
   },
@@ -1211,34 +839,21 @@ export const dbService = {
   getDailySummary: async (workId: string) => {
       const steps = await dbService.getSteps(workId);
       const materials = await dbService.getMaterials(workId);
-      
       const completed = steps.filter(s => s.status === StepStatus.COMPLETED).length;
       const now = new Date();
       const delayed = steps.filter(s => s.status !== StepStatus.COMPLETED && new Date(s.endDate) < now).length;
       const pendingMaterials = materials.filter(m => m.purchasedQty < m.plannedQty).length;
-      
-      return {
-          completedSteps: completed,
-          delayedSteps: delayed,
-          pendingMaterials,
-          totalSteps: steps.length
-      };
+      return { completedSteps: completed, delayedSteps: delayed, pendingMaterials, totalSteps: steps.length };
   },
 
   calculateWorkStats: async (workId: string) => {
     const expenses = await dbService.getExpenses(workId);
     const steps = await dbService.getSteps(workId);
-    
     const totalSpent = expenses.reduce((acc, curr) => acc + (curr.paidAmount ?? curr.amount), 0);
     const totalSteps = steps.length;
     const completedSteps = steps.filter(s => s.status === StepStatus.COMPLETED).length;
     const now = new Date();
     const delayedSteps = steps.filter(s => (s.status !== StepStatus.COMPLETED) && (new Date(s.endDate) < now)).length;
-    
-    return {
-      totalSpent,
-      progress: totalSteps === 0 ? 0 : Math.round((completedSteps / totalSteps) * 100),
-      delayedSteps
-    };
+    return { totalSpent, progress: totalSteps === 0 ? 0 : Math.round((completedSteps / totalSteps) * 100), delayedSteps };
   }
 };

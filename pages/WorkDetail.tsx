@@ -18,9 +18,7 @@ const SectionHeader: React.FC<{ title: string, subtitle: string }> = ({ title, s
     </div>
 );
 
-// ----------------------------------------------------------------------
-// SUB-VIEWS FOR "MORE" TAB
-// ----------------------------------------------------------------------
+// --- SUB-VIEWS FOR "MORE" TAB ---
 
 // 1. CONTACTS VIEW
 const ContactsView: React.FC<{ mode: 'TEAM' | 'SUPPLIERS', onBack: () => void }> = ({ mode, onBack }) => {
@@ -220,74 +218,28 @@ const CalculatorView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 const ContractsView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     const [selectedContract, setSelectedContract] = useState<any | null>(null);
     const [editableContent, setEditableContent] = useState('');
-
-    const handleSelect = (contract: any) => {
-        setSelectedContract(contract);
-        setEditableContent(contract.contentTemplate);
-    };
-
+    const handleSelect = (contract: any) => { setSelectedContract(contract); setEditableContent(contract.contentTemplate); };
     const handleDownload = () => {
-        const htmlContent = `
-            <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
-            <head><meta charset='utf-8'><title>${selectedContract.title}</title></head>
-            <body style="font-family: Arial; white-space: pre-wrap;">${editableContent}</body></html>
-        `;
+        const htmlContent = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>${selectedContract.title}</title></head><body style="font-family: Arial; white-space: pre-wrap;">${editableContent}</body></html>`;
         const blob = new Blob([htmlContent], { type: 'application/msword' });
         const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `${selectedContract.title}.doc`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        const link = document.createElement('a'); link.href = url; link.download = `${selectedContract.title}.doc`;
+        document.body.appendChild(link); link.click(); document.body.removeChild(link);
     };
-
-    const handleCopy = () => {
-        navigator.clipboard.writeText(editableContent);
-        alert('Texto copiado!');
-    };
-
     if (selectedContract) {
         return (
             <div className="animate-in fade-in slide-in-from-right-4 h-full flex flex-col">
-                <button onClick={() => setSelectedContract(null)} className="mb-4 text-sm font-bold text-slate-400 hover:text-primary flex items-center gap-2"><i className="fa-solid fa-arrow-left"></i> Voltar para Modelos</button>
-                <div className="flex justify-between items-center mb-4">
-                    <h2 className="text-xl font-bold text-primary dark:text-white">{selectedContract.title}</h2>
-                    <div className="flex gap-2">
-                        <button onClick={handleCopy} className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 px-4 py-2 rounded-xl text-xs font-bold hover:bg-slate-200 transition-colors">Copiar</button>
-                        <button onClick={handleDownload} className="bg-primary text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-primary-dark transition-colors flex items-center gap-2"><i className="fa-solid fa-download"></i> Baixar .doc</button>
-                    </div>
-                </div>
-                <div className="bg-amber-50 border border-amber-100 p-4 rounded-xl mb-4 text-xs text-amber-800">
-                    <i className="fa-solid fa-circle-info mr-2"></i>
-                    <strong>Dica:</strong> Você pode editar o texto abaixo antes de baixar. Substitua os campos em [Colchetes].
-                </div>
-                <textarea 
-                    className="flex-1 w-full p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm text-sm font-mono leading-relaxed outline-none resize-none focus:ring-2 focus:ring-secondary/50"
-                    value={editableContent}
-                    onChange={(e) => setEditableContent(e.target.value)}
-                />
+                <button onClick={() => setSelectedContract(null)} className="mb-4 text-sm font-bold text-slate-400 hover:text-primary flex items-center gap-2"><i className="fa-solid fa-arrow-left"></i> Voltar</button>
+                <div className="flex justify-between items-center mb-4"><h2 className="text-xl font-bold text-primary dark:text-white">{selectedContract.title}</h2><button onClick={handleDownload} className="bg-primary text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2"><i className="fa-solid fa-download"></i> Baixar .doc</button></div>
+                <textarea className="flex-1 w-full p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm text-sm font-mono leading-relaxed outline-none resize-none focus:ring-2 focus:ring-secondary/50" value={editableContent} onChange={(e) => setEditableContent(e.target.value)} />
             </div>
         );
     }
-
     return (
         <div className="animate-in fade-in slide-in-from-right-4">
             <button onClick={onBack} className="mb-4 text-sm font-bold text-slate-400 hover:text-primary flex items-center gap-2"><i className="fa-solid fa-arrow-left"></i> Voltar</button>
-            <SectionHeader title="Contratos e Documentos" subtitle="Modelos prontos para sua segurança." />
-            <div className="grid grid-cols-1 gap-3">
-                {CONTRACT_TEMPLATES.map(ct => (
-                    <button key={ct.id} onClick={() => handleSelect(ct)} className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 hover:border-secondary transition-all text-left shadow-sm group">
-                        <div className="flex items-start gap-4">
-                            <div className="w-12 h-12 rounded-xl bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 flex items-center justify-center text-xl group-hover:scale-110 transition-transform"><i className="fa-solid fa-file-contract"></i></div>
-                            <div>
-                                <h4 className="font-bold text-primary dark:text-white mb-1 group-hover:text-secondary transition-colors">{ct.title}</h4>
-                                <p className="text-xs text-slate-500">{ct.description}</p>
-                            </div>
-                        </div>
-                    </button>
-                ))}
-            </div>
+            <SectionHeader title="Contratos" subtitle="Modelos editáveis." />
+            <div className="grid grid-cols-1 gap-3">{CONTRACT_TEMPLATES.map(ct => (<button key={ct.id} onClick={() => handleSelect(ct)} className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 hover:border-secondary transition-all text-left shadow-sm group"><div className="flex items-start gap-4"><div className="w-12 h-12 rounded-xl bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 flex items-center justify-center text-xl group-hover:scale-110 transition-transform"><i className="fa-solid fa-file-contract"></i></div><div><h4 className="font-bold text-primary dark:text-white mb-1 group-hover:text-secondary transition-colors">{ct.title}</h4><p className="text-xs text-slate-500">{ct.description}</p></div></div></button>))}</div>
         </div>
     );
 };
@@ -296,25 +248,8 @@ const ContractsView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 const MoreMenuTab: React.FC<{ workId: string }> = ({ workId }) => {
     const { user } = useAuth();
     const isLifetime = user?.plan === PlanType.VITALICIO;
-    
-    // View State
     const [activeSection, setActiveSection] = useState<string | null>(null);
 
-    const sections = [
-        { id: 'TEAM', icon: 'fa-users', label: 'Equipe', color: 'bg-blue-500' },
-        { id: 'SUPPLIERS', icon: 'fa-truck', label: 'Fornecedores', color: 'bg-indigo-500' },
-        { id: 'REPORTS', icon: 'fa-chart-line', label: 'Relatórios', color: 'bg-emerald-500' },
-        { id: 'PHOTOS', icon: 'fa-camera', label: 'Galeria', color: 'bg-rose-500' },
-        { id: 'FILES', icon: 'fa-folder-open', label: 'Projetos', color: 'bg-orange-500' },
-    ];
-
-    const bonusFeatures = [
-        { id: 'AI', icon: 'fa-robot', label: 'IA do Zé da Obra', desc: 'Tire dúvidas 24h' },
-        { id: 'CALC', icon: 'fa-calculator', label: 'Calculadora', desc: 'Estimativa de material' },
-        { id: 'CONTRACTS', icon: 'fa-file-signature', label: 'Contratos', desc: 'Modelos prontos' },
-    ];
-
-    // Render Active Sub-View
     if (activeSection === 'TEAM') return <ContactsView mode="TEAM" onBack={() => setActiveSection(null)} />;
     if (activeSection === 'SUPPLIERS') return <ContactsView mode="SUPPLIERS" onBack={() => setActiveSection(null)} />;
     if (activeSection === 'PHOTOS') return <PhotosView workId={workId} onBack={() => setActiveSection(null)} />;
@@ -325,84 +260,20 @@ const MoreMenuTab: React.FC<{ workId: string }> = ({ workId }) => {
     
     if (activeSection === 'AI') {
         return (
-            <div className="flex flex-col h-full">
-                <button onClick={() => setActiveSection(null)} className="mb-4 text-sm font-bold text-slate-400 hover:text-primary"><i className="fa-solid fa-arrow-left"></i> Voltar</button>
-                <div className="flex-1 flex flex-col items-center justify-center text-center p-6">
-                    <div className="w-20 h-20 rounded-full bg-secondary/10 flex items-center justify-center mb-4">
-                        <i className="fa-solid fa-robot text-4xl text-secondary"></i>
-                    </div>
-                    <h3 className="text-xl font-bold text-primary dark:text-white mb-2">IA do Zé da Obra</h3>
-                    <p className="text-slate-500 mb-6">Seu assistente está disponível no ícone de robô no topo da tela em qualquer lugar do app.</p>
-                </div>
-            </div>
+            <div className="flex flex-col h-full"><button onClick={() => setActiveSection(null)} className="mb-4 text-sm font-bold text-slate-400 hover:text-primary"><i className="fa-solid fa-arrow-left"></i> Voltar</button><div className="flex-1 flex flex-col items-center justify-center text-center p-6"><div className="w-20 h-20 rounded-full bg-secondary/10 flex items-center justify-center mb-4"><i className="fa-solid fa-robot text-4xl text-secondary"></i></div><h3 className="text-xl font-bold text-primary dark:text-white mb-2">IA do Zé da Obra</h3><p className="text-slate-500 mb-6">Seu assistente está disponível no ícone de robô no topo da tela.</p></div></div>
         )
     }
+
+    const sections = [{ id: 'TEAM', icon: 'fa-users', label: 'Equipe', color: 'bg-blue-500' }, { id: 'SUPPLIERS', icon: 'fa-truck', label: 'Fornecedores', color: 'bg-indigo-500' }, { id: 'REPORTS', icon: 'fa-chart-line', label: 'Relatórios', color: 'bg-emerald-500' }, { id: 'PHOTOS', icon: 'fa-camera', label: 'Galeria', color: 'bg-rose-500' }, { id: 'FILES', icon: 'fa-folder-open', label: 'Projetos', color: 'bg-orange-500' }];
+    const bonusFeatures = [{ id: 'AI', icon: 'fa-robot', label: 'IA do Zé da Obra', desc: 'Tire dúvidas 24h' }, { id: 'CALC', icon: 'fa-calculator', label: 'Calculadora', desc: 'Estimativa de material' }, { id: 'CONTRACTS', icon: 'fa-file-signature', label: 'Contratos', desc: 'Modelos prontos' }];
 
     return (
         <div className="animate-in fade-in duration-500 pb-24">
             <SectionHeader title="Mais Opções" subtitle="Gestão completa e ferramentas." />
-            
-            {/* MANAGEMENT GRID */}
-            <div className="grid grid-cols-3 gap-3 mb-8">
-                {sections.map(s => (
-                    <button 
-                        key={s.id}
-                        onClick={() => setActiveSection(s.id)}
-                        className="flex flex-col items-center justify-center p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm hover:shadow-md transition-all active:scale-95"
-                    >
-                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-white mb-2 shadow-lg ${s.color}`}>
-                            <i className={`fa-solid ${s.icon}`}></i>
-                        </div>
-                        <span className="text-xs font-bold text-slate-600 dark:text-slate-300">{s.label}</span>
-                    </button>
-                ))}
-            </div>
-
-            {/* LIFETIME BONUS SECTION */}
+            <div className="grid grid-cols-3 gap-3 mb-8">{sections.map(s => (<button key={s.id} onClick={() => setActiveSection(s.id)} className="flex flex-col items-center justify-center p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm hover:shadow-md transition-all active:scale-95"><div className={`w-12 h-12 rounded-xl flex items-center justify-center text-white mb-2 shadow-lg ${s.color}`}><i className={`fa-solid ${s.icon}`}></i></div><span className="text-xs font-bold text-slate-600 dark:text-slate-300">{s.label}</span></button>))}</div>
             <div className={`relative rounded-3xl p-6 overflow-hidden ${isLifetime ? 'bg-gradient-to-br from-slate-900 to-slate-800 text-white' : 'bg-slate-100 dark:bg-slate-800'}`}>
-                {!isLifetime && (
-                    <div className="absolute inset-0 bg-white/60 dark:bg-black/60 backdrop-blur-[2px] z-10 flex flex-col items-center justify-center text-center p-6">
-                        <i className="fa-solid fa-lock text-3xl text-slate-400 mb-3"></i>
-                        <h3 className="font-bold text-primary dark:text-white mb-1">Bônus Exclusivo</h3>
-                        <p className="text-xs text-slate-500 mb-4">Disponível no Plano Vitalício</p>
-                        <button onClick={() => window.location.hash = '#/settings'} className="bg-premium text-white px-6 py-2 rounded-xl font-bold shadow-lg shadow-purple-500/20 text-sm">
-                            Liberar Acesso
-                        </button>
-                    </div>
-                )}
-
-                <div className="relative z-0">
-                    <div className="flex items-center gap-3 mb-6">
-                         <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-white shadow-lg">
-                             <i className="fa-solid fa-crown"></i>
-                         </div>
-                         <div>
-                             <h3 className={`font-bold ${isLifetime ? 'text-white' : 'text-slate-700 dark:text-slate-200'}`}>Ferramentas Premium</h3>
-                             <p className={`text-xs ${isLifetime ? 'text-slate-400' : 'text-slate-500'}`}>Incluso no seu plano</p>
-                         </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                        {bonusFeatures.map(f => (
-                            <button 
-                                key={f.id} 
-                                onClick={() => {
-                                    if(isLifetime) {
-                                        if (f.id === 'AI') setActiveSection('AI');
-                                        else if (f.id === 'CALC') setActiveSection('CALC');
-                                        else if (f.id === 'CONTRACTS') setActiveSection('CONTRACTS');
-                                        else alert("Funcionalidade " + f.label + " será implementada em breve.");
-                                    }
-                                }} 
-                                className={`p-4 rounded-xl text-left transition-all ${isLifetime ? 'bg-white/10 hover:bg-white/20 border border-white/5' : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700'}`}
-                            >
-                                <i className={`fa-solid ${f.icon} text-xl mb-2 ${isLifetime ? 'text-secondary' : 'text-slate-400'}`}></i>
-                                <h4 className={`font-bold text-sm mb-0.5 ${isLifetime ? 'text-white' : 'text-slate-600 dark:text-slate-300'}`}>{f.label}</h4>
-                                <p className={`text-[10px] leading-tight ${isLifetime ? 'text-slate-400' : 'text-slate-400'}`}>{f.desc}</p>
-                            </button>
-                        ))}
-                    </div>
-                </div>
+                {!isLifetime && (<div className="absolute inset-0 bg-white/60 dark:bg-black/60 backdrop-blur-[2px] z-10 flex flex-col items-center justify-center text-center p-6"><i className="fa-solid fa-lock text-3xl text-slate-400 mb-3"></i><h3 className="font-bold text-primary dark:text-white mb-1">Bônus Exclusivo</h3><p className="text-xs text-slate-500 mb-4">Disponível no Plano Vitalício</p><button onClick={() => window.location.hash = '#/settings'} className="bg-premium text-white px-6 py-2 rounded-xl font-bold shadow-lg shadow-purple-500/20 text-sm">Liberar Acesso</button></div>)}
+                <div className="relative z-0"><div className="flex items-center gap-3 mb-6"><div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-white shadow-lg"><i className="fa-solid fa-crown"></i></div><div><h3 className={`font-bold ${isLifetime ? 'text-white' : 'text-slate-700 dark:text-slate-200'}`}>Ferramentas Premium</h3><p className={`text-xs ${isLifetime ? 'text-slate-400' : 'text-slate-500'}`}>Incluso no seu plano</p></div></div><div className="grid grid-cols-2 gap-3">{bonusFeatures.map(f => (<button key={f.id} onClick={() => { if(isLifetime) setActiveSection(f.id); }} className={`p-4 rounded-xl text-left transition-all ${isLifetime ? 'bg-white/10 hover:bg-white/20 border border-white/5' : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700'}`}><i className={`fa-solid ${f.icon} text-xl mb-2 ${isLifetime ? 'text-secondary' : 'text-slate-400'}`}></i><h4 className={`font-bold text-sm mb-0.5 ${isLifetime ? 'text-white' : 'text-slate-600 dark:text-slate-300'}`}>{f.label}</h4><p className={`text-[10px] leading-tight ${isLifetime ? 'text-slate-400' : 'text-slate-400'}`}>{f.desc}</p></button>))}</div></div>
             </div>
         </div>
     );
@@ -456,7 +327,6 @@ const StepsTab: React.FC<{ workId: string, refreshWork: () => void }> = ({ workI
 // --- TABS (MATERIALS) ---
 const MaterialsTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ workId, onUpdate }) => {
     const [materials, setMaterials] = useState<Material[]>([]);
-    const [steps, setSteps] = useState<Step[]>([]); // New State for ordering
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [isImportOpen, setIsImportOpen] = useState(false);
     const [editingMaterial, setEditingMaterial] = useState<Material | null>(null);
@@ -467,14 +337,10 @@ const MaterialsTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ work
     const [groupedMaterials, setGroupedMaterials] = useState<Record<string, Material[]>>({});
 
     const load = async () => {
-        // Fetch both Materials and Steps to sort chronologically
-        const [matData, stepData] = await Promise.all([
-            dbService.getMaterials(workId),
-            dbService.getSteps(workId)
-        ]);
+        // FIX: Removed Steps fetch here to fix TS6133 (unused var). Sorting is done via category name alphabetically.
+        const matData = await dbService.getMaterials(workId);
         
         setMaterials(matData);
-        setSteps(stepData);
         
         // Group by Category
         const grouped: Record<string, Material[]> = {};
@@ -523,7 +389,7 @@ const MaterialsTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ work
         }
     }
 
-    // Sort categories based on the ALPHABETICAL order of the keys (01, 02, 03...)
+    // Sort categories ALPHABETICALLY (01-..., 02-...)
     const sortedCategories = Object.keys(groupedMaterials).sort();
 
     return (
@@ -948,122 +814,6 @@ const ExpensesTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ workI
     );
 }
 
-// --- More / Super Menu Tab ---
-const MoreMenuTab: React.FC<{ workId: string }> = ({ workId }) => {
-    const { user } = useAuth();
-    const isLifetime = user?.plan === PlanType.VITALICIO;
-    
-    // View State
-    const [activeSection, setActiveSection] = useState<string | null>(null);
-
-    const sections = [
-        { id: 'TEAM', icon: 'fa-users', label: 'Equipe', color: 'bg-blue-500' },
-        { id: 'SUPPLIERS', icon: 'fa-truck', label: 'Fornecedores', color: 'bg-indigo-500' },
-        { id: 'REPORTS', icon: 'fa-chart-line', label: 'Relatórios', color: 'bg-emerald-500' },
-        { id: 'PHOTOS', icon: 'fa-camera', label: 'Galeria', color: 'bg-rose-500' },
-        { id: 'FILES', icon: 'fa-folder-open', label: 'Projetos', color: 'bg-orange-500' },
-    ];
-
-    const bonusFeatures = [
-        { id: 'AI', icon: 'fa-robot', label: 'IA do Zé da Obra', desc: 'Tire dúvidas 24h' },
-        { id: 'CALC', icon: 'fa-calculator', label: 'Calculadora', desc: 'Estimativa de material' },
-        { id: 'CONTRACTS', icon: 'fa-file-signature', label: 'Contratos', desc: 'Modelos prontos' },
-    ];
-
-    // Render Active Sub-View
-    if (activeSection === 'TEAM') return <ContactsView mode="TEAM" onBack={() => setActiveSection(null)} />;
-    if (activeSection === 'SUPPLIERS') return <ContactsView mode="SUPPLIERS" onBack={() => setActiveSection(null)} />;
-    if (activeSection === 'PHOTOS') return <PhotosView workId={workId} onBack={() => setActiveSection(null)} />;
-    if (activeSection === 'FILES') return <FilesView workId={workId} onBack={() => setActiveSection(null)} />;
-    if (activeSection === 'REPORTS') return <ReportsView workId={workId} onBack={() => setActiveSection(null)} />;
-    if (activeSection === 'CALC') return <CalculatorView onBack={() => setActiveSection(null)} />;
-    if (activeSection === 'CONTRACTS') return <ContractsView onBack={() => setActiveSection(null)} />;
-    
-    if (activeSection === 'AI') {
-        return (
-            <div className="flex flex-col h-full">
-                <button onClick={() => setActiveSection(null)} className="mb-4 text-sm font-bold text-slate-400 hover:text-primary"><i className="fa-solid fa-arrow-left"></i> Voltar</button>
-                <div className="flex-1 flex flex-col items-center justify-center text-center p-6">
-                    <div className="w-20 h-20 rounded-full bg-secondary/10 flex items-center justify-center mb-4">
-                        <i className="fa-solid fa-robot text-4xl text-secondary"></i>
-                    </div>
-                    <h3 className="text-xl font-bold text-primary dark:text-white mb-2">IA do Zé da Obra</h3>
-                    <p className="text-slate-500 mb-6">Seu assistente está disponível no ícone de robô no topo da tela em qualquer lugar do app.</p>
-                </div>
-            </div>
-        )
-    }
-
-    return (
-        <div className="animate-in fade-in duration-500 pb-24">
-            <SectionHeader title="Mais Opções" subtitle="Gestão completa e ferramentas." />
-            
-            {/* MANAGEMENT GRID */}
-            <div className="grid grid-cols-3 gap-3 mb-8">
-                {sections.map(s => (
-                    <button 
-                        key={s.id}
-                        onClick={() => setActiveSection(s.id)}
-                        className="flex flex-col items-center justify-center p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm hover:shadow-md transition-all active:scale-95"
-                    >
-                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-white mb-2 shadow-lg ${s.color}`}>
-                            <i className={`fa-solid ${s.icon}`}></i>
-                        </div>
-                        <span className="text-xs font-bold text-slate-600 dark:text-slate-300">{s.label}</span>
-                    </button>
-                ))}
-            </div>
-
-            {/* LIFETIME BONUS SECTION */}
-            <div className={`relative rounded-3xl p-6 overflow-hidden ${isLifetime ? 'bg-gradient-to-br from-slate-900 to-slate-800 text-white' : 'bg-slate-100 dark:bg-slate-800'}`}>
-                {!isLifetime && (
-                    <div className="absolute inset-0 bg-white/60 dark:bg-black/60 backdrop-blur-[2px] z-10 flex flex-col items-center justify-center text-center p-6">
-                        <i className="fa-solid fa-lock text-3xl text-slate-400 mb-3"></i>
-                        <h3 className="font-bold text-primary dark:text-white mb-1">Bônus Exclusivo</h3>
-                        <p className="text-xs text-slate-500 mb-4">Disponível no Plano Vitalício</p>
-                        <button onClick={() => window.location.hash = '#/settings'} className="bg-premium text-white px-6 py-2 rounded-xl font-bold shadow-lg shadow-purple-500/20 text-sm">
-                            Liberar Acesso
-                        </button>
-                    </div>
-                )}
-
-                <div className="relative z-0">
-                    <div className="flex items-center gap-3 mb-6">
-                         <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-white shadow-lg">
-                             <i className="fa-solid fa-crown"></i>
-                         </div>
-                         <div>
-                             <h3 className={`font-bold ${isLifetime ? 'text-white' : 'text-slate-700 dark:text-slate-200'}`}>Ferramentas Premium</h3>
-                             <p className={`text-xs ${isLifetime ? 'text-slate-400' : 'text-slate-500'}`}>Incluso no seu plano</p>
-                         </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                        {bonusFeatures.map(f => (
-                            <button 
-                                key={f.id} 
-                                onClick={() => {
-                                    if(isLifetime) {
-                                        if (f.id === 'AI') setActiveSection('AI');
-                                        else if (f.id === 'CALC') setActiveSection('CALC');
-                                        else if (f.id === 'CONTRACTS') setActiveSection('CONTRACTS');
-                                        else alert("Funcionalidade " + f.label + " será implementada em breve.");
-                                    }
-                                }} 
-                                className={`p-4 rounded-xl text-left transition-all ${isLifetime ? 'bg-white/10 hover:bg-white/20 border border-white/5' : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700'}`}
-                            >
-                                <i className={`fa-solid ${f.icon} text-xl mb-2 ${isLifetime ? 'text-secondary' : 'text-slate-400'}`}></i>
-                                <h4 className={`font-bold text-sm mb-0.5 ${isLifetime ? 'text-white' : 'text-slate-600 dark:text-slate-300'}`}>{f.label}</h4>
-                                <p className={`text-[10px] leading-tight ${isLifetime ? 'text-slate-400' : 'text-slate-400'}`}>{f.desc}</p>
-                            </button>
-                        ))}
-                    </div>
-                </div>
-            </div>
-        </div>
-    );
-}
-
 // --- Main WorkDetail Component ---
 const WorkDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -1072,22 +822,77 @@ const WorkDetail: React.FC = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [stats, setStats] = useState({ totalSpent: 0, progress: 0, delayedSteps: 0 });
   const [loading, setLoading] = useState(true);
+  
+  // AI Chat State
   const [showAiChat, setShowAiChat] = useState(false);
   const [aiMessage, setAiMessage] = useState('');
   const [aiHistory, setAiHistory] = useState<{sender: 'user'|'ze', text: string}[]>([]);
   const [aiLoading, setAiLoading] = useState(false);
 
-  const loadWork = async () => { if (!id) return; setLoading(true); const w = await dbService.getWorkById(id); if (w) { setWork(w); const s = await dbService.calculateWorkStats(id); setStats(s); } setLoading(false); };
-  useEffect(() => { loadWork(); }, [id]);
+  const loadWork = async () => {
+      if (!id) return;
+      setLoading(true);
+      const w = await dbService.getWorkById(id);
+      if (w) {
+          setWork(w);
+          const s = await dbService.calculateWorkStats(id);
+          setStats(s);
+      }
+      setLoading(false);
+  };
 
-  const handleAiSend = async (e: React.FormEvent) => { e.preventDefault(); if (!aiMessage.trim()) return; const userMsg = aiMessage; setAiHistory(prev => [...prev, { sender: 'user', text: userMsg }]); setAiMessage(''); setAiLoading(true); const response = await aiService.sendMessage(userMsg); setAiHistory(prev => [...prev, { sender: 'ze', text: response }]); setAiLoading(false); };
+  useEffect(() => {
+      loadWork();
+  }, [id]);
 
-  if (loading) return (<div className="min-h-screen flex items-center justify-center text-secondary"><i className="fa-solid fa-circle-notch fa-spin text-3xl"></i></div>);
-  if (!work) return (<div className="min-h-screen flex flex-col items-center justify-center p-4 text-center"><h2 className="text-xl font-bold text-slate-500 mb-4">Obra não encontrada</h2><button onClick={() => navigate('/')} className="text-primary hover:underline">Voltar ao Painel</button></div>);
+  const handleAiSend = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!aiMessage.trim()) return;
+      
+      const userMsg = aiMessage;
+      setAiHistory(prev => [...prev, { sender: 'user', text: userMsg }]);
+      setAiMessage('');
+      setAiLoading(true);
+
+      const response = await aiService.sendMessage(userMsg);
+      
+      setAiHistory(prev => [...prev, { sender: 'ze', text: response }]);
+      setAiLoading(false);
+  };
+
+  if (loading) return (
+      <div className="min-h-screen flex items-center justify-center text-secondary">
+          <i className="fa-solid fa-circle-notch fa-spin text-3xl"></i>
+      </div>
+  );
+
+  if (!work) return (
+      <div className="min-h-screen flex flex-col items-center justify-center p-4 text-center">
+          <h2 className="text-xl font-bold text-slate-500 mb-4">Obra não encontrada</h2>
+          <button onClick={() => navigate('/')} className="text-primary hover:underline">Voltar ao Painel</button>
+      </div>
+  );
 
   return (
-      <div className="min-h-screen pb-24">
-          <div className="sticky top-0 z-30 bg-surface/90 dark:bg-slate-950/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 px-4 py-4 flex justify-between items-center"><div className="flex items-center gap-3"><button onClick={() => navigate('/')} className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500"><i className="fa-solid fa-arrow-left"></i></button><h1 className="font-bold text-primary dark:text-white truncate max-w-[200px]">{work.name}</h1></div><button onClick={() => setShowAiChat(true)} className="bg-secondary text-white w-8 h-8 rounded-full flex items-center justify-center shadow-lg shadow-orange-500/20"><i className="fa-solid fa-robot text-xs"></i></button></div>
+      <div className="min-h-screen pb-24"> {/* Added padding for bottom bar */}
+          
+          {/* Top Header */}
+          <div className="sticky top-0 z-30 bg-surface/90 dark:bg-slate-950/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 px-4 py-4 flex justify-between items-center">
+               <div className="flex items-center gap-3">
+                   <button onClick={() => navigate('/')} className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500">
+                       <i className="fa-solid fa-arrow-left"></i>
+                   </button>
+                   <h1 className="font-bold text-primary dark:text-white truncate max-w-[200px]">{work.name}</h1>
+               </div>
+               <button 
+                  onClick={() => setShowAiChat(true)}
+                  className="bg-secondary text-white w-8 h-8 rounded-full flex items-center justify-center shadow-lg shadow-orange-500/20"
+              >
+                  <i className="fa-solid fa-robot text-xs"></i>
+              </button>
+          </div>
+
+          {/* Content Area */}
           <div className="max-w-4xl mx-auto p-4 md:p-6">
               {activeTab === 'overview' && <OverviewTab work={work} stats={stats} onGoToSteps={() => setActiveTab('steps')} />}
               {activeTab === 'steps' && <StepsTab workId={work.id} refreshWork={loadWork} />}
@@ -1095,8 +900,89 @@ const WorkDetail: React.FC = () => {
               {activeTab === 'expenses' && <ExpensesTab workId={work.id} onUpdate={loadWork} />}
               {activeTab === 'more' && <MoreMenuTab workId={work.id} />}
           </div>
-          <div className="fixed bottom-0 left-0 w-full bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 pb-safe pt-2 px-6 flex justify-between items-center z-40 shadow-[0_-5px_20px_rgba(0,0,0,0.05)]">{[{ id: 'overview', icon: 'fa-house', label: 'Geral' }, { id: 'steps', icon: 'fa-calendar-days', label: 'Cronograma' }, { id: 'materials', icon: 'fa-cart-shopping', label: 'Materiais' }, { id: 'expenses', icon: 'fa-wallet', label: 'Gastos' }, { id: 'more', icon: 'fa-bars', label: 'Mais' }].map(tab => (<button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex flex-col items-center gap-1 min-w-[60px] transition-all duration-300 ${activeTab === tab.id ? 'text-secondary -translate-y-2' : 'text-slate-400 hover:text-slate-600'}`}><div className={`w-10 h-10 rounded-2xl flex items-center justify-center text-lg transition-all ${activeTab === tab.id ? 'bg-secondary text-white shadow-lg shadow-orange-500/30' : ''}`}><i className={`fa-solid ${tab.icon}`}></i></div><span className={`text-[10px] font-bold ${activeTab === tab.id ? 'opacity-100' : 'opacity-0'}`}>{tab.label}</span></button>))}</div>
-          {showAiChat && (<div className="fixed inset-0 z-50 flex flex-col bg-white dark:bg-slate-900 animate-in slide-in-from-bottom duration-300 md:max-w-md md:right-4 md:bottom-20 md:left-auto md:top-auto md:h-[600px] md:rounded-3xl md:shadow-2xl md:border md:border-slate-200"><div className="p-4 bg-primary text-white flex justify-between items-center shrink-0 md:rounded-t-3xl"><div className="flex items-center gap-3"><div className="w-10 h-10 rounded-full bg-white/10 p-1"><img src={ZE_AVATAR} className="w-full h-full object-cover rounded-full" /></div><div><h3 className="font-bold text-sm">Zé da Obra</h3><p className="text-[10px] text-green-300 flex items-center gap-1"><span className="w-1.5 h-1.5 bg-green-300 rounded-full animate-pulse"></span> Online</p></div></div><button onClick={() => setShowAiChat(false)} className="text-white/70 hover:text-white w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/10"><i className="fa-solid fa-xmark"></i></button></div><div className="flex-1 p-4 overflow-y-auto space-y-4 bg-slate-50 dark:bg-black/20">{aiHistory.length === 0 && (<div className="h-full flex flex-col items-center justify-center text-center opacity-40 p-6"><i className="fa-solid fa-comments text-4xl mb-3"></i><p className="text-sm font-medium">"Fala chefe! Tô aqui pra ajudar."</p></div>)}{aiHistory.map((msg, i) => (<div key={i} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}><div className={`max-w-[85%] p-3 rounded-2xl text-sm leading-relaxed ${msg.sender === 'user' ? 'bg-primary text-white rounded-tr-none' : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-tl-none shadow-sm'}`}>{msg.text}</div></div>))}{aiLoading && (<div className="flex justify-start"><div className="bg-white dark:bg-slate-800 p-4 rounded-2xl rounded-tl-none border border-slate-200 dark:border-slate-700 shadow-sm"><div className="flex gap-1.5"><span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"></span><span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce delay-75"></span><span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce delay-150"></span></div></div></div>)}</div><form onSubmit={handleAiSend} className="p-3 bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 flex gap-2 shrink-0 md:rounded-b-3xl"><input className="flex-1 bg-slate-100 dark:bg-slate-800 border-0 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-secondary/50 outline-none dark:text-white" placeholder="Digite sua dúvida..." value={aiMessage} onChange={e => setAiMessage(e.target.value)} /><button type="submit" disabled={!aiMessage.trim() || aiLoading} className="w-12 h-12 rounded-xl bg-secondary text-white flex items-center justify-center hover:bg-amber-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"><i className="fa-solid fa-paper-plane"></i></button></form></div>)}
+
+          {/* Bottom Navigation Bar */}
+          <div className="fixed bottom-0 left-0 w-full bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 pb-safe pt-2 px-6 flex justify-between items-center z-40 shadow-[0_-5px_20px_rgba(0,0,0,0.05)]">
+              {[
+                  { id: 'overview', icon: 'fa-house', label: 'Geral' },
+                  { id: 'steps', icon: 'fa-calendar-days', label: 'Cronograma' },
+                  { id: 'materials', icon: 'fa-cart-shopping', label: 'Materiais' },
+                  { id: 'expenses', icon: 'fa-wallet', label: 'Gastos' },
+                  { id: 'more', icon: 'fa-bars', label: 'Mais' },
+              ].map(tab => (
+                  <button
+                      key={tab.id}
+                      onClick={() => setActiveTab(tab.id)}
+                      className={`flex flex-col items-center gap-1 min-w-[60px] transition-all duration-300 ${
+                          activeTab === tab.id ? 'text-secondary -translate-y-2' : 'text-slate-400 hover:text-slate-600'
+                      }`}
+                  >
+                      <div className={`w-10 h-10 rounded-2xl flex items-center justify-center text-lg transition-all ${
+                          activeTab === tab.id ? 'bg-secondary text-white shadow-lg shadow-orange-500/30' : ''
+                      }`}>
+                          <i className={`fa-solid ${tab.icon}`}></i>
+                      </div>
+                      <span className={`text-[10px] font-bold ${activeTab === tab.id ? 'opacity-100' : 'opacity-0'}`}>{tab.label}</span>
+                  </button>
+              ))}
+          </div>
+
+          {/* Zé da Obra Chat Modal */}
+          {showAiChat && (
+              <div className="fixed inset-0 z-50 flex flex-col bg-white dark:bg-slate-900 animate-in slide-in-from-bottom duration-300 md:max-w-md md:right-4 md:bottom-20 md:left-auto md:top-auto md:h-[600px] md:rounded-3xl md:shadow-2xl md:border md:border-slate-200">
+                  <div className="p-4 bg-primary text-white flex justify-between items-center shrink-0 md:rounded-t-3xl">
+                      <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-white/10 p-1">
+                              <img src={ZE_AVATAR} className="w-full h-full object-cover rounded-full" />
+                          </div>
+                          <div>
+                              <h3 className="font-bold text-sm">Zé da Obra</h3>
+                              <p className="text-[10px] text-green-300 flex items-center gap-1"><span className="w-1.5 h-1.5 bg-green-300 rounded-full animate-pulse"></span> Online</p>
+                          </div>
+                      </div>
+                      <button onClick={() => setShowAiChat(false)} className="text-white/70 hover:text-white w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/10"><i className="fa-solid fa-xmark"></i></button>
+                  </div>
+
+                  <div className="flex-1 p-4 overflow-y-auto space-y-4 bg-slate-50 dark:bg-black/20">
+                      {aiHistory.length === 0 && (
+                          <div className="h-full flex flex-col items-center justify-center text-center opacity-40 p-6">
+                              <i className="fa-solid fa-comments text-4xl mb-3"></i>
+                              <p className="text-sm font-medium">"Fala chefe! Tô aqui pra ajudar. Pode perguntar sobre a obra, materiais ou pedir uma dica!"</p>
+                          </div>
+                      )}
+                      {aiHistory.map((msg, i) => (
+                          <div key={i} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+                              <div className={`max-w-[85%] p-3 rounded-2xl text-sm leading-relaxed ${msg.sender === 'user' ? 'bg-primary text-white rounded-tr-none' : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-tl-none shadow-sm'}`}>
+                                  {msg.text}
+                              </div>
+                          </div>
+                      ))}
+                      {aiLoading && (
+                          <div className="flex justify-start">
+                              <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl rounded-tl-none border border-slate-200 dark:border-slate-700 shadow-sm">
+                                  <div className="flex gap-1.5">
+                                      <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"></span>
+                                      <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce delay-75"></span>
+                                      <span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce delay-150"></span>
+                                  </div>
+                              </div>
+                          </div>
+                      )}
+                  </div>
+
+                  <form onSubmit={handleAiSend} className="p-3 bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 flex gap-2 shrink-0 md:rounded-b-3xl">
+                      <input 
+                          className="flex-1 bg-slate-100 dark:bg-slate-800 border-0 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-secondary/50 outline-none dark:text-white"
+                          placeholder="Digite sua dúvida..."
+                          value={aiMessage}
+                          onChange={e => setAiMessage(e.target.value)}
+                      />
+                      <button type="submit" disabled={!aiMessage.trim() || aiLoading} className="w-12 h-12 rounded-xl bg-secondary text-white flex items-center justify-center hover:bg-amber-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+                          <i className="fa-solid fa-paper-plane"></i>
+                      </button>
+                  </form>
+              </div>
+          )}
       </div>
   );
 };
