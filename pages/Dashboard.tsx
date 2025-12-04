@@ -19,8 +19,8 @@ const Dashboard: React.FC = () => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // Dica Dinâmica
-  const [currentTip, setCurrentTip] = useState<ZeTip>(() => getRandomZeTip());
+  // Dica Dinâmica - Removido o setter não utilizado para corrigir erro de build
+  const [currentTip] = useState<ZeTip>(() => getRandomZeTip());
   
   // Dropdown State
   const [showWorkSelector, setShowWorkSelector] = useState(false);
