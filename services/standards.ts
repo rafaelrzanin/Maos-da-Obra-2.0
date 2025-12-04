@@ -1,95 +1,133 @@
 
 // Standard Libraries for Construction Management
 
-// Avatar Zé da Obra (SVG Premium - High Fidelity v2)
-// Design vetorial profissional com sombras, iluminação e traços humanizados.
+// Avatar Zé da Obra (Premium 3D-Style Vector)
+// Técnica: Gradientes Radiais e Gaussian Blurs para simular renderização 3D/Clay.
 // Carregamento instantâneo via Data URI.
 const zeSvg = `
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800">
   <defs>
-    <!-- Degradê de Fundo Premium (Deep Navy) -->
-    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#1e293b;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#0f172a;stop-opacity:1" />
-    </linearGradient>
+    <!-- PALETA DE CORES E GRADIENTES -->
     
-    <!-- Degradê do Capacete (Safety Yellow) -->
-    <linearGradient id="helmetGrad" x1="20%" y1="20%" x2="80%" y2="100%">
-      <stop offset="0%" style="stop-color:#fcd34d;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#d97706;stop-opacity:1" />
+    <!-- Fundo: Gradiente Deep Blue "Tech" -->
+    <linearGradient id="bg_grad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1e293b" />
+      <stop offset="100%" stop-color="#0f172a" />
     </linearGradient>
 
-    <!-- Degradê da Pele (Warm Tan) -->
-    <linearGradient id="skinGrad" x1="50%" y1="0%" x2="50%" y2="100%">
-      <stop offset="0%" style="stop-color:#f5d0b0;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#e2a478;stop-opacity:1" />
+    <!-- Pele: Tom quente com iluminação -->
+    <radialGradient id="skin_grad" cx="40%" cy="40%" r="50%">
+      <stop offset="0%" stop-color="#f5d0b0" /> <!-- Luz -->
+      <stop offset="60%" stop-color="#e2a478" /> <!-- Base -->
+      <stop offset="100%" stop-color="#c28e62" /> <!-- Sombra -->
+    </radialGradient>
+
+    <!-- Capacete: Amarelo Segurança com specularity -->
+    <radialGradient id="helmet_grad" cx="30%" cy="30%" r="80%">
+      <stop offset="0%" stop-color="#fde047" /> <!-- Highlight -->
+      <stop offset="50%" stop-color="#eab308" /> <!-- Base -->
+      <stop offset="100%" stop-color="#a16207" /> <!-- Shadow -->
+    </radialGradient>
+
+    <!-- Camisa: Azul Obra Profissional -->
+    <linearGradient id="shirt_grad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#1e3a8a" />
+      <stop offset="50%" stop-color="#2563eb" />
+      <stop offset="100%" stop-color="#172554" />
     </linearGradient>
 
-    <!-- Sombra Suave -->
-    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
-      <feGaussianBlur in="SourceAlpha" stdDeviation="3"/>
-      <feOffset dx="2" dy="2" result="offsetblur"/>
+    <!-- Barba: Grisalho Mestre -->
+    <radialGradient id="beard_grad" cx="50%" cy="30%" r="70%">
+      <stop offset="0%" stop-color="#57534e" />
+      <stop offset="100%" stop-color="#292524" />
+    </radialGradient>
+
+    <!-- Sombras de Oclusão (Suavidade) -->
+    <filter id="soft_shadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="10" />
+      <feOffset dx="0" dy="5" result="offsetblur"/>
       <feComponentTransfer>
         <feFuncA type="linear" slope="0.3"/>
       </feComponentTransfer>
-      <feMerge>
+      <feMerge> 
         <feMergeNode/>
-        <feMergeNode in="SourceGraphic"/>
+        <feMergeNode in="SourceGraphic"/> 
       </feMerge>
+    </filter>
+    
+    <!-- Reflexo nos olhos -->
+    <filter id="eye_shine">
+      <feGaussianBlur stdDeviation="1" />
     </filter>
   </defs>
 
-  <!-- Fundo Circular -->
-  <circle cx="256" cy="256" r="256" fill="url(#bgGrad)" />
-  
-  <!-- Corpo (Camisa Jeans/Azul Profissional) -->
-  <path d="M120 512 L 120 440 Q 120 380 180 370 L 332 370 Q 392 380 392 440 L 392 512 Z" fill="#1e40af" />
-  <!-- Detalhe da Gola -->
-  <path d="M180 370 L 256 420 L 332 370" fill="none" stroke="#1e3a8a" stroke-width="15" stroke-linecap="round" />
-  <path d="M256 420 L 256 512" stroke="#1e3a8a" stroke-width="4" opacity="0.3" />
+  <!-- BACKGROUND CIRCULAR -->
+  <circle cx="400" cy="400" r="400" fill="url(#bg_grad)" />
 
-  <!-- Pescoço -->
-  <path d="M200 300 L 200 380 L 312 380 L 312 300" fill="#d49a6a" />
-  <path d="M200 330 Q 256 360 312 330 L 312 380 L 200 380 Z" fill="rgba(0,0,0,0.15)" /> <!-- Sombra do queixo -->
-
-  <!-- Orelhas (Detalhe importante para humanizar) -->
-  <path d="M165 280 Q 150 290 165 310" fill="#e2a478" />
-  <path d="M347 280 Q 362 290 347 310" fill="#e2a478" />
-
-  <!-- Rosto (Formato mais quadrado/masculino) -->
-  <path d="M170 200 L 170 300 Q 170 350 256 350 Q 342 350 342 300 L 342 200 Z" fill="url(#skinGrad)" />
-
-  <!-- Capacete (Forma complexa com aba) -->
-  <g filter="url(#softShadow)">
-    <!-- Cúpula -->
-    <path d="M150 210 Q 256 80 362 210" fill="url(#helmetGrad)" />
-    <!-- Aba -->
-    <path d="M140 210 L 372 210 Q 380 210 380 220 L 370 235 Q 360 245 256 245 Q 152 245 142 235 L 132 220 Q 132 210 140 210 Z" fill="#d97706" />
-    <!-- Brilho/Reflexo no Capacete (O segredo do look 'plástico') -->
-    <ellipse cx="220" cy="160" rx="60" ry="25" fill="white" opacity="0.3" transform="rotate(-20 220 160)" />
+  <!-- CORPO (Ombros) -->
+  <g transform="translate(0, 50)">
+    <path d="M200 800 L 200 650 Q 200 580 280 560 L 520 560 Q 600 580 600 650 L 600 800 Z" fill="url(#shirt_grad)" />
+    <!-- Gola da camisa -->
+    <path d="M280 560 L 400 680 L 520 560" fill="#cbd5e1" opacity="0.3" /> <!-- Camiseta de baixo -->
+    <path d="M280 560 L 400 750 L 520 560" fill="none" stroke="#0f172a" stroke-width="2" opacity="0.2" />
   </g>
 
-  <!-- Rosto - Detalhes -->
+  <!-- PESCOÇO -->
+  <path d="M320 480 L 320 580 L 480 580 L 480 480" fill="#c28e62" />
+  <ellipse cx="400" cy="580" rx="80" ry="20" fill="rgba(0,0,0,0.2)" /> <!-- Sombra projetada do queixo -->
+
+  <!-- CABEÇA (Forma base) -->
+  <g filter="url(#soft_shadow)">
+      <rect x="280" y="250" width="240" height="300" rx="100" ry="100" fill="url(#skin_grad)" />
+      <!-- Orelhas -->
+      <ellipse cx="270" cy="420" rx="20" ry="35" fill="#e2a478" />
+      <ellipse cx="530" cy="420" rx="20" ry="35" fill="#e2a478" />
+  </g>
+
+  <!-- ROSTO DETALHADO -->
   
-  <!-- Sobrancelhas (Grossas e escuras) -->
-  <path d="M190 260 Q 210 250 230 260" stroke="#451a03" stroke-width="8" fill="none" stroke-linecap="round" />
-  <path d="M282 260 Q 302 250 322 260" stroke="#451a03" stroke-width="8" fill="none" stroke-linecap="round" />
+  <!-- Barba (Estilo desenhado, não blob) -->
+  <path d="M280 450 Q 280 580 400 580 Q 520 580 520 450 L 520 420 Q 500 420 490 460 Q 400 440 310 460 Q 300 420 280 420 Z" fill="url(#beard_grad)" />
+  
+  <!-- Boca (Sorriso confiante no meio da barba) -->
+  <path d="M370 510 Q 400 530 430 510" fill="none" stroke="#1c1917" stroke-width="5" stroke-linecap="round" />
 
-  <!-- Olhos (Amigáveis e confiáveis) -->
-  <circle cx="210" cy="285" r="10" fill="#1e293b" />
-  <circle cx="302" cy="285" r="10" fill="#1e293b" />
-  <!-- Brilho nos olhos -->
-  <circle cx="213" cy="282" r="3" fill="white" />
-  <circle cx="305" cy="282" r="3" fill="white" />
+  <!-- Nariz (Volume com sombra, sem linha) -->
+  <path d="M385 460 L 395 480 L 415 480" fill="rgba(160, 80, 0, 0.1)" />
+  <circle cx="385" cy="470" r="12" fill="#c28e62" opacity="0.5" />
+  <circle cx="415" cy="470" r="12" fill="#c28e62" opacity="0.5" />
+  <circle cx="400" cy="465" r="15" fill="url(#skin_grad)" />
 
-  <!-- Nariz (Sutil) -->
-  <path d="M256 280 L 248 310 L 264 310 Z" fill="#c28e62" opacity="0.6" />
+  <!-- OLHOS (Realistas - Estilo Pixar/Disney) -->
+  <g transform="translate(0, 10)">
+      <!-- Esquerdo -->
+      <ellipse cx="340" cy="400" rx="25" ry="18" fill="#ffffff" />
+      <circle cx="340" cy="400" r="12" fill="#4b5563" /> <!-- Iris -->
+      <circle cx="340" cy="400" r="6" fill="#000000" /> <!-- Pupila -->
+      <circle cx="345" cy="396" r="4" fill="white" opacity="0.8" /> <!-- Brilho -->
+      
+      <!-- Direito -->
+      <ellipse cx="460" cy="400" rx="25" ry="18" fill="#ffffff" />
+      <circle cx="460" cy="400" r="12" fill="#4b5563" />
+      <circle cx="460" cy="400" r="6" fill="#000000" />
+      <circle cx="465" cy="396" r="4" fill="white" opacity="0.8" />
+      
+      <!-- Sobrancelhas (Grossas e expressivas) -->
+      <path d="M315 375 Q 340 365 365 375" fill="none" stroke="#292524" stroke-width="8" stroke-linecap="round" />
+      <path d="M435 375 Q 460 365 485 375" fill="none" stroke="#292524" stroke-width="8" stroke-linecap="round" />
+  </g>
 
-  <!-- Bigode (O Grande Bigode do Mestre) -->
-  <path d="M210 325 Q 256 315 302 325 Q 315 335 290 345 Q 256 335 222 345 Q 197 335 210 325" fill="#3f2317" filter="url(#softShadow)" />
-
-  <!-- Boca (Sorriso sutil) -->
-  <path d="M235 355 Q 256 360 277 355" stroke="#78350f" stroke-width="4" fill="none" stroke-linecap="round" />
+  <!-- CAPACETE (O toque final de Mestre) -->
+  <g filter="url(#soft_shadow)">
+    <!-- Casco Principal -->
+    <path d="M260 320 Q 400 150 540 320 L 550 330 L 250 330 Z" fill="url(#helmet_grad)" />
+    <!-- Aba frontal -->
+    <path d="M250 330 L 550 330 L 560 340 Q 400 360 240 340 Z" fill="#d97706" />
+    <!-- Faixa Refletiva (Prata) -->
+    <path d="M350 220 Q 400 210 450 220 L 455 240 Q 400 230 345 240 Z" fill="#e2e8f0" opacity="0.8" />
+    <!-- Brilho Especular (Plástico liso) -->
+    <ellipse cx="320" cy="250" rx="40" ry="20" fill="white" opacity="0.3" transform="rotate(-20 320 250)" />
+  </g>
 
 </svg>
 `.trim();
