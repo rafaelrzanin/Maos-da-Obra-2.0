@@ -18,22 +18,22 @@ export const aiService = {
   sendMessage: async (message: string): Promise<string> => {
     if (!ai) {
       // OFFLINE FALLBACK MODE
-      // Simula respostas úteis para evitar que o app quebre sem a chave
+      // Simula respostas técnicas para evitar que o app quebre sem a chave
       const lowerMsg = message.toLowerCase();
       
       await new Promise(r => setTimeout(r, 1000)); // Delay para parecer real
 
       if (lowerMsg.includes('concreto') || lowerMsg.includes('traço')) {
-          return "Opa Chefe! Sem internet aqui na obra (API Key não configurada), mas anota o traço padrão pra concreto forte: 1 saco de cimento, 4 latas de areia, 6 latas de brita e 1 lata e meia de água. Fica show!";
+          return "Para concreto estrutural fck 25 Mpa, recomendo o traço 1:2:3 (1 parte de cimento, 2 de areia média, 3 de brita 1) com fator água/cimento controlado (aprox 0.55). Certifique-se da cura úmida por pelo menos 7 dias.";
       }
       if (lowerMsg.includes('piso') || lowerMsg.includes('cerâmica')) {
-          return "Patrão, pra piso, lembra de conferir o nível antes! E usa argamassa AC-III se for porcelanato grande ou área externa, beleza?";
+          return "Para assentamento, verifique o nível do contrapiso. Utilize argamassa AC-III para porcelanatos ou áreas externas para garantir aderência química. Respeite sempre a junta de dilatação indicada pelo fabricante.";
       }
       if (lowerMsg.includes('tinta') || lowerMsg.includes('pintura')) {
-          return "Pra pintura render, lixa bem a parede antes, chefe. Se tiver mofo, passa água sanitária antes de tudo.";
+          return "A preparação da superfície é crítica. Lixe, limpe o pó e aplique fundo preparador ou selador antes da tinta. Para áreas externas, utilize tinta acrílica emborrachada ou standard de boa procedência para maior durabilidade.";
       }
 
-      return "Chefe, tô meio sem sinal (API Key do Google não configurada). Mas tô aqui! Configura a chave lá no Vercel que eu fico 100%. Enquanto isso, vai tocando a obra aí que eu torço daqui!";
+      return "No momento estou sem conexão com a base de dados (API Key não configurada). Por favor, verifique a configuração para que eu possa fornecer suporte técnico completo.";
     }
 
     try {
@@ -41,14 +41,14 @@ export const aiService = {
         model: "gemini-2.5-flash",
         contents: message,
         config: {
-          systemInstruction: "Você é o Zé da Obra, um mestre de obras experiente, prático, honesto e bem humorado. Você ajuda donos de obra com dicas de economia, materiais e processos construtivos. Use linguagem coloquial brasileira, chame o usuário de 'Chefe' ou 'Patrão'. Seja direto, evite termos muito técnicos sem explicação e sempre tente dar uma dica de economia no final. Responda em parágrafos curtos.",
+          systemInstruction: "Você é o Zeca da Obra, um engenheiro civil e mestre de obras com vasta experiência técnica. Sua comunicação é direta, precisa e profissional. Você domina normas técnicas (ABNT), propriedades dos materiais e gestão de projetos. Evite gírias excessivas. Seu objetivo é fornecer orientações técnicas, seguras e eficientes, focando na qualidade e durabilidade da construção, além da viabilidade econômica. Responda de forma concisa e fundamentada.",
         }
       });
       
-      return response.text || "Ixi, chefe. Me deu um branco aqui. Pode perguntar de novo?";
+      return response.text || "Poderia reformular a pergunta? Preciso de mais detalhes técnicos para responder adequadamente.";
     } catch (error) {
       console.error("Erro na IA:", error);
-      return "A obra tá sem sinal, chefe! Tive um problema para conectar. Tenta de novo daqui a pouco.";
+      return "Houve uma interrupção na conexão. Por favor, tente novamente em instantes.";
     }
   }
 };

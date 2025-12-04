@@ -29,13 +29,13 @@ export const ZeModal: React.FC<ZeModalProps> = ({ isOpen, title, message, confir
                 <div className="w-16 h-16 rounded-full p-1 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-800 shadow-lg shrink-0">
                     <img 
                     src={ZE_AVATAR} 
-                    alt="Zé da Obra" 
+                    alt="Zeca da Obra" 
                     className="w-full h-full object-cover rounded-full border-2 border-white dark:border-slate-800"
                     onError={(e) => { e.currentTarget.src = 'https://ui-avatars.com/api/?name=Ze+Obra&background=0F172A&color=fff'; }}
                     />
                 </div>
                 <div>
-                    <h3 className="text-xl font-bold text-primary dark:text-white leading-tight mb-1">Ei, Chefe!</h3>
+                    <h3 className="text-xl font-bold text-primary dark:text-white leading-tight mb-1">Atenção</h3>
                     <p className="text-sm font-medium text-slate-500 dark:text-slate-400">{title}</p>
                 </div>
             </div>

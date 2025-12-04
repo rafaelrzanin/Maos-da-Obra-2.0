@@ -1,8 +1,9 @@
 
 // Standard Libraries for Construction Management
 
-// Avatar Humanizado do Zé da Obra (Estilo Mestre de Obras Amigável)
-export const ZE_AVATAR = "https://api.dicebear.com/9.x/avataaars/svg?seed=ZeDaObra&clothing=overalls&top=hat&hatColor=blue02&facialHair=beardMedium&skinColor=light&eyes=happy&mouth=smile";
+// Avatar Zeca da Obra (Technical Profile: Mustache, Helmet, Overalls)
+// Uses DiceBear Avataaars with specific seed for consistency
+export const ZE_AVATAR = "https://api.dicebear.com/9.x/avataaars/svg?seed=ZecaEngineerV2&clothing=overalls&accessories=prescription02&top=hat&hatColor=orange01&facialHair=moustacheMagnum&hairColor=brown&skinColor=light";
 
 export interface PhaseCategory {
   category: string;

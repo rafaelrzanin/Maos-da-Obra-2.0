@@ -73,7 +73,7 @@ const Dashboard: React.FC = () => {
       setZeModal({
           isOpen: true,
           title: "Apagar Obra",
-          message: `Tem certeza, chefe? Ao apagar a obra "${workName}", você perde todo o histórico de gastos, compras e cronograma. Não tem volta!`,
+          message: `Tem certeza? Ao apagar a obra "${workName}", todo o histórico de gastos, compras e cronograma será perdido permanentemente.`,
           workId: workId
       });
   };
@@ -232,24 +232,24 @@ const Dashboard: React.FC = () => {
           )}
       </div>
       
-      {/* ZÉ DA OBRA TIP (Glassmorphism) */}
+      {/* ZÉ DA OBRA TIP (Glassmorphism) - UPDATED CONTENT */}
       <div className="mb-8 relative overflow-hidden rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/5 shadow-sm group hover:shadow-md transition-all">
            <div className="absolute top-0 right-0 w-32 h-32 bg-secondary/10 rounded-full blur-3xl translate-x-10 -translate-y-10 group-hover:bg-secondary/20 transition-all"></div>
            <div className="flex items-center gap-5 p-5 relative z-10">
                 <div className="w-16 h-16 rounded-full p-1 bg-gradient-to-br from-slate-100 to-slate-300 dark:from-slate-700 dark:to-slate-800 shrink-0 shadow-inner">
                         <img 
                         src={ZE_AVATAR} 
-                        alt="Zé" 
+                        alt="Zeca da Obra" 
                         className="w-full h-full object-cover rounded-full border-2 border-white dark:border-slate-900"
                         onError={(e) => { e.currentTarget.src = 'https://ui-avatars.com/api/?name=Ze+Obra&background=0F172A&color=fff'; }}
                         />
                 </div>
                 <div>
                     <div className="flex items-center gap-2 mb-1">
-                        <span className="bg-secondary text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">Dica do Mestre</span>
+                        <span className="bg-secondary text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">Recomendação Técnica</span>
                     </div>
                     <p className="text-sm text-slate-600 dark:text-slate-300 italic">
-                        "Nunca pague 100% adiantado para mão de obra. Combine pagamentos semanais conforme o serviço fica pronto!"
+                        "Evite adiantamentos integrais de mão de obra. Estabeleça um cronograma físico-financeiro e realize pagamentos mediante medição de serviço executado."
                     </p>
                 </div>
            </div>
