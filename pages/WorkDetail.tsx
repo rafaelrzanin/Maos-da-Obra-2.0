@@ -454,7 +454,8 @@ const MaterialsTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ work
             };
 
             // Call DB service with cost (which will create expense) and updated material
-            await dbService.updateMaterial(updatedMaterial, Number(editCost)); 
+            // PASS ADDED QTY HERE SO IT CAN BE LINKED TO THE EXPENSE
+            await dbService.updateMaterial(updatedMaterial, Number(editCost), addedQty); 
             
             setEditingMaterial(null); 
             setEditCost(''); 
@@ -552,6 +553,9 @@ const ExpensesTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ workI
     const [steps, setSteps] = useState<Step[]>([]);
     const [formData, setFormData] = useState<Partial<Expense>>({ date: new Date().toISOString().split('T')[0], category: ExpenseCategory.MATERIAL, amount: 0, paidAmount: 0, description: '', stepId: 'geral' });
     const [editingId, setEditingId] = useState<string | null>(null);
+    
+    // NEW: Modal for deletion warning
+    const [zeModal, setZeModal] = useState<{isOpen: boolean, title: string, message: string, expenseId?: string, onConfirm: () => void}>({isOpen: false, title: '', message: '', onConfirm: () => {}});
 
     const load = async () => { const [exp, stp] = await Promise.all([dbService.getExpenses(workId), dbService.getSteps(workId)]); 
         // REMOVED setExpenses(exp);
@@ -560,13 +564,58 @@ const ExpensesTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ workI
 
     const handleSave = async (e: React.FormEvent) => { e.preventDefault(); const payload = { workId, description: formData.description!, amount: Number(formData.amount), paidAmount: Number(formData.paidAmount), category: formData.category!, date: formData.date!, stepId: formData.stepId === 'geral' ? undefined : formData.stepId, quantity: 1 }; if (editingId) await dbService.updateExpense({ ...payload, id: editingId } as Expense); else await dbService.addExpense(payload); setIsCreateOpen(false); setEditingId(null); await load(); onUpdate(); };
     const handleEdit = (expense: Expense) => { setEditingId(expense.id); setFormData({ ...expense, stepId: expense.stepId || 'geral' }); setIsCreateOpen(true); };
-    const handleDelete = async (id: string) => { if(confirm("Excluir?")) { await dbService.deleteExpense(id); setIsCreateOpen(false); await load(); onUpdate(); } };
+    
+    // NEW: Enhanced delete with ZeModal and Stock Reversion check
+    const handleDeleteClick = (expense: Expense) => {
+        let message = "Tem certeza que deseja apagar este gasto?";
+        let title = "Apagar Gasto";
+        
+        // Check if linked to material
+        if (expense.relatedMaterialId && expense.category === ExpenseCategory.MATERIAL) {
+            title = "Atenção Chefe!";
+            message = `Este gasto foi gerado pela compra de materiais (${expense.quantity} unid). Se você apagar, o estoque desse material será reduzido automaticamente. Quer continuar?`;
+        }
+
+        setZeModal({
+            isOpen: true,
+            title,
+            message,
+            expenseId: expense.id,
+            onConfirm: async () => {
+                await dbService.deleteExpense(expense.id);
+                setIsCreateOpen(false); // Close edit modal if open
+                setZeModal(prev => ({...prev, isOpen: false}));
+                await load();
+                onUpdate();
+            }
+        });
+    };
 
     return (
         <div className="animate-in fade-in duration-500 pb-20">
              <div className="flex items-center justify-between mb-8"><SectionHeader title="Gastos" subtitle="Controle financeiro." /><button onClick={() => { setEditingId(null); setIsCreateOpen(true); }} className="bg-primary text-white w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg transition-all"><i className="fa-solid fa-plus text-lg"></i></button></div>
             {Object.keys(groupedExpenses).sort().map(group => (<div key={group} className="mb-8"><div className="flex justify-between items-end mb-4 border-b border-slate-100 dark:border-slate-800 pb-2"><h3 className="font-bold text-primary dark:text-white">{group}</h3><span className="text-xs font-bold text-slate-500">R$ {groupedExpenses[group].total.toLocaleString('pt-BR')}</span></div><div className="space-y-3">{groupedExpenses[group].items.map(expense => (<div key={expense.id} onClick={() => handleEdit(expense)} className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-4 rounded-2xl shadow-sm hover:shadow-md transition-all cursor-pointer"><div className="flex justify-between items-start mb-2"><div className="flex items-center gap-3"><div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs bg-slate-50 text-slate-600`}><i className="fa-solid fa-tag"></i></div><div><p className="font-bold text-sm text-primary dark:text-white">{expense.description}</p><p className="text-[10px] text-slate-400">{formatDateDisplay(expense.date)}</p></div></div><div className="text-right"><p className="font-bold text-primary dark:text-white">R$ {expense.amount.toLocaleString('pt-BR')}</p><div className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase ${expense.paidAmount === expense.amount ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{expense.paidAmount === expense.amount ? 'Pago' : 'Pendente'}</div></div></div></div>))}</div></div>))}
-            {isCreateOpen && (<div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in"><div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-8 shadow-2xl overflow-y-auto max-h-[90vh]"><h3 className="text-xl font-bold text-primary dark:text-white mb-6">{editingId ? 'Editar' : 'Novo'}</h3><form onSubmit={handleSave} className="space-y-4"><div><label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Tipo</label><div className="grid grid-cols-2 gap-2">{[ExpenseCategory.MATERIAL, ExpenseCategory.LABOR, ExpenseCategory.PERMITS, ExpenseCategory.OTHER].map(cat => (<button key={cat} type="button" onClick={() => setFormData({...formData, category: cat})} className={`p-2 rounded-xl text-xs font-bold border ${formData.category === cat ? 'bg-primary text-white border-primary' : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500'}`}>{cat}</button>))}</div></div><div><label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Etapa</label><select className="w-full px-4 py-3 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 outline-none text-sm" value={formData.stepId} onChange={e => setFormData({...formData, stepId: e.target.value})}><option value="geral">Geral</option>{steps.map(s => (<option key={s.id} value={s.id}>{s.name}</option>))}</select></div><input placeholder="Descrição" className="w-full px-4 py-3 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 outline-none text-sm" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} required /><div className="grid grid-cols-2 gap-3"><input type="number" placeholder="Total" className="w-full px-4 py-3 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 outline-none" value={formData.amount} onChange={e => setFormData({...formData, amount: Number(e.target.value)})} /><input type="number" placeholder="Pago" className="w-full px-4 py-3 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 outline-none" value={formData.paidAmount} onChange={e => setFormData({...formData, paidAmount: Number(e.target.value)})} /></div><input type="date" className="w-full px-4 py-3 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 outline-none text-sm" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} /><div className="flex gap-3 pt-2"><button type="button" onClick={() => setIsCreateOpen(false)} className="flex-1 py-3 font-bold text-slate-500">Cancelar</button><button type="submit" className="flex-1 py-3 bg-primary text-white rounded-xl font-bold shadow-lg">Salvar</button></div>{editingId && (<button type="button" onClick={() => handleDelete(editingId)} className="w-full py-2 text-red-500 text-xs font-bold uppercase tracking-wider">Excluir</button>)}</form></div></div>)}
+            
+            {isCreateOpen && (<div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in"><div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-8 shadow-2xl overflow-y-auto max-h-[90vh]"><h3 className="text-xl font-bold text-primary dark:text-white mb-6">{editingId ? 'Editar' : 'Novo'}</h3><form onSubmit={handleSave} className="space-y-4"><div><label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Tipo</label><div className="grid grid-cols-2 gap-2">{[ExpenseCategory.MATERIAL, ExpenseCategory.LABOR, ExpenseCategory.PERMITS, ExpenseCategory.OTHER].map(cat => (<button key={cat} type="button" onClick={() => setFormData({...formData, category: cat})} className={`p-2 rounded-xl text-xs font-bold border ${formData.category === cat ? 'bg-primary text-white border-primary' : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500'}`}>{cat}</button>))}</div></div><div><label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Etapa</label><select className="w-full px-4 py-3 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 outline-none text-sm" value={formData.stepId} onChange={e => setFormData({...formData, stepId: e.target.value})}><option value="geral">Geral</option>{steps.map(s => (<option key={s.id} value={s.id}>{s.name}</option>))}</select></div><input placeholder="Descrição" className="w-full px-4 py-3 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 outline-none text-sm" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} required /><div className="grid grid-cols-2 gap-3"><input type="number" placeholder="Total" className="w-full px-4 py-3 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 outline-none" value={formData.amount} onChange={e => setFormData({...formData, amount: Number(e.target.value)})} /><input type="number" placeholder="Pago" className="w-full px-4 py-3 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 outline-none" value={formData.paidAmount} onChange={e => setFormData({...formData, paidAmount: Number(e.target.value)})} /></div><input type="date" className="w-full px-4 py-3 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 outline-none text-sm" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} /><div className="flex gap-3 pt-2"><button type="button" onClick={() => setIsCreateOpen(false)} className="flex-1 py-3 font-bold text-slate-500">Cancelar</button><button type="submit" className="flex-1 py-3 bg-primary text-white rounded-xl font-bold shadow-lg">Salvar</button></div>
+            {editingId && (
+                <button 
+                    type="button" 
+                    onClick={() => {
+                        // Create a temporary object to pass to delete handler, since we have the ID and can deduce some props, or rely on finding it. 
+                        // Actually, better to find the real object from groupedExpenses
+                        let realExpense: Expense | undefined;
+                        for(const k in groupedExpenses) {
+                            const found = groupedExpenses[k].items.find(i => i.id === editingId);
+                            if(found) { realExpense = found; break; }
+                        }
+                        if(realExpense) handleDeleteClick(realExpense);
+                    }} 
+                    className="w-full py-2 text-red-500 text-xs font-bold uppercase tracking-wider"
+                >
+                    Excluir
+                </button>
+            )}</form></div></div>)}
+            <ZeModal isOpen={zeModal.isOpen} title={zeModal.title} message={zeModal.message} onConfirm={zeModal.onConfirm} onCancel={() => setZeModal({isOpen: false, title: '', message: '', onConfirm: () => {}})} />
         </div>
     );
 }
