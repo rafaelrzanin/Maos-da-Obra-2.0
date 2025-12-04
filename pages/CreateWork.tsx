@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../App';
@@ -21,7 +20,7 @@ const CreateWork: React.FC = () => {
     address: '',
     budgetPlanned: '',
     area: '',
-    floors: '1', // New field
+    floors: '1', // Default 1
     startDate: new Date().toISOString().split('T')[0],
   });
 
@@ -80,6 +79,7 @@ const CreateWork: React.FC = () => {
       if (category === 'CONSTRUCTION') {
           // Auto select the construction template
           setSelectedTemplateId('CONSTRUCAO');
+          setFormData(prev => ({ ...prev, floors: '1' }));
       } else {
           // Reset template if switching to renovation to force choice
           setSelectedTemplateId('');
@@ -145,7 +145,7 @@ const CreateWork: React.FC = () => {
         navigate(`/work/${newWork.id}`);
     } catch (error) {
         console.error(error);
-        alert("Erro ao criar obra. Tente novamente.");
+        alert(`Erro ao criar obra: ${(error as any).message || 'Erro desconhecido'}`);
     } finally {
         setLoading(false);
     }
