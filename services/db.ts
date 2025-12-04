@@ -1,3 +1,4 @@
+
 import { 
   User, Work, Step, Expense, Material, WorkPhoto, WorkFile,
   PlanType, WorkStatus, StepStatus, Notification, StandardMaterial,
@@ -88,6 +89,8 @@ const insertExpenseInternal = async (expense: Omit<Expense, 'id'>) => {
     const safePaid = Number(expense.paidAmount) || 0;
     const safeQty = Number(expense.quantity) || 1;
 
+    console.log("DB: Saving Expense...", expense);
+
     if (supabase) {
         await supabase.from('expenses').insert({
             work_id: expense.workId,
@@ -162,213 +165,60 @@ const getExpensesInternal = async (workId: string): Promise<Expense[]> => {
     }
 };
 
-// --- ENGINE: CONSTRUCTION PLAN GENERATOR (ENGENHEIRO VIRTUAL 3.0 - SEQUENCIAL) ---
 interface PlanItem {
-    stepName: string;
-    duration: number;
-    startOffset: number; 
-    materials: { name: string, unit: string, qty: number, category?: string }[];
+  stepName: string;
+  duration: number;
+  startOffset: number;
+  materials: {
+      name: string;
+      unit: string;
+      qty: number;
+  }[];
 }
 
+// --- ENGINE: CONSTRUCTION PLAN GENERATOR (ENGENHEIRO VIRTUAL 3.0 - SEQUENCIAL) ---
+// (Kept same as before, omitted for brevity but assumed present)
 const generateConstructionPlan = (totalArea: number, floors: number): PlanItem[] => {
     const plan: PlanItem[] = [];
-    const footprint = totalArea / Math.max(1, floors); // Área por pavimento
+    const footprint = totalArea / Math.max(1, floors); 
     let currentDay = 0;
     let stepCount = 1;
-
     const formatStep = (name: string) => `${stepCount.toString().padStart(2, '0')} - ${name}`;
 
     // 1. SERVIÇOS PRELIMINARES
-    plan.push({
-        stepName: formatStep("Serviços Preliminares (Canteiro)"),
-        duration: 5,
-        startOffset: currentDay,
-        materials: [
-            { name: 'Tapume (Madeirite)', unit: 'chapas', qty: Math.ceil(Math.sqrt(footprint) * 4 / 2) },
-            { name: 'Sarrasfo 2.5cm', unit: 'dz', qty: 2 },
-            { name: 'Prego 17x21', unit: 'kg', qty: 2 },
-            { name: 'Ligação Provisória Água/Luz', unit: 'vb', qty: 1 },
-        ]
-    });
-    currentDay += 5;
-    stepCount++;
-
+    plan.push({ stepName: formatStep("Serviços Preliminares (Canteiro)"), duration: 5, startOffset: currentDay, materials: [{ name: 'Tapume (Madeirite)', unit: 'chapas', qty: Math.ceil(Math.sqrt(footprint) * 4 / 2) }, { name: 'Sarrasfo 2.5cm', unit: 'dz', qty: 2 }, { name: 'Prego 17x21', unit: 'kg', qty: 2 }, { name: 'Ligação Provisória Água/Luz', unit: 'vb', qty: 1 }] });
+    currentDay += 5; stepCount++;
     // 2. FUNDAÇÃO
-    plan.push({
-        stepName: formatStep("Fundação e Baldrames"),
-        duration: 20,
-        startOffset: currentDay,
-        materials: [
-            { name: 'Cimento CP-II (Concreto)', unit: 'sacos', qty: Math.ceil(footprint * 0.8) },
-            { name: 'Areia Média/Grossa', unit: 'm³', qty: Math.ceil(footprint * 0.08) },
-            { name: 'Brita 1', unit: 'm³', qty: Math.ceil(footprint * 0.08) },
-            { name: 'Pedra de Mão (Rachão)', unit: 'm³', qty: Math.ceil(footprint * 0.04) },
-            { name: 'Vergalhão 3/8 (10mm)', unit: 'barras', qty: Math.ceil(footprint * 0.6) },
-            { name: 'Vergalhão 5/16 (8mm)', unit: 'barras', qty: Math.ceil(footprint * 0.4) },
-            { name: 'Estribos 4.2mm (Prontos)', unit: 'un', qty: Math.ceil(footprint * 4) },
-            { name: 'Tábua de Pinus 30cm (Caixaria)', unit: 'dz', qty: Math.ceil(footprint / 15) },
-            { name: 'Impermeabilizante Betuminoso', unit: 'latas', qty: Math.ceil(footprint / 12) },
-        ]
-    });
-    currentDay += 20;
-    stepCount++;
-
-    // 3. ESTRUTURA (Loop por Andar)
+    plan.push({ stepName: formatStep("Fundação e Baldrames"), duration: 20, startOffset: currentDay, materials: [{ name: 'Cimento CP-II (Concreto)', unit: 'sacos', qty: Math.ceil(footprint * 0.8) }, { name: 'Areia Média/Grossa', unit: 'm³', qty: Math.ceil(footprint * 0.08) }, { name: 'Brita 1', unit: 'm³', qty: Math.ceil(footprint * 0.08) }, { name: 'Pedra de Mão (Rachão)', unit: 'm³', qty: Math.ceil(footprint * 0.04) }, { name: 'Vergalhão 3/8 (10mm)', unit: 'barras', qty: Math.ceil(footprint * 0.6) }, { name: 'Vergalhão 5/16 (8mm)', unit: 'barras', qty: Math.ceil(footprint * 0.4) }, { name: 'Estribos 4.2mm (Prontos)', unit: 'un', qty: Math.ceil(footprint * 4) }, { name: 'Tábua de Pinus 30cm (Caixaria)', unit: 'dz', qty: Math.ceil(footprint / 15) }, { name: 'Impermeabilizante Betuminoso', unit: 'latas', qty: Math.ceil(footprint / 12) }] });
+    currentDay += 20; stepCount++;
+    // 3. ESTRUTURA
     for (let i = 0; i < floors; i++) {
         const floorLabel = i === 0 ? "Térreo" : `${i}º Pavimento`;
-        
-        // A. Paredes e Colunas
-        plan.push({
-            stepName: formatStep(`Alvenaria e Estrutura (${floorLabel})`),
-            duration: 20,
-            startOffset: currentDay,
-            materials: [
-                { name: `Tijolo/Bloco (${floorLabel})`, unit: 'milheiro', qty: Math.ceil((footprint * 3 * 25) / 1000) },
-                { name: 'Cimento (Assentamento)', unit: 'sacos', qty: Math.ceil(footprint * 0.25) },
-                { name: 'Cal Hidratada', unit: 'sacos', qty: Math.ceil(footprint * 0.3) },
-                { name: 'Areia Média', unit: 'm³', qty: Math.ceil(footprint * 0.05) },
-                { name: 'Ferro 3/8 (Colunas)', unit: 'barras', qty: Math.ceil(footprint * 0.4) },
-                { name: 'Ferro 4.2 (Estribos)', unit: 'barras', qty: Math.ceil(footprint * 0.2) },
-                { name: 'Tábua de Pinus (Vigas)', unit: 'dz', qty: Math.ceil(footprint / 20) },
-                // Caixinhas de luz entram na alvenaria
-                { name: 'Caixinhas de Luz 4x2', unit: 'un', qty: Math.ceil(footprint / 8) },
-                { name: 'Eletroduto Corrugado (Parede)', unit: 'rolos', qty: Math.ceil(footprint / 20) },
-            ]
-        });
-        currentDay += 20;
-        stepCount++;
-
-        // B. Laje
-        plan.push({
-            stepName: formatStep(`Laje e Cobertura (${floorLabel})`),
-            duration: 15,
-            startOffset: currentDay,
-            materials: [
-                { name: `Vigota Trilho (${floorLabel})`, unit: 'm', qty: Math.ceil(footprint * 3.2) },
-                { name: `Isopor/Lajota (${floorLabel})`, unit: 'un', qty: Math.ceil(footprint * 3.5) },
-                { name: 'Malha Pop 15x15', unit: 'un', qty: Math.ceil(footprint / 8) },
-                { name: 'Concreto Usinado FCK25', unit: 'm³', qty: Math.ceil(footprint * 0.1) },
-                { name: 'Escoras de Eucalipto', unit: 'dz', qty: Math.ceil(footprint / 12) },
-                { name: 'Caixas de Luz de Laje (Octogonal)', unit: 'un', qty: Math.ceil(footprint / 15) },
-                { name: 'Eletroduto Corrugado Reforçado (Laje)', unit: 'rolos', qty: Math.ceil(footprint / 40) },
-            ]
-        });
-        currentDay += 15;
-        stepCount++;
+        plan.push({ stepName: formatStep(`Alvenaria e Estrutura (${floorLabel})`), duration: 20, startOffset: currentDay, materials: [{ name: `Tijolo/Bloco (${floorLabel})`, unit: 'milheiro', qty: Math.ceil((footprint * 3 * 25) / 1000) }, { name: 'Cimento (Assentamento)', unit: 'sacos', qty: Math.ceil(footprint * 0.25) }, { name: 'Cal Hidratada', unit: 'sacos', qty: Math.ceil(footprint * 0.3) }, { name: 'Areia Média', unit: 'm³', qty: Math.ceil(footprint * 0.05) }, { name: 'Ferro 3/8 (Colunas)', unit: 'barras', qty: Math.ceil(footprint * 0.4) }, { name: 'Ferro 4.2 (Estribos)', unit: 'barras', qty: Math.ceil(footprint * 0.2) }, { name: 'Tábua de Pinus (Vigas)', unit: 'dz', qty: Math.ceil(footprint / 20) }, { name: 'Caixinhas de Luz 4x2', unit: 'un', qty: Math.ceil(footprint / 8) }, { name: 'Eletroduto Corrugado (Parede)', unit: 'rolos', qty: Math.ceil(footprint / 20) }] });
+        currentDay += 20; stepCount++;
+        plan.push({ stepName: formatStep(`Laje e Cobertura (${floorLabel})`), duration: 15, startOffset: currentDay, materials: [{ name: `Vigota Trilho (${floorLabel})`, unit: 'm', qty: Math.ceil(footprint * 3.2) }, { name: `Isopor/Lajota (${floorLabel})`, unit: 'un', qty: Math.ceil(footprint * 3.5) }, { name: 'Malha Pop 15x15', unit: 'un', qty: Math.ceil(footprint / 8) }, { name: 'Concreto Usinado FCK25', unit: 'm³', qty: Math.ceil(footprint * 0.1) }, { name: 'Escoras de Eucalipto', unit: 'dz', qty: Math.ceil(footprint / 12) }, { name: 'Caixas de Luz de Laje (Octogonal)', unit: 'un', qty: Math.ceil(footprint / 15) }, { name: 'Eletroduto Corrugado Reforçado (Laje)', unit: 'rolos', qty: Math.ceil(footprint / 40) }] });
+        currentDay += 15; stepCount++;
     }
-
     // 4. TELHADO
-    plan.push({
-        stepName: formatStep("Telhado e Calhas"),
-        duration: 15,
-        startOffset: currentDay,
-        materials: [
-            { name: 'Madeiramento (Vigas/Caibros)', unit: 'm³', qty: Math.ceil(footprint * 0.04) },
-            { name: 'Telhas (Cerâmica/Concreto)', unit: 'milheiro', qty: Math.ceil((footprint * 1.4 * 16) / 1000) },
-            { name: 'Caixa D\'água 1000L', unit: 'un', qty: 1 },
-            { name: 'Manta Térmica', unit: 'rolos', qty: Math.ceil(footprint / 45) },
-            { name: 'Calhas e Rufos', unit: 'm', qty: Math.ceil(Math.sqrt(footprint) * 3) },
-        ]
-    });
-    currentDay += 10; 
-    stepCount++;
-
-    // 5. INSTALAÇÕES HIDRÁULICAS
-    plan.push({
-        stepName: formatStep("Instalações Hidráulicas e Esgoto"),
-        duration: 10,
-        startOffset: currentDay,
-        materials: [
-            { name: 'Tubos PVC 25mm (Água)', unit: 'barras', qty: Math.ceil(totalArea / 8) },
-            { name: 'Tubos Esgoto 100mm', unit: 'barras', qty: Math.ceil(floors * 3) },
-            { name: 'Tubos Esgoto 40mm/50mm', unit: 'barras', qty: Math.ceil(totalArea / 10) },
-            { name: 'Conexões Diversas (Kit)', unit: 'vb', qty: 1 },
-            { name: 'Registros de Gaveta', unit: 'un', qty: Math.ceil(floors * 2) },
-            { name: 'Cola PVC', unit: 'tubo', qty: 2 },
-        ]
-    });
-    currentDay += 10;
-    stepCount++;
-
+    plan.push({ stepName: formatStep("Telhado e Calhas"), duration: 15, startOffset: currentDay, materials: [{ name: 'Madeiramento (Vigas/Caibros)', unit: 'm³', qty: Math.ceil(footprint * 0.04) }, { name: 'Telhas (Cerâmica/Concreto)', unit: 'milheiro', qty: Math.ceil((footprint * 1.4 * 16) / 1000) }, { name: 'Caixa D\'água 1000L', unit: 'un', qty: 1 }, { name: 'Manta Térmica', unit: 'rolos', qty: Math.ceil(footprint / 45) }, { name: 'Calhas e Rufos', unit: 'm', qty: Math.ceil(Math.sqrt(footprint) * 3) }] });
+    currentDay += 10; stepCount++;
+    // 5. INSTALAÇÕES
+    plan.push({ stepName: formatStep("Instalações Hidráulicas e Esgoto"), duration: 10, startOffset: currentDay, materials: [{ name: 'Tubos PVC 25mm (Água)', unit: 'barras', qty: Math.ceil(totalArea / 8) }, { name: 'Tubos Esgoto 100mm', unit: 'barras', qty: Math.ceil(floors * 3) }, { name: 'Tubos Esgoto 40mm/50mm', unit: 'barras', qty: Math.ceil(totalArea / 10) }, { name: 'Conexões Diversas (Kit)', unit: 'vb', qty: 1 }, { name: 'Registros de Gaveta', unit: 'un', qty: Math.ceil(floors * 2) }, { name: 'Cola PVC', unit: 'tubo', qty: 2 }] });
+    currentDay += 10; stepCount++;
     // 6. REBOCO
-    plan.push({
-        stepName: formatStep("Reboco e Contrapiso"),
-        duration: 25,
-        startOffset: currentDay,
-        materials: [
-            { name: 'Cimento (Reboco/Piso)', unit: 'sacos', qty: Math.ceil(totalArea * 0.4) },
-            { name: 'Areia Fina/Média', unit: 'm³', qty: Math.ceil(totalArea * 0.1) },
-            { name: 'Cal Hidratada', unit: 'sacos', qty: Math.ceil(totalArea * 0.3) },
-            { name: 'Aditivo Vedalit', unit: 'litros', qty: Math.ceil(totalArea / 20) },
-        ]
-    });
-    currentDay += 25;
-    stepCount++;
-
+    plan.push({ stepName: formatStep("Reboco e Contrapiso"), duration: 25, startOffset: currentDay, materials: [{ name: 'Cimento (Reboco/Piso)', unit: 'sacos', qty: Math.ceil(totalArea * 0.4) }, { name: 'Areia Fina/Média', unit: 'm³', qty: Math.ceil(totalArea * 0.1) }, { name: 'Cal Hidratada', unit: 'sacos', qty: Math.ceil(totalArea * 0.3) }, { name: 'Aditivo Vedalit', unit: 'litros', qty: Math.ceil(totalArea / 20) }] });
+    currentDay += 25; stepCount++;
     // 7. FIAÇÃO
-    plan.push({
-        stepName: formatStep("Fiação e Cabos Elétricos"),
-        duration: 7,
-        startOffset: currentDay,
-        materials: [
-            { name: 'Cabos 2.5mm (Tomadas)', unit: 'rolos', qty: Math.ceil(totalArea / 25) },
-            { name: 'Cabos 1.5mm (Iluminação)', unit: 'rolos', qty: Math.ceil(totalArea / 30) },
-            { name: 'Cabos 6mm (Chuveiro)', unit: 'm', qty: Math.ceil(floors * 15) },
-            { name: 'Quadro de Distribuição', unit: 'un', qty: floors },
-            { name: 'Disjuntor', unit: 'un', qty: Math.ceil(totalArea / 20) },
-            { name: 'Fita Isolante', unit: 'un', qty: 2 },
-        ]
-    });
-    currentDay += 7;
-    stepCount++;
-
+    plan.push({ stepName: formatStep("Fiação e Cabos Elétricos"), duration: 7, startOffset: currentDay, materials: [{ name: 'Cabos 2.5mm (Tomadas)', unit: 'rolos', qty: Math.ceil(totalArea / 25) }, { name: 'Cabos 1.5mm (Iluminação)', unit: 'rolos', qty: Math.ceil(totalArea / 30) }, { name: 'Cabos 6mm (Chuveiro)', unit: 'm', qty: Math.ceil(floors * 15) }, { name: 'Quadro de Distribuição', unit: 'un', qty: floors }, { name: 'Disjuntor', unit: 'un', qty: Math.ceil(totalArea / 20) }, { name: 'Fita Isolante', unit: 'un', qty: 2 }] });
+    currentDay += 7; stepCount++;
     // 8. PISOS
-    plan.push({
-        stepName: formatStep("Pisos e Revestimentos"),
-        duration: 20,
-        startOffset: currentDay,
-        materials: [
-            { name: 'Piso Cerâmico/Porcelanato', unit: 'm²', qty: Math.ceil(totalArea * 1.15) },
-            { name: 'Argamassa AC-II/AC-III', unit: 'sacos', qty: Math.ceil(totalArea * 1.55 / 4) },
-            { name: 'Rejunte', unit: 'kg', qty: Math.ceil(totalArea / 8) },
-            { name: 'Niveladores de Piso', unit: 'pct', qty: Math.ceil(totalArea / 30) },
-            { name: 'Rodapés', unit: 'm', qty: Math.ceil(Math.sqrt(totalArea) * 4) },
-        ]
-    });
-    currentDay += 20;
-    stepCount++;
-
+    plan.push({ stepName: formatStep("Pisos e Revestimentos"), duration: 20, startOffset: currentDay, materials: [{ name: 'Piso Cerâmico/Porcelanato', unit: 'm²', qty: Math.ceil(totalArea * 1.15) }, { name: 'Argamassa AC-II/AC-III', unit: 'sacos', qty: Math.ceil(totalArea * 1.55 / 4) }, { name: 'Rejunte', unit: 'kg', qty: Math.ceil(totalArea / 8) }, { name: 'Niveladores de Piso', unit: 'pct', qty: Math.ceil(totalArea / 30) }, { name: 'Rodapés', unit: 'm', qty: Math.ceil(Math.sqrt(totalArea) * 4) }] });
+    currentDay += 20; stepCount++;
     // 9. PINTURA
-    plan.push({
-        stepName: formatStep("Pintura Geral"),
-        duration: 15,
-        startOffset: currentDay,
-        materials: [
-            { name: 'Massa Corrida/Acrílica', unit: 'latas', qty: Math.ceil(totalArea / 12) },
-            { name: 'Selador Acrílico', unit: 'latas', qty: Math.ceil(totalArea / 60) },
-            { name: 'Tinta Acrílica (18L)', unit: 'latas', qty: Math.ceil(totalArea / 40) },
-            { name: 'Lixas 150/220', unit: 'un', qty: 20 },
-            { name: 'Rolo de Lã e Pincel', unit: 'kit', qty: 1 },
-            { name: 'Fita Crepe', unit: 'rolos', qty: 3 },
-            { name: 'Lona Plástica', unit: 'm', qty: 20 },
-        ]
-    });
-    currentDay += 15;
-    stepCount++;
-
-    // 10. ACABAMENTOS FINAIS
-    plan.push({
-        stepName: formatStep("Acabamentos Finais e Entrega"),
-        duration: 10,
-        startOffset: currentDay,
-        materials: [
-            { name: 'Kit Tomadas e Interruptores', unit: 'un', qty: Math.ceil(totalArea / 8) },
-            { name: 'Luminárias / Plafons', unit: 'un', qty: Math.ceil(totalArea / 12) },
-            { name: 'Louças (Vaso/Pia)', unit: 'un', qty: Math.ceil(floors * 1.5) },
-            { name: 'Metais (Torneiras/Chuveiro)', unit: 'un', qty: Math.ceil(floors * 2) },
-            { name: 'Sifões e Engates', unit: 'un', qty: Math.ceil(floors * 3) },
-        ]
-    });
+    plan.push({ stepName: formatStep("Pintura Geral"), duration: 15, startOffset: currentDay, materials: [{ name: 'Massa Corrida/Acrílica', unit: 'latas', qty: Math.ceil(totalArea / 12) }, { name: 'Selador Acrílico', unit: 'latas', qty: Math.ceil(totalArea / 60) }, { name: 'Tinta Acrílica (18L)', unit: 'latas', qty: Math.ceil(totalArea / 40) }, { name: 'Lixas 150/220', unit: 'un', qty: 20 }, { name: 'Rolo de Lã e Pincel', unit: 'kit', qty: 1 }, { name: 'Fita Crepe', unit: 'rolos', qty: 3 }, { name: 'Lona Plástica', unit: 'm', qty: 20 }] });
+    currentDay += 15; stepCount++;
+    // 10. ACABAMENTOS
+    plan.push({ stepName: formatStep("Acabamentos Finais e Entrega"), duration: 10, startOffset: currentDay, materials: [{ name: 'Kit Tomadas e Interruptores', unit: 'un', qty: Math.ceil(totalArea / 8) }, { name: 'Luminárias / Plafons', unit: 'un', qty: Math.ceil(totalArea / 12) }, { name: 'Louças (Vaso/Pia)', unit: 'un', qty: Math.ceil(floors * 1.5) }, { name: 'Metais (Torneiras/Chuveiro)', unit: 'un', qty: Math.ceil(floors * 2) }, { name: 'Sifões e Engates', unit: 'un', qty: Math.ceil(floors * 3) }] });
 
     return plan;
 };
@@ -392,11 +242,8 @@ export const dbService = {
         }
 
         if (data.user) {
-            // Force Update Plan to Vitalicio on Login
             await supabase.from('profiles').update({ plan: PlanType.VITALICIO }).eq('id', data.user.id);
-            
             const { data: profile } = await supabase.from('profiles').select('*').eq('id', data.user.id).single();
-            // Local Storage Persistence for Supabase Session
             if (profile) {
                 localStorage.setItem(SESSION_KEY, JSON.stringify(profile));
                 return profile as User;
@@ -409,7 +256,6 @@ export const dbService = {
                 const db = getLocalDb();
                 const user = db.users.find(u => u.email === email);
                 if (user) {
-                    // Force Plan Update Locally
                     if (user.plan !== PlanType.VITALICIO) {
                         user.plan = PlanType.VITALICIO;
                         saveLocalDb(db);
@@ -440,10 +286,7 @@ export const dbService = {
         }
         
         await new Promise(r => setTimeout(r, 1000));
-        
-        // Force Vitalicio on Signup
         await supabase.from('profiles').update({ plan: PlanType.VITALICIO }).eq('id', data.user.id);
-
         const { data: profile } = await supabase.from('profiles').select('*').eq('id', data.user.id).single();
         if (profile) localStorage.setItem(SESSION_KEY, JSON.stringify(profile));
         return profile as User;
@@ -456,7 +299,7 @@ export const dbService = {
                 name,
                 email,
                 whatsapp,
-                plan: PlanType.VITALICIO, // Force Vitalicio
+                plan: PlanType.VITALICIO, 
                 subscriptionExpiresAt: new Date(new Date().setDate(new Date().getDate() + 30)).toISOString()
             };
             db.users.push(newUser);
@@ -575,15 +418,12 @@ export const dbService = {
         const plan = generateConstructionPlan(work.area, work.floors || 1);
         const startDate = new Date(work.startDate);
 
-        // SEQUENTIAL INSERTION TO ENSURE ID LINKING
         for (const item of plan) {
-            // Calculate dates
             const sDate = new Date(startDate);
             sDate.setDate(sDate.getDate() + item.startOffset);
             const eDate = new Date(sDate);
             eDate.setDate(eDate.getDate() + item.duration);
 
-            // A. Create Step
             let stepId = '';
             if (supabase) {
                  const { data: newStep } = await supabase.from('steps').insert({
@@ -609,25 +449,21 @@ export const dbService = {
                  saveLocalDb(db);
             }
 
-            // B. Create Linked Materials
             if (item.materials.length > 0) {
-                 // FIX: FORCE CATEGORY TO MATCH STEP NAME FOR VISUAL GROUPING
                  const matPayload = item.materials.map(m => ({
                     work_id: newWorkId,
                     name: m.name,
                     planned_qty: m.qty,
                     purchased_qty: 0,
                     unit: m.unit,
-                    category: item.stepName, // CRITICAL: USE STEP NAME AS CATEGORY
-                    step_id: stepId || null // Allow null if stepId is missing
+                    category: item.stepName,
+                    step_id: stepId || null 
                  }));
 
                  if (supabase) {
-                    // Try insert via Supabase
                     const { error } = await supabase.from('materials').insert(matPayload);
                     if (error) {
                         console.error("Erro ao inserir materiais automáticos:", error);
-                        // Fallback if step_id column missing
                         if (error.message.includes('step_id')) {
                              const fallbackPayload = matPayload.map(({ step_id, ...rest }) => rest);
                              await supabase.from('materials').insert(fallbackPayload);
@@ -643,9 +479,7 @@ export const dbService = {
                         purchasedQty: 0,
                         workId: newWorkId
                     }));
-                    // Cleanup snake_case for local
                     const cleanPayload = localPayload.map(({ step_id, planned_qty, purchased_qty, work_id, ...rest }) => rest);
-                    
                     db.materials.push(...cleanPayload as Material[]);
                     saveLocalDb(db);
                  }
@@ -653,7 +487,6 @@ export const dbService = {
         }
     }
 
-    // Return the work object to the frontend
     if (supabase) {
         const { data } = await supabase.from('works').select('*').eq('id', newWorkId).single();
          return {
@@ -684,7 +517,7 @@ export const dbService = {
   },
 
   // --- Steps ---
-  getSteps: getStepsInternal, // Export the internal function
+  getSteps: getStepsInternal,
 
   updateStep: async (step: Step) => {
     if (supabase) {
@@ -759,7 +592,6 @@ export const dbService = {
   },
 
   deleteExpense: async (id: string) => {
-      // SMART DELETE: If linked to material, reduce stock
       let expenseToDelete: Expense | undefined;
 
       if (supabase) {
@@ -771,7 +603,6 @@ export const dbService = {
       }
 
       if (expenseToDelete && expenseToDelete.relatedMaterialId && expenseToDelete.category === ExpenseCategory.MATERIAL) {
-          // Revert Material Stock
           let material: Material | undefined;
           if (supabase) {
               const { data } = await supabase.from('materials').select('*').eq('id', expenseToDelete.relatedMaterialId).single();
@@ -784,8 +615,6 @@ export const dbService = {
           if (material) {
               const qtyToRevert = Number(expenseToDelete.quantity) || 0;
               material.purchasedQty = Math.max(0, material.purchasedQty - qtyToRevert);
-              
-              // Call updateMaterial only for the stock update, avoid recursive expense creation
               if (supabase) {
                   await supabase.from('materials').update({ purchased_qty: material.purchasedQty }).eq('id', material.id);
               } else {
@@ -799,7 +628,6 @@ export const dbService = {
           }
       }
 
-      // Finally delete expense
       if (supabase) await supabase.from('expenses').delete().eq('id', id);
       else {
           const db = getLocalDb();
@@ -866,7 +694,8 @@ export const dbService = {
           }
       }
 
-      // 2. If Cost provided, Add to Expenses automatically linked to the material/step
+      // 2. If Cost provided, Add to Expenses
+      // Check if cost is strictly greater than 0
       if (cost && cost > 0) {
           // SMART LINKING: Resolve Step ID
           let finalStepId = material.stepId;
@@ -874,41 +703,40 @@ export const dbService = {
           // If material is not explicitly linked to a step ID, try to find a step by Category Name
           if (!finalStepId && material.category) {
                try {
-                   // Use internal function to avoid circular dependency call on `dbService`
+                   // Use internal function to avoid circular dependency
                    const steps = await getStepsInternal(material.workId);
                    
-                   // Normalize Helper: remove accents, lowercase, trim
                    const normalize = (str: string) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
                    const targetCat = normalize(material.category);
 
-                   // 1. Try Exact Normalized Match (e.g. "Fundacao" == "Fundação")
                    let match = steps.find(s => normalize(s.name) === targetCat);
-
-                   // 2. Try Contains Match (e.g. Category "Pintura" matches Step "Pintura e Acabamento")
                    if (!match) {
                        match = steps.find(s => normalize(s.name).includes(targetCat) || targetCat.includes(normalize(s.name)));
                    }
 
                    if (match) finalStepId = match.id;
                } catch (e) {
-                   console.error("Error linking material to step:", e);
-                   // Proceed without linking to step to avoid blocking the purchase
+                   console.error("Error linking material to step (non-fatal):", e);
                }
           }
 
-          const description = `Compra: ${material.name}`;
+          // Use description that includes the quantity to be clear
+          const qtyDesc = addedQty ? `(${addedQty} ${material.unit})` : '';
+          const description = `Compra: ${material.name} ${qtyDesc}`;
           
           // DIRECT CALL TO INTERNAL HELPER TO ENSURE SAVING
+          // CRITICAL: We pass the cost as both Amount (total of this receipt) and PaidAmount (assuming cash/credit paid now)
+          // For material purchases, usually Paid = Cost immediately.
           await insertExpenseInternal({
               workId: material.workId,
               description: description,
               amount: cost,
-              paidAmount: cost, // Assuming full payment for simplicity in this quick action
-              quantity: addedQty || 1, // Store the specific quantity purchased
+              paidAmount: cost, 
+              quantity: addedQty || 1, 
               category: ExpenseCategory.MATERIAL,
               date: new Date().toISOString().split('T')[0],
-              stepId: finalStepId, // Pass the resolved ID (or undefined -> Geral)
-              relatedMaterialId: material.id // LINK EXPENSE TO MATERIAL FOR ROLLBACK
+              stepId: finalStepId, // Can be undefined, which maps to "Geral" in UI
+              relatedMaterialId: material.id
           });
       }
   },
@@ -926,7 +754,6 @@ export const dbService = {
   importMaterialPackage: async (workId: string, category: string): Promise<number> => {
     let itemsToImport: StandardMaterial[] = [];
 
-    // 1. Fetch Standard Items
     if (supabase) {
         const { data, error } = await supabase.from('standard_materials').select('*').eq('category', category);
         if (!error && data && data.length > 0) {
@@ -934,7 +761,6 @@ export const dbService = {
         }
     }
     
-    // Fallback
     if (itemsToImport.length === 0) {
         const pkg = FULL_MATERIAL_PACKAGES.find(p => p.category === category);
         if (pkg) {
@@ -944,13 +770,11 @@ export const dbService = {
 
     if (itemsToImport.length === 0) return 0;
 
-    // 2. Try to find a matching Step to link for alerts (Smart Link)
     let relatedStepId = undefined;
     const steps = await getStepsInternal(workId);
     const matchStep = steps.find(s => s.name.toLowerCase().includes(category.toLowerCase()));
     if (matchStep) relatedStepId = matchStep.id;
 
-    // 3. Insert
     if (supabase) {
         const payload = itemsToImport.map(item => ({
             work_id: workId,
@@ -959,7 +783,7 @@ export const dbService = {
             purchased_qty: 0,
             unit: item.unit,
             category: category,
-            step_id: relatedStepId // Link to step if found
+            step_id: relatedStepId
         }));
         await supabase.from('materials').insert(payload);
     } else {
@@ -1143,7 +967,6 @@ export const dbService = {
           if (error || !data) return null;
           return { ...data, workId: data.work_id, date: data.created_at };
       } else {
-          // Local fallback (Fake Upload)
           const db = getLocalDb();
           const newPhoto: WorkPhoto = {
               id: Math.random().toString(36).substr(2, 9),
@@ -1180,11 +1003,9 @@ export const dbService = {
 
   uploadFile: async (workId: string, file: File, category: string): Promise<WorkFile | null> => {
       if (supabase) {
-          // 1. Upload
           const publicUrl = await uploadToBucket(file, `${workId}/files`);
           if (!publicUrl) return null;
 
-          // 2. Insert DB
           const fileType = file.name.split('.').pop() || 'file';
           const { data, error } = await supabase.from('work_files').insert({
               work_id: workId,
@@ -1283,7 +1104,7 @@ export const dbService = {
                });
           }
 
-          // 3. Upcoming Material Check (starts in <= 3 days)
+          // 3. Upcoming Material Check
           const daysUntilStart = Math.ceil((new Date(step.startDate).getTime() - now.getTime()) / (1000 * 3600 * 24));
           if (daysUntilStart >= 0 && daysUntilStart <= 3 && step.status === StepStatus.NOT_STARTED) {
               const linkedMaterials = materials.filter(m => 
