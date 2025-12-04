@@ -1,66 +1,100 @@
 
 // Standard Libraries for Construction Management
 
-// Avatar Zé da Obra (SVG Profissional - High Fidelity)
-// Desenho vetorial complexo embutido via Data URI.
-// Garante carregamento instantâneo, sem depender de internet externa.
+// Avatar Zé da Obra (SVG Premium - High Fidelity v2)
+// Design vetorial profissional com sombras, iluminação e traços humanizados.
+// Carregamento instantâneo via Data URI.
 const zeSvg = `
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
   <defs>
-    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#0F172A;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#334155;stop-opacity:1" />
+    <!-- Degradê de Fundo Premium (Deep Navy) -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1e293b;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#0f172a;stop-opacity:1" />
     </linearGradient>
-    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
-      <feDropShadow dx="2" dy="4" stdDeviation="3" flood-opacity="0.3"/>
+    
+    <!-- Degradê do Capacete (Safety Yellow) -->
+    <linearGradient id="helmetGrad" x1="20%" y1="20%" x2="80%" y2="100%">
+      <stop offset="0%" style="stop-color:#fcd34d;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#d97706;stop-opacity:1" />
+    </linearGradient>
+
+    <!-- Degradê da Pele (Warm Tan) -->
+    <linearGradient id="skinGrad" x1="50%" y1="0%" x2="50%" y2="100%">
+      <stop offset="0%" style="stop-color:#f5d0b0;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#e2a478;stop-opacity:1" />
+    </linearGradient>
+
+    <!-- Sombra Suave -->
+    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="3"/>
+      <feOffset dx="2" dy="2" result="offsetblur"/>
+      <feComponentTransfer>
+        <feFuncA type="linear" slope="0.3"/>
+      </feComponentTransfer>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
     </filter>
   </defs>
+
+  <!-- Fundo Circular -->
+  <circle cx="256" cy="256" r="256" fill="url(#bgGrad)" />
   
-  <!-- Fundo Circular Premium -->
-  <circle cx="200" cy="200" r="200" fill="url(#bgGradient)" />
-  
-  <!-- Corpo / Macacão -->
-  <path d="M100 400 L 100 350 Q 100 320 130 310 L 270 310 Q 300 320 300 350 L 300 400 Z" fill="#1d4ed8" />
-  <path d="M130 310 L 130 400 M 270 310 L 270 400" stroke="#1e3a8a" stroke-width="4" opacity="0.3" />
-  
+  <!-- Corpo (Camisa Jeans/Azul Profissional) -->
+  <path d="M120 512 L 120 440 Q 120 380 180 370 L 332 370 Q 392 380 392 440 L 392 512 Z" fill="#1e40af" />
+  <!-- Detalhe da Gola -->
+  <path d="M180 370 L 256 420 L 332 370" fill="none" stroke="#1e3a8a" stroke-width="15" stroke-linecap="round" />
+  <path d="M256 420 L 256 512" stroke="#1e3a8a" stroke-width="4" opacity="0.3" />
+
   <!-- Pescoço -->
-  <rect x="160" y="270" width="80" height="50" fill="#e2a478" />
-  <path d="M160 270 L 160 320 L 240 320 L 240 270" fill="rgba(0,0,0,0.1)" /> <!-- Sombra pescoço -->
+  <path d="M200 300 L 200 380 L 312 380 L 312 300" fill="#d49a6a" />
+  <path d="M200 330 Q 256 360 312 330 L 312 380 L 200 380 Z" fill="rgba(0,0,0,0.15)" /> <!-- Sombra do queixo -->
 
-  <!-- Cabeça -->
-  <path d="M135 180 Q 135 130 200 130 Q 265 130 265 180 L 265 240 Q 265 290 200 290 Q 135 290 135 240 Z" fill="#f5d0b0" />
-  
-  <!-- Orelhas -->
-  <circle cx="135" cy="210" r="15" fill="#f5d0b0" />
-  <circle cx="265" cy="210" r="15" fill="#f5d0b0" />
+  <!-- Orelhas (Detalhe importante para humanizar) -->
+  <path d="M165 280 Q 150 290 165 310" fill="#e2a478" />
+  <path d="M347 280 Q 362 290 347 310" fill="#e2a478" />
 
-  <!-- Capacete Amarelo com Brilho -->
-  <path d="M110 160 Q 200 60 290 160 L 300 175 L 100 175 Z" fill="#facc15" filter="url(#shadow)" />
-  <path d="M110 160 Q 200 60 290 160" fill="none" stroke="#ca8a04" stroke-width="3" opacity="0.5" />
-  <ellipse cx="200" cy="110" rx="40" ry="15" fill="white" opacity="0.4" transform="rotate(-15 200 110)" /> <!-- Reflexo -->
+  <!-- Rosto (Formato mais quadrado/masculino) -->
+  <path d="M170 200 L 170 300 Q 170 350 256 350 Q 342 350 342 300 L 342 200 Z" fill="url(#skinGrad)" />
+
+  <!-- Capacete (Forma complexa com aba) -->
+  <g filter="url(#softShadow)">
+    <!-- Cúpula -->
+    <path d="M150 210 Q 256 80 362 210" fill="url(#helmetGrad)" />
+    <!-- Aba -->
+    <path d="M140 210 L 372 210 Q 380 210 380 220 L 370 235 Q 360 245 256 245 Q 152 245 142 235 L 132 220 Q 132 210 140 210 Z" fill="#d97706" />
+    <!-- Brilho/Reflexo no Capacete (O segredo do look 'plástico') -->
+    <ellipse cx="220" cy="160" rx="60" ry="25" fill="white" opacity="0.3" transform="rotate(-20 220 160)" />
+  </g>
+
+  <!-- Rosto - Detalhes -->
   
-  <!-- Rosto -->
-  <!-- Sobrancelhas (Expressão séria/confiável) -->
-  <path d="M155 195 Q 170 190 185 195" stroke="#451a03" stroke-width="5" fill="none" stroke-linecap="round" />
-  <path d="M215 195 Q 230 190 245 195" stroke="#451a03" stroke-width="5" fill="none" stroke-linecap="round" />
-  
-  <!-- Olhos -->
-  <circle cx="170" cy="215" r="7" fill="#1e293b" />
-  <circle cx="230" cy="215" r="7" fill="#1e293b" />
-  
-  <!-- Nariz -->
-  <path d="M200 220 L 195 245 L 205 245 Z" fill="#d4a373" />
-  
-  <!-- Bigode (O Grande Bigode do Zé) -->
-  <path d="M160 255 Q 200 245 240 255 Q 250 265 230 270 Q 200 260 170 270 Q 150 265 160 255" fill="#3f2317" filter="url(#shadow)" />
-  
-  <!-- Boca (Leve sorriso por baixo do bigode) -->
-  <path d="M190 275 Q 200 280 210 275" stroke="#78350f" stroke-width="3" fill="none" stroke-linecap="round" />
+  <!-- Sobrancelhas (Grossas e escuras) -->
+  <path d="M190 260 Q 210 250 230 260" stroke="#451a03" stroke-width="8" fill="none" stroke-linecap="round" />
+  <path d="M282 260 Q 302 250 322 260" stroke="#451a03" stroke-width="8" fill="none" stroke-linecap="round" />
+
+  <!-- Olhos (Amigáveis e confiáveis) -->
+  <circle cx="210" cy="285" r="10" fill="#1e293b" />
+  <circle cx="302" cy="285" r="10" fill="#1e293b" />
+  <!-- Brilho nos olhos -->
+  <circle cx="213" cy="282" r="3" fill="white" />
+  <circle cx="305" cy="282" r="3" fill="white" />
+
+  <!-- Nariz (Sutil) -->
+  <path d="M256 280 L 248 310 L 264 310 Z" fill="#c28e62" opacity="0.6" />
+
+  <!-- Bigode (O Grande Bigode do Mestre) -->
+  <path d="M210 325 Q 256 315 302 325 Q 315 335 290 345 Q 256 335 222 345 Q 197 335 210 325" fill="#3f2317" filter="url(#softShadow)" />
+
+  <!-- Boca (Sorriso sutil) -->
+  <path d="M235 355 Q 256 360 277 355" stroke="#78350f" stroke-width="4" fill="none" stroke-linecap="round" />
 
 </svg>
 `.trim();
 
-// Encode SVG for URL
+// Encode SVG for URL correctly
 export const ZE_AVATAR = `data:image/svg+xml;utf8,${encodeURIComponent(zeSvg)}`;
 
 export interface PhaseCategory {
