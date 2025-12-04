@@ -18,22 +18,21 @@ export const aiService = {
   sendMessage: async (message: string): Promise<string> => {
     if (!ai) {
       // OFFLINE FALLBACK MODE
-      // Simula respostas técnicas para evitar que o app quebre sem a chave
       const lowerMsg = message.toLowerCase();
       
-      await new Promise(r => setTimeout(r, 1000)); // Delay para parecer real
+      await new Promise(r => setTimeout(r, 1000)); 
 
       if (lowerMsg.includes('concreto') || lowerMsg.includes('traço')) {
-          return "Para concreto estrutural fck 25 Mpa, recomendo o traço 1:2:3 (1 parte de cimento, 2 de areia média, 3 de brita 1) com fator água/cimento controlado (aprox 0.55). Certifique-se da cura úmida por pelo menos 7 dias.";
+          return "Para um concreto bom, estrutural (25 Mpa), a medida segura é 1 lata de cimento, 2 de areia e 3 de brita. Não exagere na água pra não enfraquecer.";
       }
       if (lowerMsg.includes('piso') || lowerMsg.includes('cerâmica')) {
-          return "Para assentamento, verifique o nível do contrapiso. Utilize argamassa AC-III para porcelanatos ou áreas externas para garantir aderência química. Respeite sempre a junta de dilatação indicada pelo fabricante.";
+          return "O segredo do piso é a base nivelada e a argamassa certa. Use AC-III se for porcelanato ou área externa. E respeite a junta que o fabricante pede na caixa.";
       }
       if (lowerMsg.includes('tinta') || lowerMsg.includes('pintura')) {
-          return "A preparação da superfície é crítica. Lixe, limpe o pó e aplique fundo preparador ou selador antes da tinta. Para áreas externas, utilize tinta acrílica emborrachada ou standard de boa procedência para maior durabilidade.";
+          return "Antes de pintar, lixe bem e tire o pó. Se a parede for nova, passe selador. Se for repintura com cor escura, talvez precise de mais demãos.";
       }
 
-      return "No momento estou sem conexão com a base de dados (API Key não configurada). Por favor, verifique a configuração para que eu possa fornecer suporte técnico completo.";
+      return "Estou sem sinal da central agora (sem chave de API). Mas estou aqui, pode conferir suas anotações.";
     }
 
     try {
@@ -41,14 +40,14 @@ export const aiService = {
         model: "gemini-2.5-flash",
         contents: message,
         config: {
-          systemInstruction: "Você é o Zeca da Obra, um engenheiro civil e mestre de obras com vasta experiência técnica. Sua comunicação é direta, precisa e profissional. Você domina normas técnicas (ABNT), propriedades dos materiais e gestão de projetos. Evite gírias excessivas. Seu objetivo é fornecer orientações técnicas, seguras e eficientes, focando na qualidade e durabilidade da construção, além da viabilidade econômica. Responda de forma concisa e fundamentada.",
+          systemInstruction: "Seu nome é Zé da Obra (nunca Zeca). Você é um mestre de obras e engenheiro experiente, aquele profissional de confiança que a gente chama quando precisa de certeza. Sua personalidade é amigável, parceira e tecnicamente impecável. \n\nEstilo de comunicação:\n- Seja direto e útil, como um bom consultor.\n- Evite formalidades excessivas ('Prezado', 'Senhor').\n- Evite gírias forçadas ('Fala Chefe', 'Beleza Patrão').\n- Use um tom de conversa entre colegas de trabalho que se respeitam.\n- Fale com propriedade técnica (normas, materiais, processos) mas de jeito fácil de entender.\n\nSeu objetivo: Ajudar o usuário a economizar, evitar retrabalho e garantir segurança na obra. Se algo for perigoso ou desperdício de dinheiro, avise claramente.",
         }
       });
       
-      return response.text || "Poderia reformular a pergunta? Preciso de mais detalhes técnicos para responder adequadamente.";
+      return response.text || "Não entendi direito. Pode me explicar melhor o que você precisa na obra?";
     } catch (error) {
       console.error("Erro na IA:", error);
-      return "Houve uma interrupção na conexão. Por favor, tente novamente em instantes.";
+      return "Tive um problema de conexão aqui. Tenta de novo em um minutinho.";
     }
   }
 };

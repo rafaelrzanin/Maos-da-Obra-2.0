@@ -1,9 +1,9 @@
 
 // Standard Libraries for Construction Management
 
-// Avatar Zeca da Obra (Technical Profile: Mustache, Helmet, Overalls)
-// Uses DiceBear Avataaars with specific seed for consistency
-export const ZE_AVATAR = "https://api.dicebear.com/9.x/avataaars/svg?seed=ZecaEngineerV2&clothing=overalls&accessories=prescription02&top=hat&hatColor=orange01&facialHair=moustacheMagnum&hairColor=brown&skinColor=light";
+// Avatar Zé da Obra (SVG Data URI para carregamento instantâneo e garantido)
+// Representa um homem com capacete amarelo, bigode e macacão azul.
+export const ZE_AVATAR = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="50" fill="%23cbd5e1"/><g transform="translate(0, 10)"><path d="M50 90 C 20 90 20 100 20 100 L 80 100 C 80 100 80 90 50 90" fill="%231e3a8a"/><rect x="30" y="85" width="10" height="20" fill="%231e3a8a"/><rect x="60" y="85" width="10" height="20" fill="%231e3a8a"/></g><circle cx="50" cy="50" r="25" fill="%23fca5a5"/><path d="M25 40 Q 50 10 75 40 L 75 45 L 25 45 Z" fill="%23fbbf24"/><rect x="25" y="43" width="50" height="5" fill="%23f59e0b"/><circle cx="42" cy="55" r="3" fill="%23334155"/><circle cx="58" cy="55" r="3" fill="%23334155"/><path d="M40 65 Q 50 60 60 65 Q 65 70 60 72 Q 50 68 40 72 Q 35 70 40 65" fill="%23451a03"/></svg>`;
 
 export interface PhaseCategory {
   category: string;
