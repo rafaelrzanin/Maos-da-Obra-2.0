@@ -339,7 +339,32 @@ export const dbService = {
 
   getCurrentUser: (): User | null => { const stored = localStorage.getItem(SESSION_KEY); return stored ? JSON.parse(stored) : null; },
   logout: async () => { if (supabase) await supabase.auth.signOut(); localStorage.removeItem(SESSION_KEY); },
-  updatePlan: async (userId: string, plan: PlanType) => { /* Impl simplified for brevity */ },
+    updatePlan: async (userId: string, plan: PlanType) => {
+    if (supabase) {
+      // Atualiza plano no Supabase
+      await supabase.from('profiles').update({ plan }).eq('id', userId);
+
+      // Sincroniza o perfil atualizado no localStorage
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      if (profile) {
+        localStorage.setItem(SESSION_KEY, JSON.stringify(profile));
+      }
+    } else {
+      // Modo offline/local DB
+      const db = getLocalDb();
+      const user = db.users.find(u => u.id === userId);
+      if (user) {
+        user.plan = plan;
+        saveLocalDb(db);
+        localStorage.setItem(SESSION_KEY, JSON.stringify(user));
+      }
+    }
+  },
 
   // --- WORKS ---
   getWorks: async (userId: string): Promise<Work[]> => {
