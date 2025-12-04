@@ -1,3 +1,4 @@
+
 // Standard Libraries for Construction Management
 
 // Avatar Humanizado do Zé da Obra (Estilo Mestre de Obras Amigável)
@@ -53,7 +54,11 @@ export const WORK_TEMPLATES: WorkTemplate[] = [
     icon: 'fa-house-chimney',
     description: 'Começar do terreno vazio até a mudança.',
     defaultDurationDays: 180,
-    includedSteps: [] // Logic handled by generator
+    includedSteps: [
+      'Limpeza do terreno', 'Fundações', 'Levantamento de paredes', 'Lajes e Vigas', 'Telhado',
+      'Tubulação de Água/Esgoto', 'Fiação Elétrica', 'Chapisco e Reboco', 'Contrapiso',
+      'Pisos e Revestimentos', 'Gesso / Forro', 'Pintura Paredes/Tetos', 'Instalação de Louças e Metais'
+    ]
   },
   {
     id: 'REFORMA_APTO',
@@ -268,59 +273,190 @@ export interface LifetimeBonus {
 }
 
 export const LIFETIME_BONUSES: LifetimeBonus[] = [
-  { title: 'Planilha Mestra', desc: 'Controle total.', icon: 'fa-file-excel' },
-  { title: 'Guia Anti-Erro', desc: 'Manual de obra.', icon: 'fa-book-open' },
-  { title: 'Mentoria VIP', desc: 'Tire dúvidas.', icon: 'fa-users' },
-  { title: 'Modelos de Contrato', desc: 'Segurança jurídica.', icon: 'fa-file-contract' }
+  {
+    title: 'Planilha Mestra de Orçamento',
+    desc: 'Excel automatizado para controle detalhado.',
+    icon: 'fa-file-excel'
+  },
+  {
+    title: 'E-book: O Guia da Obra Sem Dor',
+    desc: 'Manual completo para evitar golpes e erros.',
+    icon: 'fa-book-open'
+  },
+  {
+    title: 'Grupo VIP de Mentoria',
+    desc: 'Tire dúvidas direto com engenheiros.',
+    icon: 'fa-users'
+  },
+  {
+    title: 'Checklist de Vistoria de Entrega',
+    desc: 'O que olhar antes de aceitar as chaves.',
+    icon: 'fa-list-check'
+  }
 ];
 
-// --- CONTRACTS ---
+// --- CONTRACT TEMPLATES ---
 export const CONTRACT_TEMPLATES = [
   {
     id: 'EMPREITA',
     title: 'Contrato de Empreitada',
-    description: 'Serviço com valor fechado.',
-    contentTemplate: `CONTRATO DE EMPREITADA\n\nContratante: [Nome]\nContratado: [Nome]\n\nObjeto: Realização de [Descrever Serviço] no endereço [Endereço].\n\nValor: R$ [Valor]\nPagamento: [Forma de Pagamento]\n\nData: __/__/____\n\nAssinaturas:`
+    description: 'Serviços gerais com valor fechado.',
+    contentTemplate: `CONTRATO DE PRESTAÇÃO DE SERVIÇOS POR EMPREITADA
+
+CONTRATANTE: [Seu Nome], CPF: [000.000.000-00].
+CONTRATADO: [Nome do Profissional], CPF: [000.000.000-00].
+
+OBJETO DO CONTRATO:
+O CONTRATADO se compromete a realizar os seguintes serviços na obra localizada em [Endereço da Obra]:
+- [Descrever detalhadamente o serviço 1]
+- [Descrever detalhadamente o serviço 2]
+
+VALOR E PAGAMENTO:
+O valor total ajustado é de R$ [0,00].
+O pagamento será realizado da seguinte forma:
+- Entrada: R$ [0,00] na data [00/00/0000].
+- Parcelas: [Descrever pagamentos semanais ou quinzenais conforme entrega].
+
+PRAZOS:
+Início dos trabalhos: [Data]
+Previsão de término: [Data]
+
+OBRIGAÇÕES:
+O CONTRATADO deve executar o serviço com qualidade, seguindo normas técnicas, mantendo a limpeza do local e evitando desperdício de materiais.
+
+Data: ____/____/______
+
+_____________________________
+Assinatura do Contratante
+
+_____________________________
+Assinatura do Contratado`
   },
   {
     id: 'DIARIA',
     title: 'Acordo de Diárias',
-    description: 'Pagamento por dia trabalhado.',
-    contentTemplate: `ACORDO DE DIÁRIA\n\nProfissional: [Nome]\nValor da Diária: R$ [Valor]\nHorário: 07:00 às 17:00\n\nO pagamento será feito semanalmente.`
+    description: 'Para serviços pagos por dia.',
+    contentTemplate: `ACORDO DE PRESTAÇÃO DE SERVIÇO POR DIÁRIA
+
+CONTRATANTE: [Seu Nome].
+PROFISSIONAL: [Nome do Profissional].
+
+Fica ajustado que o PROFISSIONAL prestará serviços de [Pedreiro/Ajudante/Pintor] na obra localizada em [Endereço].
+
+VALOR DA DIÁRIA:
+R$ [Valor] por dia trabalhado (das [07:00] às [17:00]).
+Incluso transporte/alimentação: [Sim/Não].
+
+PAGAMENTO:
+O pagamento será realizado [Semanalmente/Quinzenalmente], toda [Sexta-feira].
+
+OBSERVAÇÕES:
+Faltas não justificadas não serão pagas. O profissional deve zelar pelas ferramentas e materiais.
+
+Data: ____/____/______
+
+_____________________________
+Assinatura do Contratante
+
+_____________________________
+Assinatura do Profissional`
   },
   {
-    id: 'RECIBO',
-    title: 'Recibo Simples',
-    description: 'Comprovante de pagamento.',
-    contentTemplate: `RECIBO\n\nRecebi de [Nome] a quantia de R$ [Valor] referente a [Serviço].\n\nData: __/__/____\nAssinatura:`
+    id: 'RECIBO_PAGAMENTO',
+    title: 'Recibo de Pagamento',
+    description: 'Comprovante para controle financeiro.',
+    contentTemplate: `RECIBO DE PAGAMENTO
+
+VALOR: R$ [Valor Numérico]
+
+Recebi de [Seu Nome], a importância supramencionada de ([Valor por Extenso]), referente ao pagamento de:
+[ ] Diárias (Período: __/__ a __/__)
+[ ] Adiantamento de Empreita (Etapa: __________)
+[ ] Saldo Final de Serviço
+[ ] Material (Reembolso)
+
+Serviço realizado na obra: [Nome/Endereço da Obra].
+
+Para clareza e verdade, firmo o presente recibo dando plena quitação do valor recebido.
+
+[Cidade/UF], [Data].
+
+_____________________________
+Assinatura do Recebedor
+Nome: [Nome do Profissional]
+CPF: [CPF do Profissional]`
+  },
+  {
+    id: 'ENTREGA_OBRA',
+    title: 'Termo de Entrega de Serviço',
+    description: 'Formaliza que o serviço foi concluído.',
+    contentTemplate: `TERMO DE ENTREGA E ACEITE DE SERVIÇO
+
+Eu, [Seu Nome], CONTRATANTE, declaro para os devidos fins que recebi os serviços contratados de [Nome do Profissional/Empresa], referentes à:
+- [Descrever o que foi entregue, ex: Pintura completa da sala]
+
+Declaro que os serviços foram inspecionados e estão de acordo com o combinado, não havendo pendências visíveis nesta data.
+
+O pagamento final referente a este serviço foi realizado nesta data, dando-se plena quitação ao contrato.
+
+Local: [Cidade/UF]
+Data: ____/____/______
+
+_____________________________
+Assinatura do Contratante
+
+_____________________________
+Assinatura do Contratado`
   }
 ];
 
-// --- STANDARD CHECKLISTS ---
+// --- CHECKLISTS ---
 export const STANDARD_CHECKLISTS = [
   {
-    category: 'Evite Poças e Vazamentos',
+    category: 'Vistoria de Imóvel Novo',
     items: [
-      'Caimento do Piso: Jogue um balde de água no box e na varanda. A água corre sozinha pro ralo? Se parar no meio, NÃO aceite.',
-      'Teste de Vazamento: Tampe o ralo do box e deixe com água por 24h. Olhe o teto do vizinho de baixo ou as paredes em volta.',
-      'Rodapé do Box: A impermeabilização subiu 30cm na parede? Só no chão não adianta.',
-      'Ralos Tapados: Durante a obra, os ralos estão fechados? Cimento no cano é entupimento na certa.'
+      'Verificar caimento de água em áreas molhadas (banheiro/sacada)',
+      'Testar todas as tomadas com um equipamento',
+      'Abrir e fechar todas as portas e janelas (verificar trincos)',
+      'Verificar se há pisos ocos (bater levemente com cabo de vassoura)',
+      'Checar pressão da água nas torneiras e chuveiro',
+      'Verificar pintura (manchas, descascados ou falhas)',
+      'Conferir rejuntes (falhas ou buracos)',
+      'Olhar o quadro de luz (identificação dos disjuntores)'
     ]
   },
   {
-    category: 'Elétrica Segura',
+    category: 'Início de Obra',
     items: [
-      '110v ou 220v?: Marque com fita vermelha os fios 220v dentro da caixinha antes de pintar. Evita queimar a TV na mudança.',
-      'Fio Terra: Tem o fio verde em todas as tomadas? É a segurança da sua família.',
-      'Chuveiro Quente: O fio do chuveiro é grosso (6mm ou 10mm)? Fio fino derrete e gasta mais energia.'
+      'Água e Luz provisórias ligadas',
+      'Tapume ou fechamento da obra instalado',
+      'Banheiro para operários funcionando',
+      'Local de armazenamento de cimento (seco e alto)',
+      'Projetos impressos na obra (Arquitetônico, Hidráulico, Elétrico)',
+      'EPIs básicos comprados (Capacete, Luva, Bota)',
+      'Placa da obra (se exigido pela prefeitura)',
+      'Caçamba ou local de descarte definido'
     ]
   },
   {
-    category: 'Acabamentos',
+    category: 'Antes da Concretagem (Laje)',
     items: [
-      'Piso Oco: Bata com o cabo de uma chave em cada piso. Se o som for oco, vai soltar em breve.',
-      'Dente no Piso: Passe uma moeda entre dois pisos. Se travar, um está mais alto que o outro.',
-      'Porta Fantasma: Abra a porta e solte. Ela fica parada? Se fechar sozinha, está torta.'
+      'Conferir escoramento (se está firme e alinhado)',
+      'Verificar caixinhas de luz (se estão bem presas)',
+      'Checar tubulação elétrica (conduítes não amassados)',
+      'Verificar espaçadores da ferragem (para não encostar na madeira)',
+      'Molhar as formas de madeira antes do concreto',
+      'Conferir nível da laje'
+    ]
+  },
+  {
+    category: 'Elétrica e Hidráulica',
+    items: [
+      'Tirar fotos das paredes com tubulação antes de rebocar',
+      'Testar vazamento de canos (deixar com água pressurizada)',
+      'Conferir altura das tomadas e interruptores',
+      'Verificar se há disjuntor exclusivo para chuveiro',
+      'Conferir aterramento'
     ]
   }
 ];
