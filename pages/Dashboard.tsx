@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../App';
 import { dbService } from '../services/db';
 import { Work, Notification } from '../types';
-import { ZE_AVATAR } from '../services/standards';
+import { ZE_AVATAR, ZE_AVATAR_FALLBACK } from '../services/standards';
 import { ZeModal } from '../components/ZeModal';
 
 const Dashboard: React.FC = () => {
@@ -240,8 +240,13 @@ const Dashboard: React.FC = () => {
                         <img 
                         src={ZE_AVATAR} 
                         alt="Zeca da Obra" 
-                        className="w-full h-full object-cover rounded-full border-2 border-white dark:border-slate-900"
-                        onError={(e) => { e.currentTarget.src = 'https://ui-avatars.com/api/?name=Ze+Obra&background=0F172A&color=fff'; }}
+                        className="w-full h-full object-cover rounded-full border-2 border-white dark:border-slate-900 bg-white"
+                        onError={(e) => { 
+                            const target = e.currentTarget;
+                            if (target.src !== ZE_AVATAR_FALLBACK) {
+                                target.src = ZE_AVATAR_FALLBACK;
+                            }
+                        }}
                         />
                 </div>
                 <div>

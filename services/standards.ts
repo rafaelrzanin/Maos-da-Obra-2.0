@@ -1,139 +1,17 @@
 
 // Standard Libraries for Construction Management
 
-// Avatar Zé da Obra (Premium 3D-Style Vector)
-// Técnica: Gradientes Radiais e Gaussian Blurs para simular renderização 3D/Clay.
-// Carregamento instantâneo via Data URI.
-const zeSvg = `
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800">
-  <defs>
-    <!-- PALETA DE CORES E GRADIENTES -->
-    
-    <!-- Fundo: Gradiente Deep Blue "Tech" -->
-    <linearGradient id="bg_grad" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" stop-color="#1e293b" />
-      <stop offset="100%" stop-color="#0f172a" />
-    </linearGradient>
+// --- AVATAR CONFIG ---
+// INSTRUÇÃO PARA O DESENVOLVEDOR:
+// 1. Crie uma pasta chamada 'public' na raiz do projeto (se não existir).
+// 2. Coloque sua imagem PNG premium dentro dela.
+// 3. Renomeie o arquivo para 'ze.png'.
+// O app dará preferência para sua imagem local.
+export const ZE_AVATAR = './ze.png';
 
-    <!-- Pele: Tom quente com iluminação -->
-    <radialGradient id="skin_grad" cx="40%" cy="40%" r="50%">
-      <stop offset="0%" stop-color="#f5d0b0" /> <!-- Luz -->
-      <stop offset="60%" stop-color="#e2a478" /> <!-- Base -->
-      <stop offset="100%" stop-color="#c28e62" /> <!-- Sombra -->
-    </radialGradient>
-
-    <!-- Capacete: Amarelo Segurança com specularity -->
-    <radialGradient id="helmet_grad" cx="30%" cy="30%" r="80%">
-      <stop offset="0%" stop-color="#fde047" /> <!-- Highlight -->
-      <stop offset="50%" stop-color="#eab308" /> <!-- Base -->
-      <stop offset="100%" stop-color="#a16207" /> <!-- Shadow -->
-    </radialGradient>
-
-    <!-- Camisa: Azul Obra Profissional -->
-    <linearGradient id="shirt_grad" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#1e3a8a" />
-      <stop offset="50%" stop-color="#2563eb" />
-      <stop offset="100%" stop-color="#172554" />
-    </linearGradient>
-
-    <!-- Barba: Grisalho Mestre -->
-    <radialGradient id="beard_grad" cx="50%" cy="30%" r="70%">
-      <stop offset="0%" stop-color="#57534e" />
-      <stop offset="100%" stop-color="#292524" />
-    </radialGradient>
-
-    <!-- Sombras de Oclusão (Suavidade) -->
-    <filter id="soft_shadow" x="-50%" y="-50%" width="200%" height="200%">
-      <feGaussianBlur in="SourceAlpha" stdDeviation="10" />
-      <feOffset dx="0" dy="5" result="offsetblur"/>
-      <feComponentTransfer>
-        <feFuncA type="linear" slope="0.3"/>
-      </feComponentTransfer>
-      <feMerge> 
-        <feMergeNode/>
-        <feMergeNode in="SourceGraphic"/> 
-      </feMerge>
-    </filter>
-    
-    <!-- Reflexo nos olhos -->
-    <filter id="eye_shine">
-      <feGaussianBlur stdDeviation="1" />
-    </filter>
-  </defs>
-
-  <!-- BACKGROUND CIRCULAR -->
-  <circle cx="400" cy="400" r="400" fill="url(#bg_grad)" />
-
-  <!-- CORPO (Ombros) -->
-  <g transform="translate(0, 50)">
-    <path d="M200 800 L 200 650 Q 200 580 280 560 L 520 560 Q 600 580 600 650 L 600 800 Z" fill="url(#shirt_grad)" />
-    <!-- Gola da camisa -->
-    <path d="M280 560 L 400 680 L 520 560" fill="#cbd5e1" opacity="0.3" /> <!-- Camiseta de baixo -->
-    <path d="M280 560 L 400 750 L 520 560" fill="none" stroke="#0f172a" stroke-width="2" opacity="0.2" />
-  </g>
-
-  <!-- PESCOÇO -->
-  <path d="M320 480 L 320 580 L 480 580 L 480 480" fill="#c28e62" />
-  <ellipse cx="400" cy="580" rx="80" ry="20" fill="rgba(0,0,0,0.2)" /> <!-- Sombra projetada do queixo -->
-
-  <!-- CABEÇA (Forma base) -->
-  <g filter="url(#soft_shadow)">
-      <rect x="280" y="250" width="240" height="300" rx="100" ry="100" fill="url(#skin_grad)" />
-      <!-- Orelhas -->
-      <ellipse cx="270" cy="420" rx="20" ry="35" fill="#e2a478" />
-      <ellipse cx="530" cy="420" rx="20" ry="35" fill="#e2a478" />
-  </g>
-
-  <!-- ROSTO DETALHADO -->
-  
-  <!-- Barba (Estilo desenhado, não blob) -->
-  <path d="M280 450 Q 280 580 400 580 Q 520 580 520 450 L 520 420 Q 500 420 490 460 Q 400 440 310 460 Q 300 420 280 420 Z" fill="url(#beard_grad)" />
-  
-  <!-- Boca (Sorriso confiante no meio da barba) -->
-  <path d="M370 510 Q 400 530 430 510" fill="none" stroke="#1c1917" stroke-width="5" stroke-linecap="round" />
-
-  <!-- Nariz (Volume com sombra, sem linha) -->
-  <path d="M385 460 L 395 480 L 415 480" fill="rgba(160, 80, 0, 0.1)" />
-  <circle cx="385" cy="470" r="12" fill="#c28e62" opacity="0.5" />
-  <circle cx="415" cy="470" r="12" fill="#c28e62" opacity="0.5" />
-  <circle cx="400" cy="465" r="15" fill="url(#skin_grad)" />
-
-  <!-- OLHOS (Realistas - Estilo Pixar/Disney) -->
-  <g transform="translate(0, 10)">
-      <!-- Esquerdo -->
-      <ellipse cx="340" cy="400" rx="25" ry="18" fill="#ffffff" />
-      <circle cx="340" cy="400" r="12" fill="#4b5563" /> <!-- Iris -->
-      <circle cx="340" cy="400" r="6" fill="#000000" /> <!-- Pupila -->
-      <circle cx="345" cy="396" r="4" fill="white" opacity="0.8" /> <!-- Brilho -->
-      
-      <!-- Direito -->
-      <ellipse cx="460" cy="400" rx="25" ry="18" fill="#ffffff" />
-      <circle cx="460" cy="400" r="12" fill="#4b5563" />
-      <circle cx="460" cy="400" r="6" fill="#000000" />
-      <circle cx="465" cy="396" r="4" fill="white" opacity="0.8" />
-      
-      <!-- Sobrancelhas (Grossas e expressivas) -->
-      <path d="M315 375 Q 340 365 365 375" fill="none" stroke="#292524" stroke-width="8" stroke-linecap="round" />
-      <path d="M435 375 Q 460 365 485 375" fill="none" stroke="#292524" stroke-width="8" stroke-linecap="round" />
-  </g>
-
-  <!-- CAPACETE (O toque final de Mestre) -->
-  <g filter="url(#soft_shadow)">
-    <!-- Casco Principal -->
-    <path d="M260 320 Q 400 150 540 320 L 550 330 L 250 330 Z" fill="url(#helmet_grad)" />
-    <!-- Aba frontal -->
-    <path d="M250 330 L 550 330 L 560 340 Q 400 360 240 340 Z" fill="#d97706" />
-    <!-- Faixa Refletiva (Prata) -->
-    <path d="M350 220 Q 400 210 450 220 L 455 240 Q 400 230 345 240 Z" fill="#e2e8f0" opacity="0.8" />
-    <!-- Brilho Especular (Plástico liso) -->
-    <ellipse cx="320" cy="250" rx="40" ry="20" fill="white" opacity="0.3" transform="rotate(-20 320 250)" />
-  </g>
-
-</svg>
-`.trim();
-
-// Encode SVG for URL correctly
-export const ZE_AVATAR = `data:image/svg+xml;utf8,${encodeURIComponent(zeSvg)}`;
+// Fallback Premium (Estilo 3D Fluent/Memoji)
+// Se o arquivo './ze.png' não for encontrado, esta imagem será usada automaticamente.
+export const ZE_AVATAR_FALLBACK = 'https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/People/Construction%20Worker.png';
 
 export interface PhaseCategory {
   category: string;

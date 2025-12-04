@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { ZE_AVATAR } from '../services/standards';
+import { ZE_AVATAR, ZE_AVATAR_FALLBACK } from '../services/standards';
 
 interface ZeModalProps {
   isOpen: boolean;
@@ -31,7 +31,12 @@ export const ZeModal: React.FC<ZeModalProps> = ({ isOpen, title, message, confir
                     src={ZE_AVATAR} 
                     alt="Zeca da Obra" 
                     className="w-full h-full object-cover rounded-full border-2 border-white dark:border-slate-800"
-                    onError={(e) => { e.currentTarget.src = 'https://ui-avatars.com/api/?name=Ze+Obra&background=0F172A&color=fff'; }}
+                    onError={(e) => { 
+                        const target = e.currentTarget;
+                        if (target.src !== ZE_AVATAR_FALLBACK) {
+                            target.src = ZE_AVATAR_FALLBACK;
+                        }
+                    }}
                     />
                 </div>
                 <div>
