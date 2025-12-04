@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { dbService } from '../services/db';
-import { Work, Step, Expense, Material, StepStatus, ExpenseCategory, WorkPhoto, WorkFile } from '../types';
+import { Work, Step, Expense, Material, StepStatus, ExpenseCategory, WorkPhoto, WorkFile, PlanType } from '../types';
 import { Recharts } from '../components/RechartsWrapper';
 import { ZeModal } from '../components/ZeModal';
 import { FULL_MATERIAL_PACKAGES, ZE_AVATAR, CALCULATOR_LOGIC, CONTRACT_TEMPLATES, STANDARD_CHECKLISTS } from '../services/standards';
@@ -431,41 +431,52 @@ const MaterialsTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ work
     const [isAddOpen, setIsAddOpen] = useState(false);
     const [isImportOpen, setIsImportOpen] = useState(false);
     const [editingMaterial, setEditingMaterial] = useState<Material | null>(null);
-    const [formData, setFormData] = useState({ name: '', plannedQty: 0, purchasedQty: 0, unit: '', category: 'Geral', cost: 0, purchaseNow: 0 });
+    
+    // Split State for clarity and specific "New Purchase" logic
+    const [detailsData, setDetailsData] = useState({ name: '', plannedQty: 0, unit: '', category: '' });
+    const [purchaseData, setPurchaseData] = useState({ qtyNow: '', costNow: '' });
 
     const load = async () => { const m = await dbService.getMaterials(workId); setMaterials(m); };
     useEffect(() => { load(); }, [workId]);
 
     const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
-        // If editing existing material
+        
         if (editingMaterial) {
-            // Check if we are registering a purchase (cost > 0)
-            const cost = Number(formData.cost);
-            const addedQty = Number(formData.purchaseNow);
-            
+            // Update Basic Details
             const updatedMaterial = {
                 ...editingMaterial,
-                name: formData.name,
-                plannedQty: Number(formData.plannedQty),
-                purchasedQty: editingMaterial.purchasedQty + addedQty,
-                unit: formData.unit,
-                category: formData.category
+                name: detailsData.name,
+                plannedQty: Number(detailsData.plannedQty),
+                unit: detailsData.unit,
+                category: detailsData.category
             };
+            
+            const qtyBuying = Number(purchaseData.qtyNow);
+            const costBuying = Number(purchaseData.costNow);
 
-            await dbService.updateMaterial(updatedMaterial, cost, addedQty);
+            if (qtyBuying > 0) {
+                updatedMaterial.purchasedQty += qtyBuying;
+            }
+
+            // Calls DB update: 
+            // 1. Updates Material Record (new total purchased)
+            // 2. Creates Expense Record (using ONLY costBuying)
+            await dbService.updateMaterial(updatedMaterial, costBuying, qtyBuying);
         } else {
-            // New Material
+            // Create New
             await dbService.addMaterial({
                 workId,
-                name: formData.name,
-                plannedQty: Number(formData.plannedQty),
+                name: detailsData.name,
+                plannedQty: Number(detailsData.plannedQty),
                 purchasedQty: 0,
-                unit: formData.unit,
-                category: formData.category
+                unit: detailsData.unit,
+                category: detailsData.category
             });
         }
-        setIsAddOpen(false); setEditingMaterial(null); setFormData({ name: '', plannedQty: 0, purchasedQty: 0, unit: '', category: 'Geral', cost: 0, purchaseNow: 0 });
+        setIsAddOpen(false); setEditingMaterial(null);
+        setDetailsData({ name: '', plannedQty: 0, unit: '', category: '' });
+        setPurchaseData({ qtyNow: '', costNow: '' });
         await load(); onUpdate();
     };
 
@@ -477,15 +488,13 @@ const MaterialsTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ work
 
     const openEdit = (m: Material) => {
         setEditingMaterial(m);
-        setFormData({
+        setDetailsData({
             name: m.name,
             plannedQty: m.plannedQty,
-            purchasedQty: m.purchasedQty,
             unit: m.unit,
-            category: m.category || 'Geral',
-            cost: 0,
-            purchaseNow: 0
+            category: m.category || 'Geral'
         });
+        setPurchaseData({ qtyNow: '', costNow: '' });
         setIsAddOpen(true);
     };
     
@@ -538,7 +547,7 @@ const MaterialsTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ work
             </div>
 
             <button 
-                onClick={() => { setEditingMaterial(null); setFormData({ name: '', plannedQty: 0, purchasedQty: 0, unit: 'un', category: 'Geral', cost: 0, purchaseNow: 0 }); setIsAddOpen(true); }}
+                onClick={() => { setEditingMaterial(null); setDetailsData({ name: '', plannedQty: 0, unit: 'un', category: 'Geral' }); setPurchaseData({qtyNow: '', costNow: ''}); setIsAddOpen(true); }}
                 className="fixed bottom-24 right-6 w-14 h-14 bg-primary text-white rounded-full shadow-2xl flex items-center justify-center hover:scale-110 transition-transform z-40"
             >
                 <i className="fa-solid fa-plus text-xl"></i>
@@ -547,47 +556,77 @@ const MaterialsTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ work
             {isAddOpen && (
                 <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
                     <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-6 shadow-2xl overflow-y-auto max-h-[90vh]">
-                        <h3 className="text-xl font-bold text-primary dark:text-white mb-6">{editingMaterial ? 'Atualizar Material' : 'Novo Material'}</h3>
+                        <h3 className="text-xl font-bold text-primary dark:text-white mb-6">{editingMaterial ? 'Gerenciar Material' : 'Novo Material'}</h3>
                         <form onSubmit={handleSave} className="space-y-4">
-                            <div>
-                                <label className="text-xs font-bold text-slate-400 uppercase">Nome do Material</label>
-                                <input className="w-full p-3 rounded-xl border dark:bg-slate-800 dark:border-slate-700 dark:text-white outline-none" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})} required />
-                            </div>
-                            <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label className="text-xs font-bold text-slate-400 uppercase">Planejado</label>
-                                    <input type="number" className="w-full p-3 rounded-xl border dark:bg-slate-800 dark:border-slate-700 dark:text-white outline-none" value={formData.plannedQty} onChange={e => setFormData({...formData, plannedQty: Number(e.target.value)})} required />
-                                </div>
-                                <div>
-                                    <label className="text-xs font-bold text-slate-400 uppercase">Unidade</label>
-                                    <input className="w-full p-3 rounded-xl border dark:bg-slate-800 dark:border-slate-700 dark:text-white outline-none" placeholder="un, kg, m..." value={formData.unit} onChange={e => setFormData({...formData, unit: e.target.value})} required />
-                                </div>
-                            </div>
-                            <div>
-                                <label className="text-xs font-bold text-slate-400 uppercase">Categoria</label>
-                                <input className="w-full p-3 rounded-xl border dark:bg-slate-800 dark:border-slate-700 dark:text-white outline-none" placeholder="Ex: Elétrica" value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})} />
-                            </div>
-
+                            
+                            {/* --- STATS SECTION (READ ONLY) --- */}
                             {editingMaterial && (
-                                <div className="p-4 bg-orange-50 dark:bg-orange-900/20 rounded-2xl border border-orange-100 dark:border-orange-900 space-y-3">
-                                    <p className="text-xs font-bold text-orange-600 dark:text-orange-400 uppercase flex items-center gap-2"><i className="fa-solid fa-cart-shopping"></i> Registrar Compra</p>
-                                    <div className="flex gap-3">
-                                        <div className="flex-1">
-                                            <label className="text-[10px] text-slate-500 font-bold uppercase">Qtd Comprada Agora</label>
-                                            <input type="number" className="w-full p-2 rounded-lg border dark:bg-slate-800 dark:border-slate-700 dark:text-white outline-none" value={formData.purchaseNow} onChange={e => setFormData({...formData, purchaseNow: Number(e.target.value)})} />
-                                        </div>
-                                        <div className="flex-1">
-                                            <label className="text-[10px] text-slate-500 font-bold uppercase">Valor Pago (Total)</label>
-                                            <input type="number" className="w-full p-2 rounded-lg border dark:bg-slate-800 dark:border-slate-700 dark:text-white outline-none" value={formData.cost} onChange={e => setFormData({...formData, cost: Number(e.target.value)})} />
-                                        </div>
+                                <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-xl border border-slate-100 dark:border-slate-700 mb-2">
+                                    <div className="flex justify-between text-sm mb-2">
+                                        <span className="text-slate-500 font-medium">Planejado: <b className="text-primary dark:text-white">{editingMaterial.plannedQty}</b></span>
+                                        <span className="text-slate-500 font-medium">Em Estoque: <b className="text-primary dark:text-white">{editingMaterial.purchasedQty}</b></span>
                                     </div>
-                                    <p className="text-[10px] text-slate-400 leading-tight">Ao preencher, o valor será adicionado em "Gastos" e a quantidade atualizada.</p>
+                                    <div className="w-full bg-slate-200 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
+                                         <div className="bg-primary h-2 rounded-full transition-all" style={{width: `${Math.min(100, (editingMaterial.purchasedQty/Math.max(1, editingMaterial.plannedQty))*100)}%`}}></div>
+                                    </div>
                                 </div>
                             )}
 
+                            {/* --- NEW PURCHASE SECTION (EDIT ONLY) --- */}
+                            {editingMaterial && (
+                                <div className="bg-orange-50 dark:bg-orange-900/10 p-5 rounded-2xl border border-orange-100 dark:border-orange-900 mb-4 shadow-sm">
+                                    <h4 className="font-bold text-orange-600 dark:text-orange-400 text-xs uppercase tracking-wider mb-3 flex items-center gap-2">
+                                        <i className="fa-solid fa-cart-plus"></i> Registrar Nova Compra
+                                    </h4>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">Qtd. Comprando Agora</label>
+                                            <input 
+                                                type="number" 
+                                                className="w-full p-3 rounded-xl border dark:bg-slate-800 dark:border-slate-700 dark:text-white outline-none font-bold text-lg" 
+                                                value={purchaseData.qtyNow}
+                                                onChange={e => setPurchaseData({...purchaseData, qtyNow: e.target.value})}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] font-bold text-slate-500 uppercase mb-1 block">Valor Pago (R$)</label>
+                                            <input 
+                                                type="number" 
+                                                className="w-full p-3 rounded-xl border dark:bg-slate-800 dark:border-slate-700 dark:text-white outline-none font-bold text-lg" 
+                                                value={purchaseData.costNow}
+                                                onChange={e => setPurchaseData({...purchaseData, costNow: e.target.value})}
+                                                placeholder="0.00"
+                                            />
+                                        </div>
+                                    </div>
+                                    <p className="text-[10px] text-slate-400 mt-2 leading-tight">
+                                        Ao salvar, adicionaremos <b>{purchaseData.qtyNow || 0} {detailsData.unit}</b> ao estoque e lançaremos <b>R$ {purchaseData.costNow || 0}</b> nos gastos.
+                                    </p>
+                                </div>
+                            )}
+
+                            {/* --- EDIT DETAILS SECTION --- */}
+                            <div className="space-y-3 pt-2">
+                                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Detalhes do Item</p>
+                                <div>
+                                    <input className="w-full p-3 rounded-xl border dark:bg-slate-800 dark:border-slate-700 dark:text-white outline-none" placeholder="Nome do Material" value={detailsData.name} onChange={e => setDetailsData({...detailsData, name: e.target.value})} required />
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <input type="number" className="w-full p-3 rounded-xl border dark:bg-slate-800 dark:border-slate-700 dark:text-white outline-none" placeholder="Qtd Planejada" value={detailsData.plannedQty} onChange={e => setDetailsData({...detailsData, plannedQty: Number(e.target.value)})} required />
+                                    </div>
+                                    <div>
+                                        <input className="w-full p-3 rounded-xl border dark:bg-slate-800 dark:border-slate-700 dark:text-white outline-none" placeholder="Unidade" value={detailsData.unit} onChange={e => setDetailsData({...detailsData, unit: e.target.value})} required />
+                                    </div>
+                                </div>
+                                <div>
+                                    <input className="w-full p-3 rounded-xl border dark:bg-slate-800 dark:border-slate-700 dark:text-white outline-none" placeholder="Categoria (Ex: Elétrica)" value={detailsData.category} onChange={e => setDetailsData({...detailsData, category: e.target.value})} />
+                                </div>
+                            </div>
+
                             <div className="flex gap-3 pt-4">
                                 <button type="button" onClick={() => setIsAddOpen(false)} className="flex-1 py-3 font-bold text-slate-500">Cancelar</button>
-                                <button type="submit" className="flex-1 py-3 bg-primary text-white rounded-xl font-bold">Salvar</button>
+                                <button type="submit" className="flex-1 py-3 bg-primary text-white rounded-xl font-bold shadow-lg">Salvar</button>
                             </div>
                             {editingMaterial && (
                                 <button type="button" onClick={async () => { await dbService.deleteMaterial(editingMaterial.id); setIsAddOpen(false); await load(); onUpdate(); }} className="w-full py-2 text-red-500 text-xs font-bold">Excluir Material</button>
@@ -808,26 +847,114 @@ const ExpensesTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ workI
 }
 
 const MoreMenuTab: React.FC<{ onSelect: (view: string) => void }> = ({ onSelect }) => {
-    const menu = [
-        { id: 'CONTACTS_TEAM', label: 'Minha Equipe', icon: 'fa-helmet-safety', color: 'bg-blue-500' },
-        { id: 'CONTACTS_SUPPLIERS', label: 'Fornecedores', icon: 'fa-truck', color: 'bg-indigo-500' },
-        { id: 'PHOTOS', label: 'Fotos da Obra', icon: 'fa-camera', color: 'bg-pink-500' },
-        { id: 'FILES', label: 'Projetos/Arquivos', icon: 'fa-file-pdf', color: 'bg-orange-500' },
+    const { user } = useAuth();
+    const navigate = useNavigate();
+    
+    // Tools
+    const tools = [
         { id: 'REPORTS', label: 'Relatórios', icon: 'fa-chart-pie', color: 'bg-emerald-500' },
         { id: 'CALCULATOR', label: 'Calculadoras', icon: 'fa-calculator', color: 'bg-slate-600' },
         { id: 'CONTRACTS', label: 'Modelos Contrato', icon: 'fa-file-signature', color: 'bg-purple-500' },
         { id: 'CHECKLISTS', label: 'Checklists', icon: 'fa-list-check', color: 'bg-teal-500' },
     ];
+
+    // Resources
+    const resources = [
+        { id: 'CONTACTS_TEAM', label: 'Minha Equipe', icon: 'fa-helmet-safety', color: 'bg-blue-500' },
+        { id: 'CONTACTS_SUPPLIERS', label: 'Fornecedores', icon: 'fa-truck', color: 'bg-indigo-500' },
+        { id: 'PHOTOS', label: 'Fotos da Obra', icon: 'fa-camera', color: 'bg-pink-500' },
+        { id: 'FILES', label: 'Arquivos', icon: 'fa-file-pdf', color: 'bg-orange-500' },
+    ];
+
+    const isVitalicio = user?.plan === PlanType.VITALICIO;
+
     return (
-        <div className="animate-in fade-in grid grid-cols-2 gap-4 pb-24">
-            {menu.map(item => (
-                <button key={item.id} onClick={() => onSelect(item.id)} className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-100 dark:border-slate-800 flex flex-col items-center gap-3 hover:shadow-md transition-all">
-                    <div className={`w-12 h-12 rounded-xl ${item.color} text-white flex items-center justify-center text-xl shadow-lg`}>
-                        <i className={`fa-solid ${item.icon}`}></i>
+        <div className="animate-in fade-in pb-28 space-y-6">
+            
+            {/* CTA VITALICIO */}
+            {!isVitalicio && (
+                <div 
+                    onClick={() => navigate('/settings')}
+                    className="p-5 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg cursor-pointer transform transition-all active:scale-[0.98]"
+                >
+                    <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center text-2xl">
+                            <i className="fa-solid fa-crown"></i>
+                        </div>
+                        <div className="flex-1">
+                            <h3 className="font-bold text-lg">Seja Vitalício</h3>
+                            <p className="text-xs text-purple-100">Desbloqueie bônus e economize.</p>
+                        </div>
+                        <i className="fa-solid fa-chevron-right opacity-50"></i>
                     </div>
-                    <span className="font-bold text-sm text-primary dark:text-white">{item.label}</span>
-                </button>
-            ))}
+                </div>
+            )}
+
+            <div>
+                <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4 px-2">Ferramentas</h3>
+                <div className="grid grid-cols-2 gap-4">
+                    {tools.map(item => (
+                        <button key={item.id} onClick={() => onSelect(item.id)} className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 flex items-center gap-3 hover:shadow-md transition-all text-left">
+                            <div className={`w-10 h-10 rounded-xl ${item.color} text-white flex items-center justify-center text-lg shadow-sm shrink-0`}>
+                                <i className={`fa-solid ${item.icon}`}></i>
+                            </div>
+                            <span className="font-bold text-sm text-primary dark:text-white leading-tight">{item.label}</span>
+                        </button>
+                    ))}
+                </div>
+            </div>
+
+            <div>
+                <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4 px-2">Gestão e Arquivos</h3>
+                <div className="grid grid-cols-2 gap-4">
+                    {resources.map(item => (
+                        <button key={item.id} onClick={() => onSelect(item.id)} className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 flex items-center gap-3 hover:shadow-md transition-all text-left">
+                            <div className={`w-10 h-10 rounded-xl ${item.color} text-white flex items-center justify-center text-lg shadow-sm shrink-0`}>
+                                <i className={`fa-solid ${item.icon}`}></i>
+                            </div>
+                            <span className="font-bold text-sm text-primary dark:text-white leading-tight">{item.label}</span>
+                        </button>
+                    ))}
+                </div>
+            </div>
+
+            {/* BONUS SECTION (VISIBLE FOR ALL, LOCKED STATE IF NOT VITALICIO) */}
+            <div>
+                <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4 px-2">Bônus Exclusivos</h3>
+                <div className="space-y-3">
+                    <div 
+                        onClick={() => !isVitalicio && navigate('/settings')}
+                        className={`p-4 rounded-2xl border flex items-center justify-between cursor-pointer transition-all ${isVitalicio ? 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-900' : 'bg-slate-50 border-slate-200 opacity-70'}`}
+                    >
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-white dark:bg-slate-800 flex items-center justify-center text-green-600 shadow-sm">
+                                <i className="fa-solid fa-file-excel"></i>
+                            </div>
+                            <div>
+                                <h4 className="font-bold text-sm text-primary dark:text-white">Planilha Mestra</h4>
+                                <p className="text-xs text-slate-500">{isVitalicio ? 'Baixar Agora' : 'Bloqueado'}</p>
+                            </div>
+                        </div>
+                        {!isVitalicio && <i className="fa-solid fa-lock text-slate-400"></i>}
+                    </div>
+                    
+                    <div 
+                        onClick={() => !isVitalicio && navigate('/settings')}
+                        className={`p-4 rounded-2xl border flex items-center justify-between cursor-pointer transition-all ${isVitalicio ? 'bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-900' : 'bg-slate-50 border-slate-200 opacity-70'}`}
+                    >
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-white dark:bg-slate-800 flex items-center justify-center text-blue-600 shadow-sm">
+                                <i className="fa-solid fa-book-open"></i>
+                            </div>
+                            <div>
+                                <h4 className="font-bold text-sm text-primary dark:text-white">E-book Guia da Obra</h4>
+                                <p className="text-xs text-slate-500">{isVitalicio ? 'Ler Agora' : 'Bloqueado'}</p>
+                            </div>
+                        </div>
+                        {!isVitalicio && <i className="fa-solid fa-lock text-slate-400"></i>}
+                    </div>
+                </div>
+            </div>
         </div>
     );
 };
