@@ -339,7 +339,29 @@ export const dbService = {
 
   getCurrentUser: (): User | null => { const stored = localStorage.getItem(SESSION_KEY); return stored ? JSON.parse(stored) : null; },
   logout: async () => { if (supabase) await supabase.auth.signOut(); localStorage.removeItem(SESSION_KEY); },
-  updatePlan: async (userId: string, plan: PlanType) => { /* Impl simplified for brevity */ },
+  
+  updatePlan: async (userId: string, plan: PlanType) => {
+     if (supabase) {
+        const baseDate = new Date();
+        if (plan === PlanType.MENSAL) baseDate.setMonth(baseDate.getMonth() + 1);
+        if (plan === PlanType.SEMESTRAL) baseDate.setMonth(baseDate.getMonth() + 6);
+        if (plan === PlanType.VITALICIO) baseDate.setFullYear(baseDate.getFullYear() + 99);
+
+        await supabase.from('profiles').update({ 
+            plan, 
+            subscription_expires_at: baseDate.toISOString() 
+        }).eq('id', userId);
+     } else {
+        const db = getLocalDb();
+        const userIdx = db.users.findIndex(u => u.id === userId);
+        if (userIdx > -1) {
+            db.users[userIdx].plan = plan;
+            db.users[userIdx].subscriptionExpiresAt = new Date().toISOString();
+            saveLocalDb(db); 
+            localStorage.setItem(SESSION_KEY, JSON.stringify(db.users[userIdx]));
+        }
+     }
+  },
 
   // --- WORKS ---
   getWorks: async (userId: string): Promise<Work[]> => {
