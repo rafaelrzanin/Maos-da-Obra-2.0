@@ -81,6 +81,28 @@ const uploadToBucket = async (file: File, path: string): Promise<string | null> 
     }
 }
 
+// --- INTERNAL HELPERS (Avoid Circular Dependency) ---
+const insertExpenseInternal = async (expense: Omit<Expense, 'id'>) => {
+    if (supabase) {
+        await supabase.from('expenses').insert({
+            work_id: expense.workId,
+            description: expense.description,
+            amount: expense.amount,
+            paid_amount: expense.paidAmount,
+            quantity: expense.quantity,
+            category: expense.category,
+            date: expense.date,
+            step_id: expense.stepId,
+            worker_id: expense.workerId,
+            related_material_id: expense.relatedMaterialId
+        });
+    } else {
+        const db = getLocalDb();
+        db.expenses.push({ ...expense, id: Math.random().toString(36).substr(2, 9) });
+        saveLocalDb(db);
+    }
+};
+
 // --- ENGINE: CONSTRUCTION PLAN GENERATOR (ENGENHEIRO VIRTUAL 3.0 - SEQUENCIAL) ---
 interface PlanItem {
     stepName: string;
@@ -692,24 +714,7 @@ export const dbService = {
   },
 
   addExpense: async (expense: Omit<Expense, 'id'>) => {
-      if (supabase) {
-          await supabase.from('expenses').insert({
-              work_id: expense.workId,
-              description: expense.description,
-              amount: expense.amount,
-              paid_amount: expense.paidAmount,
-              quantity: expense.quantity,
-              category: expense.category,
-              date: expense.date,
-              step_id: expense.stepId,
-              worker_id: expense.workerId,
-              related_material_id: expense.relatedMaterialId
-          });
-      } else {
-          const db = getLocalDb();
-          db.expenses.push({ ...expense, id: Math.random().toString(36).substr(2, 9) });
-          saveLocalDb(db);
-      }
+      await insertExpenseInternal(expense);
   },
 
   updateExpense: async (expense: Expense) => {
@@ -867,7 +872,9 @@ export const dbService = {
           }
 
           const description = `Compra: ${material.name}`;
-          await dbService.addExpense({
+          
+          // DIRECT CALL TO INTERNAL HELPER TO ENSURE SAVING
+          await insertExpenseInternal({
               workId: material.workId,
               description: description,
               amount: cost,
