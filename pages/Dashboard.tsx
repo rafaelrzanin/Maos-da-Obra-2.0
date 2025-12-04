@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../App';
 import { dbService } from '../services/db';
 import { Work, Notification } from '../types';
-import { ZE_AVATAR, ZE_AVATAR_FALLBACK } from '../services/standards';
+import { ZE_AVATAR, ZE_AVATAR_FALLBACK, getRandomZeTip, ZeTip } from '../services/standards';
 import { ZeModal } from '../components/ZeModal';
 
 const Dashboard: React.FC = () => {
@@ -18,6 +18,9 @@ const Dashboard: React.FC = () => {
   const [dailySummary, setDailySummary] = useState({ completedSteps: 0, delayedSteps: 0, pendingMaterials: 0, totalSteps: 0 });
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
+  
+  // Dica Dinâmica
+  const [currentTip, setCurrentTip] = useState<ZeTip>(() => getRandomZeTip());
   
   // Dropdown State
   const [showWorkSelector, setShowWorkSelector] = useState(false);
@@ -251,10 +254,10 @@ const Dashboard: React.FC = () => {
                 </div>
                 <div>
                     <div className="flex items-center gap-2 mb-1">
-                        <span className="bg-secondary text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">Recomendação Técnica</span>
+                        <span className="bg-secondary text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">Dica do Zé: {currentTip.tag}</span>
                     </div>
                     <p className="text-sm text-slate-600 dark:text-slate-300 italic">
-                        "Evite adiantamentos integrais de mão de obra. Estabeleça um cronograma físico-financeiro e realize pagamentos mediante medição de serviço executado."
+                        "{currentTip.text}"
                     </p>
                 </div>
            </div>

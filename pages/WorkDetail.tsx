@@ -5,7 +5,7 @@ import { dbService } from '../services/db';
 import { Work, Step, Expense, Material, StepStatus, ExpenseCategory, PlanType, WorkPhoto, WorkFile } from '../types';
 import { Recharts } from '../components/RechartsWrapper';
 import { ZeModal } from '../components/ZeModal';
-import { FULL_MATERIAL_PACKAGES, ZE_AVATAR, ZE_AVATAR_FALLBACK, CALCULATOR_LOGIC, CONTRACT_TEMPLATES, STANDARD_CHECKLISTS } from '../services/standards';
+import { FULL_MATERIAL_PACKAGES, ZE_AVATAR, ZE_AVATAR_FALLBACK, CALCULATOR_LOGIC, CONTRACT_TEMPLATES, STANDARD_CHECKLISTS, getRandomZeTip, ZeTip } from '../services/standards';
 import { useAuth } from '../App';
 import { aiService } from '../services/ai';
 
@@ -355,6 +355,10 @@ const OverviewTab: React.FC<{ work: Work, stats: any, onGoToSteps: () => void }>
       { name: 'Concluído', value: stats.progress, fill: '#059669' }, 
       { name: 'Pendente', value: 100 - stats.progress, fill: '#E2E8F0' }
   ];
+  
+  // Dica Dinâmica (Estado interno para garantir que a dica fique fixa durante a navegação na tab)
+  const [currentTip] = useState<ZeTip>(() => getRandomZeTip());
+
   return (
     <div className="animate-in fade-in duration-500">
       <SectionHeader title="Visão Geral" subtitle="O pulso da sua obra em tempo real." />
@@ -363,7 +367,7 @@ const OverviewTab: React.FC<{ work: Work, stats: any, onGoToSteps: () => void }>
         <div className="bg-gradient-to-br from-slate-900 to-primary p-8 rounded-3xl shadow-xl text-white flex flex-col justify-between relative overflow-hidden"><div className="absolute top-0 right-0 w-40 h-40 bg-secondary/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div><div className="relative z-10"><div className="flex items-center gap-3 mb-6"><div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-secondary"><i className="fa-solid fa-wallet text-xl"></i></div><span className="text-xs text-slate-300 uppercase font-bold tracking-widest">Financeiro</span></div><div className="mb-8"><p className="text-4xl font-bold mb-1 tracking-tight">R$ {stats.totalSpent.toLocaleString('pt-BR')}</p><p className="text-sm text-slate-400 font-medium">de R$ {work.budgetPlanned.toLocaleString('pt-BR')} planejado</p></div><div className="w-full bg-black/30 rounded-full h-2 mb-2 overflow-hidden backdrop-blur-sm"><div className={`h-full rounded-full transition-all duration-1000 ${budgetUsage > 100 ? 'bg-red-500' : 'bg-secondary'}`} style={{ width: `${Math.min(budgetUsage, 100)}%` }}></div></div><div className="flex justify-between text-xs font-bold text-slate-400 uppercase tracking-wider"><span>0%</span><span>{Math.round(budgetUsage)}% Usado</span></div></div></div>
       </div>
       
-      {/* UPDATE: Zeca Technical Note */}
+      {/* UPDATE: Zeca Technical Note - DYNAMIC */}
       <div className="mb-6 relative overflow-hidden rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm group hover:shadow-md transition-all">
            <div className="flex items-start gap-5 p-5 relative z-10">
                 <div className="w-12 h-12 rounded-full p-0.5 bg-slate-200 dark:bg-slate-700 shrink-0">
@@ -380,11 +384,11 @@ const OverviewTab: React.FC<{ work: Work, stats: any, onGoToSteps: () => void }>
                 </div>
                 <div>
                     <h4 className="font-bold text-sm text-primary dark:text-white flex items-center gap-2">
-                        Nota Técnica do Zé
-                        <span className="bg-secondary/10 text-secondary text-[10px] px-2 py-0.5 rounded-full uppercase">Engenharia</span>
+                        Dica do Zé
+                        <span className="bg-secondary/10 text-secondary text-[10px] px-2 py-0.5 rounded-full uppercase">{currentTip.tag}</span>
                     </h4>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
-                        "Para garantir a durabilidade da estrutura, respeite o tempo de cura do concreto (mínimo 7 dias úmidos). Isso evita fissuras e garante a resistência projetada (fck)."
+                        "{currentTip.text}"
                     </p>
                 </div>
            </div>

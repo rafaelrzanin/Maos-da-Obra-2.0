@@ -13,6 +13,37 @@ export const ZE_AVATAR = './ze.png';
 // Se o arquivo './ze.png' não for encontrado, esta imagem será usada automaticamente.
 export const ZE_AVATAR_FALLBACK = 'https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/People/Construction%20Worker.png';
 
+// --- DICAS DINÂMICAS DO ZÉ ---
+export interface ZeTip {
+  text: string;
+  tag: string;
+}
+
+export const ZE_TIPS: ZeTip[] = [
+  // GESTÃO E FINANCEIRO
+  { tag: 'Financeiro', text: 'Evite adiantamentos integrais de mão de obra. Estabeleça um cronograma físico-financeiro e realize pagamentos mediante medição de serviço executado.' },
+  { tag: 'Gestão', text: 'Material faltando para a obra mais que chuva. Verifique o estoque 2 dias antes da próxima etapa começar para não pagar diária de pedreiro parado.' },
+  { tag: 'Contrato', text: 'O combinado não sai caro. Sempre faça um contrato escrito descrevendo exatamente o que será feito e o que NÃO está incluso no orçamento.' },
+  { tag: 'Economia', text: 'Comprar tudo de uma vez pode parecer bom, mas o cimento empedra e o piso quebra. Compre materiais brutos conforme a demanda da etapa.' },
+  
+  // TÉCNICO E ESTRUTURA
+  { tag: 'Estrutura', text: 'Para garantir a durabilidade, respeite a cura do concreto. Molhe a laje ou pilares por pelo menos 7 dias (cura úmida) para evitar trincas.' },
+  { tag: 'Instalações', text: 'Tire fotos das paredes com a tubulação hidráulica e elétrica antes de rebocar. Isso é um mapa do tesouro para evitar furar canos no futuro.' },
+  { tag: 'Impermeabilização', text: 'Não economize na impermeabilização dos baldrames e áreas molhadas. Resolver infiltração depois de pronto custa 5x mais caro.' },
+  { tag: 'Elétrica', text: 'Nunca use fio mais fino que o especificado para o chuveiro (geralmente 6mm ou 10mm). Fio fino esquenta, gasta mais energia e pode causar incêndio.' },
+  
+  // ACABAMENTO E FINALIZAÇÃO
+  { tag: 'Acabamento', text: 'Proteja o piso recém-instalado com papelão ondulado ou gesso. O tráfego de obra arranha porcelanato com muita facilidade.' },
+  { tag: 'Pintura', text: 'Tinta boa em parede mal lixada não faz milagre. O segredo da pintura perfeita é 80% preparação (lixa/massa) e 20% tinta.' },
+  { tag: 'Caimento', text: 'Antes de pagar o azulejista, jogue um balde de água no banheiro e na sacada. A água tem que correr sozinha para o ralo, sem empoçar.' },
+  { tag: 'Entulho', text: 'Mantenha a obra limpa. Entulho acumulado esconde ferramentas, causa acidentes e passa a impressão de desorganização para a equipe.' }
+];
+
+export const getRandomZeTip = (): ZeTip => {
+  const randomIndex = Math.floor(Math.random() * ZE_TIPS.length);
+  return ZE_TIPS[randomIndex];
+};
+
 export interface PhaseCategory {
   category: string;
   steps: string[];
