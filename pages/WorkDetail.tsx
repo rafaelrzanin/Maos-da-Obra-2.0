@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { dbService } from '../services/db';
-import { Work, Step, Expense, Material, StepStatus, ExpenseCategory, PlanType, WorkPhoto, WorkFile } from '../types';
+import { Work, Step, Expense, Material, StepStatus, ExpenseCategory, WorkPhoto, WorkFile } from '../types';
 import { Recharts } from '../components/RechartsWrapper';
 import { ZeModal } from '../components/ZeModal';
 import { FULL_MATERIAL_PACKAGES, ZE_AVATAR, CALCULATOR_LOGIC, CONTRACT_TEMPLATES, STANDARD_CHECKLISTS } from '../services/standards';
@@ -843,7 +843,7 @@ const MoreMenuTab: React.FC<{ onSelect: (view: string) => void }> = ({ onSelect 
 const WorkDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  // REMOVED: const { user } = useAuth(); // Unused
   const [work, setWork] = useState<Work | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'STEPS' | 'MATERIALS' | 'EXPENSES' | 'MORE'>('OVERVIEW');
