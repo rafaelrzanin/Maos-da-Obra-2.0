@@ -83,13 +83,18 @@ const uploadToBucket = async (file: File, path: string): Promise<string | null> 
 
 // --- INTERNAL HELPERS (Avoid Circular Dependency) ---
 const insertExpenseInternal = async (expense: Omit<Expense, 'id'>) => {
+    // Ensure numbers are numbers
+    const safeAmount = Number(expense.amount) || 0;
+    const safePaid = Number(expense.paidAmount) || 0;
+    const safeQty = Number(expense.quantity) || 1;
+
     if (supabase) {
         await supabase.from('expenses').insert({
             work_id: expense.workId,
             description: expense.description,
-            amount: expense.amount,
-            paid_amount: expense.paidAmount,
-            quantity: expense.quantity,
+            amount: safeAmount,
+            paid_amount: safePaid,
+            quantity: safeQty,
             category: expense.category,
             date: expense.date,
             step_id: expense.stepId,
@@ -98,8 +103,62 @@ const insertExpenseInternal = async (expense: Omit<Expense, 'id'>) => {
         });
     } else {
         const db = getLocalDb();
-        db.expenses.push({ ...expense, id: Math.random().toString(36).substr(2, 9) });
+        db.expenses.push({ 
+            ...expense, 
+            amount: safeAmount,
+            paidAmount: safePaid,
+            quantity: safeQty,
+            id: Math.random().toString(36).substr(2, 9) 
+        });
         saveLocalDb(db);
+    }
+};
+
+const getStepsInternal = async (workId: string): Promise<Step[]> => {
+    if (supabase) {
+        const { data } = await supabase.from('steps').select('*').eq('work_id', workId);
+        const now = new Date();
+        return (data || []).map(s => {
+             const endDate = new Date(s.end_date);
+             const isDelayed = (s.status !== StepStatus.COMPLETED) && (now > endDate);
+             return {
+                 ...s,
+                 workId: s.work_id,
+                 startDate: s.start_date,
+                 endDate: s.end_date,
+                 isDelayed
+             };
+        });
+    } else {
+        const db = getLocalDb();
+        const now = new Date();
+        return Promise.resolve(db.steps.filter(s => s.workId === workId).map(s => {
+            const endDate = new Date(s.endDate);
+            const isDelayed = (s.status !== StepStatus.COMPLETED) && (now > endDate);
+            return { ...s, isDelayed };
+        }));
+    }
+};
+
+const getExpensesInternal = async (workId: string): Promise<Expense[]> => {
+    if (supabase) {
+        const { data } = await supabase.from('expenses').select('*').eq('work_id', workId);
+        return (data || []).map(e => ({
+            ...e,
+            workId: e.work_id,
+            paidAmount: Number(e.paid_amount) || 0,
+            amount: Number(e.amount) || 0,
+            stepId: e.step_id,
+            workerId: e.worker_id,
+            relatedMaterialId: e.related_material_id
+        }));
+    } else {
+        const db = getLocalDb();
+        return Promise.resolve(db.expenses.filter(e => e.workId === workId).map(e => ({
+            ...e,
+            amount: Number(e.amount) || 0,
+            paidAmount: Number(e.paidAmount) || 0
+        })));
     }
 };
 
@@ -625,31 +684,7 @@ export const dbService = {
   },
 
   // --- Steps ---
-  getSteps: async (workId: string): Promise<Step[]> => {
-    if (supabase) {
-        const { data } = await supabase.from('steps').select('*').eq('work_id', workId);
-        const now = new Date();
-        return (data || []).map(s => {
-             const endDate = new Date(s.end_date);
-             const isDelayed = (s.status !== StepStatus.COMPLETED) && (now > endDate);
-             return {
-                 ...s,
-                 workId: s.work_id,
-                 startDate: s.start_date,
-                 endDate: s.end_date,
-                 isDelayed
-             };
-        });
-    } else {
-        const db = getLocalDb();
-        const now = new Date();
-        return Promise.resolve(db.steps.filter(s => s.workId === workId).map(s => {
-            const endDate = new Date(s.endDate);
-            const isDelayed = (s.status !== StepStatus.COMPLETED) && (now > endDate);
-            return { ...s, isDelayed };
-        }));
-    }
-  },
+  getSteps: getStepsInternal, // Export the internal function
 
   updateStep: async (step: Step) => {
     if (supabase) {
@@ -696,22 +731,7 @@ export const dbService = {
   },
 
   // --- Expenses ---
-  getExpenses: async (workId: string): Promise<Expense[]> => {
-    if (supabase) {
-        const { data } = await supabase.from('expenses').select('*').eq('work_id', workId);
-        return (data || []).map(e => ({
-            ...e,
-            workId: e.work_id,
-            paidAmount: e.paid_amount,
-            stepId: e.step_id,
-            workerId: e.worker_id,
-            relatedMaterialId: e.related_material_id
-        }));
-    } else {
-        const db = getLocalDb();
-        return Promise.resolve(db.expenses.filter(e => e.workId === workId));
-    }
-  },
+  getExpenses: getExpensesInternal,
 
   addExpense: async (expense: Omit<Expense, 'id'>) => {
       await insertExpenseInternal(expense);
@@ -762,7 +782,7 @@ export const dbService = {
           }
 
           if (material) {
-              const qtyToRevert = expenseToDelete.quantity || 0;
+              const qtyToRevert = Number(expenseToDelete.quantity) || 0;
               material.purchasedQty = Math.max(0, material.purchasedQty - qtyToRevert);
               
               // Call updateMaterial only for the stock update, avoid recursive expense creation
@@ -853,22 +873,27 @@ export const dbService = {
 
           // If material is not explicitly linked to a step ID, try to find a step by Category Name
           if (!finalStepId && material.category) {
-               // We need to fetch steps to find the ID
-               const steps = await dbService.getSteps(material.workId);
-               
-               // Normalize Helper: remove accents, lowercase, trim
-               const normalize = (str: string) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
-               const targetCat = normalize(material.category);
+               try {
+                   // Use internal function to avoid circular dependency call on `dbService`
+                   const steps = await getStepsInternal(material.workId);
+                   
+                   // Normalize Helper: remove accents, lowercase, trim
+                   const normalize = (str: string) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+                   const targetCat = normalize(material.category);
 
-               // 1. Try Exact Normalized Match (e.g. "Fundacao" == "Fundação")
-               let match = steps.find(s => normalize(s.name) === targetCat);
+                   // 1. Try Exact Normalized Match (e.g. "Fundacao" == "Fundação")
+                   let match = steps.find(s => normalize(s.name) === targetCat);
 
-               // 2. Try Contains Match (e.g. Category "Pintura" matches Step "Pintura e Acabamento")
-               if (!match) {
-                   match = steps.find(s => normalize(s.name).includes(targetCat) || targetCat.includes(normalize(s.name)));
+                   // 2. Try Contains Match (e.g. Category "Pintura" matches Step "Pintura e Acabamento")
+                   if (!match) {
+                       match = steps.find(s => normalize(s.name).includes(targetCat) || targetCat.includes(normalize(s.name)));
+                   }
+
+                   if (match) finalStepId = match.id;
+               } catch (e) {
+                   console.error("Error linking material to step:", e);
+                   // Proceed without linking to step to avoid blocking the purchase
                }
-
-               if (match) finalStepId = match.id;
           }
 
           const description = `Compra: ${material.name}`;
@@ -921,7 +946,7 @@ export const dbService = {
 
     // 2. Try to find a matching Step to link for alerts (Smart Link)
     let relatedStepId = undefined;
-    const steps = await dbService.getSteps(workId);
+    const steps = await getStepsInternal(workId);
     const matchStep = steps.find(s => s.name.toLowerCase().includes(category.toLowerCase()));
     if (matchStep) relatedStepId = matchStep.id;
 
@@ -1213,8 +1238,8 @@ export const dbService = {
       saveLocalDb(db);
   },
   generateSmartNotifications: async (userId: string, workId: string) => {
-      const expenses = await dbService.getExpenses(workId);
-      const steps = await dbService.getSteps(workId);
+      const expenses = await getExpensesInternal(workId);
+      const steps = await getStepsInternal(workId);
       const materials = await dbService.getMaterials(workId);
       const work = await dbService.getWorkById(workId);
 
@@ -1228,7 +1253,7 @@ export const dbService = {
       if (lastCheck === today) return; 
 
       // 1. Budget Check
-      const totalSpent = expenses.reduce((acc, curr) => acc + (curr.paidAmount ?? curr.amount), 0);
+      const totalSpent = expenses.reduce((acc, curr) => acc + (Number(curr.paidAmount) || Number(curr.amount) || 0), 0);
       const percentage = work.budgetPlanned > 0 ? (totalSpent / work.budgetPlanned) : 0;
       
       if (percentage >= 0.8) {
@@ -1287,7 +1312,7 @@ export const dbService = {
   },
 
   getDailySummary: async (workId: string) => {
-      const steps = await dbService.getSteps(workId);
+      const steps = await getStepsInternal(workId);
       const materials = await dbService.getMaterials(workId);
       
       const completed = steps.filter(s => s.status === StepStatus.COMPLETED).length;
@@ -1304,10 +1329,11 @@ export const dbService = {
   },
 
   calculateWorkStats: async (workId: string) => {
-    const expenses = await dbService.getExpenses(workId);
-    const steps = await dbService.getSteps(workId);
+    const expenses = await getExpensesInternal(workId);
+    const steps = await getStepsInternal(workId);
     
-    const totalSpent = expenses.reduce((acc, curr) => acc + (curr.paidAmount ?? curr.amount), 0);
+    // Safety check to ensure numbers are numbers
+    const totalSpent = expenses.reduce((acc, curr) => acc + (Number(curr.paidAmount) || Number(curr.amount) || 0), 0);
     const totalSteps = steps.length;
     const completedSteps = steps.filter(s => s.status === StepStatus.COMPLETED).length;
     const now = new Date();
