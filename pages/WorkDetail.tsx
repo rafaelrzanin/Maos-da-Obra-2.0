@@ -8,8 +8,13 @@ import { /*FULL_MATERIAL_PACKAGES,*/ ZE_AVATAR, CALCULATOR_LOGIC, CONTRACT_TEMPL
 import { useAuth } from '../App';
 import { aiService } from '../services/ai';
 
-// --- Shared Components ---
+// --- TEMP: Placeholders para as abas principais ---
+const OverviewTab: React.FC<any> = () => null;
+const StepsTab: React.FC<any> = () => null;
+const MaterialsTab: React.FC<any> = () => null;
+const ExpensesTab: React.FC<any> = () => null;
 
+// --- Shared Components ---
 const SectionHeader: React.FC<{ title: string, subtitle: string }> = ({ title, subtitle }) => (
     <div className="mb-6 print:mb-2">
         <h2 className="text-2xl font-bold text-primary dark:text-white tracking-tight">{title}</h2>
