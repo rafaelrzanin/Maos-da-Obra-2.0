@@ -3,9 +3,23 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../App';
 import { dbService } from '../services/db';
-import { Work, Notification } from '../types';
+import { Work, Notification, Step, StepStatus } from '../types';
 import { ZE_AVATAR, ZE_AVATAR_FALLBACK, getRandomZeTip, ZeTip } from '../services/standards';
 import { ZeModal } from '../components/ZeModal';
+
+// Helper para formatar data
+const formatDateDisplay = (dateStr: string) => {
+    if (!dateStr) return '--/--';
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+        const [year, month, day] = dateStr.split('-');
+        return `${day}/${month}`;
+    }
+    try {
+        return new Date(dateStr).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+    } catch (e) {
+        return dateStr;
+    }
+};
 
 const Dashboard: React.FC = () => {
   const { user } = useAuth();
@@ -17,9 +31,10 @@ const Dashboard: React.FC = () => {
   const [stats, setStats] = useState({ totalSpent: 0, progress: 0, delayedSteps: 0 });
   const [dailySummary, setDailySummary] = useState({ completedSteps: 0, delayedSteps: 0, pendingMaterials: 0, totalSteps: 0 });
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [upcomingSteps, setUpcomingSteps] = useState<Step[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // Dica Dinâmica - Removido o setter não utilizado para corrigir erro de build
+  // Dica Dinâmica - Corrigido erro TS removendo o setter não utilizado
   const [currentTip] = useState<ZeTip>(() => getRandomZeTip());
   
   // Dropdown State
@@ -52,15 +67,23 @@ const Dashboard: React.FC = () => {
       setLoading(true);
       
       try {
-        const [workStats, summary, notifs] = await Promise.all([
+        const [workStats, summary, notifs, steps] = await Promise.all([
             dbService.calculateWorkStats(work.id),
             dbService.getDailySummary(work.id),
-            dbService.getNotifications(user!.id)
+            dbService.getNotifications(user!.id),
+            dbService.getSteps(work.id)
         ]);
 
         setStats(workStats);
         setDailySummary(summary);
         setNotifications(notifs);
+
+        // Filter Next Steps (Top 3 Pending)
+        const nextSteps = steps
+            .filter(s => s.status !== StepStatus.COMPLETED)
+            .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
+            .slice(0, 3);
+        setUpcomingSteps(nextSteps);
 
         // Run smart check (fire and forget)
         dbService.generateSmartNotifications(user!.id, work.id);
@@ -235,7 +258,7 @@ const Dashboard: React.FC = () => {
           )}
       </div>
       
-      {/* ZÉ DA OBRA TIP (Glassmorphism) - UPDATED CONTENT */}
+      {/* ZÉ DA OBRA TIP (Glassmorphism) - DYNAMIC */}
       <div className="mb-8 relative overflow-hidden rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/5 shadow-sm group hover:shadow-md transition-all">
            <div className="absolute top-0 right-0 w-32 h-32 bg-secondary/10 rounded-full blur-3xl translate-x-10 -translate-y-10 group-hover:bg-secondary/20 transition-all"></div>
            <div className="flex items-center gap-5 p-5 relative z-10">
@@ -377,6 +400,56 @@ const Dashboard: React.FC = () => {
               </div>
           </div>
       </div>
+
+      {/* UPCOMING STEPS SECTION */}
+      {upcomingSteps.length > 0 && (
+        <div className="mb-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 mb-4 px-1">
+                <i className="fa-solid fa-calendar-day"></i> Próximas Etapas
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                {upcomingSteps.map((step) => {
+                    const today = new Date();
+                    const startDate = new Date(step.startDate);
+                    // Reset times
+                    today.setHours(0,0,0,0);
+                    startDate.setHours(0,0,0,0);
+                    
+                    const diffTime = startDate.getTime() - today.getTime();
+                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                    
+                    let statusLabel = '';
+                    let statusColor = 'text-slate-400 bg-slate-100 dark:bg-slate-800';
+                    
+                    if (diffDays < 0) {
+                        statusLabel = 'Atrasado';
+                        statusColor = 'text-red-600 bg-red-100 dark:bg-red-900/30';
+                    } else if (diffDays === 0) {
+                        statusLabel = 'Começa Hoje';
+                        statusColor = 'text-green-600 bg-green-100 dark:bg-green-900/30';
+                    } else {
+                        statusLabel = `Em ${diffDays} dias`;
+                        statusColor = 'text-secondary bg-orange-100 dark:bg-orange-900/20';
+                    }
+
+                    return (
+                        <div key={step.id} onClick={() => navigate(`/work/${focusWork.id}`)} className="cursor-pointer bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 flex items-center gap-4 shadow-sm hover:shadow-md hover:border-secondary/30 transition-all">
+                            <div className="w-10 h-10 rounded-xl bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-500">
+                                <i className="fa-regular fa-calendar"></i>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <h4 className="font-bold text-primary dark:text-white text-sm truncate">{step.name}</h4>
+                                <p className="text-xs text-slate-500">{formatDateDisplay(step.startDate)}</p>
+                            </div>
+                            <div className={`text-[10px] font-bold px-2 py-1 rounded-md uppercase whitespace-nowrap ${statusColor}`}>
+                                {statusLabel}
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+      )}
 
       {/* Notifications Section */}
       <div>
