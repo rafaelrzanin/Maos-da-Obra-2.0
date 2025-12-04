@@ -1,9 +1,67 @@
 
 // Standard Libraries for Construction Management
 
-// Avatar Zé da Obra (SVG Data URI para carregamento instantâneo e garantido)
-// Representa um homem com capacete amarelo, bigode e macacão azul.
-export const ZE_AVATAR = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="50" fill="%23cbd5e1"/><g transform="translate(0, 10)"><path d="M50 90 C 20 90 20 100 20 100 L 80 100 C 80 100 80 90 50 90" fill="%231e3a8a"/><rect x="30" y="85" width="10" height="20" fill="%231e3a8a"/><rect x="60" y="85" width="10" height="20" fill="%231e3a8a"/></g><circle cx="50" cy="50" r="25" fill="%23fca5a5"/><path d="M25 40 Q 50 10 75 40 L 75 45 L 25 45 Z" fill="%23fbbf24"/><rect x="25" y="43" width="50" height="5" fill="%23f59e0b"/><circle cx="42" cy="55" r="3" fill="%23334155"/><circle cx="58" cy="55" r="3" fill="%23334155"/><path d="M40 65 Q 50 60 60 65 Q 65 70 60 72 Q 50 68 40 72 Q 35 70 40 65" fill="%23451a03"/></svg>`;
+// Avatar Zé da Obra (SVG Profissional - High Fidelity)
+// Desenho vetorial complexo embutido via Data URI.
+// Garante carregamento instantâneo, sem depender de internet externa.
+const zeSvg = `
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400">
+  <defs>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0F172A;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#334155;stop-opacity:1" />
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="2" dy="4" stdDeviation="3" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+  
+  <!-- Fundo Circular Premium -->
+  <circle cx="200" cy="200" r="200" fill="url(#bgGradient)" />
+  
+  <!-- Corpo / Macacão -->
+  <path d="M100 400 L 100 350 Q 100 320 130 310 L 270 310 Q 300 320 300 350 L 300 400 Z" fill="#1d4ed8" />
+  <path d="M130 310 L 130 400 M 270 310 L 270 400" stroke="#1e3a8a" stroke-width="4" opacity="0.3" />
+  
+  <!-- Pescoço -->
+  <rect x="160" y="270" width="80" height="50" fill="#e2a478" />
+  <path d="M160 270 L 160 320 L 240 320 L 240 270" fill="rgba(0,0,0,0.1)" /> <!-- Sombra pescoço -->
+
+  <!-- Cabeça -->
+  <path d="M135 180 Q 135 130 200 130 Q 265 130 265 180 L 265 240 Q 265 290 200 290 Q 135 290 135 240 Z" fill="#f5d0b0" />
+  
+  <!-- Orelhas -->
+  <circle cx="135" cy="210" r="15" fill="#f5d0b0" />
+  <circle cx="265" cy="210" r="15" fill="#f5d0b0" />
+
+  <!-- Capacete Amarelo com Brilho -->
+  <path d="M110 160 Q 200 60 290 160 L 300 175 L 100 175 Z" fill="#facc15" filter="url(#shadow)" />
+  <path d="M110 160 Q 200 60 290 160" fill="none" stroke="#ca8a04" stroke-width="3" opacity="0.5" />
+  <ellipse cx="200" cy="110" rx="40" ry="15" fill="white" opacity="0.4" transform="rotate(-15 200 110)" /> <!-- Reflexo -->
+  
+  <!-- Rosto -->
+  <!-- Sobrancelhas (Expressão séria/confiável) -->
+  <path d="M155 195 Q 170 190 185 195" stroke="#451a03" stroke-width="5" fill="none" stroke-linecap="round" />
+  <path d="M215 195 Q 230 190 245 195" stroke="#451a03" stroke-width="5" fill="none" stroke-linecap="round" />
+  
+  <!-- Olhos -->
+  <circle cx="170" cy="215" r="7" fill="#1e293b" />
+  <circle cx="230" cy="215" r="7" fill="#1e293b" />
+  
+  <!-- Nariz -->
+  <path d="M200 220 L 195 245 L 205 245 Z" fill="#d4a373" />
+  
+  <!-- Bigode (O Grande Bigode do Zé) -->
+  <path d="M160 255 Q 200 245 240 255 Q 250 265 230 270 Q 200 260 170 270 Q 150 265 160 255" fill="#3f2317" filter="url(#shadow)" />
+  
+  <!-- Boca (Leve sorriso por baixo do bigode) -->
+  <path d="M190 275 Q 200 280 210 275" stroke="#78350f" stroke-width="3" fill="none" stroke-linecap="round" />
+
+</svg>
+`.trim();
+
+// Encode SVG for URL
+export const ZE_AVATAR = `data:image/svg+xml;utf8,${encodeURIComponent(zeSvg)}`;
 
 export interface PhaseCategory {
   category: string;
