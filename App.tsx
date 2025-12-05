@@ -57,6 +57,7 @@ interface AuthContextType {
   logout: () => void;
   updatePlan: (plan: PlanType) => Promise<void>;
   refreshUser: () => Promise<void>;
+  isSubscriptionValid: boolean;
 }
 
 const AuthContext = createContext<AuthContextType>(null!);
@@ -65,16 +66,23 @@ export const useAuth = () => useContext(AuthContext);
 
 const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [isSubscriptionValid, setIsSubscriptionValid] = useState(true);
 
   useEffect(() => {
     const initAuth = async () => {
         // 1. Try Local Storage first (instant load for perceived performance)
         const localUser = dbService.getCurrentUser();
-        if (localUser) setUser(localUser);
+        if (localUser) {
+            setUser(localUser);
+            setIsSubscriptionValid(dbService.isSubscriptionActive(localUser));
+        }
 
         // 2. Check Supabase Session (Handles OAuth Redirect & Session Validity)
         const sbUser = await dbService.syncSession();
-        if (sbUser) setUser(sbUser);
+        if (sbUser) {
+            setUser(sbUser);
+            setIsSubscriptionValid(dbService.isSubscriptionActive(sbUser));
+        }
     };
     
     initAuth();
@@ -82,6 +90,7 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
     // 3. Listen for real-time auth changes (Sign In / Sign Out / Token Refresh)
     const unsubscribe = dbService.onAuthChange((u) => {
         setUser(u);
+        if (u) setIsSubscriptionValid(dbService.isSubscriptionActive(u));
     });
 
     return () => {
@@ -91,13 +100,17 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
 
   const refreshUser = async () => {
       const currentUser = dbService.getCurrentUser();
-      if (currentUser) setUser(currentUser);
+      if (currentUser) {
+          setUser(currentUser);
+          setIsSubscriptionValid(dbService.isSubscriptionActive(currentUser));
+      }
   };
 
   const login = async (email: string, password?: string) => {
     const u = await dbService.login(email, password);
     if (u) {
         setUser(u);
+        setIsSubscriptionValid(dbService.isSubscriptionActive(u));
         return true;
     }
     return false;
@@ -105,7 +118,10 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
 
   const signup = async (name: string, email: string, whatsapp?: string, password?: string) => {
     const u = await dbService.signup(name, email, whatsapp, password);
-    if (u) setUser(u);
+    if (u) {
+        setUser(u);
+        setIsSubscriptionValid(dbService.isSubscriptionActive(u));
+    }
   };
 
   const logout = () => {
@@ -116,12 +132,13 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
   const updatePlan = async (plan: PlanType) => {
     if (user) {
       await dbService.updatePlan(user.id, plan);
-      setUser({ ...user, plan });
+      // Recarregar user para obter nova data de expiração
+      await refreshUser();
     }
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, signup, logout, updatePlan, refreshUser }}>
+    <AuthContext.Provider value={{ user, login, signup, logout, updatePlan, refreshUser, isSubscriptionValid }}>
       {children}
     </AuthContext.Provider>
   );
@@ -129,13 +146,46 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
 
 // Layout Component
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, logout } = useAuth();
+  const { user, logout, isSubscriptionValid } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
+  // 1. Check Login
   if (!user) return <Navigate to="/login" />;
+
+  // 2. Check Subscription (Except on Settings/Payment page)
+  const isSettingsPage = location.pathname === '/settings';
+  if (!isSubscriptionValid && !isSettingsPage) {
+      return (
+          <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+              <div className="bg-white dark:bg-slate-800 p-8 rounded-2xl max-w-md text-center shadow-2xl">
+                  <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center text-red-500 text-2xl mx-auto mb-4">
+                      <i className="fa-solid fa-lock"></i>
+                  </div>
+                  <h2 className="text-2xl font-bold text-primary dark:text-white mb-2">Assinatura Expirada</h2>
+                  <p className="text-slate-500 dark:text-slate-400 mb-6">
+                      Seu período de acesso terminou. Renove seu plano para continuar gerenciando suas obras.
+                  </p>
+                  <div className="flex flex-col gap-3">
+                      <button 
+                          onClick={() => navigate('/settings')}
+                          className="w-full py-3 bg-secondary text-white font-bold rounded-xl shadow-lg hover:bg-orange-600 transition-colors"
+                      >
+                          Renovar Agora
+                      </button>
+                      <button 
+                          onClick={logout}
+                          className="text-sm text-slate-400 hover:text-slate-500 font-bold"
+                      >
+                          Sair da Conta
+                      </button>
+                  </div>
+              </div>
+          </div>
+      );
+  }
 
   const navItems = [
     { label: 'Painel Geral', path: '/', icon: 'fa-house' },
