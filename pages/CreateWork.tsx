@@ -131,13 +131,13 @@ const CreateWork: React.FC = () => {
   };
 
   const CounterInput = ({ label, field, icon }: { label: string, field: keyof typeof formData, icon: string }) => (
-      <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 p-3 flex flex-col items-center justify-center shadow-sm">
-          <div className="text-slate-400 mb-1"><i className={`fa-solid ${icon}`}></i></div>
-          <label className="text-[10px] font-bold text-slate-500 uppercase mb-2 text-center">{label}</label>
-          <div className="flex items-center gap-2">
-              <button type="button" onClick={() => handleCounter(field, false)} className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold hover:bg-slate-200 transition-colors">-</button>
-              <span className="w-6 text-center font-bold text-primary dark:text-white text-lg">{formData[field as keyof typeof formData]}</span>
-              <button type="button" onClick={() => handleCounter(field, true)} className="w-8 h-8 rounded-lg bg-primary text-white font-bold hover:bg-primary-light transition-colors shadow-sm">+</button>
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border-2 border-slate-200 dark:border-slate-700 p-4 flex flex-col items-center justify-center shadow-lg hover:border-secondary/50 transition-colors group">
+          <div className="text-slate-400 mb-2 group-hover:text-secondary transition-colors text-xl"><i className={`fa-solid ${icon}`}></i></div>
+          <label className="text-xs font-black text-slate-700 dark:text-slate-300 uppercase mb-3 text-center tracking-wider">{label}</label>
+          <div className="flex items-center gap-3 w-full justify-center">
+              <button type="button" onClick={() => handleCounter(field, false)} className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold hover:bg-slate-200 transition-colors border border-slate-200 dark:border-slate-700 shadow-sm text-xl flex items-center justify-center pb-1">-</button>
+              <span className="min-w-[2rem] text-center font-black text-primary dark:text-white text-2xl">{formData[field as keyof typeof formData]}</span>
+              <button type="button" onClick={() => handleCounter(field, true)} className="w-10 h-10 rounded-xl bg-primary text-white font-bold hover:bg-primary-light transition-colors shadow-md shadow-primary/20 text-xl flex items-center justify-center pb-1">+</button>
           </div>
       </div>
   );
@@ -147,56 +147,62 @@ const CreateWork: React.FC = () => {
     switch(currentStep) {
         case 1:
             return (
-                <div className="animate-in fade-in slide-in-from-right-4 duration-300">
-                    <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 shadow-sm border border-slate-100 dark:border-slate-800">
-                        <h2 className="text-xl font-bold text-primary dark:text-white mb-1">Vamos começar com o básico</h2>
-                        <p className="text-text-muted dark:text-slate-400 mb-6 text-sm">Me conte um pouco sobre o que você vai fazer.</p>
+                <div className="animate-in fade-in slide-in-from-right-8 duration-500">
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 md:p-8 shadow-2xl shadow-slate-200/50 dark:shadow-black/50 border border-slate-100 dark:border-slate-800">
+                        <h2 className="text-2xl font-black text-primary dark:text-white mb-2 tracking-tight">O Básico</h2>
+                        <p className="text-slate-500 dark:text-slate-400 mb-8 font-medium">Primeiro, vamos dar um nome e definir as metas.</p>
 
-                        <div className="space-y-4">
+                        <div className="space-y-6">
                             <div>
-                                <label className="block text-xs font-bold text-text-muted uppercase mb-1">Nome ou Apelido da Obra</label>
+                                <label className="block text-xs font-black text-slate-700 dark:text-slate-300 uppercase mb-2 tracking-widest pl-1">Nome ou Apelido da Obra</label>
                                 <input 
                                   name="name" 
                                   autoFocus
-                                  placeholder="Ex: Minha Casa Nova, Reforma da Cozinha..."
+                                  placeholder="Ex: Reforma da Cozinha..."
                                   value={formData.name}
-                                  className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 bg-surface dark:bg-slate-800 text-text-main dark:text-white rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all"
+                                  className="w-full px-5 py-4 text-lg font-bold border-2 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white rounded-2xl focus:ring-4 focus:ring-primary/10 focus:border-primary focus:bg-white dark:focus:bg-slate-900 outline-none transition-all placeholder:text-slate-300 dark:placeholder:text-slate-600 shadow-inner"
                                   onChange={handleChange}
                                 />
                             </div>
 
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-xs font-bold text-text-muted uppercase mb-1 min-h-[2rem] flex items-end">Tamanho Total (m²)</label>
-                                    <input 
-                                    name="area" 
-                                    type="number" 
-                                    placeholder="Ex: 50"
-                                    value={formData.area}
-                                    className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 bg-surface dark:bg-slate-800 text-text-main dark:text-white rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all"
-                                    onChange={handleChange}
-                                    />
+                                    <label className="block text-xs font-black text-slate-700 dark:text-slate-300 uppercase mb-2 tracking-widest pl-1 min-h-[1rem]">Tamanho (m²)</label>
+                                    <div className="relative">
+                                        <input 
+                                        name="area" 
+                                        type="number" 
+                                        placeholder="0"
+                                        value={formData.area}
+                                        className="w-full px-5 py-4 text-lg font-bold border-2 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white rounded-2xl focus:ring-4 focus:ring-primary/10 focus:border-primary focus:bg-white dark:focus:bg-slate-900 outline-none transition-all placeholder:text-slate-300 dark:placeholder:text-slate-600 shadow-inner"
+                                        onChange={handleChange}
+                                        />
+                                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm pointer-events-none">m²</span>
+                                    </div>
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-bold text-text-muted uppercase mb-1 min-h-[2rem] flex items-end">Meu Orçamento (R$)</label>
-                                    <input 
-                                        name="budgetPlanned" 
-                                        type="number" 
-                                        placeholder="0,00"
-                                        value={formData.budgetPlanned}
-                                        className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 bg-surface dark:bg-slate-800 text-text-main dark:text-white rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all"
-                                        onChange={handleChange}
-                                    />
+                                    <label className="block text-xs font-black text-slate-700 dark:text-slate-300 uppercase mb-2 tracking-widest pl-1 min-h-[1rem]">Orçamento (R$)</label>
+                                    <div className="relative">
+                                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-bold pointer-events-none">R$</span>
+                                        <input 
+                                            name="budgetPlanned" 
+                                            type="number" 
+                                            placeholder="0,00"
+                                            value={formData.budgetPlanned}
+                                            className="w-full pl-10 pr-5 py-4 text-lg font-bold border-2 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white rounded-2xl focus:ring-4 focus:ring-primary/10 focus:border-primary focus:bg-white dark:focus:bg-slate-900 outline-none transition-all placeholder:text-slate-300 dark:placeholder:text-slate-600 shadow-inner"
+                                            onChange={handleChange}
+                                        />
+                                    </div>
                                 </div>
                             </div>
                             
                             <div>
-                                <label className="block text-xs font-bold text-text-muted uppercase mb-1">Endereço (Opcional)</label>
+                                <label className="block text-xs font-black text-slate-700 dark:text-slate-300 uppercase mb-2 tracking-widest pl-1">Endereço <span className="text-slate-400 font-medium normal-case tracking-normal">(Opcional)</span></label>
                                 <input 
                                   name="address" 
                                   placeholder="Cidade ou bairro"
                                   value={formData.address}
-                                  className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 bg-surface dark:bg-slate-800 text-text-main dark:text-white rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all"
+                                  className="w-full px-5 py-4 text-base font-bold border-2 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white rounded-2xl focus:ring-4 focus:ring-primary/10 focus:border-primary focus:bg-white dark:focus:bg-slate-900 outline-none transition-all placeholder:text-slate-300 dark:placeholder:text-slate-600 shadow-inner"
                                   onChange={handleChange}
                                 />
                             </div>
@@ -208,37 +214,37 @@ const CreateWork: React.FC = () => {
             // LEVEL 1: MACRO SELECTION (Construir vs Reformar)
             if (!workCategory) {
                 return (
-                    <div className="animate-in fade-in slide-in-from-right-4 duration-300">
-                        <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 shadow-sm border border-slate-100 dark:border-slate-800 text-center">
-                            <h2 className="text-xl font-bold text-primary dark:text-white mb-2">O que você vai fazer?</h2>
-                            <p className="text-text-muted dark:text-slate-400 mb-8 text-sm">Escolha a opção que melhor descreve o momento.</p>
+                    <div className="animate-in fade-in slide-in-from-right-8 duration-500">
+                        <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 md:p-8 shadow-2xl shadow-slate-200/50 dark:shadow-black/50 border border-slate-100 dark:border-slate-800 text-center">
+                            <h2 className="text-2xl font-black text-primary dark:text-white mb-2 tracking-tight">Tipo de Projeto</h2>
+                            <p className="text-slate-500 dark:text-slate-400 mb-8 font-medium">Escolha a categoria principal da sua obra.</p>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <button
                                     type="button"
                                     onClick={() => handleCategorySelect('CONSTRUCTION')}
-                                    className="p-8 rounded-2xl border-2 border-slate-100 dark:border-slate-700 hover:border-primary hover:bg-slate-50 dark:hover:bg-slate-800 transition-all flex flex-col items-center gap-4 group"
+                                    className="relative p-8 rounded-3xl border-2 border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:border-secondary hover:bg-white dark:hover:bg-slate-800 hover:shadow-2xl hover:shadow-orange-500/10 hover:-translate-y-1 transition-all duration-300 flex flex-col items-center gap-5 group"
                                 >
-                                    <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center text-primary text-3xl group-hover:scale-110 transition-transform">
+                                    <div className="w-20 h-20 rounded-full bg-primary text-white flex items-center justify-center text-3xl shadow-xl shadow-primary/30 group-hover:scale-110 transition-transform duration-500">
                                         <i className="fa-solid fa-trowel-bricks"></i>
                                     </div>
                                     <div>
-                                        <h3 className="font-bold text-lg text-text-main dark:text-white">Construção</h3>
-                                        <p className="text-sm text-text-muted dark:text-slate-400">Vou construir do zero (terreno vazio).</p>
+                                        <h3 className="font-black text-xl text-primary dark:text-white mb-1">Construção</h3>
+                                        <p className="text-sm font-bold text-slate-400 group-hover:text-slate-500">Do zero (Terreno Vazio)</p>
                                     </div>
                                 </button>
 
                                 <button
                                     type="button"
                                     onClick={() => handleCategorySelect('RENOVATION')}
-                                    className="p-8 rounded-2xl border-2 border-slate-100 dark:border-slate-700 hover:border-primary hover:bg-slate-50 dark:hover:bg-slate-800 transition-all flex flex-col items-center gap-4 group"
+                                    className="relative p-8 rounded-3xl border-2 border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:border-secondary hover:bg-white dark:hover:bg-slate-800 hover:shadow-2xl hover:shadow-orange-500/10 hover:-translate-y-1 transition-all duration-300 flex flex-col items-center gap-5 group"
                                 >
-                                    <div className="w-16 h-16 rounded-full bg-secondary/10 flex items-center justify-center text-secondary text-3xl group-hover:scale-110 transition-transform">
+                                    <div className="w-20 h-20 rounded-full bg-secondary text-white flex items-center justify-center text-3xl shadow-xl shadow-secondary/30 group-hover:scale-110 transition-transform duration-500">
                                         <i className="fa-solid fa-paint-roller"></i>
                                     </div>
                                     <div>
-                                        <h3 className="font-bold text-lg text-text-main dark:text-white">Reforma</h3>
-                                        <p className="text-sm text-text-muted dark:text-slate-400">Vou reformar ou melhorar um imóvel.</p>
+                                        <h3 className="font-black text-xl text-primary dark:text-white mb-1">Reforma</h3>
+                                        <p className="text-sm font-bold text-slate-400 group-hover:text-slate-500">Melhoria ou Reparo</p>
                                     </div>
                                 </button>
                             </div>
@@ -249,39 +255,44 @@ const CreateWork: React.FC = () => {
 
             // LEVEL 2: SPECIFIC SELECTION
             return (
-                <div className="animate-in fade-in slide-in-from-right-4 duration-300">
-                    <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 shadow-sm border border-slate-100 dark:border-slate-800">
-                        <div className="flex items-center justify-between mb-4">
+                <div className="animate-in fade-in slide-in-from-right-8 duration-500">
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 md:p-8 shadow-2xl shadow-slate-200/50 dark:shadow-black/50 border border-slate-100 dark:border-slate-800">
+                        <div className="flex items-center justify-between mb-6 border-b border-slate-100 dark:border-slate-800 pb-4">
                             <div>
-                                <h2 className="text-xl font-bold text-primary dark:text-white mb-1">
-                                    {workCategory === 'CONSTRUCTION' ? 'Detalhes da Construção' : 'O que vamos reformar?'}
+                                <h2 className="text-2xl font-black text-primary dark:text-white mb-1 tracking-tight">
+                                    {workCategory === 'CONSTRUCTION' ? 'Estrutura' : 'Tipo de Reforma'}
                                 </h2>
-                                <p className="text-text-muted dark:text-slate-400 text-sm">
-                                    {workCategory === 'CONSTRUCTION' ? 'Precisamos de detalhes para calcular os materiais.' : 'Selecione a opção mais parecida.'}
+                                <p className="text-slate-500 dark:text-slate-400 text-sm font-bold">
+                                    {workCategory === 'CONSTRUCTION' ? 'Detalhe os cômodos para o cálculo.' : 'Selecione o modelo mais próximo.'}
                                 </p>
                             </div>
-                            <button onClick={() => setWorkCategory(null)} className="text-xs font-bold text-primary hover:underline">
-                                Mudar tipo
+                            <button onClick={() => setWorkCategory(null)} className="text-xs font-black uppercase tracking-wider text-secondary hover:underline bg-secondary/5 px-3 py-1.5 rounded-lg transition-colors">
+                                <i className="fa-solid fa-rotate-left mr-1"></i> Mudar
                             </button>
                         </div>
 
                         {/* If Renovation, show Grid of options */}
                         {workCategory === 'RENOVATION' && (
-                             <div className="grid grid-cols-2 gap-3 mb-6">
+                             <div className="grid grid-cols-2 gap-4 mb-8">
                                 {WORK_TEMPLATES.filter(t => t.id !== 'CONSTRUCAO').map(template => (
                                     <button
                                         key={template.id}
                                         type="button"
                                         onClick={() => setSelectedTemplateId(template.id)}
-                                        className={`p-4 rounded-xl border text-left transition-all relative ${
+                                        className={`p-5 rounded-2xl border-2 text-left transition-all relative flex flex-col gap-3 group ${
                                             selectedTemplateId === template.id 
-                                            ? 'border-primary bg-primary/5 dark:bg-primary/20 ring-1 ring-primary' 
-                                            : 'border-slate-200 dark:border-slate-700 hover:border-primary/50'
+                                            ? 'border-secondary bg-secondary/5 ring-2 ring-secondary/20 shadow-lg' 
+                                            : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-secondary/50 hover:shadow-lg'
                                         }`}
                                     >
-                                        <i className={`fa-solid ${template.icon} text-2xl mb-2 ${selectedTemplateId === template.id ? 'text-primary' : 'text-slate-400'}`}></i>
-                                        <h3 className={`font-bold text-sm ${selectedTemplateId === template.id ? 'text-primary' : 'text-text-main dark:text-white'}`}>{template.label}</h3>
-                                        {selectedTemplateId === template.id && <i className="fa-solid fa-circle-check absolute top-2 right-2 text-primary"></i>}
+                                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl transition-colors ${selectedTemplateId === template.id ? 'bg-secondary text-white shadow-md' : 'bg-slate-100 dark:bg-slate-700 text-slate-400 group-hover:text-secondary'}`}>
+                                            <i className={`fa-solid ${template.icon}`}></i>
+                                        </div>
+                                        <div>
+                                            <h3 className={`font-black text-sm mb-1 ${selectedTemplateId === template.id ? 'text-primary dark:text-white' : 'text-slate-600 dark:text-slate-300'}`}>{template.label}</h3>
+                                            <p className="text-[10px] font-bold text-slate-400 leading-tight">{template.description}</p>
+                                        </div>
+                                        {selectedTemplateId === template.id && <div className="absolute top-3 right-3 text-secondary"><i className="fa-solid fa-circle-check text-xl"></i></div>}
                                     </button>
                                 ))}
                             </div>
@@ -289,59 +300,64 @@ const CreateWork: React.FC = () => {
                         
                         {/* Enhanced Details Form (For Construction OR Full Renovation) */}
                         {needsDetailedInputs && (
-                             <div className="mb-6 space-y-4 animate-in fade-in slide-in-from-bottom-2">
+                             <div className="mb-8 space-y-6 animate-in fade-in slide-in-from-bottom-2">
                                  {workCategory === 'CONSTRUCTION' && (
-                                     <div className="p-4 bg-surface dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
-                                         <div className="flex items-center gap-3 mb-4">
-                                             <i className="fa-solid fa-layer-group text-2xl text-secondary"></i>
+                                     <div className="p-5 bg-gradient-to-r from-slate-50 to-white dark:from-slate-800 dark:to-slate-900 rounded-2xl border-2 border-slate-200 dark:border-slate-700 shadow-sm">
+                                         <div className="flex items-center gap-4 mb-4">
+                                             <div className="w-10 h-10 rounded-lg bg-secondary/10 flex items-center justify-center text-secondary text-xl">
+                                                <i className="fa-solid fa-layer-group"></i>
+                                             </div>
                                              <div>
-                                                 <h3 className="font-bold text-text-main dark:text-white text-sm">Estrutura Principal</h3>
-                                                 <p className="text-xs text-text-muted dark:text-slate-400">Defina os pavimentos.</p>
+                                                 <h3 className="font-black text-slate-800 dark:text-white text-sm uppercase tracking-wide">Pavimentos</h3>
+                                                 <p className="text-xs font-bold text-slate-400">Quantos andares terá a obra?</p>
                                              </div>
                                          </div>
-                                         <div className="flex items-center justify-between">
-                                             <label className="text-xs font-bold text-text-muted uppercase">Quantos Andares?</label>
-                                             <div className="flex items-center gap-2">
-                                                 <button type="button" onClick={() => handleCounter('floors', false)} className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-700 text-text-main dark:text-white font-bold hover:bg-slate-200 transition-colors">-</button>
-                                                 <span className="w-8 text-center font-bold text-primary dark:text-white">{formData.floors}</span>
-                                                 <button type="button" onClick={() => handleCounter('floors', true)} className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-700 text-text-main dark:text-white font-bold hover:bg-slate-200 transition-colors">+</button>
+                                         <div className="flex items-center justify-between bg-white dark:bg-slate-800 p-2 rounded-xl border border-slate-200 dark:border-slate-700">
+                                             <label className="text-xs font-black text-slate-500 uppercase ml-3">Quantidade</label>
+                                             <div className="flex items-center gap-3">
+                                                 <button type="button" onClick={() => handleCounter('floors', false)} className="w-10 h-10 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-white font-bold hover:bg-slate-200 transition-colors text-lg">-</button>
+                                                 <span className="w-8 text-center font-black text-xl text-primary dark:text-white">{formData.floors}</span>
+                                                 <button type="button" onClick={() => handleCounter('floors', true)} className="w-10 h-10 rounded-lg bg-primary text-white font-bold hover:bg-primary-light transition-colors text-lg shadow-md shadow-primary/20">+</button>
                                              </div>
                                          </div>
                                      </div>
                                  )}
 
-                                 <div className="grid grid-cols-2 gap-3">
+                                 <div className="grid grid-cols-2 gap-4">
                                      <CounterInput label="Quartos" field="bedrooms" icon="fa-bed" />
                                      <CounterInput label="Banheiros" field="bathrooms" icon="fa-bath" />
                                      <CounterInput label="Cozinhas" field="kitchens" icon="fa-kitchen-set" />
                                      <CounterInput label="Salas" field="livingRooms" icon="fa-couch" />
                                  </div>
 
-                                 <div className="p-4 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 flex items-center justify-between cursor-pointer" onClick={() => setFormData({...formData, hasLeisureArea: !formData.hasLeisureArea})}>
-                                     <div className="flex items-center gap-3">
-                                         <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${formData.hasLeisureArea ? 'bg-secondary text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}>
+                                 <div 
+                                    className={`p-4 rounded-2xl border-2 cursor-pointer transition-all flex items-center justify-between group ${formData.hasLeisureArea ? 'bg-secondary/5 border-secondary shadow-md' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:border-secondary/50'}`} 
+                                    onClick={() => setFormData({...formData, hasLeisureArea: !formData.hasLeisureArea})}
+                                 >
+                                     <div className="flex items-center gap-4">
+                                         <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl transition-colors ${formData.hasLeisureArea ? 'bg-secondary text-white shadow-md' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}>
                                              <i className="fa-solid fa-umbrella-beach"></i>
                                          </div>
                                          <div>
-                                             <h3 className="font-bold text-text-main dark:text-white text-sm">Área de Lazer</h3>
-                                             <p className="text-xs text-text-muted">Churrasqueira / Piscina</p>
+                                             <h3 className={`font-black text-sm uppercase tracking-wide ${formData.hasLeisureArea ? 'text-primary dark:text-white' : 'text-slate-600 dark:text-slate-300'}`}>Área de Lazer</h3>
+                                             <p className="text-xs font-bold text-slate-400">Piscina ou Churrasqueira</p>
                                          </div>
                                      </div>
-                                     <div className={`w-12 h-6 rounded-full p-1 transition-colors ${formData.hasLeisureArea ? 'bg-secondary' : 'bg-slate-200 dark:bg-slate-700'}`}>
-                                         <div className={`w-4 h-4 rounded-full bg-white transition-transform ${formData.hasLeisureArea ? 'translate-x-6' : ''}`}></div>
+                                     <div className={`w-14 h-8 rounded-full p-1 transition-colors duration-300 ${formData.hasLeisureArea ? 'bg-secondary' : 'bg-slate-200 dark:bg-slate-700'}`}>
+                                         <div className={`w-6 h-6 rounded-full bg-white shadow-sm transition-transform duration-300 ${formData.hasLeisureArea ? 'translate-x-6' : ''}`}></div>
                                      </div>
                                  </div>
                              </div>
                         )}
 
                         <div>
-                            <label className="block text-xs font-bold text-text-muted uppercase mb-1">Quando vou começar?</label>
+                            <label className="block text-xs font-black text-slate-700 dark:text-slate-300 uppercase mb-2 tracking-widest pl-1">Data de Início</label>
                             <input 
                                 name="startDate" 
                                 type="date" 
                                 required 
                                 value={formData.startDate}
-                                className="w-full px-4 py-3 border border-slate-200 dark:border-slate-700 bg-surface dark:bg-slate-800 text-text-body dark:text-white rounded-xl focus:ring-2 focus:ring-primary outline-none transition-all"
+                                className="w-full px-5 py-4 text-base font-bold border-2 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white rounded-2xl focus:ring-4 focus:ring-primary/10 focus:border-primary focus:bg-white dark:focus:bg-slate-900 outline-none transition-all shadow-inner"
                                 onChange={handleChange}
                             />
                         </div>
@@ -350,40 +366,47 @@ const CreateWork: React.FC = () => {
             );
         case 3:
             return (
-                <div className="animate-in fade-in slide-in-from-right-4 duration-300">
-                    <div className="bg-white dark:bg-slate-900 rounded-2xl p-6 shadow-sm border border-slate-100 dark:border-slate-800">
-                        <h2 className="text-xl font-bold text-primary dark:text-white mb-1">O que vamos fazer?</h2>
-                        <p className="text-text-muted dark:text-slate-400 mb-6 text-sm">Confira as etapas abaixo.</p>
+                <div className="animate-in fade-in slide-in-from-right-8 duration-500">
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 md:p-8 shadow-2xl shadow-slate-200/50 dark:shadow-black/50 border border-slate-100 dark:border-slate-800">
+                        <h2 className="text-2xl font-black text-primary dark:text-white mb-2 tracking-tight">Cálculo Virtual</h2>
+                        <p className="text-slate-500 dark:text-slate-400 mb-8 font-medium">Nosso sistema está pronto para gerar seu plano.</p>
 
-                        <div className="space-y-4">
-                            <div className="bg-blue-50 dark:bg-blue-900/20 p-6 rounded-xl border border-blue-100 dark:border-blue-900 text-center">
-                                <div className="w-16 h-16 bg-blue-100 dark:bg-blue-800 text-blue-600 dark:text-blue-200 rounded-full flex items-center justify-center mx-auto mb-4">
-                                    <i className="fa-solid fa-wand-magic-sparkles text-2xl"></i>
-                                </div>
-                                <h3 className="font-bold text-blue-900 dark:text-blue-100 mb-2">Engenheiro Virtual</h3>
-                                <p className="text-sm text-blue-800 dark:text-blue-200 leading-relaxed mb-4">
-                                    Personalizando materiais e cronograma para:
-                                </p>
-                                <div className="flex flex-wrap justify-center gap-2">
-                                    {needsDetailedInputs ? (
-                                        <>
-                                            {workCategory === 'CONSTRUCTION' && <span className="bg-white/50 dark:bg-black/20 text-blue-800 dark:text-blue-200 text-xs font-bold px-3 py-1 rounded-full">{formData.floors} Andares</span>}
-                                            <span className="bg-white/50 dark:bg-black/20 text-blue-800 dark:text-blue-200 text-xs font-bold px-3 py-1 rounded-full">{formData.bedrooms} Quartos</span>
-                                            <span className="bg-white/50 dark:bg-black/20 text-blue-800 dark:text-blue-200 text-xs font-bold px-3 py-1 rounded-full">{formData.bathrooms} Banheiros</span>
-                                            {formData.hasLeisureArea && <span className="bg-white/50 dark:bg-black/20 text-blue-800 dark:text-blue-200 text-xs font-bold px-3 py-1 rounded-full">Lazer</span>}
-                                        </>
-                                    ) : (
-                                        <span className="bg-white/50 dark:bg-black/20 text-blue-800 dark:text-blue-200 text-xs font-bold px-3 py-1 rounded-full">{selectedTemplate?.label} ({formData.area} m²)</span>
-                                    )}
+                        <div className="space-y-6">
+                            {/* The "Magic" Box */}
+                            <div className="relative overflow-hidden bg-gradient-to-br from-blue-600 to-indigo-700 rounded-3xl p-8 text-white shadow-xl shadow-blue-500/20 group">
+                                <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 group-hover:bg-white/20 transition-colors"></div>
+                                <div className="absolute bottom-0 left-0 w-32 h-32 bg-black/10 rounded-full blur-2xl translate-y-1/2 -translate-x-1/2"></div>
+                                
+                                <div className="relative z-10 flex flex-col items-center text-center">
+                                    <div className="w-20 h-20 bg-white/20 backdrop-blur-md border border-white/20 rounded-full flex items-center justify-center mb-4 shadow-lg animate-pulse">
+                                        <i className="fa-solid fa-wand-magic-sparkles text-3xl text-white"></i>
+                                    </div>
+                                    <h3 className="text-xl font-black mb-2 tracking-wide">Engenheiro Virtual</h3>
+                                    <p className="text-blue-100 text-sm font-medium mb-6 max-w-xs mx-auto">
+                                        Vou criar automaticamente o cronograma físico-financeiro e a lista de materiais para:
+                                    </p>
+                                    
+                                    <div className="flex flex-wrap justify-center gap-2">
+                                        {needsDetailedInputs ? (
+                                            <>
+                                                {workCategory === 'CONSTRUCTION' && <span className="bg-white/20 backdrop-blur-sm border border-white/10 text-white text-xs font-bold px-4 py-1.5 rounded-full shadow-sm">{formData.floors} Pavimentos</span>}
+                                                <span className="bg-white/20 backdrop-blur-sm border border-white/10 text-white text-xs font-bold px-4 py-1.5 rounded-full shadow-sm">{formData.bedrooms} Quartos</span>
+                                                <span className="bg-white/20 backdrop-blur-sm border border-white/10 text-white text-xs font-bold px-4 py-1.5 rounded-full shadow-sm">{formData.bathrooms} Banheiros</span>
+                                                {formData.hasLeisureArea && <span className="bg-white/20 backdrop-blur-sm border border-white/10 text-white text-xs font-bold px-4 py-1.5 rounded-full shadow-sm">Área de Lazer</span>}
+                                            </>
+                                        ) : (
+                                            <span className="bg-white/20 backdrop-blur-sm border border-white/10 text-white text-xs font-bold px-4 py-1.5 rounded-full shadow-sm">{selectedTemplate?.label} ({formData.area} m²)</span>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
-                            <p className="text-center text-xs text-text-muted">
-                                Calcularemos automaticamente a lista de materiais necessária para este tipo de obra.
-                            </p>
-                        </div>
-                        
-                        <div className="text-center text-xs text-text-muted mt-4">
-                            <p>Fique tranquilo, você pode ajustar tudo depois.</p>
+
+                            <div className="text-center bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl border border-slate-100 dark:border-slate-800">
+                                <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Nota</p>
+                                <p className="text-sm font-bold text-slate-600 dark:text-slate-300">
+                                    Você poderá ajustar quantidades e prazos manualmente depois.
+                                </p>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -393,26 +416,30 @@ const CreateWork: React.FC = () => {
   };
 
   return (
-    <div className="max-w-2xl mx-auto pb-12 pt-4 px-4 font-sans">
-      <button onClick={() => navigate('/')} className="mb-4 text-text-muted hover:text-primary font-bold flex items-center text-sm transition-colors">
-        <i className="fa-solid fa-arrow-left mr-2"></i> Cancelar
+    <div className="max-w-2xl mx-auto pb-12 pt-6 px-4 font-sans">
+      <button onClick={() => navigate('/')} className="mb-6 text-slate-400 hover:text-primary font-black uppercase text-xs tracking-widest flex items-center gap-2 transition-colors">
+        <i className="fa-solid fa-arrow-left"></i> Cancelar
       </button>
       
-      <div className="mb-6">
-          <div className="flex items-center justify-between mb-2">
-            <h1 className="text-2xl font-bold text-text-main dark:text-white">Começar Nova Obra</h1>
-            <span className="text-sm font-bold text-primary bg-primary/10 px-3 py-1 rounded-full">Passo {currentStep} de {totalSteps}</span>
+      <div className="mb-8">
+          <div className="flex flex-col gap-2 mb-4">
+            <span className="w-fit px-3 py-1 rounded-full bg-secondary/10 text-secondary text-[10px] font-black uppercase tracking-widest border border-secondary/20">
+                Passo {currentStep} de {totalSteps}
+            </span>
+            <h1 className="text-3xl font-black text-slate-800 dark:text-white tracking-tight">
+                {currentStep === 1 ? 'Nova Obra' : currentStep === 2 ? 'Configuração' : 'Resumo'}
+            </h1>
           </div>
           
-          <div className="w-full bg-slate-200 dark:bg-slate-800 rounded-full h-2">
+          <div className="w-full bg-slate-200 dark:bg-slate-800 rounded-full h-2.5 overflow-hidden">
              <div 
-                className="bg-primary h-2 rounded-full transition-all duration-300" 
+                className="bg-gradient-to-r from-secondary to-orange-500 h-full rounded-full transition-all duration-500 ease-out shadow-[0_0_10px_rgba(217,119,6,0.5)]" 
                 style={{ width: `${(currentStep / totalSteps) * 100}%` }}
              ></div>
           </div>
       </div>
       
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-8">
         
         {renderStepContent()}
 
@@ -422,7 +449,7 @@ const CreateWork: React.FC = () => {
                 type="button" 
                 onClick={prevStep}
                 disabled={loading}
-                className="flex-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-text-main dark:text-white font-bold py-4 rounded-xl transition-all hover:bg-slate-50 dark:hover:bg-slate-700 disabled:opacity-50"
+                className="flex-1 bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-black text-sm uppercase tracking-wide py-5 rounded-2xl transition-all hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-slate-300 disabled:opacity-50 shadow-sm"
              >
                 Voltar
              </button>
@@ -433,7 +460,7 @@ const CreateWork: React.FC = () => {
                  <button 
                     type="button" 
                     onClick={nextStep}
-                    className="flex-1 bg-primary hover:bg-primary-dark text-white font-bold py-4 rounded-xl transition-all shadow-lg shadow-primary/20 flex items-center justify-center gap-2"
+                    className="flex-1 bg-primary hover:bg-primary-dark text-white font-black text-sm uppercase tracking-wide py-5 rounded-2xl transition-all shadow-xl shadow-primary/30 flex items-center justify-center gap-3 hover:-translate-y-1 active:translate-y-0"
                  >
                     Continuar <i className="fa-solid fa-arrow-right"></i>
                  </button>
@@ -441,7 +468,7 @@ const CreateWork: React.FC = () => {
                 <button 
                     type="submit" 
                     disabled={loading}
-                    className="flex-1 bg-success hover:bg-success-dark text-white font-bold py-4 rounded-xl transition-all shadow-lg shadow-success/20 flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-wait"
+                    className="flex-1 bg-green-600 hover:bg-green-700 text-white font-black text-sm uppercase tracking-wide py-5 rounded-2xl transition-all shadow-xl shadow-green-600/30 flex items-center justify-center gap-3 hover:-translate-y-1 active:translate-y-0 disabled:opacity-70 disabled:cursor-wait"
                 >
                     {loading ? (
                         <>
@@ -449,7 +476,7 @@ const CreateWork: React.FC = () => {
                         </>
                     ) : (
                         <>
-                           <i className="fa-solid fa-check"></i> Criar minha obra!
+                           <i className="fa-solid fa-check"></i> Gerar Obra
                         </>
                     )}
                 </button>
