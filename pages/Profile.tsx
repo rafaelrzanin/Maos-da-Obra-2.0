@@ -13,7 +13,6 @@ const Profile: React.FC = () => {
   const [whatsapp, setWhatsapp] = useState('');
   
   // Password State
-  const [currentPass, setCurrentPass] = useState(''); // Not used in this simplified update flow but usually required
   const [newPass, setNewPass] = useState('');
   const [confirmPass, setConfirmPass] = useState('');
 
