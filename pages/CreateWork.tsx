@@ -33,18 +33,11 @@ const CreateWork: React.FC = () => {
   // Template Logic
   const [workCategory, setWorkCategory] = useState<'CONSTRUCTION' | 'RENOVATION' | null>(null);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
-  const [suggestedSteps, setSuggestedSteps] = useState<{name: string, checked: boolean}[]>([]);
+  
+  // Helper to determine if we need detailed room inputs
+  const needsDetailedInputs = workCategory === 'CONSTRUCTION' || selectedTemplateId === 'REFORMA_APTO';
 
   const selectedTemplate = WORK_TEMPLATES.find(t => t.id === selectedTemplateId);
-
-  // Update steps when template changes
-  useEffect(() => {
-    if (selectedTemplate) {
-      setSuggestedSteps(
-        selectedTemplate.includedSteps.map(step => ({ name: step, checked: true }))
-      );
-    }
-  }, [selectedTemplateId]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
@@ -59,12 +52,6 @@ const CreateWork: React.FC = () => {
           if (field === 'floors' && newVal < 1) return prev;
           return { ...prev, [field]: String(newVal) };
       });
-  };
-
-  const handleStepToggle = (index: number) => {
-    const newSteps = [...suggestedSteps];
-    newSteps[index].checked = !newSteps[index].checked;
-    setSuggestedSteps(newSteps);
   };
 
   const validateStep = (step: number) => {
@@ -109,8 +96,6 @@ const CreateWork: React.FC = () => {
 
     setLoading(true);
 
-    const isConstruction = workCategory === 'CONSTRUCTION';
-
     // Calculate end date based on template duration
     const duration = selectedTemplate?.defaultDurationDays || 90;
     const start = new Date(formData.startDate);
@@ -118,7 +103,8 @@ const CreateWork: React.FC = () => {
     end.setDate(end.getDate() + duration);
 
     try {
-        // 1. CREATE WORK (If Construction, DB Service handles Steps & Materials generation)
+        // UNIFIED CREATION: Both Construction and Renovation now use the smart generator
+        // We pass 'selectedTemplateId' so the DB service knows which materials/steps to generate.
         const newWork = await dbService.createWork({
           userId: user.id,
           name: formData.name,
@@ -134,34 +120,7 @@ const CreateWork: React.FC = () => {
           livingRooms: Number(formData.livingRooms),
           hasLeisureArea: formData.hasLeisureArea,
           notes: selectedTemplate?.label || ''
-        }, isConstruction); 
-
-        // 2. ADD STEPS MANUALLY **ONLY IF RENOVATION**
-        // If it's construction, the service already generated the intelligent plan.
-        if (!isConstruction) {
-            const finalSteps = suggestedSteps.filter(s => s.checked).map(s => s.name);
-            const stepDuration = Math.max(2, Math.floor(duration / finalSteps.length));
-            
-            let currentOffset = 0;
-            
-            for (const stepName of finalSteps) {
-                const sDate = new Date(start);
-                sDate.setDate(sDate.getDate() + currentOffset);
-                
-                const eDate = new Date(sDate);
-                eDate.setDate(eDate.getDate() + stepDuration);
-
-                await dbService.addStep({
-                    workId: newWork.id,
-                    name: stepName,
-                    startDate: sDate.toISOString().split('T')[0],
-                    endDate: eDate.toISOString().split('T')[0],
-                    status: StepStatus.NOT_STARTED
-                });
-                
-                currentOffset += (stepDuration - 1); 
-            }
-        }
+        }, selectedTemplateId); // Pass the Template ID directly
 
         navigate(`/work/${newWork.id}`);
     } catch (error) {
@@ -329,26 +288,28 @@ const CreateWork: React.FC = () => {
                             </div>
                         )}
                         
-                        {/* If Construction, show Enhanced Details Form */}
-                        {workCategory === 'CONSTRUCTION' && (
-                             <div className="mb-6 space-y-4">
-                                 <div className="p-4 bg-surface dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
-                                     <div className="flex items-center gap-3 mb-4">
-                                         <i className="fa-solid fa-layer-group text-2xl text-secondary"></i>
-                                         <div>
-                                             <h3 className="font-bold text-text-main dark:text-white text-sm">Estrutura Principal</h3>
-                                             <p className="text-xs text-text-muted dark:text-slate-400">Defina os pavimentos.</p>
+                        {/* Enhanced Details Form (For Construction OR Full Renovation) */}
+                        {needsDetailedInputs && (
+                             <div className="mb-6 space-y-4 animate-in fade-in slide-in-from-bottom-2">
+                                 {workCategory === 'CONSTRUCTION' && (
+                                     <div className="p-4 bg-surface dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
+                                         <div className="flex items-center gap-3 mb-4">
+                                             <i className="fa-solid fa-layer-group text-2xl text-secondary"></i>
+                                             <div>
+                                                 <h3 className="font-bold text-text-main dark:text-white text-sm">Estrutura Principal</h3>
+                                                 <p className="text-xs text-text-muted dark:text-slate-400">Defina os pavimentos.</p>
+                                             </div>
+                                         </div>
+                                         <div className="flex items-center justify-between">
+                                             <label className="text-xs font-bold text-text-muted uppercase">Quantos Andares?</label>
+                                             <div className="flex items-center gap-2">
+                                                 <button type="button" onClick={() => handleCounter('floors', false)} className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-700 text-text-main dark:text-white font-bold hover:bg-slate-200 transition-colors">-</button>
+                                                 <span className="w-8 text-center font-bold text-primary dark:text-white">{formData.floors}</span>
+                                                 <button type="button" onClick={() => handleCounter('floors', true)} className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-700 text-text-main dark:text-white font-bold hover:bg-slate-200 transition-colors">+</button>
+                                             </div>
                                          </div>
                                      </div>
-                                     <div className="flex items-center justify-between">
-                                         <label className="text-xs font-bold text-text-muted uppercase">Quantos Andares?</label>
-                                         <div className="flex items-center gap-2">
-                                             <button type="button" onClick={() => handleCounter('floors', false)} className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-700 text-text-main dark:text-white font-bold hover:bg-slate-200 transition-colors">-</button>
-                                             <span className="w-8 text-center font-bold text-primary dark:text-white">{formData.floors}</span>
-                                             <button type="button" onClick={() => handleCounter('floors', true)} className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-700 text-text-main dark:text-white font-bold hover:bg-slate-200 transition-colors">+</button>
-                                         </div>
-                                     </div>
-                                 </div>
+                                 )}
 
                                  <div className="grid grid-cols-2 gap-3">
                                      <CounterInput label="Quartos" field="bedrooms" icon="fa-bed" />
@@ -395,47 +356,32 @@ const CreateWork: React.FC = () => {
                         <h2 className="text-xl font-bold text-primary dark:text-white mb-1">O que vamos fazer?</h2>
                         <p className="text-text-muted dark:text-slate-400 mb-6 text-sm">Confira as etapas abaixo.</p>
 
-                        {workCategory === 'RENOVATION' && (
-                             <div className="space-y-2 mb-6 max-h-[400px] overflow-y-auto pr-2">
-                               {suggestedSteps.map((step, idx) => (
-                                   <label key={idx} className={`flex items-center p-3 rounded-xl border cursor-pointer transition-all ${step.checked ? 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700' : 'opacity-50 border-transparent'}`}>
-                                       <div className={`w-6 h-6 rounded-md border flex items-center justify-center mr-3 transition-colors ${step.checked ? 'bg-primary border-primary text-white' : 'bg-white dark:bg-slate-900 border-slate-300'}`}>
-                                           {step.checked && <i className="fa-solid fa-check text-xs"></i>}
-                                       </div>
-                                       <input 
-                                          type="checkbox" 
-                                          className="hidden" 
-                                          checked={step.checked} 
-                                          onChange={() => handleStepToggle(idx)}
-                                       />
-                                       <span className="text-sm font-medium text-text-main dark:text-white">{step.name}</span>
-                                   </label>
-                               ))}
-                            </div>
-                        )}
-                        
-                        {workCategory === 'CONSTRUCTION' && (
-                            <div className="space-y-4">
-                                <div className="bg-blue-50 dark:bg-blue-900/20 p-6 rounded-xl border border-blue-100 dark:border-blue-900 text-center">
-                                    <div className="w-16 h-16 bg-blue-100 dark:bg-blue-800 text-blue-600 dark:text-blue-200 rounded-full flex items-center justify-center mx-auto mb-4">
-                                        <i className="fa-solid fa-wand-magic-sparkles text-2xl"></i>
-                                    </div>
-                                    <h3 className="font-bold text-blue-900 dark:text-blue-100 mb-2">Engenheiro Virtual</h3>
-                                    <p className="text-sm text-blue-800 dark:text-blue-200 leading-relaxed mb-4">
-                                        Personalizando cronograma para:
-                                    </p>
-                                    <div className="flex flex-wrap justify-center gap-2">
-                                        <span className="bg-white/50 dark:bg-black/20 text-blue-800 dark:text-blue-200 text-xs font-bold px-3 py-1 rounded-full">{formData.floors} Andares</span>
-                                        <span className="bg-white/50 dark:bg-black/20 text-blue-800 dark:text-blue-200 text-xs font-bold px-3 py-1 rounded-full">{formData.bedrooms} Quartos</span>
-                                        <span className="bg-white/50 dark:bg-black/20 text-blue-800 dark:text-blue-200 text-xs font-bold px-3 py-1 rounded-full">{formData.bathrooms} Banheiros</span>
-                                        {formData.hasLeisureArea && <span className="bg-white/50 dark:bg-black/20 text-blue-800 dark:text-blue-200 text-xs font-bold px-3 py-1 rounded-full">Lazer</span>}
-                                    </div>
+                        <div className="space-y-4">
+                            <div className="bg-blue-50 dark:bg-blue-900/20 p-6 rounded-xl border border-blue-100 dark:border-blue-900 text-center">
+                                <div className="w-16 h-16 bg-blue-100 dark:bg-blue-800 text-blue-600 dark:text-blue-200 rounded-full flex items-center justify-center mx-auto mb-4">
+                                    <i className="fa-solid fa-wand-magic-sparkles text-2xl"></i>
                                 </div>
-                                <p className="text-center text-xs text-text-muted">
-                                    Vamos calcular materiais hidráulicos, elétricos e de acabamento com maior precisão baseada nesses dados.
+                                <h3 className="font-bold text-blue-900 dark:text-blue-100 mb-2">Engenheiro Virtual</h3>
+                                <p className="text-sm text-blue-800 dark:text-blue-200 leading-relaxed mb-4">
+                                    Personalizando materiais e cronograma para:
                                 </p>
+                                <div className="flex flex-wrap justify-center gap-2">
+                                    {needsDetailedInputs ? (
+                                        <>
+                                            {workCategory === 'CONSTRUCTION' && <span className="bg-white/50 dark:bg-black/20 text-blue-800 dark:text-blue-200 text-xs font-bold px-3 py-1 rounded-full">{formData.floors} Andares</span>}
+                                            <span className="bg-white/50 dark:bg-black/20 text-blue-800 dark:text-blue-200 text-xs font-bold px-3 py-1 rounded-full">{formData.bedrooms} Quartos</span>
+                                            <span className="bg-white/50 dark:bg-black/20 text-blue-800 dark:text-blue-200 text-xs font-bold px-3 py-1 rounded-full">{formData.bathrooms} Banheiros</span>
+                                            {formData.hasLeisureArea && <span className="bg-white/50 dark:bg-black/20 text-blue-800 dark:text-blue-200 text-xs font-bold px-3 py-1 rounded-full">Lazer</span>}
+                                        </>
+                                    ) : (
+                                        <span className="bg-white/50 dark:bg-black/20 text-blue-800 dark:text-blue-200 text-xs font-bold px-3 py-1 rounded-full">{selectedTemplate?.label} ({formData.area} m²)</span>
+                                    )}
+                                </div>
                             </div>
-                        )}
+                            <p className="text-center text-xs text-text-muted">
+                                Calcularemos automaticamente a lista de materiais necessária para este tipo de obra.
+                            </p>
+                        </div>
                         
                         <div className="text-center text-xs text-text-muted mt-4">
                             <p>Fique tranquilo, você pode ajustar tudo depois.</p>
