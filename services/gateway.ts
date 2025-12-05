@@ -21,7 +21,9 @@ export const gatewayService = {
    * e retorna a URL para redirecionamento.
    */
   checkout: async (user: User, planType: PlanType): Promise<string> => {
-    console.log(`[Gateway] Iniciando checkout para ${user.email} no plano ${planType}...`);
+    // Security: Masked email in logs
+    const maskedEmail = user.email.replace(/(.{2})(.*)(@.*)/, "$1***$3");
+    console.log(`[Gateway] Iniciando checkout para ${maskedEmail} no plano ${planType}...`);
 
     // ---------------------------------------------------------
     // EXEMPLO DE IMPLEMENTAÇÃO REAL (Descomente e ajuste):
@@ -67,8 +69,10 @@ export const gatewayService = {
     // Em produção, isso viria da sua API
     const baseUrl = "https://checkout.pagamento.com"; 
     const planId = GATEWAY_PLAN_IDS[planType];
-    const userEmail = encodeURIComponent(user.email);
+    // In production, avoid sending PII in URL parameters if possible, use backend session ID.
+    // For visual MVP simulation, we use a hash or masked value to represent the user in the URL.
+    const userHash = btoa(user.email); // Base64 just to hide from plain view in this mock
     
-    return `${baseUrl}/pay/${planId}?email=${userEmail}`;
+    return `${baseUrl}/pay/${planId}?u=${userHash}`;
   }
 };
