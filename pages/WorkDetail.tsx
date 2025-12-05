@@ -323,26 +323,26 @@ const ReportsView: React.FC<{ workId: string, onBack: () => void }> = ({ workId,
                      </div>
                      <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm">
                          <h3 className="font-bold mb-4 dark:text-white">Extrato Detalhado</h3>
-                         <table className="w-full text-sm text-left">
-                             <thead>
-                                 <tr className="border-b dark:border-slate-700 text-slate-500">
-                                     <th className="py-2 font-bold">Data</th>
-                                     <th className="py-2 font-bold">Descrição</th>
-                                     <th className="py-2 font-bold">Categoria</th>
-                                     <th className="py-2 font-bold text-right">Valor Pago</th>
-                                 </tr>
-                             </thead>
-                             <tbody>
-                                 {expenses.map(e => (
-                                     <tr key={e.id} className="border-b dark:border-slate-800 last:border-0 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
-                                         <td className="py-3 text-slate-500">{formatDateDisplay(e.date)}</td>
-                                         <td className="py-3 font-medium dark:text-slate-300">{e.description}</td>
-                                         <td className="py-3 text-xs"><span className="bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-md">{e.category}</span></td>
-                                         <td className="py-3 text-right font-bold dark:text-white">R$ {(e.paidAmount || 0).toLocaleString('pt-BR')}</td>
-                                     </tr>
-                                 ))}
-                             </tbody>
-                         </table>
+                         <div className="space-y-3">
+                             {expenses.map(e => (
+                                 <div key={e.id} className="flex flex-col p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/30 border border-slate-100 dark:border-slate-700/50">
+                                     <div className="flex justify-between items-start mb-2">
+                                         <span className="font-bold text-sm text-primary dark:text-white leading-tight">{e.description}</span>
+                                         <span className="font-bold text-sm text-primary dark:text-white ml-4 whitespace-nowrap">R$ {(e.paidAmount || 0).toLocaleString('pt-BR')}</span>
+                                     </div>
+                                     <div className="flex justify-between items-center text-xs">
+                                         <div className="flex items-center gap-2 text-slate-500">
+                                             <i className="fa-regular fa-calendar"></i>
+                                             <span>{formatDateDisplay(e.date)}</span>
+                                         </div>
+                                         <span className="bg-white dark:bg-slate-800 px-2 py-1 rounded-lg border border-slate-100 dark:border-slate-700 text-slate-500 font-medium text-[10px] uppercase tracking-wide">
+                                             {e.category}
+                                         </span>
+                                     </div>
+                                 </div>
+                             ))}
+                             {expenses.length === 0 && <p className="text-slate-400 text-center text-sm py-4">Nenhum lançamento.</p>}
+                         </div>
                      </div>
                  </div>
              )}
