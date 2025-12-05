@@ -131,11 +131,11 @@ const CreateWork: React.FC = () => {
   };
 
   const CounterInput = ({ label, field, icon }: { label: string, field: keyof typeof formData, icon: string }) => (
-      <div className="bg-white dark:bg-slate-900 rounded-2xl border-2 border-slate-200 dark:border-slate-700 p-4 flex flex-col items-center justify-center shadow-lg hover:border-secondary/50 transition-colors group">
+      <div className="bg-white dark:bg-slate-800 rounded-2xl border-2 border-slate-200 dark:border-slate-700 p-4 flex flex-col items-center justify-center shadow-lg hover:border-secondary/50 dark:hover:border-secondary/50 transition-colors group">
           <div className="text-slate-400 mb-2 group-hover:text-secondary transition-colors text-xl"><i className={`fa-solid ${icon}`}></i></div>
           <label className="text-xs font-black text-slate-700 dark:text-slate-300 uppercase mb-3 text-center tracking-wider">{label}</label>
           <div className="flex items-center gap-3 w-full justify-center">
-              <button type="button" onClick={() => handleCounter(field, false)} className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold hover:bg-slate-200 transition-colors border border-slate-200 dark:border-slate-700 shadow-sm text-xl flex items-center justify-center pb-1">-</button>
+              <button type="button" onClick={() => handleCounter(field, false)} className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-200 font-bold hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors border border-slate-200 dark:border-slate-600 shadow-sm text-xl flex items-center justify-center pb-1">-</button>
               <span className="min-w-[2rem] text-center font-black text-primary dark:text-white text-2xl">{formData[field as keyof typeof formData]}</span>
               <button type="button" onClick={() => handleCounter(field, true)} className="w-10 h-10 rounded-xl bg-primary text-white font-bold hover:bg-primary-light transition-colors shadow-md shadow-primary/20 text-xl flex items-center justify-center pb-1">+</button>
           </div>
@@ -223,28 +223,28 @@ const CreateWork: React.FC = () => {
                                 <button
                                     type="button"
                                     onClick={() => handleCategorySelect('CONSTRUCTION')}
-                                    className="relative p-8 rounded-3xl border-2 border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:border-secondary hover:bg-white dark:hover:bg-slate-800 hover:shadow-2xl hover:shadow-orange-500/10 hover:-translate-y-1 transition-all duration-300 flex flex-col items-center gap-5 group"
+                                    className="relative p-8 rounded-3xl border-2 border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:border-secondary hover:bg-white dark:hover:bg-slate-700 hover:shadow-2xl hover:shadow-orange-500/10 hover:-translate-y-1 transition-all duration-300 flex flex-col items-center gap-5 group"
                                 >
                                     <div className="w-20 h-20 rounded-full bg-secondary text-white flex items-center justify-center text-3xl shadow-xl shadow-secondary/30 group-hover:scale-110 transition-transform duration-500">
                                         <i className="fa-solid fa-trowel-bricks"></i>
                                     </div>
                                     <div>
                                         <h3 className="font-black text-xl text-primary dark:text-white mb-1">Construção</h3>
-                                        <p className="text-sm font-bold text-slate-400 group-hover:text-slate-500">Do zero (Terreno Vazio)</p>
+                                        <p className="text-sm font-bold text-slate-400 group-hover:text-slate-500 dark:text-slate-500 dark:group-hover:text-slate-300">Do zero (Terreno Vazio)</p>
                                     </div>
                                 </button>
 
                                 <button
                                     type="button"
                                     onClick={() => handleCategorySelect('RENOVATION')}
-                                    className="relative p-8 rounded-3xl border-2 border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:border-secondary hover:bg-white dark:hover:bg-slate-800 hover:shadow-2xl hover:shadow-orange-500/10 hover:-translate-y-1 transition-all duration-300 flex flex-col items-center gap-5 group"
+                                    className="relative p-8 rounded-3xl border-2 border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:border-secondary hover:bg-white dark:hover:bg-slate-700 hover:shadow-2xl hover:shadow-orange-500/10 hover:-translate-y-1 transition-all duration-300 flex flex-col items-center gap-5 group"
                                 >
                                     <div className="w-20 h-20 rounded-full bg-secondary text-white flex items-center justify-center text-3xl shadow-xl shadow-secondary/30 group-hover:scale-110 transition-transform duration-500">
                                         <i className="fa-solid fa-paint-roller"></i>
                                     </div>
                                     <div>
                                         <h3 className="font-black text-xl text-primary dark:text-white mb-1">Reforma</h3>
-                                        <p className="text-sm font-bold text-slate-400 group-hover:text-slate-500">Melhoria ou Reparo</p>
+                                        <p className="text-sm font-bold text-slate-400 group-hover:text-slate-500 dark:text-slate-500 dark:group-hover:text-slate-300">Melhoria ou Reparo</p>
                                     </div>
                                 </button>
                             </div>
@@ -281,7 +281,7 @@ const CreateWork: React.FC = () => {
                                         onClick={() => setSelectedTemplateId(template.id)}
                                         className={`p-5 rounded-2xl border-2 text-left transition-all relative flex flex-col gap-3 group ${
                                             selectedTemplateId === template.id 
-                                            ? 'border-secondary bg-secondary/5 ring-2 ring-secondary/20 shadow-lg' 
+                                            ? 'border-secondary bg-secondary/5 ring-2 ring-secondary/20 shadow-lg dark:bg-secondary/10' 
                                             : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-secondary/50 hover:shadow-lg'
                                         }`}
                                     >
@@ -331,11 +331,11 @@ const CreateWork: React.FC = () => {
                                  </div>
 
                                  <div 
-                                    className={`p-4 rounded-2xl border-2 cursor-pointer transition-all flex items-center justify-between group ${formData.hasLeisureArea ? 'bg-secondary/5 border-secondary shadow-md' : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-700 hover:border-secondary/50'}`} 
+                                    className={`p-4 rounded-2xl border-2 cursor-pointer transition-all flex items-center justify-between group ${formData.hasLeisureArea ? 'bg-secondary/5 border-secondary shadow-md dark:bg-secondary/10' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:border-secondary/50'}`} 
                                     onClick={() => setFormData({...formData, hasLeisureArea: !formData.hasLeisureArea})}
                                  >
                                      <div className="flex items-center gap-4">
-                                         <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl transition-colors ${formData.hasLeisureArea ? 'bg-secondary text-white shadow-md' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}>
+                                         <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl transition-colors ${formData.hasLeisureArea ? 'bg-secondary text-white shadow-md' : 'bg-slate-100 dark:bg-slate-700 text-slate-400'}`}>
                                              <i className="fa-solid fa-umbrella-beach"></i>
                                          </div>
                                          <div>
@@ -401,7 +401,7 @@ const CreateWork: React.FC = () => {
                                 </div>
                             </div>
 
-                            <div className="text-center bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl border border-slate-100 dark:border-slate-800">
+                            <div className="text-center bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl border border-slate-100 dark:border-slate-700">
                                 <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Nota</p>
                                 <p className="text-sm font-bold text-slate-600 dark:text-slate-300">
                                     Você poderá ajustar quantidades e prazos manualmente depois.
@@ -417,7 +417,7 @@ const CreateWork: React.FC = () => {
 
   return (
     <div className="max-w-2xl mx-auto pb-12 pt-6 px-4 font-sans">
-      <button onClick={() => navigate('/')} className="mb-6 text-slate-400 hover:text-primary font-black uppercase text-xs tracking-widest flex items-center gap-2 transition-colors">
+      <button onClick={() => navigate('/')} className="mb-6 text-slate-400 hover:text-primary dark:hover:text-white font-black uppercase text-xs tracking-widest flex items-center gap-2 transition-colors">
         <i className="fa-solid fa-arrow-left"></i> Cancelar
       </button>
       
