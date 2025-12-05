@@ -2,10 +2,10 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { dbService } from '../services/db';
-import { Work, Step, Expense, Material, StepStatus, ExpenseCategory, PlanType, WorkPhoto, WorkFile } from '../types';
+import { Work, Step, Expense, Material, StepStatus, WorkPhoto, WorkFile } from '../types';
 import { Recharts } from '../components/RechartsWrapper';
 import { ZeModal } from '../components/ZeModal';
-import { FULL_MATERIAL_PACKAGES, ZE_AVATAR, ZE_AVATAR_FALLBACK, CALCULATOR_LOGIC, CONTRACT_TEMPLATES, STANDARD_CHECKLISTS, getRandomZeTip, ZeTip } from '../services/standards';
+import { ZE_AVATAR, ZE_AVATAR_FALLBACK, getRandomZeTip, ZeTip } from '../services/standards';
 import { useAuth } from '../App';
 import { aiService } from '../services/ai';
 import * as XLSX from 'xlsx';
