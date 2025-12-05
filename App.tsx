@@ -8,7 +8,7 @@ import CreateWork from './pages/CreateWork';
 import WorkDetail from './pages/WorkDetail';
 import Settings from './pages/Settings';
 import Profile from './pages/Profile';
-import Tutorials from './pages/Tutorials';
+import VideoTutorials from './pages/VideoTutorials';
 
 // --- Theme Context ---
 type Theme = 'light' | 'dark';
@@ -326,7 +326,7 @@ const App: React.FC = () => {
             <Route path="/work/:id" element={<Layout><WorkDetail /></Layout>} />
             <Route path="/settings" element={<Layout><Settings /></Layout>} />
             <Route path="/profile" element={<Layout><Profile /></Layout>} />
-            <Route path="/tutorials" element={<Layout><Tutorials /></Layout>} />
+            <Route path="/tutorials" element={<Layout><VideoTutorials /></Layout>} />
           </Routes>
         </AuthProvider>
       </ThemeProvider>
