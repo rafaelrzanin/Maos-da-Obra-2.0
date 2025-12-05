@@ -225,7 +225,7 @@ const CreateWork: React.FC = () => {
                                     onClick={() => handleCategorySelect('CONSTRUCTION')}
                                     className="relative p-8 rounded-3xl border-2 border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:border-secondary hover:bg-white dark:hover:bg-slate-800 hover:shadow-2xl hover:shadow-orange-500/10 hover:-translate-y-1 transition-all duration-300 flex flex-col items-center gap-5 group"
                                 >
-                                    <div className="w-20 h-20 rounded-full bg-primary text-white flex items-center justify-center text-3xl shadow-xl shadow-primary/30 group-hover:scale-110 transition-transform duration-500">
+                                    <div className="w-20 h-20 rounded-full bg-secondary text-white flex items-center justify-center text-3xl shadow-xl shadow-secondary/30 group-hover:scale-110 transition-transform duration-500">
                                         <i className="fa-solid fa-trowel-bricks"></i>
                                     </div>
                                     <div>
