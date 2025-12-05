@@ -1,5 +1,3 @@
-
-
 export enum PlanType {
   MENSAL = 'MENSAL',
   SEMESTRAL = 'SEMESTRAL',
@@ -38,6 +36,12 @@ export interface Work {
   endDate: string;
   area: number; // m2
   floors?: number; // Quantity of floors (pavimentos)
+  // Detailed specs for better estimation
+  bedrooms?: number;
+  bathrooms?: number;
+  kitchens?: number;
+  livingRooms?: number;
+  hasLeisureArea?: boolean;
   notes: string;
   status: WorkStatus;
 }
