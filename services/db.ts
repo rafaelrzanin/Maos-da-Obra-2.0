@@ -230,9 +230,8 @@ const generateSmartPlan = (
 ): PlanItem[] => {
   const plan: PlanItem[] = [];
 
-  // Se quiser manter essas variáveis só pra futuro:
-  const _footprint = totalArea / Math.max(1, floors);
-  let _currentDay = 0;
+  // Se quiser, depois você usa totalArea, floors, templateId, details
+  // aqui para montar um plano mais completo.
 
   plan.push({
     stepName: "Início da obra",
