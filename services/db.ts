@@ -394,7 +394,7 @@ const generateSmartPlan = (templateId: string, totalArea: number, floors: number
 export const dbService = {
   
   // --- Auth ---
-  loginSocial: async (provider: 'google' | 'apple'): Promise<{ error: any }> => {
+  loginSocial: async (provider: 'google'): Promise<{ error: any }> => {
       if (supabase) {
           const { data, error } = await supabase.auth.signInWithOAuth({
               provider: provider,
