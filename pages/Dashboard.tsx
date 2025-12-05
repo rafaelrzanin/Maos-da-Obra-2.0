@@ -11,7 +11,7 @@ import { ZeModal } from '../components/ZeModal';
 const formatDateDisplay = (dateStr: string) => {
     if (!dateStr) return '--/--';
     if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
-        const [year, month, day] = dateStr.split('-');
+        const [, month, day] = dateStr.split('-');
         return `${day}/${month}`;
     }
     try {
