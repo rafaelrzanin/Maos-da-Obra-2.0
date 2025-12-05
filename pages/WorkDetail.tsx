@@ -319,7 +319,7 @@ const ChecklistsView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 };
 
 // --- More / Super Menu Tab ---
-const MoreMenuTab: React.FC<{ workId: string }> = ({ workId }) => {
+const MoreMenuTab: React.FC<{ workId: string, onOpenChat: () => void }> = ({ workId, onOpenChat }) => {
     const { user } = useAuth();
     const isLifetime = user?.plan === PlanType.VITALICIO;
     const [activeSection, setActiveSection] = useState<string | null>(null);
@@ -333,14 +333,96 @@ const MoreMenuTab: React.FC<{ workId: string }> = ({ workId }) => {
     if (activeSection === 'CONTRACTS') return <ContractsView onBack={() => setActiveSection(null)} />;
     if (activeSection === 'CHECKLISTS') return <ChecklistsView onBack={() => setActiveSection(null)} />;
     
+    // NEW: ZDA OBRA LANDING PAGE
     if (activeSection === 'AI') {
         return (
-            <div className="flex flex-col h-full"><button onClick={() => setActiveSection(null)} className="mb-4 text-sm font-bold text-slate-400 hover:text-primary"><i className="fa-solid fa-arrow-left"></i> Voltar</button><div className="flex-1 flex flex-col items-center justify-center text-center p-6"><div className="w-20 h-20 rounded-full bg-secondary/10 flex items-center justify-center mb-4"><i className="fa-solid fa-robot text-4xl text-secondary"></i></div><h3 className="text-xl font-bold text-primary dark:text-white mb-2">IA do Zé da Obra</h3><p className="text-slate-500 mb-6">Seu assistente está disponível no ícone de robô no topo da tela.</p></div></div>
+            <div className="flex flex-col h-full animate-in fade-in zoom-in-95 duration-500">
+                <button onClick={() => setActiveSection(null)} className="mb-4 text-sm font-bold text-slate-400 hover:text-primary dark:hover:text-white z-20 flex items-center gap-2">
+                    <i className="fa-solid fa-arrow-left"></i> Voltar
+                </button>
+                
+                <div className="flex-1 bg-white dark:bg-slate-900 rounded-3xl overflow-hidden border border-slate-100 dark:border-slate-800 shadow-xl relative">
+                    
+                    {/* Background Visuals */}
+                    <div className="absolute top-0 inset-x-0 h-48 bg-gradient-premium"></div>
+                    <div className="absolute top-0 right-0 w-64 h-64 bg-secondary/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
+                    
+                    <div className="relative z-10 flex flex-col h-full overflow-y-auto">
+                        
+                        {/* Header Hero */}
+                        <div className="pt-10 pb-6 px-6 text-center text-white">
+                            <div className="w-24 h-24 rounded-full p-1 bg-gradient-to-br from-white/20 to-white/5 mx-auto mb-4 backdrop-blur-md shadow-2xl">
+                                <img 
+                                    src={ZE_AVATAR} 
+                                    className="w-full h-full object-cover rounded-full bg-slate-800" 
+                                    alt="Zé da Obra"
+                                    onError={(e) => { 
+                                        const target = e.currentTarget;
+                                        if (target.src !== ZE_AVATAR_FALLBACK) {
+                                            target.src = ZE_AVATAR_FALLBACK;
+                                        }
+                                    }}
+                                />
+                            </div>
+                            <h2 className="text-2xl font-extrabold tracking-tight mb-1">ZDA Obra IA</h2>
+                            <p className="text-white/60 text-sm font-medium">Seu Mestre de Obras Digital 24h</p>
+                        </div>
+
+                        {/* White/Dark Content Card */}
+                        <div className="flex-1 bg-white dark:bg-slate-950 rounded-t-[2.5rem] p-8 -mt-6">
+                            
+                            <div className="grid grid-cols-2 gap-4 mb-8">
+                                <div className="p-4 rounded-2xl bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30 text-center">
+                                    <i className="fa-solid fa-brain text-2xl text-blue-600 dark:text-blue-400 mb-2"></i>
+                                    <h3 className="font-bold text-xs text-blue-900 dark:text-blue-200">Tira Dúvidas Técnicas</h3>
+                                </div>
+                                <div className="p-4 rounded-2xl bg-green-50 dark:bg-green-900/10 border border-green-100 dark:border-green-900/30 text-center">
+                                    <i className="fa-solid fa-sack-dollar text-2xl text-green-600 dark:text-green-400 mb-2"></i>
+                                    <h3 className="font-bold text-xs text-green-900 dark:text-green-200">Evita Desperdício</h3>
+                                </div>
+                                <div className="p-4 rounded-2xl bg-purple-50 dark:bg-purple-900/10 border border-purple-100 dark:border-purple-900/30 text-center">
+                                    <i className="fa-solid fa-calculator text-2xl text-purple-600 dark:text-purple-400 mb-2"></i>
+                                    <h3 className="font-bold text-xs text-purple-900 dark:text-purple-200">Calcula Materiais</h3>
+                                </div>
+                                <div className="p-4 rounded-2xl bg-orange-50 dark:bg-orange-900/10 border border-orange-100 dark:border-orange-900/30 text-center">
+                                    <i className="fa-solid fa-handshake-simple text-2xl text-orange-600 dark:text-orange-400 mb-2"></i>
+                                    <h3 className="font-bold text-xs text-orange-900 dark:text-orange-200">Ajuda em Conflitos</h3>
+                                </div>
+                            </div>
+
+                            <div className="space-y-4 mb-8">
+                                <h3 className="font-bold text-primary dark:text-white text-lg">Como eu ajudo na obra?</h3>
+                                <p className="text-slate-500 text-sm leading-relaxed">
+                                    Eu sei tudo sobre traço de concreto, tempo de secagem, elétrica e hidráulica. 
+                                    Pode me perguntar: 
+                                    <span className="italic text-primary dark:text-slate-300"> "Qual o traço pro reboco?", "Quantos tijolos por metro quadrado?", "Meu pedreiro disse X, tá certo?"</span>.
+                                </p>
+                            </div>
+
+                            <button 
+                                onClick={() => {
+                                    setActiveSection(null);
+                                    onOpenChat();
+                                }}
+                                className="w-full py-4 bg-gradient-premium text-white font-bold rounded-2xl shadow-xl shadow-slate-900/20 flex items-center justify-center gap-3 group"
+                            >
+                                <span>Conversar com o Zé</span>
+                                <i className="fa-solid fa-comments group-hover:scale-110 transition-transform"></i>
+                            </button>
+                            
+                            <p className="text-center text-[10px] text-slate-400 mt-4">
+                                Você também pode me chamar pelo botão no topo da tela <i className="fa-solid fa-arrow-up mx-1"></i>
+                            </p>
+
+                        </div>
+                    </div>
+                </div>
+            </div>
         )
     }
 
     const sections = [{ id: 'TEAM', icon: 'fa-users', label: 'Equipe', color: 'bg-blue-500' }, { id: 'SUPPLIERS', icon: 'fa-truck', label: 'Fornecedores', color: 'bg-indigo-500' }, { id: 'REPORTS', icon: 'fa-chart-line', label: 'Relatórios', color: 'bg-emerald-500' }, { id: 'PHOTOS', icon: 'fa-camera', label: 'Galeria', color: 'bg-rose-500' }, { id: 'FILES', icon: 'fa-folder-open', label: 'Projetos', color: 'bg-orange-500' }];
-    const bonusFeatures = [{ id: 'AI', icon: 'fa-robot', label: 'IA do Zé', desc: 'Tire dúvidas técnicas' }, { id: 'CALC', icon: 'fa-calculator', label: 'Calculadora', desc: 'Estimativa de material' }, { id: 'CONTRACTS', icon: 'fa-file-signature', label: 'Contratos', desc: 'Modelos prontos' }, { id: 'CHECKLISTS', icon: 'fa-list-check', label: 'Checklists', desc: 'Não esqueça nada' }];
+    const bonusFeatures = [{ id: 'AI', icon: 'fa-robot', label: 'ZDA Obra', desc: 'IA Mestre de Obras' }, { id: 'CALC', icon: 'fa-calculator', label: 'Calculadora', desc: 'Estimativa de material' }, { id: 'CONTRACTS', icon: 'fa-file-signature', label: 'Contratos', desc: 'Modelos prontos' }, { id: 'CHECKLISTS', icon: 'fa-list-check', label: 'Checklists', desc: 'Não esqueça nada' }];
 
     return (
         <div className="animate-in fade-in duration-500 pb-24">
@@ -348,7 +430,7 @@ const MoreMenuTab: React.FC<{ workId: string }> = ({ workId }) => {
             <div className="grid grid-cols-3 gap-3 mb-8">{sections.map(s => (<button key={s.id} onClick={() => setActiveSection(s.id)} className="flex flex-col items-center justify-center p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm hover:shadow-md transition-all active:scale-95"><div className={`w-12 h-12 rounded-xl flex items-center justify-center text-white mb-2 shadow-lg ${s.color}`}><i className={`fa-solid ${s.icon}`}></i></div><span className="text-xs font-bold text-slate-600 dark:text-slate-300">{s.label}</span></button>))}</div>
             <div className={`relative rounded-3xl p-6 overflow-hidden ${isLifetime ? 'bg-gradient-to-br from-slate-900 to-slate-800 text-white' : 'bg-slate-100 dark:bg-slate-800'}`}>
                 {!isLifetime && (<div className="absolute inset-0 bg-white/60 dark:bg-black/60 backdrop-blur-[2px] z-10 flex flex-col items-center justify-center text-center p-6"><i className="fa-solid fa-lock text-3xl text-slate-400 mb-3"></i><h3 className="font-bold text-primary dark:text-white mb-1">Bônus Exclusivo</h3><p className="text-xs text-slate-500 mb-4">Disponível no Plano Vitalício</p><button onClick={() => window.location.hash = '#/settings'} className="bg-premium text-white px-6 py-2 rounded-xl font-bold shadow-lg shadow-purple-500/20 text-sm">Liberar Acesso</button></div>)}
-                <div className="relative z-0"><div className="flex items-center gap-3 mb-6"><div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-white shadow-lg"><i className="fa-solid fa-crown"></i></div><div><h3 className={`font-bold ${isLifetime ? 'text-white' : 'text-slate-700 dark:text-slate-200'}`}>Ferramentas Premium</h3><p className={`text-xs ${isLifetime ? 'text-slate-400' : 'text-slate-500'}`}>Incluso no seu plano</p></div></div><div className="grid grid-cols-2 gap-3">{bonusFeatures.map(f => (<button key={f.id} onClick={() => { if(isLifetime) setActiveSection(f.id); }} className={`p-4 rounded-xl text-left transition-all ${isLifetime ? 'bg-white/10 hover:bg-white/20 border border-white/5' : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700'}`}><i className={`fa-solid ${f.icon} text-xl mb-2 ${isLifetime ? 'text-secondary' : 'text-slate-400'}`}></i><h4 className={`font-bold text-sm mb-0.5 ${isLifetime ? 'text-white' : 'text-slate-600 dark:text-slate-300'}`}>{f.label}</h4><p className={`text-[10px] leading-tight ${isLifetime ? 'text-slate-400' : 'text-slate-400'}`}>{f.desc}</p></button>))}</div></div>
+                <div className="relative z-0"><div className="flex items-center gap-3 mb-6"><div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center text-white shadow-lg"><i className="fa-solid fa-crown"></i></div><div><h3 className={`font-bold ${isLifetime ? 'text-white' : 'text-slate-700 dark:text-slate-200'}`}>Ferramentas Premium</h3><p className={`text-xs ${isLifetime ? 'text-slate-400' : 'text-slate-500'}`}>Incluso no seu plano</p></div></div><div className="grid grid-cols-2 gap-3">{bonusFeatures.map(f => (<button key={f.id} onClick={() => { if(isLifetime) setActiveSection(f.id); }} className={`p-4 rounded-xl text-left transition-all ${isLifetime ? 'bg-white/10 hover:bg-white/20 border border-white/5' : 'bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700'}`}><div className="flex items-center justify-between mb-2"><i className={`fa-solid ${f.icon} text-xl ${isLifetime ? 'text-secondary' : 'text-slate-400'}`}></i> {f.id === 'AI' && <i className="fa-solid fa-chevron-right text-[10px] opacity-50"></i>}</div><h4 className={`font-bold text-sm mb-0.5 ${isLifetime ? 'text-white' : 'text-slate-600 dark:text-slate-300'}`}>{f.label}</h4><p className={`text-[10px] leading-tight ${isLifetime ? 'text-slate-400' : 'text-slate-400'}`}>{f.desc}</p></button>))}</div></div>
             </div>
         </div>
     );
@@ -784,7 +866,7 @@ const WorkDetail: React.FC = () => {
               {activeTab === 'steps' && <StepsTab workId={work.id} refreshWork={loadWork} />}
               {activeTab === 'materials' && <MaterialsTab workId={work.id} onUpdate={loadWork} />}
               {activeTab === 'expenses' && <ExpensesTab workId={work.id} onUpdate={loadWork} />}
-              {activeTab === 'more' && <MoreMenuTab workId={work.id} />}
+              {activeTab === 'more' && <MoreMenuTab workId={work.id} onOpenChat={() => setShowAiChat(true)} />}
           </div>
           <div className="fixed bottom-0 left-0 w-full bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 pb-safe pt-2 px-6 flex justify-between items-center z-40 shadow-[0_-5px_20px_rgba(0,0,0,0.05)]">{[{ id: 'overview', icon: 'fa-house', label: 'Geral' }, { id: 'steps', icon: 'fa-calendar-days', label: 'Cronograma' }, { id: 'materials', icon: 'fa-cart-shopping', label: 'Materiais' }, { id: 'expenses', icon: 'fa-wallet', label: 'Gastos' }, { id: 'more', icon: 'fa-bars', label: 'Mais' }].map(tab => (<button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex flex-col items-center gap-1 min-w-[60px] transition-all duration-300 ${activeTab === tab.id ? 'text-secondary -translate-y-2' : 'text-slate-400 hover:text-slate-600'}`}><div className={`w-10 h-10 rounded-2xl flex items-center justify-center text-lg transition-all ${activeTab === tab.id ? 'bg-secondary text-white shadow-lg shadow-orange-500/30' : ''}`}><i className={`fa-solid ${tab.icon}`}></i></div><span className={`text-[10px] font-bold ${activeTab === tab.id ? 'opacity-100' : 'opacity-0'}`}>{tab.label}</span></button>))}</div>
           
