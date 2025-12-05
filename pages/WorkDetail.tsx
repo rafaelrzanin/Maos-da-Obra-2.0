@@ -297,10 +297,43 @@ const ContractsView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 // 7. CHECKLISTS VIEW
 const ChecklistsView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     const [openCategory, setOpenCategory] = useState<string | null>(null);
+
+    const handleExportCSV = () => {
+        const BOM = "\uFEFF";
+        let csvContent = BOM + "Fase,Verificação\n";
+
+        STANDARD_CHECKLISTS.forEach(list => {
+            list.items.forEach(item => {
+                const safeCategory = `"${list.category.replace(/"/g, '""')}"`;
+                const safeItem = `"${item.replace(/"/g, '""')}"`;
+                csvContent += `${safeCategory},${safeItem}\n`;
+            });
+        });
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.href = url;
+        link.setAttribute("download", "checklist_obra_ze.csv");
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
     return (
         <div className="animate-in fade-in slide-in-from-right-4">
             <button onClick={onBack} className="mb-4 text-sm font-bold text-slate-400 hover:text-primary flex items-center gap-2 print:hidden"><i className="fa-solid fa-arrow-left"></i> Voltar</button>
-            <div className="flex justify-between items-center mb-6"><SectionHeader title="Checklists Anti-Erro" subtitle="O que verificar para evitar prejuízo." /><button onClick={() => window.print()} className="bg-slate-100 dark:bg-slate-800 text-slate-500 w-10 h-10 rounded-xl flex items-center justify-center print:hidden"><i className="fa-solid fa-print"></i></button></div>
+            <div className="flex justify-between items-center mb-6">
+                <SectionHeader title="Checklists Anti-Erro" subtitle="O que verificar para evitar prejuízo." />
+                <div className="flex gap-2 print:hidden">
+                    <button onClick={handleExportCSV} className="bg-slate-100 dark:bg-slate-800 text-green-600 hover:text-green-700 w-10 h-10 rounded-xl flex items-center justify-center transition-colors shadow-sm" title="Baixar CSV">
+                        <i className="fa-solid fa-file-csv text-lg"></i>
+                    </button>
+                    <button onClick={() => window.print()} className="bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-primary w-10 h-10 rounded-xl flex items-center justify-center transition-colors shadow-sm" title="Imprimir">
+                        <i className="fa-solid fa-print"></i>
+                    </button>
+                </div>
+            </div>
             <div className="space-y-4">
                 {STANDARD_CHECKLISTS.map((list: any, idx: number) => {
                     const isOpen = openCategory === list.category;
