@@ -2,77 +2,100 @@
 import { PlanType, User } from '../types';
 
 // --- CONFIGURAÇÃO DO GATEWAY ---
-// Substitua pelos dados reais da sua API de pagamento
+// Coloca aquí las credenciales de tu portal de pago
+const API_URL = "https://api.tu-portal-de-pago.com/v1"; // Reemplazar con la URL real
+const PUBLIC_KEY = "TU_PUBLIC_KEY"; // Si la API requiere auth desde el front
 
-// Mapeamento de IDs do seu gateway para os planos do App
+// IDs de los planes en tu portal de pago
 const GATEWAY_PLAN_IDS = {
-  [PlanType.MENSAL]: "plano_mensal_id_123",
-  [PlanType.SEMESTRAL]: "plano_semestral_id_456",
-  [PlanType.VITALICIO]: "plano_vitalicio_id_789"
+  [PlanType.MENSAL]: "plan_id_mensal_real",
+  [PlanType.SEMESTRAL]: "plan_id_semestral_real",
+  [PlanType.VITALICIO]: "plan_id_vitalicio_real"
 };
-
-// URL da sua API que gera o checkout
-// const API_ENDPOINT = "https://api.seugateway.com/v1/checkout";
-// const API_KEY = "SUA_CHAVE_PUBLICA"; 
 
 export const gatewayService = {
   /**
-   * Chama a API do gateway para gerar um link de pagamento
-   * e retorna a URL para redirecionamento.
+   * Crea una sesión de checkout en el portal de pago.
    */
   checkout: async (user: User, planType: PlanType): Promise<string> => {
-    // Security: Masked email in logs
-    const maskedEmail = user.email.replace(/(.{2})(.*)(@.*)/, "$1***$3");
-    console.log(`[Gateway] Iniciando checkout para ${maskedEmail} no plano ${planType}...`);
+    console.log(`[Gateway] Iniciando checkout para ${user.email} no plano ${planType}...`);
 
-    // ---------------------------------------------------------
-    // EXEMPLO DE IMPLEMENTAÇÃO REAL (Descomente e ajuste):
-    // ---------------------------------------------------------
-    /*
     try {
-      const response = await fetch("https://sua-api.com/checkout", {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${process.env.REACT_APP_API_KEY}`
+      // 1. Preparar el cuerpo de la solicitud según la documentación de tu API
+      const payload = {
+        items: [
+          {
+            id: GATEWAY_PLAN_IDS[planType],
+            title: `Assinatura Mãos da Obra - ${planType}`,
+            quantity: 1,
+            currency_id: 'BRL',
+            unit_price: planType === PlanType.VITALICIO ? 247.00 : (planType === PlanType.SEMESTRAL ? 97.00 : 29.90)
+          }
+        ],
+        payer: {
+          email: user.email,
+          name: user.name,
+          // phone: user.whatsapp // Opcional dependiendo de la API
         },
-        body: JSON.stringify({
-          plan_id: GATEWAY_PLAN_IDS[planType],
-          customer: {
-            name: user.name,
-            email: user.email,
-            phone: user.whatsapp
-          },
-          success_url: window.location.origin + "/#/settings?status=success",
-          cancel_url: window.location.origin + "/#/settings?status=cancel"
-        })
+        external_reference: user.id, // IMPORTANTE: Para vincular el pago al usuario en el Webhook
+        back_urls: {
+          success: `${window.location.origin}/#/settings?status=success`,
+          failure: `${window.location.origin}/#/settings?status=failure`,
+          pending: `${window.location.origin}/#/settings?status=pending`
+        },
+        auto_return: "approved"
+      };
+
+      // 2. Hacer la llamada a la API (Ejemplo genérico, ajustar headers según documentación)
+      /* 
+      const response = await fetch(`${API_URL}/checkout/preferences`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${PUBLIC_KEY}`
+        },
+        body: JSON.stringify(payload),
       });
 
-      if (!response.ok) throw new Error('Erro ao criar checkout');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Erro ao criar preferência de pagamento');
+      }
 
       const data = await response.json();
-      return data.checkout_url; // A URL que o gateway devolveu
+      return data.init_point; // URL de redirección (Mercado Pago usa init_point, Stripe usa url, etc.)
+      */
+
+      // --- SIMULACIÓN PARA MANTENER LA APP FUNCIONANDO MIENTRAS INTEGRAS ---
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Simula que la API devolvió una URL de pago real
+      // En producción, descomenta el bloque fetch de arriba y elimina esto
+      const mockCheckoutUrl = `https://checkout.pagamento.com/pay/${GATEWAY_PLAN_IDS[planType]}?ref=${user.id}`;
+      console.warn("MODO SIMULACIÓN: Redirigiendo a URL ficticia. Implementar fetch real en services/gateway.ts");
+      
+      return mockCheckoutUrl;
+
     } catch (error) {
-      console.error("Erro no pagamento:", error);
+      console.error("Erro no gateway de pagamento:", error);
       throw error;
     }
-    */
+  },
 
-    // ---------------------------------------------------------
-    // SIMULAÇÃO (Para o MVP funcionar visualmente):
-    // ---------------------------------------------------------
-    
-    // Simula delay de rede
-    await new Promise(resolve => setTimeout(resolve, 1500));
+  /**
+   * Verifica si una transacción fue exitosa basado en los parámetros de la URL
+   * (Útil para feedback inmediato en el frontend, pero NO para seguridad final)
+   */
+  checkPaymentStatus: (searchParams: URLSearchParams): 'success' | 'failure' | 'pending' | null => {
+    const status = searchParams.get('status');
+    const paymentId = searchParams.get('payment_id'); // O el parámetro que use tu gateway
 
-    // Retorna uma URL fictícia de checkout
-    // Em produção, isso viria da sua API
-    const baseUrl = "https://checkout.pagamento.com"; 
-    const planId = GATEWAY_PLAN_IDS[planType];
-    // In production, avoid sending PII in URL parameters if possible, use backend session ID.
-    // For visual MVP simulation, we use a hash or masked value to represent the user in the URL.
-    const userHash = btoa(user.email); // Base64 just to hide from plain view in this mock
-    
-    return `${baseUrl}/pay/${planId}?u=${userHash}`;
+    if (status === 'approved' || status === 'success') {
+      return 'success';
+    }
+    if (status === 'failure' || status === 'rejected') {
+      return 'failure';
+    }
+    return null;
   }
 };
