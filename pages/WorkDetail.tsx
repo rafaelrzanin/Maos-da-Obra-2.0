@@ -50,6 +50,7 @@ const ContactsView: React.FC<{ mode: 'TEAM' | 'SUPPLIERS', onBack: () => void }>
     const [newName, setNewName] = useState('');
     const [newRole, setNewRole] = useState(''); 
     const [newPhone, setNewPhone] = useState('');
+    const [newNotes, setNewNotes] = useState('');
 
     const [zeModal, setZeModal] = useState<{isOpen: boolean, title: string, message: string, onConfirm: () => void}>({isOpen: false, title: '', message: '', onConfirm: () => {}});
 
@@ -73,16 +74,16 @@ const ContactsView: React.FC<{ mode: 'TEAM' | 'SUPPLIERS', onBack: () => void }>
             if (editingId) {
                 if (mode === 'TEAM') {
                     const currentItem = items.find(i => i.id === editingId);
-                    if (currentItem) await dbService.updateWorker({ ...currentItem, name: newName, role: newRole, phone: newPhone });
+                    if (currentItem) await dbService.updateWorker({ ...currentItem, name: newName, role: newRole, phone: newPhone, notes: newNotes });
                 } else {
                     const currentItem = items.find(i => i.id === editingId);
-                    if (currentItem) await dbService.updateSupplier({ ...currentItem, name: newName, category: newRole, phone: newPhone });
+                    if (currentItem) await dbService.updateSupplier({ ...currentItem, name: newName, category: newRole, phone: newPhone, notes: newNotes });
                 }
             } else {
-                if (mode === 'TEAM') await dbService.addWorker({ userId: user.id, name: newName, role: newRole, phone: newPhone });
-                else await dbService.addSupplier({ userId: user.id, name: newName, category: newRole, phone: newPhone });
+                if (mode === 'TEAM') await dbService.addWorker({ userId: user.id, name: newName, role: newRole, phone: newPhone, notes: newNotes });
+                else await dbService.addSupplier({ userId: user.id, name: newName, category: newRole, phone: newPhone, notes: newNotes });
             }
-            setIsAddOpen(false); setEditingId(null); setNewName(''); setNewRole(''); setNewPhone(''); loadData();
+            setIsAddOpen(false); setEditingId(null); setNewName(''); setNewRole(''); setNewPhone(''); setNewNotes(''); loadData();
         }
     };
 
@@ -91,6 +92,7 @@ const ContactsView: React.FC<{ mode: 'TEAM' | 'SUPPLIERS', onBack: () => void }>
         setNewName(item.name);
         setNewRole(item.role || item.category);
         setNewPhone(item.phone);
+        setNewNotes(item.notes || '');
         setIsAddOpen(true);
     };
 
@@ -113,7 +115,11 @@ const ContactsView: React.FC<{ mode: 'TEAM' | 'SUPPLIERS', onBack: () => void }>
                     <div key={item.id} onClick={() => handleEdit(item)} className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-100 dark:border-slate-800 flex justify-between items-center cursor-pointer hover:border-secondary transition-all">
                         <div className="flex items-center gap-3">
                             <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white ${mode === 'TEAM' ? 'bg-blue-500' : 'bg-indigo-500'}`}><i className={`fa-solid ${mode === 'TEAM' ? 'fa-helmet-safety' : 'fa-truck'}`}></i></div>
-                            <div><h4 className="font-bold text-primary dark:text-white">{item.name}</h4><p className="text-xs text-slate-500">{(item as any).role || (item as any).category}</p></div>
+                            <div>
+                                <h4 className="font-bold text-primary dark:text-white">{item.name}</h4>
+                                <p className="text-xs text-slate-500">{(item as any).role || (item as any).category}</p>
+                                {(item as any).notes && <p className="text-[10px] text-slate-400 mt-0.5 truncate max-w-[150px] italic">{(item as any).notes}</p>}
+                            </div>
                         </div>
                         <div className="flex gap-2">
                              <a href={`https://wa.me/55${item.phone.replace(/\D/g,'')}`} target="_blank" onClick={(e) => e.stopPropagation()} className="w-8 h-8 rounded-full bg-green-100 text-green-600 flex items-center justify-center hover:bg-green-200"><i className="fa-brands fa-whatsapp"></i></a>
@@ -123,7 +129,7 @@ const ContactsView: React.FC<{ mode: 'TEAM' | 'SUPPLIERS', onBack: () => void }>
                 ))}
                 {items.length === 0 && <p className="text-center text-slate-400 py-4 text-sm">Nenhum cadastro encontrado.</p>}
             </div>
-            <button onClick={() => { setEditingId(null); setNewName(''); setNewRole(''); setNewPhone(''); setIsAddOpen(true); }} className="mt-6 w-full py-3 bg-primary text-white rounded-xl font-bold shadow-lg"><i className="fa-solid fa-plus mr-2"></i> Adicionar</button>
+            <button onClick={() => { setEditingId(null); setNewName(''); setNewRole(''); setNewPhone(''); setNewNotes(''); setIsAddOpen(true); }} className="mt-6 w-full py-3 bg-primary text-white rounded-xl font-bold shadow-lg"><i className="fa-solid fa-plus mr-2"></i> Adicionar</button>
             {isAddOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
                     <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-sm p-6 shadow-2xl">
@@ -135,6 +141,7 @@ const ContactsView: React.FC<{ mode: 'TEAM' | 'SUPPLIERS', onBack: () => void }>
                                 {options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                             </select>
                             <input placeholder="Telefone" value={newPhone} onChange={e => setNewPhone(e.target.value)} className="w-full p-3 rounded-xl border dark:border-slate-700 dark:bg-slate-800 dark:text-white outline-none" required />
+                            <textarea placeholder="Observações (Ex: Vendedor Pedro)" value={newNotes} onChange={e => setNewNotes(e.target.value)} className="w-full p-3 rounded-xl border dark:border-slate-700 dark:bg-slate-800 dark:text-white outline-none resize-none h-20 text-sm" />
                             <div className="flex gap-2 pt-2">
                                 <button type="button" onClick={() => setIsAddOpen(false)} className="flex-1 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl">Cancelar</button>
                                 <button type="submit" className="flex-1 py-3 bg-primary text-white rounded-xl font-bold">Salvar</button>
