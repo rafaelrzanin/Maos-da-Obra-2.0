@@ -396,7 +396,7 @@ export const dbService = {
   // --- Auth ---
   loginSocial: async (provider: 'google'): Promise<{ error: any }> => {
       if (supabase) {
-          const { data, error } = await supabase.auth.signInWithOAuth({
+          const { error } = await supabase.auth.signInWithOAuth({
               provider: provider,
               options: {
                   redirectTo: window.location.origin
