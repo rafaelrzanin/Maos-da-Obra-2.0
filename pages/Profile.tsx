@@ -86,7 +86,7 @@ const Profile: React.FC = () => {
                 type="email" 
                 value={email} 
                 disabled
-                className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800/50 text-slate-500 cursor-not-allowed"
+                className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800/50 text-slate-500 dark:text-slate-400 cursor-not-allowed"
               />
             </div>
 
@@ -136,7 +136,7 @@ const Profile: React.FC = () => {
         </div>
 
         {successMsg && (
-          <div className="p-4 bg-green-100 border border-green-200 text-green-700 rounded-xl flex items-center gap-2 animate-in fade-in">
+          <div className="p-4 bg-green-100 dark:bg-green-900/30 border border-green-200 dark:border-green-900 text-green-700 dark:text-green-300 rounded-xl flex items-center gap-2 animate-in fade-in">
             <i className="fa-solid fa-check-circle"></i> {successMsg}
           </div>
         )}
