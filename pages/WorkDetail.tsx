@@ -364,7 +364,7 @@ const MoreMenuTab: React.FC<{ workId: string, onOpenChat: () => void }> = ({ wor
                                     }}
                                 />
                             </div>
-                            <h2 className="text-2xl font-extrabold tracking-tight mb-1">ZDA Obra IA</h2>
+                            <h2 className="text-2xl font-extrabold tracking-tight mb-1">Zé da Obra IA</h2>
                             <p className="text-white/60 text-sm font-medium">Seu Mestre de Obras Digital 24h</p>
                         </div>
 
@@ -422,7 +422,7 @@ const MoreMenuTab: React.FC<{ workId: string, onOpenChat: () => void }> = ({ wor
     }
 
     const sections = [{ id: 'TEAM', icon: 'fa-users', label: 'Equipe', color: 'bg-blue-500' }, { id: 'SUPPLIERS', icon: 'fa-truck', label: 'Fornecedores', color: 'bg-indigo-500' }, { id: 'REPORTS', icon: 'fa-chart-line', label: 'Relatórios', color: 'bg-emerald-500' }, { id: 'PHOTOS', icon: 'fa-camera', label: 'Galeria', color: 'bg-rose-500' }, { id: 'FILES', icon: 'fa-folder-open', label: 'Projetos', color: 'bg-orange-500' }];
-    const bonusFeatures = [{ id: 'AI', icon: 'fa-robot', label: 'ZDA Obra', desc: 'IA Mestre de Obras' }, { id: 'CALC', icon: 'fa-calculator', label: 'Calculadora', desc: 'Estimativa de material' }, { id: 'CONTRACTS', icon: 'fa-file-signature', label: 'Contratos', desc: 'Modelos prontos' }, { id: 'CHECKLISTS', icon: 'fa-list-check', label: 'Checklists', desc: 'Não esqueça nada' }];
+    const bonusFeatures = [{ id: 'AI', icon: 'fa-robot', label: 'Zé da Obra', desc: 'IA Mestre de Obras' }, { id: 'CALC', icon: 'fa-calculator', label: 'Calculadora', desc: 'Estimativa de material' }, { id: 'CONTRACTS', icon: 'fa-file-signature', label: 'Contratos', desc: 'Modelos prontos' }, { id: 'CHECKLISTS', icon: 'fa-list-check', label: 'Checklists', desc: 'Não esqueça nada' }];
 
     return (
         <div className="animate-in fade-in duration-500 pb-24">
