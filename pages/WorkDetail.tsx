@@ -215,21 +215,243 @@ const ReportsView: React.FC<{ workId: string, onBack: () => void }> = ({ workId,
         const loadAll = async () => { const [exp, mat, stp, w] = await Promise.all([dbService.getExpenses(workId), dbService.getMaterials(workId), dbService.getSteps(workId), dbService.getWorkById(workId)]); setExpenses(exp); setMaterials(mat); setSteps(stp.sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())); setWork(w); }; loadAll();
     }, [workId]);
     const handlePrint = () => { window.print(); };
+    
+    // EXPORT TO EXCEL LOGIC
+    const handleExportExcel = () => {
+        let data: any[] = [];
+        let sheetName = "";
+
+        if (activeTab === 'FINANCIAL') {
+            sheetName = "Financeiro";
+            data = expenses.map(e => ({
+                Data: new Date(e.date).toLocaleDateString('pt-BR'),
+                Descrição: e.description,
+                Categoria: e.category,
+                'Valor Lançado': e.amount,
+                'Valor Pago': e.paidAmount || 0
+            }));
+        } else if (activeTab === 'MATERIALS') {
+            sheetName = "Materiais";
+            data = materials.map(m => ({
+                Material: m.name,
+                Categoria: m.category || 'Geral',
+                Planejado: m.plannedQty,
+                Comprado: m.purchasedQty,
+                Unidade: m.unit,
+                Status: m.purchasedQty >= m.plannedQty ? 'Comprado' : m.purchasedQty > 0 ? 'Parcial' : 'Pendente'
+            }));
+        } else if (activeTab === 'STEPS') {
+            sheetName = "Cronograma";
+            data = steps.map(s => {
+                const isLate = s.status !== StepStatus.COMPLETED && new Date(s.endDate) < new Date();
+                let status = 'Planejamento';
+                if (s.status === StepStatus.COMPLETED) status = 'Concluído';
+                else if (s.status === StepStatus.IN_PROGRESS) status = 'Em Andamento';
+                if (isLate) status += ' (Atrasado)';
+                
+                return {
+                    Etapa: s.name,
+                    Início: new Date(s.startDate).toLocaleDateString('pt-BR'),
+                    Fim: new Date(s.endDate).toLocaleDateString('pt-BR'),
+                    Status: status
+                };
+            });
+        }
+
+        const ws = XLSX.utils.json_to_sheet(data);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, sheetName);
+        XLSX.writeFile(wb, `Relatorio_${sheetName}_${work?.name.replace(/\s/g, '_')}.xlsx`);
+    };
+
     const financialData = expenses.reduce((acc: any[], curr) => { const existing = acc.find((a: any) => a.name === curr.category); if (existing) existing.value += curr.amount; else acc.push({ name: curr.category, value: curr.amount }); return acc; }, []);
     const totalSpent = expenses.reduce((acc, e) => acc + e.amount, 0); const totalPaid = expenses.reduce((acc, e) => acc + (e.paidAmount || 0), 0); const totalPending = totalSpent - totalPaid;
-    const purchasedMaterials = materials.filter(m => m.purchasedQty >= m.plannedQty).length; const materialChartData = [{ name: 'Comprado', value: purchasedMaterials, fill: '#059669' }, { name: 'Pendente', value: materials.length - purchasedMaterials, fill: '#E2E8F0' }];
-    const groupedMaterials: Record<string, Material[]> = {}; materials.forEach(m => { const cat = m.category || 'Geral'; if (!groupedMaterials[cat]) groupedMaterials[cat] = []; groupedMaterials[cat].push(m); });
-    const completedSteps = steps.filter(s => s.status === StepStatus.COMPLETED).length; const delayedSteps = steps.filter(s => s.isDelayed).length; const totalSteps = steps.length;
+    
+    // Group Materials
+    const groupedMaterials: Record<string, Material[]> = {}; 
+    materials.forEach(m => { const cat = m.category || 'Geral'; if (!groupedMaterials[cat]) groupedMaterials[cat] = []; groupedMaterials[cat].push(m); });
+    const sortedCategories = Object.keys(groupedMaterials).sort();
+
+    // Steps Logic
+    const completedSteps = steps.filter(s => s.status === StepStatus.COMPLETED).length; 
+    const delayedSteps = steps.filter(s => s.status !== StepStatus.COMPLETED && new Date(s.endDate) < new Date()).length;
+    const inProgressSteps = steps.filter(s => s.status === StepStatus.IN_PROGRESS).length; 
+    const totalSteps = steps.length;
 
     return (
         <div className="animate-in fade-in slide-in-from-right-4 bg-white dark:bg-slate-950 min-h-screen">
              <div className="hidden print:block mb-8 border-b-2 border-black pb-4"><h1 className="text-3xl font-bold uppercase">{work?.name || "Relatório"}</h1><p className="text-sm">Endereço: {work?.address}</p></div>
-             <div className="flex justify-between items-center mb-6 print:hidden"><button onClick={onBack} className="text-sm font-bold text-slate-400 hover:text-primary flex items-center gap-2"><i className="fa-solid fa-arrow-left"></i> Voltar</button><div className="flex gap-2"><button onClick={handlePrint} className="bg-primary text-white px-4 py-2 rounded-xl text-sm font-bold shadow-lg flex items-center gap-2"><i className="fa-solid fa-print"></i> PDF</button></div></div>
+             <div className="flex justify-between items-center mb-6 print:hidden">
+                 <button onClick={onBack} className="text-sm font-bold text-slate-400 hover:text-primary flex items-center gap-2"><i className="fa-solid fa-arrow-left"></i> Voltar</button>
+                 <div className="flex gap-2">
+                     <button onClick={handleExportExcel} className="bg-green-600 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-lg flex items-center gap-2 hover:bg-green-700 transition-colors"><i className="fa-solid fa-file-excel"></i> Excel</button>
+                     <button onClick={handlePrint} className="bg-primary text-white px-4 py-2 rounded-xl text-sm font-bold shadow-lg flex items-center gap-2 hover:bg-slate-800 transition-colors"><i className="fa-solid fa-print"></i> PDF</button>
+                 </div>
+             </div>
              <SectionHeader title="Relatórios Inteligentes" subtitle="Analise cada detalhe da sua obra." />
              <div className="flex p-1 bg-slate-100 dark:bg-slate-800/50 rounded-xl mb-6 print:hidden">{[{ id: 'FINANCIAL', label: 'Financeiro', icon: 'fa-wallet' }, { id: 'MATERIALS', label: 'Compras', icon: 'fa-cart-shopping' }, { id: 'STEPS', label: 'Etapas', icon: 'fa-list-check' }].map(tab => (<button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`flex-1 py-3 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-all ${activeTab === tab.id ? 'bg-white dark:bg-slate-800 text-primary dark:text-white shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}><i className={`fa-solid ${tab.icon}`}></i> {tab.label}</button>))}</div>
-             {activeTab === 'FINANCIAL' && (<div className="space-y-6 animate-in fade-in"><div className="grid grid-cols-1 md:grid-cols-3 gap-4"><div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 shadow-sm"><p className="text-xs font-bold text-slate-400 uppercase">Total Gasto</p><p className="text-2xl font-bold text-primary dark:text-white">R$ {totalSpent.toLocaleString('pt-BR')}</p></div><div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 shadow-sm"><p className="text-xs font-bold text-slate-400 uppercase">Valor Pago</p><p className="text-2xl font-bold text-green-600">R$ {totalPaid.toLocaleString('pt-BR')}</p></div><div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 shadow-sm"><p className="text-xs font-bold text-slate-400 uppercase">A Pagar</p><p className="text-2xl font-bold text-red-500">R$ {totalPending.toLocaleString('pt-BR')}</p></div></div><div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm"><div className="h-64"><Recharts.ResponsiveContainer width="100%" height="100%"><Recharts.BarChart data={financialData}><Recharts.CartesianGrid strokeDasharray="3 3" vertical={false} /><Recharts.XAxis dataKey="name" tick={{fontSize: 10}} /><Recharts.YAxis /><Recharts.Tooltip /><Recharts.Bar dataKey="value" fill="#D97706" radius={[6, 6, 0, 0]} barSize={40} /></Recharts.BarChart></Recharts.ResponsiveContainer></div></div><div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm"><h3 className="font-bold mb-4 dark:text-white">Extrato Detalhado</h3><table className="w-full text-sm text-left"><thead><tr className="border-b dark:border-slate-700 text-slate-500"><th className="py-2 font-bold">Data</th><th className="py-2 font-bold">Descrição</th><th className="py-2 font-bold">Categoria</th><th className="py-2 font-bold text-right">Valor</th></tr></thead><tbody>{expenses.map(e => (<tr key={e.id} className="border-b dark:border-slate-800 last:border-0 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"><td className="py-3 text-slate-500">{formatDateDisplay(e.date)}</td><td className="py-3 font-medium dark:text-slate-300">{e.description}</td><td className="py-3 text-xs"><span className="bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-md">{e.category}</span></td><td className="py-3 text-right font-bold dark:text-white">R$ {e.amount.toLocaleString('pt-BR')}</td></tr>))}</tbody></table></div></div>)}
-             {activeTab === 'MATERIALS' && (<div className="space-y-6 animate-in fade-in"><div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col items-center justify-center"><div className="w-40 h-40 relative"><Recharts.ResponsiveContainer width="100%" height="100%"><Recharts.PieChart><Recharts.Pie data={materialChartData} cx="50%" cy="50%" innerRadius={40} outerRadius={60} paddingAngle={5} dataKey="value" cornerRadius={5} /></Recharts.PieChart></Recharts.ResponsiveContainer><div className="absolute inset-0 flex flex-col items-center justify-center"><span className="text-2xl font-bold text-primary dark:text-white">{purchasedMaterials}</span><span className="text-[10px] text-slate-400 uppercase">Comprados</span></div></div></div><div className="space-y-4">{Object.keys(groupedMaterials).sort().map(cat => (<div key={cat} className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 break-inside-avoid"><h4 className="font-bold text-primary dark:text-white mb-4 border-b border-slate-100 dark:border-slate-800 pb-2">{cat}</h4><div className="grid grid-cols-1 gap-3">{groupedMaterials[cat].map(m => (<div key={m.id} className="flex items-center gap-4 text-sm"><div className={`w-2 h-2 rounded-full ${m.purchasedQty >= m.plannedQty ? 'bg-green-500' : 'bg-slate-300'}`}></div><div className="flex-1"><div className="flex justify-between mb-1"><span className="font-medium dark:text-slate-200">{m.name}</span><span className="text-slate-500 text-xs">{m.purchasedQty} / {m.plannedQty} {m.unit}</span></div></div></div>))}</div></div>))}</div></div>)}
-             {activeTab === 'STEPS' && (<div className="space-y-6 animate-in fade-in"><div className="flex gap-4 mb-4 overflow-x-auto pb-2"><div className="flex-1 min-w-[120px] bg-green-50 dark:bg-green-900/20 p-4 rounded-xl border border-green-100 dark:border-green-900/30 text-center"><p className="text-2xl font-bold text-green-600 dark:text-green-400">{completedSteps}</p><p className="text-xs font-bold text-green-700 dark:text-green-300 uppercase">Concluídas</p></div><div className="flex-1 min-w-[120px] bg-red-50 dark:bg-red-900/20 p-4 rounded-xl border border-red-100 dark:border-red-900/30 text-center"><p className="text-2xl font-bold text-red-600 dark:text-red-400">{delayedSteps}</p><p className="text-xs font-bold text-red-700 dark:text-red-300 uppercase">Atrasadas</p></div><div className="flex-1 min-w-[120px] bg-slate-50 dark:bg-slate-800 p-4 rounded-xl border border-slate-100 dark:border-slate-700 text-center"><p className="text-2xl font-bold text-slate-600 dark:text-slate-300">{totalSteps}</p><p className="text-xs font-bold text-slate-500 uppercase">Total Etapas</p></div></div><div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 overflow-hidden"><div className="p-4 bg-slate-50 dark:bg-slate-800 border-b border-slate-100 dark:border-slate-700 font-bold text-sm text-slate-500 flex justify-between"><span>Etapa</span><span>Status & Prazo</span></div><div className="divide-y divide-slate-100 dark:divide-slate-800">{steps.map(step => { const isDone = step.status === StepStatus.COMPLETED; const isLate = !isDone && step.isDelayed; return (<div key={step.id} className="p-4 flex justify-between items-center hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors break-inside-avoid"><div className="flex items-center gap-3"><div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs text-white ${isDone ? 'bg-green-500' : isLate ? 'bg-red-500' : 'bg-slate-300'}`}><i className={`fa-solid ${isDone ? 'fa-check' : isLate ? 'fa-exclamation' : 'fa-clock'}`}></i></div><div><p className={`font-bold text-sm ${isDone ? 'text-slate-400 line-through' : 'text-primary dark:text-white'}`}>{step.name}</p><p className="text-xs text-slate-400">Previsto: {formatDateDisplay(step.startDate)} - {formatDateDisplay(step.endDate)}</p></div></div><div className="text-right">{isLate && <span className="bg-red-100 text-red-600 text-[10px] font-bold px-2 py-1 rounded-md uppercase">Atrasado</span>}{isDone && <span className="bg-green-100 text-green-600 text-[10px] font-bold px-2 py-1 rounded-md uppercase">Feito</span>}{!isLate && !isDone && <span className="bg-slate-100 text-slate-500 text-[10px] font-bold px-2 py-1 rounded-md uppercase">Em andamento</span>}</div></div>)})}</div></div></div>)}
+             
+             {/* FINANCIAL TAB */}
+             {activeTab === 'FINANCIAL' && (
+                 <div className="space-y-6 animate-in fade-in">
+                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                         <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 shadow-sm">
+                             <p className="text-xs font-bold text-slate-400 uppercase">Total Lançado</p>
+                             <p className="text-2xl font-bold text-primary dark:text-white">R$ {totalSpent.toLocaleString('pt-BR')}</p>
+                         </div>
+                         <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 shadow-sm">
+                             <p className="text-xs font-bold text-slate-400 uppercase">Valor Pago</p>
+                             <p className="text-2xl font-bold text-green-600">R$ {totalPaid.toLocaleString('pt-BR')}</p>
+                         </div>
+                         <div className="p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 shadow-sm">
+                             <p className="text-xs font-bold text-slate-400 uppercase">A Pagar</p>
+                             <p className="text-2xl font-bold text-red-500">R$ {totalPending.toLocaleString('pt-BR')}</p>
+                         </div>
+                     </div>
+                     <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm">
+                         <div className="h-64">
+                             <Recharts.ResponsiveContainer width="100%" height="100%">
+                                 <Recharts.BarChart data={financialData}>
+                                     <Recharts.CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                     <Recharts.XAxis dataKey="name" tick={{fontSize: 10}} />
+                                     <Recharts.YAxis />
+                                     <Recharts.Tooltip />
+                                     <Recharts.Bar dataKey="value" fill="#D97706" radius={[6, 6, 0, 0]} barSize={40} />
+                                 </Recharts.BarChart>
+                             </Recharts.ResponsiveContainer>
+                         </div>
+                     </div>
+                     <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm">
+                         <h3 className="font-bold mb-4 dark:text-white">Extrato Detalhado</h3>
+                         <table className="w-full text-sm text-left">
+                             <thead>
+                                 <tr className="border-b dark:border-slate-700 text-slate-500">
+                                     <th className="py-2 font-bold">Data</th>
+                                     <th className="py-2 font-bold">Descrição</th>
+                                     <th className="py-2 font-bold">Categoria</th>
+                                     <th className="py-2 font-bold text-right">Valor Pago</th>
+                                 </tr>
+                             </thead>
+                             <tbody>
+                                 {expenses.map(e => (
+                                     <tr key={e.id} className="border-b dark:border-slate-800 last:border-0 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                                         <td className="py-3 text-slate-500">{formatDateDisplay(e.date)}</td>
+                                         <td className="py-3 font-medium dark:text-slate-300">{e.description}</td>
+                                         <td className="py-3 text-xs"><span className="bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-md">{e.category}</span></td>
+                                         <td className="py-3 text-right font-bold dark:text-white">R$ {(e.paidAmount || 0).toLocaleString('pt-BR')}</td>
+                                     </tr>
+                                 ))}
+                             </tbody>
+                         </table>
+                     </div>
+                 </div>
+             )}
+
+             {/* MATERIALS TAB */}
+             {activeTab === 'MATERIALS' && (
+                 <div className="space-y-6 animate-in fade-in">
+                     <div className="space-y-4">
+                         {sortedCategories.map((cat, idx) => (
+                             <div key={cat} className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 break-inside-avoid">
+                                 <h4 className="font-bold text-primary dark:text-white mb-4 border-b border-slate-100 dark:border-slate-800 pb-2 flex items-center gap-2">
+                                     <span className="text-secondary bg-secondary/10 w-6 h-6 rounded-md flex items-center justify-center text-xs">{String(idx + 1).padStart(2, '0')}</span> 
+                                     {cat}
+                                 </h4>
+                                 <div className="grid grid-cols-1 gap-3">
+                                     {groupedMaterials[cat].map(m => {
+                                         const isComplete = m.purchasedQty >= m.plannedQty;
+                                         const isPartial = m.purchasedQty > 0 && m.purchasedQty < m.plannedQty;
+                                         const isPending = m.purchasedQty === 0;
+                                         
+                                         let dotColor = 'bg-slate-300';
+                                         if (isComplete) dotColor = 'bg-green-500';
+                                         else if (isPartial) dotColor = 'bg-orange-500';
+
+                                         return (
+                                             <div key={m.id} className="flex items-center gap-4 text-sm">
+                                                 <div className={`w-3 h-3 rounded-full ${dotColor}`}></div>
+                                                 <div className="flex-1">
+                                                     <div className="flex justify-between mb-1">
+                                                         <span className="font-medium dark:text-slate-200">{m.name}</span>
+                                                         <span className="text-slate-500 text-xs">{m.purchasedQty} / {m.plannedQty} {m.unit}</span>
+                                                     </div>
+                                                 </div>
+                                             </div>
+                                         );
+                                     })}
+                                 </div>
+                             </div>
+                         ))}
+                     </div>
+                 </div>
+             )}
+
+             {/* STEPS TAB */}
+             {activeTab === 'STEPS' && (
+                 <div className="space-y-6 animate-in fade-in">
+                     {/* Big Stats Card */}
+                     <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm flex items-center justify-between">
+                         <div>
+                             <p className="text-sm font-bold text-slate-400 uppercase tracking-widest">Total de Etapas</p>
+                             <p className="text-4xl font-extrabold text-primary dark:text-white mt-1">{totalSteps}</p>
+                         </div>
+                         <div className="w-16 h-16 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center text-3xl text-slate-400">
+                             <i className="fa-solid fa-list-check"></i>
+                         </div>
+                     </div>
+
+                     {/* Detail Grid */}
+                     <div className="grid grid-cols-3 gap-4">
+                         <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border-l-4 border-green-500 shadow-sm">
+                             <p className="text-2xl font-bold text-green-600 dark:text-green-400">{completedSteps}</p>
+                             <p className="text-xs font-bold text-slate-500 uppercase mt-1">Concluídas</p>
+                         </div>
+                         <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border-l-4 border-orange-500 shadow-sm">
+                             <p className="text-2xl font-bold text-orange-600 dark:text-orange-400">{inProgressSteps}</p>
+                             <p className="text-xs font-bold text-slate-500 uppercase mt-1">Em Andamento</p>
+                         </div>
+                         <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border-l-4 border-red-500 shadow-sm">
+                             <p className="text-2xl font-bold text-red-600 dark:text-red-400">{delayedSteps}</p>
+                             <p className="text-xs font-bold text-slate-500 uppercase mt-1">Atrasadas</p>
+                         </div>
+                     </div>
+
+                     {/* Steps List */}
+                     <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 overflow-hidden">
+                         <div className="p-4 bg-slate-50 dark:bg-slate-800 border-b border-slate-100 dark:border-slate-700 font-bold text-sm text-slate-500 flex justify-between">
+                             <span>Etapa</span><span>Status & Prazo</span>
+                         </div>
+                         <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                             {steps.map(step => {
+                                 const isDone = step.status === StepStatus.COMPLETED;
+                                 const isInProgress = step.status === StepStatus.IN_PROGRESS;
+                                 const isNotStarted = step.status === StepStatus.NOT_STARTED;
+                                 const isLate = !isDone && new Date(step.endDate) < new Date();
+
+                                 return (
+                                     <div key={step.id} className="p-4 flex justify-between items-center hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors break-inside-avoid">
+                                         <div className="flex items-center gap-3">
+                                             <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs text-white ${isDone ? 'bg-green-500' : isLate ? 'bg-red-500' : isInProgress ? 'bg-orange-500' : 'bg-slate-300'}`}>
+                                                 <i className={`fa-solid ${isDone ? 'fa-check' : isLate ? 'fa-exclamation' : isInProgress ? 'fa-play' : 'fa-clock'}`}></i>
+                                             </div>
+                                             <div>
+                                                 <p className={`font-bold text-sm ${isDone ? 'text-slate-400 line-through' : 'text-primary dark:text-white'}`}>{step.name}</p>
+                                                 <p className="text-xs text-slate-400">Previsto: {formatDateDisplay(step.startDate)} - {formatDateDisplay(step.endDate)}</p>
+                                             </div>
+                                         </div>
+                                         <div className="text-right">
+                                             {isLate && <span className="bg-red-100 text-red-600 text-[10px] font-bold px-2 py-1 rounded-md uppercase">Atrasado</span>}
+                                             {isDone && <span className="bg-green-100 text-green-600 text-[10px] font-bold px-2 py-1 rounded-md uppercase">Feito</span>}
+                                             {isInProgress && !isLate && <span className="bg-orange-100 text-orange-600 text-[10px] font-bold px-2 py-1 rounded-md uppercase flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-orange-500"></div> Em Andamento</span>}
+                                             {isNotStarted && !isLate && <span className="bg-slate-100 text-slate-500 text-[10px] font-bold px-2 py-1 rounded-md uppercase">Planejamento</span>}
+                                         </div>
+                                     </div>
+                                 );
+                             })}
+                         </div>
+                     </div>
+                 </div>
+             )}
         </div>
     );
 };
