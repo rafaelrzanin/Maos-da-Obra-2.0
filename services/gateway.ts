@@ -6,13 +6,15 @@ import { PlanType, User } from '../types';
 
 // Base da API da NeonPay:
 // Pela doc, o exemplo usa: https://app.neonpay.com.br/api/v1
+// helper pra acessar import.meta.env sem encher o saco do TypeScript
+const env = (import.meta as any).env || {};
+
 const API_BASE_URL =
-  (import.meta.env.VITE_NEON_API_BASE_URL as string | undefined) ||
+  (env.VITE_NEON_API_BASE_URL as string | undefined) ||
   'https://app.neonpay.com.br/api/v1';
 
-// Chaves da NeonPay vindas das variáveis de ambiente (Vercel)
-const NEON_PUBLIC_KEY = import.meta.env.VITE_NEON_PUBLIC_KEY as string | undefined;
-const NEON_SECRET_KEY = import.meta.env.VITE_NEON_SECRET_KEY as string | undefined;
+const NEON_PUBLIC_KEY = env.VITE_NEON_PUBLIC_KEY as string | undefined;
+const NEON_SECRET_KEY = env.VITE_NEON_SECRET_KEY as string | undefined;
 
 // IDs externos (externalId) para identificar cada plano na Neon
 const GATEWAY_PLAN_IDS = {
