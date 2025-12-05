@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { dbService } from '../services/db';
@@ -36,20 +37,17 @@ const formatDateDisplay = (dateStr: string) => {
 // SUB-VIEWS FOR "MORE" TAB
 // ----------------------------------------------------------------------
 
-// 1. CONTACTS VIEW (Updated with Description Field)
+// 1. CONTACTS VIEW
 const ContactsView: React.FC<{ mode: 'TEAM' | 'SUPPLIERS', onBack: () => void }> = ({ mode, onBack }) => {
     const { user } = useAuth();
     const [items, setItems] = useState<any[]>([]);
     const [options, setOptions] = useState<string[]>([]);
     const [isAddOpen, setIsAddOpen] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
-    
-    // Form State
     const [newName, setNewName] = useState('');
     const [newRole, setNewRole] = useState(''); 
     const [newPhone, setNewPhone] = useState('');
-    const [newNotes, setNewNotes] = useState(''); // Description field state
-
+    const [newNotes, setNewNotes] = useState('');
     const [zeModal, setZeModal] = useState<{isOpen: boolean, title: string, message: string, onConfirm: () => void}>({isOpen: false, title: '', message: '', onConfirm: () => {}});
 
     const loadData = async () => {
@@ -137,15 +135,6 @@ const ContactsView: React.FC<{ mode: 'TEAM' | 'SUPPLIERS', onBack: () => void }>
                                 {options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                             </select>
                             <input placeholder="Telefone" value={newPhone} onChange={e => setNewPhone(e.target.value)} className="w-full p-3 rounded-xl border dark:border-slate-700 dark:bg-slate-800 dark:text-white outline-none" required />
-                            
-                            {/* ADDED DESCRIPTION FIELD */}
-                            <textarea 
-                                placeholder="Descrição / Anotações" 
-                                value={newNotes} 
-                                onChange={e => setNewNotes(e.target.value)} 
-                                className="w-full p-3 rounded-xl border dark:border-slate-700 dark:bg-slate-800 dark:text-white outline-none resize-none h-24" 
-                            />
-
                             <div className="flex gap-2 pt-2">
                                 <button type="button" onClick={() => setIsAddOpen(false)} className="flex-1 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl">Cancelar</button>
                                 <button type="submit" className="flex-1 py-3 bg-primary text-white rounded-xl font-bold">Salvar</button>
@@ -334,26 +323,26 @@ const ReportsView: React.FC<{ workId: string, onBack: () => void }> = ({ workId,
                      </div>
                      <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm">
                          <h3 className="font-bold mb-4 dark:text-white">Extrato Detalhado</h3>
-                         <div className="space-y-3">
-                             {expenses.map(e => (
-                                 <div key={e.id} className="flex flex-col p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/30 border border-slate-100 dark:border-slate-700/50">
-                                     <div className="flex justify-between items-start mb-2">
-                                         <span className="font-bold text-sm text-primary dark:text-white leading-tight">{e.description}</span>
-                                         <span className="font-bold text-sm text-primary dark:text-white ml-4 whitespace-nowrap">R$ {(e.paidAmount || 0).toLocaleString('pt-BR')}</span>
-                                     </div>
-                                     <div className="flex justify-between items-center text-xs">
-                                         <div className="flex items-center gap-2 text-slate-500">
-                                             <i className="fa-regular fa-calendar"></i>
-                                             <span>{formatDateDisplay(e.date)}</span>
-                                         </div>
-                                         <span className="bg-white dark:bg-slate-800 px-2 py-1 rounded-lg border border-slate-100 dark:border-slate-700 text-slate-500 font-medium text-[10px] uppercase tracking-wide">
-                                             {e.category}
-                                         </span>
-                                     </div>
-                                 </div>
-                             ))}
-                             {expenses.length === 0 && <p className="text-slate-400 text-center text-sm py-4">Nenhum lançamento.</p>}
-                         </div>
+                         <table className="w-full text-sm text-left">
+                             <thead>
+                                 <tr className="border-b dark:border-slate-700 text-slate-500">
+                                     <th className="py-2 font-bold">Data</th>
+                                     <th className="py-2 font-bold">Descrição</th>
+                                     <th className="py-2 font-bold">Categoria</th>
+                                     <th className="py-2 font-bold text-right">Valor Pago</th>
+                                 </tr>
+                             </thead>
+                             <tbody>
+                                 {expenses.map(e => (
+                                     <tr key={e.id} className="border-b dark:border-slate-800 last:border-0 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
+                                         <td className="py-3 text-slate-500">{formatDateDisplay(e.date)}</td>
+                                         <td className="py-3 font-medium dark:text-slate-300">{e.description}</td>
+                                         <td className="py-3 text-xs"><span className="bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-md">{e.category}</span></td>
+                                         <td className="py-3 text-right font-bold dark:text-white">R$ {(e.paidAmount || 0).toLocaleString('pt-BR')}</td>
+                                     </tr>
+                                 ))}
+                             </tbody>
+                         </table>
                      </div>
                  </div>
              )}
@@ -1033,216 +1022,39 @@ const ExpensesTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ workI
 const WorkDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { user } = useAuth();
-
   const [work, setWork] = useState<Work | null>(null);
-  const [loading, setLoading] = useState(true);
-  
-  // Navigation State
-  const [subView, setSubView] = useState<'NONE' | 'TEAM' | 'SUPPLIERS' | 'PHOTOS' | 'FILES' | 'REPORTS'>('NONE');
-  const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'STEPS' | 'FINANCE' | 'MATERIALS' | 'AI'>('OVERVIEW');
-
-  // Data State for Main View
-  const [steps, setSteps] = useState<Step[]>([]);
-  const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [materials, setMaterials] = useState<Material[]>([]);
+  const [activeTab, setActiveTab] = useState('overview');
   const [stats, setStats] = useState({ totalSpent: 0, progress: 0, delayedSteps: 0 });
-
-  // AI Chat State
-  const [chatMessage, setChatMessage] = useState('');
-  const [chatHistory, setChatHistory] = useState<{sender: 'USER'|'AI', text: string}[]>([]);
-  const [aiLoading, setAiLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [showAiChat, setShowAiChat] = useState(false);
+  const [aiMessage, setAiMessage] = useState('');
+  const [aiHistory, setAiHistory] = useState<{sender: 'user'|'ze', text: string}[]>([]);
+  const [aiLoading, setAiLoading] = useState(false);
 
-  // Modals
-  const [zeModal, setZeModal] = useState({isOpen: false, title: '', message: '', onConfirm: () => {}});
+  const loadWork = async () => { if (!id) return; setLoading(true); const w = await dbService.getWorkById(id); if (w) { setWork(w); const s = await dbService.calculateWorkStats(id); setStats(s); } setLoading(false); };
+  useEffect(() => { loadWork(); }, [id]);
 
-  // Load Work Data
-  const loadData = async () => {
-      if (!id) return;
-      setLoading(true);
-      const w = await dbService.getWorkById(id);
-      if (!w) {
-          navigate('/');
-          return;
-      }
-      setWork(w);
-      
-      const [s, e, m, st] = await Promise.all([
-          dbService.getSteps(id),
-          dbService.getExpenses(id),
-          dbService.getMaterials(id),
-          dbService.calculateWorkStats(id)
-      ]);
-      setSteps(s.sort((a,b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()));
-      setExpenses(e.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
-      setMaterials(m);
-      setStats(st);
-      setLoading(false);
-  };
+  const handleAiSend = async (e: React.FormEvent) => { e.preventDefault(); if (!aiMessage.trim()) return; const userMsg = aiMessage; setAiHistory(prev => [...prev, { sender: 'user', text: userMsg }]); setAiMessage(''); setAiLoading(true); const response = await aiService.sendMessage(userMsg); setAiHistory(prev => [...prev, { sender: 'ze', text: response }]); setAiLoading(false); };
 
-  useEffect(() => {
-      loadData();
-  }, [id]);
-
-  // AI Handler
-  const handleSendMessage = async (e: React.FormEvent) => {
-      e.preventDefault();
-      if (!chatMessage.trim()) return;
-      
-      const userMsg = chatMessage;
-      setChatHistory(prev => [...prev, { sender: 'USER', text: userMsg }]);
-      setChatMessage('');
-      setAiLoading(true);
-
-      const response = await aiService.sendMessage(userMsg);
-      
-      setChatHistory(prev => [...prev, { sender: 'AI', text: response }]);
-      setAiLoading(false);
-  };
-
-  if (loading) return <div className="flex h-screen items-center justify-center text-primary"><i className="fa-solid fa-circle-notch fa-spin text-4xl"></i></div>;
-  if (!work) return null;
-
-  // Render Sub Views
-  if (subView === 'TEAM') return <div className="p-4 md:p-8"><ContactsView mode="TEAM" onBack={() => setSubView('NONE')} /></div>;
-  if (subView === 'SUPPLIERS') return <div className="p-4 md:p-8"><ContactsView mode="SUPPLIERS" onBack={() => setSubView('NONE')} /></div>;
-  if (subView === 'PHOTOS') return <div className="p-4 md:p-8 h-screen"><PhotosView workId={work.id} onBack={() => setSubView('NONE')} /></div>;
-  if (subView === 'FILES') return <div className="p-4 md:p-8 h-screen"><FilesView workId={work.id} onBack={() => setSubView('NONE')} /></div>;
-  if (subView === 'REPORTS') return <div className="p-4 md:p-8"><ReportsView workId={work.id} onBack={() => setSubView('NONE')} /></div>;
-
-  // Helper to render Tab Button
-  const TabBtn = ({ id, label, icon }: any) => (
-      <button 
-        onClick={() => setActiveTab(id)} 
-        className={`flex flex-col items-center justify-center p-2 rounded-xl transition-all ${activeTab === id ? 'text-secondary font-bold' : 'text-slate-400 hover:text-slate-600'}`}
-      >
-          <i className={`fa-solid ${icon} text-xl mb-1`}></i>
-          <span className="text-[10px] uppercase tracking-wide">{label}</span>
-      </button>
-  );
+  if (loading) return (<div className="min-h-screen flex items-center justify-center text-secondary"><i className="fa-solid fa-circle-notch fa-spin text-3xl"></i></div>);
+  if (!work) return (<div className="min-h-screen flex flex-col items-center justify-center p-4 text-center"><h2 className="text-xl font-bold text-slate-500 mb-4">Obra não encontrada</h2><button onClick={() => navigate('/')} className="text-primary hover:underline">Voltar ao Painel</button></div>);
 
   return (
-    <div className="pb-24 md:pb-0">
-       {/* HEADER Mobile/Desktop */}
-       <div className="flex justify-between items-center mb-6">
-           <div>
-               <button onClick={() => navigate('/')} className="text-slate-400 text-xs font-bold uppercase tracking-widest hover:text-primary mb-1">
-                   <i className="fa-solid fa-chevron-left"></i> Painel Geral
-               </button>
-               <h1 className="text-2xl font-extrabold text-primary dark:text-white leading-none">{work.name}</h1>
-           </div>
-           
-           <div className="flex gap-2">
-               <button onClick={() => setSubView('REPORTS')} className="w-10 h-10 rounded-xl bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 shadow-sm border border-slate-200 dark:border-slate-700 flex items-center justify-center hover:bg-slate-50 dark:hover:bg-slate-700" title="Relatórios">
-                   <i className="fa-solid fa-chart-pie"></i>
-               </button>
-               <div className="relative group">
-                   <button className="w-10 h-10 rounded-xl bg-primary text-white shadow-lg shadow-primary/30 flex items-center justify-center">
-                       <i className="fa-solid fa-ellipsis-vertical"></i>
-                   </button>
-                   <div className="absolute right-0 top-full mt-2 w-48 bg-white dark:bg-slate-900 rounded-xl shadow-xl border border-slate-100 dark:border-slate-800 overflow-hidden hidden group-hover:block z-50 animate-in fade-in slide-in-from-top-2">
-                       <button onClick={() => setSubView('TEAM')} className="w-full text-left px-4 py-3 text-sm hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 font-medium flex items-center gap-2"><i className="fa-solid fa-helmet-safety w-5"></i> Equipe</button>
-                       <button onClick={() => setSubView('SUPPLIERS')} className="w-full text-left px-4 py-3 text-sm hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 font-medium flex items-center gap-2"><i className="fa-solid fa-truck w-5"></i> Fornecedores</button>
-                       <button onClick={() => setSubView('PHOTOS')} className="w-full text-left px-4 py-3 text-sm hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 font-medium flex items-center gap-2"><i className="fa-solid fa-camera w-5"></i> Fotos</button>
-                       <button onClick={() => setSubView('FILES')} className="w-full text-left px-4 py-3 text-sm hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 font-medium flex items-center gap-2"><i className="fa-solid fa-folder w-5"></i> Arquivos</button>
-                   </div>
-               </div>
-           </div>
-       </div>
-
-       {/* MAIN TABS CONTENT */}
-       <div className="animate-in fade-in slide-in-from-bottom-4">
-           
-           {/* OVERVIEW */}
-           {activeTab === 'OVERVIEW' && (
-                <OverviewTab work={work} stats={stats} onGoToSteps={() => setActiveTab('STEPS')} />
-           )}
-
-           {/* STEPS TAB */}
-           {activeTab === 'STEPS' && (
-               <StepsTab workId={work.id} refreshWork={loadData} />
-           )}
-
-            {/* FINANCE TAB */}
-            {activeTab === 'FINANCE' && (
-                <ExpensesTab workId={work.id} onUpdate={loadData} />
-            )}
-
-            {/* MATERIALS TAB */}
-            {activeTab === 'MATERIALS' && (
-                <MaterialsTab workId={work.id} onUpdate={loadData} />
-            )}
-
-           {/* AI CHAT TAB */}
-           {activeTab === 'AI' && (
-               <div className="flex flex-col h-[60vh]">
-                   <div className="flex-1 bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 p-4 overflow-y-auto space-y-4 mb-4">
-                       {/* Welcome Message */}
-                       <div className="flex gap-3">
-                           <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center shrink-0 overflow-hidden">
-                               <img src={ZE_AVATAR} alt="Zé" className="w-full h-full object-cover" onError={(e:any) => e.target.src = ZE_AVATAR_FALLBACK}/>
-                           </div>
-                           <div className="bg-slate-100 dark:bg-slate-800 p-3 rounded-tr-xl rounded-br-xl rounded-bl-xl text-sm text-slate-700 dark:text-slate-300">
-                               Fala parceiro! Eu sou o Zé. Pode perguntar qualquer coisa sobre sua obra que eu ajudo.
-                           </div>
-                       </div>
-                       
-                       {chatHistory.map((msg, idx) => (
-                           <div key={idx} className={`flex gap-3 ${msg.sender === 'USER' ? 'flex-row-reverse' : ''}`}>
-                               <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 overflow-hidden ${msg.sender === 'USER' ? 'bg-primary text-white' : 'bg-slate-200 dark:bg-slate-700'}`}>
-                                   {msg.sender === 'USER' ? <span className="text-xs font-bold">{user?.name.charAt(0)}</span> : <img src={ZE_AVATAR} alt="Zé" className="w-full h-full object-cover" onError={(e:any) => e.target.src = ZE_AVATAR_FALLBACK}/>}
-                               </div>
-                               <div className={`p-3 max-w-[80%] text-sm ${msg.sender === 'USER' ? 'bg-primary text-white rounded-tl-xl rounded-bl-xl rounded-br-xl' : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-tr-xl rounded-br-xl rounded-bl-xl'}`}>
-                                   {msg.text}
-                               </div>
-                           </div>
-                       ))}
-                       {aiLoading && (
-                           <div className="flex gap-3">
-                               <div className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center shrink-0"><i className="fa-solid fa-circle-notch fa-spin text-slate-400"></i></div>
-                               <div className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-xl text-xs text-slate-400 italic">Digitando...</div>
-                           </div>
-                       )}
-                   </div>
-                   <form onSubmit={handleSendMessage} className="flex gap-2">
-                       <input 
-                          value={chatMessage}
-                          onChange={e => setChatMessage(e.target.value)}
-                          placeholder="Ex: Qual o traço do concreto?" 
-                          className="flex-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 outline-none focus:border-secondary dark:text-white"
-                       />
-                       <button type="submit" disabled={aiLoading || !chatMessage.trim()} className="bg-secondary text-white w-12 h-12 rounded-xl flex items-center justify-center shadow-lg disabled:opacity-50">
-                           <i className="fa-solid fa-paper-plane"></i>
-                       </button>
-                   </form>
-               </div>
-           )}
-
-       </div>
-
-       {/* MOBILE TAB BAR */}
-       <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 p-2 md:hidden z-50 flex justify-between px-6 pb-safe">
-           <TabBtn id="OVERVIEW" label="Resumo" icon="fa-house" />
-           <TabBtn id="STEPS" label="Etapas" icon="fa-list-check" />
-           <div className="-mt-8">
-               <button onClick={() => setActiveTab('AI')} className={`w-14 h-14 rounded-full flex items-center justify-center shadow-lg border-4 border-slate-50 dark:border-slate-950 transition-transform active:scale-95 ${activeTab === 'AI' ? 'bg-secondary text-white' : 'bg-primary text-white'}`}>
-                   <img src={ZE_AVATAR} className="w-full h-full object-cover rounded-full" onError={(e:any) => e.target.src = ZE_AVATAR_FALLBACK} />
-               </button>
-           </div>
-           <TabBtn id="FINANCE" label="Gastos" icon="fa-wallet" />
-           <TabBtn id="MATERIALS" label="Materiais" icon="fa-cart-shopping" />
-       </div>
-       
-       {/* More Menu Modal (Reusing existing component structure) */}
-       {subView === 'NONE' && activeTab === 'OVERVIEW' && (
-           <div className="mt-8">
-               <MoreMenuTab workId={work.id} onOpenChat={() => setActiveTab('AI')} />
-           </div>
-       )}
-       
-       <ZeModal isOpen={zeModal.isOpen} title={zeModal.title} message={zeModal.message} onConfirm={zeModal.onConfirm} onCancel={() => setZeModal({isOpen: false, title: '', message: '', onConfirm: () => {}})} />
-    </div>
+      <div className="min-h-screen pb-24">
+          <div className="sticky top-0 z-30 bg-surface/90 dark:bg-slate-950/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 px-4 py-4 flex justify-between items-center"><div className="flex items-center gap-3"><button onClick={() => navigate('/')} className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500"><i className="fa-solid fa-arrow-left"></i></button><h1 className="font-bold text-primary dark:text-white truncate max-w-[200px]">{work.name}</h1></div>
+          <button onClick={() => setShowAiChat(true)} className="bg-secondary text-white pl-2 pr-4 py-1.5 rounded-full flex items-center gap-2 shadow-lg shadow-orange-500/20 hover:bg-orange-600 transition-colors"><div className="w-7 h-7 rounded-full bg-white/20 p-0.5"><img src={ZE_AVATAR} className="w-full h-full rounded-full bg-slate-100 object-cover" alt="Zé" onError={(e) => { const target = e.currentTarget; if (target.src !== ZE_AVATAR_FALLBACK) { target.src = ZE_AVATAR_FALLBACK; } }} /></div><span className="font-bold text-xs">Zé da Obra AI</span></button></div>
+          
+          <div className="max-w-4xl mx-auto p-4 md:p-6">
+              {activeTab === 'overview' && <OverviewTab work={work} stats={stats} onGoToSteps={() => setActiveTab('steps')} />}
+              {activeTab === 'steps' && <StepsTab workId={work.id} refreshWork={loadWork} />}
+              {activeTab === 'materials' && <MaterialsTab workId={work.id} onUpdate={loadWork} />}
+              {activeTab === 'expenses' && <ExpensesTab workId={work.id} onUpdate={loadWork} />}
+              {activeTab === 'more' && <MoreMenuTab workId={work.id} onOpenChat={() => setShowAiChat(true)} />}
+          </div>
+          <div className="fixed bottom-0 left-0 w-full bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 pb-safe pt-2 px-6 flex justify-between items-center z-40 shadow-[0_-5px_20px_rgba(0,0,0,0.05)]">{[{ id: 'overview', icon: 'fa-house', label: 'Geral' }, { id: 'steps', icon: 'fa-calendar-days', label: 'Cronograma' }, { id: 'materials', icon: 'fa-cart-shopping', label: 'Materiais' }, { id: 'expenses', icon: 'fa-wallet', label: 'Gastos' }, { id: 'more', icon: 'fa-bars', label: 'Mais' }].map(tab => (<button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex flex-col items-center gap-1 min-w-[60px] transition-all duration-300 ${activeTab === tab.id ? 'text-secondary -translate-y-2' : 'text-slate-400 hover:text-slate-600'}`}><div className={`w-10 h-10 rounded-2xl flex items-center justify-center text-lg transition-all ${activeTab === tab.id ? 'bg-secondary text-white shadow-lg shadow-orange-500/30' : ''}`}><i className={`fa-solid ${tab.icon}`}></i></div><span className={`text-[10px] font-bold ${activeTab === tab.id ? 'opacity-100' : 'opacity-0'}`}>{tab.label}</span></button>))}</div>
+          
+          {showAiChat && (<div className="fixed inset-0 z-50 flex flex-col bg-white dark:bg-slate-900 animate-in slide-in-from-bottom duration-300 md:max-w-md md:right-4 md:bottom-20 md:left-auto md:top-auto md:h-[600px] md:rounded-3xl md:shadow-2xl md:border md:border-slate-200"><div className="p-4 bg-primary text-white flex justify-between items-center shrink-0 md:rounded-t-3xl"><div className="flex items-center gap-3"><div className="w-10 h-10 rounded-full bg-white/10 p-1"><img src={ZE_AVATAR} className="w-full h-full object-cover rounded-full bg-slate-100" onError={(e) => { const target = e.currentTarget; if (target.src !== ZE_AVATAR_FALLBACK) { target.src = ZE_AVATAR_FALLBACK; } }} /></div><div><h3 className="font-bold text-sm">Zé da Obra</h3><p className="text-[10px] text-green-300 flex items-center gap-1"><span className="w-1.5 h-1.5 bg-green-300 rounded-full animate-pulse"></span> Mestre Virtual</p></div></div><button onClick={() => setShowAiChat(false)} className="text-white/70 hover:text-white w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/10"><i className="fa-solid fa-xmark"></i></button></div><div className="flex-1 p-4 overflow-y-auto space-y-4 bg-slate-50 dark:bg-black/20">{aiHistory.length === 0 && (<div className="h-full flex flex-col items-center justify-center text-center opacity-40 p-6"><i className="fa-solid fa-comments text-4xl mb-3"></i><p className="text-sm font-medium">"Opa! Sou o Zé. Pode perguntar qualquer coisa sobre a obra que eu ajudo."</p></div>)}{aiHistory.map((msg, i) => (<div key={i} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}><div className={`max-w-[85%] p-3 rounded-2xl text-sm leading-relaxed ${msg.sender === 'user' ? 'bg-primary text-white rounded-tr-none' : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-tl-none shadow-sm'}`}>{msg.text}</div></div>))}{aiLoading && (<div className="flex justify-start"><div className="bg-white dark:bg-slate-800 p-4 rounded-2xl rounded-tl-none border border-slate-200 dark:border-slate-700 shadow-sm"><div className="flex gap-1.5"><span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"></span><span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce delay-75"></span><span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce delay-150"></span></div></div></div>)}</div><form onSubmit={handleAiSend} className="p-3 bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 flex gap-2 shrink-0 md:rounded-b-3xl"><input className="flex-1 bg-slate-100 dark:bg-slate-800 border-0 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-secondary/50 outline-none dark:text-white" placeholder="Digite sua dúvida..." value={aiMessage} onChange={e => setAiMessage(e.target.value)} /><button type="submit" disabled={!aiMessage.trim() || aiLoading} className="w-12 h-12 rounded-xl bg-secondary text-white flex items-center justify-center hover:bg-amber-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"><i className="fa-solid fa-paper-plane"></i></button></form></div>)}
+      </div>
   );
 };
 
