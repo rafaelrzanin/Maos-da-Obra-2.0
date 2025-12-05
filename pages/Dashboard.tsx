@@ -149,7 +149,7 @@ const Dashboard: React.FC = () => {
                 <i className="fa-solid fa-helmet-safety text-5xl"></i>
             </div>
             <h2 className="text-3xl font-bold text-primary dark:text-white mb-4 tracking-tight">Bem-vindo ao Mãos da Obra</h2>
-            <p className="text-slate-500 dark:text-slate-400 max-w-md mb-10 leading-relaxed">
+            <p className="text-slate-600 dark:text-slate-300 max-w-md mb-10 leading-relaxed">
                 Gestão profissional para sua construção. Simples, visual e direto ao ponto. Vamos começar sua primeira obra?
             </p>
             <button 
@@ -213,16 +213,16 @@ const Dashboard: React.FC = () => {
                  {/* Explicit Delete Button for Current Work */}
                  <button 
                     onClick={(e) => handleDeleteClick(e, focusWork.id, focusWork.name)}
-                    className="w-11 h-11 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-400 hover:text-red-500 hover:border-red-200 flex items-center justify-center shadow-sm transition-all"
+                    className="w-11 h-11 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-400 hover:text-red-500 hover:border-red-200 dark:hover:border-red-900 dark:hover:text-red-400 flex items-center justify-center shadow-sm transition-all"
                     title="Excluir Obra Atual"
                  >
                      <i className="fa-solid fa-trash"></i>
                  </button>
                  
                  {showWorkSelector && (
-                     <div className="absolute right-0 top-full mt-2 w-72 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-100 dark:border-slate-800 overflow-hidden animate-in fade-in slide-in-from-top-2 z-50">
-                         <div className="p-3 bg-slate-50 dark:bg-black/20 border-b border-slate-100 dark:border-slate-800">
-                             <p className="text-xs font-bold text-slate-500 uppercase">Minhas Obras</p>
+                     <div className="absolute right-0 top-full mt-2 w-72 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-100 dark:border-slate-700 overflow-hidden animate-in fade-in slide-in-from-top-2 z-50">
+                         <div className="p-3 bg-slate-50 dark:bg-slate-800 border-b border-slate-100 dark:border-slate-700">
+                             <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">Minhas Obras</p>
                          </div>
                          {works.map(w => (
                              <div
@@ -258,14 +258,14 @@ const Dashboard: React.FC = () => {
       </div>
       
       {/* ZÉ DA OBRA TIP (Glassmorphism) - DYNAMIC */}
-      <div className="mb-8 relative overflow-hidden rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/5 shadow-sm group hover:shadow-md transition-all">
+      <div className="mb-8 relative overflow-hidden rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm group hover:shadow-md transition-all">
            <div className="absolute top-0 right-0 w-32 h-32 bg-secondary/10 rounded-full blur-3xl translate-x-10 -translate-y-10 group-hover:bg-secondary/20 transition-all"></div>
            <div className="flex items-center gap-5 p-5 relative z-10">
                 <div className="w-16 h-16 rounded-full p-1 bg-gradient-to-br from-slate-100 to-slate-300 dark:from-slate-700 dark:to-slate-800 shrink-0 shadow-inner">
                         <img 
                         src={ZE_AVATAR} 
                         alt="Zeca da Obra" 
-                        className="w-full h-full object-cover rounded-full border-2 border-white dark:border-slate-900 bg-white"
+                        className="w-full h-full object-cover rounded-full border-2 border-white dark:border-slate-800 bg-white"
                         onError={(e) => { 
                             const target = e.currentTarget;
                             if (target.src !== ZE_AVATAR_FALLBACK) {
@@ -278,7 +278,7 @@ const Dashboard: React.FC = () => {
                     <div className="flex items-center gap-2 mb-1">
                         <span className="bg-secondary text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">Dica do Zé: {currentTip.tag}</span>
                     </div>
-                    <p className="text-sm text-slate-600 dark:text-slate-300 italic">
+                    <p className="text-sm text-slate-600 dark:text-slate-300 italic font-medium">
                         "{currentTip.text}"
                     </p>
                 </div>
@@ -298,7 +298,7 @@ const Dashboard: React.FC = () => {
                 </div>
                 <div className="text-left">
                     <h3 className="text-lg font-bold">Acessar Minha Obra</h3>
-                    <p className="text-xs opacity-70 font-medium">Gerenciar etapas, compras e gastos</p>
+                    <p className="text-xs opacity-80 font-medium">Gerenciar etapas, compras e gastos</p>
                 </div>
             </div>
             <i className="fa-solid fa-chevron-right text-xl opacity-50 group-hover:translate-x-1 transition-transform"></i>
@@ -307,7 +307,7 @@ const Dashboard: React.FC = () => {
 
       {/* MAIN HUD (Heads Up Display) */}
       <div className="glass-panel rounded-3xl p-1 shadow-2xl mb-8 relative z-0">
-          <div className="bg-white/50 dark:bg-black/40 rounded-[1.4rem] p-6 lg:p-8 backdrop-blur-xl">
+          <div className="bg-white/50 dark:bg-slate-800/60 rounded-[1.4rem] p-6 lg:p-8 backdrop-blur-xl">
               
               {/* Status Header */}
               <div className="flex items-center gap-4 mb-8">
@@ -325,10 +325,10 @@ const Dashboard: React.FC = () => {
                   {/* Card 1: Tarefas */}
                   <div 
                     onClick={() => navigate(`/work/${focusWork.id}`)}
-                    className={`p-5 rounded-2xl border transition-all cursor-pointer hover:-translate-y-1 hover:shadow-lg bg-white dark:bg-slate-800 ${hasDelay ? 'border-red-500/30' : 'border-white/10'}`}
+                    className={`p-5 rounded-2xl border transition-all cursor-pointer hover:-translate-y-1 hover:shadow-lg bg-white dark:bg-slate-800/80 ${hasDelay ? 'border-red-500/30' : 'border-slate-100 dark:border-slate-700'}`}
                   >
                       <div className="flex justify-between items-start mb-3">
-                          <div className={`w-10 h-10 rounded-full flex items-center justify-center ${hasDelay ? 'bg-red-100 text-red-600' : 'bg-slate-100 dark:bg-slate-700 text-slate-500'}`}>
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center ${hasDelay ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400' : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400'}`}>
                                <i className="fa-solid fa-list-check"></i>
                           </div>
                           {hasDelay && <span className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></span>}
@@ -336,7 +336,7 @@ const Dashboard: React.FC = () => {
                       <p className="text-3xl font-extrabold text-primary dark:text-white mb-1">
                           {hasDelay ? dailySummary.delayedSteps : dailySummary.completedSteps}
                       </p>
-                      <p className={`text-xs font-bold uppercase tracking-wider ${hasDelay ? 'text-red-500' : 'text-slate-500'}`}>
+                      <p className={`text-xs font-bold uppercase tracking-wider ${hasDelay ? 'text-red-500 dark:text-red-400' : 'text-slate-500 dark:text-slate-400'}`}>
                           {hasDelay ? 'Atrasadas' : 'Concluídas'}
                       </p>
                   </div>
@@ -344,7 +344,7 @@ const Dashboard: React.FC = () => {
                   {/* Card 2: Compras */}
                   <div 
                     onClick={() => navigate(`/work/${focusWork.id}`)}
-                    className="p-5 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-white/5 transition-all cursor-pointer hover:-translate-y-1 hover:shadow-lg"
+                    className="p-5 rounded-2xl bg-white dark:bg-slate-800/80 border border-slate-100 dark:border-slate-700 transition-all cursor-pointer hover:-translate-y-1 hover:shadow-lg"
                   >
                       <div className="flex justify-between items-start mb-3">
                           <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-700 text-secondary flex items-center justify-center">
@@ -354,7 +354,7 @@ const Dashboard: React.FC = () => {
                       <p className="text-3xl font-extrabold text-primary dark:text-white mb-1">
                           {dailySummary.pendingMaterials}
                       </p>
-                      <p className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                      <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                           Pendentes
                       </p>
                   </div>
@@ -378,21 +378,21 @@ const Dashboard: React.FC = () => {
               </div>
 
               {/* Financial Strip */}
-              <div className="bg-slate-50 dark:bg-slate-800/80 rounded-2xl p-6 border border-slate-200 dark:border-white/5 relative overflow-hidden">
+              <div className="bg-slate-50 dark:bg-slate-800/80 rounded-2xl p-6 border border-slate-200 dark:border-slate-700 relative overflow-hidden">
                   {/* Background Bar */}
                   <div className="absolute bottom-0 left-0 h-1 bg-slate-200 dark:bg-slate-700 w-full"></div>
                   <div className={`absolute bottom-0 left-0 h-1 transition-all duration-1000 ${isOverBudget ? 'bg-danger shadow-[0_0_15px_red]' : 'bg-success shadow-[0_0_15px_lime]'}`} style={{ width: `${Math.min(budgetPercentage, 100)}%` }}></div>
 
                   <div className="flex justify-between items-end mb-2 relative z-10">
                       <div>
-                          <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Orçamento Utilizado</p>
+                          <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1">Orçamento Utilizado</p>
                           <p className="text-xl font-bold text-primary dark:text-white">
                               R$ {stats.totalSpent.toLocaleString('pt-BR')} 
-                              <span className="text-sm font-normal text-slate-400 mx-2">/</span>
-                              <span className="text-sm text-slate-400">R$ {focusWork.budgetPlanned.toLocaleString('pt-BR')}</span>
+                              <span className="text-sm font-normal text-slate-400 dark:text-slate-500 mx-2">/</span>
+                              <span className="text-sm text-slate-400 dark:text-slate-500">R$ {focusWork.budgetPlanned.toLocaleString('pt-BR')}</span>
                           </p>
                       </div>
-                      <div className={`px-3 py-1 rounded-lg text-sm font-bold ${isOverBudget ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-700'}`}>
+                      <div className={`px-3 py-1 rounded-lg text-sm font-bold ${isOverBudget ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400' : 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'}`}>
                           {budgetPercentage}%
                       </div>
                   </div>
@@ -433,13 +433,13 @@ const Dashboard: React.FC = () => {
                     }
 
                     return (
-                        <div key={step.id} onClick={() => navigate(`/work/${focusWork.id}`)} className="cursor-pointer bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 flex items-center gap-4 shadow-sm hover:shadow-md hover:border-secondary/30 transition-all">
-                            <div className="w-10 h-10 rounded-xl bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-500">
+                        <div key={step.id} onClick={() => navigate(`/work/${focusWork.id}`)} className="cursor-pointer bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 flex items-center gap-4 shadow-sm hover:shadow-md hover:border-secondary/30 transition-all">
+                            <div className="w-10 h-10 rounded-xl bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-500 dark:text-slate-400">
                                 <i className="fa-regular fa-calendar"></i>
                             </div>
                             <div className="flex-1 min-w-0">
                                 <h4 className="font-bold text-primary dark:text-white text-sm truncate">{step.name}</h4>
-                                <p className="text-xs text-slate-500">{formatDateDisplay(step.startDate)}</p>
+                                <p className="text-xs text-slate-500 dark:text-slate-400">{formatDateDisplay(step.startDate)}</p>
                             </div>
                             <div className={`text-[10px] font-bold px-2 py-1 rounded-md uppercase whitespace-nowrap ${statusColor}`}>
                                 {statusLabel}
@@ -472,11 +472,11 @@ const Dashboard: React.FC = () => {
                   notifications.map(notif => (
                       <div key={notif.id} className={`group relative p-4 rounded-2xl border flex items-start gap-4 transition-all ${
                           notif.type === 'WARNING' ? 'bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-900/30' :
-                          'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800'
+                          'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800'
                       }`}>
                           <div className={`mt-1 w-8 h-8 rounded-lg flex items-center justify-center shrink-0 shadow-sm ${
-                              notif.type === 'WARNING' ? 'bg-amber-100 text-amber-600' :
-                              'bg-blue-100 text-blue-600'
+                              notif.type === 'WARNING' ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400' :
+                              'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
                           }`}>
                               <i className={`fa-solid ${
                                   notif.type === 'WARNING' ? 'fa-bolt' : 'fa-info'
