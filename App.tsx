@@ -249,12 +249,12 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         
         {/* Logo Area */}
         <div className="p-8 pb-4 flex items-center gap-4">
-          <div className="w-12 h-12 bg-gradient-gold rounded-xl flex items-center justify-center text-white shadow-lg shadow-orange-500/20 transform rotate-3">
+          <div className="w-12 h-12 bg-gradient-gold rounded-xl flex items-center justify-center text-white shadow-lg shadow-orange-500/20 transform rotate-3 shrink-0">
              <i className="fa-solid fa-helmet-safety text-2xl"></i>
           </div>
           <div>
             <h1 className="font-extrabold text-white tracking-tight leading-none text-xl">MÃOS DA<br/>OBRA</h1>
-            <p className="text-[10px] text-secondary tracking-widest uppercase font-bold mt-1">Premium Edition</p>
+            <p className="text-[10px] text-secondary/90 font-semibold tracking-wide mt-1 leading-tight">O controle da sua obra na palma da sua mão</p>
           </div>
         </div>
         
