@@ -450,53 +450,130 @@ Assinatura do Contratado`
   }
 ];
 
-// --- CHECKLISTS ---
+// --- CHECKLISTS ENRIQUECIDOS (ANTI-ERRO) ---
 export const STANDARD_CHECKLISTS = [
   {
-    category: 'Vistoria de Imóvel Novo',
+    category: '01. Início de Obra e Canteiro',
     items: [
-      'Verificar caimento de água em áreas molhadas (banheiro/sacada)',
-      'Testar todas as tomadas com um equipamento',
-      'Abrir e fechar todas as portas e janelas (verificar trincos)',
-      'Verificar se há pisos ocos (bater levemente com cabo de vassoura)',
-      'Checar pressão da água nas torneiras e chuveiro',
-      'Verificar pintura (manchas, descascados ou falhas)',
-      'Conferir rejuntes (falhas ou buracos)',
-      'Olhar o quadro de luz (identificação dos disjuntores)'
+      'Água e Luz provisórias ligadas e funcionando',
+      'Tapume ou fechamento seguro do perímetro',
+      'Banheiro para operários limpo e funcionando',
+      'Local de armazenamento de cimento (seco, alto e ventilado)',
+      'Projetos impressos e plastificados na obra (Arquitetônico, Estrutural)',
+      'EPIs básicos disponíveis (Capacete, Luva, Bota, Óculos)',
+      'Placa da obra instalada (se exigido pela prefeitura)',
+      'Caçamba ou local definido para descarte de entulho'
     ]
   },
   {
-    category: 'Início de Obra',
+    category: '02. Fundação e Impermeabilização (Crítico)',
     items: [
-      'Água e Luz provisórias ligadas',
-      'Tapume ou fechamento da obra instalado',
-      'Banheiro para operários funcionando',
-      'Local de armazenamento de cimento (seco e alto)',
-      'Projetos impressos na obra (Arquitetônico, Hidráulico, Elétrico)',
-      'EPIs básicos comprados (Capacete, Luva, Bota)',
-      'Placa da obra (se exigido pela prefeitura)',
-      'Caçamba ou local de descarte definido'
+      'Conferir gabarito e eixos das paredes',
+      'Verificar profundidade e largura das sapatas/brocas',
+      'Checar espaçadores na ferragem (ferro não pode encostar na terra)',
+      'Aplicação de tinta betuminosa (piche) em 100% da viga baldrame',
+      'Impermeabilização negativa (primeiras 3 fiadas de tijolo)',
+      'Conferir prumo e alinhamento dos arranques dos pilares'
     ]
   },
   {
-    category: 'Antes da Concretagem (Laje)',
+    category: '03. Alvenaria e Paredes',
     items: [
-      'Conferir escoramento (se está firme e alinhado)',
-      'Verificar caixinhas de luz (se estão bem presas)',
-      'Checar tubulação elétrica (conduítes não amassados)',
-      'Verificar espaçadores da ferragem (para não encostar na madeira)',
-      'Molhar as formas de madeira antes do concreto',
-      'Conferir nível da laje'
+      'Conferir esquadro dos cômodos (trena nos cantos)',
+      'Verificar prumo (parede em pé) e nível (fiadas retas)',
+      'Checar amarração dos tijolos nos cantos (trançado)',
+      'Vergas e contravergas instaladas em janelas e portas (evita trinca 45º)',
+      'Encunhamento (aperto) entre parede e viga superior feito corretamente',
+      'Limpeza de restos de massa no rodapé das paredes'
     ]
   },
   {
-    category: 'Elétrica e Hidráulica',
+    category: '04. Antes da Concretagem (Laje/Vigas)',
     items: [
-      'Tirar fotos das paredes com tubulação antes de rebocar',
-      'Testar vazamento de canos (deixar com água pressurizada)',
-      'Conferir altura das tomadas e interruptores',
-      'Verificar se há disjuntor exclusivo para chuveiro',
-      'Conferir aterramento'
+      'Conferir escoramento (se está firme, alinhado e travado)',
+      'Verificar caixinhas de luz (se estão bem presas e vedadas)',
+      'Checar tubulação elétrica (conduítes não amassados/quebrados)',
+      'Verificar espaçadores da ferragem (ferro não pode encostar na madeira)',
+      'Molhar as formas de madeira abundantemente antes do concreto',
+      'Conferir nível da laje (mestras) para garantir espessura correta',
+      'Verificar passantes de hidráulica/esgoto (para não furar laje depois)'
+    ]
+  },
+  {
+    category: '05. Telhado e Cobertura',
+    items: [
+      'Verificar alinhamento das telhas (galga correta)',
+      'Conferir fixação das telhas (parafusos ou amarração contra vento)',
+      'Checar caimento das calhas (jogar água para testar)',
+      'Verificar vedação dos rufos na parede (silicone ou argamassa)',
+      'Teste de estanqueidade (jogar água com mangueira simulando chuva)',
+      'Manta térmica instalada sem rasgos (se houver)'
+    ]
+  },
+  {
+    category: '06. Hidráulica e Esgoto',
+    items: [
+      'Tirar fotos das paredes com tubulação antes de rebocar (Mapa da Mina)',
+      'Teste de pressão (deixar rede de água pressurizada por 24h)',
+      'Teste de vazão nos ralos (jogar balde d\'água)',
+      'Verificar caimento do piso do box para o ralo',
+      'Conferir altura dos pontos de esgoto (pia, tanque, vaso)',
+      'Colocar plugues/tampões em todos os canos abertos (evita entulho dentro)'
+    ]
+  },
+  {
+    category: '07. Elétrica',
+    items: [
+      'Conferir altura das tomadas (Baixa: 30cm, Média: 1.20m, Alta: 2.20m)',
+      'Verificar se há circuitos separados (Chuveiro, Ar, Cozinha)',
+      'Testar todas as tomadas com equipamento (multímetro ou testador)',
+      'Identificar disjuntores no quadro com etiquetas',
+      'Conferir aterramento (fio terra) em todas as tomadas',
+      'Verificar se cabos estão estanhados ou com terminais nas pontas'
+    ]
+  },
+  {
+    category: '08. Contrapiso e Revestimentos',
+    items: [
+      'Verificar caimento de água em áreas molhadas (banheiro, sacada, lavanderia)',
+      'Teste do som cavo (bater levemente com cabo de vassoura no piso)',
+      'Conferir alinhamento das juntas (rejunte)',
+      'Verificar recortes (se estão bem feitos e em locais escondidos)',
+      'Checar se há peças lascadas ou riscadas',
+      'Teste de escoamento no box (água não pode empoçar)'
+    ]
+  },
+  {
+    category: '09. Esquadrias (Portas e Janelas)',
+    items: [
+      'Abrir e fechar todas as folhas (movimento suave, sem agarrar)',
+      'Testar trincos e fechaduras (chave entrando fácil)',
+      'Verificar vedação (borrachas/silicone) contra chuva',
+      'Conferir se estão no prumo e nível',
+      'Verificar riscos nos vidros ou perfis de alumínio'
+    ]
+  },
+  {
+    category: '10. Pintura e Acabamento Final',
+    items: [
+      'Verificar uniformidade da cor (sem manchas de rolo)',
+      'Checar recortes no teto e rodapé (linha reta)',
+      'Verificar se respingou tinta em espelhos, vidros ou piso',
+      'Testar interruptores e lâmpadas',
+      'Conferir se louças e metais estão firmes (torneira bamba?)',
+      'Limpeza grossa removida (restos de massa, gesso)'
+    ]
+  },
+  {
+    category: '11. Vistoria Final de Entrega (Chaves)',
+    items: [
+      'Levar balde, lâmpada e carregador de celular para testes',
+      'Abrir todas as torneiras simultaneamente (checar pressão)',
+      'Acionar todas as descargas',
+      'Jogar água em todas as áreas laváveis (sacada/box)',
+      'Testar todas as chaves em todas as portas',
+      'Olhar contra a luz paredes e pisos (buscar defeitos)',
+      'Verificar manual do proprietário e garantias dos equipamentos'
     ]
   }
 ];
