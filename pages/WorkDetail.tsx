@@ -104,7 +104,7 @@ const ContactsView: React.FC<{ mode: 'TEAM' | 'SUPPLIERS', onBack: () => void }>
 
     return (
         <div className="animate-in fade-in slide-in-from-right-4">
-            <button onClick={onBack} className="mb-4 text-sm font-bold text-slate-400 hover:text-primary"><i className="fa-solid fa-arrow-left"></i> Voltar</button>
+            <button onClick={onBack} className="mb-4 text-sm font-bold text-slate-400 hover:text-primary dark:hover:text-white"><i className="fa-solid fa-arrow-left"></i> Voltar</button>
             <SectionHeader title={mode === 'TEAM' ? "Minha Equipe" : "Meus Fornecedores"} subtitle={mode === 'TEAM' ? "Profissionais cadastrados." : "Lojas e prestadores."} />
             <div className="space-y-3">
                 {items.map(item => (
@@ -113,7 +113,7 @@ const ContactsView: React.FC<{ mode: 'TEAM' | 'SUPPLIERS', onBack: () => void }>
                             <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white ${mode === 'TEAM' ? 'bg-blue-500' : 'bg-indigo-500'}`}><i className={`fa-solid ${mode === 'TEAM' ? 'fa-helmet-safety' : 'fa-truck'}`}></i></div>
                             <div>
                                 <h4 className="font-bold text-primary dark:text-white">{item.name}</h4>
-                                <p className="text-xs text-slate-500">{(item as any).role || (item as any).category}</p>
+                                <p className="text-xs text-slate-500 dark:text-slate-400">{(item as any).role || (item as any).category}</p>
                             </div>
                         </div>
                         <div className="flex gap-2">
@@ -129,20 +129,20 @@ const ContactsView: React.FC<{ mode: 'TEAM' | 'SUPPLIERS', onBack: () => void }>
                     <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-sm p-6 shadow-2xl">
                         <h3 className="text-lg font-bold mb-4 dark:text-white">{editingId ? 'Editar Cadastro' : 'Novo Cadastro'}</h3>
                         <form onSubmit={handleSave} className="space-y-3">
-                            <input placeholder="Nome" value={newName} onChange={e => setNewName(e.target.value)} className="w-full p-3 rounded-xl border dark:border-slate-700 dark:bg-slate-800 dark:text-white outline-none" required />
-                            <select value={newRole} onChange={e => setNewRole(e.target.value)} className="w-full p-3 rounded-xl border dark:border-slate-700 dark:bg-slate-800 dark:text-white outline-none" required>
+                            <input placeholder="Nome" value={newName} onChange={e => setNewName(e.target.value)} className="w-full p-3 rounded-xl border dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none" required />
+                            <select value={newRole} onChange={e => setNewRole(e.target.value)} className="w-full p-3 rounded-xl border dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none" required>
                                 <option value="">{mode === 'TEAM' ? "Selecione a Profissão" : "Selecione a Categoria"}</option>
                                 {options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                             </select>
-                            <input placeholder="Telefone" value={newPhone} onChange={e => setNewPhone(e.target.value)} className="w-full p-3 rounded-xl border dark:border-slate-700 dark:bg-slate-800 dark:text-white outline-none" required />
+                            <input placeholder="Telefone" value={newPhone} onChange={e => setNewPhone(e.target.value)} className="w-full p-3 rounded-xl border dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none" required />
                             <textarea 
                                 placeholder="Descrição / Anotações" 
                                 value={newNotes} 
                                 onChange={e => setNewNotes(e.target.value)} 
-                                className="w-full p-3 rounded-xl border dark:border-slate-700 dark:bg-slate-800 dark:text-white outline-none resize-none h-24" 
+                                className="w-full p-3 rounded-xl border dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none resize-none h-24" 
                             />
                             <div className="flex gap-2 pt-2">
-                                <button type="button" onClick={() => setIsAddOpen(false)} className="flex-1 py-3 text-slate-500 font-bold hover:bg-slate-50 rounded-xl">Cancelar</button>
+                                <button type="button" onClick={() => setIsAddOpen(false)} className="flex-1 py-3 text-slate-500 font-bold hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl">Cancelar</button>
                                 <button type="submit" className="flex-1 py-3 bg-primary text-white rounded-xl font-bold">Salvar</button>
                             </div>
                         </form>
@@ -163,13 +163,13 @@ const PhotosView: React.FC<{ workId: string, onBack: () => void }> = ({ workId, 
     
     return (
         <div className="animate-in fade-in slide-in-from-right-4 flex flex-col h-full">
-             <button onClick={onBack} className="mb-4 text-sm font-bold text-slate-400 hover:text-primary flex items-center gap-2 w-fit"><i className="fa-solid fa-arrow-left"></i> Voltar</button>
+             <button onClick={onBack} className="mb-4 text-sm font-bold text-slate-400 hover:text-primary dark:hover:text-white flex items-center gap-2 w-fit"><i className="fa-solid fa-arrow-left"></i> Voltar</button>
              <div className="flex justify-between items-center mb-6">
                  <SectionHeader title="Galeria" subtitle="Acompanhamento visual." />
                  {photos.length > 0 && <label className="bg-primary hover:bg-slate-700 text-white w-10 h-10 rounded-xl flex items-center justify-center shadow-lg cursor-pointer transition-colors"><i className="fa-solid fa-camera"></i><input type="file" className="hidden" accept="image/*" onChange={handleUpload} /></label>}
              </div>
              {photos.length === 0 ? (
-                 <div className="flex-1 flex flex-col items-center justify-center p-8 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-3xl bg-slate-50/50 dark:bg-slate-900/50">
+                 <div className="flex-1 flex flex-col items-center justify-center p-8 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-3xl bg-slate-50/50 dark:bg-slate-800/50">
                      <div className="w-20 h-20 bg-white dark:bg-slate-800 rounded-full flex items-center justify-center text-slate-300 dark:text-slate-600 mb-6 shadow-sm"><i className="fa-solid fa-images text-3xl"></i></div>
                      <h3 className="text-xl font-bold text-primary dark:text-white mb-2">Galeria Vazia</h3>
                      <label className="bg-primary text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-primary/20 cursor-pointer flex items-center gap-2 hover:bg-slate-800 transition-all"><i className="fa-solid fa-camera"></i> Adicionar Foto<input type="file" className="hidden" accept="image/*" onChange={handleUpload} /></label>
@@ -192,13 +192,13 @@ const FilesView: React.FC<{ workId: string, onBack: () => void }> = ({ workId, o
     
     return (
         <div className="animate-in fade-in slide-in-from-right-4 flex flex-col h-full">
-             <button onClick={onBack} className="mb-4 text-sm font-bold text-slate-400 hover:text-primary flex items-center gap-2 w-fit"><i className="fa-solid fa-arrow-left"></i> Voltar</button>
+             <button onClick={onBack} className="mb-4 text-sm font-bold text-slate-400 hover:text-primary dark:hover:text-white flex items-center gap-2 w-fit"><i className="fa-solid fa-arrow-left"></i> Voltar</button>
              <div className="flex justify-between items-center mb-6">
                  <SectionHeader title="Projetos" subtitle="Plantas e documentos." />
                  {files.length > 0 && <label className="bg-primary hover:bg-slate-700 text-white w-10 h-10 rounded-xl flex items-center justify-center shadow-lg cursor-pointer transition-colors"><i className="fa-solid fa-upload"></i><input type="file" className="hidden" onChange={handleUpload} /></label>}
              </div>
              {files.length === 0 ? (
-                 <div className="flex-1 flex flex-col items-center justify-center p-8 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-3xl bg-slate-50/50 dark:bg-slate-900/50">
+                 <div className="flex-1 flex flex-col items-center justify-center p-8 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-3xl bg-slate-50/50 dark:bg-slate-800/50">
                      <div className="w-20 h-20 bg-white dark:bg-slate-800 rounded-full flex items-center justify-center text-slate-300 dark:text-slate-600 mb-6 shadow-sm"><i className="fa-solid fa-folder-open text-3xl"></i></div>
                      <h3 className="text-xl font-bold text-primary dark:text-white mb-2">Sem Arquivos</h3>
                      <label className="bg-primary text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-primary/20 cursor-pointer flex items-center gap-2 hover:bg-slate-800 transition-all"><i className="fa-solid fa-cloud-arrow-up"></i> Adicionar Arquivo<input type="file" className="hidden" onChange={handleUpload} /></label>
@@ -288,14 +288,14 @@ const ReportsView: React.FC<{ workId: string, onBack: () => void }> = ({ workId,
         <div className="animate-in fade-in slide-in-from-right-4 bg-white dark:bg-slate-950 min-h-screen">
              <div className="hidden print:block mb-8 border-b-2 border-black pb-4"><h1 className="text-3xl font-bold uppercase">{work?.name || "Relatório"}</h1><p className="text-sm">Endereço: {work?.address}</p></div>
              <div className="flex justify-between items-center mb-6 print:hidden">
-                 <button onClick={onBack} className="text-sm font-bold text-slate-400 hover:text-primary flex items-center gap-2"><i className="fa-solid fa-arrow-left"></i> Voltar</button>
+                 <button onClick={onBack} className="text-sm font-bold text-slate-400 hover:text-primary dark:hover:text-white flex items-center gap-2"><i className="fa-solid fa-arrow-left"></i> Voltar</button>
                  <div className="flex gap-2">
                      <button onClick={handleExportExcel} className="bg-green-600 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-lg flex items-center gap-2 hover:bg-green-700 transition-colors"><i className="fa-solid fa-file-excel"></i> Excel</button>
                      <button onClick={handlePrint} className="bg-primary text-white px-4 py-2 rounded-xl text-sm font-bold shadow-lg flex items-center gap-2 hover:bg-slate-800 transition-colors"><i className="fa-solid fa-print"></i> PDF</button>
                  </div>
              </div>
              <SectionHeader title="Relatórios Inteligentes" subtitle="Analise cada detalhe da sua obra." />
-             <div className="flex p-1 bg-slate-100 dark:bg-slate-800/50 rounded-xl mb-6 print:hidden">{[{ id: 'FINANCIAL', label: 'Financeiro', icon: 'fa-wallet' }, { id: 'MATERIALS', label: 'Compras', icon: 'fa-cart-shopping' }, { id: 'STEPS', label: 'Etapas', icon: 'fa-list-check' }].map(tab => (<button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`flex-1 py-3 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-all ${activeTab === tab.id ? 'bg-white dark:bg-slate-800 text-primary dark:text-white shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}><i className={`fa-solid ${tab.icon}`}></i> {tab.label}</button>))}</div>
+             <div className="flex p-1 bg-slate-100 dark:bg-slate-800/50 rounded-xl mb-6 print:hidden">{[{ id: 'FINANCIAL', label: 'Financeiro', icon: 'fa-wallet' }, { id: 'MATERIALS', label: 'Compras', icon: 'fa-cart-shopping' }, { id: 'STEPS', label: 'Etapas', icon: 'fa-list-check' }].map(tab => (<button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`flex-1 py-3 rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-all ${activeTab === tab.id ? 'bg-white dark:bg-slate-800 text-primary dark:text-white shadow-sm' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'}`}><i className={`fa-solid ${tab.icon}`}></i> {tab.label}</button>))}</div>
              
              {/* FINANCIAL TAB */}
              {activeTab === 'FINANCIAL' && (
@@ -318,10 +318,10 @@ const ReportsView: React.FC<{ workId: string, onBack: () => void }> = ({ workId,
                          <div className="h-64">
                              <Recharts.ResponsiveContainer width="100%" height="100%">
                                  <Recharts.BarChart data={financialData}>
-                                     <Recharts.CartesianGrid strokeDasharray="3 3" vertical={false} />
-                                     <Recharts.XAxis dataKey="name" tick={{fontSize: 10}} />
-                                     <Recharts.YAxis />
-                                     <Recharts.Tooltip />
+                                     <Recharts.CartesianGrid strokeDasharray="3 3" vertical={false} strokeOpacity={0.1} />
+                                     <Recharts.XAxis dataKey="name" tick={{fontSize: 10, fill: '#94a3b8'}} />
+                                     <Recharts.YAxis tick={{fill: '#94a3b8'}} />
+                                     <Recharts.Tooltip contentStyle={{backgroundColor: '#1e293b', borderColor: '#334155', color: '#fff'}} />
                                      <Recharts.Bar dataKey="value" fill="#D97706" radius={[6, 6, 0, 0]} barSize={40} />
                                  </Recharts.BarChart>
                              </Recharts.ResponsiveContainer>
@@ -342,9 +342,9 @@ const ReportsView: React.FC<{ workId: string, onBack: () => void }> = ({ workId,
                                  {expenses.map(e => (
                                      <tr key={e.id} className="border-b dark:border-slate-800 last:border-0 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors">
                                          <td className="py-3 text-slate-500">{formatDateDisplay(e.date)}</td>
-                                         <td className="py-3 font-medium dark:text-slate-300">{e.description}</td>
-                                         <td className="py-3 text-xs"><span className="bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-md">{e.category}</span></td>
-                                         <td className="py-3 text-right font-bold dark:text-white">R$ {(e.paidAmount || 0).toLocaleString('pt-BR')}</td>
+                                         <td className="py-3 font-medium text-slate-700 dark:text-slate-300">{e.description}</td>
+                                         <td className="py-3 text-xs"><span className="bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-md text-slate-600 dark:text-slate-400">{e.category}</span></td>
+                                         <td className="py-3 text-right font-bold text-slate-800 dark:text-white">R$ {(e.paidAmount || 0).toLocaleString('pt-BR')}</td>
                                      </tr>
                                  ))}
                              </tbody>
@@ -368,7 +368,7 @@ const ReportsView: React.FC<{ workId: string, onBack: () => void }> = ({ workId,
                                          const isComplete = m.purchasedQty >= m.plannedQty;
                                          const isPartial = m.purchasedQty > 0 && m.purchasedQty < m.plannedQty;
                                          
-                                         let dotColor = 'bg-slate-300';
+                                         let dotColor = 'bg-slate-300 dark:bg-slate-600';
                                          if (isComplete) dotColor = 'bg-green-500';
                                          else if (isPartial) dotColor = 'bg-orange-500';
 
@@ -377,7 +377,7 @@ const ReportsView: React.FC<{ workId: string, onBack: () => void }> = ({ workId,
                                                  <div className={`w-3 h-3 rounded-full ${dotColor}`}></div>
                                                  <div className="flex-1">
                                                      <div className="flex justify-between mb-1">
-                                                         <span className="font-medium dark:text-slate-200">{m.name}</span>
+                                                         <span className="font-medium text-slate-700 dark:text-slate-200">{m.name}</span>
                                                          <span className="text-slate-500 text-xs">{m.purchasedQty} / {m.plannedQty} {m.unit}</span>
                                                      </div>
                                                  </div>
@@ -436,7 +436,7 @@ const ReportsView: React.FC<{ workId: string, onBack: () => void }> = ({ workId,
                                  return (
                                      <div key={step.id} className="p-4 flex justify-between items-center hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors break-inside-avoid">
                                          <div className="flex items-center gap-3">
-                                             <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs text-white ${isDone ? 'bg-green-500' : isLate ? 'bg-red-500' : isInProgress ? 'bg-orange-500' : 'bg-slate-300'}`}>
+                                             <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs text-white ${isDone ? 'bg-green-500' : isLate ? 'bg-red-500' : isInProgress ? 'bg-orange-500' : 'bg-slate-300 dark:bg-slate-700'}`}>
                                                  <i className={`fa-solid ${isDone ? 'fa-check' : isLate ? 'fa-exclamation' : isInProgress ? 'fa-play' : 'fa-clock'}`}></i>
                                              </div>
                                              <div>
@@ -448,7 +448,7 @@ const ReportsView: React.FC<{ workId: string, onBack: () => void }> = ({ workId,
                                              {isLate && <span className="bg-red-100 text-red-600 text-[10px] font-bold px-2 py-1 rounded-md uppercase">Atrasado</span>}
                                              {isDone && <span className="bg-green-100 text-green-600 text-[10px] font-bold px-2 py-1 rounded-md uppercase">Feito</span>}
                                              {isInProgress && !isLate && <span className="bg-orange-100 text-orange-600 text-[10px] font-bold px-2 py-1 rounded-md uppercase flex items-center gap-1"><div className="w-1.5 h-1.5 rounded-full bg-orange-500"></div> Em Andamento</span>}
-                                             {isNotStarted && !isLate && <span className="bg-slate-100 text-slate-500 text-[10px] font-bold px-2 py-1 rounded-md uppercase">Planejamento</span>}
+                                             {isNotStarted && !isLate && <span className="bg-slate-100 dark:bg-slate-800 text-slate-500 text-[10px] font-bold px-2 py-1 rounded-md uppercase">Planejamento</span>}
                                          </div>
                                      </div>
                                  );
@@ -491,7 +491,7 @@ const CalculatorView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     };
     return (
         <div className="animate-in fade-in slide-in-from-right-4">
-            <button onClick={mode === 'MENU' ? onBack : () => setMode('MENU')} className="mb-4 text-sm font-bold text-slate-400 hover:text-primary flex items-center gap-2"><i className="fa-solid fa-arrow-left"></i> {mode === 'MENU' ? 'Voltar' : 'Outras Calculadoras'}</button>
+            <button onClick={mode === 'MENU' ? onBack : () => setMode('MENU')} className="mb-4 text-sm font-bold text-slate-400 hover:text-primary dark:hover:text-white flex items-center gap-2"><i className="fa-solid fa-arrow-left"></i> {mode === 'MENU' ? 'Voltar' : 'Outras Calculadoras'}</button>
             <SectionHeader title="Calculadora Premium" subtitle="Estimativas precisas para sua obra." />
             {renderContent()}
         </div>
@@ -530,20 +530,20 @@ const ContractsView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     if (selectedContract) {
         return (
             <div className="animate-in fade-in slide-in-from-right-4 h-full flex flex-col">
-                <button onClick={() => setSelectedContract(null)} className="mb-4 text-sm font-bold text-slate-400 hover:text-primary flex items-center gap-2"><i className="fa-solid fa-arrow-left"></i> Voltar para Modelos</button>
+                <button onClick={() => setSelectedContract(null)} className="mb-4 text-sm font-bold text-slate-400 hover:text-primary dark:hover:text-white flex items-center gap-2"><i className="fa-solid fa-arrow-left"></i> Voltar para Modelos</button>
                 <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-3 mb-4">
                     <h2 className="text-xl font-bold text-primary dark:text-white">{selectedContract.title}</h2>
                     <div className="flex gap-2"><button onClick={handleCopy} className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all shadow-sm ${copySuccess ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border border-green-200 dark:border-green-800' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 border border-transparent'}`}><i className={`fa-solid ${copySuccess ? 'fa-check' : 'fa-copy'}`}></i> {copySuccess ? 'Copiado!' : 'Copiar Texto'}</button><button onClick={handleDownload} className="bg-primary text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-lg hover:bg-primary-light transition-colors"><i className="fa-solid fa-download"></i> Baixar .doc</button></div>
                 </div>
-                <textarea className="flex-1 w-full p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm text-sm font-mono leading-relaxed outline-none resize-none focus:ring-2 focus:ring-secondary/50" value={editableContent} onChange={(e) => setEditableContent(e.target.value)} />
+                <textarea className="flex-1 w-full p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm text-sm font-mono leading-relaxed outline-none resize-none focus:ring-2 focus:ring-secondary/50 dark:text-slate-300" value={editableContent} onChange={(e) => setEditableContent(e.target.value)} />
             </div>
         );
     }
     return (
         <div className="animate-in fade-in slide-in-from-right-4">
-            <button onClick={onBack} className="mb-4 text-sm font-bold text-slate-400 hover:text-primary flex items-center gap-2"><i className="fa-solid fa-arrow-left"></i> Voltar</button>
+            <button onClick={onBack} className="mb-4 text-sm font-bold text-slate-400 hover:text-primary dark:hover:text-white flex items-center gap-2"><i className="fa-solid fa-arrow-left"></i> Voltar</button>
             <SectionHeader title="Contratos" subtitle="Modelos editáveis." />
-            <div className="grid grid-cols-1 gap-3">{CONTRACT_TEMPLATES.map(ct => (<button key={ct.id} onClick={() => handleSelect(ct)} className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 hover:border-secondary transition-all text-left shadow-sm group"><div className="flex items-start gap-4"><div className="w-12 h-12 rounded-xl bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 flex items-center justify-center text-xl group-hover:scale-110 transition-transform"><i className="fa-solid fa-file-contract"></i></div><div><h4 className="font-bold text-primary dark:text-white mb-1 group-hover:text-secondary transition-colors">{ct.title}</h4><p className="text-xs text-slate-500">{ct.description}</p></div></div></button>))}</div>
+            <div className="grid grid-cols-1 gap-3">{CONTRACT_TEMPLATES.map(ct => (<button key={ct.id} onClick={() => handleSelect(ct)} className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 hover:border-secondary transition-all text-left shadow-sm group"><div className="flex items-start gap-4"><div className="w-12 h-12 rounded-xl bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 flex items-center justify-center text-xl group-hover:scale-110 transition-transform"><i className="fa-solid fa-file-contract"></i></div><div><h4 className="font-bold text-primary dark:text-white mb-1 group-hover:text-secondary transition-colors">{ct.title}</h4><p className="text-xs text-slate-500 dark:text-slate-400">{ct.description}</p></div></div></button>))}</div>
         </div>
     );
 };
@@ -563,12 +563,12 @@ const ChecklistsView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
     return (
         <div className="animate-in fade-in slide-in-from-right-4">
-            <button onClick={onBack} className="mb-4 text-sm font-bold text-slate-400 hover:text-primary flex items-center gap-2 print:hidden"><i className="fa-solid fa-arrow-left"></i> Voltar</button>
+            <button onClick={onBack} className="mb-4 text-sm font-bold text-slate-400 hover:text-primary dark:hover:text-white flex items-center gap-2 print:hidden"><i className="fa-solid fa-arrow-left"></i> Voltar</button>
             <div className="flex justify-between items-center mb-6">
                 <SectionHeader title="Checklists Anti-Erro" subtitle="O que verificar para evitar prejuízo." />
-                <div className="flex gap-2 print:hidden"><button onClick={handleExportXLSX} className="bg-slate-100 dark:bg-slate-800 text-green-600 hover:text-green-700 w-10 h-10 rounded-xl flex items-center justify-center transition-colors shadow-sm" title="Baixar Planilha Excel"><i className="fa-solid fa-file-excel text-lg"></i></button><button onClick={() => window.print()} className="bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-primary w-10 h-10 rounded-xl flex items-center justify-center transition-colors shadow-sm" title="Imprimir"><i className="fa-solid fa-print"></i></button></div>
+                <div className="flex gap-2 print:hidden"><button onClick={handleExportXLSX} className="bg-slate-100 dark:bg-slate-800 text-green-600 dark:text-green-400 hover:text-green-700 w-10 h-10 rounded-xl flex items-center justify-center transition-colors shadow-sm" title="Baixar Planilha Excel"><i className="fa-solid fa-file-excel text-lg"></i></button><button onClick={() => window.print()} className="bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-primary dark:hover:text-white w-10 h-10 rounded-xl flex items-center justify-center transition-colors shadow-sm" title="Imprimir"><i className="fa-solid fa-print"></i></button></div>
             </div>
-            <div className="space-y-4">{STANDARD_CHECKLISTS.map((list: any, idx: number) => { const isOpen = openCategory === list.category; return (<div key={idx} className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 overflow-hidden print:border-black print:break-inside-avoid"><button onClick={() => setOpenCategory(isOpen ? null : list.category)} className="w-full flex items-center justify-between p-5 text-left bg-slate-50/50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"><div className="flex items-center gap-3"><div className="w-8 h-8 rounded-lg bg-green-100 text-green-600 flex items-center justify-center text-sm"><i className="fa-solid fa-list-check"></i></div><h4 className="font-bold text-primary dark:text-white">{list.category}</h4></div><i className={`fa-solid fa-chevron-down text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`}></i></button>{(isOpen || window.matchMedia('print').matches) && (<div className="p-5 pt-0 border-t border-slate-100 dark:border-slate-800"><div className="space-y-4 mt-4">{list.items.map((item: any, i: number) => (<label key={i} className="flex items-start gap-3 cursor-pointer group"><input type="checkbox" className="mt-1 w-5 h-5 rounded border-slate-300 text-primary focus:ring-primary" /><span className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed group-hover:text-primary dark:group-hover:text-white transition-colors">{item}</span></label>))}</div></div>)}</div>); })}</div>
+            <div className="space-y-4">{STANDARD_CHECKLISTS.map((list: any, idx: number) => { const isOpen = openCategory === list.category; return (<div key={idx} className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 overflow-hidden print:border-black print:break-inside-avoid"><button onClick={() => setOpenCategory(isOpen ? null : list.category)} className="w-full flex items-center justify-between p-5 text-left bg-slate-50/50 dark:bg-slate-800/50 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"><div className="flex items-center gap-3"><div className="w-8 h-8 rounded-lg bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400 flex items-center justify-center text-sm"><i className="fa-solid fa-list-check"></i></div><h4 className="font-bold text-primary dark:text-white">{list.category}</h4></div><i className={`fa-solid fa-chevron-down text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`}></i></button>{(isOpen || window.matchMedia('print').matches) && (<div className="p-5 pt-0 border-t border-slate-100 dark:border-slate-800"><div className="space-y-4 mt-4">{list.items.map((item: any, i: number) => (<label key={i} className="flex items-start gap-3 cursor-pointer group"><input type="checkbox" className="mt-1 w-5 h-5 rounded border-slate-300 text-primary focus:ring-primary" /><span className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed group-hover:text-primary dark:group-hover:text-white transition-colors">{item}</span></label>))}</div></div>)}</div>); })}</div>
         </div>
     );
 };
@@ -650,7 +650,7 @@ const OverviewTab: React.FC<{ work: Work, stats: any, onGoToSteps: () => void }>
       <div className="mb-6 relative overflow-hidden rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm group hover:shadow-md transition-all">
            <div className="flex items-start gap-5 p-5 relative z-10">
                 <div className="w-12 h-12 rounded-full p-0.5 bg-slate-200 dark:bg-slate-700 shrink-0"><img src={ZE_AVATAR} className="w-full h-full object-cover rounded-full bg-white" onError={(e) => { const target = e.currentTarget; if (target.src !== ZE_AVATAR_FALLBACK) { target.src = ZE_AVATAR_FALLBACK; } }} /></div>
-                <div><h4 className="font-bold text-sm text-primary dark:text-white flex items-center gap-2">Dica do Zé<span className="bg-secondary/10 text-secondary text-[10px] px-2 py-0.5 rounded-full uppercase">{currentTip.tag}</span></h4><p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">"{currentTip.text}"</p></div>
+                <div><h4 className="font-bold text-sm text-primary dark:text-white flex items-center gap-2">Dica do Zé<span className="bg-secondary/10 text-secondary text-[10px] px-2 py-0.5 rounded-full uppercase">{currentTip.tag}</span></h4><p className="text-xs text-slate-600 dark:text-slate-300 mt-1 leading-relaxed">"{currentTip.text}"</p></div>
            </div>
       </div>
       <button onClick={() => { if (stats.delayedSteps > 0) onGoToSteps(); }} className={`w-full bg-white dark:bg-slate-900 p-6 rounded-2xl border transition-all flex items-center justify-between group ${stats.delayedSteps > 0 ? 'border-red-200 dark:border-red-900/30 shadow-lg shadow-red-500/5 hover:-translate-y-1' : 'border-slate-100 dark:border-slate-800 hover:border-success/30'}`}><div className="flex items-center gap-4"><div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-xl shadow-sm ${stats.delayedSteps > 0 ? 'bg-red-50 text-red-500' : 'bg-green-50 text-green-600'}`}><i className={`fa-solid ${stats.delayedSteps > 0 ? 'fa-clock' : 'fa-check-circle'}`}></i></div><div><h3 className={`text-lg font-bold ${stats.delayedSteps > 0 ? 'text-red-600 dark:text-red-400' : 'text-primary dark:text-white'}`}>{stats.delayedSteps > 0 ? `${stats.delayedSteps} Etapas Atrasadas` : 'Cronograma em dia'}</h3><p className="text-sm text-slate-500">Status atual do cronograma</p></div></div>{stats.delayedSteps > 0 && <i className="fa-solid fa-chevron-right text-slate-300 group-hover:text-red-500 transition-colors"></i>}</button>
@@ -683,9 +683,9 @@ const StepsTab: React.FC<{ workId: string, refreshWork: () => void }> = ({ workI
         // Use robust isDelayed flag from service
         const isLate = step.isDelayed; 
         
-        return (<div key={step.id} className={`group relative p-5 rounded-3xl border transition-all duration-300 ${isComplete ? 'bg-slate-50 dark:bg-slate-900 border-slate-100 dark:border-slate-800 opacity-60' : isInProgress ? 'bg-white dark:bg-slate-800 border-secondary/30 ring-1 ring-secondary/20 shadow-lg shadow-secondary/5' : isLate ? 'bg-white dark:bg-slate-800 border-red-200 dark:border-red-900/30 shadow-sm' : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 shadow-sm hover:shadow-md hover:border-slate-300'}`}>{idx < steps.length - 1 && (<div className="absolute left-9 bottom-[-20px] top-[60px] w-0.5 bg-slate-100 dark:bg-slate-800 z-0"></div>)}<div className="flex items-center gap-5 relative z-10"><button onClick={(e) => { e.stopPropagation(); toggleStatus(step); }} className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300 shadow-sm border-2 ${isComplete ? 'bg-success border-success text-white' : isInProgress ? 'bg-secondary border-secondary text-white' : isLate ? 'bg-white border-red-300 text-red-500' : 'bg-white border-slate-300 text-transparent hover:border-secondary'}`}><i className={`fa-solid ${isComplete ? 'fa-check' : isInProgress ? 'fa-play text-[10px]' : isLate ? 'fa-exclamation' : 'fa-check'}`}></i></button><div onClick={() => setEditingStep(step)} className="cursor-pointer flex-1"><div className="flex justify-between items-start"><h4 className={`text-base font-bold mb-1 ${isComplete ? 'line-through text-slate-400' : 'text-primary dark:text-white'}`}>{step.name}</h4><div className="opacity-0 group-hover:opacity-100 transition-opacity"><i className="fa-solid fa-pen text-slate-300 hover:text-secondary"></i></div></div><div className="flex items-center flex-wrap gap-3 text-xs font-medium"><span className="text-slate-500 flex items-center gap-1 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md"><i className="fa-regular fa-calendar"></i>{formatDateDisplay(step.startDate)} - {formatDateDisplay(step.endDate)}</span>{isLate && <span className="text-red-600 bg-red-50 dark:bg-red-900/20 px-2 py-0.5 rounded-md uppercase tracking-wide font-bold">Atrasado</span>}{isInProgress && <span className="text-secondary bg-orange-50 dark:bg-orange-900/20 px-2 py-0.5 rounded-md uppercase tracking-wide font-bold">Em Andamento</span>}</div></div></div></div>)})}</div>
-      {isCreateModalOpen && (<div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-primary/60 backdrop-blur-sm animate-in fade-in"><div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-8 shadow-2xl animate-in zoom-in-95"><h3 className="text-xl font-bold text-primary dark:text-white mb-6">Nova Etapa</h3><form onSubmit={handleCreateStep} className="space-y-5"><div><label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Nome</label><input placeholder="Ex: Pintar Sala" className="w-full px-4 py-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none" value={newStepName} onChange={e => setNewStepName(e.target.value)} required /></div><div><label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Data</label><input type="date" className="w-full px-4 py-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none" value={newStepDate} onChange={e => setNewStepDate(e.target.value)} required /></div><div className="flex gap-3 pt-2"><button type="button" onClick={() => setIsCreateModalOpen(false)} className="flex-1 py-4 rounded-xl font-bold text-slate-500 hover:bg-slate-50">Cancelar</button><button type="submit" className="flex-1 py-4 rounded-xl bg-primary text-white font-bold hover:bg-slate-800 shadow-lg">Salvar</button></div></form></div></div>)}
-      {editingStep && (<div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-primary/60 backdrop-blur-sm animate-in fade-in"><div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-8 shadow-2xl animate-in zoom-in-95"><div className="flex justify-between items-center mb-6"><h3 className="text-xl font-bold text-primary dark:text-white">Editar Etapa</h3><button onClick={() => handleDeleteClick(editingStep.id)} className="w-8 h-8 rounded-full bg-red-50 text-red-500 flex items-center justify-center hover:bg-red-100"><i className="fa-solid fa-trash text-sm"></i></button></div><form onSubmit={handleUpdateStep} className="space-y-5"><input className="w-full px-4 py-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white font-bold text-lg outline-none" value={editingStep.name} onChange={e => setEditingStep({...editingStep, name: e.target.value})} /><div className="grid grid-cols-2 gap-3"><div><label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Início</label><input type="date" className="w-full px-3 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm outline-none" value={editingStep.startDate} onChange={e => setEditingStep({...editingStep, startDate: e.target.value})} /></div><div><label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Fim</label><input type="date" className="w-full px-3 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm outline-none" value={editingStep.endDate} onChange={e => setEditingStep({...editingStep, endDate: e.target.value})} /></div></div><div className="flex gap-3 pt-2"><button type="button" onClick={() => setEditingStep(null)} className="flex-1 py-4 rounded-xl font-bold text-slate-500 hover:bg-slate-50">Cancelar</button><button type="submit" className="flex-1 py-4 rounded-xl bg-primary text-white font-bold hover:bg-slate-800 shadow-lg">Atualizar</button></div></form></div></div>)}
+        return (<div key={step.id} className={`group relative p-5 rounded-3xl border transition-all duration-300 ${isComplete ? 'bg-slate-50 dark:bg-slate-900 border-slate-100 dark:border-slate-800 opacity-60' : isInProgress ? 'bg-white dark:bg-slate-900 border-secondary/30 ring-1 ring-secondary/20 shadow-lg shadow-secondary/5' : isLate ? 'bg-white dark:bg-slate-900 border-red-200 dark:border-red-900/30 shadow-sm' : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 shadow-sm hover:shadow-md hover:border-slate-300'}`}>{idx < steps.length - 1 && (<div className="absolute left-9 bottom-[-20px] top-[60px] w-0.5 bg-slate-100 dark:bg-slate-800 z-0"></div>)}<div className="flex items-center gap-5 relative z-10"><button onClick={(e) => { e.stopPropagation(); toggleStatus(step); }} className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300 shadow-sm border-2 ${isComplete ? 'bg-success border-success text-white' : isInProgress ? 'bg-secondary border-secondary text-white' : isLate ? 'bg-white border-red-300 text-red-500' : 'bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-transparent hover:border-secondary'}`}><i className={`fa-solid ${isComplete ? 'fa-check' : isInProgress ? 'fa-play text-[10px]' : isLate ? 'fa-exclamation' : 'fa-check'}`}></i></button><div onClick={() => setEditingStep(step)} className="cursor-pointer flex-1"><div className="flex justify-between items-start"><h4 className={`text-base font-bold mb-1 ${isComplete ? 'line-through text-slate-400' : 'text-primary dark:text-white'}`}>{step.name}</h4><div className="opacity-0 group-hover:opacity-100 transition-opacity"><i className="fa-solid fa-pen text-slate-300 hover:text-secondary"></i></div></div><div className="flex items-center flex-wrap gap-3 text-xs font-medium"><span className="text-slate-500 dark:text-slate-400 flex items-center gap-1 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md"><i className="fa-regular fa-calendar"></i>{formatDateDisplay(step.startDate)} - {formatDateDisplay(step.endDate)}</span>{isLate && <span className="text-red-600 bg-red-50 dark:bg-red-900/20 px-2 py-0.5 rounded-md uppercase tracking-wide font-bold">Atrasado</span>}{isInProgress && <span className="text-secondary bg-orange-50 dark:bg-orange-900/20 px-2 py-0.5 rounded-md uppercase tracking-wide font-bold">Em Andamento</span>}</div></div></div></div>)})}</div>
+      {isCreateModalOpen && (<div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-primary/60 backdrop-blur-sm animate-in fade-in"><div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-8 shadow-2xl animate-in zoom-in-95"><h3 className="text-xl font-bold text-primary dark:text-white mb-6">Nova Etapa</h3><form onSubmit={handleCreateStep} className="space-y-5"><div><label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Nome</label><input placeholder="Ex: Pintar Sala" className="w-full px-4 py-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none" value={newStepName} onChange={e => setNewStepName(e.target.value)} required /></div><div><label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Data</label><input type="date" className="w-full px-4 py-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none" value={newStepDate} onChange={e => setNewStepDate(e.target.value)} required /></div><div className="flex gap-3 pt-2"><button type="button" onClick={() => setIsCreateModalOpen(false)} className="flex-1 py-4 rounded-xl font-bold text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800">Cancelar</button><button type="submit" className="flex-1 py-4 rounded-xl bg-primary text-white font-bold hover:bg-slate-800 shadow-lg">Salvar</button></div></form></div></div>)}
+      {editingStep && (<div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-primary/60 backdrop-blur-sm animate-in fade-in"><div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-8 shadow-2xl animate-in zoom-in-95"><div className="flex justify-between items-center mb-6"><h3 className="text-xl font-bold text-primary dark:text-white">Editar Etapa</h3><button onClick={() => handleDeleteClick(editingStep.id)} className="w-8 h-8 rounded-full bg-red-50 text-red-500 flex items-center justify-center hover:bg-red-100"><i className="fa-solid fa-trash text-sm"></i></button></div><form onSubmit={handleUpdateStep} className="space-y-5"><input className="w-full px-4 py-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white font-bold text-lg outline-none" value={editingStep.name} onChange={e => setEditingStep({...editingStep, name: e.target.value})} /><div className="grid grid-cols-2 gap-3"><div><label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Início</label><input type="date" className="w-full px-3 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm outline-none dark:text-white" value={editingStep.startDate} onChange={e => setEditingStep({...editingStep, startDate: e.target.value})} /></div><div><label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Fim</label><input type="date" className="w-full px-3 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm outline-none dark:text-white" value={editingStep.endDate} onChange={e => setEditingStep({...editingStep, endDate: e.target.value})} /></div></div><div className="flex gap-3 pt-2"><button type="button" onClick={() => setEditingStep(null)} className="flex-1 py-4 rounded-xl font-bold text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800">Cancelar</button><button type="submit" className="flex-1 py-4 rounded-xl bg-primary text-white font-bold hover:bg-slate-800 shadow-lg">Atualizar</button></div></form></div></div>)}
       <ZeModal isOpen={zeModal.isOpen} title={zeModal.title} message={zeModal.message} onConfirm={zeModal.onConfirm} onCancel={() => setZeModal({isOpen: false, title: '', message: '', onConfirm: () => {}})} />
     </div>
   );
@@ -762,25 +762,25 @@ const MaterialsTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ work
 
     return (
         <div className="animate-in fade-in duration-500 pb-20">
-            <div className="flex items-center justify-between mb-8"><SectionHeader title="Materiais" subtitle="Controle de compras e estoque." /><div className="flex gap-2"><button onClick={() => setIsImportOpen(true)} className="bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-secondary w-12 h-12 rounded-2xl flex items-center justify-center transition-all"><i className="fa-solid fa-cloud-arrow-down text-lg"></i></button><button onClick={() => setIsCreateOpen(true)} className="bg-primary text-white w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg transition-all"><i className="fa-solid fa-plus text-lg"></i></button></div></div>
+            <div className="flex items-center justify-between mb-8"><SectionHeader title="Materiais" subtitle="Controle de compras e estoque." /><div className="flex gap-2"><button onClick={() => setIsImportOpen(true)} className="bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-secondary w-12 h-12 rounded-2xl flex items-center justify-center transition-all"><i className="fa-solid fa-cloud-arrow-down text-lg"></i></button><button onClick={() => setIsCreateOpen(true)} className="bg-primary text-white w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg transition-all"><i className="fa-solid fa-plus text-lg"></i></button></div></div>
             {sortedCategories.map(cat => (<div key={cat} className="mb-8 last:mb-0"><h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2"><i className="fa-solid fa-layer-group text-secondary"></i> {cat}</h3><div className="space-y-3">{groupedMaterials[cat].map(m => {
                 // Logic for Material Status (Pending, Partial, Completed)
                 const isCompleted = m.purchasedQty >= m.plannedQty;
                 const isPartial = m.purchasedQty > 0 && m.purchasedQty < m.plannedQty;
                 
                 let statusLabel = 'Pendente';
-                let statusColor = 'bg-slate-100 text-slate-500';
+                let statusColor = 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300';
                 let progressColor = 'bg-secondary';
                 let cardBorder = 'border-slate-100 dark:border-slate-800';
 
                 if (isCompleted) {
                     statusLabel = 'Comprado';
-                    statusColor = 'bg-green-100 text-green-700';
+                    statusColor = 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400';
                     progressColor = 'bg-success';
                     cardBorder = 'border-green-200 dark:border-green-900/30 opacity-60';
                 } else if (isPartial) {
                     statusLabel = 'Parcial';
-                    statusColor = 'bg-orange-100 text-orange-700';
+                    statusColor = 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400';
                     progressColor = 'bg-orange-500';
                     cardBorder = 'border-orange-200 dark:border-orange-900/30 shadow-md';
                 }
@@ -797,7 +797,7 @@ const MaterialsTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ work
                                     <div className={`h-full rounded-full transition-all duration-500 ${progressColor}`} style={{width: `${Math.min(100, (m.purchasedQty / m.plannedQty) * 100)}%`}}></div>
                                 </div>
                             </div>
-                            <div className="text-xs font-bold text-slate-500 whitespace-nowrap">{m.purchasedQty} / {m.plannedQty} {m.unit}</div>
+                            <div className="text-xs font-bold text-slate-500 dark:text-slate-400 whitespace-nowrap">{m.purchasedQty} / {m.plannedQty} {m.unit}</div>
                         </div>
                     </div>
                 );
@@ -809,9 +809,9 @@ const MaterialsTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ work
                     <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-6 shadow-2xl max-h-[80vh] overflow-y-auto">
                         <div className="flex justify-between items-center mb-6">
                             <h3 className="text-xl font-bold text-primary dark:text-white">Importar Lista</h3>
-                            <button onClick={() => setIsImportOpen(false)} className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500"><i className="fa-solid fa-xmark"></i></button>
+                            <button onClick={() => setIsImportOpen(false)} className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"><i className="fa-solid fa-xmark"></i></button>
                         </div>
-                        <p className="text-sm text-slate-500 mb-4">Selecione um pacote padrão para adicionar itens rapidamente.</p>
+                        <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">Selecione um pacote padrão para adicionar itens rapidamente.</p>
                         <div className="space-y-3">
                             {FULL_MATERIAL_PACKAGES.map((pkg, idx) => (
                                 <button 
@@ -820,7 +820,7 @@ const MaterialsTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ work
                                     className="w-full text-left p-4 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-primary dark:hover:border-primary transition-all flex items-center justify-between group"
                                 >
                                     <span className="font-bold text-primary dark:text-white">{pkg.category}</span>
-                                    <span className="text-xs text-slate-400 group-hover:text-primary transition-colors">{pkg.items.length} itens</span>
+                                    <span className="text-xs text-slate-400 group-hover:text-primary dark:group-hover:text-white transition-colors">{pkg.items.length} itens</span>
                                 </button>
                             ))}
                         </div>
@@ -828,9 +828,9 @@ const MaterialsTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ work
                 </div>
             )}
 
-            {isCreateOpen && (<div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in"><div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-8 shadow-2xl"><h3 className="text-xl font-bold text-primary dark:text-white mb-6">Novo Material</h3><form onSubmit={handleAdd} className="space-y-4"><input placeholder="Nome" className="w-full px-4 py-3 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 outline-none" value={newMaterial.name} onChange={e => setNewMaterial({...newMaterial, name: e.target.value})} /><div className="grid grid-cols-2 gap-3"><input type="number" placeholder="Qtd" className="w-full px-4 py-3 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 outline-none" value={newMaterial.plannedQty} onChange={e => setNewMaterial({...newMaterial, plannedQty: e.target.value})} /><input placeholder="Un" className="w-full px-4 py-3 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 outline-none" value={newMaterial.unit} onChange={e => setNewMaterial({...newMaterial, unit: e.target.value})} /></div>
-            <div className="w-full"><label className="text-[10px] uppercase font-bold text-slate-400 mb-1 block">Categoria / Etapa</label><select className="w-full px-4 py-3 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 outline-none text-sm appearance-none bg-no-repeat bg-[right_1rem_center]" value={newMaterial.category} onChange={e => setNewMaterial({...newMaterial, category: e.target.value})}><option value="Geral">Geral / Extra</option>{steps.sort((a,b) => a.name.localeCompare(b.name)).map(s => (<option key={s.id} value={s.name}>{s.name}</option>))}</select></div>
-            <div className="flex gap-3 pt-2"><button type="button" onClick={() => setIsCreateOpen(false)} className="flex-1 py-3 font-bold text-slate-500">Cancelar</button><button type="submit" className="flex-1 py-3 bg-primary text-white rounded-xl font-bold">Salvar</button></div></form></div></div>)}
+            {isCreateOpen && (<div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in"><div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-8 shadow-2xl"><h3 className="text-xl font-bold text-primary dark:text-white mb-6">Novo Material</h3><form onSubmit={handleAdd} className="space-y-4"><input placeholder="Nome" className="w-full px-4 py-3 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 outline-none dark:text-white" value={newMaterial.name} onChange={e => setNewMaterial({...newMaterial, name: e.target.value})} /><div className="grid grid-cols-2 gap-3"><input type="number" placeholder="Qtd" className="w-full px-4 py-3 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 outline-none dark:text-white" value={newMaterial.plannedQty} onChange={e => setNewMaterial({...newMaterial, plannedQty: e.target.value})} /><input placeholder="Un" className="w-full px-4 py-3 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 outline-none dark:text-white" value={newMaterial.unit} onChange={e => setNewMaterial({...newMaterial, unit: e.target.value})} /></div>
+            <div className="w-full"><label className="text-[10px] uppercase font-bold text-slate-400 mb-1 block">Categoria / Etapa</label><select className="w-full px-4 py-3 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 outline-none text-sm appearance-none bg-no-repeat bg-[right_1rem_center] dark:text-white" value={newMaterial.category} onChange={e => setNewMaterial({...newMaterial, category: e.target.value})}><option value="Geral">Geral / Extra</option>{steps.sort((a,b) => a.name.localeCompare(b.name)).map(s => (<option key={s.id} value={s.name}>{s.name}</option>))}</select></div>
+            <div className="flex gap-3 pt-2"><button type="button" onClick={() => setIsCreateOpen(false)} className="flex-1 py-3 font-bold text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl">Cancelar</button><button type="submit" className="flex-1 py-3 bg-primary text-white rounded-xl font-bold">Salvar</button></div></form></div></div>)}
             {editingMaterial && (<div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in"><div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-8 shadow-2xl"><h3 className="text-xl font-bold text-primary dark:text-white mb-6">Atualizar Estoque</h3><form onSubmit={handleUpdate} className="space-y-4">
             <div className="space-y-3 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-700"><div><label className="text-[10px] uppercase font-bold text-slate-400 mb-1 block">Nome do Material</label><input className="w-full px-0 py-1 bg-transparent border-b border-slate-200 dark:border-slate-600 text-primary dark:text-white font-bold outline-none" value={editingMaterial.name} onChange={e => setEditingMaterial({...editingMaterial, name: e.target.value})} /></div><div><label className="text-[10px] uppercase font-bold text-slate-400 mb-1 block">Categoria / Etapa</label><select className="w-full px-0 py-1 bg-transparent border-b border-slate-200 dark:border-slate-600 text-sm text-slate-600 dark:text-slate-300 outline-none" value={editingMaterial.category || ''} onChange={e => setEditingMaterial({...editingMaterial, category: e.target.value})}><option value="Geral">Geral / Extra</option>{steps.sort((a,b) => a.name.localeCompare(b.name)).map(s => (<option key={s.id} value={s.name}>{s.name}</option>))}</select></div>
             <div className="pt-2">
@@ -844,24 +844,24 @@ const MaterialsTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ work
                     <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Planejado</span>
                     <span className="text-xl font-bold text-slate-700 dark:text-slate-300">{editingMaterial.plannedQty} <span className="text-xs font-normal">{editingMaterial.unit}</span></span>
                 </div>
-                <div className={`p-3 rounded-xl border ${editingMaterial.purchasedQty >= editingMaterial.plannedQty ? 'bg-green-50 border-green-200' : 'bg-slate-50 border-slate-200'} dark:bg-slate-800 dark:border-slate-700`}>
+                <div className={`p-3 rounded-xl border ${editingMaterial.purchasedQty >= editingMaterial.plannedQty ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-900' : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700'}`}>
                     <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Já Comprado</span>
-                    <span className={`text-xl font-bold ${editingMaterial.purchasedQty >= editingMaterial.plannedQty ? 'text-green-600' : 'text-slate-700 dark:text-slate-300'}`}>{editingMaterial.purchasedQty} <span className="text-xs font-normal">{editingMaterial.unit}</span></span>
+                    <span className={`text-xl font-bold ${editingMaterial.purchasedQty >= editingMaterial.plannedQty ? 'text-green-600 dark:text-green-400' : 'text-slate-700 dark:text-slate-300'}`}>{editingMaterial.purchasedQty} <span className="text-xs font-normal">{editingMaterial.unit}</span></span>
                 </div>
             </div>
 
-            <div className="bg-blue-50 dark:bg-blue-900/10 p-4 rounded-2xl border border-blue-100 dark:border-blue-800">
+            <div className="bg-blue-50 dark:bg-blue-900/10 p-4 rounded-2xl border border-blue-100 dark:border-blue-900/30">
                 <h4 className="text-sm font-bold text-blue-800 dark:text-blue-300 mb-3 flex items-center gap-2">
                     <i className="fa-solid fa-cart-plus"></i> Registrar Compra
                 </h4>
                 <div className="grid grid-cols-2 gap-3">
                     <div>
                         <label className="text-[10px] uppercase font-bold text-blue-600/70 dark:text-blue-400 block mb-1">Qtd. Comprando</label>
-                        <input type="number" className="w-full px-3 py-2 rounded-xl border bg-white dark:bg-slate-900 border-blue-200 dark:border-blue-800 outline-none focus:ring-2 focus:ring-blue-500/20" placeholder="0" value={qtyToAdd} onChange={e => setQtyToAdd(e.target.value)} />
+                        <input type="number" className="w-full px-3 py-2 rounded-xl border bg-white dark:bg-slate-900 border-blue-200 dark:border-blue-800 outline-none focus:ring-2 focus:ring-blue-500/20 dark:text-white" placeholder="0" value={qtyToAdd} onChange={e => setQtyToAdd(e.target.value)} />
                     </div>
                     <div>
                         <label className="text-[10px] uppercase font-bold text-blue-600/70 dark:text-blue-400 block mb-1">Valor Pago (R$)</label>
-                        <input type="number" className="w-full px-3 py-2 rounded-xl border bg-white dark:bg-slate-900 border-blue-200 dark:border-blue-800 outline-none focus:ring-2 focus:ring-blue-500/20" placeholder="0.00" value={editCost} onChange={e => setEditCost(e.target.value)} />
+                        <input type="number" className="w-full px-3 py-2 rounded-xl border bg-white dark:bg-slate-900 border-blue-200 dark:border-blue-800 outline-none focus:ring-2 focus:ring-blue-500/20 dark:text-white" placeholder="0.00" value={editCost} onChange={e => setEditCost(e.target.value)} />
                     </div>
                 </div>
                 {(Number(qtyToAdd) > 0) && (
@@ -871,7 +871,7 @@ const MaterialsTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ work
                 )}
             </div>
 
-            <div className="flex gap-3 pt-2"><button type="button" onClick={() => { setEditingMaterial(null); setEditCost(''); setQtyToAdd(''); }} className="flex-1 py-3 font-bold text-slate-500">Cancelar</button><button type="submit" className="flex-1 py-3 bg-primary text-white rounded-xl font-bold shadow-lg">Confirmar Compra</button></div><button type="button" onClick={async () => { await dbService.deleteMaterial(editingMaterial.id); setEditingMaterial(null); await load(); onUpdate(); }} className="w-full py-2 text-red-500 text-xs font-bold uppercase tracking-wider">Excluir Item</button></form></div></div>)}
+            <div className="flex gap-3 pt-2"><button type="button" onClick={() => { setEditingMaterial(null); setEditCost(''); setQtyToAdd(''); }} className="flex-1 py-3 font-bold text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl">Cancelar</button><button type="submit" className="flex-1 py-3 bg-primary text-white rounded-xl font-bold shadow-lg">Confirmar Compra</button></div><button type="button" onClick={async () => { await dbService.deleteMaterial(editingMaterial.id); setEditingMaterial(null); await load(); onUpdate(); }} className="w-full py-2 text-red-500 text-xs font-bold uppercase tracking-wider mt-2">Excluir Item</button></form></div></div>)}
         </div>
     );
 }
@@ -938,20 +938,20 @@ const ExpensesTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ workI
     return (
         <div className="animate-in fade-in duration-500 pb-20">
              <div className="flex items-center justify-between mb-8"><SectionHeader title="Gastos" subtitle="Controle financeiro." /><button onClick={() => { setEditingId(null); setExistingPaidAmount(0); setPayNowAmount(''); setFormData({ date: new Date().toISOString().split('T')[0], category: ExpenseCategory.MATERIAL, amount: 0, paidAmount: 0, description: '', stepId: 'geral' }); setIsCreateOpen(true); }} className="bg-primary text-white w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg transition-all"><i className="fa-solid fa-plus text-lg"></i></button></div>
-            {Object.keys(groupedExpenses).sort().map(group => (<div key={group} className="mb-8"><div className="flex justify-between items-end mb-4 border-b border-slate-100 dark:border-slate-800 pb-2"><h3 className="font-bold text-primary dark:text-white">{group}</h3><span className="text-xs font-bold text-slate-500">R$ {groupedExpenses[group].total.toLocaleString('pt-BR')}</span></div><div className="space-y-3">{groupedExpenses[group].items.map(expense => {
+            {Object.keys(groupedExpenses).sort().map(group => (<div key={group} className="mb-8"><div className="flex justify-between items-end mb-4 border-b border-slate-100 dark:border-slate-800 pb-2"><h3 className="font-bold text-primary dark:text-white">{group}</h3><span className="text-xs font-bold text-slate-500 dark:text-slate-400">R$ {groupedExpenses[group].total.toLocaleString('pt-BR')}</span></div><div className="space-y-3">{groupedExpenses[group].items.map(expense => {
                 const total = Number(expense.amount) || 0;
                 const paid = Number(expense.paidAmount) || 0;
                 let statusLabel = 'Pendente';
-                let statusColor = 'bg-slate-100 text-slate-500';
+                let statusColor = 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400';
                 
-                if (paid >= total && total > 0) { statusLabel = 'Pago'; statusColor = 'bg-green-100 text-green-700'; }
-                else if (paid > 0) { statusLabel = 'Parcial'; statusColor = 'bg-orange-100 text-orange-700'; }
+                if (paid >= total && total > 0) { statusLabel = 'Pago'; statusColor = 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'; }
+                else if (paid > 0) { statusLabel = 'Parcial'; statusColor = 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400'; }
 
                 return (
                 <div key={expense.id} onClick={() => handleEdit(expense)} className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 p-4 rounded-2xl shadow-sm hover:shadow-md transition-all cursor-pointer">
                     <div className="flex justify-between items-start mb-2">
                         <div className="flex items-center gap-3">
-                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs bg-slate-50 text-slate-600`}><i className="fa-solid fa-tag"></i></div>
+                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs bg-slate-50 dark:bg-slate-800 text-slate-600 dark:text-slate-400`}><i className="fa-solid fa-tag"></i></div>
                             <div>
                                 <p className="font-bold text-sm text-primary dark:text-white">{expense.description}</p>
                                 <p className="text-[10px] text-slate-400">{formatDateDisplay(expense.date)}</p>
@@ -987,23 +987,23 @@ const ExpensesTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ workI
                                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Tipo</label>
                                 <div className="grid grid-cols-2 gap-2">
                                     {[ExpenseCategory.MATERIAL, ExpenseCategory.LABOR, ExpenseCategory.PERMITS, ExpenseCategory.OTHER].map(cat => (
-                                        <button key={cat} type="button" onClick={() => setFormData({...formData, category: cat})} className={`p-2 rounded-xl text-xs font-bold border ${formData.category === cat ? 'bg-primary text-white border-primary' : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500'}`}>{cat}</button>
+                                        <button key={cat} type="button" onClick={() => setFormData({...formData, category: cat})} className={`p-2 rounded-xl text-xs font-bold border ${formData.category === cat ? 'bg-primary text-white border-primary' : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400'}`}>{cat}</button>
                                     ))}
                                 </div>
                             </div>
                             <div>
                                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Etapa</label>
-                                <select className="w-full px-4 py-3 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 outline-none text-sm" value={formData.stepId} onChange={e => setFormData({...formData, stepId: e.target.value})}>
+                                <select className="w-full px-4 py-3 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 outline-none text-sm dark:text-white" value={formData.stepId} onChange={e => setFormData({...formData, stepId: e.target.value})}>
                                     <option value="geral">Geral</option>
                                     {steps.map(s => (<option key={s.id} value={s.id}>{s.name}</option>))}
                                 </select>
                             </div>
-                            <input placeholder="Descrição" className="w-full px-4 py-3 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 outline-none text-sm" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} required />
+                            <input placeholder="Descrição" className="w-full px-4 py-3 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 outline-none text-sm dark:text-white" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} required />
                             
                             <div className="p-4 bg-slate-50 dark:bg-black/20 rounded-2xl border border-slate-100 dark:border-slate-800 space-y-4">
                                 <div>
                                     <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Valor Total Combinado</label>
-                                    <div className="relative"><span className="absolute left-4 top-3 text-slate-400 text-sm">R$</span><input type="number" placeholder="0.00" className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 outline-none font-bold text-lg" value={formData.amount} onChange={e => setFormData({...formData, amount: Number(e.target.value)})} /></div>
+                                    <div className="relative"><span className="absolute left-4 top-3 text-slate-400 text-sm">R$</span><input type="number" placeholder="0.00" className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 outline-none font-bold text-lg dark:text-white" value={formData.amount} onChange={e => setFormData({...formData, amount: Number(e.target.value)})} /></div>
                                 </div>
                                 {editingId && (
                                     <div className="flex justify-between items-center px-2">
@@ -1017,9 +1017,9 @@ const ExpensesTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ workI
                                 </div>
                             </div>
 
-                            <input type="date" className="w-full px-4 py-3 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 outline-none text-sm" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} />
-                            <div className="flex gap-3 pt-2"><button type="button" onClick={() => setIsCreateOpen(false)} className="flex-1 py-3 font-bold text-slate-500">Cancelar</button><button type="submit" className="flex-1 py-3 bg-primary text-white rounded-xl font-bold shadow-lg">Salvar</button></div>
-                            {editingId && (<button type="button" onClick={() => handleDelete(editingId)} className="w-full py-2 text-red-500 text-xs font-bold uppercase tracking-wider">Excluir</button>)}
+                            <input type="date" className="w-full px-4 py-3 rounded-xl border bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 outline-none text-sm dark:text-white" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} />
+                            <div className="flex gap-3 pt-2"><button type="button" onClick={() => setIsCreateOpen(false)} className="flex-1 py-3 font-bold text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl">Cancelar</button><button type="submit" className="flex-1 py-3 bg-primary text-white rounded-xl font-bold shadow-lg">Salvar</button></div>
+                            {editingId && (<button type="button" onClick={() => handleDelete(editingId)} className="w-full py-2 text-red-500 text-xs font-bold uppercase tracking-wider mt-2">Excluir</button>)}
                         </form>
                     </div>
                 </div>
@@ -1051,7 +1051,7 @@ const WorkDetail: React.FC = () => {
 
   return (
       <div className="min-h-screen pb-24">
-          <div className="sticky top-0 z-30 bg-surface/90 dark:bg-slate-950/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 px-4 py-4 flex justify-between items-center"><div className="flex items-center gap-3"><button onClick={() => navigate('/')} className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500"><i className="fa-solid fa-arrow-left"></i></button><h1 className="font-bold text-primary dark:text-white truncate max-w-[200px]">{work.name}</h1></div>
+          <div className="sticky top-0 z-30 bg-surface/90 dark:bg-slate-950/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-800 px-4 py-4 flex justify-between items-center"><div className="flex items-center gap-3"><button onClick={() => navigate('/')} className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 hover:text-primary dark:hover:text-white transition-colors"><i className="fa-solid fa-arrow-left"></i></button><h1 className="font-bold text-primary dark:text-white truncate max-w-[200px]">{work.name}</h1></div>
           <button onClick={() => setShowAiChat(true)} className="bg-secondary text-white pl-2 pr-4 py-1.5 rounded-full flex items-center gap-2 shadow-lg shadow-orange-500/20 hover:bg-orange-600 transition-colors"><div className="w-7 h-7 rounded-full bg-white/20 p-0.5"><img src={ZE_AVATAR} className="w-full h-full rounded-full bg-slate-100 object-cover" alt="Zé" onError={(e) => { const target = e.currentTarget; if (target.src !== ZE_AVATAR_FALLBACK) { target.src = ZE_AVATAR_FALLBACK; } }} /></div><span className="font-bold text-xs">Zé da Obra AI</span></button></div>
           
           <div className="max-w-4xl mx-auto p-4 md:p-6">
@@ -1061,9 +1061,9 @@ const WorkDetail: React.FC = () => {
               {activeTab === 'expenses' && <ExpensesTab workId={work.id} onUpdate={loadWork} />}
               {activeTab === 'more' && <MoreMenuTab workId={work.id} onOpenChat={() => setShowAiChat(true)} />}
           </div>
-          <div className="fixed bottom-0 left-0 w-full bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 pb-safe pt-2 px-6 flex justify-between items-center z-40 shadow-[0_-5px_20px_rgba(0,0,0,0.05)]">{[{ id: 'overview', icon: 'fa-house', label: 'Geral' }, { id: 'steps', icon: 'fa-calendar-days', label: 'Cronograma' }, { id: 'materials', icon: 'fa-cart-shopping', label: 'Materiais' }, { id: 'expenses', icon: 'fa-wallet', label: 'Gastos' }, { id: 'more', icon: 'fa-bars', label: 'Mais' }].map(tab => (<button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex-1 flex flex-col items-center gap-1 min-w-[60px] transition-all duration-300 ${activeTab === tab.id ? 'text-secondary -translate-y-2' : 'text-slate-400 hover:text-slate-600'}`}><div className={`w-10 h-10 rounded-2xl flex items-center justify-center text-lg transition-all ${activeTab === tab.id ? 'bg-secondary text-white shadow-lg shadow-orange-500/30' : ''}`}><i className={`fa-solid ${tab.icon}`}></i></div><span className={`text-[10px] font-bold ${activeTab === tab.id ? 'opacity-100' : 'opacity-0'}`}>{tab.label}</span></button>))}</div>
+          <div className="fixed bottom-0 left-0 w-full bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 pb-safe pt-2 px-6 flex justify-between items-center z-40 shadow-[0_-5px_20px_rgba(0,0,0,0.05)]">{[{ id: 'overview', icon: 'fa-house', label: 'Geral' }, { id: 'steps', icon: 'fa-calendar-days', label: 'Cronograma' }, { id: 'materials', icon: 'fa-cart-shopping', label: 'Materiais' }, { id: 'expenses', icon: 'fa-wallet', label: 'Gastos' }, { id: 'more', icon: 'fa-bars', label: 'Mais' }].map(tab => (<button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex-1 flex flex-col items-center gap-1 min-w-[60px] transition-all duration-300 ${activeTab === tab.id ? 'text-secondary -translate-y-2' : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300'}`}><div className={`w-10 h-10 rounded-2xl flex items-center justify-center text-lg transition-all ${activeTab === tab.id ? 'bg-secondary text-white shadow-lg shadow-orange-500/30' : ''}`}><i className={`fa-solid ${tab.icon}`}></i></div><span className={`text-[10px] font-bold ${activeTab === tab.id ? 'opacity-100 dark:text-white' : 'opacity-0'}`}>{tab.label}</span></button>))}</div>
           
-          {showAiChat && (<div className="fixed inset-0 z-50 flex flex-col bg-white dark:bg-slate-900 animate-in slide-in-from-bottom duration-300 md:max-w-md md:right-4 md:bottom-20 md:left-auto md:top-auto md:h-[600px] md:rounded-3xl md:shadow-2xl md:border md:border-slate-200"><div className="p-4 bg-primary text-white flex justify-between items-center shrink-0 md:rounded-t-3xl"><div className="flex items-center gap-3"><div className="w-10 h-10 rounded-full bg-white/10 p-1"><img src={ZE_AVATAR} className="w-full h-full object-cover rounded-full bg-slate-100" onError={(e) => { const target = e.currentTarget; if (target.src !== ZE_AVATAR_FALLBACK) { target.src = ZE_AVATAR_FALLBACK; } }} /></div><div><h3 className="font-bold text-sm">Zé da Obra</h3><p className="text-[10px] text-green-300 flex items-center gap-1"><span className="w-1.5 h-1.5 bg-green-300 rounded-full animate-pulse"></span> Mestre Virtual</p></div></div><button onClick={() => setShowAiChat(false)} className="text-white/70 hover:text-white w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/10"><i className="fa-solid fa-xmark"></i></button></div><div className="flex-1 p-4 overflow-y-auto space-y-4 bg-slate-50 dark:bg-black/20">{aiHistory.length === 0 && (<div className="h-full flex flex-col items-center justify-center text-center opacity-40 p-6"><i className="fa-solid fa-comments text-4xl mb-3"></i><p className="text-sm font-medium">"Opa! Sou o Zé. Pode perguntar qualquer coisa sobre a obra que eu ajudo."</p></div>)}{aiHistory.map((msg, i) => (<div key={i} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}><div className={`max-w-[85%] p-3 rounded-2xl text-sm leading-relaxed ${msg.sender === 'user' ? 'bg-primary text-white rounded-tr-none' : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-tl-none shadow-sm'}`}>{msg.text}</div></div>))}{aiLoading && (<div className="flex justify-start"><div className="bg-white dark:bg-slate-800 p-4 rounded-2xl rounded-tl-none border border-slate-200 dark:border-slate-700 shadow-sm"><div className="flex gap-1.5"><span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"></span><span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce delay-75"></span><span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce delay-150"></span></div></div></div>)}</div><form onSubmit={handleAiSend} className="p-3 bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 flex gap-2 shrink-0 md:rounded-b-3xl"><input className="flex-1 bg-slate-100 dark:bg-slate-800 border-0 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-secondary/50 outline-none dark:text-white" placeholder="Digite sua dúvida..." value={aiMessage} onChange={e => setAiMessage(e.target.value)} /><button type="submit" disabled={!aiMessage.trim() || aiLoading} className="w-12 h-12 rounded-xl bg-secondary text-white flex items-center justify-center hover:bg-amber-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"><i className="fa-solid fa-paper-plane"></i></button></form></div>)}
+          {showAiChat && (<div className="fixed inset-0 z-50 flex flex-col bg-white dark:bg-slate-900 animate-in slide-in-from-bottom duration-300 md:max-w-md md:right-4 md:bottom-20 md:left-auto md:top-auto md:h-[600px] md:rounded-3xl md:shadow-2xl md:border md:border-slate-200 dark:border-slate-700"><div className="p-4 bg-primary text-white flex justify-between items-center shrink-0 md:rounded-t-3xl"><div className="flex items-center gap-3"><div className="w-10 h-10 rounded-full bg-white/10 p-1"><img src={ZE_AVATAR} className="w-full h-full object-cover rounded-full bg-slate-100" onError={(e) => { const target = e.currentTarget; if (target.src !== ZE_AVATAR_FALLBACK) { target.src = ZE_AVATAR_FALLBACK; } }} /></div><div><h3 className="font-bold text-sm">Zé da Obra</h3><p className="text-[10px] text-green-300 flex items-center gap-1"><span className="w-1.5 h-1.5 bg-green-300 rounded-full animate-pulse"></span> Mestre Virtual</p></div></div><button onClick={() => setShowAiChat(false)} className="text-white/70 hover:text-white w-8 h-8 flex items-center justify-center rounded-full hover:bg-white/10"><i className="fa-solid fa-xmark"></i></button></div><div className="flex-1 p-4 overflow-y-auto space-y-4 bg-slate-50 dark:bg-black/20">{aiHistory.length === 0 && (<div className="h-full flex flex-col items-center justify-center text-center opacity-40 p-6"><i className="fa-solid fa-comments text-4xl mb-3 dark:text-slate-400"></i><p className="text-sm font-medium dark:text-slate-400">"Opa! Sou o Zé. Pode perguntar qualquer coisa sobre a obra que eu ajudo."</p></div>)}{aiHistory.map((msg, i) => (<div key={i} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}><div className={`max-w-[85%] p-3 rounded-2xl text-sm leading-relaxed ${msg.sender === 'user' ? 'bg-primary text-white rounded-tr-none' : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 rounded-tl-none shadow-sm'}`}>{msg.text}</div></div>))}{aiLoading && (<div className="flex justify-start"><div className="bg-white dark:bg-slate-800 p-4 rounded-2xl rounded-tl-none border border-slate-200 dark:border-slate-700 shadow-sm"><div className="flex gap-1.5"><span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce"></span><span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce delay-75"></span><span className="w-2 h-2 bg-slate-400 rounded-full animate-bounce delay-150"></span></div></div></div>)}</div><form onSubmit={handleAiSend} className="p-3 bg-white dark:bg-slate-900 border-t border-slate-100 dark:border-slate-800 flex gap-2 shrink-0 md:rounded-b-3xl"><input className="flex-1 bg-slate-100 dark:bg-slate-800 border-0 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-secondary/50 outline-none dark:text-white" placeholder="Digite sua dúvida..." value={aiMessage} onChange={e => setAiMessage(e.target.value)} /><button type="submit" disabled={!aiMessage.trim() || aiLoading} className="w-12 h-12 rounded-xl bg-secondary text-white flex items-center justify-center hover:bg-amber-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"><i className="fa-solid fa-paper-plane"></i></button></form></div>)}
       </div>
   );
 };
