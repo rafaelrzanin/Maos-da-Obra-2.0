@@ -223,13 +223,14 @@ interface ConstructionDetails {
 
 // --- ENGINE: SMART PLAN GENERATOR (CONSTRUCTION & RENOVATION) ---
 const generateSmartPlan = (
-  templateId: string,
+  _templateId: string,
   totalArea: number,
   floors: number,
   _details?: ConstructionDetails
 ): PlanItem[] => {
   const plan: PlanItem[] = [];
 
+  // Se quiser manter essas variáveis só pra futuro:
   const _footprint = totalArea / Math.max(1, floors);
   let _currentDay = 0;
 
@@ -242,6 +243,7 @@ const generateSmartPlan = (
 
   return plan;
 };
+
 
 
 // --- SERVICE LAYER (ASYNC INTERFACE) ---
