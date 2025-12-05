@@ -67,8 +67,26 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
   const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
-    const currentUser = dbService.getCurrentUser();
-    if (currentUser) setUser(currentUser);
+    const initAuth = async () => {
+        // 1. Try Local Storage first (instant load for perceived performance)
+        const localUser = dbService.getCurrentUser();
+        if (localUser) setUser(localUser);
+
+        // 2. Check Supabase Session (Handles OAuth Redirect & Session Validity)
+        const sbUser = await dbService.syncSession();
+        if (sbUser) setUser(sbUser);
+    };
+    
+    initAuth();
+
+    // 3. Listen for real-time auth changes (Sign In / Sign Out / Token Refresh)
+    const unsubscribe = dbService.onAuthChange((u) => {
+        setUser(u);
+    });
+
+    return () => {
+        unsubscribe();
+    };
   }, []);
 
   const refreshUser = async () => {
