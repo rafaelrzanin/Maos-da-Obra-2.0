@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../App';
@@ -409,11 +408,12 @@ const Dashboard: React.FC = () => {
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 {upcomingSteps.map((step) => {
+                    // Normalize dates to LOCAL time boundaries to avoid timezone issues
                     const today = new Date();
-                    const startDate = new Date(step.startDate);
-                    // Reset times
                     today.setHours(0,0,0,0);
-                    startDate.setHours(0,0,0,0);
+                    
+                    const [y, m, d] = step.startDate.split('-').map(Number);
+                    const startDate = new Date(y, m - 1, d); // Construct Local Date
                     
                     const diffTime = startDate.getTime() - today.getTime();
                     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
