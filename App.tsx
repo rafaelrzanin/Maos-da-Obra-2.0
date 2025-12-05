@@ -140,7 +140,8 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const navItems = [
     { label: 'Painel Geral', path: '/', icon: 'fa-house' },
     { label: 'Nova Obra', path: '/create', icon: 'fa-plus' },
-    { label: 'Tutoriais', path: '/tutorials', icon: 'fa-circle-play' },
+    // Item ocultado temporariamente conforme solicitado
+    // { label: 'Tutoriais', path: '/tutorials', icon: 'fa-circle-play' },
     { label: 'Configurações', path: '/profile', icon: 'fa-gear' },
     { label: 'Assinatura', path: '/settings', icon: 'fa-id-card' },
   ];
