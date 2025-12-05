@@ -1,171 +1,179 @@
 import { PlanType, User } from '../types';
 
 // ---------------------------------------------------------------------------
-// CONFIGURAÇÃO DO GATEWAY (NEON)
+// CONFIGURAÇÃO DO GATEWAY (NEONPAY)
 // ---------------------------------------------------------------------------
 
-// URL base da API da Neon (checkout API)
-const API_URL = "https://api.neonpay.com"; // endpoint oficial da Neon /checkout :contentReference[oaicite:1]{index=1}
+// Base da API da NeonPay:
+// Pela doc, o exemplo usa: https://app.neonpay.com.br/api/v1
+const API_BASE_URL =
+  (import.meta.env.VITE_NEON_API_BASE_URL as string | undefined) ||
+  'https://app.neonpay.com.br/api/v1';
 
-// ⚠️ IMPORTANTE:
-// Cria no Vercel (ou no .env) a variável VITE_NEON_API_KEY
-// com a chave que a Neon te deu (chave SECRETA de servidor, NÃO expor publicamente).
-const NEON_API_KEY = import.meta.env.VITE_NEON_API_KEY as string | undefined;
+// Chaves da NeonPay vindas das variáveis de ambiente (Vercel)
+const NEON_PUBLIC_KEY = import.meta.env.VITE_NEON_PUBLIC_KEY as string | undefined;
+const NEON_SECRET_KEY = import.meta.env.VITE_NEON_SECRET_KEY as string | undefined;
 
-// Mapeia os tipos de plano do app para o "código de plano" interno
-// que você configurou lá na Neon (SKU / Offer / Product Code, etc.)
-const GATEWAY_PLAN_IDS: Record<PlanType, string> = {
-  [PlanType.MENSAL]: "Mãos da Obra - Plano Mensal",        // <-- troque pelo SKU real do plano mensal na Neon
-  [PlanType.SEMESTRAL]: "Mãos da Obra - Plano Semestral",  // <-- troque pelo SKU real do plano semestral
-  [PlanType.VITALICIO]: "Mãos da Obra - Plano Vitalício"   // <-- troque pelo SKU real do vitalício
+// IDs externos (externalId) para identificar cada plano na Neon
+const GATEWAY_PLAN_IDS = {
+  [PlanType.MENSAL]: 'MAOS_MENSAL',       // pode trocar por outro ID se quiser
+  [PlanType.SEMESTRAL]: 'MAOS_SEMESTRAL',
+  [PlanType.VITALICIO]: 'MAOS_VITALICIO'
 };
 
-// Mapeia PlanType (enum do app) para o texto que o webhook espera ("monthly", etc.)
-const NEON_PLAN_TYPE: Record<PlanType, "monthly" | "semiannual" | "lifetime"> = {
-  [PlanType.MENSAL]: "monthly",
-  [PlanType.SEMESTRAL]: "semiannual",
-  [PlanType.VITALICIO]: "lifetime"
+// Mapeia o enum PlanType para o texto que o webhook vai usar
+const NEON_PLAN_TYPE: Record<PlanType, 'monthly' | 'semiannual' | 'lifetime'> = {
+  [PlanType.MENSAL]: 'monthly',
+  [PlanType.SEMESTRAL]: 'semiannual',
+  [PlanType.VITALICIO]: 'lifetime'
 };
 
 export const gatewayService = {
   /**
-   * Cria uma sessão de checkout na Neon e devolve a URL de redirecionamento.
+   * Cria uma sessão de checkout NeonPay e retorna a checkoutUrl
    */
   checkout: async (user: User, planType: PlanType): Promise<string> => {
     console.log(
-      `[Gateway] Iniciando checkout Neon para ${user.email} no plano ${PlanType[planType]}...`
+      `[Gateway] Iniciando checkout NeonPay para ${user.email} no plano ${PlanType[planType]}...`
     );
 
-    if (!NEON_API_KEY) {
-      console.error("VITE_NEON_API_KEY não configurada.");
+    if (!NEON_PUBLIC_KEY || !NEON_SECRET_KEY) {
+      console.error('Chaves da NeonPay não configuradas.');
       throw new Error(
-        "Configuração de pagamento ausente. Avise o suporte do Mãos da Obra."
+        'Configuração de pagamento ausente. Avise o suporte do Mãos da Obra.'
       );
     }
 
-    // SKU do plano na Neon (você que define no painel da Neon)
-    const sku = GATEWAY_PLAN_IDS[planType];
-    if (!sku) {
+    const externalId = GATEWAY_PLAN_IDS[planType];
+    if (!externalId) {
       throw new Error(
-        `SKU do plano ${PlanType[planType]} não configurado em GATEWAY_PLAN_IDS.`
+        `GATEWAY_PLAN_IDS não configurado para o plano ${PlanType[planType]}.`
       );
     }
 
-    // Tipo de plano em texto (para o webhook entender)
     const normalizedPlanType = NEON_PLAN_TYPE[planType];
 
+    // Valores em centavos (ajuste para os preços reais do Mãos da Obra)
+    const priceInCents =
+      planType === PlanType.VITALICIO
+        ? 24700   // R$ 247,00
+        : planType === PlanType.SEMESTRAL
+        ? 9700    // R$ 97,00
+        : 2990;   // R$ 29,90
+
     // -----------------------------------------------------------------------
-    // MONTA O PAYLOAD PARA A NEON
-    //
-    // ⚠️ A Neon trabalha com "items" / "offers" / "SKU" cadastrados lá no painel.
-    // O formato exato você pode confirmar clicando em "Try It" na doc
-    // de POST https://api.neonpay.com/checkout, mas a ideia é essa:
+    // BODY NO FORMATO QUE A DOC DA NEON MOSTROU (/gateway/checkout)
     // -----------------------------------------------------------------------
-    const payload: any = {
-      // Lista de itens/serviços que vão pro checkout
-      items: [
-        {
-          // Aqui você manda o SKU/código do plano que cadastrou na Neon
-          sku,
-          quantity: 1
+    const payload = {
+      product: {
+        name: `Mãos da Obra - Plano ${PlanType[planType]}`,
+        externalId, // ID pra identificar esse plano na Neon
+        photos: [
+          // Coloca aqui uma imagem do teu app (pode trocar depois)
+          'https://www.maosdaobra.online/img/checkout-banner.png'
+        ],
+        offer: {
+          name: `Plano ${PlanType[planType]}`,
+          price: priceInCents,   // em centavos
+          offerType: 'NATIONAL',
+          currency: 'BRL',
+          lang: 'pt-BR'
         }
-      ],
-
-      // Metadados que vão viajar junto na compra e chegam no webhook
-      metadata: {
-        userId: user.id,                 // quem é o usuário no Supabase
-        planType: normalizedPlanType,    // "monthly" | "semiannual" | "lifetime"
-        email: user.email,
+      },
+      settings: {
+        paymentMethods: ['PIX', 'CREDIT_CARD'],
+        acceptedDocs: ['CPF'],
+        thankYouPage: `${window.location.origin}/#/settings?status=success`,
+        askForAddress: false,
+        colors: {
+          primaryColor: '#FFB629',
+          text: '#111111',
+          background: '#FFFFFF',
+          purchaseButtonBackground: '#FFB629',
+          purchaseButtonText: '#111111',
+          widgets: '#F5F5F5',
+          inputBackground: '#F1F1F1',
+          inputText: '#333333'
+        }
+      },
+      customer: {
         name: user.name,
-        source: "maos-da-obra"
+        email: user.email,
+        phone: (user as any).whatsapp || '',
+        document: (user as any).cpf || ''
+        // Se quiser usar address, adiciona aqui seguindo o exemplo da doc
+      },
+      trackProps: {
+        userId: user.id,               // pro webhook saber quem liberar
+        planType: normalizedPlanType,  // "monthly" | "semiannual" | "lifetime"
+        source: 'maos-da-obra'
       }
-
-      // Se a Neon permitir mais campos (ex: orderNumber, countryCode, etc),
-      // você pode acrescentar aqui conforme a documentação.
     };
 
-    // -----------------------------------------------------------------------
-    // CHAMADA HTTP PARA A NEON
-    // -----------------------------------------------------------------------
-    const url = `${API_URL.replace(/\/+$/, '')}/checkout`; // https://api.neonpay.com/checkout
+    const url = `${API_BASE_URL.replace(/\/+$/, '')}/gateway/checkout`;
 
-    try {
-      const response = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+    console.log('[Gateway] Enviando payload para NeonPay:', payload);
 
-          // ⚠️ HEADER DE AUTENTICAÇÃO:
-          // Verifica na doc ou no painel Neon se é:
-          //   Authorization: Bearer <token>
-          // ou
-          //   X-Api-Key: <chave>
-          //
-          // Aqui vou deixar o mais comum:
-          "Authorization": `Bearer ${NEON_API_KEY}`
-          // Se a doc mandar usar outro header, é só trocar aqui.
-        },
-        body: JSON.stringify(payload)
-      });
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-public-key': NEON_PUBLIC_KEY,
+        'x-secret-key': NEON_SECRET_KEY
+      },
+      body: JSON.stringify(payload)
+    });
 
-      if (!response.ok) {
-        let errorText = "";
-        try {
-          errorText = await response.text();
-        } catch {
-          // ignora
-        }
-        console.error("Erro ao criar checkout Neon:", response.status, errorText);
-        throw new Error(
-          "Não foi possível iniciar o pagamento agora. Tente novamente em alguns minutos."
-        );
+    if (!response.ok) {
+      let errorText = '';
+      try {
+        errorText = await response.text();
+      } catch {
+        // ignora
       }
-
-      const data: any = await response.json();
-
-      // A doc da Neon diz que, ao criar o checkout, você deve redirecionar
-      // o usuário para o `redirectUrl` retornado. :contentReference[oaicite:2]{index=2}
-      const redirectUrl: string =
-        data.redirectUrl ||
-        data.url ||
-        data.checkoutUrl ||
-        "";
-
-      if (!redirectUrl) {
-        console.error("Resposta da Neon sem redirectUrl conhecido:", data);
-        throw new Error(
-          "Pagamento criado, mas não recebemos a URL do checkout. Verifique a integração com a Neon."
-        );
-      }
-
-      return redirectUrl;
-
-    } catch (error) {
-      console.error("Erro no gateway de pagamento (Neon):", error);
-      throw error;
+      console.error(
+        'Erro ao criar checkout na NeonPay:',
+        response.status,
+        errorText
+      );
+      throw new Error(
+        'Não foi possível iniciar o pagamento agora. Tente novamente em alguns minutos.'
+      );
     }
+
+    const data = (await response.json()) as {
+      success: boolean;
+      checkoutUrl: string;
+    };
+
+    if (!data.success || !data.checkoutUrl) {
+      console.error('Resposta inesperada da NeonPay:', data);
+      throw new Error(
+        'Pagamento criado, mas não recebemos a URL do checkout. Verifique a integração.'
+      );
+    }
+
+    console.log('[Gateway] Checkout criado com sucesso. URL:', data.checkoutUrl);
+    return data.checkoutUrl;
   },
 
   /**
-   * Verifica o status via query string APÓS o redirecionamento de volta.
-   * Obs.: isso é só visual pro usuário; quem manda mesmo é o webhook
-   * atualizando o Supabase.
+   * Verifica status via query string após o retorno (apenas UX, quem manda é o webhook)
    */
   checkPaymentStatus: (
     searchParams: URLSearchParams
-  ): "success" | "failure" | "pending" | null => {
-    // Ajuste se a Neon mandar algum parâmetro específico na URL de retorno
-    const status = searchParams.get("status") || searchParams.get("result");
-    const errorCode = searchParams.get("error");
+  ): 'success' | 'failure' | 'pending' | null => {
+    const status = searchParams.get('status');
 
-    if (status === "success" || status === "approved" || status === "completed") {
-      return "success";
+    if (status === 'approved' || status === 'success' || status === 'paid') {
+      return 'success';
     }
-
-    if (status === "failure" || status === "rejected" || errorCode) {
-      return "failure";
+    if (status === 'failure' || status === 'rejected') {
+      return 'failure';
     }
-
+    if (status === 'pending') {
+      return 'pending';
+    }
     return null;
   }
 };
