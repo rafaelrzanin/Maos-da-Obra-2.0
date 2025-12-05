@@ -38,7 +38,8 @@ const Login: React.FC = () => {
     
     if (error) {
         console.error("Erro no login social:", error);
-        alert(error.message || "Erro ao conectar. Verifique se o login social está configurado.");
+        // Security: Show generic message instead of raw error
+        alert("Não foi possível conectar com o provedor social. Tente novamente.");
         setLoading(false);
     }
     // Nota: Se funcionar, o Supabase vai redirecionar a página para o provedor e depois de volta para cá.
