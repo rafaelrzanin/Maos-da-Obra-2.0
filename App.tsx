@@ -136,7 +136,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     <div className="min-h-screen bg-surface dark:bg-slate-950 flex flex-col md:flex-row font-sans text-text-body dark:text-slate-300 transition-colors duration-300 print:block print:bg-white">
       
       {/* Mobile Header (Premium Dark) */}
-      <div className="md:hidden bg-primary dark:bg-black text-white p-4 flex justify-between items-center shadow-md print:hidden z-50 sticky top-0 border-b border-white/5">
+      <div className="md:hidden bg-primary dark:bg-slate-900 text-white p-4 flex justify-between items-center shadow-md print:hidden z-50 sticky top-0 border-b border-white/5 dark:border-slate-800">
         <h1 className="font-bold text-lg tracking-tight flex items-center gap-2">
             <span className="bg-secondary text-white w-8 h-8 rounded-lg flex items-center justify-center shadow-glow">
                 <i className="fa-solid fa-helmet-safety text-sm"></i>
@@ -158,22 +158,22 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           <div className="md:hidden fixed inset-0 z-[100] bg-surface dark:bg-slate-950 animate-in slide-in-from-right duration-300 flex flex-col">
               
               {/* Menu Header */}
-              <div className="p-4 flex justify-between items-center border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-black/20">
+              <div className="p-4 flex justify-between items-center border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
                   <h2 className="text-lg font-bold text-primary dark:text-white flex items-center gap-2">
                       <i className="fa-solid fa-bars text-secondary"></i> Menu
                   </h2>
                   <button 
                       onClick={() => setIsMobileMenuOpen(false)}
-                      className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-primary dark:hover:text-white flex items-center justify-center transition-colors"
+                      className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-primary dark:text-slate-400 dark:hover:text-white flex items-center justify-center transition-colors"
                   >
                       <i className="fa-solid fa-xmark text-lg"></i>
                   </button>
               </div>
 
-              <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-6">
+              <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-6 bg-slate-50 dark:bg-slate-950">
                   
                   {/* User Profile Card (Mobile) */}
-                  <div className="bg-gradient-premium p-6 rounded-2xl shadow-xl text-white">
+                  <div className="bg-gradient-premium p-6 rounded-2xl shadow-xl text-white border border-white/5">
                       <div className="flex items-center gap-4 mb-4">
                           <div className="w-14 h-14 rounded-full bg-gradient-to-br from-slate-700 to-slate-900 border-2 border-white/20 flex items-center justify-center text-white font-bold text-xl shadow-inner">
                               {user.name.charAt(0)}
@@ -189,7 +189,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
                   {/* Navigation Links */}
                   <nav className="space-y-3">
-                      <p className="text-xs font-bold text-slate-400 uppercase tracking-wider ml-1">Navegação</p>
+                      <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider ml-1">Navegação</p>
                       {navItems.map(item => {
                           const isActive = location.pathname === item.path;
                           return (
@@ -198,11 +198,11 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                                   onClick={() => handleMobileNav(item.path)}
                                   className={`w-full flex items-center p-4 rounded-xl text-base font-semibold transition-all ${
                                       isActive 
-                                      ? 'bg-primary dark:bg-white text-white dark:text-primary shadow-lg' 
-                                      : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-800'
+                                      ? 'bg-primary dark:bg-slate-800 text-white shadow-lg' 
+                                      : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800'
                                   }`}
                               >
-                                  <div className={`w-8 flex justify-center mr-2 ${isActive ? 'text-secondary' : 'text-slate-400'}`}>
+                                  <div className={`w-8 flex justify-center mr-2 ${isActive ? 'text-secondary' : 'text-slate-400 dark:text-slate-500'}`}>
                                       <i className={`fa-solid ${item.icon}`}></i>
                                   </div>
                                   {item.label}
@@ -213,7 +213,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
                   {/* Actions (Theme & Logout) */}
                   <div className="mt-auto space-y-3">
-                      <p className="text-xs font-bold text-slate-400 uppercase tracking-wider ml-1">Opções</p>
+                      <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider ml-1">Opções</p>
                       
                       <button 
                           onClick={toggleTheme}
@@ -230,7 +230,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
                       <button 
                           onClick={logout}
-                          className="w-full flex items-center justify-center gap-2 p-4 rounded-xl bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 font-bold border border-red-100 dark:border-red-900/50 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
+                          className="w-full flex items-center justify-center gap-2 p-4 rounded-xl bg-red-50 dark:bg-red-900/10 text-red-600 dark:text-red-400 font-bold border border-red-100 dark:border-red-900/30 hover:bg-red-100 dark:hover:bg-red-900/20 transition-colors"
                       >
                           <i className="fa-solid fa-right-from-bracket"></i>
                           Sair da Conta
