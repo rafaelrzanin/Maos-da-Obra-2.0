@@ -6,7 +6,6 @@ const Tutorials: React.FC = () => {
       id: 'video1',
       title: 'Primeiros Passos no App',
       desc: 'Aprenda a criar sua primeira obra e configurar o perfil.',
-      // Using a placeholder thumbnail for visual consistency in MVP
       thumb: 'https://images.unsplash.com/photo-1541888946425-d81bb19240f5?q=80&w=600&auto=format&fit=crop',
       duration: '5:20'
     },
