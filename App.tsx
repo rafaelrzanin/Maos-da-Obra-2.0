@@ -7,6 +7,8 @@ import Dashboard from './pages/Dashboard';
 import CreateWork from './pages/CreateWork';
 import WorkDetail from './pages/WorkDetail';
 import Settings from './pages/Settings';
+import Profile from './pages/Profile';
+import Tutorials from './pages/Tutorials';
 
 // --- Theme Context ---
 type Theme = 'light' | 'dark';
@@ -54,6 +56,7 @@ interface AuthContextType {
   signup: (name: string, email: string, whatsapp?: string, password?: string) => Promise<void>;
   logout: () => void;
   updatePlan: (plan: PlanType) => Promise<void>;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>(null!);
@@ -67,6 +70,11 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
     const currentUser = dbService.getCurrentUser();
     if (currentUser) setUser(currentUser);
   }, []);
+
+  const refreshUser = async () => {
+      const currentUser = dbService.getCurrentUser();
+      if (currentUser) setUser(currentUser);
+  };
 
   const login = async (email: string, password?: string) => {
     const u = await dbService.login(email, password);
@@ -95,7 +103,7 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, signup, logout, updatePlan }}>
+    <AuthContext.Provider value={{ user, login, signup, logout, updatePlan, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );
@@ -114,6 +122,8 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const navItems = [
     { label: 'Painel Geral', path: '/', icon: 'fa-house' },
     { label: 'Nova Obra', path: '/create', icon: 'fa-plus' },
+    { label: 'Tutoriais', path: '/tutorials', icon: 'fa-circle-play' },
+    { label: 'Configurações', path: '/profile', icon: 'fa-gear' },
     { label: 'Assinatura', path: '/settings', icon: 'fa-id-card' },
   ];
 
@@ -203,7 +213,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
                   {/* Actions (Theme & Logout) */}
                   <div className="mt-auto space-y-3">
-                      <p className="text-xs font-bold text-slate-400 uppercase tracking-wider ml-1">Configurações</p>
+                      <p className="text-xs font-bold text-slate-400 uppercase tracking-wider ml-1">Opções</p>
                       
                       <button 
                           onClick={toggleTheme}
@@ -315,6 +325,8 @@ const App: React.FC = () => {
             <Route path="/create" element={<Layout><CreateWork /></Layout>} />
             <Route path="/work/:id" element={<Layout><WorkDetail /></Layout>} />
             <Route path="/settings" element={<Layout><Settings /></Layout>} />
+            <Route path="/profile" element={<Layout><Profile /></Layout>} />
+            <Route path="/tutorials" element={<Layout><Tutorials /></Layout>} />
           </Routes>
         </AuthProvider>
       </ThemeProvider>
