@@ -230,8 +230,8 @@ const generateSmartPlan = (
 ): PlanItem[] => {
   const plan: PlanItem[] = [];
 
-  const footprint = totalArea / Math.max(1, floors);
-  let currentDay = 0;
+  const _footprint = totalArea / Math.max(1, floors);
+  let _currentDay = 0;
 
   plan.push({
     stepName: "Início da obra",
