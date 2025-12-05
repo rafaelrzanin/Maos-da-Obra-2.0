@@ -264,10 +264,22 @@ const CalculatorView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 const ContractsView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     const [selectedContract, setSelectedContract] = useState<any | null>(null);
     const [editableContent, setEditableContent] = useState('');
+    const [copySuccess, setCopySuccess] = useState(false);
 
     const handleSelect = (contract: any) => {
         setSelectedContract(contract);
         setEditableContent(contract.contentTemplate);
+        setCopySuccess(false);
+    };
+
+    const handleCopy = async () => {
+        try {
+            await navigator.clipboard.writeText(editableContent);
+            setCopySuccess(true);
+            setTimeout(() => setCopySuccess(false), 2000);
+        } catch (err) {
+            alert("Erro ao copiar texto. Tente selecionar manualmente.");
+        }
     };
 
     const handleDownload = () => {
@@ -281,7 +293,30 @@ const ContractsView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         return (
             <div className="animate-in fade-in slide-in-from-right-4 h-full flex flex-col">
                 <button onClick={() => setSelectedContract(null)} className="mb-4 text-sm font-bold text-slate-400 hover:text-primary flex items-center gap-2"><i className="fa-solid fa-arrow-left"></i> Voltar para Modelos</button>
-                <div className="flex justify-between items-center mb-4"><h2 className="text-xl font-bold text-primary dark:text-white">{selectedContract.title}</h2><button onClick={handleDownload} className="bg-primary text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2"><i className="fa-solid fa-download"></i> Baixar .doc</button></div>
+                
+                <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-3 mb-4">
+                    <h2 className="text-xl font-bold text-primary dark:text-white">{selectedContract.title}</h2>
+                    <div className="flex gap-2">
+                        {/* Copy Button with Feedback */}
+                        <button 
+                            onClick={handleCopy} 
+                            className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all shadow-sm ${
+                                copySuccess 
+                                ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 border border-green-200 dark:border-green-800' 
+                                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700 border border-transparent'
+                            }`}
+                        >
+                            <i className={`fa-solid ${copySuccess ? 'fa-check' : 'fa-copy'}`}></i> 
+                            {copySuccess ? 'Copiado!' : 'Copiar Texto'}
+                        </button>
+                        
+                        {/* Download Button */}
+                        <button onClick={handleDownload} className="bg-primary text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-lg hover:bg-primary-light transition-colors">
+                            <i className="fa-solid fa-download"></i> Baixar .doc
+                        </button>
+                    </div>
+                </div>
+
                 <textarea className="flex-1 w-full p-6 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm text-sm font-mono leading-relaxed outline-none resize-none focus:ring-2 focus:ring-secondary/50" value={editableContent} onChange={(e) => setEditableContent(e.target.value)} />
             </div>
         );
