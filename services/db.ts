@@ -518,7 +518,7 @@ export const dbService = {
 
     // 2. GENERATE INTELLIGENT PLAN (Simplified for this file update)
     // The full logic exists in the original file, just ensuring structure is correct
-    const _plan = generateSmartPlan(templateId, work.area, work.floors || 1, undefined);
+    //const _plan = generateSmartPlan(templateId, work.area, work.floors || 1, undefined);
     
     // ... Logic to insert steps and materials ...
     // (Preserved from original implementation implicitly)
