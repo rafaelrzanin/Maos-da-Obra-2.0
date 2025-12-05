@@ -32,17 +32,17 @@ const Login: React.FC = () => {
   };
 
   const handleSocialLogin = async (provider: 'google' | 'apple') => {
-    const socialEmail = provider === 'google' ? 'usuario.google@gmail.com' : 'usuario.apple@icloud.com';
-    const socialName = provider === 'google' ? 'Usuário Google' : 'Usuário Apple';
-    
     setLoading(true);
-    const existingUser = await dbService.login(socialEmail);
-    if (existingUser) {
-      await login(socialEmail);
-    } else {
-      await signup(socialName, socialEmail);
+    
+    const { error } = await dbService.loginSocial(provider);
+    
+    if (error) {
+        console.error("Erro no login social:", error);
+        alert(error.message || "Erro ao conectar. Verifique se o login social está configurado.");
+        setLoading(false);
     }
-    setLoading(false);
+    // Nota: Se funcionar, o Supabase vai redirecionar a página para o provedor e depois de volta para cá.
+    // Não precisamos de setLoading(false) no caso de sucesso imediato pois a página vai recarregar.
   };
 
   return (
@@ -177,6 +177,7 @@ const Login: React.FC = () => {
                   {/* Social Login - Glass Style */}
                   <div className="grid grid-cols-2 gap-3">
                       <button 
+                          type="button"
                           onClick={() => handleSocialLogin('google')} 
                           className="flex items-center justify-center gap-2 h-11 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white transition-all hover:-translate-y-0.5 active:scale-95"
                       >
@@ -185,6 +186,7 @@ const Login: React.FC = () => {
                       </button>
 
                       <button 
+                          type="button"
                           onClick={() => handleSocialLogin('apple')} 
                           className="flex items-center justify-center gap-2 h-11 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white transition-all hover:-translate-y-0.5 active:scale-95"
                       >
