@@ -176,8 +176,7 @@ interface PlanItem {
   }[];
 }
 
-// --- ENGINE: CONSTRUCTION PLAN GENERATOR (ENGENHEIRO VIRTUAL 3.0 - SEQUENCIAL) ---
-// (Kept same as before, omitted for brevity but assumed present)
+// --- ENGINE: CONSTRUCTION PLAN GENERATOR ---
 const generateConstructionPlan = (totalArea: number, floors: number): PlanItem[] => {
     const plan: PlanItem[] = [];
     const footprint = totalArea / Math.max(1, floors); 
@@ -720,13 +719,9 @@ export const dbService = {
                }
           }
 
-          // Use description that includes the quantity to be clear
           const qtyDesc = addedQty ? `(${addedQty} ${material.unit})` : '';
           const description = `Compra: ${material.name} ${qtyDesc}`;
           
-          // DIRECT CALL TO INTERNAL HELPER TO ENSURE SAVING
-          // CRITICAL: We pass the cost as both Amount (total of this receipt) and PaidAmount (assuming cash/credit paid now)
-          // For material purchases, usually Paid = Cost immediately.
           await insertExpenseInternal({
               workId: material.workId,
               description: description,
@@ -735,7 +730,7 @@ export const dbService = {
               quantity: addedQty || 1, 
               category: ExpenseCategory.MATERIAL,
               date: new Date().toISOString().split('T')[0],
-              stepId: finalStepId, // Can be undefined, which maps to "Geral" in UI
+              stepId: finalStepId, 
               relatedMaterialId: material.id
           });
       }
@@ -1074,7 +1069,8 @@ export const dbService = {
       if (lastCheck === today) return; 
 
       // 1. Budget Check
-      const totalSpent = expenses.reduce((acc, curr) => acc + (Number(curr.paidAmount) || Number(curr.amount) || 0), 0);
+      // Only count PAID amounts towards "spending" for notifications
+      const totalSpent = expenses.reduce((acc, curr) => acc + (Number(curr.paidAmount) || 0), 0);
       const percentage = work.budgetPlanned > 0 ? (totalSpent / work.budgetPlanned) : 0;
       
       if (percentage >= 0.8) {
@@ -1154,7 +1150,8 @@ export const dbService = {
     const steps = await getStepsInternal(workId);
     
     // Safety check to ensure numbers are numbers
-    const totalSpent = expenses.reduce((acc, curr) => acc + (Number(curr.paidAmount) || Number(curr.amount) || 0), 0);
+    // FIXED: Only count what is actually paid (paidAmount)
+    const totalSpent = expenses.reduce((acc, curr) => acc + (Number(curr.paidAmount) || 0), 0);
     const totalSteps = steps.length;
     const completedSteps = steps.filter(s => s.status === StepStatus.COMPLETED).length;
     const now = new Date();
