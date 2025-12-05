@@ -15,9 +15,9 @@ const NEON_API_KEY = import.meta.env.VITE_NEON_API_KEY as string | undefined;
 // Mapeia os tipos de plano do app para o "código de plano" interno
 // que você configurou lá na Neon (SKU / Offer / Product Code, etc.)
 const GATEWAY_PLAN_IDS: Record<PlanType, string> = {
-  [PlanType.MENSAL]: "SKU_MAOS_MENSAL",        // <-- troque pelo SKU real do plano mensal na Neon
-  [PlanType.SEMESTRAL]: "SKU_MAOS_SEMESTRAL",  // <-- troque pelo SKU real do plano semestral
-  [PlanType.VITALICIO]: "SKU_MAOS_VITALICIO"   // <-- troque pelo SKU real do vitalício
+  [PlanType.MENSAL]: "Mãos da Obra - Plano Mensal",        // <-- troque pelo SKU real do plano mensal na Neon
+  [PlanType.SEMESTRAL]: "Mãos da Obra - Plano Semestral",  // <-- troque pelo SKU real do plano semestral
+  [PlanType.VITALICIO]: "Mãos da Obra - Plano Vitalício"   // <-- troque pelo SKU real do vitalício
 };
 
 // Mapeia PlanType (enum do app) para o texto que o webhook espera ("monthly", etc.)
