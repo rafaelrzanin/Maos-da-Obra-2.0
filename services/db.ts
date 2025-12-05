@@ -128,7 +128,8 @@ const insertExpenseInternal = async (expense: Omit<Expense, 'id'>) => {
     const safePaid = Number(expense.paidAmount) || 0;
     const safeQty = Number(expense.quantity) || 1;
 
-    console.log("DB: Saving Expense...", expense);
+    // Secure: Removed logging of expense payload to prevent data leaks
+    // console.log("DB: Saving Expense...", expense);
 
     if (supabase) {
         await supabase.from('expenses').insert({
@@ -463,7 +464,8 @@ export const dbService = {
     if (supabase) {
         const { data, error } = await supabase.auth.signInWithPassword({
             email,
-            password: password || '123456' 
+            // Security: Removed hardcoded default password. Requires proper password.
+            password: password || '' 
         });
         
         if (error) {
@@ -504,7 +506,8 @@ export const dbService = {
     if (supabase) {
         const { data, error } = await supabase.auth.signUp({
             email,
-            password: password || '123456',
+            // Security: Removed hardcoded default password.
+            password: password || '',
             options: {
                 data: { name, whatsapp }
             }
