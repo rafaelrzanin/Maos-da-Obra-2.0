@@ -223,29 +223,30 @@ interface ConstructionDetails {
 
 // --- ENGINE: SMART PLAN GENERATOR (CONSTRUCTION & RENOVATION) ---
 const generateSmartPlan = (
-  _templateId: string,
+  templateId: string,
   totalArea: number,
   floors: number,
-  _details?: ConstructionDetails
+  details?: ConstructionDetails
 ): PlanItem[] => {
-  // ... (Plan generator code remains unchanged for brevity, as it is large and not related to payments)
-  // Mantendo a lógica existente de geração de planos...
+  // Implementação simples de fallback só pra manter o app rodando.
+  // No futuro você pode voltar com a lógica completa de geração inteligente.
 
-  const _plan: PlanItem[] = [];
-  const _footprint = totalArea / Math.max(1, floors);
-  let _currentDay = 0;
+  const plan: PlanItem[] = [];
 
-  // TODO: implementar a lógica de geração inteligente de plano aqui
+  const footprint = totalArea / Math.max(1, floors);
+  let currentDay = 0;
 
-  return []; // por enquanto não usamos o plano
-};
+  // Exemplo de primeiro passo básico
+  plan.push({
+    stepName: "Início da obra",
+    duration: 1,
+    startOffset: 0,
+    materials: []
+  });
 
-    
-    // Fallback simple implementation to satisfy Typescript in this abbreviated file
-    // In production, keep the full function from previous file
-    plan.push({ stepName: "Início", duration: 1, startOffset: 0, materials: [] });
-    
-    return plan; 
+  // Aqui você poderia adicionar outros passos com base em templateId, footprint, etc.
+
+  return plan;
 };
 
 
