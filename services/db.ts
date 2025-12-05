@@ -226,7 +226,7 @@ const generateSmartPlan = (
   templateId: string,
   totalArea: number,
   floors: number,
-  details?: ConstructionDetails
+  _details?: ConstructionDetails
 ): PlanItem[] => {
   const plan: PlanItem[] = [];
 
