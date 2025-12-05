@@ -162,12 +162,51 @@ const PhotosView: React.FC<{ workId: string, onBack: () => void }> = ({ workId, 
     const loadPhotos = async () => { const p = await dbService.getPhotos(workId); setPhotos(p); };
     useEffect(() => { loadPhotos(); }, [workId]);
     const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => { if (e.target.files && e.target.files[0]) { await dbService.uploadPhoto(workId, e.target.files[0], 'PROGRESS'); loadPhotos(); }};
+    
     return (
-        <div className="animate-in fade-in slide-in-from-right-4">
-             <button onClick={onBack} className="mb-4 text-sm font-bold text-slate-400 hover:text-primary"><i className="fa-solid fa-arrow-left"></i> Voltar</button>
-             <div className="flex justify-between items-center mb-6"><SectionHeader title="Galeria" subtitle="Acompanhamento visual." /><label className="bg-primary text-white w-10 h-10 rounded-xl flex items-center justify-center shadow-lg cursor-pointer"><i className="fa-solid fa-camera"></i><input type="file" className="hidden" accept="image/*" onChange={handleUpload} /></label></div>
-             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">{photos.map(p => (<div key={p.id} className="aspect-square rounded-xl overflow-hidden relative group"><img src={p.url} className="w-full h-full object-cover" /><div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"><button onClick={async () => { await dbService.deletePhoto(p.id); loadPhotos(); }} className="text-white hover:text-red-400"><i className="fa-solid fa-trash"></i></button></div></div>))}</div>
-             {photos.length === 0 && <p className="text-center text-slate-400 py-10">Nenhuma foto.</p>}
+        <div className="animate-in fade-in slide-in-from-right-4 flex flex-col h-full">
+             <button onClick={onBack} className="mb-4 text-sm font-bold text-slate-400 hover:text-primary flex items-center gap-2 w-fit"><i className="fa-solid fa-arrow-left"></i> Voltar</button>
+             
+             <div className="flex justify-between items-center mb-6">
+                 <SectionHeader title="Galeria" subtitle="Acompanhamento visual." />
+                 {photos.length > 0 && (
+                    <label className="bg-primary hover:bg-slate-700 text-white w-10 h-10 rounded-xl flex items-center justify-center shadow-lg cursor-pointer transition-colors">
+                        <i className="fa-solid fa-camera"></i>
+                        <input type="file" className="hidden" accept="image/*" onChange={handleUpload} />
+                    </label>
+                 )}
+             </div>
+
+             {photos.length === 0 ? (
+                 <div className="flex-1 flex flex-col items-center justify-center p-8 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-3xl bg-slate-50/50 dark:bg-slate-900/50">
+                     <div className="w-20 h-20 bg-white dark:bg-slate-800 rounded-full flex items-center justify-center text-slate-300 dark:text-slate-600 mb-6 shadow-sm">
+                         <i className="fa-solid fa-images text-3xl"></i>
+                     </div>
+                     <h3 className="text-xl font-bold text-primary dark:text-white mb-2">Galeria Vazia</h3>
+                     <p className="text-slate-500 dark:text-slate-400 text-center text-sm max-w-xs mb-8 leading-relaxed">
+                         Registre o antes, durante e depois. Fotos são essenciais para evitar dúvidas e garantir a qualidade.
+                     </p>
+                     <label className="bg-primary text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-primary/20 cursor-pointer flex items-center gap-2 hover:bg-slate-800 transition-all">
+                         <i className="fa-solid fa-camera"></i>
+                         Adicionar Primeira Foto
+                         <input type="file" className="hidden" accept="image/*" onChange={handleUpload} />
+                     </label>
+                 </div>
+             ) : (
+                 <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                     {photos.map(p => (
+                         <div key={p.id} className="aspect-square rounded-2xl overflow-hidden relative group border border-slate-100 dark:border-slate-800 shadow-sm bg-slate-100 dark:bg-slate-900">
+                             <img src={p.url} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110" loading="lazy" />
+                             <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-2">
+                                 <span className="text-white text-[10px] font-medium bg-black/50 px-2 py-1 rounded-full">{new Date(p.date).toLocaleDateString()}</span>
+                                 <button onClick={async () => { if(confirm('Apagar foto?')) { await dbService.deletePhoto(p.id); loadPhotos(); }}} className="text-white bg-red-500/80 hover:bg-red-500 w-10 h-10 rounded-full flex items-center justify-center transition-colors">
+                                     <i className="fa-solid fa-trash"></i>
+                                 </button>
+                             </div>
+                         </div>
+                     ))}
+                 </div>
+             )}
         </div>
     );
 };
@@ -178,12 +217,61 @@ const FilesView: React.FC<{ workId: string, onBack: () => void }> = ({ workId, o
     const loadFiles = async () => { const f = await dbService.getFiles(workId); setFiles(f); };
     useEffect(() => { loadFiles(); }, [workId]);
     const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => { if (e.target.files && e.target.files[0]) { await dbService.uploadFile(workId, e.target.files[0], 'Geral'); loadFiles(); }};
+    
     return (
-        <div className="animate-in fade-in slide-in-from-right-4">
-             <button onClick={onBack} className="mb-4 text-sm font-bold text-slate-400 hover:text-primary"><i className="fa-solid fa-arrow-left"></i> Voltar</button>
-             <div className="flex justify-between items-center mb-6"><SectionHeader title="Projetos" subtitle="Plantas e documentos." /><label className="bg-primary text-white w-10 h-10 rounded-xl flex items-center justify-center shadow-lg cursor-pointer"><i className="fa-solid fa-upload"></i><input type="file" className="hidden" onChange={handleUpload} /></label></div>
-             <div className="space-y-3">{files.map(f => (<div key={f.id} className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-100 dark:border-slate-800 flex justify-between items-center"><div className="flex items-center gap-3"><div className="w-10 h-10 rounded-lg bg-orange-100 text-orange-600 flex items-center justify-center text-xl"><i className="fa-solid fa-file-pdf"></i></div><div><h4 className="font-bold text-sm text-primary dark:text-white truncate max-w-[150px]">{f.name}</h4><p className="text-xs text-slate-500">{new Date(f.date).toLocaleDateString()}</p></div></div><div className="flex gap-3"><a href={f.url} target="_blank" className="text-secondary font-bold text-sm">Abrir</a><button onClick={async () => { await dbService.deleteFile(f.id); loadFiles(); }} className="text-slate-400 hover:text-red-500"><i className="fa-solid fa-trash"></i></button></div></div>))}</div>
-             {files.length === 0 && <p className="text-center text-slate-400 py-10">Nenhum arquivo.</p>}
+        <div className="animate-in fade-in slide-in-from-right-4 flex flex-col h-full">
+             <button onClick={onBack} className="mb-4 text-sm font-bold text-slate-400 hover:text-primary flex items-center gap-2 w-fit"><i className="fa-solid fa-arrow-left"></i> Voltar</button>
+             
+             <div className="flex justify-between items-center mb-6">
+                 <SectionHeader title="Projetos" subtitle="Plantas e documentos." />
+                 {files.length > 0 && (
+                    <label className="bg-primary hover:bg-slate-700 text-white w-10 h-10 rounded-xl flex items-center justify-center shadow-lg cursor-pointer transition-colors">
+                        <i className="fa-solid fa-upload"></i>
+                        <input type="file" className="hidden" onChange={handleUpload} />
+                    </label>
+                 )}
+             </div>
+
+             {files.length === 0 ? (
+                 <div className="flex-1 flex flex-col items-center justify-center p-8 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-3xl bg-slate-50/50 dark:bg-slate-900/50">
+                     <div className="w-20 h-20 bg-white dark:bg-slate-800 rounded-full flex items-center justify-center text-slate-300 dark:text-slate-600 mb-6 shadow-sm">
+                         <i className="fa-solid fa-folder-open text-3xl"></i>
+                     </div>
+                     <h3 className="text-xl font-bold text-primary dark:text-white mb-2">Sem Arquivos</h3>
+                     <p className="text-slate-500 dark:text-slate-400 text-center text-sm max-w-xs mb-8 leading-relaxed">
+                         Centralize plantas, contratos e notas fiscais aqui. Nunca mais perca um documento importante da obra.
+                     </p>
+                     <label className="bg-primary text-white px-6 py-3 rounded-xl font-bold shadow-lg shadow-primary/20 cursor-pointer flex items-center gap-2 hover:bg-slate-800 transition-all">
+                         <i className="fa-solid fa-cloud-arrow-up"></i>
+                         Adicionar Arquivo
+                         <input type="file" className="hidden" onChange={handleUpload} />
+                     </label>
+                 </div>
+             ) : (
+                 <div className="space-y-3">
+                     {files.map(f => (
+                         <div key={f.id} className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 flex justify-between items-center hover:border-secondary/30 transition-all shadow-sm group">
+                             <div className="flex items-center gap-4">
+                                 <div className="w-12 h-12 rounded-xl bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400 flex items-center justify-center text-xl shrink-0">
+                                     <i className={`fa-solid ${f.name.endsWith('.pdf') ? 'fa-file-pdf' : 'fa-file-lines'}`}></i>
+                                 </div>
+                                 <div className="min-w-0">
+                                     <h4 className="font-bold text-sm text-primary dark:text-white truncate max-w-[180px] md:max-w-xs">{f.name}</h4>
+                                     <p className="text-[10px] text-slate-500 uppercase tracking-wide font-bold mt-0.5">{new Date(f.date).toLocaleDateString()} • {f.category}</p>
+                                 </div>
+                             </div>
+                             <div className="flex gap-2">
+                                 <a href={f.url} target="_blank" className="w-9 h-9 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 flex items-center justify-center hover:bg-primary hover:text-white transition-colors" title="Abrir">
+                                     <i className="fa-solid fa-arrow-up-right-from-square text-xs"></i>
+                                 </a>
+                                 <button onClick={async () => { if(confirm('Excluir arquivo?')) { await dbService.deleteFile(f.id); loadFiles(); }}} className="w-9 h-9 rounded-xl bg-red-50 dark:bg-red-900/20 text-red-500 hover:bg-red-500 hover:text-white flex items-center justify-center transition-colors" title="Excluir">
+                                     <i className="fa-solid fa-trash text-xs"></i>
+                                 </button>
+                             </div>
+                         </div>
+                     ))}
+                 </div>
+             )}
         </div>
     );
 };
