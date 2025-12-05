@@ -1,14 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
-  Work, Step, Material, Expense, WorkPhoto, WorkFile, 
-  StepStatus, ExpenseCategory, PlanType 
+  Work, Step, Material, Expense, WorkPhoto, 
+  StepStatus, ExpenseCategory 
 } from '../types';
 import { dbService } from '../services/db';
 import { FULL_MATERIAL_PACKAGES, ZE_AVATAR, ZE_AVATAR_FALLBACK } from '../services/standards';
 import { aiService } from '../services/ai';
 import { useAuth } from '../App';
-import { ZeModal } from '../components/ZeModal';
 
 // --- HELPER COMPONENTS ---
 const SectionHeader: React.FC<{ title: string, subtitle: string }> = ({ title, subtitle }) => (
@@ -205,7 +204,7 @@ const StepsTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ workId, 
             
             <div className="space-y-4 relative">
                 <div className="absolute left-6 top-4 bottom-4 w-0.5 bg-slate-200 dark:bg-slate-800 z-0"></div>
-                {steps.map((step, idx) => {
+                {steps.map((step) => {
                     const isCompleted = step.status === StepStatus.COMPLETED;
                     const isDelayed = step.isDelayed;
                     return (
