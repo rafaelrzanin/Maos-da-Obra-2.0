@@ -447,7 +447,7 @@ export const dbService = {
   // NEW METHOD: Ouve mudanças de auth (login, logout, refresh)
   onAuthChange: (callback: (user: User | null) => void) => {
       if (!supabase) return () => {};
-      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, _session) => {
           if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
               const user = await syncSupabaseUser();
               callback(user);
