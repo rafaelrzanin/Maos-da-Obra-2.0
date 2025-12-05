@@ -361,7 +361,6 @@ const ReportsView: React.FC<{ workId: string, onBack: () => void }> = ({ workId,
                                      {groupedMaterials[cat].map(m => {
                                          const isComplete = m.purchasedQty >= m.plannedQty;
                                          const isPartial = m.purchasedQty > 0 && m.purchasedQty < m.plannedQty;
-                                         const isPending = m.purchasedQty === 0;
                                          
                                          let dotColor = 'bg-slate-300';
                                          if (isComplete) dotColor = 'bg-green-500';
