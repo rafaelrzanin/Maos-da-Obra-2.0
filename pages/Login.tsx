@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { useAuth, useTheme } from '../App';
+import { useAuth } from '../App';
 import { useNavigate } from 'react-router-dom';
 import { dbService } from '../services/db';
 
 const Login: React.FC = () => {
   const { login, signup, user } = useAuth();
-  const { theme, toggleTheme } = useTheme();
+  // Theme toggle removed from Login screen
   const navigate = useNavigate();
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
@@ -50,24 +50,15 @@ const Login: React.FC = () => {
       
       {/* 1. BACKGROUND LAYER (Cinematic Photo) */}
       <div className="absolute inset-0 z-0">
-          {/* High-end architectural dark background */}
+          {/* High-end architectural dark background - BRIGHTER NOW */}
           <img 
             src="https://images.unsplash.com/photo-1600585154340-be6161a56a0c?q=80&w=2070&auto=format&fit=crop" 
-            className="w-full h-full object-cover animate-[pulse_10s_ease-in-out_infinite_alternate] scale-105"
+            className="w-full h-full object-cover animate-[pulse_20s_ease-in-out_infinite_alternate] scale-105"
             alt="Luxury Background"
           />
-          {/* Sophisticated Overlay (Gradient from Black to Transparent) */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black via-slate-900/80 to-slate-900/60 mix-blend-multiply"></div>
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]"></div>
+          {/* Lighter Gradient Overlay: Clear at top, Dark at bottom for text contrast */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent"></div>
       </div>
-
-      {/* Theme Toggle (Absolute Top Right) */}
-      <button 
-        onClick={toggleTheme}
-        className="absolute top-6 right-6 z-50 w-10 h-10 rounded-full bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-white/70 hover:text-white hover:bg-white/20 transition-all"
-      >
-        <i className={`fa-solid ${theme === 'dark' ? 'fa-sun' : 'fa-moon'}`}></i>
-      </button>
 
       {/* 2. GLASS CONTENT WRAPPER */}
       <div className="relative z-10 w-full max-w-md animate-in fade-in zoom-in-95 duration-700">
@@ -77,19 +68,19 @@ const Login: React.FC = () => {
               <div className="w-20 h-20 bg-gradient-to-br from-amber-500 to-orange-600 rounded-3xl flex items-center justify-center text-white text-3xl mb-4 shadow-[0_0_30px_rgba(217,119,6,0.6)] transform rotate-6 border-2 border-white/20 ring-4 ring-black/20">
                   <i className="fa-solid fa-helmet-safety"></i>
               </div>
-              <h1 className="text-3xl font-black text-white tracking-tight leading-none">
+              <h1 className="text-3xl font-black text-white tracking-tight leading-none drop-shadow-lg">
                   MÃOS DA <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-200 to-orange-400">OBRA</span>
               </h1>
-              <p className="text-white/60 text-xs font-bold uppercase tracking-[0.3em] mt-2">Premium Edition</p>
+              <p className="text-white/80 text-xs font-bold uppercase tracking-[0.3em] mt-2 drop-shadow-md">Premium Edition</p>
           </div>
 
-          {/* 3. THE GLASS CARD (Vitrificação) */}
-          <div className="backdrop-blur-xl bg-white/10 dark:bg-black/30 border border-white/20 rounded-[2.5rem] p-8 shadow-2xl relative overflow-hidden group">
+          {/* 3. THE GLASS CARD (Vitrificação Fumê) */}
+          {/* Changed bg-white/10 to bg-black/50 for a darker "smoked" glass look */}
+          <div className="backdrop-blur-xl bg-black/60 border border-white/10 rounded-[2.5rem] p-8 shadow-2xl relative overflow-hidden group ring-1 ring-white/5">
               
               {/* Shine Effect on Glass */}
-              <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-white/50 to-transparent opacity-50"></div>
-              <div className="absolute -top-[100px] -left-[100px] w-[200px] h-[200px] bg-white/5 rounded-full blur-[50px] pointer-events-none"></div>
-
+              <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-white/30 to-transparent opacity-50"></div>
+              
               <div className="text-center mb-6">
                   <h2 className="text-xl font-bold text-white mb-1">
                       {isLogin ? 'Bem-vindo de volta' : 'Criar Conta Exclusiva'}
@@ -111,7 +102,7 @@ const Login: React.FC = () => {
                             value={name}
                             onChange={(e) => setName(e.target.value)}
                             placeholder="Nome Completo"
-                            className="block w-full pl-11 pr-4 py-3.5 bg-black/20 border border-white/10 rounded-xl text-white placeholder-white/30 focus:bg-black/40 focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 transition-all outline-none"
+                            className="block w-full pl-11 pr-4 py-3.5 bg-black/30 border border-white/10 rounded-xl text-white placeholder-white/30 focus:bg-black/50 focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 transition-all outline-none"
                         />
                     </div>
                   )}
@@ -125,7 +116,7 @@ const Login: React.FC = () => {
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
                           placeholder="E-mail"
-                          className="block w-full pl-11 pr-4 py-3.5 bg-black/20 border border-white/10 rounded-xl text-white placeholder-white/30 focus:bg-black/40 focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 transition-all outline-none"
+                          className="block w-full pl-11 pr-4 py-3.5 bg-black/30 border border-white/10 rounded-xl text-white placeholder-white/30 focus:bg-black/50 focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 transition-all outline-none"
                       />
                   </div>
 
@@ -139,7 +130,7 @@ const Login: React.FC = () => {
                             value={whatsapp}
                             onChange={(e) => setWhatsapp(e.target.value)}
                             placeholder="WhatsApp"
-                            className="block w-full pl-11 pr-4 py-3.5 bg-black/20 border border-white/10 rounded-xl text-white placeholder-white/30 focus:bg-black/40 focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 transition-all outline-none"
+                            className="block w-full pl-11 pr-4 py-3.5 bg-black/30 border border-white/10 rounded-xl text-white placeholder-white/30 focus:bg-black/50 focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 transition-all outline-none"
                         />
                     </div>
                   )}
@@ -153,7 +144,7 @@ const Login: React.FC = () => {
                           value={password}
                           onChange={(e) => setPassword(e.target.value)}
                           placeholder="Senha"
-                          className="block w-full pl-11 pr-4 py-3.5 bg-black/20 border border-white/10 rounded-xl text-white placeholder-white/30 focus:bg-black/40 focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 transition-all outline-none"
+                          className="block w-full pl-11 pr-4 py-3.5 bg-black/30 border border-white/10 rounded-xl text-white placeholder-white/30 focus:bg-black/50 focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 transition-all outline-none"
                       />
                   </div>
 
@@ -166,7 +157,7 @@ const Login: React.FC = () => {
                   <button 
                     onClick={handleSubmit}
                     disabled={loading}
-                    className="w-full py-4 mt-2 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-white font-bold rounded-xl shadow-lg shadow-orange-900/30 transform active:scale-[0.98] transition-all flex items-center justify-center gap-2 border border-white/10 disabled:opacity-70 disabled:cursor-wait"
+                    className="w-full py-4 mt-2 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-white font-bold rounded-xl shadow-lg shadow-orange-900/40 transform active:scale-[0.98] transition-all flex items-center justify-center gap-2 border border-white/10 disabled:opacity-70 disabled:cursor-wait"
                   >
                       {loading ? <i className="fa-solid fa-circle-notch fa-spin"></i> : (isLogin ? 'Entrar Agora' : 'Cadastrar Grátis')}
                       {!loading && <i className="fa-solid fa-arrow-right"></i>}
@@ -178,7 +169,7 @@ const Login: React.FC = () => {
                           <div className="w-full border-t border-white/10"></div>
                       </div>
                       <div className="relative flex justify-center">
-                          <span className="bg-transparent px-2 text-[10px] text-white/40 uppercase tracking-widest bg-slate-900/50 backdrop-blur-sm rounded-full">Ou entre com</span>
+                          <span className="bg-transparent px-2 text-[10px] text-white/40 uppercase tracking-widest bg-black/40 backdrop-blur-sm rounded-full">Ou entre com</span>
                       </div>
                   </div>
 
@@ -205,7 +196,7 @@ const Login: React.FC = () => {
           
           {/* Footer Text */}
           <div className="text-center mt-6">
-              <p className="text-sm text-white/50">
+              <p className="text-sm text-white/60 drop-shadow-md">
                   {isLogin ? 'Não tem conta?' : 'Já é membro?'}
                   <button 
                     onClick={() => setIsLogin(!isLogin)}
