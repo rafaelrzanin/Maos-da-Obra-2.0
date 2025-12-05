@@ -71,7 +71,9 @@ const Login: React.FC = () => {
               <h1 className="text-3xl font-black text-white tracking-tight leading-none drop-shadow-lg">
                   MÃOS DA <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-200 to-orange-400">OBRA</span>
               </h1>
-              <p className="text-white/80 text-xs font-bold uppercase tracking-[0.3em] mt-2 drop-shadow-md">Premium Edition</p>
+              <p className="text-white/90 text-sm font-medium tracking-wide mt-2 drop-shadow-md">
+                  O controle da sua obra na palma da sua mão
+              </p>
           </div>
 
           {/* 3. THE GLASS CARD (Vitrificação Fumê) */}
