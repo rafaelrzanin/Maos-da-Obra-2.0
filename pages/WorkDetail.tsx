@@ -8,6 +8,7 @@ import { ZeModal } from '../components/ZeModal';
 import { FULL_MATERIAL_PACKAGES, ZE_AVATAR, ZE_AVATAR_FALLBACK, CALCULATOR_LOGIC, CONTRACT_TEMPLATES, STANDARD_CHECKLISTS, getRandomZeTip, ZeTip } from '../services/standards';
 import { useAuth } from '../App';
 import { aiService } from '../services/ai';
+import * as XLSX from 'xlsx';
 
 // --- Shared Components & Helpers ---
 
@@ -298,26 +299,34 @@ const ContractsView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 const ChecklistsView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     const [openCategory, setOpenCategory] = useState<string | null>(null);
 
-    const handleExportCSV = () => {
-        const BOM = "\uFEFF";
-        let csvContent = BOM + "Fase,Verificação\n";
+    const handleExportXLSX = () => {
+        // Flatten data structure for Excel
+        const rows = STANDARD_CHECKLISTS.flatMap(list => 
+            list.items.map(item => ({
+                'Fase da Obra': list.category,
+                'Item de Verificação': item,
+                'Conferido?': '', // Empty column for user to check
+                'Observações': '' // Empty column for notes
+            }))
+        );
 
-        STANDARD_CHECKLISTS.forEach(list => {
-            list.items.forEach(item => {
-                const safeCategory = `"${list.category.replace(/"/g, '""')}"`;
-                const safeItem = `"${item.replace(/"/g, '""')}"`;
-                csvContent += `${safeCategory},${safeItem}\n`;
-            });
-        });
+        // Create Sheet
+        const worksheet = XLSX.utils.json_to_sheet(rows);
 
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.setAttribute("download", "checklist_obra_ze.csv");
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        // Column widths for better UX
+        worksheet['!cols'] = [
+            { wch: 35 }, // Fase
+            { wch: 80 }, // Item
+            { wch: 15 }, // Conferido
+            { wch: 40 }  // Obs
+        ];
+
+        // Create Workbook
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Checklist Completo");
+
+        // Download
+        XLSX.writeFile(workbook, "Checklist_Ze_da_Obra.xlsx");
     };
 
     return (
@@ -326,8 +335,8 @@ const ChecklistsView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
             <div className="flex justify-between items-center mb-6">
                 <SectionHeader title="Checklists Anti-Erro" subtitle="O que verificar para evitar prejuízo." />
                 <div className="flex gap-2 print:hidden">
-                    <button onClick={handleExportCSV} className="bg-slate-100 dark:bg-slate-800 text-green-600 hover:text-green-700 w-10 h-10 rounded-xl flex items-center justify-center transition-colors shadow-sm" title="Baixar CSV">
-                        <i className="fa-solid fa-file-csv text-lg"></i>
+                    <button onClick={handleExportXLSX} className="bg-slate-100 dark:bg-slate-800 text-green-600 hover:text-green-700 w-10 h-10 rounded-xl flex items-center justify-center transition-colors shadow-sm" title="Baixar Planilha Excel">
+                        <i className="fa-solid fa-file-excel text-lg"></i>
                     </button>
                     <button onClick={() => window.print()} className="bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-primary w-10 h-10 rounded-xl flex items-center justify-center transition-colors shadow-sm" title="Imprimir">
                         <i className="fa-solid fa-print"></i>
