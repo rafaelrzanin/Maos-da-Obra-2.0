@@ -228,23 +228,17 @@ const generateSmartPlan = (
   floors: number,
   details?: ConstructionDetails
 ): PlanItem[] => {
-  // Implementação simples de fallback só pra manter o app rodando.
-  // No futuro você pode voltar com a lógica completa de geração inteligente.
-
   const plan: PlanItem[] = [];
 
   const footprint = totalArea / Math.max(1, floors);
   let currentDay = 0;
 
-  // Exemplo de primeiro passo básico
   plan.push({
     stepName: "Início da obra",
     duration: 1,
     startOffset: 0,
     materials: []
   });
-
-  // Aqui você poderia adicionar outros passos com base em templateId, footprint, etc.
 
   return plan;
 };
