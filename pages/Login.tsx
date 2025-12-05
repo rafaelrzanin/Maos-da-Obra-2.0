@@ -46,18 +46,18 @@ const Login: React.FC = () => {
   };
 
   return (
-    <div className="relative min-h-screen w-full overflow-hidden font-sans flex items-center justify-center p-4">
+    <div className="relative min-h-screen w-full overflow-hidden font-sans flex items-center justify-center p-4 bg-slate-900">
       
       {/* 1. BACKGROUND LAYER (Cinematic Photo) */}
       <div className="absolute inset-0 z-0">
           {/* High-end architectural dark background - BRIGHTER NOW */}
           <img 
             src="https://images.unsplash.com/photo-1600585154340-be6161a56a0c?q=80&w=2070&auto=format&fit=crop" 
-            className="w-full h-full object-cover animate-[pulse_20s_ease-in-out_infinite_alternate] scale-105"
+            className="w-full h-full object-cover opacity-60 animate-[pulse_20s_ease-in-out_infinite_alternate] scale-105"
             alt="Luxury Background"
           />
           {/* Lighter Gradient Overlay: Clear at top, Dark at bottom for text contrast */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent"></div>
+          <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-black/30"></div>
       </div>
 
       {/* 2. GLASS CONTENT WRAPPER */}
@@ -71,14 +71,13 @@ const Login: React.FC = () => {
               <h1 className="text-3xl font-black text-white tracking-tight leading-none drop-shadow-lg">
                   MÃOS DA <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-200 to-orange-400">OBRA</span>
               </h1>
-              <p className="text-white/90 text-sm font-medium tracking-wide mt-2 drop-shadow-md">
+              <p className="text-white/90 text-sm font-medium tracking-wide mt-2 drop-shadow-md text-shadow-sm">
                   O controle da sua obra na palma da sua mão
               </p>
           </div>
 
           {/* 3. THE GLASS CARD (Vitrificação Fumê) */}
-          {/* Changed bg-white/10 to bg-black/50 for a darker "smoked" glass look */}
-          <div className="backdrop-blur-xl bg-black/60 border border-white/10 rounded-[2.5rem] p-8 shadow-2xl relative overflow-hidden group ring-1 ring-white/5">
+          <div className="backdrop-blur-xl bg-black/70 border border-white/10 rounded-[2.5rem] p-8 shadow-2xl relative overflow-hidden group ring-1 ring-white/5">
               
               {/* Shine Effect on Glass */}
               <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-white/30 to-transparent opacity-50"></div>
@@ -97,62 +96,62 @@ const Login: React.FC = () => {
                   {!isLogin && (
                     <div className="relative group">
                         <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                            <i className="fa-solid fa-user text-white/40 group-focus-within:text-amber-400 transition-colors"></i>
+                            <i className="fa-solid fa-user text-white/50 group-focus-within:text-amber-400 transition-colors"></i>
                         </div>
                         <input 
                             type="text" 
                             value={name}
                             onChange={(e) => setName(e.target.value)}
                             placeholder="Nome Completo"
-                            className="block w-full pl-11 pr-4 py-3.5 bg-black/30 border border-white/10 rounded-xl text-white placeholder-white/30 focus:bg-black/50 focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 transition-all outline-none"
+                            className="block w-full pl-11 pr-4 py-3.5 bg-white/10 border border-white/10 rounded-xl text-white placeholder-white/40 focus:bg-black/50 focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 transition-all outline-none"
                         />
                     </div>
                   )}
 
                   <div className="relative group">
                       <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                          <i className="fa-solid fa-envelope text-white/40 group-focus-within:text-amber-400 transition-colors"></i>
+                          <i className="fa-solid fa-envelope text-white/50 group-focus-within:text-amber-400 transition-colors"></i>
                       </div>
                       <input 
                           type="email" 
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}
                           placeholder="E-mail"
-                          className="block w-full pl-11 pr-4 py-3.5 bg-black/30 border border-white/10 rounded-xl text-white placeholder-white/30 focus:bg-black/50 focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 transition-all outline-none"
+                          className="block w-full pl-11 pr-4 py-3.5 bg-white/10 border border-white/10 rounded-xl text-white placeholder-white/40 focus:bg-black/50 focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 transition-all outline-none"
                       />
                   </div>
 
                   {!isLogin && (
                      <div className="relative group">
                         <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                            <i className="fa-brands fa-whatsapp text-white/40 group-focus-within:text-amber-400 transition-colors"></i>
+                            <i className="fa-brands fa-whatsapp text-white/50 group-focus-within:text-amber-400 transition-colors"></i>
                         </div>
                         <input 
                             type="tel" 
                             value={whatsapp}
                             onChange={(e) => setWhatsapp(e.target.value)}
                             placeholder="WhatsApp"
-                            className="block w-full pl-11 pr-4 py-3.5 bg-black/30 border border-white/10 rounded-xl text-white placeholder-white/30 focus:bg-black/50 focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 transition-all outline-none"
+                            className="block w-full pl-11 pr-4 py-3.5 bg-white/10 border border-white/10 rounded-xl text-white placeholder-white/40 focus:bg-black/50 focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 transition-all outline-none"
                         />
                     </div>
                   )}
 
                   <div className="relative group">
                       <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                          <i className="fa-solid fa-lock text-white/40 group-focus-within:text-amber-400 transition-colors"></i>
+                          <i className="fa-solid fa-lock text-white/50 group-focus-within:text-amber-400 transition-colors"></i>
                       </div>
                       <input 
                           type="password" 
                           value={password}
                           onChange={(e) => setPassword(e.target.value)}
                           placeholder="Senha"
-                          className="block w-full pl-11 pr-4 py-3.5 bg-black/30 border border-white/10 rounded-xl text-white placeholder-white/30 focus:bg-black/50 focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 transition-all outline-none"
+                          className="block w-full pl-11 pr-4 py-3.5 bg-white/10 border border-white/10 rounded-xl text-white placeholder-white/40 focus:bg-black/50 focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 transition-all outline-none"
                       />
                   </div>
 
                   {isLogin && (
                       <div className="flex justify-end">
-                          <a href="#" className="text-xs font-bold text-white/60 hover:text-white transition-colors">Esqueceu a senha?</a>
+                          <a href="#" className="text-xs font-bold text-white/70 hover:text-white transition-colors">Esqueceu a senha?</a>
                       </div>
                   )}
 
@@ -171,7 +170,7 @@ const Login: React.FC = () => {
                           <div className="w-full border-t border-white/10"></div>
                       </div>
                       <div className="relative flex justify-center">
-                          <span className="bg-transparent px-2 text-[10px] text-white/40 uppercase tracking-widest bg-black/40 backdrop-blur-sm rounded-full">Ou entre com</span>
+                          <span className="bg-transparent px-2 text-[10px] text-white/50 uppercase tracking-widest bg-black/40 backdrop-blur-sm rounded-full">Ou entre com</span>
                       </div>
                   </div>
 
@@ -179,7 +178,7 @@ const Login: React.FC = () => {
                   <div className="grid grid-cols-2 gap-3">
                       <button 
                           onClick={() => handleSocialLogin('google')} 
-                          className="flex items-center justify-center gap-2 h-11 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white transition-all hover:-translate-y-0.5"
+                          className="flex items-center justify-center gap-2 h-11 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white transition-all hover:-translate-y-0.5 active:scale-95"
                       >
                           <img src="https://www.svgrepo.com/show/475656/google-color.svg" className="w-4 h-4" alt="Google" />
                           <span className="text-xs font-bold">Google</span>
@@ -187,7 +186,7 @@ const Login: React.FC = () => {
 
                       <button 
                           onClick={() => handleSocialLogin('apple')} 
-                          className="flex items-center justify-center gap-2 h-11 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white transition-all hover:-translate-y-0.5"
+                          className="flex items-center justify-center gap-2 h-11 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white transition-all hover:-translate-y-0.5 active:scale-95"
                       >
                           <i className="fa-brands fa-apple text-sm"></i>
                           <span className="text-xs font-bold">Apple</span>
@@ -198,7 +197,7 @@ const Login: React.FC = () => {
           
           {/* Footer Text */}
           <div className="text-center mt-6">
-              <p className="text-sm text-white/60 drop-shadow-md">
+              <p className="text-sm text-white/70 drop-shadow-md">
                   {isLogin ? 'Não tem conta?' : 'Já é membro?'}
                   <button 
                     onClick={() => setIsLogin(!isLogin)}
