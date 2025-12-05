@@ -11,6 +11,15 @@ const DB_KEY = 'maos_db_v1';
 const SESSION_KEY = 'maos_session_v1';
 const NOTIFICATION_CHECK_KEY = 'maos_last_notif_check';
 
+// --- HELPER: GET LOCAL YYYY-MM-DD STRING ---
+const getLocalTodayString = () => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+};
+
 // --- TYPES FOR LOCAL MOCK ---
 interface DbSchema {
   users: User[];
@@ -117,12 +126,13 @@ const insertExpenseInternal = async (expense: Omit<Expense, 'id'>) => {
 };
 
 const getStepsInternal = async (workId: string): Promise<Step[]> => {
+    const todayStr = getLocalTodayString();
+    
     if (supabase) {
         const { data } = await supabase.from('steps').select('*').eq('work_id', workId);
-        const now = new Date();
         return (data || []).map(s => {
-             const endDate = new Date(s.end_date);
-             const isDelayed = (s.status !== StepStatus.COMPLETED) && (now > endDate);
+             // String comparison is safer for dates YYYY-MM-DD than Date objects due to timezone offsets
+             const isDelayed = (s.status !== StepStatus.COMPLETED) && (todayStr > s.end_date);
              return {
                  ...s,
                  workId: s.work_id,
@@ -133,10 +143,9 @@ const getStepsInternal = async (workId: string): Promise<Step[]> => {
         });
     } else {
         const db = getLocalDb();
-        const now = new Date();
         return Promise.resolve(db.steps.filter(s => s.workId === workId).map(s => {
-            const endDate = new Date(s.endDate);
-            const isDelayed = (s.status !== StepStatus.COMPLETED) && (now > endDate);
+            // String comparison is safer for dates YYYY-MM-DD than Date objects due to timezone offsets
+            const isDelayed = (s.status !== StepStatus.COMPLETED) && (todayStr > s.endDate);
             return { ...s, isDelayed };
         }));
     }
@@ -617,21 +626,35 @@ export const dbService = {
     };
 
     const plan = generateSmartPlan(templateId, work.area, work.floors || 1, constructionDetails);
-    const startDate = new Date(work.startDate);
+    
+    // SAFE LOCAL DATE PARSING (YYYY-MM-DD to Date)
+    const [startY, startM, startD] = work.startDate.split('-').map(Number);
+    const startDate = new Date(startY, startM - 1, startD); // Local Date at midnight
 
     for (const item of plan) {
         const sDate = new Date(startDate);
         sDate.setDate(sDate.getDate() + item.startOffset);
         const eDate = new Date(sDate);
         eDate.setDate(eDate.getDate() + item.duration);
+        
+        // Helper to format Date object back to YYYY-MM-DD string
+        const formatDateStr = (d: Date) => {
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${y}-${m}-${day}`;
+        };
+
+        const sDateStr = formatDateStr(sDate);
+        const eDateStr = formatDateStr(eDate);
 
         let stepId = '';
         if (supabase) {
                 const { data: newStep } = await supabase.from('steps').insert({
                 work_id: newWorkId,
                 name: item.stepName,
-                start_date: sDate.toISOString().split('T')[0],
-                end_date: eDate.toISOString().split('T')[0],
+                start_date: sDateStr,
+                end_date: eDateStr,
                 status: StepStatus.NOT_STARTED
                 }).select().single();
                 if (newStep) stepId = newStep.id;
@@ -642,8 +665,8 @@ export const dbService = {
                     id: stepId,
                     workId: newWorkId,
                     name: item.stepName,
-                    startDate: sDate.toISOString().split('T')[0],
-                    endDate: eDate.toISOString().split('T')[0],
+                    startDate: sDateStr,
+                    endDate: eDateStr,
                     status: StepStatus.NOT_STARTED,
                     isDelayed: false
                 });
@@ -1263,7 +1286,7 @@ export const dbService = {
       if (!work) return;
       
       const db = getLocalDb();
-      const today = new Date().toISOString().split('T')[0];
+      const today = getLocalTodayString();
       const lastCheckKey = `${NOTIFICATION_CHECK_KEY}_${workId}`;
       const lastCheck = localStorage.getItem(lastCheckKey);
 
@@ -1288,8 +1311,8 @@ export const dbService = {
       
       const now = new Date();
       steps.forEach(step => {
-          // 2. Delay Check
-          if (step.status !== StepStatus.COMPLETED && new Date(step.endDate) < now) {
+          // 2. Delay Check (Reused isDelayed which is string based)
+          if (step.isDelayed) {
                db.notifications.push({
                       id: Math.random().toString(36).substr(2, 9),
                       userId,
@@ -1334,8 +1357,10 @@ export const dbService = {
       const materials = await dbService.getMaterials(workId);
       
       const completed = steps.filter(s => s.status === StepStatus.COMPLETED).length;
-      const now = new Date();
-      const delayed = steps.filter(s => s.status !== StepStatus.COMPLETED && new Date(s.endDate) < now).length;
+      
+      // Use the pre-calculated isDelayed flag which uses robust string comparison
+      const delayed = steps.filter(s => s.isDelayed).length;
+      
       const pendingMaterials = materials.filter(m => m.purchasedQty < m.plannedQty).length;
       
       return {
@@ -1355,8 +1380,9 @@ export const dbService = {
     const totalSpent = expenses.reduce((acc, curr) => acc + (Number(curr.paidAmount) || 0), 0);
     const totalSteps = steps.length;
     const completedSteps = steps.filter(s => s.status === StepStatus.COMPLETED).length;
-    const now = new Date();
-    const delayedSteps = steps.filter(s => (s.status !== StepStatus.COMPLETED) && (new Date(s.endDate) < now)).length;
+    
+    // Use robust isDelayed logic
+    const delayedSteps = steps.filter(s => s.isDelayed).length;
     
     return {
       totalSpent,
