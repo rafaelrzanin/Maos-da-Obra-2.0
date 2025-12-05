@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useAuth } from '../App';
 import { PlanType } from '../types';
@@ -154,7 +153,7 @@ const Settings: React.FC = () => {
       {/* MODAL DE BONUS VITALICIO */}
       {showBonusModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
-            <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-lg p-0 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-lg p-0 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 border border-slate-200 dark:border-slate-800">
                 <div className="bg-premium p-6 text-center">
                     <i className="fa-solid fa-crown text-4xl text-white mb-2"></i>
                     <h3 className="text-xl font-bold text-white">Bônus do Plano Vitalício</h3>
