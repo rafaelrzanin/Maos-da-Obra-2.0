@@ -31,7 +31,7 @@ const Login: React.FC = () => {
     setLoading(false);
   };
 
-  const handleSocialLogin = async (provider: 'google' | 'apple') => {
+  const handleSocialLogin = async (provider: 'google') => {
     setLoading(true);
     
     const { error } = await dbService.loginSocial(provider);
@@ -175,23 +175,14 @@ const Login: React.FC = () => {
                   </div>
 
                   {/* Social Login - Glass Style */}
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="mt-4">
                       <button 
                           type="button"
                           onClick={() => handleSocialLogin('google')} 
-                          className="flex items-center justify-center gap-2 h-11 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white transition-all hover:-translate-y-0.5 active:scale-95"
+                          className="w-full flex items-center justify-center gap-2 h-12 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white transition-all hover:-translate-y-0.5 active:scale-95"
                       >
-                          <img src="https://www.svgrepo.com/show/475656/google-color.svg" className="w-4 h-4" alt="Google" />
-                          <span className="text-xs font-bold">Google</span>
-                      </button>
-
-                      <button 
-                          type="button"
-                          onClick={() => handleSocialLogin('apple')} 
-                          className="flex items-center justify-center gap-2 h-11 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white transition-all hover:-translate-y-0.5 active:scale-95"
-                      >
-                          <i className="fa-brands fa-apple text-sm"></i>
-                          <span className="text-xs font-bold">Apple</span>
+                          <img src="https://www.svgrepo.com/show/475656/google-color.svg" className="w-5 h-5" alt="Google" />
+                          <span className="text-sm font-bold">Continuar com Google</span>
                       </button>
                   </div>
               </form>
