@@ -1,9 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../App';
 import { dbService } from '../services/db';
 import { WORK_TEMPLATES } from '../services/standards';
-import { StepStatus } from '../types';
 
 const CreateWork: React.FC = () => {
   const { user } = useAuth();
