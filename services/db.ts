@@ -394,6 +394,20 @@ const generateSmartPlan = (templateId: string, totalArea: number, floors: number
 export const dbService = {
   
   // --- Auth ---
+  loginSocial: async (provider: 'google' | 'apple'): Promise<{ error: any }> => {
+      if (supabase) {
+          const { data, error } = await supabase.auth.signInWithOAuth({
+              provider: provider,
+              options: {
+                  redirectTo: window.location.origin
+              }
+          });
+          return { error };
+      } else {
+          return { error: { message: "Supabase não configurado. Adicione as chaves no arquivo .env" } };
+      }
+  },
+
   login: async (email: string, password?: string): Promise<User | null> => {
     if (supabase) {
         const { data, error } = await supabase.auth.signInWithPassword({
