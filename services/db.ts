@@ -471,6 +471,42 @@ export const dbService = {
     return stored ? JSON.parse(stored) : null;
   },
 
+  updateUser: async (userId: string, data: { name?: string, whatsapp?: string }, newPassword?: string): Promise<User | null> => {
+      if (supabase) {
+          // 1. Update Profile Data
+          const { data: profile, error } = await supabase.from('profiles')
+              .update(data)
+              .eq('id', userId)
+              .select()
+              .single();
+          
+          if (error) throw error;
+
+          // 2. Update Password (if provided)
+          if (newPassword) {
+              const { error: pwdError } = await supabase.auth.updateUser({ password: newPassword });
+              if (pwdError) throw pwdError;
+          }
+
+          if (profile) {
+              localStorage.setItem(SESSION_KEY, JSON.stringify(profile));
+              return profile as User;
+          }
+      } else {
+          // Local Mock
+          const db = getLocalDb();
+          const userIdx = db.users.findIndex(u => u.id === userId);
+          if (userIdx > -1) {
+              if (data.name) db.users[userIdx].name = data.name;
+              if (data.whatsapp) db.users[userIdx].whatsapp = data.whatsapp;
+              saveLocalDb(db);
+              localStorage.setItem(SESSION_KEY, JSON.stringify(db.users[userIdx]));
+              return db.users[userIdx];
+          }
+      }
+      return null;
+  },
+
   logout: async () => {
     if (supabase) await supabase.auth.signOut();
     localStorage.removeItem(SESSION_KEY);
