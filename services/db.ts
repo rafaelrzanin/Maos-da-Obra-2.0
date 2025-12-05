@@ -90,6 +90,37 @@ const uploadToBucket = async (file: File, path: string): Promise<string | null> 
     }
 }
 
+// --- HELPER: SYNC SUPABASE USER (INTERNAL) ---
+const syncSupabaseUser = async (): Promise<User | null> => {
+    if (!supabase) return null;
+    
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    if (session?.user) {
+        // Tenta buscar perfil existente
+        let { data: profile } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
+        
+        // Se não existir (primeiro login social), cria
+        if (!profile) {
+             const { data: newProfile, error } = await supabase.from('profiles').insert({
+                id: session.user.id,
+                email: session.user.email,
+                name: session.user.user_metadata.full_name || session.user.email?.split('@')[0] || 'Usuário',
+                plan: PlanType.VITALICIO,
+             }).select().single();
+             
+             if (newProfile) profile = newProfile;
+             else if (error) console.error("Error creating profile:", error);
+        }
+
+        if (profile) {
+            localStorage.setItem(SESSION_KEY, JSON.stringify(profile));
+            return profile as User;
+        }
+    }
+    return null;
+};
+
 // --- INTERNAL HELPERS (Avoid Circular Dependency) ---
 const insertExpenseInternal = async (expense: Omit<Expense, 'id'>) => {
     // Ensure numbers are numbers
@@ -406,6 +437,26 @@ export const dbService = {
       } else {
           return { error: { message: "Supabase não configurado. Adicione as chaves no arquivo .env" } };
       }
+  },
+
+  // NEW METHOD: Sincroniza a sessão do Supabase (útil após redirect do OAuth)
+  syncSession: async (): Promise<User | null> => {
+      return await syncSupabaseUser();
+  },
+
+  // NEW METHOD: Ouve mudanças de auth (login, logout, refresh)
+  onAuthChange: (callback: (user: User | null) => void) => {
+      if (!supabase) return () => {};
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+          if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+              const user = await syncSupabaseUser();
+              callback(user);
+          } else if (event === 'SIGNED_OUT') {
+              localStorage.removeItem(SESSION_KEY);
+              callback(null);
+          }
+      });
+      return () => subscription.unsubscribe();
   },
 
   login: async (email: string, password?: string): Promise<User | null> => {
