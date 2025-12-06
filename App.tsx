@@ -53,7 +53,7 @@ const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) =>
 interface AuthContextType {
   user: User | null;
   login: (email: string, password?: string) => Promise<boolean>;
-  signup: (name: string, email: string, whatsapp?: string, password?: string) => Promise<void>;
+  signup: (name: string, email: string, whatsapp: string, password?: string, cpf?: string, planType?: string | null) => Promise<void>;
   logout: () => void;
   updatePlan: (plan: PlanType) => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -108,8 +108,8 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
     return false;
   };
 
-  const signup = async (name: string, email: string, whatsapp?: string, password?: string) => {
-    const u = await dbService.signup(name, email, whatsapp, password);
+  const signup = async (name: string, email: string, whatsapp: string, password?: string, cpf?: string, planType?: string | null) => {
+    const u = await dbService.signup(name, email, whatsapp, password, cpf, planType);
     if (u) {
         setUser(u);
         setIsSubscriptionValid(dbService.isSubscriptionActive(u));
