@@ -9,6 +9,7 @@ export interface User {
   name: string;
   email: string;
   whatsapp?: string;
+  cpf?: string; // Added field
   plan: PlanType;
   subscriptionExpiresAt?: string;
 }
