@@ -3,9 +3,10 @@ import { useAuth } from '../App';
 import { PlanType } from '../types';
 import { gatewayService } from '../services/gateway';
 import { LIFETIME_BONUSES } from '../services/standards';
+import { dbService } from '../services/db';
 
 const Settings: React.FC = () => {
-  const { user } = useAuth();
+  const { user, isSubscriptionValid } = useAuth();
   const [loadingPlan, setLoadingPlan] = useState<PlanType | null>(null);
   const [showBonusModal, setShowBonusModal] = useState(false);
 
@@ -65,29 +66,50 @@ const Settings: React.FC = () => {
 
   return (
     <div className="max-w-6xl mx-auto pb-12 pt-4 px-4">
-      <h1 className="text-3xl font-bold text-text-main dark:text-white mb-2">Minha Assinatura</h1>
-      <p className="text-text-body dark:text-slate-400 mb-10">Escolha como prefere pagar. Todos os planos liberam <strong>tudo</strong> no app.</p>
+      {/* Show Header only if valid, or a different header if locked (controlled in App.tsx layout mainly, but text here helps) */}
+      <h1 className="text-3xl font-bold text-text-main dark:text-white mb-2">
+          {isSubscriptionValid ? 'Minha Assinatura' : 'Escolha seu Plano'}
+      </h1>
+      <p className="text-text-body dark:text-slate-400 mb-10">
+          {isSubscriptionValid 
+            ? 'Gerencie seu plano atual.' 
+            : 'Para começar a usar o Mãos da Obra, ative uma assinatura.'}
+      </p>
       
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         {plans.map(plan => {
-          const isCurrent = user.plan === plan.id;
+          const isCurrentPlanType = user.plan === plan.id;
           const isVitalicio = plan.id === PlanType.VITALICIO;
           const isLoading = loadingPlan === plan.id;
           
+          // Logic for Button State:
+          // 1. If it's the current plan type AND subscription is valid => "Current Plan" (Disabled)
+          // 2. If it's the current plan type BUT subscription is INVALID (Expired) => "Renew" (Enabled)
+          // 3. Otherwise => "Subscribe" (Enabled)
+          
+          const isActiveCurrent = isCurrentPlanType && isSubscriptionValid;
+          const isExpiredCurrent = isCurrentPlanType && !isSubscriptionValid;
+
           return (
             <div 
               key={plan.id} 
               className={`relative bg-white dark:bg-slate-900 rounded-3xl p-8 flex flex-col border transition-all hover:shadow-xl ${
                 isVitalicio ? 'border-premium shadow-lg shadow-premium/10' : 'border-slate-200 dark:border-slate-800 shadow-sm'
-              } ${isCurrent ? 'ring-2 ring-primary ring-offset-2 dark:ring-offset-slate-900' : ''}`}
+              } ${isActiveCurrent ? 'ring-2 ring-primary ring-offset-2 dark:ring-offset-slate-900' : ''}`}
             >
-              {isCurrent && (
+              {isActiveCurrent && (
                 <div className="absolute top-0 right-0 bg-primary text-white text-[10px] font-bold px-3 py-1.5 rounded-bl-xl rounded-tr-2xl tracking-wider uppercase">
-                  Meu Plano Atual
+                  Ativo
+                </div>
+              )}
+              
+              {isExpiredCurrent && (
+                <div className="absolute top-0 right-0 bg-red-500 text-white text-[10px] font-bold px-3 py-1.5 rounded-bl-xl rounded-tr-2xl tracking-wider uppercase">
+                  Expirado
                 </div>
               )}
 
-              {plan.savings && !isCurrent && (
+              {plan.savings && !isCurrentPlanType && (
                  <div className={`absolute -top-3 left-1/2 transform -translate-x-1/2 ${isVitalicio ? 'bg-premium' : 'bg-success'} text-white text-[10px] font-bold px-4 py-1 rounded-full uppercase tracking-wider shadow-sm`}>
                    {plan.savings}
                  </div>
@@ -124,14 +146,16 @@ const Settings: React.FC = () => {
               </div>
 
               <button
-                disabled={isCurrent || isLoading || loadingPlan !== null}
+                disabled={isActiveCurrent || isLoading || loadingPlan !== null}
                 onClick={() => handleSubscribe(plan.id)}
                 className={`w-full py-4 rounded-xl font-bold transition-all flex items-center justify-center ${
-                  isCurrent 
+                  isActiveCurrent 
                     ? 'bg-surface dark:bg-slate-800 text-text-muted dark:text-slate-400 cursor-default border border-slate-200 dark:border-slate-700' 
-                    : isVitalicio 
-                        ? 'bg-premium hover:bg-purple-800 text-white shadow-lg shadow-premium/30'
-                        : 'bg-primary hover:bg-primary-dark text-white shadow-lg shadow-primary/20'
+                    : isExpiredCurrent
+                        ? 'bg-red-500 hover:bg-red-600 text-white shadow-lg shadow-red-500/20'
+                        : isVitalicio 
+                            ? 'bg-premium hover:bg-purple-800 text-white shadow-lg shadow-premium/30'
+                            : 'bg-primary hover:bg-primary-dark text-white shadow-lg shadow-primary/20'
                 } ${isLoading ? 'opacity-80 cursor-wait' : ''}`}
               >
                 {isLoading ? (
@@ -139,8 +163,10 @@ const Settings: React.FC = () => {
                     <i className="fa-solid fa-circle-notch fa-spin mr-2"></i>
                     Processando...
                   </>
-                ) : isCurrent ? (
-                  'Já é meu plano'
+                ) : isActiveCurrent ? (
+                  'Plano Ativo'
+                ) : isExpiredCurrent ? (
+                  'Renovar Agora'
                 ) : (
                   'Quero este plano'
                 )}
