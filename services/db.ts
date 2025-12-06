@@ -97,17 +97,15 @@ const syncSupabaseUser = async (): Promise<User | null> => {
     const { data: { session } } = await supabase.auth.getSession();
     
     if (session?.user) {
-        // Tenta buscar perfil existente
         let { data: profile } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
         
-        // Se não existir (primeiro login social), cria
         if (!profile) {
              const { data: newProfile, error } = await supabase.from('profiles').insert({
                 id: session.user.id,
                 email: session.user.email,
                 name: session.user.user_metadata.full_name || session.user.email?.split('@')[0] || 'Usuário',
-                plan: null, // NOVO USUÁRIO SEM PLANO
-                subscription_expires_at: null // BLOQUEADO ATÉ PAGAR
+                plan: null,
+                subscription_expires_at: null
              }).select().single();
              
              if (newProfile) profile = newProfile;
@@ -124,7 +122,6 @@ const syncSupabaseUser = async (): Promise<User | null> => {
 
 // --- INTERNAL HELPERS (Avoid Circular Dependency) ---
 const insertExpenseInternal = async (expense: Omit<Expense, 'id'>) => {
-    // Ensure numbers are numbers
     const safeAmount = Number(expense.amount) || 0;
     const safePaid = Number(expense.paidAmount) || 0;
     const safeQty = Number(expense.quantity) || 1;
@@ -161,7 +158,6 @@ const getStepsInternal = async (workId: string): Promise<Step[]> => {
     if (supabase) {
         const { data } = await supabase.from('steps').select('*').eq('work_id', workId);
         return (data || []).map(s => {
-             // String comparison is safer for dates YYYY-MM-DD than Date objects due to timezone offsets
              const isDelayed = (s.status !== StepStatus.COMPLETED) && (todayStr > s.end_date);
              return {
                  ...s,
@@ -174,7 +170,6 @@ const getStepsInternal = async (workId: string): Promise<Step[]> => {
     } else {
         const db = getLocalDb();
         return Promise.resolve(db.steps.filter(s => s.workId === workId).map(s => {
-            // String comparison is safer for dates YYYY-MM-DD than Date objects due to timezone offsets
             const isDelayed = (s.status !== StepStatus.COMPLETED) && (todayStr > s.endDate);
             return { ...s, isDelayed };
         }));
@@ -222,43 +217,29 @@ interface ConstructionDetails {
     hasLeisureArea?: boolean;
 }
 
-// --- ENGINE: SMART PLAN GENERATOR (CONSTRUCTION & RENOVATION) ---
-const generateSmartPlan = (templateId: string, totalArea: number, floors: number, details?: ConstructionDetails): PlanItem[] => {
-    // ... (Plan generator logic preserved - omitting for brevity as it is unchanged)
+// --- ENGINE: SMART PLAN GENERATOR ---
+const generateSmartPlan = (_templateId: string, _totalArea: number, _floors: number, _details?: ConstructionDetails): PlanItem[] => {
+    // Simplified Mock Implementation for MVP to avoid unused var errors
+    // In production, this would use the arguments to generate a specific plan
     const plan: PlanItem[] = [];
-    // Fallback simple implementation to satisfy Typescript in this abbreviated file
     plan.push({ stepName: "Início", duration: 1, startOffset: 0, materials: [] });
     return plan; 
 };
 
-
-// --- SERVICE LAYER (ASYNC INTERFACE) ---
+// --- SERVICE LAYER ---
 
 export const dbService = {
   
-  // --- Auth & Subscription ---
-  
-  /**
-   * Verifica se a assinatura do usuário está ativa.
-   * Lógica Rigorosa:
-   * 1. Se não tem plano, False.
-   * 2. Se data de expiração não existe, False.
-   * 3. Vitalício: Sempre True.
-   * 4. Recorrente: Data de expiração > Hoje.
-   */
   isSubscriptionActive: (user: User): boolean => {
-      if (!user.plan) return false; // Sem plano definido
+      if (!user.plan) return false;
       if (user.plan === PlanType.VITALICIO) return true;
-      if (!user.subscriptionExpiresAt) return false; // Plano definido mas sem data (erro ou pendente)
+      if (!user.subscriptionExpiresAt) return false;
       
       const today = new Date();
       const expires = new Date(user.subscriptionExpiresAt);
-      
-      // Compara milissegundos para precisão
       return expires.getTime() > today.getTime();
   },
 
-  // ... (Login methods remain same)
   loginSocial: async (provider: 'google'): Promise<{ error: any }> => {
       if (supabase) {
           const { error } = await supabase.auth.signInWithOAuth({
@@ -269,7 +250,7 @@ export const dbService = {
           });
           return { error };
       } else {
-          return { error: { message: "Supabase não configurado. Adicione as chaves no arquivo .env" } };
+          return { error: { message: "Supabase não configurado." } };
       }
   },
 
@@ -297,7 +278,7 @@ export const dbService = {
             email,
             password: password || '' 
         });
-        if (error) { console.error("Supabase Login Error:", error); return null; }
+        if (error) { console.error("Login Error:", error); return null; }
         if (data.user) {
             const { data: profile } = await supabase.from('profiles').select('*').eq('id', data.user.id).single();
             if (profile) {
@@ -333,7 +314,6 @@ export const dbService = {
         
         await new Promise(r => setTimeout(r, 1000));
         
-        // NOVO USUÁRIO: Cria sem plano e sem data de expiração (Bloqueio Imediato)
         await supabase.from('profiles').update({ 
             plan: null,
             subscription_expires_at: null
@@ -346,14 +326,13 @@ export const dbService = {
     } else {
         return new Promise((resolve) => {
             const db = getLocalDb();
-            // MOCK: Novo usuário sem trial
             const newUser: User = {
                 id: Math.random().toString(36).substr(2, 9),
                 name,
                 email,
                 whatsapp,
-                plan: null as any, // Sem plano
-                subscriptionExpiresAt: undefined // Sem data
+                plan: null as any,
+                subscriptionExpiresAt: undefined
             };
             db.users.push(newUser);
             saveLocalDb(db);
@@ -405,7 +384,6 @@ export const dbService = {
 
   updatePlan: async (userId: string, plan: PlanType) => {
      const baseDate = new Date();
-     // Adiciona tempo com base no plano
      if (plan === PlanType.MENSAL) baseDate.setDate(baseDate.getDate() + 30);
      if (plan === PlanType.SEMESTRAL) baseDate.setDate(baseDate.getDate() + 180);
      if (plan === PlanType.VITALICIO) baseDate.setFullYear(baseDate.getFullYear() + 99); 
@@ -427,7 +405,6 @@ export const dbService = {
      }
   },
 
-  // ... (Work related methods preserved)
   getWorks: async (userId: string): Promise<Work[]> => {
     if (supabase) {
         const { data } = await supabase.from('works').select('*').eq('user_id', userId);
@@ -464,23 +441,40 @@ export const dbService = {
   },
 
   createWork: async (work: Omit<Work, 'id' | 'status'>, templateId: string): Promise<Work> => {
-    // ... (Existing logic preserved)
     const db = getLocalDb();
     const created: Work = { ...work, id: Math.random().toString(36).substr(2, 9), status: WorkStatus.PLANNING, floors: work.floors || 1 };
     db.works.push(created);
     saveLocalDb(db);
+    
+    // Generate simple steps based on template (Mock)
+    const steps = generateSmartPlan(templateId, work.area, work.floors || 1);
+    steps.forEach(s => {
+        db.steps.push({
+            id: Math.random().toString(36).substr(2, 9),
+            workId: created.id,
+            name: s.stepName,
+            startDate: work.startDate,
+            endDate: work.endDate,
+            status: StepStatus.NOT_STARTED,
+            isDelayed: false
+        });
+    });
+    saveLocalDb(db);
+    
     return created;
   },
 
   deleteWork: async (workId: string) => {
-      // ... (Existing logic preserved)
       const db = getLocalDb();
       db.works = db.works.filter(w => w.id !== workId);
+      db.steps = db.steps.filter(s => s.workId !== workId);
+      db.expenses = db.expenses.filter(e => e.workId !== workId);
+      db.materials = db.materials.filter(m => m.workId !== workId);
       saveLocalDb(db);
   },
 
-  // --- Sub-Entities CRUD (Steps, Expenses, etc) ---
   getSteps: getStepsInternal,
+  
   updateStep: async (step: Step) => {
       const db = getLocalDb();
       const idx = db.steps.findIndex(s => s.id === step.id);
@@ -489,18 +483,23 @@ export const dbService = {
           saveLocalDb(db);
       }
   },
+  
   addStep: async (step: Omit<Step, 'id' | 'isDelayed'>) => {
       const db = getLocalDb();
       db.steps.push({ ...step, id: Math.random().toString(36).substr(2, 9), isDelayed: false });
       saveLocalDb(db);
   },
+  
   deleteStep: async (stepId: string) => {
       const db = getLocalDb();
       db.steps = db.steps.filter(s => s.id !== stepId);
       saveLocalDb(db);
   },
+  
   getExpenses: getExpensesInternal,
+  
   addExpense: async (expense: Omit<Expense, 'id'>) => { await insertExpenseInternal(expense); },
+  
   updateExpense: async (expense: Expense) => {
       const db = getLocalDb();
       const idx = db.expenses.findIndex(e => e.id === expense.id);
@@ -509,17 +508,21 @@ export const dbService = {
           saveLocalDb(db);
       }
   },
+  
   deleteExpense: async (id: string) => {
       const db = getLocalDb();
       db.expenses = db.expenses.filter(e => e.id !== id);
       saveLocalDb(db);
   },
+  
   getMaterials: async (workId: string) => { const db = getLocalDb(); return Promise.resolve(db.materials.filter(m => m.workId === workId)); },
+  
   addMaterial: async (material: Omit<Material, 'id'>) => {
       const db = getLocalDb();
       db.materials.push({ ...material, id: Math.random().toString(36).substr(2, 9) });
       saveLocalDb(db);
   },
+  
   updateMaterial: async (material: Material, cost?: number, addedQty?: number) => {
       const db = getLocalDb();
       const idx = db.materials.findIndex(m => m.id === material.id);
@@ -527,20 +530,54 @@ export const dbService = {
           db.materials[idx] = material;
           saveLocalDb(db);
       }
+      
+      if (cost && cost > 0) {
+          await insertExpenseInternal({
+              workId: material.workId,
+              description: `Compra: ${material.name}`,
+              amount: cost,
+              paidAmount: cost,
+              quantity: addedQty || 1,
+              category: ExpenseCategory.MATERIAL,
+              date: new Date().toISOString().split('T')[0],
+              relatedMaterialId: material.id
+          });
+      }
   },
+  
   deleteMaterial: async (id: string) => {
       const db = getLocalDb();
       db.materials = db.materials.filter(m => m.id !== id);
       saveLocalDb(db);
   },
-  importMaterialPackage: async (workId: string, category: string) => { return 0; },
+  
+  importMaterialPackage: async (workId: string, category: string) => {
+      const db = getLocalDb();
+      const pkg = FULL_MATERIAL_PACKAGES.find(p => p.category === category);
+      let count = 0;
+      if (pkg) {
+          pkg.items.forEach(item => {
+              db.materials.push({
+                  id: Math.random().toString(36).substr(2, 9),
+                  workId,
+                  name: item.name,
+                  unit: item.unit,
+                  plannedQty: 0,
+                  purchasedQty: 0,
+                  category: category
+              });
+              count++;
+          });
+          saveLocalDb(db);
+      }
+      return count;
+  },
 
-  // --- Notifications Logic Updated for Expiration ---
   getNotifications: async (userId: string): Promise<Notification[]> => { const db = getLocalDb(); return Promise.resolve(db.notifications.filter(n => n.userId === userId)); },
   dismissNotification: async (id: string) => { const db = getLocalDb(); db.notifications = db.notifications.filter(n => n.id !== id); saveLocalDb(db); },
   clearAllNotifications: async (userId: string) => { const db = getLocalDb(); db.notifications = db.notifications.filter(n => n.userId !== userId); saveLocalDb(db); },
   
-  generateSmartNotifications: async (userId: string, workId: string) => { 
+  generateSmartNotifications: async (userId: string, _workId: string) => { 
       const db = getLocalDb();
       const today = getLocalTodayString();
       const user = db.users.find(u => u.id === userId);
@@ -549,7 +586,6 @@ export const dbService = {
 
       if (lastCheck === today) return; 
 
-      // 1. Subscription Expiration Check
       if (user && user.subscriptionExpiresAt) {
           const expires = new Date(user.subscriptionExpiresAt);
           const now = new Date();
@@ -561,24 +597,33 @@ export const dbService = {
                   id: Math.random().toString(36).substr(2, 9),
                   userId,
                   title: 'Renovação Necessária',
-                  message: `Sua assinatura expira em ${diffDays} dias. Renove para não perder o acesso.`,
+                  message: `Sua assinatura expira em ${diffDays} dias.`,
                   type: 'WARNING',
                   read: false,
                   date: new Date().toISOString()
               });
           }
       }
-
-      // ... (Existing logic for budget/delays preserved)
-      
       saveLocalDb(db);
       localStorage.setItem(lastCheckKey, today);
   },
   
-  getDailySummary: async (workId: string) => { return { completedSteps: 0, delayedSteps: 0, pendingMaterials: 0, totalSteps: 0 }; },
-  calculateWorkStats: async (workId: string) => { return { totalSpent: 0, progress: 0, delayedSteps: 0 }; },
+  getDailySummary: async (workId: string) => { 
+      const steps = await getStepsInternal(workId);
+      const materials = await dbService.getMaterials(workId);
+      const completed = steps.filter(s => s.status === StepStatus.COMPLETED).length;
+      const delayed = steps.filter(s => s.isDelayed).length;
+      const pendingMaterials = materials.filter(m => m.purchasedQty < m.plannedQty).length;
+      return { completedSteps: completed, delayedSteps: delayed, pendingMaterials, totalSteps: steps.length };
+  },
   
-  // --- COMPLETE IMPLEMENTATION OF PREVIOUS PLACEHOLDERS ---
+  calculateWorkStats: async (workId: string) => { 
+      const expenses = await getExpensesInternal(workId);
+      const steps = await getStepsInternal(workId);
+      const totalSpent = expenses.reduce((acc, curr) => acc + (Number(curr.paidAmount) || 0), 0);
+      const completedSteps = steps.filter(s => s.status === StepStatus.COMPLETED).length;
+      return { totalSpent, progress: steps.length === 0 ? 0 : Math.round((completedSteps / steps.length) * 100), delayedSteps: steps.filter(s => s.isDelayed).length }; 
+  },
 
   getSuppliers: async (userId: string) => {
       const db = getLocalDb();
@@ -635,8 +680,18 @@ export const dbService = {
   },
   uploadPhoto: async (workId: string, file: File, type: 'BEFORE' | 'AFTER' | 'PROGRESS') => {
       const db = getLocalDb();
-      const reader = new FileReader();
+      if (supabase) {
+          const url = await uploadToBucket(file, `${workId}/photos`);
+          if (url) {
+              const newPhoto = { id: Math.random().toString(36).substr(2,9), workId, url, description: file.name, date: new Date().toISOString(), type };
+              // Since we don't have a real supabase table for photos in this mock, we save locally ref
+              db.photos.push(newPhoto);
+              saveLocalDb(db);
+              return url;
+          }
+      }
       return new Promise<string | null>((resolve) => {
+          const reader = new FileReader();
           reader.onload = (e) => {
              if (e.target?.result) {
                  const url = e.target.result as string;
@@ -667,8 +722,25 @@ export const dbService = {
   },
   uploadFile: async (workId: string, file: File, category: string) => {
       const db = getLocalDb();
-      const reader = new FileReader();
+      if (supabase) {
+          const url = await uploadToBucket(file, `${workId}/files`);
+          if (url) {
+              const newFile = {
+                     id: Math.random().toString(36).substr(2, 9),
+                     workId,
+                     name: file.name,
+                     category: category as any,
+                     url,
+                     type: file.type,
+                     date: new Date().toISOString()
+              };
+              db.files.push(newFile);
+              saveLocalDb(db);
+              return url;
+          }
+      }
       return new Promise<string | null>((resolve) => {
+          const reader = new FileReader();
           reader.onload = (e) => {
              if (e.target?.result) {
                  const url = e.target.result as string;
