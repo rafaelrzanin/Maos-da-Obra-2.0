@@ -2,7 +2,6 @@ import React, { useState, useEffect, createContext, useContext } from 'react';
 import { HashRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { User, PlanType } from './types';
 import { dbService } from './services/db';
-import { gatewayService } from './services/gateway';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import CreateWork from './pages/CreateWork';
@@ -152,22 +151,21 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       
       const handlePaymentSuccess = async () => {
           if (status === 'success' && user) {
-              // In a real app, verify 'plan_id' from params or verify transaction with backend.
-              // For MVP, we assume success means the user paid for MENSAL (or whatever they clicked).
-              // Since gateway.ts is mocked, we need to know WHICH plan. 
-              // We'll default to renewing the current plan or MENSAL if none.
               const planToActivate = user.plan || PlanType.MENSAL;
+              
+              await updatePlan(planToActivate);
+              // Force refresh to ensure state is synced
+              await refreshUser();
+              
+              alert("Pagamento confirmado! Sua assinatura está ativa.");
               
               // Clear URL params to avoid re-triggering
               navigate(location.pathname, { replace: true });
-              
-              await updatePlan(planToActivate);
-              alert("Pagamento confirmado! Sua assinatura está ativa.");
           }
       };
       
       handlePaymentSuccess();
-  }, [location.search, user]);
+  }, [location.search, user, updatePlan, refreshUser, navigate, location.pathname]);
 
   // 2. Check Login
   if (!user) return <Navigate to="/login" />;
@@ -179,7 +177,6 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   }
 
   // 4. Determine if navigation should be shown
-  // Hide navigation if blocked (not valid), user forced to Settings
   const showNavigation = isSubscriptionValid;
 
   const navItems = [
