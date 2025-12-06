@@ -3,7 +3,6 @@ import { useAuth } from '../App';
 import { PlanType } from '../types';
 import { gatewayService } from '../services/gateway';
 import { LIFETIME_BONUSES } from '../services/standards';
-import { dbService } from '../services/db';
 
 const Settings: React.FC = () => {
   const { user, isSubscriptionValid } = useAuth();
