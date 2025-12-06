@@ -222,10 +222,10 @@ interface ConstructionDetails {
 }
 
 // --- ENGINE: SMART PLAN GENERATOR (CONSTRUCTION & RENOVATION) ---
-const generateSmartPlan = (
+export const generateSmartPlan = (
   _templateId: string,
-  totalArea: number,
-  floors: number,
+  _totalArea: number,
+  _floors: number,
   _details?: ConstructionDetails
 ): PlanItem[] => {
   const plan: PlanItem[] = [];
@@ -241,7 +241,6 @@ const generateSmartPlan = (
 
   return plan;
 };
-
 // --- SERVICE LAYER (ASYNC INTERFACE) ---
 
 export const dbService = {
