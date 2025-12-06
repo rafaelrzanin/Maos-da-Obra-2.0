@@ -100,6 +100,7 @@ const syncSupabaseUser = async (): Promise<User | null> => {
         let { data: profile } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
         
         if (!profile) {
+             // Fallback profile creation if not exists (should be handled by signup usually)
              const { data: newProfile, error } = await supabase.from('profiles').insert({
                 id: session.user.id,
                 email: session.user.email,
@@ -303,20 +304,31 @@ export const dbService = {
     }
   },
   
-  signup: async (name: string, email: string, whatsapp?: string, password?: string): Promise<User | null> => {
+  signup: async (name: string, email: string, whatsapp: string, password?: string, cpf?: string, planType?: string | null): Promise<User | null> => {
     if (supabase) {
+        // 1. Create Auth User
         const { data, error } = await supabase.auth.signUp({
             email,
             password: password || '',
             options: { data: { name, whatsapp } }
         });
-        if (error || !data.user) { console.error("Signup Error", error); return null; }
+        
+        if (error || !data.user) { 
+            console.error("Signup Error", error); 
+            return null; 
+        }
         
         await new Promise(r => setTimeout(r, 1000));
         
+        // 2. Update Profile with Extra Fields (CPF, Plan, etc)
+        // Note: The trigger usually creates the profile on insert, so we UPDATE here
         await supabase.from('profiles').update({ 
-            plan: null,
-            subscription_expires_at: null
+            name: name,
+            whatsapp: whatsapp,
+            cpf: cpf,
+            plan_type: planType, // Saving the plan intent (e.g. 'mensal')
+            // Don't set subscription_expires_at yet if they haven't paid, OR set to null explicitly
+            subscription_expires_at: null 
         }).eq('id', data.user.id);
 
         const { data: profile } = await supabase.from('profiles').select('*').eq('id', data.user.id).single();
@@ -331,7 +343,8 @@ export const dbService = {
                 name,
                 email,
                 whatsapp,
-                plan: null as any,
+                cpf,
+                plan: planType as PlanType || null,
                 subscriptionExpiresAt: undefined
             };
             db.users.push(newUser);
