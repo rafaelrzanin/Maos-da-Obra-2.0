@@ -1,6 +1,6 @@
 import { 
   User, Work, Step, Expense, Material, WorkPhoto, WorkFile,
-  PlanType, WorkStatus, StepStatus, Notification, StandardMaterial,
+  PlanType, WorkStatus, StepStatus, Notification,
   Supplier, Worker, ExpenseCategory
 } from '../types';
 import { FULL_MATERIAL_PACKAGES, STANDARD_JOB_ROLES, STANDARD_SUPPLIER_CATEGORIES } from './standards';
