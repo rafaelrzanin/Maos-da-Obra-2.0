@@ -478,7 +478,7 @@ export const dbService = {
     }
   },
 
-  createWork: async (work: Omit<Work, 'id' | 'status'>, templateId: string): Promise<Work> => {
+  createWork: async (work: Omit<Work, 'id' | 'status'>, _templateId: string): Promise<Work> => {
     // 1. CREATE WORK RECORD
     let newWorkId = '';
     
