@@ -231,6 +231,7 @@ const generateSmartPlan = (
   const plan: PlanItem[] = [];
 
   // Implementação mínima só pra manter o app rodando.
+  // Depois você pode voltar aqui e deixar o plano inteligente mesmo.
   plan.push({
     stepName: "Início da obra",
     duration: 1,
@@ -240,8 +241,6 @@ const generateSmartPlan = (
 
   return plan;
 };
-
-
 
 // --- SERVICE LAYER (ASYNC INTERFACE) ---
 
