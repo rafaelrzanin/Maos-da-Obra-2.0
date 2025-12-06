@@ -230,9 +230,7 @@ const generateSmartPlan = (
 ): PlanItem[] => {
   const plan: PlanItem[] = [];
 
-  // Se quiser, depois você usa totalArea, floors, templateId, details
-  // aqui para montar um plano mais completo.
-
+  // Implementação mínima só pra manter o app rodando.
   plan.push({
     stepName: "Início da obra",
     duration: 1,
