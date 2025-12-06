@@ -1,22 +1,56 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../App';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { dbService } from '../services/db';
 
 const Login: React.FC = () => {
   const { login, signup, user } = useAuth();
-  // Theme toggle removed from Login screen
   const navigate = useNavigate();
+  const location = useLocation();
+  
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [whatsapp, setWhatsapp] = useState('');
+  const [cpf, setCpf] = useState('');
   const [loading, setLoading] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
 
+  // Check URL params for plan
   useEffect(() => {
-    if (user) navigate('/');
-  }, [user, navigate]);
+    const params = new URLSearchParams(location.search);
+    const plan = params.get('plan');
+    if (plan) {
+      setSelectedPlan(plan);
+      setIsLogin(false); // Auto switch to signup if plan is present
+    }
+  }, [location.search]);
+
+  // Handle redirect after login/signup
+  useEffect(() => {
+    if (user) {
+        // If we are already logged in, navigate away
+        if (selectedPlan) {
+            navigate('/checkout'); // Or logic to update existing user plan
+        } else {
+            navigate('/');
+        }
+    }
+  }, [user, navigate, selectedPlan]);
+
+  const formatCPF = (value: string) => {
+    return value
+      .replace(/\D/g, '') // Remove non-digits
+      .replace(/(\d{3})(\d)/, '$1.$2')
+      .replace(/(\d{3})(\d)/, '$1.$2')
+      .replace(/(\d{3})(\d{1,2})/, '$1-$2')
+      .replace(/(-\d{2})\d+?$/, '$1');
+  };
+
+  const handleCpfChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setCpf(formatCPF(e.target.value));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,7 +60,16 @@ const Login: React.FC = () => {
       if (!success) alert('Falha ao entrar. Verifique seus dados.');
     } else {
       if (!name) { alert('Preciso saber seu nome.'); setLoading(false); return; }
-      await signup(name, email, whatsapp, password);
+      if (!cpf || cpf.length < 14) { alert('CPF é obrigatório para o cadastro.'); setLoading(false); return; }
+      
+      // Pass selectedPlan (if any) to signup
+      await signup(name, email, whatsapp, password, cpf, selectedPlan);
+      
+      // Navigation is handled by the useEffect [user] hook primarily, 
+      // but we can force it here if context update is slow
+      if (selectedPlan) {
+          navigate('/checkout');
+      }
     }
     setLoading(false);
   };
@@ -38,12 +81,9 @@ const Login: React.FC = () => {
     
     if (error) {
         console.error("Erro no login social:", error);
-        // Security: Show generic message instead of raw error
         alert("Não foi possível conectar com o provedor social. Tente novamente.");
         setLoading(false);
     }
-    // Nota: Se funcionar, o Supabase vai redirecionar a página para o provedor e depois de volta para cá.
-    // Não precisamos de setLoading(false) no caso de sucesso imediato pois a página vai recarregar.
   };
 
   return (
@@ -51,20 +91,18 @@ const Login: React.FC = () => {
       
       {/* 1. BACKGROUND LAYER (Cinematic Photo) */}
       <div className="absolute inset-0 z-0">
-          {/* High-end architectural dark background - BRIGHTER NOW */}
           <img 
             src="https://images.unsplash.com/photo-1600585154340-be6161a56a0c?q=80&w=2070&auto=format&fit=crop" 
             className="w-full h-full object-cover opacity-60 animate-[pulse_20s_ease-in-out_infinite_alternate] scale-105"
             alt="Luxury Background"
           />
-          {/* Lighter Gradient Overlay: Clear at top, Dark at bottom for text contrast */}
           <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-black/30"></div>
       </div>
 
       {/* 2. GLASS CONTENT WRAPPER */}
       <div className="relative z-10 w-full max-w-md animate-in fade-in zoom-in-95 duration-700">
           
-          {/* Logo Header - Floating above the glass */}
+          {/* Logo Header */}
           <div className="text-center mb-8 flex flex-col items-center drop-shadow-2xl">
               <div className="w-20 h-20 bg-gradient-to-br from-amber-500 to-orange-600 rounded-3xl flex items-center justify-center text-white text-3xl mb-4 shadow-[0_0_30px_rgba(217,119,6,0.6)] transform rotate-6 border-2 border-white/20 ring-4 ring-black/20">
                   <i className="fa-solid fa-helmet-safety"></i>
@@ -77,10 +115,10 @@ const Login: React.FC = () => {
               </p>
           </div>
 
-          {/* 3. THE GLASS CARD (Vitrificação Fumê) */}
+          {/* 3. THE GLASS CARD */}
           <div className="backdrop-blur-xl bg-black/70 border border-white/10 rounded-[2.5rem] p-8 shadow-2xl relative overflow-hidden group ring-1 ring-white/5">
               
-              {/* Shine Effect on Glass */}
+              {/* Shine Effect */}
               <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-white/30 to-transparent opacity-50"></div>
               
               <div className="text-center mb-6">
@@ -88,25 +126,45 @@ const Login: React.FC = () => {
                       {isLogin ? 'Bem-vindo de volta' : 'Criar Conta Exclusiva'}
                   </h2>
                   <p className="text-sm text-slate-300">
-                      {isLogin ? 'Gerencie sua obra com maestria.' : 'Comece a construir seu sonho.'}
+                      {selectedPlan 
+                        ? `Você selecionou o plano ${selectedPlan}. Crie sua conta para continuar.`
+                        : (isLogin ? 'Gerencie sua obra com maestria.' : 'Comece a construir seu sonho.')
+                      }
                   </p>
               </div>
 
               <form onSubmit={handleSubmit} className="space-y-4">
                   
                   {!isLogin && (
-                    <div className="relative group">
-                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                            <i className="fa-solid fa-user text-white/50 group-focus-within:text-amber-400 transition-colors"></i>
+                    <>
+                        <div className="relative group">
+                            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                <i className="fa-solid fa-user text-white/50 group-focus-within:text-amber-400 transition-colors"></i>
+                            </div>
+                            <input 
+                                type="text" 
+                                value={name}
+                                onChange={(e) => setName(e.target.value)}
+                                placeholder="Nome Completo"
+                                className="block w-full pl-11 pr-4 py-3.5 bg-white/10 border border-white/10 rounded-xl text-white placeholder-white/40 focus:bg-black/50 focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 transition-all outline-none"
+                            />
                         </div>
-                        <input 
-                            type="text" 
-                            value={name}
-                            onChange={(e) => setName(e.target.value)}
-                            placeholder="Nome Completo"
-                            className="block w-full pl-11 pr-4 py-3.5 bg-white/10 border border-white/10 rounded-xl text-white placeholder-white/40 focus:bg-black/50 focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 transition-all outline-none"
-                        />
-                    </div>
+                        
+                        {/* CPF Field */}
+                        <div className="relative group">
+                            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                <i className="fa-solid fa-id-card text-white/50 group-focus-within:text-amber-400 transition-colors"></i>
+                            </div>
+                            <input 
+                                type="text" 
+                                value={cpf}
+                                onChange={handleCpfChange}
+                                placeholder="CPF (000.000.000-00)"
+                                maxLength={14}
+                                className="block w-full pl-11 pr-4 py-3.5 bg-white/10 border border-white/10 rounded-xl text-white placeholder-white/40 focus:bg-black/50 focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 transition-all outline-none"
+                            />
+                        </div>
+                    </>
                   )}
 
                   <div className="relative group">
@@ -161,7 +219,7 @@ const Login: React.FC = () => {
                     disabled={loading}
                     className="w-full py-4 mt-2 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-white font-bold rounded-xl shadow-lg shadow-orange-900/40 transform active:scale-[0.98] transition-all flex items-center justify-center gap-2 border border-white/10 disabled:opacity-70 disabled:cursor-wait"
                   >
-                      {loading ? <i className="fa-solid fa-circle-notch fa-spin"></i> : (isLogin ? 'Entrar Agora' : 'Cadastrar Grátis')}
+                      {loading ? <i className="fa-solid fa-circle-notch fa-spin"></i> : (isLogin ? 'Entrar Agora' : (selectedPlan ? 'Ir para Pagamento' : 'Cadastrar Grátis'))}
                       {!loading && <i className="fa-solid fa-arrow-right"></i>}
                   </button>
 
