@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../App';
 import { PlanType } from '../types';
-import { gatewayService } from '../services/gateway';
 import { LIFETIME_BONUSES } from '../services/standards';
 
 const Settings: React.FC = () => {
   const { user, isSubscriptionValid } = useAuth();
+  const navigate = useNavigate();
   const [loadingPlan, setLoadingPlan] = useState<PlanType | null>(null);
   const [showBonusModal, setShowBonusModal] = useState(false);
 
@@ -31,16 +32,16 @@ const Settings: React.FC = () => {
     {
       id: PlanType.SEMESTRAL,
       name: 'Semestral',
-      price: 'R$ 97,00',
+      price: 'R$ 149,90',
       period: '/semestre',
       color: 'bg-primary-light',
       highlight: true,
-      savings: 'Economia de 45%'
+      savings: 'Economia de 17%'
     },
     {
       id: PlanType.VITALICIO,
       name: 'Vitalício',
-      price: 'R$ 247,00',
+      price: 'R$ 299,90',
       period: 'pague uma vez só',
       color: 'bg-premium',
       highlight: true,
@@ -48,17 +49,15 @@ const Settings: React.FC = () => {
     }
   ];
 
-  const handleSubscribe = async (planId: PlanType) => {
+  const handleSubscribe = (planId: PlanType) => {
     if (!user) return;
     
-    try {
-      setLoadingPlan(planId);
-      const checkoutUrl = await gatewayService.checkout(user, planId);
-      window.location.href = checkoutUrl;
-    } catch (error) {
-      alert("Houve um erro ao conectar com o pagamento. Tente novamente.");
-      setLoadingPlan(null);
-    }
+    // Navegação interna para a página de Checkout com State
+    navigate(`/checkout?plan=${planId}`, {
+        state: {
+            plan: planId
+        }
+    });
   };
 
   if (!user) return null;
