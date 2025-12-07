@@ -1,180 +1,99 @@
 import { PlanType, User } from '../types';
 
-// ---------------------------------------------------------------------------
-// CONFIGURAÇÃO DO GATEWAY (NEONPAY)
-// ---------------------------------------------------------------------------
+// --- CONFIGURAÇÃO DO GATEWAY ---
+// Coloca aquí las credenciales de tu portal de pago
+const API_URL = "https://api.tu-portal-de-pago.com/v1"; // Reemplazar con la URL real
+const PUBLIC_KEY = "TU_PUBLIC_KEY"; // Si la API requiere auth desde el front
 
-// Base da API da NeonPay:
-// Pela doc, o exemplo usa: https://app.neonpay.com.br/api/v1
-// helper pra acessar import.meta.env sem encher o saco do TypeScript
-const env = (import.meta as any).env || {};
-
-const API_BASE_URL =
-  (env.VITE_NEON_API_BASE_URL as string | undefined) ||
-  'https://app.neonpay.com.br/api/v1';
-
-const NEON_PUBLIC_KEY = env.VITE_NEON_PUBLIC_KEY as string | undefined;
-const NEON_SECRET_KEY = env.VITE_NEON_SECRET_KEY as string | undefined;
-
-// IDs externos (externalId) para identificar cada plano na Neon
+// IDs de los planes en tu portal de pago
 const GATEWAY_PLAN_IDS = {
-  [PlanType.MENSAL]: 'MAOS_MENSAL',       // pode trocar por outro ID se quiser
-  [PlanType.SEMESTRAL]: 'MAOS_SEMESTRAL',
-  [PlanType.VITALICIO]: 'MAOS_VITALICIO'
-};
-
-// Mapeia o enum PlanType para o texto que o webhook vai usar
-const NEON_PLAN_TYPE: Record<PlanType, 'monthly' | 'semiannual' | 'lifetime'> = {
-  [PlanType.MENSAL]: 'monthly',
-  [PlanType.SEMESTRAL]: 'semiannual',
-  [PlanType.VITALICIO]: 'lifetime'
+  [PlanType.MENSAL]: "plan_id_mensal_real",
+  [PlanType.SEMESTRAL]: "plan_id_semestral_real",
+  [PlanType.VITALICIO]: "plan_id_vitalicio_real"
 };
 
 export const gatewayService = {
   /**
-   * Cria uma sessão de checkout NeonPay e retorna a checkoutUrl
+   * Crea una sesión de checkout en el portal de pago.
    */
   checkout: async (user: User, planType: PlanType): Promise<string> => {
-    console.log(
-      `[Gateway] Iniciando checkout NeonPay para ${user.email} no plano ${PlanType[planType]}...`
-    );
+    console.log(`[Gateway] Iniciando checkout para ${user.email} no plano ${planType}...`);
 
-    if (!NEON_PUBLIC_KEY || !NEON_SECRET_KEY) {
-      console.error('Chaves da NeonPay não configuradas.');
-      throw new Error(
-        'Configuração de pagamento ausente. Avise o suporte do Mãos da Obra.'
-      );
-    }
-
-    const externalId = GATEWAY_PLAN_IDS[planType];
-    if (!externalId) {
-      throw new Error(
-        `GATEWAY_PLAN_IDS não configurado para o plano ${PlanType[planType]}.`
-      );
-    }
-
-    const normalizedPlanType = NEON_PLAN_TYPE[planType];
-
-    // Valores em centavos (ajuste para os preços reais do Mãos da Obra)
-    const priceInCents =
-      planType === PlanType.VITALICIO
-        ? 24700   // R$ 247,00
-        : planType === PlanType.SEMESTRAL
-        ? 9700    // R$ 97,00
-        : 2990;   // R$ 29,90
-
-    // -----------------------------------------------------------------------
-    // BODY NO FORMATO QUE A DOC DA NEON MOSTROU (/gateway/checkout)
-    // -----------------------------------------------------------------------
-    const payload = {
-      product: {
-        name: `Mãos da Obra - Plano ${PlanType[planType]}`,
-        externalId, // ID pra identificar esse plano na Neon
-        photos: [
-          // Coloca aqui uma imagem do teu app (pode trocar depois)
-          'https://www.maosdaobra.online/img/checkout-banner.png'
+    try {
+      // 1. Preparar el cuerpo de la solicitud según la documentación de tu API
+      const payload = {
+        items: [
+          {
+            id: GATEWAY_PLAN_IDS[planType],
+            title: `Assinatura Mãos da Obra - ${planType}`,
+            quantity: 1,
+            currency_id: 'BRL',
+            unit_price: planType === PlanType.VITALICIO ? 247.00 : (planType === PlanType.SEMESTRAL ? 97.00 : 29.90)
+          }
         ],
-        offer: {
-          name: `Plano ${PlanType[planType]}`,
-          price: priceInCents,   // em centavos
-          offerType: 'NATIONAL',
-          currency: 'BRL',
-          lang: 'pt-BR'
-        }
-      },
-      settings: {
-        paymentMethods: ['PIX', 'CREDIT_CARD'],
-        acceptedDocs: ['CPF'],
-        thankYouPage: `${window.location.origin}/#/settings?status=success`,
-        askForAddress: false,
-        colors: {
-          primaryColor: '#FFB629',
-          text: '#111111',
-          background: '#FFFFFF',
-          purchaseButtonBackground: '#FFB629',
-          purchaseButtonText: '#111111',
-          widgets: '#F5F5F5',
-          inputBackground: '#F1F1F1',
-          inputText: '#333333'
-        }
-      },
-      customer: {
-        name: user.name,
-        email: user.email,
-        phone: (user as any).whatsapp || '',
-        document: (user as any).cpf || ''
-        // Se quiser usar address, adiciona aqui seguindo o exemplo da doc
-      },
-      trackProps: {
-        userId: user.id,               // pro webhook saber quem liberar
-        planType: normalizedPlanType,  // "monthly" | "semiannual" | "lifetime"
-        source: 'maos-da-obra'
+        payer: {
+          email: user.email,
+          name: user.name,
+          // phone: user.whatsapp // Opcional dependiendo de la API
+        },
+        external_reference: user.id, // IMPORTANTE: Para vincular el pago al usuario en el Webhook
+        back_urls: {
+          success: `${window.location.origin}/settings?status=success`,
+          failure: `${window.location.origin}/settings?status=failure`,
+          pending: `${window.location.origin}/settings?status=pending`
+        },
+        auto_return: "approved"
+      };
+
+      // 2. Hacer la llamada a la API (Ejemplo genérico, ajustar headers según documentación)
+      /* 
+      const response = await fetch(`${API_URL}/checkout/preferences`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${PUBLIC_KEY}`
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Erro ao criar preferência de pagamento');
       }
-    };
 
-    const url = `${API_BASE_URL.replace(/\/+$/, '')}/gateway/checkout`;
+      const data = await response.json();
+      return data.init_point; // URL de redirección (Mercado Pago usa init_point, Stripe usa url, etc.)
+      */
 
-    console.log('[Gateway] Enviando payload para NeonPay:', payload);
+      // --- SIMULACIÓN PARA MANTENER LA APP FUNCIONANDO MIENTRAS INTEGRAS ---
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Simula que la API devolvió una URL de pago real
+      // En producción, descomenta el bloque fetch de arriba y elimina esto
+      const mockCheckoutUrl = `https://checkout.pagamento.com/pay/${GATEWAY_PLAN_IDS[planType]}?ref=${user.id}`;
+      console.warn("MODO SIMULACIÓN: Redirigiendo a URL ficticia. Implementar fetch real en services/gateway.ts");
+      
+      return mockCheckoutUrl;
 
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-public-key': NEON_PUBLIC_KEY,
-        'x-secret-key': NEON_SECRET_KEY
-      },
-      body: JSON.stringify(payload)
-    });
-
-    if (!response.ok) {
-      let errorText = '';
-      try {
-        errorText = await response.text();
-      } catch {
-        // ignora
-      }
-      console.error(
-        'Erro ao criar checkout na NeonPay:',
-        response.status,
-        errorText
-      );
-      throw new Error(
-        'Não foi possível iniciar o pagamento agora. Tente novamente em alguns minutos.'
-      );
+    } catch (error) {
+      console.error("Erro no gateway de pagamento:", error);
+      throw error;
     }
-
-    const data = (await response.json()) as {
-      success: boolean;
-      checkoutUrl: string;
-    };
-
-    if (!data.success || !data.checkoutUrl) {
-      console.error('Resposta inesperada da NeonPay:', data);
-      throw new Error(
-        'Pagamento criado, mas não recebemos a URL do checkout. Verifique a integração.'
-      );
-    }
-
-    console.log('[Gateway] Checkout criado com sucesso. URL:', data.checkoutUrl);
-    return data.checkoutUrl;
   },
 
   /**
-   * Verifica status via query string após o retorno (apenas UX, quem manda é o webhook)
+   * Verifica si una transacción fue exitosa basado en los parámetros de la URL
+   * (Útil para feedback inmediato en el frontend, pero NO para seguridad final)
    */
-  checkPaymentStatus: (
-    searchParams: URLSearchParams
-  ): 'success' | 'failure' | 'pending' | null => {
+  checkPaymentStatus: (searchParams: URLSearchParams): 'success' | 'failure' | 'pending' | null => {
     const status = searchParams.get('status');
+    const paymentId = searchParams.get('payment_id'); // O el parámetro que use tu gateway
 
-    if (status === 'approved' || status === 'success' || status === 'paid') {
+    if (status === 'approved' || status === 'success') {
       return 'success';
     }
     if (status === 'failure' || status === 'rejected') {
       return 'failure';
-    }
-    if (status === 'pending') {
-      return 'pending';
     }
     return null;
   }
