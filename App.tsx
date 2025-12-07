@@ -1,5 +1,5 @@
 import React, { useState, useEffect, createContext, useContext } from 'react';
-import { HashRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { User, PlanType } from './types';
 import { dbService } from './services/db';
 import Login from './pages/Login';
@@ -302,7 +302,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
 const App: React.FC = () => {
   return (
-    <HashRouter>
+    <BrowserRouter>
       <ThemeProvider>
         <AuthProvider>
           <Routes>
@@ -317,7 +317,7 @@ const App: React.FC = () => {
           </Routes>
         </AuthProvider>
       </ThemeProvider>
-    </HashRouter>
+    </BrowserRouter>
   );
 };
 
