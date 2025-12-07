@@ -34,7 +34,8 @@ const Checkout: React.FC = () => {
           return;
         }
 
-        const price = PLAN_PRICES[profile.plan_type as PlanType];
+        // Garante que o preço nunca seja undefined
+        const price = PLAN_PRICES[profile.plan_type as PlanType] || 0;
         setPlanDetails({ type: profile.plan_type as PlanType, price });
       } catch (err) {
         console.error("Erro ao carregar dados do checkout:", err);
@@ -125,7 +126,10 @@ const Checkout: React.FC = () => {
                   <h2 className="text-xl font-bold text-primary dark:text-white">Plano {planDetails.type}</h2>
                   <p className="text-xs text-slate-500">Acesso imediato a todas as funções</p>
                 </div>
-                <p className="text-2xl font-black text-green-600 dark:text-green-400">R$ {planDetails.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                {/* CORREÇÃO APLICADA AQUI: Fallback para evitar erro de toLocaleString em undefined */}
+                <p className="text-2xl font-black text-green-600 dark:text-green-400">
+                  R$ {(planDetails?.price || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </p>
               </div>
             </div>
 
