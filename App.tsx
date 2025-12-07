@@ -9,6 +9,7 @@ import WorkDetail from './pages/WorkDetail';
 import Settings from './pages/Settings';
 import Profile from './pages/Profile';
 import VideoTutorials from './pages/VideoTutorials';
+import Checkout from './pages/Checkout';
 
 // --- Theme Context ---
 type Theme = 'light' | 'dark';
@@ -172,7 +173,9 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
   // 3. Check Subscription (Strict Blockade)
   const isSettingsPage = location.pathname === '/settings';
-  if (!isSubscriptionValid && !isSettingsPage) {
+  const isCheckoutPage = location.pathname === '/checkout'; // Allow access to checkout even if expired
+  
+  if (!isSubscriptionValid && !isSettingsPage && !isCheckoutPage) {
       return <Navigate to="/settings" replace />;
   }
 
@@ -279,7 +282,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       {/* Main Content */}
       <main className="flex-1 p-4 md:p-8 overflow-y-auto h-auto min-h-[calc(100vh-64px)] md:min-h-screen bg-surface dark:bg-slate-950 transition-colors duration-300 print:overflow-visible print:h-auto print:min-h-0 print:block print:p-0 print:bg-white scroll-smooth">
         {/* If blocked, show a header indicating why */}
-        {!isSubscriptionValid && isSettingsPage && (
+        {!isSubscriptionValid && isSettingsPage && !isCheckoutPage && (
             <div className="bg-red-500 text-white p-4 rounded-xl mb-6 shadow-lg flex items-center justify-between">
                 <div className="flex items-center gap-3">
                     <i className="fa-solid fa-lock text-2xl"></i>
@@ -308,6 +311,7 @@ const App: React.FC = () => {
             <Route path="/create" element={<Layout><CreateWork /></Layout>} />
             <Route path="/work/:id" element={<Layout><WorkDetail /></Layout>} />
             <Route path="/settings" element={<Layout><Settings /></Layout>} />
+            <Route path="/checkout" element={<Layout><Checkout /></Layout>} />
             <Route path="/profile" element={<Layout><Profile /></Layout>} />
             <Route path="/tutorials" element={<Layout><VideoTutorials /></Layout>} />
           </Routes>
