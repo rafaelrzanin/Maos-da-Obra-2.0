@@ -1,40 +1,40 @@
-O erro 401 persiste. O Backend não está lendo a variável de ambiente.
+// api/create-pix.js
+// Usando formato CommonJS para evitar erros de sintaxe na Vercel
 
-Por favor, reescreva o arquivo `api/create-pix.js` com uma VERIFICAÇÃO DE SEGURANÇA no início.
-
-O código deve ser assim:
-
-export default async function handler(req, res) {
-  // 1. Configurar CORS para aceitar seu site
+module.exports = async (req, res) => {
+  // 1. Configurar cabeçalhos de segurança (CORS)
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
   res.setHeader(
     'Access-Control-Allow-Headers',
-    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
+    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization'
   );
 
-  // Tratamento para o navegador perguntando se pode conectar (OPTIONS)
+  // Se for uma "pergunta" do navegador (OPTIONS), responde que pode passar
   if (req.method === 'OPTIONS') {
-    res.status(200).end();
-    return;
-  }
-
-  // 2. Tentar ler a chave de todas as formas possíveis
-  const apiKey = process.env.NEON_SECRET_KEY || process.env.VITE_NEON_SECRET_KEY;
-
-  console.log("Tentando iniciar Pix...");
-  console.log("Chave existe?", !!apiKey); // Isso vai pro log da Vercel
-
-  // 3. SE NÃO TIVER CHAVE, PARE AQUI
-  if (!apiKey) {
-    return res.status(500).json({ 
-      error: "ERRO DE CONFIGURAÇÃO: A variável NEON_SECRET_KEY não foi encontrada no servidor." 
-    });
+    return res.status(200).end();
   }
 
   try {
-    // 4. Faz a chamada para a Neon
+    // 2. Tentar ler a chave (agora com logs)
+    const apiKey = process.env.NEON_SECRET_KEY || process.env.VITE_NEON_SECRET_KEY;
+    
+    console.log("--> Iniciando rota API Pix...");
+    
+    if (!apiKey) {
+      console.error("ERRO FATAL: Nenhuma chave API encontrada no servidor.");
+      // Retorna erro explicativo
+      return res.status(500).json({ 
+        erro: "CONFIGURAÇÃO_FALTANTE",
+        mensagem: "A chave NEON_SECRET_KEY não está configurada nas variáveis de ambiente da Vercel." 
+      });
+    }
+
+    console.log("--> Chave encontrada. Enviando requisição para Neon...");
+
+    // 3. Fazer o pedido para a Neon
+    // Nota: Em Node.js antigo precisa de 'node-fetch', mas Vercel atual já suporta fetch nativo.
     const response = await fetch('https://app.neonpay.com.br/api/v1/gateway/pix/receive', {
       method: 'POST',
       headers: {
@@ -44,17 +44,18 @@ export default async function handler(req, res) {
       body: JSON.stringify(req.body)
     });
 
+    // Lê a resposta do banco
     const data = await response.json();
+    console.log("--> Resposta da Neon:", response.status);
 
-    if (!response.ok) {
-      // Repassa o erro exato do banco
-      return res.status(response.status).json(data);
-    }
-
-    // Sucesso
-    return res.status(200).json(data);
+    // Devolve para o site exatamente o que o banco respondeu
+    return res.status(response.status).json(data);
 
   } catch (error) {
-    return res.status(500).json({ error: error.message });
+    console.error("--> Erro no código do servidor:", error);
+    return res.status(500).json({ 
+      erro: "ERRO_INTERNO", 
+      mensagem: error.message 
+    });
   }
-}
+};
