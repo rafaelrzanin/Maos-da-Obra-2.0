@@ -4,7 +4,7 @@ import react from '@vitejs/plugin-react';
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
-  base: './', // CRUCIAL: Permite que o app rode em subpastas ou hospedagem compartilhada sem servidor Node
+  base: '/', // Changed from './' to '/' for proper SPA routing with BrowserRouter
   build: {
     outDir: 'dist',
     assetsDir: 'assets',
