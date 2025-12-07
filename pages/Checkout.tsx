@@ -118,13 +118,10 @@ const Checkout: React.FC = () => {
     setErrorMsg('');
     setProcessing(true);
     
-    // CONFIGURAÇÃO DA API
-    const API_URL = "https://app.neonpay.com.br/api/v1/gateway/pix/receive";
+    // CONFIGURAÇÃO DA API INTERNA (Serverless Function)
+    // Isso evita o erro de CORS pois o pedido vai para o mesmo domínio
+    const API_URL = "/api/create-pix";
     
-    // Acessa variáveis de ambiente de forma segura
-    const env = (import.meta as any).env || {};
-    const secretKey = env.VITE_NEON_SECRET_KEY || ''; 
-
     try {
       // 1. Preparar Dados
       const profile = await dbService.getUserProfile(user.id);
@@ -134,10 +131,10 @@ const Checkout: React.FC = () => {
       // UUID único para esta transação
       const identifier = generateUUID();
 
-      // Body conforme documentação solicitada
+      // Body do pedido
       const payload = {
         identifier: identifier,
-        amount: planDetails.price, // Float ex: 29.90
+        amount: planDetails.price, 
         client: {
           name: user.name,
           email: user.email,
@@ -146,50 +143,45 @@ const Checkout: React.FC = () => {
         }
       };
 
-      console.log("--- INICIANDO REQUEST NEON ---");
-      console.log("URL:", API_URL);
-      console.log("Payload:", JSON.stringify(payload, null, 2));
+      console.log("--- INICIANDO REQUEST PIX (VIA PROXY) ---");
+      
+      // TENTATIVA DE INTEGRAÇÃO REAL VIA BACKEND
+      const response = await fetch(API_URL, {
+          method: 'POST',
+          headers: {
+              'Content-Type': 'application/json'
+              // Não enviamos chave aqui. O backend injeta a chave secretamente.
+          },
+          body: JSON.stringify(payload)
+      });
 
-      // TENTATIVA DE INTEGRAÇÃO REAL
-      if (secretKey) {
-          const response = await fetch(API_URL, {
-              method: 'POST',
-              headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${secretKey}`
-              },
-              body: JSON.stringify(payload)
+      if (!response.ok) {
+          // Se o proxy retornar erro (4xx, 5xx), tentamos ler o erro ou lançamos exceção
+          const errorData = await response.json().catch(() => ({})); 
+          throw new Error(`Erro na API: ${response.status} - ${JSON.stringify(errorData)}`);
+      }
+
+      const data = await response.json();
+      
+      // Verifica sucesso na estrutura da Neon
+      if (data && (data.qrcode || data.emv)) {
+          setPixData({
+              qr_code_base64: data.qrcode?.base64 || data.qrcode || '', 
+              copy_paste_code: data.emv || data.qrcode?.emv || data.code || ''
           });
-
-          if (!response.ok) {
-              const errorText = await response.text();
-              throw new Error(`Neon API Error (${response.status}): ${errorText}`);
-          }
-
-          const data = await response.json();
-          
-          if (data && (data.qrcode || data.emv)) {
-              // Sucesso real da API
-              setPixData({
-                  qr_code_base64: data.qrcode?.base64 || data.qrcode || '', 
-                  copy_paste_code: data.emv || data.qrcode?.emv || data.code || ''
-              });
-              setProcessing(false);
-              return; 
-          }
-      } else {
-          console.warn("Secret Key não encontrada. Indo para fallback.");
+          setProcessing(false);
+          return; 
       }
       
-      // Se chegou aqui e não retornou sucesso no bloco acima, lança erro para cair no catch
-      throw new Error("Fluxo de API incompleto ou chave ausente");
+      throw new Error("Resposta da API incompleta ou inválida");
 
     } catch (error: any) {
-      // MODO DE SEGURANÇA / FALLBACK (CORS ou Erro de Rede)
-      console.warn("--- FALHA NA API / CORS DETECTADO ---");
+      // MODO DE SEGURANÇA / FALLBACK
+      // Se a API falhar (timeout, erro 500, chave inválida), não travamos o usuário.
+      console.warn("--- FALHA NA INTEGRAÇÃO REAL ---");
       console.error(error);
       
-      alert("Aviso: Falha de conexão com gateway (provável bloqueio de CORS no navegador). Gerando Pix de Teste para visualização.");
+      alert("Aviso: Falha na comunicação com o banco (ou chaves não configuradas). Gerando QR Code de Teste para prosseguir com a demonstração.");
 
       // Geração de Pix Mockado para não travar o fluxo visual
       const mockData = await dbService.generatePix(planDetails.price, {
