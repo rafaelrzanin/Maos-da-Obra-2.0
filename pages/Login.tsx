@@ -27,17 +27,19 @@ const Login: React.FC = () => {
     }
   }, [location.search]);
 
-  // Handle redirect after login/signup
+  // Handle redirect after login (for existing sessions)
   useEffect(() => {
-    if (user) {
-        // If we are already logged in, navigate away
+    if (user && !loading) {
+        // Only redirect via effect if we are NOT in the middle of a submission process
+        // to avoid race conditions with manual redirects
+        console.log("Auth Effect: User detected, redirecting...");
         if (selectedPlan) {
-            navigate('/checkout'); // Or logic to update existing user plan
+            navigate('/checkout'); 
         } else {
             navigate('/');
         }
     }
-  }, [user, navigate, selectedPlan]);
+  }, [user, navigate, selectedPlan]); // Removed loading dependency to allow effect on mount
 
   const formatCPF = (value: string) => {
     return value
@@ -53,25 +55,61 @@ const Login: React.FC = () => {
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
+    // 1. PREVENT DEFAULT MUST BE FIRST
     e.preventDefault();
+    console.log("1. Submit iniciado via botão (Prevent Default Executado)");
+
     setLoading(true);
-    if (isLogin) {
-      const success = await login(email, password);
-      if (!success) alert('Falha ao entrar. Verifique seus dados.');
-    } else {
-      if (!name) { alert('Preciso saber seu nome.'); setLoading(false); return; }
-      if (!cpf || cpf.length < 14) { alert('CPF é obrigatório para o cadastro.'); setLoading(false); return; }
-      
-      // Pass selectedPlan (if any) to signup
-      await signup(name, email, whatsapp, password, cpf, selectedPlan);
-      
-      // Navigation is handled by the useEffect [user] hook primarily, 
-      // but we can force it here if context update is slow
-      if (selectedPlan) {
-          navigate('/checkout');
-      }
+
+    try {
+        if (isLogin) {
+            console.log("2. Tentando Login...");
+            const success = await login(email, password);
+            console.log("3. Resultado Login:", success);
+            
+            if (!success) {
+                alert('Falha ao entrar. Verifique seus dados.');
+            }
+            // Redirect is handled by context/effect or we can do it here explicitly
+        } else {
+            console.log("2. Tentando Signup...", { name, email, cpf, selectedPlan });
+            
+            if (!name) { alert('Preciso saber seu nome.'); setLoading(false); return; }
+            if (!cpf || cpf.length < 14) { alert('CPF é obrigatório para o cadastro.'); setLoading(false); return; }
+            
+            // 3. AWAIT EXPLICIT RETURN
+            const success = await signup(name, email, whatsapp, password, cpf, selectedPlan);
+            console.log("3. Resultado Signup (Boolean):", success);
+            
+            // 4. CHECK SUCCESS BEFORE REDIRECT
+            if (success) {
+                console.log("4. Sucesso confirmado! Redirecionando agora...");
+                
+                // Force explicit navigation to override any effect lag
+                if (selectedPlan) {
+                    console.log("-> Indo para /checkout");
+                    navigate('/checkout');
+                } else {
+                    console.log("-> Indo para /");
+                    navigate('/');
+                }
+            } else {
+                console.warn("4. Falha no cadastro (retorno false do signup)");
+                alert("Não foi possível criar a conta. Verifique se o e-mail já está em uso ou tente novamente.");
+            }
+        }
+    } catch (error) {
+        console.error("ERRO CRÍTICO NO SUBMIT:", error);
+        alert("Ocorreu um erro inesperado no sistema.");
+    } finally {
+        // Only stop loading if we failed, otherwise keep loading while redirecting to avoid flicker
+        // But since we are strict, let's stop it to be safe against hung states
+        // setLoading(false); 
+        // Better:
+        if (isLogin || !user) {
+             setLoading(false);
+        }
     }
-    setLoading(false);
   };
 
   const handleSocialLogin = async (provider: 'google') => {
@@ -215,7 +253,7 @@ const Login: React.FC = () => {
                   )}
 
                   <button 
-                    onClick={handleSubmit}
+                    type="submit"
                     disabled={loading}
                     className="w-full py-4 mt-2 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-white font-bold rounded-xl shadow-lg shadow-orange-900/40 transform active:scale-[0.98] transition-all flex items-center justify-center gap-2 border border-white/10 disabled:opacity-70 disabled:cursor-wait"
                   >
@@ -252,7 +290,11 @@ const Login: React.FC = () => {
               <p className="text-sm text-white/70 drop-shadow-md">
                   {isLogin ? 'Não tem conta?' : 'Já é membro?'}
                   <button 
-                    onClick={() => setIsLogin(!isLogin)}
+                    onClick={() => {
+                        setIsLogin(!isLogin);
+                        // Reset erro states if any
+                    }}
+                    type="button"
                     className="ml-2 font-bold text-amber-400 hover:text-amber-300 transition-colors underline decoration-amber-400/50 underline-offset-4"
                   >
                       {isLogin ? 'Criar conta' : 'Fazer Login'}
