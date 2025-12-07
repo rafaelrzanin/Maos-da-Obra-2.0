@@ -54,7 +54,7 @@ const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) =>
 interface AuthContextType {
   user: User | null;
   login: (email: string, password?: string) => Promise<boolean>;
-  signup: (name: string, email: string, whatsapp: string, password?: string, cpf?: string, planType?: string | null) => Promise<void>;
+  signup: (name: string, email: string, whatsapp: string, password?: string, cpf?: string, planType?: string | null) => Promise<boolean>;
   logout: () => void;
   updatePlan: (plan: PlanType) => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -114,7 +114,9 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
     if (u) {
         setUser(u);
         setIsSubscriptionValid(dbService.isSubscriptionActive(u));
+        return true;
     }
+    return false;
   };
 
   const logout = () => {
