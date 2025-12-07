@@ -111,71 +111,92 @@ const Checkout: React.FC = () => {
     setErrorMsg('');
     setProcessing(true);
     
-    // DEBUG: Verificando chaves no console como solicitado
     const env = (import.meta as any).env || {};
+    
+    // CONFIGURAÇÃO DA API
+    // Prioridade: Variável de Ambiente > URL Sandbox Padrão
+    const baseUrl = env.VITE_NEON_API_URL || 'https://api.sandbox.neon.com.br/pejota/v1'; 
     const publicKey = env.VITE_NEON_PUBLIC_KEY;
     const secretKey = env.VITE_NEON_SECRET_KEY;
-    console.log("Tentando gerar Pix com chave Pública:", publicKey ? `${publicKey.substring(0, 10)}...` : "NÃO DEFINIDA");
 
     try {
-      // 1. Dados do usuário
+      // 1. Preparar Dados
       const profile = await dbService.getUserProfile(user.id);
       const cpf = profile?.cpf || '000.000.000-00'; 
       const amountCents = Math.round(planDetails.price * 100);
 
-      // 2. Se as chaves existirem, tentar integração real
+      // TENTATIVA DE INTEGRAÇÃO REAL
       if (publicKey && secretKey) {
           try {
-              // Exemplo de chamada para API Neon (Endpoint genérico placeholder)
-              // Em um cenário real, você ajustaria a URL exata da documentação da Neon
-              const response = await fetch('https://api.neonpay.com.br/v1/pix/transactions', {
+              const url = `${baseUrl}/pix/transactions`;
+              const body = {
+                  amount: amountCents,
+                  customer: {
+                      name: user.name,
+                      email: user.email,
+                      cpf: cpf.replace(/\D/g, '')
+                  }
+              };
+
+              // LOGS REAIS SOLICITADOS
+              console.log("--- INICIANDO REQUEST NEON ---");
+              console.log("Enviando para URL:", url);
+              console.log("Com Body:", JSON.stringify(body, null, 2));
+              console.log("Chave Pública:", publicKey.substring(0, 5) + "...");
+
+              const response = await fetch(url, {
                   method: 'POST',
                   headers: {
                       'Content-Type': 'application/json',
-                      'Authorization': `Bearer ${secretKey}`, // Autenticação Server-side (Cuidado em produção front-end)
+                      'Authorization': `Bearer ${secretKey}`, 
                       'Public-Key': publicKey
                   },
-                  body: JSON.stringify({
-                      amount: amountCents,
-                      customer: {
-                          name: user.name,
-                          email: user.email,
-                          cpf: cpf.replace(/\D/g, '')
-                      }
-                  })
+                  body: JSON.stringify(body)
               });
 
-              if (response.ok) {
-                  const data = await response.json();
-                  if (data && data.qrcode) {
-                      setPixData({
-                          qr_code_base64: data.qrcode.base64 || data.qrcode, 
-                          copy_paste_code: data.qrcode.emv || data.emv
-                      });
-                      return; // Sucesso na integração real
-                  }
-              } else {
-                  console.warn("Neon API retornou erro:", response.status, response.statusText);
-                  // Não lançamos erro aqui para cair no fallback do mock e não travar o usuário
+              if (!response.ok) {
+                  const errorText = await response.text();
+                  throw new Error(`Neon API Error (${response.status}): ${errorText}`);
               }
-          } catch (apiError) {
-              console.error("Erro na requisição Neon Pay:", apiError);
-              // Segue para o fallback
+
+              const data = await response.json();
+              
+              if (data && (data.qrcode || data.emv)) {
+                  // Sucesso real da API
+                  setPixData({
+                      qr_code_base64: data.qrcode?.base64 || data.qrcode || '', 
+                      copy_paste_code: data.emv || data.qrcode?.emv || ''
+                  });
+                  return; 
+              } else {
+                  throw new Error("Resposta da API incompleta");
+              }
+
+          } catch (apiError: any) {
+              console.warn("ALERTA: Falha na integração real com Neon.", apiError.message);
+              // NÃO bloqueia o usuário. Cai no bloco abaixo (Fallback).
+              throw apiError; // Relança para cair no catch externo e ativar o modo simulado
           }
+      } else {
+          console.log("Chaves não configuradas. Indo direto para simulação.");
+          throw new Error("Chaves de API não encontradas no .env");
       }
 
-      // 3. Fallback / Mock (Caso a API falhe ou chaves não existam, garantindo que o usuário consiga "pagar")
-      console.log("Usando gerador Pix interno (Fallback).");
+    } catch (error: any) {
+      // MODO DE SEGURANÇA / FALLBACK (SIMULAÇÃO)
+      console.error("Erro capturado no fluxo Pix:", error);
+      
+      // Feedback visual solicitado
+      alert("Modo de Teste: API falhou ou não configurada, gerando Pix simulado para aprovação visual.");
+
+      const profile = await dbService.getUserProfile(user.id);
       const mockData = await dbService.generatePix(planDetails.price, {
         name: user.name,
         email: user.email,
-        cpf: cpf
+        cpf: profile?.cpf || ''
       });
       setPixData(mockData);
 
-    } catch (error: any) {
-      console.error("Erro CRÍTICO no Pix:", error);
-      setErrorMsg("Falha ao gerar PIX. Por favor, tente novamente ou use cartão.");
     } finally {
       setProcessing(false);
     }
