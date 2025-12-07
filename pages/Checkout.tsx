@@ -94,6 +94,13 @@ const Checkout: React.FC = () => {
 
   // --- MÉTODOS AUXILIARES ---
 
+  const generateUUID = () => {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+      var r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+  };
+
   const handleCardChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     let { name, value } = e.target;
     
@@ -111,89 +118,84 @@ const Checkout: React.FC = () => {
     setErrorMsg('');
     setProcessing(true);
     
-    const env = (import.meta as any).env || {};
-    
     // CONFIGURAÇÃO DA API
-    // Prioridade: Variável de Ambiente > URL Sandbox Padrão
-    const baseUrl = env.VITE_NEON_API_URL || 'https://api.sandbox.neon.com.br/pejota/v1'; 
-    const publicKey = env.VITE_NEON_PUBLIC_KEY;
-    const secretKey = env.VITE_NEON_SECRET_KEY;
+    const API_URL = "https://app.neonpay.com.br/api/v1/gateway/pix/receive";
+    
+    // Acessa variáveis de ambiente de forma segura
+    const env = (import.meta as any).env || {};
+    const secretKey = env.VITE_NEON_SECRET_KEY || ''; 
 
     try {
       // 1. Preparar Dados
       const profile = await dbService.getUserProfile(user.id);
-      const cpf = profile?.cpf || '000.000.000-00'; 
-      const amountCents = Math.round(planDetails.price * 100);
+      const cpf = (profile?.cpf || '00000000000').replace(/\D/g, '');
+      const phone = (profile?.whatsapp || '0000000000').replace(/\D/g, '');
+      
+      // UUID único para esta transação
+      const identifier = generateUUID();
+
+      // Body conforme documentação solicitada
+      const payload = {
+        identifier: identifier,
+        amount: planDetails.price, // Float ex: 29.90
+        client: {
+          name: user.name,
+          email: user.email,
+          document: cpf,
+          phone: phone
+        }
+      };
+
+      console.log("--- INICIANDO REQUEST NEON ---");
+      console.log("URL:", API_URL);
+      console.log("Payload:", JSON.stringify(payload, null, 2));
 
       // TENTATIVA DE INTEGRAÇÃO REAL
-      if (publicKey && secretKey) {
-          try {
-              const url = `${baseUrl}/pix/transactions`;
-              const body = {
-                  amount: amountCents,
-                  customer: {
-                      name: user.name,
-                      email: user.email,
-                      cpf: cpf.replace(/\D/g, '')
-                  }
-              };
+      if (secretKey) {
+          const response = await fetch(API_URL, {
+              method: 'POST',
+              headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${secretKey}`
+              },
+              body: JSON.stringify(payload)
+          });
 
-              // LOGS REAIS SOLICITADOS
-              console.log("--- INICIANDO REQUEST NEON ---");
-              console.log("Enviando para URL:", url);
-              console.log("Com Body:", JSON.stringify(body, null, 2));
-              console.log("Chave Pública:", publicKey.substring(0, 5) + "...");
+          if (!response.ok) {
+              const errorText = await response.text();
+              throw new Error(`Neon API Error (${response.status}): ${errorText}`);
+          }
 
-              const response = await fetch(url, {
-                  method: 'POST',
-                  headers: {
-                      'Content-Type': 'application/json',
-                      'Authorization': `Bearer ${secretKey}`, 
-                      'Public-Key': publicKey
-                  },
-                  body: JSON.stringify(body)
+          const data = await response.json();
+          
+          if (data && (data.qrcode || data.emv)) {
+              // Sucesso real da API
+              setPixData({
+                  qr_code_base64: data.qrcode?.base64 || data.qrcode || '', 
+                  copy_paste_code: data.emv || data.qrcode?.emv || data.code || ''
               });
-
-              if (!response.ok) {
-                  const errorText = await response.text();
-                  throw new Error(`Neon API Error (${response.status}): ${errorText}`);
-              }
-
-              const data = await response.json();
-              
-              if (data && (data.qrcode || data.emv)) {
-                  // Sucesso real da API
-                  setPixData({
-                      qr_code_base64: data.qrcode?.base64 || data.qrcode || '', 
-                      copy_paste_code: data.emv || data.qrcode?.emv || ''
-                  });
-                  return; 
-              } else {
-                  throw new Error("Resposta da API incompleta");
-              }
-
-          } catch (apiError: any) {
-              console.warn("ALERTA: Falha na integração real com Neon.", apiError.message);
-              // NÃO bloqueia o usuário. Cai no bloco abaixo (Fallback).
-              throw apiError; // Relança para cair no catch externo e ativar o modo simulado
+              setProcessing(false);
+              return; 
           }
       } else {
-          console.log("Chaves não configuradas. Indo direto para simulação.");
-          throw new Error("Chaves de API não encontradas no .env");
+          console.warn("Secret Key não encontrada. Indo para fallback.");
       }
+      
+      // Se chegou aqui e não retornou sucesso no bloco acima, lança erro para cair no catch
+      throw new Error("Fluxo de API incompleto ou chave ausente");
 
     } catch (error: any) {
-      // MODO DE SEGURANÇA / FALLBACK (SIMULAÇÃO)
-      console.error("Erro capturado no fluxo Pix:", error);
+      // MODO DE SEGURANÇA / FALLBACK (CORS ou Erro de Rede)
+      console.warn("--- FALHA NA API / CORS DETECTADO ---");
+      console.error(error);
       
-      // Feedback visual solicitado
-      alert("Modo de Teste: API falhou ou não configurada, gerando Pix simulado para aprovação visual.");
+      alert("Aviso: Falha de conexão com gateway (provável bloqueio de CORS no navegador). Gerando Pix de Teste para visualização.");
 
-      const profile = await dbService.getUserProfile(user.id);
+      // Geração de Pix Mockado para não travar o fluxo visual
       const mockData = await dbService.generatePix(planDetails.price, {
         name: user.name,
         email: user.email,
-        cpf: profile?.cpf || ''
+        cpf: '000.000.000-00'
       });
       setPixData(mockData);
 
