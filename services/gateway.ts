@@ -2,8 +2,8 @@ import { PlanType, User } from '../types';
 
 // --- CONFIGURAÇÃO DO GATEWAY ---
 // Coloca aquí las credenciales de tu portal de pago
-const _API_URL = "https://api.tu-portal-de-pago.com/v1"; // Reemplazar con la URL real
-const _PUBLIC_KEY = "TU_PUBLIC_KEY"; // Si la API requiere auth desde el front
+// const API_URL = "https://api.tu-portal-de-pago.com/v1"; // Reemplazar con la URL real
+// const PUBLIC_KEY = "TU_PUBLIC_KEY"; // Si la API requiere auth desde el front
 
 // IDs de los planes en tu portal de pago
 const GATEWAY_PLAN_IDS = {
@@ -21,8 +21,8 @@ export const gatewayService = {
 
     try {
       // 1. Preparar el cuerpo de la solicitud según la documentación de tu API
-      // Variável com _ para ignorar erro de linter enquanto não é usada na simulação
-      const _payload = {
+      /* 
+      const payload = {
         items: [
           {
             id: GATEWAY_PLAN_IDS[planType],
@@ -45,16 +45,17 @@ export const gatewayService = {
         },
         auto_return: "approved"
       };
+      */
 
       // 2. Hacer la llamada a la API (Ejemplo genérico, ajustar headers según documentación)
       /* 
-      const response = await fetch(`${_API_URL}/checkout/preferences`, {
+      const response = await fetch(`${API_URL}/checkout/preferences`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${_PUBLIC_KEY}`
+          "Authorization": `Bearer ${PUBLIC_KEY}`
         },
-        body: JSON.stringify(_payload),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
@@ -88,7 +89,7 @@ export const gatewayService = {
    */
   checkPaymentStatus: (searchParams: URLSearchParams): 'success' | 'failure' | 'pending' | null => {
     const status = searchParams.get('status');
-    const _paymentId = searchParams.get('payment_id'); // O el parámetro que use tu gateway
+    // const paymentId = searchParams.get('payment_id'); // O el parámetro que use tu gateway
 
     if (status === 'approved' || status === 'success') {
       return 'success';
