@@ -418,6 +418,34 @@ export const dbService = {
      }
   },
 
+  // --- CHECKOUT & PIX HELPERS ---
+  getUserProfile: async (userId: string) => {
+      if (supabase) {
+          const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
+          if (error) throw error;
+          return data;
+      }
+      const db = getLocalDb();
+      return db.users.find(u => u.id === userId);
+  },
+
+  generatePix: async (amount: number, customer: { name: string, email: string, cpf: string }) => {
+      if (supabase) {
+          const { data, error } = await supabase.functions.invoke('create-pix', {
+              body: { amount, customer }
+          });
+          if (error) throw error;
+          return data; // Expected { qr_code_base64, copy_paste_code }
+      }
+      
+      // MOCK PIX RESPONSE
+      await new Promise(r => setTimeout(r, 1500));
+      return {
+          qr_code_base64: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", // 1x1 Pixel Mock
+          copy_paste_code: "00020126580014BR.GOV.BCB.PIX0136123e4567-e89b-12d3-a456-426614174000520400005303986540410.005802BR5913Maos Da Obra6008Brasilia62070503***6304ABCD"
+      };
+  },
+
   getWorks: async (userId: string): Promise<Work[]> => {
     if (supabase) {
         const { data } = await supabase.from('works').select('*').eq('user_id', userId);
