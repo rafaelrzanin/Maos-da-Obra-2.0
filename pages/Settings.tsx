@@ -7,7 +7,6 @@ import { LIFETIME_BONUSES } from '../services/standards';
 const Settings: React.FC = () => {
   const { user, isSubscriptionValid } = useAuth();
   const navigate = useNavigate();
-  const [loadingPlan, setLoadingPlan] = useState<PlanType | null>(null);
   const [showBonusModal, setShowBonusModal] = useState(false);
 
   const fullAccessFeatures = [
@@ -78,7 +77,6 @@ const Settings: React.FC = () => {
         {plans.map(plan => {
           const isCurrentPlanType = user.plan === plan.id;
           const isVitalicio = plan.id === PlanType.VITALICIO;
-          const isLoading = loadingPlan === plan.id;
           
           // Logic for Button State:
           // 1. If it's the current plan type AND subscription is valid => "Current Plan" (Disabled)
@@ -144,7 +142,7 @@ const Settings: React.FC = () => {
               </div>
 
               <button
-                disabled={isActiveCurrent || isLoading || loadingPlan !== null}
+                disabled={isActiveCurrent}
                 onClick={() => handleSubscribe(plan.id)}
                 className={`w-full py-4 rounded-xl font-bold transition-all flex items-center justify-center ${
                   isActiveCurrent 
@@ -154,14 +152,9 @@ const Settings: React.FC = () => {
                         : isVitalicio 
                             ? 'bg-premium hover:bg-purple-800 text-white shadow-lg shadow-premium/30'
                             : 'bg-primary hover:bg-primary-dark text-white shadow-lg shadow-primary/20'
-                } ${isLoading ? 'opacity-80 cursor-wait' : ''}`}
+                }`}
               >
-                {isLoading ? (
-                  <>
-                    <i className="fa-solid fa-circle-notch fa-spin mr-2"></i>
-                    Processando...
-                  </>
-                ) : isActiveCurrent ? (
+                {isActiveCurrent ? (
                   'Plano Ativo'
                 ) : isExpiredCurrent ? (
                   'Renovar Agora'
