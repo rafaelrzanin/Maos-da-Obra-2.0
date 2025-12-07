@@ -31,16 +31,16 @@ const Settings: React.FC = () => {
     {
       id: PlanType.SEMESTRAL,
       name: 'Semestral',
-      price: 'R$ 149,90',
+      price: 'R$ 97,00',
       period: '/semestre',
       color: 'bg-primary-light',
       highlight: true,
-      savings: 'Economia de 17%'
+      savings: 'Economia de 46%'
     },
     {
       id: PlanType.VITALICIO,
       name: 'Vitalício',
-      price: 'R$ 299,90',
+      price: 'R$ 247,00',
       period: 'pague uma vez só',
       color: 'bg-premium',
       highlight: true,
