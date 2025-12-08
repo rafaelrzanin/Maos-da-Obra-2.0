@@ -33,6 +33,10 @@ export default async function handler(req, res) {
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
     const { amount, card, client, installments, planType } = body;
 
+    // --- NOVO LOG DE DEBUGGING: Verifica se o documento está a chegar ---
+    console.log("--> [CARTÃO] Documento recebido do front-end:", client.document);
+    // -------------------------------------------------------------------
+
     // Garante que amount seja number e válido
     const numericAmount = parseFloat(amount);
     if (isNaN(numericAmount) || numericAmount <= 0) {
