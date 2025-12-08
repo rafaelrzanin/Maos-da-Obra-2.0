@@ -105,6 +105,11 @@ export default async function handler(req, res) {
         ];
     }
 
+    // --- NOVO LOG DE DEBUGGING ---
+    // Loga o payload que está sendo enviado (sem os dados sensíveis do cartão)
+    const logPayload = { ...payload, card: { number: card.number.substring(0, 4) + '****', owner: card.name, expiresAt: expiresAtFormatado, cvv: '***' } };
+    console.log("--> [CARTÃO] Payload sendo enviado (Debug):", JSON.stringify(logPayload, null, 2));
+
     console.log("--> [CARTÃO] Enviando para:", endpoint);
 
     // 5. Envia para a Neon
@@ -122,9 +127,12 @@ export default async function handler(req, res) {
 
     if (!response.ok) {
         console.error("--> [CARTÃO] Erro Neon:", JSON.stringify(data, null, 2));
+        // Melhorar a mensagem de erro para o front-end
+        const neonMessage = data.message || (data.details && data.details.description) || "Pagamento não autorizado. Verifique os dados do cartão.";
+
         return res.status(response.status).json({
             erro: "TRANSACAO_NEGADA",
-            mensagem: data.message || "Pagamento não autorizado.",
+            mensagem: neonMessage,
             detalhes: data
         });
     }
