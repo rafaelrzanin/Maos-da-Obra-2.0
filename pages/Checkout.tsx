@@ -73,16 +73,15 @@ export default function Checkout() {
 
       const parsedUser = JSON.parse(savedUser);
 
-      // --- VALIDAÇÃO CRÍTICA DO CPF/DOCUMENTO ---
-      // Se o user não tiver o campo 'cpf', ele é inválido.
+      // --- VALIDAÇÃO CRÍTICA DO CPF/DOCUMENTO (Força o retorno ao registro se CPF faltar) ---
       if (!parsedUser.cpf) {
-         setErrorMsg("Erro: CPF/Documento não foi salvo no registro. Volte e preencha.");
+         setErrorMsg("Erro: CPF/Documento não foi salvo no registro. Redirecionando...");
+         // Força o usuário a voltar ao registro para preencher o campo obrigatório
+         navigate(`/register?plan=${searchParams.get('plan') || 'mensal'}`); 
          setLoading(false);
-         // Opcional: Descomente para forçar o usuário a voltar ao registro
-         // navigate(`/register?plan=${searchParams.get('plan') || 'mensal'}`); 
          return;
       }
-      // --------------------------------------------------
+      // ---------------------------------------------------------------------------------------
 
       setUser(parsedUser);
 
@@ -329,24 +328,4 @@ const handleCreditCardSubmit = async (e: React.FormEvent) => {
                         <div><label className="block text-xs font-bold text-gray-400 mb-2 uppercase ml-1">Nome Completo</label><input type="text" name="name" placeholder="Como no cartão" value={cardData.name} onChange={(e) => setCardData({...cardData, name: e.target.value.toUpperCase()})} className="w-full bg-[#0f1623] border border-gray-700 text-white px-4 py-4 rounded-xl focus:ring-1 focus:ring-[#bc5a08] outline-none" required /></div>
                         <div className="grid grid-cols-2 gap-5">
                             <div><label className="block text-xs font-bold text-gray-400 mb-2 uppercase ml-1">Validade</label><input type="text" name="expiry" placeholder="MM/AA" value={cardData.expiry} onChange={handleInputChange} className="w-full bg-[#0f1623] border border-gray-700 text-white px-4 py-4 rounded-xl focus:ring-1 focus:ring-[#bc5a08] outline-none text-center" required /></div>
-                            <div><label className="block text-xs font-bold text-gray-400 mb-2 uppercase ml-1">CVV</label><div className="relative"><input type="text" name="cvv" placeholder="123" value={cardData.cvv} onChange={handleInputChange} className="w-full bg-[#0f1623] border border-gray-700 text-white px-4 py-4 rounded-xl focus:ring-1 focus:ring-[#bc5a08] outline-none text-center" required /><ShieldCheck className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500" size={16} /></div></div>
-                        </div>
-                        <div>
-                            <label className="block text-xs font-bold text-gray-400 mb-2 uppercase ml-1">Parcelamento</label>
-                            <div className="relative"><select name="installments" value={cardData.installments} onChange={handleInputChange} className="w-full bg-[#0f1623] border border-gray-700 text-white px-4 py-4 rounded-xl focus:ring-1 focus:ring-[#bc5a08] outline-none appearance-none cursor-pointer"><option value={1}>1x de R$ {planDetails?.price.toFixed(2)} (Sem juros)</option><option value={2}>2x de R$ {(planDetails?.price! / 2).toFixed(2)}</option><option value={3}>3x de R$ {(planDetails?.price! / 3).toFixed(2)}</option></select><ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 w-4 h-4 pointer-events-none" /></div>
-                        </div>
-                        <button type="submit" disabled={processing} className="w-full mt-4 text-white font-bold py-4 rounded-xl shadow-lg hover:shadow-orange-900/20 flex items-center justify-center gap-2 disabled:opacity-50" style={{ backgroundColor: '#bc5a08' }}>{processing ? <><Loader2 className="animate-spin" /> Processando...</> : `Pagar R$ ${planDetails?.price.toFixed(2)}`}</button>
-                        
-                        <div className="text-center pt-2">
-                            <span className="text-xs text-gray-500 flex items-center justify-center gap-1"><ShieldCheck size={12} /> Ambiente seguro e criptografado</span>
-                        </div>
-                    </form>
-                )}
-
-               </div>
-              </div>
-        </div>
-      </div>
-    </div>
-  );
-}
+                            <div><label className="block text-xs font-bold text-gray-400 mb-2 uppercase ml-1">CVV</label><div className="relative"><input type="text" name="cvv" placeholder="123"
