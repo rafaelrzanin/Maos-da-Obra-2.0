@@ -1,19 +1,14 @@
-import React from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { CheckCircle, ArrowRight, Lock, HardHat } from 'lucide-react';
 
 export default function Success() {
-  const navigate = useNavigate();
+  // REMOVIDO: const navigate = useNavigate(); (Era a causa do erro)
   const [searchParams] = useSearchParams();
-  const email = searchParams.get('email'); // Pega o email da URL que o Checkout enviou
+  const email = searchParams.get('email'); // Pega o email da URL
 
   const handleAccessApp = () => {
-    // IMPORTANTE: Aqui você coloca o link real do seu aplicativo
-    // Se o seu app for externo, use window.location.href
+    // Usamos window.location.href para garantir a saída do App Quiz e a entrada no App principal
     window.location.href = "https://app.maosdaobra.com.br/dashboard"; 
-    
-    // Se o app for interno (outra rota do Router), use:
-    // navigate('/dashboard'); 
   };
 
   return (
