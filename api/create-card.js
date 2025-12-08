@@ -26,11 +26,15 @@ export default async function handler(req, res) {
     if (!publicKey || !secretKey) {
         return res.status(500).json({ erro: "CONFIG_ERROR", mensagem: "Chaves de API (NEON_PUBLIC_KEY ou NEON_SECRET_KEY) não configuradas." });
     }
+    
+    // --- CORREÇÃO DE URL BASE: Usando o Gateway correto (padrão) ---
+    // A documentação indica que o endpoint é 'gateway/card/receive', o que implica que a base é o GATEWAY.
+    const GATEWAY_BASE_URL = process.env.NEON_GATEWAY_URL || 'https://gateway.neonpay.com.br';
 
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
     const { amount, card, client, installments, planType } = body;
 
-    // CORREÇÃO: Garante que amount seja number
+    // CORREÇÃO: Garante que amount seja number e válido
     const numericAmount = parseFloat(amount);
     if (isNaN(numericAmount) || numericAmount <= 0) {
         return res.status(400).json({ erro: "INVALID_AMOUNT", mensagem: "O valor do pagamento é inválido." });
@@ -39,14 +43,12 @@ export default async function handler(req, res) {
     // 3. Define se é Assinatura ou Pagamento Único
     const isSubscription = planType.toUpperCase() !== 'VITALICIO';
     
-    // URL base da Neon
-    const baseUrl = 'https://app.neonpay.com.br'; 
     // endpoint muda dependendo do tipo
     const endpoint = isSubscription ? '/gateway/card/subscription' : '/gateway/card/receive';
     
     console.log(`--> [CARTÃO] Modo: ${isSubscription ? 'ASSINATURA' : 'PAGAMENTO ÚNICO'}`);
 
-    // CORREÇÃO DE FORMATO: Transforma 'MM/AA' para 'YYYY-MM'
+    // CORREÇÃO DE FORMATO: Transforma 'MM/AA' para 'YYYY-MM' (Exigido pela Neon)
     const [mes, anoCurto] = card.expiry.split('/');
     // Assume que AA é do século 21 (ex: 25 => 2025)
     const anoCompleto = `20${anoCurto}`;
@@ -73,7 +75,7 @@ export default async function handler(req, res) {
         },
         card: {
             number: card.number.replace(/\s/g, ''),
-            owner: card.name, // CORREÇÃO: Usando card.name do form como owner
+            owner: card.name, 
             expiresAt: expiresAtFormatado, // Formato YYYY-MM
             cvv: card.cvv
         }
@@ -110,20 +112,41 @@ export default async function handler(req, res) {
     const logPayload = { ...payload, card: { number: card.number.substring(0, 4) + '****', owner: card.name, expiresAt: expiresAtFormatado, cvv: '***' } };
     console.log("--> [CARTÃO] Payload sendo enviado (Debug):", JSON.stringify(logPayload, null, 2));
 
-    console.log("--> [CARTÃO] Enviando para:", endpoint);
+    console.log(`--> [CARTÃO] Enviando para: ${GATEWAY_BASE_URL}${endpoint}`);
 
-    // 5. Envia para a Neon
-    const response = await fetch(`${baseUrl}${endpoint}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-public-key': publicKey,
-        'x-secret-key': secretKey
-      },
-      body: JSON.stringify(payload)
-    });
+    let response;
+    let rawResponseText = '';
+    let data;
 
-    const data = await response.json();
+    try {
+        // 5. Envia para a Neon
+        response = await fetch(`${GATEWAY_BASE_URL}${endpoint}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-public-key': publicKey,
+                'x-secret-key': secretKey
+            },
+            body: JSON.stringify(payload)
+        });
+        
+        // Tenta ler a resposta como texto primeiro para capturar erros HTML
+        rawResponseText = await response.text();
+        data = JSON.parse(rawResponseText);
+
+    } catch (fetchError) {
+        // Captura o erro se a URL estiver errada ou se a resposta não for JSON (erro HTML)
+        if (rawResponseText.startsWith('<')) {
+            console.error("--> [CARTÃO] ERRO CRÍTICO HTML/URL. Resposta não é JSON, mas sim HTML. URL de Gateway possivelmente incorreta. Resposta:", rawResponseText.substring(0, 150));
+            return res.status(500).json({ 
+                erro: "API_URL_ERROR", 
+                mensagem: "Falha na comunicação com o gateway de pagamento. Verifique a chave NEON_GATEWAY_URL." 
+            });
+        }
+        // Se for outro erro (ex: problema de rede), trata como erro interno
+        throw fetchError;
+    }
+
 
     if (!response.ok) {
         console.error("--> [CARTÃO] Erro Neon:", JSON.stringify(data, null, 2));
