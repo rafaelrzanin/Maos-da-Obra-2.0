@@ -70,8 +70,6 @@ const Checkout: React.FC = () => {
             targetPlan = PlanType.MENSAL;
         }
 
-        console.log(`Checkout: Plano definido -> ${targetPlan}`);
-
         setPlanDetails({
             type: targetPlan,
             price: PLAN_PRICES[targetPlan],
@@ -111,20 +109,38 @@ const Checkout: React.FC = () => {
     setCardData(prev => ({ ...prev, [name]: value }));
   };
 
-  // --- AQUI ESTÁ A CORREÇÃO PRINCIPAL ---
+  // --- FUNÇÃO BLINDADA PARA GERAR PIX ---
   const handleGeneratePix = async () => {
     if (!user || !planDetails) return;
     setErrorMsg('');
     setProcessing(true);
     
-    // Rota da sua API na Vercel
+    // Rota da API na Vercel
     const API_URL = "/api/create-pix";
     
     try {
-      // 1. Preparar Dados
-      const profile = await dbService.getUserProfile(user.id);
-      const cpf = (profile?.cpf || '00000000000').replace(/\D/g, '');
-      const phone = (profile?.whatsapp || '0000000000').replace(/\D/g, '');
+      console.log("--- [PASSO 1] Iniciando Processo Pix ---");
+
+      // 1. Preparar Dados (Com timeout de segurança)
+      // Se o banco demorar mais de 2s, usamos dados padrão para não travar a venda
+      let cpf = '00000000000';
+      let phone = '00000000000';
+
+      try {
+          const timeout = new Promise((_, reject) => setTimeout(() => reject("Timeout Banco"), 2000));
+          const profileRequest = dbService.getUserProfile(user.id);
+          
+          // Tenta pegar o perfil, mas se demorar, desiste
+          const profile: any = await Promise.race([profileRequest, timeout]);
+          
+          if (profile) {
+             cpf = (profile.cpf || '00000000000').replace(/\D/g, '');
+             phone = (profile.whatsapp || '0000000000').replace(/\D/g, '');
+             console.log("--- [PASSO 1.5] Perfil carregado com sucesso ---");
+          }
+      } catch (err) {
+          console.warn("Aviso: Não foi possível carregar dados do perfil (ou demorou muito). Usando padrão.", err);
+      }
       
       const payload = {
         identifier: generateUUID(),
@@ -137,7 +153,7 @@ const Checkout: React.FC = () => {
         }
       };
 
-      console.log("--- ENVIANDO PEDIDO PIX ---");
+      console.log("--- [PASSO 2] Enviando fetch para API... ---");
       
       const response = await fetch(API_URL, {
           method: 'POST',
@@ -147,6 +163,8 @@ const Checkout: React.FC = () => {
           body: JSON.stringify(payload)
       });
 
+      console.log("--- [PASSO 3] Resposta HTTP:", response.status);
+
       if (!response.ok) {
           const errorData = await response.json().catch(() => ({})); 
           console.error("Erro na API:", errorData);
@@ -154,23 +172,21 @@ const Checkout: React.FC = () => {
       }
 
       const data = await response.json();
-      console.log("Resposta Recebida do Backend:", data);
+      console.log("--- [PASSO 4] Dados Recebidos:", data);
       
-      // --- LÓGICA DE PARSING DA NEON PAY ---
-      // A Neon retorna: { point_of_interaction: { transaction_data: { qr_code_base64, qr_code } } }
+      // Tratamento da resposta Neon (Estrutura Nova)
       const neonData = data.point_of_interaction?.transaction_data;
 
       if (neonData && neonData.qr_code_base64) {
           setPixData({
               qr_code_base64: neonData.qr_code_base64, 
-              // Na Neon, o campo 'qr_code' contém a string copia-e-cola
               copy_paste_code: neonData.qr_code 
           });
-          setProcessing(false); // Para o loading
+          setProcessing(false);
           return; 
       }
       
-      // Fallback para outros formatos (caso mude o gateway no futuro)
+      // Fallback para outros formatos (Legado)
       if (data.qrcode || data.emv || data.payload) {
           setPixData({
               qr_code_base64: data.qrcode?.base64 || data.qrcode || '', 
@@ -180,22 +196,23 @@ const Checkout: React.FC = () => {
           return;
       }
       
-      throw new Error("Estrutura de resposta desconhecida (QR Code não encontrado).");
+      throw new Error("QR Code não encontrado na resposta.");
 
     } catch (error: any) {
-      console.error("Falha ao gerar Pix Real:", error);
-      alert("Aviso: Houve uma falha na comunicação bancária. Gerando QR Code de demonstração.");
+      console.error("--- ERRO FATAL ---", error);
+      alert("Aviso: Falha na conexão bancária. Exibindo QR Code de demonstração.");
 
-      // Geração de Pix Mockado (Fallback)
-      const mockData = await dbService.generatePix(planDetails.price, {
-        name: user.name,
-        email: user.email,
-        cpf: '000.000.000-00'
-      });
-      setPixData(mockData);
+      // Fallback LOCAL Estático (Sem chamar DB para evitar travamento duplo)
+      // Garante que algo aparece na tela mesmo se tudo falhar
+      const mockStaticData = {
+          // Um pixel transparente em base64 apenas para preencher a imagem
+          qr_code_base64: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==", 
+          copy_paste_code: "00020126580014BR.GOV.BCB.PIX0136123e4567-e89b-12d3-a456-426614174000520400005303986540510.005802BR5913Maos da Obra6008BRASILIA62070503***6304E2CA"
+      };
+      setPixData(mockStaticData);
 
     } finally {
-      // Garante que o loading pare sempre
+      // Garante que o botão destrava
       setProcessing(false);
     }
   };
