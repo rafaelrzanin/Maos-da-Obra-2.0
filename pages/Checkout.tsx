@@ -5,14 +5,6 @@ import {
   Copy, Smartphone, Zap, Star, LayoutDashboard 
 } from 'lucide-react';
 
-// --- MOCKS ---
-const dbService = {
-  getUserProfile: async (_id: string) => {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    return { cpf: '12345678900', whatsapp: '(11) 99999-9999' };
-  }
-};
-
 // --- TIPAGEM ---
 interface PlanDetails {
   id: string;
@@ -56,7 +48,7 @@ export default function Checkout() {
       
       setUser({ id: 'user_123', name: 'Usuário', email: 'usuario@email.com' });
 
-      // CORREÇÃO DA LÓGICA DE PREÇOS AQUI
+      // LÓGICA DE PREÇOS
       if (planId === 'semestral') {
         setPlanDetails({ 
             id: 'semestral', 
@@ -95,7 +87,7 @@ export default function Checkout() {
     return true;
   };
 
-  // --- HANDLERS (Pix e Cartão iguais ao anterior, focando no design aqui) ---
+  // --- HANDLERS ---
   const handlePixGenerate = async () => {
       setProcessing(true);
       setErrorMsg('');
@@ -126,7 +118,7 @@ export default function Checkout() {
         if (cleanNumber.length < 16) throw new Error("Número do cartão inválido");
         if (cardData.cvv.length < 3) throw new Error("CVV inválido");
 
-        // Simula processamento
+        // Simula processamento com sucesso
         await new Promise(resolve => setTimeout(resolve, 2000));
         
         // Se tudo der certo:
