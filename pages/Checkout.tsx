@@ -83,16 +83,6 @@ export default function Checkout() {
       definePlan(newPlan);
   };
 
-  // --- FUNÇÃO INJETADA: Redirecionamento final após pagamento PIX ---
-  const redirectToApp = () => {
-      // Limpa dados temporários e navega para o Dashboard
-      localStorage.removeItem('tempUser'); 
-      // IMPORTANTE: Use o link real do seu app, que o cliente está logado
-      window.location.href = "https://app.maosdaobra.com.br/dashboard"; 
-  }
-  // --- FIM FUNÇÃO INJETADA ---
-
-
   // --- LÓGICA REAL DE GERAÇÃO DE PIX ---
   const handlePixGenerate = async () => {
       setProcessing(true);
@@ -135,7 +125,7 @@ export default function Checkout() {
           if (data.pix && data.pix.code) {
              setPixCode(data.pix.code);
           } else {
-             throw new Error("Neon Pay não retornou o código PIX.");
+             throw new Error("Neon Pay não retornou o código PIX. Verifique o Backend.");
           }
 
       } catch (err: any) { 
@@ -192,6 +182,15 @@ export default function Checkout() {
     if (name === 'cvv') v = v.replace(/\D/g, '').substring(0, 4);
     setCardData(prev => ({ ...prev, [name]: v }));
   };
+
+  // --- LÓGICA INJETADA: Redirecionamento final após pagamento PIX ---
+  const redirectToAppLogic = () => {
+    // Limpa dados temporários e navega para o Dashboard
+    localStorage.removeItem('tempUser'); 
+    window.location.href = "https://app.maosdaobra.com.br/dashboard"; 
+  }
+  // --- FIM LÓGICA INJETADA ---
+
 
   if (loading) return <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#172134]"><Loader2 className="h-10 w-10 animate-spin text-[#bc5a08]" /></div>;
   
@@ -281,6 +280,11 @@ export default function Checkout() {
                             <div className="space-y-6 animate-in fade-in">
                                 <div className="bg-white p-4 rounded-xl inline-block shadow-lg"><img src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(pixCode)}`} alt="QR Code" className="w-48 h-48" /></div>
                                 <div className="bg-[#0f1623] p-4 rounded-xl border border-white/5 text-left"><label className="text-xs text-gray-500 mb-2 block uppercase font-bold">Copia e Cola</label><div className="flex gap-2"><input readOnly value={pixCode} className="w-full bg-transparent border-none text-gray-300 text-xs font-mono p-0 truncate outline-none" /><button onClick={handleCopyPix} className="text-[#bc5a08] hover:text-white transition-colors">{pixCopied ? <CheckCircle size={20} /> : <Copy size={20} />}</button></div></div>
+                                
+                                {/* BOTÃO INJETADO PARA ACESSAR O APP */}
+                                <button onClick={redirectToAppLogic} className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 rounded-xl transition-all shadow-lg shadow-green-900/20 flex items-center justify-center gap-2">
+                                    JÁ PAGUEI! ACESSAR O APP
+                                </button>
                             </div>
                         )}
                     </div>
