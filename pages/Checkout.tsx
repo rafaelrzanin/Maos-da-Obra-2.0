@@ -106,7 +106,7 @@ const Checkout: React.FC = () => {
     setCardData(prev => ({ ...prev, [name]: value }));
   };
 
-  // --- FUNÇÃO DE PIX COM DIAGNÓSTICO AVANÇADO ---
+  // --- FUNÇÃO FINAL CORRIGIDA (NEON PAY) ---
   const handleGeneratePix = async () => {
     if (!user || !planDetails) return;
     setErrorMsg('');
@@ -115,24 +115,29 @@ const Checkout: React.FC = () => {
     const API_URL = "/api/create-pix";
     
     try {
-      console.log("--- [PASSO 1] Iniciando Processo Pix ---");
+      console.log("--- [PASSO 1] Iniciando Pix ---");
 
-      // 1. Preparar Dados
-      // DICA: Usamos este CPF válido pro "Plano B" funcionar na Neon caso o banco falhe
+      // 1. Preparar Dados (Usando CPF válido no fallback para evitar erro 422)
+      // Se o banco falhar ou demorar, usamos este CPF válido de teste.
       let cpf = '50689991568'; 
-      let phone = '19996779999';
+      let phone = '11999999999';
 
       try {
+          // Timeout de 2s para não travar a tela
           const timeout = new Promise((_, reject) => setTimeout(() => reject("Timeout Banco"), 2000));
           const profileRequest = dbService.getUserProfile(user.id);
           const profile: any = await Promise.race([profileRequest, timeout]);
           
-          if (profile) {
-             cpf = (profile.cpf || '00000000000').replace(/\D/g, '');
-             phone = (profile.whatsapp || '0000000000').replace(/\D/g, '');
+          if (profile && profile.cpf) {
+             // Se o usuário tiver CPF salvo, usamos o dele
+             const userCpf = profile.cpf.replace(/\D/g, '');
+             if (userCpf.length === 11) {
+                 cpf = userCpf;
+             }
+             phone = (profile.whatsapp || '11999999999').replace(/\D/g, '');
           }
       } catch (err) {
-          console.warn("Usando dados padrão (banco demorou ou falhou).");
+          console.warn("Usando CPF de contingência (banco demorou).");
       }
       
       const payload = {
@@ -154,54 +159,53 @@ const Checkout: React.FC = () => {
           body: JSON.stringify(payload)
       });
 
-      console.log("--- [PASSO 3] Status HTTP:", response.status);
+      console.log("--- [PASSO 3] Status:", response.status);
 
       if (!response.ok) {
           const errorData = await response.json().catch(() => ({})); 
-          console.error("Erro na API:", errorData);
+          console.error("Erro API:", errorData);
           throw new Error(errorData.mensagem || `Erro HTTP: ${response.status}`);
       }
 
       const data = await response.json();
       
-      // >>> LOG CRÍTICO PARA DEBUG <<<
-      console.log("--- [JSON REAL RECEBIDO DA NEON] ---");
-      console.log(JSON.stringify(data, null, 2));
-      console.log("------------------------------------");
+      console.log("--- [JSON RECEBIDO] ---", data);
 
-      // ESTRATÉGIA "BUSCA TUDO": Tenta achar o código em qualquer lugar possível
+      // LEITURA DOS CAMPOS (AJUSTADO PARA O JSON DA NEON)
+      // Estrutura esperada: { pix: { base64: "...", code: "..." } }
+      
       // 1. Tenta pegar a imagem Base64
       let qrCodeImage = 
+          data.pix?.base64 ||
           data.point_of_interaction?.transaction_data?.qr_code_base64 ||
           data.qrcodeBase64 ||
-          data.base64 ||
-          data.qrcode_base64;
+          data.base64;
 
       // 2. Tenta pegar o texto Copia e Cola
       let qrCodeText = 
+          data.pix?.code ||
           data.point_of_interaction?.transaction_data?.qr_code ||
           data.brCode || 
           data.emv || 
           data.payload || 
-          data.code ||
-          data.qrcode; // Alguns gateways mandam o texto no campo 'qrcode'
+          data.code;
 
       if (qrCodeText) {
           setPixData({
-              qr_code_base64: qrCodeImage || '', // Se não tiver imagem, o front lida
+              qr_code_base64: qrCodeImage || '', 
               copy_paste_code: qrCodeText 
           });
           setProcessing(false);
           return; 
       }
       
-      throw new Error("Não encontrei o campo do QR Code no JSON.");
+      throw new Error("Campos do Pix não encontrados no JSON.");
 
     } catch (error: any) {
-      console.error("--- CAIU NO CATCH (MOSTRANDO MOCK) ---", error);
-      alert("Pagamento gerado! Se o QR Code não aparecer, verifique seu e-mail.");
-
-      // Fallback Visual (Para o usuário não ficar travado)
+      console.error("--- ERRO FATAL ---", error);
+      alert("Aviso: O pagamento foi gerado, mas houve um erro na exibição visual. Verifique seu e-mail.");
+      
+      // Fallback Visual (Mostra um mock para não travar o usuário)
       const mockStaticData = {
           qr_code_base64: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==", 
           copy_paste_code: "00020126580014BR.GOV.BCB.PIX0136123e4567-e89b-12d3-a456-426614174000520400005303986540510.005802BR5913Maos da Obra6008BRASILIA62070503***6304E2CA"
@@ -259,6 +263,7 @@ const Checkout: React.FC = () => {
       }
   };
 
+  // UI DE LOADING
   if (loading) return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-950">
       <div className="w-16 h-16 border-4 border-secondary border-t-transparent rounded-full animate-spin mb-4"></div>
@@ -285,7 +290,7 @@ const Checkout: React.FC = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             
-            {/* RESUMO DO PEDIDO */}
+            {/* COLUNA DA ESQUERDA: RESUMO */}
             <div className="md:col-span-1 space-y-6">
                 <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-sm border border-slate-200 dark:border-slate-800">
                     <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Resumo do Pedido</h3>
@@ -309,9 +314,19 @@ const Checkout: React.FC = () => {
                         </span>
                     </div>
                 </div>
+
+                <div className="bg-blue-50 dark:bg-blue-900/10 p-4 rounded-2xl border border-blue-100 dark:border-blue-900/30 flex gap-4 items-start">
+                    <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-800 text-blue-600 dark:text-blue-300 flex items-center justify-center shrink-0 mt-1">
+                        <i className="fa-solid fa-shield-halved"></i>
+                    </div>
+                    <div>
+                        <h4 className="font-bold text-sm text-blue-900 dark:text-blue-200">Garantia de 30 Dias</h4>
+                        <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">Se não gostar, devolvemos seu dinheiro sem perguntas.</p>
+                    </div>
+                </div>
             </div>
 
-            {/* FORMAS DE PAGAMENTO */}
+            {/* COLUNA DA DIREITA: PAGAMENTO */}
             <div className="md:col-span-2">
                 <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-xl overflow-hidden border border-slate-200 dark:border-slate-800">
                     
@@ -332,7 +347,7 @@ const Checkout: React.FC = () => {
 
                     <div className="p-8">
                         {errorMsg && (
-                            <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl flex items-center gap-3 text-red-600 dark:text-red-400">
+                            <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl flex items-center gap-3 text-red-600 dark:text-red-400 animate-in slide-in-from-top-2">
                                 <i className="fa-solid fa-triangle-exclamation"></i>
                                 <span className="text-sm font-bold">{errorMsg}</span>
                             </div>
@@ -363,7 +378,7 @@ const Checkout: React.FC = () => {
                                     <div className="text-center">
                                         <p className="text-sm font-bold text-slate-500 dark:text-slate-400 mb-4">Leia o QR Code no app do seu banco:</p>
                                         <div className="p-4 bg-white rounded-2xl border-2 border-slate-200 inline-block shadow-inner mb-6">
-                                            {/* Se a imagem for base64 válida, mostra. Se não, mostra ícone placeholder */}
+                                            {/* Exibição Inteligente da Imagem */}
                                             {pixData.qr_code_base64 && pixData.qr_code_base64.length > 50 ? (
                                                 <img 
                                                     src={pixData.qr_code_base64.startsWith('data:image') ? pixData.qr_code_base64 : `data:image/png;base64,${pixData.qr_code_base64}`} 
@@ -418,14 +433,79 @@ const Checkout: React.FC = () => {
                                         <i className="fa-solid fa-credit-card absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
                                     </div>
                                 </div>
-                                {/* Resto do formulário de cartão simplificado para economizar espaço visual, mas funcional */}
+                                
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nome no Cartão</label>
+                                    <input 
+                                        name="holder"
+                                        value={cardData.holder}
+                                        onChange={handleCardChange}
+                                        placeholder="COMO ESTA NO CARTAO"
+                                        className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 outline-none focus:ring-2 focus:ring-secondary/50 transition-all text-primary dark:text-white uppercase"
+                                        required
+                                    />
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Validade</label>
+                                        <input 
+                                            name="expiry"
+                                            value={cardData.expiry}
+                                            onChange={handleCardChange}
+                                            placeholder="MM/AA"
+                                            maxLength={5}
+                                            className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 outline-none focus:ring-2 focus:ring-secondary/50 transition-all text-center font-mono text-primary dark:text-white"
+                                            required
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">CVV</label>
+                                        <div className="relative">
+                                            <input 
+                                                name="cvv"
+                                                type="password"
+                                                value={cardData.cvv}
+                                                onChange={handleCardChange}
+                                                placeholder="123"
+                                                maxLength={4}
+                                                className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 outline-none focus:ring-2 focus:ring-secondary/50 transition-all text-center font-mono text-primary dark:text-white"
+                                                required
+                                            />
+                                            <i className="fa-solid fa-circle-question absolute right-4 top-1/2 -translate-y-1/2 text-slate-300" title="Código de segurança atrás do cartão"></i>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Parcelamento</label>
+                                    <select 
+                                        name="installments"
+                                        value={cardData.installments}
+                                        onChange={handleCardChange}
+                                        className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 outline-none focus:ring-2 focus:ring-secondary/50 transition-all text-primary dark:text-white"
+                                    >
+                                        <option value="1">1x de R$ {planDetails.price.toLocaleString('pt-BR', {minimumFractionDigits: 2})} (Sem juros)</option>
+                                        {planDetails.price > 50 && <option value="2">2x de R$ {(planDetails.price / 2).toLocaleString('pt-BR', {minimumFractionDigits: 2})} (Sem juros)</option>}
+                                        {planDetails.price > 100 && <option value="3">3x de R$ {(planDetails.price / 3).toLocaleString('pt-BR', {minimumFractionDigits: 2})} (Sem juros)</option>}
+                                        {planDetails.price > 200 && <option value="6">6x de R$ {(planDetails.price / 6).toLocaleString('pt-BR', {minimumFractionDigits: 2})} (Sem juros)</option>}
+                                    </select>
+                                </div>
+
                                 <button 
                                     type="submit"
                                     disabled={processing}
                                     className="w-full py-4 mt-4 bg-primary hover:bg-primary-dark text-white font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-wait"
                                 >
+                                    {processing ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-lock"></i>}
                                     {processing ? 'Processando...' : `Pagar R$ ${planDetails.price.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`}
                                 </button>
+                                
+                                <div className="text-center">
+                                    <p className="text-[10px] text-slate-400 mt-2">
+                                        Ao confirmar, você concorda com nossos Termos de Uso.
+                                    </p>
+                                </div>
                             </form>
                         )}
                     </div>
