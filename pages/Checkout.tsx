@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { 
   CreditCard, QrCode, ShieldCheck, Loader2, CheckCircle, 
-  Copy, Smartphone, Zap, Star, LayoutDashboard 
+  Copy, HardHat, Check, Lock
 } from 'lucide-react';
 
 // --- TIPAGEM ---
@@ -44,11 +44,10 @@ export default function Checkout() {
   // 1. Carregar Dados e Lógica de Preço
   useEffect(() => {
     const loadData = async () => {
-      const planId = searchParams.get('plan'); // ex: 'semestral', 'mensal', 'vitalicio'
+      const planId = searchParams.get('plan');
       
       setUser({ id: 'user_123', name: 'Usuário', email: 'usuario@email.com' });
 
-      // LÓGICA DE PREÇOS
       if (planId === 'semestral') {
         setPlanDetails({ 
             id: 'semestral', 
@@ -66,7 +65,6 @@ export default function Checkout() {
             period: 'Acesso Único'
         });
       } else {
-        // Default para Mensal
         setPlanDetails({ 
             id: 'mensal', 
             name: 'Plano Mensal', 
@@ -83,7 +81,7 @@ export default function Checkout() {
   }, [searchParams]);
 
   const updatePlan = async (type: string) => {
-    console.log(`Atualizando plano para: ${type}`);
+    // Lógica de atualização aqui
     return true;
   };
 
@@ -93,6 +91,7 @@ export default function Checkout() {
       setErrorMsg('');
       try {
           await new Promise(resolve => setTimeout(resolve, 1500));
+          // Mock PIX
           const mockPixCode = "00020126580014BR.GOV.BCB.PIX0136123e4567-e89b-12d3-a456-426614174000520400005303986540410.005802BR5913MAOS DA OBRA6008SAO PAULO62070503***6304ABCD";
           setPixCode(mockPixCode);
       } catch (err) { setErrorMsg("Erro ao gerar PIX."); } 
@@ -118,10 +117,7 @@ export default function Checkout() {
         if (cleanNumber.length < 16) throw new Error("Número do cartão inválido");
         if (cardData.cvv.length < 3) throw new Error("CVV inválido");
 
-        // Simula processamento com sucesso
         await new Promise(resolve => setTimeout(resolve, 2000));
-        
-        // Se tudo der certo:
         await updatePlan(planDetails.type);
         navigate('/?status=success'); 
 
@@ -141,85 +137,103 @@ export default function Checkout() {
     setCardData(prev => ({ ...prev, [name]: v }));
   };
 
-  if (loading) return <div className="flex h-screen items-center justify-center bg-slate-950"><Loader2 className="h-10 w-10 animate-spin text-yellow-500" /></div>;
-  if (!planDetails) return <div className="text-white text-center p-10 bg-slate-950">Plano não encontrado.</div>;
+  if (loading) return (
+    <div className="flex h-screen items-center justify-center" style={{ backgroundColor: '#172134' }}>
+        <Loader2 className="h-10 w-10 animate-spin" style={{ color: '#bc5a08' }} />
+    </div>
+  );
+  
+  if (!planDetails) return <div className="p-10 text-white">Plano não encontrado.</div>;
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 py-8 px-4 sm:px-6 lg:px-8 font-sans">
+    <div className="min-h-screen flex items-center justify-center p-4 sm:p-6 lg:p-8 font-sans relative overflow-hidden" style={{ backgroundColor: '#172134' }}>
       
-      {/* Header Minimalista */}
-      <div className="max-w-6xl mx-auto mb-8 flex items-center gap-3">
-        <div className="w-10 h-10 bg-yellow-500 rounded-lg flex items-center justify-center shadow-lg shadow-yellow-500/20">
-            <LayoutDashboard className="text-slate-900 w-6 h-6" />
-        </div>
-        <h1 className="text-xl font-bold tracking-tight text-white">Mãos da Obra <span className="text-yellow-500">Premium</span></h1>
+      {/* Background Decorativo (Glow Azulado Sutil) */}
+      <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0 pointer-events-none">
+        <div className="absolute -top-[20%] -left-[10%] w-[50%] h-[50%] rounded-full bg-blue-600/10 blur-[120px]"></div>
+        <div className="absolute top-[20%] -right-[10%] w-[40%] h-[40%] rounded-full bg-[#bc5a08]/10 blur-[100px]"></div>
       </div>
 
-      <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="max-w-6xl w-full grid grid-cols-1 lg:grid-cols-5 gap-8 relative z-10">
         
-        {/* COLUNA DA ESQUERDA: BENEFÍCIOS (Visual Premium) */}
-        <div className="lg:col-span-1 space-y-6">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl relative overflow-hidden">
-            {/* Efeito de brilho no fundo */}
-            <div className="absolute -top-10 -right-10 w-32 h-32 bg-yellow-500/10 rounded-full blur-3xl pointer-events-none"></div>
-            
-            <h2 className="text-gray-400 text-sm font-medium uppercase tracking-wider mb-2">Você escolheu</h2>
-            <div className="flex items-baseline gap-1 mb-6">
-              <span className="text-3xl font-bold text-white">{planDetails.name}</span>
-            </div>
-            
-            <div className="space-y-4 mb-8">
-                <div className="flex items-center gap-3 text-sm text-slate-300">
-                    <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-yellow-500"><Zap size={16} /></div>
-                    <span>Acesso Imediato ao App</span>
+        {/* ESQUERDA: BRANDING & RESUMO */}
+        <div className="lg:col-span-2 flex flex-col justify-center space-y-8 p-4">
+            {/* LOGO CUSTOMIZADO */}
+            <div className="flex items-center gap-4 mb-4">
+                <div 
+                    className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg transform rotate-6 hover:rotate-0 transition-all duration-300"
+                    style={{ backgroundColor: '#bc5a08', boxShadow: '0 10px 25px -5px rgba(188, 90, 8, 0.4)' }}
+                >
+                    <HardHat className="text-white w-8 h-8 transform -rotate-6" strokeWidth={2.5} />
                 </div>
-                <div className="flex items-center gap-3 text-sm text-slate-300">
-                    <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-yellow-500"><Smartphone size={16} /></div>
-                    <span>Sem anúncios e ilimitado</span>
-                </div>
-                <div className="flex items-center gap-3 text-sm text-slate-300">
-                    <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-yellow-500"><Star size={16} /></div>
-                    <span>Suporte Prioritário</span>
+                <div>
+                    <h1 className="text-2xl font-bold text-white tracking-tight leading-none">Mãos da Obra</h1>
+                    <span className="text-xs uppercase tracking-widest text-gray-400 font-medium">Checkout Seguro</span>
                 </div>
             </div>
 
-            <div className="border-t border-slate-800 pt-4 flex justify-between items-center">
-                <span className="text-slate-400">Total a pagar:</span>
-                <span className="text-2xl font-bold text-yellow-400">R$ {planDetails.price.toFixed(2)}</span>
+            <div className="space-y-2">
+                <h2 className="text-gray-300 text-lg">Resumo do pedido</h2>
+                <div className="text-4xl font-bold text-white tracking-tight">{planDetails.name}</div>
+                <div className="text-3xl font-bold flex items-baseline gap-1" style={{ color: '#bc5a08' }}>
+                    R$ {planDetails.price.toFixed(2)}
+                    <span className="text-sm font-normal text-gray-400">/{planDetails.period}</span>
+                </div>
             </div>
-          </div>
-          
-          <div className="flex items-center justify-center gap-2 text-xs text-slate-500">
-            <ShieldCheck className="w-4 h-4 text-green-500" />
-            Pagamento Processado com Criptografia SSL
-          </div>
+
+            <div className="space-y-4 pt-4 border-t border-gray-700/50">
+                <div className="flex items-center gap-3">
+                    <div className="w-6 h-6 rounded-full flex items-center justify-center bg-green-500/20 text-green-500">
+                        <Check size={14} strokeWidth={3} />
+                    </div>
+                    <span className="text-gray-300">Acesso ilimitado a todas as ferramentas</span>
+                </div>
+                <div className="flex items-center gap-3">
+                    <div className="w-6 h-6 rounded-full flex items-center justify-center bg-green-500/20 text-green-500">
+                        <Check size={14} strokeWidth={3} />
+                    </div>
+                    <span className="text-gray-300">Gestão completa de obras</span>
+                </div>
+                <div className="flex items-center gap-3">
+                    <div className="w-6 h-6 rounded-full flex items-center justify-center bg-green-500/20 text-green-500">
+                        <Check size={14} strokeWidth={3} />
+                    </div>
+                    <span className="text-gray-300">Suporte técnico prioritário</span>
+                </div>
+            </div>
+            
+            <div className="pt-8">
+               <div className="flex items-center gap-2 text-xs text-gray-500 bg-[#0f1623] py-2 px-3 rounded-lg w-fit border border-gray-800">
+                    <Lock size={12} /> Seus dados estão protegidos com criptografia de ponta a ponta.
+               </div>
+            </div>
         </div>
 
-        {/* COLUNA DA DIREITA: CHECKOUT FORM */}
-        <div className="lg:col-span-2">
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 sm:p-8 shadow-2xl">
+        {/* DIREITA: FORMULÁRIO (CARD GLASS) */}
+        <div className="lg:col-span-3">
+          <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-3xl p-6 sm:p-8 shadow-2xl">
             
-            {/* Seletor de Método */}
-            <div className="grid grid-cols-2 gap-4 mb-8">
+            {/* Abas de Pagamento Customizadas */}
+            <div className="flex bg-[#0f1623] p-1 rounded-xl mb-8 border border-white/5">
                 <button
                     onClick={() => setPaymentMethod('pix')}
-                    className={`flex items-center justify-center gap-2 py-4 rounded-xl border transition-all duration-200 ${
+                    className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg text-sm font-semibold transition-all duration-300 ${
                         paymentMethod === 'pix' 
-                        ? 'bg-green-500/10 border-green-500 text-green-400 font-semibold' 
-                        : 'bg-slate-800 border-transparent text-slate-400 hover:bg-slate-750 hover:text-white'
+                        ? 'bg-[#172134] text-white shadow-lg border border-gray-700' 
+                        : 'text-gray-400 hover:text-white'
                     }`}
                 >
-                    <QrCode className="w-5 h-5" /> PIX
+                    <QrCode size={18} /> PIX Instantâneo
                 </button>
                 <button
                     onClick={() => setPaymentMethod('card')}
-                    className={`flex items-center justify-center gap-2 py-4 rounded-xl border transition-all duration-200 ${
+                    className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg text-sm font-semibold transition-all duration-300 ${
                         paymentMethod === 'card' 
-                        ? 'bg-yellow-500/10 border-yellow-500 text-yellow-400 font-semibold' 
-                        : 'bg-slate-800 border-transparent text-slate-400 hover:bg-slate-750 hover:text-white'
+                        ? 'bg-[#172134] text-white shadow-lg border border-gray-700' 
+                        : 'text-gray-400 hover:text-white'
                     }`}
                 >
-                    <CreditCard className="w-5 h-5" /> Cartão
+                    <CreditCard size={18} /> Cartão de Crédito
                 </button>
             </div>
 
@@ -231,50 +245,56 @@ export default function Checkout() {
 
             {/* CONTEÚDO PIX */}
             {paymentMethod === 'pix' && (
-                <div className="text-center animate-in fade-in zoom-in duration-300">
+                <div className="text-center py-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
                     {!pixCode ? (
-                        <div className="py-8">
-                            <div className="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4 text-green-500">
-                                <QrCode size={32} />
+                        <div className="space-y-6">
+                            <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-[#bc5a08]/10 text-[#bc5a08] mb-2">
+                                <QrCode size={40} />
                             </div>
-                            <h3 className="text-white font-medium text-lg mb-2">Liberação Instantânea</h3>
-                            <p className="text-slate-400 text-sm mb-6 max-w-sm mx-auto">
-                                O QR Code expira em 30 minutos. Após o pagamento, seu acesso será liberado automaticamente.
-                            </p>
+                            <div>
+                                <h3 className="text-white font-bold text-xl mb-2">Pague com PIX</h3>
+                                <p className="text-gray-400 text-sm max-w-xs mx-auto">
+                                    Liberação imediata do seu acesso. Simples, rápido e seguro.
+                                </p>
+                            </div>
                             <button 
                                 onClick={handlePixGenerate}
                                 disabled={processing}
-                                className="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-4 rounded-xl transition-all shadow-lg shadow-green-900/20 flex justify-center items-center gap-2"
+                                className="w-full text-white font-bold py-4 rounded-xl transition-all shadow-lg hover:shadow-orange-900/20 flex justify-center items-center gap-2 transform active:scale-[0.98]"
+                                style={{ backgroundColor: '#bc5a08' }}
                             >
-                                {processing ? <Loader2 className="animate-spin" /> : "Gerar Pagamento PIX"}
+                                {processing ? <Loader2 className="animate-spin" /> : "Gerar QR Code"}
                             </button>
                         </div>
                     ) : (
-                        <div className="py-4 space-y-6">
-                            <div className="bg-white p-4 rounded-xl inline-block">
+                        <div className="space-y-6">
+                            <div className="bg-white p-4 rounded-xl inline-block shadow-lg">
                                 <img 
                                     src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(pixCode)}`} 
                                     alt="QR Code" 
-                                    className="w-48 h-48 opacity-90"
+                                    className="w-48 h-48"
                                 />
                             </div>
                             
-                            <div className="max-w-md mx-auto">
-                                <label className="text-xs text-slate-400 mb-2 block text-left">Pix Copia e Cola</label>
+                            <div className="bg-[#0f1623] p-4 rounded-xl border border-white/5 text-left">
+                                <label className="text-xs text-gray-500 mb-2 block uppercase tracking-wider font-semibold">Copia e Cola</label>
                                 <div className="flex gap-2">
                                     <input 
                                         readOnly 
                                         value={pixCode}
-                                        className="w-full bg-slate-950 border border-slate-700 rounded-lg px-4 py-3 text-xs text-slate-300 font-mono focus:outline-none"
+                                        className="w-full bg-transparent border-none text-gray-300 text-xs font-mono focus:ring-0 p-0 truncate"
                                     />
                                     <button 
                                         onClick={handleCopyPix}
-                                        className="bg-slate-800 hover:bg-slate-700 text-white px-4 rounded-lg border border-slate-700 transition-colors"
+                                        className="text-[#bc5a08] hover:text-white transition-colors"
                                     >
-                                        {pixCopied ? <CheckCircle className="text-green-500" /> : <Copy />}
+                                        {pixCopied ? <CheckCircle size={20} /> : <Copy size={20} />}
                                     </button>
                                 </div>
                             </div>
+                            <p className="text-green-400 text-xs flex items-center justify-center gap-1">
+                                <Loader2 size={12} className="animate-spin" /> Aguardando pagamento...
+                            </p>
                         </div>
                     )}
                 </div>
@@ -282,46 +302,64 @@ export default function Checkout() {
 
             {/* CONTEÚDO CARTÃO */}
             {paymentMethod === 'card' && (
-                <form onSubmit={handleCreditCardSubmit} className="space-y-5 animate-in slide-in-from-right-4 duration-300">
+                <form onSubmit={handleCreditCardSubmit} className="space-y-5 animate-in fade-in slide-in-from-right-4 duration-500">
                     <div>
-                        <label className="block text-xs font-medium text-slate-400 mb-1.5 uppercase tracking-wide">Número do Cartão</label>
-                        <input type="text" name="number" placeholder="0000 0000 0000 0000" value={cardData.number} onChange={handleInputChange} 
-                        className="w-full bg-slate-950 border border-slate-800 text-white px-4 py-3.5 rounded-xl focus:ring-2 focus:ring-yellow-500/50 focus:border-yellow-500 outline-none transition-all placeholder:text-slate-600" required />
+                        <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide ml-1">Número do Cartão</label>
+                        <div className="relative">
+                            <input type="text" name="number" placeholder="0000 0000 0000 0000" value={cardData.number} onChange={handleInputChange} 
+                            className="w-full bg-[#0f1623] border border-gray-700 text-white px-4 py-4 rounded-xl focus:ring-1 focus:ring-[#bc5a08] focus:border-[#bc5a08] outline-none transition-all placeholder:text-gray-600 pl-12" required />
+                            <CreditCard className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={20} />
+                        </div>
                     </div>
 
                     <div>
-                        <label className="block text-xs font-medium text-slate-400 mb-1.5 uppercase tracking-wide">Nome Completo</label>
-                        <input type="text" name="name" placeholder="Impresso no cartão" value={cardData.name} onChange={(e) => setCardData({...cardData, name: e.target.value.toUpperCase()})} 
-                        className="w-full bg-slate-950 border border-slate-800 text-white px-4 py-3.5 rounded-xl focus:ring-2 focus:ring-yellow-500/50 focus:border-yellow-500 outline-none transition-all placeholder:text-slate-600" required />
+                        <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide ml-1">Nome Completo</label>
+                        <input type="text" name="name" placeholder="Nome impresso no cartão" value={cardData.name} onChange={(e) => setCardData({...cardData, name: e.target.value.toUpperCase()})} 
+                        className="w-full bg-[#0f1623] border border-gray-700 text-white px-4 py-4 rounded-xl focus:ring-1 focus:ring-[#bc5a08] focus:border-[#bc5a08] outline-none transition-all placeholder:text-gray-600" required />
                     </div>
 
                     <div className="grid grid-cols-2 gap-5">
                         <div>
-                            <label className="block text-xs font-medium text-slate-400 mb-1.5 uppercase tracking-wide">Validade</label>
+                            <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide ml-1">Validade</label>
                             <input type="text" name="expiry" placeholder="MM/AA" value={cardData.expiry} onChange={handleInputChange} 
-                            className="w-full bg-slate-950 border border-slate-800 text-white px-4 py-3.5 rounded-xl focus:ring-2 focus:ring-yellow-500/50 focus:border-yellow-500 outline-none transition-all placeholder:text-slate-600" required />
+                            className="w-full bg-[#0f1623] border border-gray-700 text-white px-4 py-4 rounded-xl focus:ring-1 focus:ring-[#bc5a08] focus:border-[#bc5a08] outline-none transition-all placeholder:text-gray-600 text-center" required />
                         </div>
                         <div>
-                            <label className="block text-xs font-medium text-slate-400 mb-1.5 uppercase tracking-wide">CVV</label>
-                            <input type="text" name="cvv" placeholder="123" value={cardData.cvv} onChange={handleInputChange} 
-                            className="w-full bg-slate-950 border border-slate-800 text-white px-4 py-3.5 rounded-xl focus:ring-2 focus:ring-yellow-500/50 focus:border-yellow-500 outline-none transition-all placeholder:text-slate-600" required />
+                            <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide ml-1">CVV</label>
+                            <div className="relative">
+                                <input type="text" name="cvv" placeholder="123" value={cardData.cvv} onChange={handleInputChange} 
+                                className="w-full bg-[#0f1623] border border-gray-700 text-white px-4 py-4 rounded-xl focus:ring-1 focus:ring-[#bc5a08] focus:border-[#bc5a08] outline-none transition-all placeholder:text-gray-600 text-center" required />
+                                <ShieldCheck className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500" size={16} />
+                            </div>
                         </div>
                     </div>
 
                     <div>
-                        <label className="block text-xs font-medium text-slate-400 mb-1.5 uppercase tracking-wide">Parcelamento</label>
-                        <select name="installments" value={cardData.installments} onChange={handleInputChange} 
-                        className="w-full bg-slate-950 border border-slate-800 text-white px-4 py-3.5 rounded-xl focus:ring-2 focus:ring-yellow-500/50 focus:border-yellow-500 outline-none transition-all">
-                            <option value={1}>1x de R$ {planDetails.price.toFixed(2)} (Sem juros)</option>
-                            <option value={2}>2x de R$ {(planDetails.price / 2).toFixed(2)}</option>
-                            <option value={3}>3x de R$ {(planDetails.price / 3).toFixed(2)}</option>
-                        </select>
+                        <label className="block text-xs font-bold text-gray-400 mb-2 uppercase tracking-wide ml-1">Parcelamento</label>
+                        <div className="relative">
+                            <select name="installments" value={cardData.installments} onChange={handleInputChange} 
+                            className="w-full bg-[#0f1623] border border-gray-700 text-white px-4 py-4 rounded-xl focus:ring-1 focus:ring-[#bc5a08] focus:border-[#bc5a08] outline-none transition-all appearance-none cursor-pointer">
+                                <option value={1}>1x de R$ {planDetails.price.toFixed(2)} (Sem juros)</option>
+                                <option value={2}>2x de R$ {(planDetails.price / 2).toFixed(2)}</option>
+                                <option value={3}>3x de R$ {(planDetails.price / 3).toFixed(2)}</option>
+                            </select>
+                            <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none">
+                                <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path></svg>
+                            </div>
+                        </div>
                     </div>
 
                     <button type="submit" disabled={processing} 
-                    className="w-full mt-4 bg-yellow-500 hover:bg-yellow-400 text-slate-900 font-bold py-4 rounded-xl transition-all shadow-lg shadow-yellow-500/20 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transform active:scale-[0.98]">
-                        {processing ? <><Loader2 className="animate-spin" /> Processando...</> : `Confirmar Pagamento de R$ ${planDetails.price.toFixed(2)}`}
+                    className="w-full mt-4 text-white font-bold py-4 rounded-xl transition-all shadow-lg hover:shadow-orange-900/20 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed transform active:scale-[0.98]"
+                    style={{ backgroundColor: '#bc5a08' }}>
+                        {processing ? <><Loader2 className="animate-spin" /> Processando...</> : `Pagar R$ ${planDetails.price.toFixed(2)}`}
                     </button>
+                    
+                    <div className="text-center">
+                        <span className="text-xs text-gray-500 flex items-center justify-center gap-1">
+                            <ShieldCheck size={12} /> Pagamento processado com segurança bancária
+                        </span>
+                    </div>
                 </form>
             )}
           </div>
