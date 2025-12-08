@@ -34,8 +34,14 @@ export default async function handler(req, res) {
     const { amount, card, client, installments, planType } = body;
 
     // --- NOVO LOG DE DEBUGGING: Verifica se o documento está a chegar ---
-    console.log("--> [CARTÃO] Documento recebido do front-end:", client.document);
+    // Logamos o que está em client.document (se for undefined, indica erro no frontend)
+    console.log("--> [CARTÃO] Documento recebido do front-end (Debug):", client.document);
     // -------------------------------------------------------------------
+
+    // Validação de segurança: o documento não pode ser nulo ou vazio
+    if (!client.document || client.document.length < 11) {
+        return res.status(400).json({ erro: "MISSING_CLIENT_DOCUMENT", mensagem: "Documento (CPF/CNPJ) do cliente é obrigatório e não foi enviado." });
+    }
 
     // Garante que amount seja number e válido
     const numericAmount = parseFloat(amount);
@@ -66,7 +72,7 @@ export default async function handler(req, res) {
             name: client.name,
             email: client.email,
             phone: client.phone,
-            // CORREÇÃO ESSENCIAL: O campo document é obrigatório pela Neon Pay.
+            // CORREÇÃO ESSENCIAL: Garante que o documento (CPF/CNPJ) seja incluído
             document: client.document, 
             address: { 
                 country: "BR",
