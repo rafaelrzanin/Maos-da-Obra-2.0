@@ -318,6 +318,7 @@ const App: React.FC = () => {
 
             {/* ROTAS PROTEGIDAS (DENTRO DO APP) */}
             <Route path="/" element={<Layout><Dashboard /></Layout>} />
+            <Route path="/dashboard" element={<Layout><Dashboard /></Layout>} /> // ROTA ADICIONADA
             <Route path="/create" element={<Layout><CreateWork /></Layout>} />
             <Route path="/work/:id" element={<Layout><WorkDetail /></Layout>} />
             <Route path="/settings" element={<Layout><Settings /></Layout>} />
