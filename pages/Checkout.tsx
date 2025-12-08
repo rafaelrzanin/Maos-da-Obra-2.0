@@ -72,6 +72,7 @@ export default function Checkout() {
       }
 
       const parsedUser = JSON.parse(savedUser);
+      // Fallback para ler documento de qualquer propriedade que contenha o CPF/CNPJ
       let documentValue = parsedUser.cpf || parsedUser.document || parsedUser.id_doc;
 
       // --- VALIDAÇÃO CRÍTICA DO CPF/DOCUMENTO ---
@@ -203,7 +204,7 @@ const handleCreditCardSubmit = async (e: React.FormEvent) => {
         
         // Se a resposta for 405, lança um erro para mostrar a mensagem
         if (response.status === 405) {
-             throw new Error("Erro de Servidor (405): Método POST não permitido. Contacte o suporte.");
+             throw new Error("Erro de Servidor (405): O servidor Vercel bloqueou o método POST. O roteamento da API está incorreto.");
         }
 
         const result = await response.json();
