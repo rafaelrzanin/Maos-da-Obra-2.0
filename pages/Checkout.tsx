@@ -4,8 +4,8 @@ import {
   CreditCard, QrCode, ShieldCheck, Loader2, CheckCircle, 
   Copy, HardHat, ChevronDown, UserCheck, AlertTriangle
 } from 'lucide-react'; 
-// REMOVIDO 'Check' e 'Lock' para corrigir erro de build
 
+// --- TIPAGEM (Manter como estava) ---
 interface PlanDetails {
   id: string;
   name: string;
@@ -21,6 +21,7 @@ interface CardData {
   cvv: string;
   installments: number;
 }
+// --- FIM TIPAGEM ---
 
 export default function Checkout() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -54,8 +55,9 @@ export default function Checkout() {
 
   useEffect(() => {
     const loadData = async () => {
-      // 1. Recuperar Usuário
+      // 1. Recuperar Usuário do Passo Anterior (Register)
       const savedUser = localStorage.getItem('tempUser');
+      
       if (!savedUser) {
           const currentPlan = searchParams.get('plan') || 'mensal';
           navigate(`/register?plan=${currentPlan}`);
@@ -81,28 +83,34 @@ export default function Checkout() {
       definePlan(newPlan);
   };
 
+  // --- LÓGICA DE GERAÇÃO REAL DE PIX ---
   const handlePixGenerate = async () => {
       setProcessing(true);
       setErrorMsg('');
       try {
+          // CHAMADA REAL PARA SUA API (Neon Pay)
           const response = await fetch('/api/create-pix', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                   amount: planDetails?.price,
                   description: `Mãos da Obra - ${planDetails?.name}`,
-                  payer: user
+                  payer: user // Dados do usuário recém-cadastrado
               })
           });
           const data = await response.json();
           if (!response.ok) throw new Error(data.message || 'Erro ao gerar PIX');
+          
+          // Verifica se o backend Neon Pay retornou o código de copia e cola (emv)
           if (data.qrcode_text || data.emv) setPixCode(data.qrcode_text || data.emv);
-          else throw new Error("Erro no banco.");
+          else throw new Error("Código PIX não retornado pelo banco. Verifique as chaves Neon Pay.");
+          
       } catch (err: any) { 
-          setErrorMsg(err.message || "Erro ao gerar PIX."); 
+          setErrorMsg(err.message || "Erro ao gerar PIX. Tente novamente."); 
       } finally { setProcessing(false); }
   };
 
+  // --- LÓGICA DE PAGAMENTO REAL DO CARTÃO ---
   const handleCreditCardSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!planDetails) return;
@@ -113,6 +121,7 @@ export default function Checkout() {
         if (cleanNumber.length < 16) throw new Error("Número do cartão inválido");
         if (cardData.cvv.length < 3) throw new Error("CVV inválido");
 
+        // CHAMADA REAL PARA SUA API (Neon Pay)
         const response = await fetch('/api/create-card', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -121,19 +130,22 @@ export default function Checkout() {
                 installments: cardData.installments,
                 planType: planDetails.type,
                 card: { ...cardData, number: cleanNumber },
-                client: user
+                client: user // Enviando dados reais do cadastro
             })
         });
         const result = await response.json();
         if (!response.ok) throw new Error(result.message || "Transação recusada.");
 
-        alert("Pagamento Aprovado! Entrando no App...");
-        window.location.href = "https://app.maosdaobra.com.br"; 
+        // SUCESSO REAL: Redireciona para o App (Dashboard)
+        // Usamos window.location.href para garantir a limpeza do LocalStorage e o Login
+        localStorage.removeItem('tempUser'); // Limpa dados temporários
+        window.location.href = "https://app.maosdaobra.com.br/dashboard"; // Link do seu App/Dashboard final
 
     } catch (err: any) {
         setErrorMsg(err.message || "Erro ao processar cartão.");
     } finally { setProcessing(false); }
   };
+
 
   const handleCopyPix = () => {
     if (pixCode) { navigator.clipboard.writeText(pixCode); setPixCopied(true); setTimeout(() => setPixCopied(false), 3000); }
@@ -150,8 +162,12 @@ export default function Checkout() {
 
   if (loading) return <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#172134]"><Loader2 className="h-10 w-10 animate-spin text-[#bc5a08]" /></div>;
   
+  if (!user) return null; // Não renderiza se o usuário não foi carregado via localStorage (será redirecionado via useEffect)
+
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-[#172134] font-sans selection:bg-[#bc5a08] selection:text-white">
+      
+      {/* Background Decorativo */}
       <div className="fixed top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
         <div className="absolute -top-[20%] -left-[10%] w-[50%] h-[50%] rounded-full bg-blue-600/10 blur-[120px]"></div>
         <div className="absolute top-[20%] -right-[10%] w-[40%] h-[40%] rounded-full bg-[#bc5a08]/10 blur-[100px]"></div>
@@ -160,7 +176,9 @@ export default function Checkout() {
       <div className="min-h-screen flex items-center justify-center p-4 sm:p-6 lg:p-8 relative z-10">
         <div className="max-w-6xl w-full grid grid-cols-1 lg:grid-cols-5 gap-8">
             
+            {/* ESQUERDA: INFO DO PEDIDO */}
             <div className="lg:col-span-2 flex flex-col justify-center space-y-8 lg:pr-8">
+                {/* LOGO */}
                 <div className="flex items-center gap-4">
                     <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg transform rotate-6" style={{ backgroundColor: '#bc5a08', boxShadow: '0 10px 25px -5px rgba(188, 90, 8, 0.4)' }}>
                         <HardHat className="text-white w-8 h-8 transform -rotate-6" strokeWidth={2.5} />
@@ -171,14 +189,15 @@ export default function Checkout() {
                     </div>
                 </div>
 
+                {/* USER CARD */}
                 <div className="bg-white/5 border border-white/10 rounded-xl p-4 flex items-center gap-4">
                     <div className="w-10 h-10 bg-[#bc5a08]/20 rounded-full flex items-center justify-center text-[#bc5a08]">
                         <UserCheck size={20} />
                     </div>
                     <div className="flex-1 min-w-0">
                         <p className="text-xs text-gray-400 uppercase font-bold">Conta Criada</p>
-                        <p className="text-white font-medium truncate">{user?.name}</p>
-                        <p className="text-xs text-gray-500 truncate">{user?.email}</p>
+                        <p className="text-white font-medium truncate">{user.name}</p>
+                        <p className="text-xs text-gray-500 truncate">{user.email}</p>
                     </div>
                     <button onClick={() => navigate('/register')} className="text-xs text-[#bc5a08] hover:text-white underline">Alterar</button>
                 </div>
@@ -198,9 +217,11 @@ export default function Checkout() {
                 </div>
             </div>
 
+            {/* DIREITA: FORMULÁRIO */}
             <div className="lg:col-span-3">
-               <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-3xl p-6 sm:p-8 shadow-2xl">
-                  
+            <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-3xl p-6 sm:p-8 shadow-2xl">
+                
+                {/* Abas */}
                 <div className="flex bg-[#0f1623] p-1 rounded-xl mb-8 border border-white/5">
                     <button onClick={() => setPaymentMethod('pix')} className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg text-sm font-semibold transition-all duration-300 ${paymentMethod === 'pix' ? 'bg-[#172134] text-white shadow-lg border border-gray-700' : 'text-gray-400 hover:text-white'}`}>
                         <QrCode size={18} /> PIX
@@ -212,6 +233,7 @@ export default function Checkout() {
 
                 {errorMsg && <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 text-red-400 text-sm rounded-xl flex items-center gap-3"><AlertTriangle className="flex-shrink-0" />{errorMsg}</div>}
 
+                {/* PIX */}
                 {paymentMethod === 'pix' && (
                     <div className="text-center py-4">
                         {!pixCode ? (
@@ -231,6 +253,7 @@ export default function Checkout() {
                     </div>
                 )}
 
+                {/* CARTÃO */}
                 {paymentMethod === 'card' && (
                     <form onSubmit={handleCreditCardSubmit} className="space-y-5">
                         <div><label className="block text-xs font-bold text-gray-400 mb-2 uppercase ml-1">Número do Cartão</label><div className="relative"><input type="text" name="number" placeholder="0000 0000 0000 0000" value={cardData.number} onChange={handleInputChange} className="w-full bg-[#0f1623] border border-gray-700 text-white px-4 py-4 rounded-xl focus:ring-1 focus:ring-[#bc5a08] outline-none pl-12" required /><CreditCard className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={20} /></div></div>
