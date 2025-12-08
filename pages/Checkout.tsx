@@ -142,39 +142,51 @@ export default function Checkout() {
       }
   };
 
-  // --- LÓGICA DE PAGAMENTO REAL DO CARTÃO ---
-  const handleCreditCardSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!planDetails) return;
-    setErrorMsg('');
-    setProcessing(true);
-    try {
-        const cleanNumber = cardData.number.replace(/\s/g, '');
-        if (cleanNumber.length < 16) throw new Error("Número do cartão inválido");
-        if (cardData.cvv.length < 3) throw new Error("CVV inválido");
+ // ESTA FUNÇÃO DEVE SER ATUALIZADA NO SEU FICHEIRO Checkout.tsx
 
-        const response = await fetch('/api/create-card', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                amount: planDetails.price,
-                installments: cardData.installments,
-                planType: planDetails.type,
-                card: { ...cardData, number: cleanNumber },
-                client: user
-            })
-        });
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.message || "Transação recusada.");
+const handleCreditCardSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!planDetails || !user) return; // Garante que user exista
+    setErrorMsg('');
+    setProcessing(true);
+    try {
+        const cleanNumber = cardData.number.replace(/\s/g, '');
+        if (cleanNumber.length < 16) throw new Error("Número do cartão inválido");
+        if (cardData.cvv.length < 3) throw new Error("CVV inválido");
 
-        // SUCESSO REAL (Cartão): Redireciona para o App
-        redirectToDashboard(); // CHAMANDO A FUNÇÃO DE REDIRECIONAMENTO
+        // --- CORREÇÃO: Cria o objeto client com o 'document' (CPF) ---
+        const clientPayload = {
+            name: user.name,
+            email: user.email,
+            phone: user.phone,
+            document: user.cpf, // Assume que o CPF está na propriedade 'cpf' do objeto 'user'
+        };
+        // -------------------------------------------------------------
 
-    } catch (err: any) {
-        setErrorMsg(err.message || "Erro ao processar cartão.");
-    } finally { setProcessing(false); }
-  };
+        const response = await fetch('/api/create-card', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                amount: planDetails.price,
+                installments: cardData.installments,
+                planType: planDetails.type,
+                card: { ...cardData, number: cleanNumber },
+                client: clientPayload // Envia o payload corrigido
+            })
+        });
+        
+        // ... restante do código de erro e sucesso
+        
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.message || "Transação recusada.");
 
+        // SUCESSO REAL (Cartão): Redireciona para o App
+        redirectToDashboard();
+
+    } catch (err: any) {
+        setErrorMsg(err.message || "Erro ao processar cartão.");
+    } finally { setProcessing(false); }
+};
 
   const handleCopyPix = () => {
     if (pixCode) { navigator.clipboard.writeText(pixCode); setPixCopied(true); setTimeout(() => setPixCopied(false), 3000); }
