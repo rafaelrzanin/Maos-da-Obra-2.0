@@ -28,7 +28,6 @@ export default async function handler(req, res) {
     }
     
     // --- CORREÇÃO DE URL BASE: USANDO A URL DA DOCUMENTAÇÃO ---
-    // URL base: https://app.neonpay.com.br/api/v1
     const API_BASE_URL = process.env.NEON_API_BASE_URL || 'https://app.neonpay.com.br/api/v1';
 
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
@@ -44,7 +43,6 @@ export default async function handler(req, res) {
     const isSubscription = planType.toUpperCase() !== 'VITALICIO';
     
     // O endpoint completo será API_BASE_URL + /gateway/card/receive ou /subscription
-    // O /gateway está no seu código, vamos usá-lo como sub-rota
     const subEndpoint = isSubscription ? '/gateway/card/subscription' : '/gateway/card/receive';
     
     console.log(`--> [CARTÃO] Modo: ${isSubscription ? 'ASSINATURA' : 'PAGAMENTO ÚNICO'}`);
@@ -69,6 +67,8 @@ export default async function handler(req, res) {
                 country: "BR",
                 state: "SP",
                 city: "São Paulo",
+                // CORREÇÃO: Adicionando o campo 'neighborhood' (Bairro), que a API exige.
+                neighborhood: "Centro", 
                 zipCode: "01001-000",
                 street: "Rua Digital",
                 number: "100"
