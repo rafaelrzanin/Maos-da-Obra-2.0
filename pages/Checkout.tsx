@@ -70,7 +70,21 @@ export default function Checkout() {
           navigate(`/register?plan=${currentPlan}`);
           return;
       }
-      setUser(JSON.parse(savedUser));
+
+      const parsedUser = JSON.parse(savedUser);
+
+      // --- VALIDAÇÃO CRÍTICA DO CPF/DOCUMENTO (Novo) ---
+      // Se o user não tiver o campo 'cpf', não deve prosseguir para evitar o erro da Neon Pay.
+      if (!parsedUser.cpf) {
+         setErrorMsg("Erro: CPF/Documento não foi salvo corretamente no passo de registro.");
+         setLoading(false);
+         // Opcional: Redirecionar para o registro se o dado estiver faltando
+         // navigate(`/register?plan=${searchParams.get('plan') || 'mensal'}`); 
+         return;
+      }
+      // --------------------------------------------------
+
+      setUser(parsedUser);
 
       // 2. Definir Plano
       let planId = searchParams.get('plan');
@@ -97,12 +111,12 @@ export default function Checkout() {
       try {
           if (!user || !planDetails) throw new Error("Dados do usuário ou plano ausentes.");
 
-          // O clientPayload para PIX já inclui o CPF, conforme o código original
+          // O clientPayload para PIX já inclui o CPF
           const clientPayload = {
               name: user.name,
               email: user.email,
               phone: user.phone.replace(/\D/g, ''),
-              document: user.cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4")
+              document: user.cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4") // Usa user.cpf
           };
 
           const payload = {
@@ -146,9 +160,10 @@ export default function Checkout() {
  // --- FUNÇÃO DE PAGAMENTO COM CARTÃO (CORRIGIDA) ---
 const handleCreditCardSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Variáveis como planDetails, user, cardData, setErrorMsg, setProcessing 
-    // devem estar definidas no escopo do componente pai (Checkout.tsx)
-    if (!planDetails || !user) return; 
+    if (!planDetails || !user || !user.cpf) { // Validação forte do CPF/Documento
+       setErrorMsg("Erro: CPF/Documento não foi carregado corretamente para o usuário.");
+       return;
+    } 
     setErrorMsg('');
     setProcessing(true);
     try {
@@ -162,7 +177,7 @@ const handleCreditCardSubmit = async (e: React.FormEvent) => {
             name: user.name,
             email: user.email,
             phone: user.phone,
-            document: user.cpf, 
+            document: user.cpf, // Assume que o CPF está na propriedade 'cpf' do objeto 'user'
         };
         // -------------------------------------------------------------
 
