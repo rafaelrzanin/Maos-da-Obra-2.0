@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom'; // Mudança principal: Vite usa react-router-dom
-import { CreditCard, QrCode, ShieldCheck, Loader2, CheckCircle } from 'lucide-react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
+import { CreditCard, QrCode, ShieldCheck, Loader2, CheckCircle, Copy, AlertCircle } from 'lucide-react';
 
 // --- MOCKS/IMPORTS ---
-// Mock simples para o código não quebrar (ajuste o parâmetro 'id' para '_id' para evitar erro de variável não usada)
 const dbService = {
   getUserProfile: async (_id: string) => {
     await new Promise(resolve => setTimeout(resolve, 500));
@@ -28,7 +27,6 @@ interface CardData {
 }
 
 export default function Checkout() {
-  // Hooks do React Router DOM (Vite)
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
@@ -36,12 +34,17 @@ export default function Checkout() {
   const [user, setUser] = useState<{ id: string; name: string; email: string } | null>(null);
   const [planDetails, setPlanDetails] = useState<PlanDetails | null>(null);
 
-  // Estados de UI e Formulário
-  const [paymentMethod, setPaymentMethod] = useState<'pix' | 'card'>('card');
+  // Estados de UI
+  // MUDANÇA: Começa com 'pix' selecionado
+  const [paymentMethod, setPaymentMethod] = useState<'pix' | 'card'>('pix'); 
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   
+  // Estado do PIX
+  const [pixCode, setPixCode] = useState<string | null>(null);
+  const [pixCopied, setPixCopied] = useState(false);
+
   // Estado do Cartão
   const [cardData, setCardData] = useState<CardData>({
     number: '',
@@ -56,7 +59,6 @@ export default function Checkout() {
     const loadData = async () => {
       const planId = searchParams.get('plan');
       
-      // Simulação de Usuário Logado
       setUser({ id: 'user_123', name: 'Usuário Teste', email: 'teste@email.com' });
 
       if (planId === 'vitalicio') {
@@ -77,7 +79,34 @@ export default function Checkout() {
     return true;
   };
 
-  // --- LÓGICA DE SUBMISSÃO ---
+  // --- LÓGICA PIX ---
+  const handlePixGenerate = async () => {
+      setProcessing(true);
+      setErrorMsg('');
+      try {
+          // Simula chamada API
+          await new Promise(resolve => setTimeout(resolve, 1500));
+          
+          // Gera um código PIX fictício
+          const mockPixCode = "00020126580014BR.GOV.BCB.PIX0136123e4567-e89b-12d3-a456-426614174000520400005303986540410.005802BR5913MAOS DA OBRA6008SAO PAULO62070503***6304ABCD";
+          setPixCode(mockPixCode);
+          
+      } catch (err) {
+          setErrorMsg("Erro ao gerar PIX. Tente novamente.");
+      } finally {
+          setProcessing(false);
+      }
+  };
+
+  const handleCopyPix = () => {
+      if (pixCode) {
+          navigator.clipboard.writeText(pixCode);
+          setPixCopied(true);
+          setTimeout(() => setPixCopied(false), 3000);
+      }
+  };
+
+  // --- LÓGICA CARTÃO ---
   const handleCreditCardSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!planDetails || !user) return;
@@ -86,19 +115,16 @@ export default function Checkout() {
     setProcessing(true);
 
     try {
-        // 1. Validações
         const cleanNumber = cardData.number.replace(/\s/g, '');
         if (cleanNumber.length < 16) throw new Error("Número do cartão inválido");
         if (cardData.cvv.length < 3) throw new Error("CVV inválido");
         if (!cardData.expiry.includes('/')) throw new Error("Validade inválida (MM/AA)");
 
-        // 2. Preparar dados
         let clientCpf = '00000000000';
         let clientPhone = '(11) 99999-9999';
         
         try {
             const timeout = new Promise((_, reject) => setTimeout(() => reject("Timeout"), 2000));
-            // Usamos user.id aqui
             const profileRequest = dbService.getUserProfile(user.id);
             const profile: any = await Promise.race([profileRequest, timeout]);
             
@@ -111,11 +137,10 @@ export default function Checkout() {
         }
 
         if (clientCpf === '00000000000' || clientCpf.length !== 11) {
-             clientCpf = '06266344009'; // CPF Teste
+             clientCpf = '06266344009'; 
         }
 
-        // 3. API Call
-        const response = await fetch('/api/create-card', { // Nota: Em Vite, certifique-se que essa rota existe no backend
+        const response = await fetch('/api/create-card', { 
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -138,9 +163,8 @@ export default function Checkout() {
             throw new Error(result.mensagem || "Transação não autorizada.");
         }
 
-        // 4. Sucesso
         await updatePlan(planDetails.type);
-        navigate('/?status=success'); // MUDANÇA: router.push -> navigate
+        navigate('/?status=success'); 
 
     } catch (err: any) {
         console.error(err);
@@ -199,16 +223,6 @@ export default function Checkout() {
             {/* Abas */}
             <div className="flex gap-4 mb-6">
               <button
-                onClick={() => setPaymentMethod('card')}
-                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg border font-medium transition-all ${
-                  paymentMethod === 'card' 
-                    ? 'border-blue-600 bg-blue-50 text-blue-700' 
-                    : 'border-gray-200 text-gray-600 hover:bg-gray-50'
-                }`}
-              >
-                <CreditCard className="w-5 h-5" /> Cartão
-              </button>
-              <button
                 onClick={() => setPaymentMethod('pix')}
                 className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg border font-medium transition-all ${
                   paymentMethod === 'pix' 
@@ -218,13 +232,89 @@ export default function Checkout() {
               >
                 <QrCode className="w-5 h-5" /> PIX
               </button>
+              <button
+                onClick={() => setPaymentMethod('card')}
+                className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg border font-medium transition-all ${
+                  paymentMethod === 'card' 
+                    ? 'border-blue-600 bg-blue-50 text-blue-700' 
+                    : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                }`}
+              >
+                <CreditCard className="w-5 h-5" /> Cartão
+              </button>
             </div>
 
             {errorMsg && (
-                <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg">{errorMsg}</div>
+                <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 text-sm rounded-lg flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4"/> {errorMsg}
+                </div>
             )}
 
-            {/* Form Cartão */}
+            {/* --- CONTEÚDO PIX --- */}
+            {paymentMethod === 'pix' && (
+              <div className="space-y-6">
+                 {!pixCode ? (
+                     <div className="text-center py-8">
+                         <div className="bg-gray-50 p-6 rounded-full inline-block mb-4">
+                            <QrCode className="w-12 h-12 text-green-600" />
+                         </div>
+                         <h3 className="text-lg font-medium text-gray-900 mb-2">Pague com PIX</h3>
+                         <p className="text-gray-500 mb-6 max-w-sm mx-auto">
+                            Aprovação imediata. Gere o QR Code abaixo e pague pelo app do seu banco.
+                         </p>
+                         <button 
+                            onClick={handlePixGenerate}
+                            disabled={processing}
+                            className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-lg transition-colors flex items-center justify-center gap-2"
+                         >
+                            {processing ? <><Loader2 className="w-5 h-5 animate-spin" /> Gerando...</> : "Gerar QR Code PIX"}
+                         </button>
+                     </div>
+                 ) : (
+                     <div className="text-center py-4 animate-in fade-in duration-500">
+                         <div className="mb-6 p-4 border-2 border-green-500 border-dashed rounded-xl inline-block bg-white">
+                             {/* Mock de Imagem QR Code - Na real viria da API */}
+                             <img 
+                                src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(pixCode)}`} 
+                                alt="QR Code PIX" 
+                                className="w-48 h-48 mx-auto"
+                             />
+                         </div>
+                         
+                         <div className="mb-6">
+                            <p className="text-sm text-gray-500 mb-2">Código Copia e Cola:</p>
+                            <div className="flex gap-2">
+                                <input 
+                                    type="text" 
+                                    readOnly 
+                                    value={pixCode}
+                                    className="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs text-gray-600 font-mono"
+                                />
+                                <button 
+                                    onClick={handleCopyPix}
+                                    className="bg-gray-100 hover:bg-gray-200 text-gray-700 p-2 rounded-lg border border-gray-200 transition-colors"
+                                    title="Copiar código"
+                                >
+                                    {pixCopied ? <CheckCircle className="w-5 h-5 text-green-600"/> : <Copy className="w-5 h-5"/>}
+                                </button>
+                            </div>
+                            {pixCopied && <p className="text-green-600 text-xs mt-1 font-medium">Código copiado!</p>}
+                         </div>
+
+                         <div className="bg-blue-50 p-4 rounded-lg text-left">
+                             <h4 className="font-semibold text-blue-900 text-sm mb-2">Como pagar?</h4>
+                             <ol className="list-decimal list-inside text-sm text-blue-800 space-y-1">
+                                 <li>Abra o app do seu banco.</li>
+                                 <li>Escolha a opção <strong>PIX</strong>.</li>
+                                 <li>Selecione <strong>Ler QR Code</strong> ou <strong>PIX Copia e Cola</strong>.</li>
+                             </ol>
+                         </div>
+                     </div>
+                 )}
+              </div>
+            )}
+
+            {/* --- CONTEÚDO CARTÃO --- */}
             {paymentMethod === 'card' && (
               <form onSubmit={handleCreditCardSubmit} className="space-y-4">
                 <div>
@@ -257,12 +347,6 @@ export default function Checkout() {
                   {processing ? <><Loader2 className="w-5 h-5 animate-spin" /> Processando...</> : <><CheckCircle className="w-5 h-5" /> Pagar R$ {planDetails.price.toFixed(2)}</>}
                 </button>
               </form>
-            )}
-
-            {paymentMethod === 'pix' && (
-              <div className="text-center py-8">
-                <p>Implementar PIX aqui</p>
-              </div>
             )}
           </div>
         </div>
