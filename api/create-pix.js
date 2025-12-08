@@ -12,27 +12,27 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   try {
-    console.log("--> [API] Iniciando com Autenticação Dupla (Docs)...");
+    console.log("--> [API] Iniciando processamento Pix...");
 
-    // ============================================================
-    // COLE SUAS CHAVES AQUI (DENTRO DAS ASPAS):
-    // ============================================================
-    const publicKey = "rafaelzanin_tcy9tsl2402e90an"; 
-    const secretKey = "qrmhhjnlrugspa070mv7u63n1999m7pb9i4h48vdc62y9ufbd7ajrxxsfj815ng8";
-    // ============================================================
+    // CARREGA AS CHAVES DO AMBIENTE SEGURO (VERCEL)
+    const publicKey = process.env.NEON_PUBLIC_KEY;
+    const secretKey = process.env.NEON_SECRET_KEY;
+
+    if (!publicKey || !secretKey) {
+        console.error("ERRO: Chaves NEON não configuradas no painel da Vercel.");
+        return res.status(500).json({ erro: "CONFIG_ERROR", mensagem: "Erro de configuração no servidor." });
+    }
 
     let bodyData = req.body;
     if (typeof bodyData === 'string') bodyData = JSON.parse(bodyData);
 
     const url = 'https://app.neonpay.com.br/api/v1/gateway/pix/receive';
     
-    console.log(`--> Enviando para: ${url}`);
-
+    // Envia para a Neon
     const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        // HEADER OFICIAL CONFORME DOCUMENTAÇÃO:
         'x-public-key': publicKey,
         'x-secret-key': secretKey
       },
@@ -40,10 +40,11 @@ export default async function handler(req, res) {
     });
 
     const data = await response.json();
-    console.log("--> [API] Status:", response.status);
-
+    
     if (!response.ok) {
-        console.error("--> [API] Erro detalhado:", JSON.stringify(data, null, 2));
+        console.error("--> [API] Erro Neon:", JSON.stringify(data, null, 2));
+    } else {
+        console.log("--> [API] Pix gerado com sucesso (200 OK)");
     }
 
     return res.status(response.status).json(data);
