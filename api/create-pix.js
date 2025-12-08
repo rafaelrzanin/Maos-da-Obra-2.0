@@ -6,35 +6,35 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,POST');
   res.setHeader(
     'Access-Control-Allow-Headers',
-    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization'
+    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization, x-public-key, x-secret-key'
   );
 
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   try {
-    console.log("--> [API] Iniciando com Basic Auth...");
+    console.log("--> [API] Iniciando com Autenticação Dupla (Docs)...");
 
-    // 1. SUA CHAVE AQUI (Mantenha Hardcoded para o teste final)
-    const apiKey = "qrmhhjnlrugspa070mv7u63n1999m7pb9i4h48vdc62y9ufbd7ajrxxsfj815ng8"; 
-
-    // 2. CODIFICAÇÃO PARA BASIC AUTH
-    // O padrão é "Basic <base64(chave:)>" (Note os dois pontos no final da chave)
-    const basicAuth = 'Basic ' + Buffer.from(apiKey + ':').toString('base64');
+    // ============================================================
+    // COLE SUAS CHAVES AQUI (DENTRO DAS ASPAS):
+    // ============================================================
+    const publicKey = "rafaelzanin_tcy9tsl2402e90an"; 
+    const secretKey = "qrmhhjnlrugspa070mv7u63n1999m7pb9i4h48vdc62y9ufbd7ajrxxsfj815ng8";
+    // ============================================================
 
     let bodyData = req.body;
     if (typeof bodyData === 'string') bodyData = JSON.parse(bodyData);
 
-    // 3. URL CORRETA (A que respondeu 401 antes)
     const url = 'https://app.neonpay.com.br/api/v1/gateway/pix/receive';
     
     console.log(`--> Enviando para: ${url}`);
-    console.log(`--> Header Auth: ${basicAuth.substring(0, 20)}...`);
 
     const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': basicAuth // <--- Aqui está o segredo
+        // HEADER OFICIAL CONFORME DOCUMENTAÇÃO:
+        'x-public-key': publicKey,
+        'x-secret-key': secretKey
       },
       body: JSON.stringify(bodyData)
     });
