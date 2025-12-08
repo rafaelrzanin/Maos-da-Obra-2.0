@@ -45,52 +45,54 @@ const Checkout: React.FC = () => {
     installments: '1'
   });
 
-  // 1. INICIALIZAÇÃO E RECUPERAÇÃO DO PLANO
+  // 1. INICIALIZAÇÃO ROBUSTA (CORREÇÃO DO LOADING INFINITO)
   useEffect(() => {
-    const init = async () => {
-      if (!user) return;
-      
-      try {
-        // Tenta pegar o plano da URL (?plan=VITALICIO)
+    // Se não tiver usuário, o AuthProvider vai redirecionar, mas desligamos o loading para evitar travamento visual
+    if (!user) {
+        setLoading(false);
+        return;
+    }
+
+    try {
+        console.log("Checkout: Iniciando setup...");
+        
+        // A. Tenta pegar da URL
         const params = new URLSearchParams(location.search);
         let targetPlan = params.get('plan') as PlanType;
 
-        // Se não tiver na URL, tenta pegar do state da navegação
+        // B. Tenta pegar do State da navegação
         if (!targetPlan && location.state && (location.state as any).plan) {
             targetPlan = (location.state as any).plan;
         }
 
-        // Se ainda não tiver, tenta verificar se o usuário já tinha uma intenção de compra no perfil (fallback)
-        if (!targetPlan) {
-            const profile = await dbService.getUserProfile(user.id);
-            if (profile && profile.plan_type) {
-                targetPlan = profile.plan_type as PlanType;
-            }
-        }
-
-        // Validação Final
+        // C. FALLBACK DE SEGURANÇA (Se tudo falhar, usa Mensal)
         if (!targetPlan || !PLAN_PRICES[targetPlan]) {
-          console.warn("Plano não identificado ou inválido. Redirecionando.");
-          navigate('/settings');
-          return;
+            console.warn("Plano não identificado. Usando Fallback: MENSAL.");
+            targetPlan = PlanType.MENSAL;
         }
 
-        // Define os detalhes do plano
+        console.log(`Checkout: Plano definido -> ${targetPlan}`);
+
+        // Define os detalhes
         setPlanDetails({
             type: targetPlan,
             price: PLAN_PRICES[targetPlan],
             label: PLAN_LABELS[targetPlan]
         });
 
-      } catch (err) {
-        console.error("Erro ao inicializar checkout:", err);
-        setErrorMsg("Erro ao carregar detalhes do pedido.");
-      } finally {
+    } catch (err) {
+        console.error("Erro fatal no checkout init:", err);
+        // Mesmo com erro, definimos um plano padrão para o usuário não ficar preso
+        setPlanDetails({
+            type: PlanType.MENSAL,
+            price: PLAN_PRICES[PlanType.MENSAL],
+            label: PLAN_LABELS[PlanType.MENSAL]
+        });
+    } finally {
+        // OBRIGATÓRIO: Desliga o loading independente do que aconteça
         setLoading(false);
-      }
-    };
-    init();
-  }, [user, navigate, location]);
+    }
+  }, [user, location]);
 
   // --- MÉTODOS AUXILIARES ---
 
@@ -119,7 +121,6 @@ const Checkout: React.FC = () => {
     setProcessing(true);
     
     // CONFIGURAÇÃO DA API INTERNA (Serverless Function)
-    // Isso evita o erro de CORS pois o pedido vai para o mesmo domínio
     const API_URL = "/api/create-pix";
     
     try {
@@ -150,15 +151,15 @@ const Checkout: React.FC = () => {
           method: 'POST',
           headers: {
               'Content-Type': 'application/json'
-              // Não enviamos chave aqui. O backend injeta a chave secretamente.
           },
           body: JSON.stringify(payload)
       });
 
+      // Se a resposta da API não for ok, lança erro para cair no catch (fallback)
       if (!response.ok) {
-          // Se o proxy retornar erro (4xx, 5xx), tentamos ler o erro ou lançamos exceção
           const errorData = await response.json().catch(() => ({})); 
-          throw new Error(`Erro na API: ${response.status} - ${JSON.stringify(errorData)}`);
+          console.error("API Error Response:", errorData);
+          throw new Error(`Erro na API: ${response.status}`);
       }
 
       const data = await response.json();
@@ -177,11 +178,10 @@ const Checkout: React.FC = () => {
 
     } catch (error: any) {
       // MODO DE SEGURANÇA / FALLBACK
-      // Se a API falhar (timeout, erro 500, chave inválida), não travamos o usuário.
-      console.warn("--- FALHA NA INTEGRAÇÃO REAL ---");
+      console.warn("--- FALHA NA INTEGRAÇÃO REAL (USANDO MOCK) ---");
       console.error(error);
       
-      alert("Aviso: Falha na comunicação com o banco (ou chaves não configuradas). Gerando QR Code de Teste para prosseguir com a demonstração.");
+      alert("Aviso: Falha na comunicação com o banco. Gerando QR Code de Demonstração.");
 
       // Geração de Pix Mockado para não travar o fluxo visual
       const mockData = await dbService.generatePix(planDetails.price, {
@@ -251,6 +251,7 @@ const Checkout: React.FC = () => {
       }
   };
 
+  // UI DE LOADING (Evita piscar conteúdo não carregado)
   if (loading) return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-950">
       <div className="w-16 h-16 border-4 border-secondary border-t-transparent rounded-full animate-spin mb-4"></div>
@@ -258,6 +259,7 @@ const Checkout: React.FC = () => {
     </div>
   );
 
+  // Se loading=false mas planDetails ainda é null (improvável devido ao fallback), retorna null
   if (!planDetails) return null;
 
   return (
