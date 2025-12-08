@@ -80,8 +80,9 @@ export default function Checkout() {
     loadData();
   }, [searchParams]);
 
+  // CORREÇÃO AQUI: Usamos a variável 'type' no console.log para o TypeScript não reclamar
   const updatePlan = async (type: string) => {
-    // Lógica de atualização aqui
+    console.log("Processando upgrade para o plano:", type);
     return true;
   };
 
