@@ -23,7 +23,7 @@ interface CardData {
 }
 
 export default function Checkout() {
-  const [searchParams, setSearchParams] = useSearchParams(); // Agora usamos setSearchParams para trocar URL se precisar
+  const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
 
   // Estados
@@ -41,42 +41,49 @@ export default function Checkout() {
     number: '', name: '', expiry: '', cvv: '', installments: 1
   });
 
-  // 1. Carregar Dados e Lógica de Preço
-  // Função extraída para poder ser chamada ao trocar de plano manualmente
+  // Função centralizada para definir o plano
   const definePlan = (planId: string | null) => {
-    if (planId === 'semestral') {
+    // Normaliza para minúsculo para evitar erro de digitação (ex: Semestral vs semestral)
+    const normalizedPlan = planId?.toLowerCase() || 'mensal';
+
+    if (normalizedPlan === 'semestral') {
         setPlanDetails({ 
             id: 'semestral', name: 'Plano Semestral', price: 97.00, type: 'semestral', period: '6 meses'
         });
-    } else if (planId === 'vitalicio') {
+    } else if (normalizedPlan === 'vitalicio') {
         setPlanDetails({ 
-            id: 'vitalicio', name: 'Acesso Vitalício', price: 197.00, type: 'vitalicio', period: 'Acesso Único'
+            id: 'vitalicio', name: 'Acesso Vitalício', price: 247.00, type: 'vitalicio', period: 'Acesso Único'
         });
     } else {
-        // Default
+        // Default: Mensal
         setPlanDetails({ 
             id: 'mensal', name: 'Plano Mensal', price: 29.90, type: 'mensal', period: 'Mensal'
         });
     }
   };
 
+  // 1. Carregar Dados ao Abrir a Tela
   useEffect(() => {
     const loadData = async () => {
-      const planId = searchParams.get('plan');
-      console.log("Plano recebido na URL:", planId); // Debug
+      // Pega o parâmetro 'plan' da URL (ex: ?plan=semestral)
+      const urlPlan = searchParams.get('plan');
+      console.log("URL detectada com plano:", urlPlan); // Debug no console
       
       setUser({ id: 'user_123', name: 'Usuário', email: 'usuario@email.com' });
-      definePlan(planId);
+      
+      // Define o plano IMEDIATAMENTE baseado na URL
+      definePlan(urlPlan);
+      
       setLoading(false);
     };
 
     loadData();
   }, [searchParams]);
 
-  // Handler para troca manual de plano no UI
+  // Handler para troca manual (Seletor)
   const handlePlanSwitch = (newPlan: string) => {
-      setSearchParams({ plan: newPlan }); // Atualiza URL
-      definePlan(newPlan); // Atualiza Estado Local
+      setSearchParams({ plan: newPlan });
+      definePlan(newPlan);
   };
 
   const updatePlan = async (type: string) => {
@@ -144,7 +151,7 @@ export default function Checkout() {
   if (!planDetails) return <div className="fixed inset-0 z-50 bg-[#172134] text-white p-10">Plano não encontrado.</div>;
 
   return (
-    // FIX DE LAYOUT: "fixed inset-0 z-50 overflow-y-auto" força tela cheia sobrepondo tudo
+    // FIX DE LAYOUT: Tela cheia forçada
     <div className="fixed inset-0 z-50 overflow-y-auto bg-[#172134] font-sans selection:bg-[#bc5a08] selection:text-white">
       
       {/* Background Decorativo */}
@@ -156,7 +163,7 @@ export default function Checkout() {
       <div className="min-h-screen flex items-center justify-center p-4 sm:p-6 lg:p-8 relative z-10">
         <div className="max-w-6xl w-full grid grid-cols-1 lg:grid-cols-5 gap-8">
             
-            {/* ESQUERDA: BRANDING & RESUMO */}
+            {/* ESQUERDA: INFO DO PEDIDO */}
             <div className="lg:col-span-2 flex flex-col justify-center space-y-8 lg:pr-8">
                 {/* LOGO */}
                 <div className="flex items-center gap-4">
@@ -172,34 +179,36 @@ export default function Checkout() {
                     </div>
                 </div>
 
-                {/* INFO DO PLANO COM SELETOR MANUAL (CORREÇÃO DO PROBLEMA DO 97/29) */}
+                {/* INFO DO PLANO E SELETOR */}
                 <div className="space-y-4">
                     <h2 className="text-gray-400 text-sm font-medium uppercase tracking-wider">Você está assinando:</h2>
                     
-                    {/* Botões para troca rápida de plano caso o link esteja errado */}
-                    <div className="flex gap-2 mb-4">
+                    {/* Seletor visual (Botões) */}
+                    <div className="flex flex-wrap gap-2 mb-4">
                         <button 
                             onClick={() => handlePlanSwitch('mensal')}
-                            className={`px-3 py-1 text-xs rounded-full border transition-all ${planDetails.id === 'mensal' ? 'bg-[#bc5a08] border-[#bc5a08] text-white' : 'border-gray-700 text-gray-400 hover:border-gray-500'}`}
+                            className={`px-4 py-2 text-xs font-medium rounded-lg border transition-all ${planDetails.id === 'mensal' ? 'bg-[#bc5a08] border-[#bc5a08] text-white shadow-lg shadow-orange-900/20' : 'border-gray-700 text-gray-400 hover:border-gray-500 bg-white/5'}`}
                         >
                             Mensal
                         </button>
                         <button 
                             onClick={() => handlePlanSwitch('semestral')}
-                            className={`px-3 py-1 text-xs rounded-full border transition-all ${planDetails.id === 'semestral' ? 'bg-[#bc5a08] border-[#bc5a08] text-white' : 'border-gray-700 text-gray-400 hover:border-gray-500'}`}
+                            className={`px-4 py-2 text-xs font-medium rounded-lg border transition-all ${planDetails.id === 'semestral' ? 'bg-[#bc5a08] border-[#bc5a08] text-white shadow-lg shadow-orange-900/20' : 'border-gray-700 text-gray-400 hover:border-gray-500 bg-white/5'}`}
                         >
                             Semestral
                         </button>
                         <button 
                             onClick={() => handlePlanSwitch('vitalicio')}
-                            className={`px-3 py-1 text-xs rounded-full border transition-all ${planDetails.id === 'vitalicio' ? 'bg-[#bc5a08] border-[#bc5a08] text-white' : 'border-gray-700 text-gray-400 hover:border-gray-500'}`}
+                            className={`px-4 py-2 text-xs font-medium rounded-lg border transition-all ${planDetails.id === 'vitalicio' ? 'bg-[#bc5a08] border-[#bc5a08] text-white shadow-lg shadow-orange-900/20' : 'border-gray-700 text-gray-400 hover:border-gray-500 bg-white/5'}`}
                         >
                             Vitalício
                         </button>
                     </div>
 
-                    <div className="text-4xl font-bold text-white tracking-tight">{planDetails.name}</div>
-                    <div className="text-3xl font-bold flex items-baseline gap-1" style={{ color: '#bc5a08' }}>
+                    <div className="text-4xl font-bold text-white tracking-tight animate-in fade-in duration-300">
+                        {planDetails.name}
+                    </div>
+                    <div className="text-3xl font-bold flex items-baseline gap-1 animate-in fade-in duration-300" style={{ color: '#bc5a08' }}>
                         R$ {planDetails.price.toFixed(2)}
                         <span className="text-sm font-normal text-gray-400">/{planDetails.period}</span>
                     </div>
