@@ -27,16 +27,11 @@ export default async function handler(req, res) {
         return res.status(500).json({ erro: "CONFIG_ERROR", mensagem: "Chaves de API (NEON_PUBLIC_KEY ou NEON_SECRET_KEY) não configuradas." });
     }
     
-    // --- CORREÇÃO DE URL BASE: USANDO A URL DA DOCUMENTAÇÃO ---
+    // --- URL BASE: (Confirmada pela documentação) ---
     const API_BASE_URL = process.env.NEON_API_BASE_URL || 'https://app.neonpay.com.br/api/v1';
 
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
     const { amount, card, client, installments, planType } = body;
-
-    // --- NOVO LOG DE DEBUGGING: Verifica se o documento está a chegar ---
-    // Logamos o que está em client.document (se for undefined, indica erro no frontend)
-    console.log("--> [CARTÃO] Documento recebido do front-end (Debug):", client.document);
-    // -------------------------------------------------------------------
 
     // Validação de segurança: o documento não pode ser nulo ou vazio
     if (!client.document || client.document.length < 11) {
@@ -63,6 +58,12 @@ export default async function handler(req, res) {
     const anoCompleto = `20${anoCurto}`;
     const expiresAtFormatado = `${anoCompleto}-${mes}`;
 
+    // --- CORREÇÃO DE FORMATO DO NOME DO TITULAR (Titular Limpo e Tratado) ---
+    const cleanOwnerName = card.name
+        .toUpperCase()
+        .replace(/[^A-Z\s]/g, '') // Remove caracteres especiais
+        .substring(0, 60); // Limita o tamanho
+
     // 4. Monta o Payload (Dados)
     let payload = {
         identifier: body.identifier || `txn_${Date.now()}`,
@@ -72,13 +73,11 @@ export default async function handler(req, res) {
             name: client.name,
             email: client.email,
             phone: client.phone,
-            // CORREÇÃO ESSENCIAL: Garante que o documento (CPF/CNPJ) seja incluído
             document: client.document, 
             address: { 
                 country: "BR",
                 state: "SP",
                 city: "São Paulo",
-                // Necessário para validação da Neon
                 neighborhood: "Centro", 
                 zipCode: "01001-000",
                 street: "Rua Digital",
@@ -87,7 +86,7 @@ export default async function handler(req, res) {
         },
         card: {
             number: card.number.replace(/\s/g, ''),
-            owner: card.name, 
+            owner: cleanOwnerName, // Usa o nome limpo e formatado
             expiresAt: expiresAtFormatado, // Formato YYYY-MM
             cvv: card.cvv
         }
@@ -120,7 +119,7 @@ export default async function handler(req, res) {
     }
 
     // Loga o payload que está sendo enviado (sem os dados sensíveis do cartão)
-    const logPayload = { ...payload, card: { number: card.number.substring(0, 4) + '****', owner: card.name, expiresAt: expiresAtFormatado, cvv: '***' } };
+    const logPayload = { ...payload, card: { number: card.number.substring(0, 4) + '****', owner: cleanOwnerName, expiresAt: expiresAtFormatado, cvv: '***' } };
     console.log("--> [CARTÃO] Payload sendo enviado (Debug):", JSON.stringify(logPayload, null, 2));
 
     // URL COMPLETA para envio: API_BASE_URL + subEndpoint
