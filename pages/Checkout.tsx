@@ -72,18 +72,19 @@ export default function Checkout() {
       }
 
       const parsedUser = JSON.parse(savedUser);
+      let documentValue = parsedUser.cpf || parsedUser.document || parsedUser.id_doc;
 
       // --- VALIDAÇÃO CRÍTICA DO CPF/DOCUMENTO (Força o retorno ao registro se CPF faltar) ---
-      if (!parsedUser.cpf) {
-         setErrorMsg("Erro: CPF/Documento não foi salvo no registro. Redirecionando...");
-         // Força o usuário a voltar ao registro para preencher o campo obrigatório
-         navigate(`/register?plan=${searchParams.get('plan') || 'mensal'}`); 
+      if (!documentValue) {
+         setErrorMsg("Erro: CPF/Documento não foi salvo no registro. Por favor, registre novamente.");
          setLoading(false);
+         // Não usa 'navigate' aqui para evitar erros de ciclo/405
          return;
       }
       // ---------------------------------------------------------------------------------------
 
-      setUser(parsedUser);
+      // Atualiza o user com o CPF encontrado para ser consistente com o backend
+      setUser({ ...parsedUser, cpf: documentValue, document: documentValue });
 
       // 2. Definir Plano
       let planId = searchParams.get('plan');
@@ -328,4 +329,24 @@ const handleCreditCardSubmit = async (e: React.FormEvent) => {
                         <div><label className="block text-xs font-bold text-gray-400 mb-2 uppercase ml-1">Nome Completo</label><input type="text" name="name" placeholder="Como no cartão" value={cardData.name} onChange={(e) => setCardData({...cardData, name: e.target.value.toUpperCase()})} className="w-full bg-[#0f1623] border border-gray-700 text-white px-4 py-4 rounded-xl focus:ring-1 focus:ring-[#bc5a08] outline-none" required /></div>
                         <div className="grid grid-cols-2 gap-5">
                             <div><label className="block text-xs font-bold text-gray-400 mb-2 uppercase ml-1">Validade</label><input type="text" name="expiry" placeholder="MM/AA" value={cardData.expiry} onChange={handleInputChange} className="w-full bg-[#0f1623] border border-gray-700 text-white px-4 py-4 rounded-xl focus:ring-1 focus:ring-[#bc5a08] outline-none text-center" required /></div>
-                            <div><label className="block text-xs font-bold text-gray-400 mb-2 uppercase ml-1">CVV</label><div className="relative"><input type="text" name="cvv" placeholder="123"
+                            <div><label className="block text-xs font-bold text-gray-400 mb-2 uppercase ml-1">CVV</label><div className="relative"><input type="text" name="cvv" placeholder="123" value={cardData.cvv} onChange={handleInputChange} className="w-full bg-[#0f1623] border border-gray-700 text-white px-4 py-4 rounded-xl focus:ring-1 focus:ring-[#bc5a08] outline-none text-center" required /><ShieldCheck className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500" size={16} /></div></div>
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-gray-400 mb-2 uppercase ml-1">Parcelamento</label>
+                            <div className="relative"><select name="installments" value={cardData.installments} onChange={handleInputChange} className="w-full bg-[#0f1623] border border-gray-700 text-white px-4 py-4 rounded-xl focus:ring-1 focus:ring-[#bc5a08] outline-none appearance-none cursor-pointer"><option value={1}>1x de R$ {planDetails?.price.toFixed(2)} (Sem juros)</option><option value={2}>2x de R$ {(planDetails?.price! / 2).toFixed(2)}</option><option value={3}>3x de R$ {(planDetails?.price! / 3).toFixed(2)}</option></select><ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 w-4 h-4 pointer-events-none" /></div>
+                        </div>
+                        <button type="submit" disabled={processing} className="w-full mt-4 text-white font-bold py-4 rounded-xl shadow-lg hover:shadow-orange-900/20 flex items-center justify-center gap-2 disabled:opacity-50" style={{ backgroundColor: '#bc5a08' }}>{processing ? <><Loader2 className="animate-spin" /> Processando...</> : `Pagar R$ ${planDetails?.price.toFixed(2)}`}</button>
+                        
+                        <div className="text-center pt-2">
+                            <span className="text-xs text-gray-500 flex items-center justify-center gap-1"><ShieldCheck size={12} /> Ambiente seguro e criptografado</span>
+                        </div>
+                    </form>
+                )}
+
+               </div>
+              </div>
+        </div>
+      </div>
+    </div>
+  );
+}
