@@ -53,9 +53,8 @@ export default function Checkout() {
     }
   };
 
-  // --- FUNÇÃO DE REDIRECIONAMENTO CORRIGIDA (DEFINIDA UMA ÚNICA VEZ) ---
+  // --- FUNÇÃO DE REDIRECIONAMENTO CORRIGIDA (DOMÍNIO REAL) ---
   const redirectToDashboard = () => {
-    // Limpa dados temporários e navega para o Dashboard no domínio real
     localStorage.removeItem('tempUser'); 
     window.location.href = "https://www.maosdaobra.online/dashboard"; 
   }
@@ -228,7 +227,6 @@ export default function Checkout() {
                     <div className="flex-1 min-w-0">
                         <p className="text-xs text-gray-400 uppercase font-bold">Conta Criada</p>
                         <p className="text-white font-medium truncate">{user.name}</p>
-                        <p className="text-xs text-gray-500 truncate">{user.email}</p>
                     </div>
                     <button onClick={() => navigate('/register')} className="text-xs text-[#bc5a08] hover:text-white underline">Alterar</button>
                 </div>
