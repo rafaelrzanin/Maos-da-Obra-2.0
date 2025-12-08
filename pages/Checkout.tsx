@@ -73,12 +73,12 @@ export default function Checkout() {
 
       const parsedUser = JSON.parse(savedUser);
 
-      // --- VALIDAÇÃO CRÍTICA DO CPF/DOCUMENTO (Novo) ---
-      // Se o user não tiver o campo 'cpf', não deve prosseguir para evitar o erro da Neon Pay.
+      // --- VALIDAÇÃO CRÍTICA DO CPF/DOCUMENTO ---
+      // Se o user não tiver o campo 'cpf', ele é inválido.
       if (!parsedUser.cpf) {
-         setErrorMsg("Erro: CPF/Documento não foi salvo corretamente no passo de registro.");
+         setErrorMsg("Erro: CPF/Documento não foi salvo no registro. Volte e preencha.");
          setLoading(false);
-         // Opcional: Redirecionar para o registro se o dado estiver faltando
+         // Opcional: Descomente para forçar o usuário a voltar ao registro
          // navigate(`/register?plan=${searchParams.get('plan') || 'mensal'}`); 
          return;
       }
@@ -110,6 +110,9 @@ export default function Checkout() {
       setErrorMsg('');
       try {
           if (!user || !planDetails) throw new Error("Dados do usuário ou plano ausentes.");
+          // Validação de documento na geração PIX
+          if (!user.cpf) throw new Error("CPF/Documento está faltando no registro.");
+
 
           // O clientPayload para PIX já inclui o CPF
           const clientPayload = {
@@ -160,8 +163,9 @@ export default function Checkout() {
  // --- FUNÇÃO DE PAGAMENTO COM CARTÃO (CORRIGIDA) ---
 const handleCreditCardSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!planDetails || !user || !user.cpf) { // Validação forte do CPF/Documento
-       setErrorMsg("Erro: CPF/Documento não foi carregado corretamente para o usuário.");
+    // Validação forte do CPF/Documento
+    if (!planDetails || !user || !user.cpf) { 
+       setErrorMsg("Erro: CPF/Documento não foi carregado corretamente para o usuário. Volte e registre novamente.");
        return;
     } 
     setErrorMsg('');
@@ -172,7 +176,7 @@ const handleCreditCardSubmit = async (e: React.FormEvent) => {
         if (cardData.cvv.length < 3) throw new Error("CVV inválido");
 
         // --- CORREÇÃO: Cria o objeto client com o 'document' (CPF) ---
-        // O valor user.cpf VEM do localStorage, por isso é crucial que ele exista.
+        // O valor user.cpf VEM do localStorage, e o backend precisa do 'document'.
         const clientPayload = {
             name: user.name,
             email: user.email,
@@ -340,7 +344,7 @@ const handleCreditCardSubmit = async (e: React.FormEvent) => {
                 )}
 
                </div>
-            </div>
+              </div>
         </div>
       </div>
     </div>
