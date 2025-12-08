@@ -72,7 +72,6 @@ export default function Checkout() {
       }
 
       const parsedUser = JSON.parse(savedUser);
-      // Fallback para ler documento de qualquer propriedade que contenha o CPF/CNPJ
       let documentValue = parsedUser.cpf || parsedUser.document || parsedUser.id_doc;
 
       // --- VALIDAÇÃO CRÍTICA DO CPF/DOCUMENTO ---
@@ -184,8 +183,8 @@ const handleCreditCardSubmit = async (e: React.FormEvent) => {
         };
         // -------------------------------------------------------------
 
-        // --- CORREÇÃO DE URL: Usando URL Absoluta para contornar roteamento do Vercel ---
-        const apiUrl = `https://${window.location.host}/api/create-card`;
+        // --- CORREÇÃO DE URL: Voltando para o URL Relativo (Padrão Next.js/Vercel) ---
+        const apiUrl = '/api/create-card';
 
 
         const response = await fetch(apiUrl, {
@@ -204,7 +203,7 @@ const handleCreditCardSubmit = async (e: React.FormEvent) => {
         
         // Se a resposta for 405, lança um erro para mostrar a mensagem
         if (response.status === 405) {
-             throw new Error("Erro de Servidor (405): O servidor Vercel bloqueou o método POST. O roteamento da API está incorreto.");
+             throw new Error("Erro de Servidor (405): O servidor Vercel bloqueou o método POST. O ficheiro create-card.js precisa de ser reimplantado.");
         }
 
         const result = await response.json();
