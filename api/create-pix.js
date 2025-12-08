@@ -19,8 +19,14 @@ export default async function handler(req, res) {
   try {
     console.log("--> [API] Iniciando processamento...");
 
-    // 2. Carrega a Chave API
-    const apiKey = process.env.NEON_SECRET_KEY;
+    // 2. Carrega a Chave API (MODO TESTE DIRETO)
+    // const apiKey = process.env.NEON_SECRET_KEY; <--- Comente esta linha
+    
+    // COLE SUA CHAVE NEON DENTRO DAS ASPAS ABAIXO:
+    const apiKey = "qrmhhjnlrugspa070mv7u63n1999m7pb9i4h48vdc62y9ufbd7ajrxxsfj815ng8"; 
+    
+    // Garanta que o Header use o Bearer padrão
+    const authHeader = `Bearer ${apiKey}`;
     
     // DEBUG: Mostra no log se a chave foi lida (sem vazar a senha toda)
     if (apiKey) {
@@ -42,12 +48,12 @@ export default async function handler(req, res) {
 
     console.log("--> [API] Enviando para Neon Pay...");
 
-    // 4. Chama a Neon
+   // 4. Chama a Neon
     const response = await fetch('https://app.neonpay.com.br/api/v1/gateway/pix/receive', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': apiKey // Autenticação Bearer Padrão
+        'Authorization': authHeader // Usando a variável que criamos acima
       },
       body: JSON.stringify(bodyData)
     });
