@@ -2,7 +2,10 @@ import React, { useState, useEffect, createContext, useContext } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { User, PlanType } from './types';
 import { dbService } from './services/db';
+
+// Pages
 import Login from './pages/Login';
+import Register from './pages/Register'; // NOVO: Tela de Cadastro
 import Dashboard from './pages/Dashboard';
 import CreateWork from './pages/CreateWork';
 import WorkDetail from './pages/WorkDetail';
@@ -139,7 +142,7 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
   );
 };
 
-// Layout Component
+// Layout Component (PROTECTED ROUTES)
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, logout, isSubscriptionValid, refreshUser, updatePlan } = useAuth();
   const { theme, toggleTheme } = useTheme();
@@ -175,9 +178,9 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
   // 3. Check Subscription (Strict Blockade)
   const isSettingsPage = location.pathname === '/settings';
-  const isCheckoutPage = location.pathname === '/checkout'; // Allow access to checkout even if expired
+  // Note: Checkout is now handled outside Layout, so we don't need to check it here anymore
   
-  if (!isSubscriptionValid && !isSettingsPage && !isCheckoutPage) {
+  if (!isSubscriptionValid && !isSettingsPage) {
       return <Navigate to="/settings" replace />;
   }
 
@@ -284,7 +287,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       {/* Main Content */}
       <main className="flex-1 p-4 md:p-8 overflow-y-auto h-auto min-h-[calc(100vh-64px)] md:min-h-screen bg-surface dark:bg-slate-950 transition-colors duration-300 print:overflow-visible print:h-auto print:min-h-0 print:block print:p-0 print:bg-white scroll-smooth">
         {/* If blocked, show a header indicating why */}
-        {!isSubscriptionValid && isSettingsPage && !isCheckoutPage && (
+        {!isSubscriptionValid && isSettingsPage && (
             <div className="bg-red-500 text-white p-4 rounded-xl mb-6 shadow-lg flex items-center justify-between">
                 <div className="flex items-center gap-3">
                     <i className="fa-solid fa-lock text-2xl"></i>
@@ -308,12 +311,16 @@ const App: React.FC = () => {
       <ThemeProvider>
         <AuthProvider>
           <Routes>
+            {/* ROTAS PÚBLICAS / ONBOARDING */}
             <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+            <Route path="/checkout" element={<Checkout />} />
+
+            {/* ROTAS PROTEGIDAS (DENTRO DO APP) */}
             <Route path="/" element={<Layout><Dashboard /></Layout>} />
             <Route path="/create" element={<Layout><CreateWork /></Layout>} />
             <Route path="/work/:id" element={<Layout><WorkDetail /></Layout>} />
             <Route path="/settings" element={<Layout><Settings /></Layout>} />
-            <Route path="/checkout" element={<Layout><Checkout /></Layout>} />
             <Route path="/profile" element={<Layout><Profile /></Layout>} />
             <Route path="/tutorials" element={<Layout><VideoTutorials /></Layout>} />
           </Routes>
