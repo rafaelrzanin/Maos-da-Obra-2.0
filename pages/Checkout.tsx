@@ -2,10 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { 
   CreditCard, QrCode, ShieldCheck, Loader2, CheckCircle, 
-  Copy, HardHat, Check, Lock, ChevronDown, UserCheck
-} from 'lucide-react';
+  Copy, HardHat, ChevronDown, UserCheck, AlertTriangle
+} from 'lucide-react'; 
+// REMOVIDO 'Check' e 'Lock' para corrigir erro de build
 
-// ... (Mantenha as interfaces PlanDetails e CardData iguais ao anterior) ...
 interface PlanDetails {
   id: string;
   name: string;
@@ -27,7 +27,7 @@ export default function Checkout() {
   const navigate = useNavigate();
 
   // Estados
-  const [user, setUser] = useState<any>(null); // Agora pegamos do cadastro real
+  const [user, setUser] = useState<any>(null);
   const [planDetails, setPlanDetails] = useState<PlanDetails | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<'pix' | 'card'>('pix'); 
   const [loading, setLoading] = useState(true);
@@ -54,16 +54,13 @@ export default function Checkout() {
 
   useEffect(() => {
     const loadData = async () => {
-      // 1. Recuperar Usuário do Passo Anterior (Register)
+      // 1. Recuperar Usuário
       const savedUser = localStorage.getItem('tempUser');
-      
-      // Se não tiver usuário, manda voltar pro cadastro (Segurança de Fluxo)
       if (!savedUser) {
           const currentPlan = searchParams.get('plan') || 'mensal';
           navigate(`/register?plan=${currentPlan}`);
           return;
       }
-
       setUser(JSON.parse(savedUser));
 
       // 2. Definir Plano
@@ -84,7 +81,6 @@ export default function Checkout() {
       definePlan(newPlan);
   };
 
-  // --- API HANDLERS (Igual ao anterior, mas agora usa o user real) ---
   const handlePixGenerate = async () => {
       setProcessing(true);
       setErrorMsg('');
@@ -95,7 +91,7 @@ export default function Checkout() {
               body: JSON.stringify({
                   amount: planDetails?.price,
                   description: `Mãos da Obra - ${planDetails?.name}`,
-                  payer: user // Enviando CPF, Nome, Email reais
+                  payer: user
               })
           });
           const data = await response.json();
@@ -125,16 +121,14 @@ export default function Checkout() {
                 installments: cardData.installments,
                 planType: planDetails.type,
                 card: { ...cardData, number: cleanNumber },
-                client: user // Enviando dados reais do cadastro
+                client: user
             })
         });
         const result = await response.json();
         if (!response.ok) throw new Error(result.message || "Transação recusada.");
 
-        // SUCESSO REAL: Vai direto para o APP (Dashboard)
-        // Aqui você faria o Login automático. Vamos simular mandando pro /app
         alert("Pagamento Aprovado! Entrando no App...");
-        window.location.href = "https://app.maosdaobra.com.br"; // Link do seu App final
+        window.location.href = "https://app.maosdaobra.com.br"; 
 
     } catch (err: any) {
         setErrorMsg(err.message || "Erro ao processar cartão.");
@@ -158,7 +152,6 @@ export default function Checkout() {
   
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-[#172134] font-sans selection:bg-[#bc5a08] selection:text-white">
-      {/* ... (BACKGROUND E LAYOUT IGUAIS AO ANTERIOR) ... */}
       <div className="fixed top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
         <div className="absolute -top-[20%] -left-[10%] w-[50%] h-[50%] rounded-full bg-blue-600/10 blur-[120px]"></div>
         <div className="absolute top-[20%] -right-[10%] w-[40%] h-[40%] rounded-full bg-[#bc5a08]/10 blur-[100px]"></div>
@@ -167,7 +160,6 @@ export default function Checkout() {
       <div className="min-h-screen flex items-center justify-center p-4 sm:p-6 lg:p-8 relative z-10">
         <div className="max-w-6xl w-full grid grid-cols-1 lg:grid-cols-5 gap-8">
             
-            {/* ESQUERDA: AGORA MOSTRA O USUÁRIO LOGADO */}
             <div className="lg:col-span-2 flex flex-col justify-center space-y-8 lg:pr-8">
                 <div className="flex items-center gap-4">
                     <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg transform rotate-6" style={{ backgroundColor: '#bc5a08', boxShadow: '0 10px 25px -5px rgba(188, 90, 8, 0.4)' }}>
@@ -179,7 +171,6 @@ export default function Checkout() {
                     </div>
                 </div>
 
-                {/* USER CARD (NOVO) */}
                 <div className="bg-white/5 border border-white/10 rounded-xl p-4 flex items-center gap-4">
                     <div className="w-10 h-10 bg-[#bc5a08]/20 rounded-full flex items-center justify-center text-[#bc5a08]">
                         <UserCheck size={20} />
@@ -194,7 +185,6 @@ export default function Checkout() {
 
                 <div className="space-y-4">
                     <h2 className="text-gray-400 text-sm font-medium uppercase tracking-wider">Plano Selecionado:</h2>
-                    {/* (Seletor de Planos igual ao anterior...) */}
                     <div className="flex flex-wrap gap-2 mb-4">
                         <button onClick={() => handlePlanSwitch('mensal')} className={`px-4 py-2 text-xs font-medium rounded-lg border transition-all ${planDetails?.id === 'mensal' ? 'bg-[#bc5a08] border-[#bc5a08] text-white' : 'border-gray-700 text-gray-400 hover:border-gray-500 bg-white/5'}`}>Mensal</button>
                         <button onClick={() => handlePlanSwitch('semestral')} className={`px-4 py-2 text-xs font-medium rounded-lg border transition-all ${planDetails?.id === 'semestral' ? 'bg-[#bc5a08] border-[#bc5a08] text-white' : 'border-gray-700 text-gray-400 hover:border-gray-500 bg-white/5'}`}>Semestral</button>
@@ -208,14 +198,9 @@ export default function Checkout() {
                 </div>
             </div>
 
-            {/* DIREITA: APENAS O PAGAMENTO (Igual ao código anterior) */}
             <div className="lg:col-span-3">
                <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-3xl p-6 sm:p-8 shadow-2xl">
-                  {/* ... (CÓDIGO DAS ABAS PIX/CARTÃO E FORMULÁRIO - MANTENHA IGUAL AO ANTERIOR) ... */}
-                  {/* Vou simplificar aqui, mas você COPIA O BLOCO DO FORMULÁRIO DO CÓDIGO ANTERIOR */}
-                  {/* A única diferença é que ao dar SUCESSO, ele redireciona para o APP e não para Success Page */}
                   
-                  {/* Abas */}
                 <div className="flex bg-[#0f1623] p-1 rounded-xl mb-8 border border-white/5">
                     <button onClick={() => setPaymentMethod('pix')} className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg text-sm font-semibold transition-all duration-300 ${paymentMethod === 'pix' ? 'bg-[#172134] text-white shadow-lg border border-gray-700' : 'text-gray-400 hover:text-white'}`}>
                         <QrCode size={18} /> PIX
@@ -225,9 +210,8 @@ export default function Checkout() {
                     </button>
                 </div>
 
-                {errorMsg && <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 text-red-400 text-sm rounded-xl">{errorMsg}</div>}
+                {errorMsg && <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 text-red-400 text-sm rounded-xl flex items-center gap-3"><AlertTriangle className="flex-shrink-0" />{errorMsg}</div>}
 
-                {/* PIX */}
                 {paymentMethod === 'pix' && (
                     <div className="text-center py-4">
                         {!pixCode ? (
@@ -247,7 +231,6 @@ export default function Checkout() {
                     </div>
                 )}
 
-                {/* CARTÃO */}
                 {paymentMethod === 'card' && (
                     <form onSubmit={handleCreditCardSubmit} className="space-y-5">
                         <div><label className="block text-xs font-bold text-gray-400 mb-2 uppercase ml-1">Número do Cartão</label><div className="relative"><input type="text" name="number" placeholder="0000 0000 0000 0000" value={cardData.number} onChange={handleInputChange} className="w-full bg-[#0f1623] border border-gray-700 text-white px-4 py-4 rounded-xl focus:ring-1 focus:ring-[#bc5a08] outline-none pl-12" required /><CreditCard className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={20} /></div></div>
@@ -261,6 +244,10 @@ export default function Checkout() {
                             <div className="relative"><select name="installments" value={cardData.installments} onChange={handleInputChange} className="w-full bg-[#0f1623] border border-gray-700 text-white px-4 py-4 rounded-xl focus:ring-1 focus:ring-[#bc5a08] outline-none appearance-none cursor-pointer"><option value={1}>1x de R$ {planDetails?.price.toFixed(2)} (Sem juros)</option><option value={2}>2x de R$ {(planDetails?.price! / 2).toFixed(2)}</option><option value={3}>3x de R$ {(planDetails?.price! / 3).toFixed(2)}</option></select><ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 w-4 h-4 pointer-events-none" /></div>
                         </div>
                         <button type="submit" disabled={processing} className="w-full mt-4 text-white font-bold py-4 rounded-xl shadow-lg hover:shadow-orange-900/20 flex items-center justify-center gap-2 disabled:opacity-50" style={{ backgroundColor: '#bc5a08' }}>{processing ? <><Loader2 className="animate-spin" /> Processando...</> : `Pagar R$ ${planDetails?.price.toFixed(2)}`}</button>
+                        
+                        <div className="text-center pt-2">
+                            <span className="text-xs text-gray-500 flex items-center justify-center gap-1"><ShieldCheck size={12} /> Ambiente seguro e criptografado</span>
+                        </div>
                     </form>
                 )}
 
