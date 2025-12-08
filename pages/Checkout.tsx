@@ -117,9 +117,10 @@ const Checkout: React.FC = () => {
     try {
       console.log("--- [PASSO 1] Iniciando Processo Pix ---");
 
-      // 1. Preparar Dados (com timeout para não travar se o banco demorar)
-      let cpf = '00000000000';
-      let phone = '00000000000';
+      // 1. Preparar Dados
+      // DICA: Usamos este CPF válido pro "Plano B" funcionar na Neon caso o banco falhe
+      let cpf = '50689991568'; 
+      let phone = '19996779999';
 
       try {
           const timeout = new Promise((_, reject) => setTimeout(() => reject("Timeout Banco"), 2000));
