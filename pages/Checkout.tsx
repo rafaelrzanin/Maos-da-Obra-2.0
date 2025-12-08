@@ -53,6 +53,14 @@ export default function Checkout() {
     }
   };
 
+  // --- FUNÇÃO DE REDIRECIONAMENTO CORRIGIDA (USANDO O DOMÍNIO REAL) ---
+  const redirectToDashboard = () => {
+    localStorage.removeItem('tempUser'); 
+    window.location.href = "https://www.maosdaobra.online/dashboard"; 
+  }
+  // --- FIM FUNÇÃO CORRIGIDA ---
+
+
   useEffect(() => {
     const loadData = async () => {
       // 1. Recuperar Usuário do Passo Anterior (Register)
@@ -99,7 +107,7 @@ export default function Checkout() {
 
           const payload = {
               identifier: `MDO-${Date.now()}`,
-              amount: planDetails.price, 
+              amount: planDetails.price, 
               client: clientPayload,
               dueDate: new Date(Date.now() + (86400000 * 2)).toISOString().split('T')[0],
               metadata: {
@@ -162,7 +170,7 @@ export default function Checkout() {
 
         // SUCESSO REAL (Cartão): Redireciona para o App
         localStorage.removeItem('tempUser'); 
-        window.location.href = "https://app.maosdaobra.com.br/dashboard"; 
+        window.location.href = "https://www.maosdaobra.online/dashboard"; // CORRIGIDO PARA O DOMÍNIO REAL
 
     } catch (err: any) {
         setErrorMsg(err.message || "Erro ao processar cartão.");
@@ -184,10 +192,10 @@ export default function Checkout() {
   };
 
   // --- LÓGICA INJETADA: Redirecionamento final após pagamento PIX ---
-  const redirectToAppLogic = () => {
+  const redirectToDashboard = () => {
     // Limpa dados temporários e navega para o Dashboard
     localStorage.removeItem('tempUser'); 
-    window.location.href = "https://app.maosdaobra.com.br/dashboard"; 
+    window.location.href = "https://www.maosdaobra.online/dashboard"; // USANDO O DOMÍNIO REAL
   }
   // --- FIM LÓGICA INJETADA ---
 
@@ -281,10 +289,10 @@ export default function Checkout() {
                                 <div className="bg-white p-4 rounded-xl inline-block shadow-lg"><img src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(pixCode)}`} alt="QR Code" className="w-48 h-48" /></div>
                                 <div className="bg-[#0f1623] p-4 rounded-xl border border-white/5 text-left"><label className="text-xs text-gray-500 mb-2 block uppercase font-bold">Copia e Cola</label><div className="flex gap-2"><input readOnly value={pixCode} className="w-full bg-transparent border-none text-gray-300 text-xs font-mono p-0 truncate outline-none" /><button onClick={handleCopyPix} className="text-[#bc5a08] hover:text-white transition-colors">{pixCopied ? <CheckCircle size={20} /> : <Copy size={20} />}</button></div></div>
                                 
-                                {/* BOTÃO INJETADO PARA ACESSAR O APP */}
-                                <button onClick={redirectToAppLogic} className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 rounded-xl transition-all shadow-lg shadow-green-900/20 flex items-center justify-center gap-2">
-                                    JÁ PAGUEI! ACESSAR O APP
-                                </button>
+                                {/* BOTÃO INJETADO PARA ACESSAR O APP */}
+                                <button onClick={redirectToDashboard} className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 rounded-xl transition-all shadow-lg shadow-green-900/20 flex items-center justify-center gap-2">
+                                    JÁ PAGUEI! ACESSAR O APP
+                                </button>
                             </div>
                         )}
                     </div>
@@ -313,6 +321,7 @@ export default function Checkout() {
 
                </div>
             </div>
+           
         </div>
       </div>
     </div>
