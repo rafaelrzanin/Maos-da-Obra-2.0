@@ -3,7 +3,7 @@ import {
   PlanType, WorkStatus, StepStatus, Notification,
   Supplier, Worker, ExpenseCategory
 } from '../types';
-import { FULL_MATERIAL_PACKAGES, STANDARD_JOB_ROLES, STANDARD_SUPPLIER_CATEGORIES } from './standards';
+import { FULL_MATERIAL_PACKAGES, STANDARD_JOB_ROLES, STANDARD_SUPPLIER_CATEGORIES, WORK_TEMPLATES } from './standards';
 import { supabase } from './supabase';
 
 // --- LOCAL STORAGE FALLBACK CONSTANTS ---
@@ -186,7 +186,7 @@ const getExpensesInternal = async (workId: string): Promise<Expense[]> => {
             paidAmount: Number(e.paid_amount) || 0,
             amount: Number(e.amount) || 0,
             stepId: e.step_id,
-            workerId: e.worker_id,
+            worker_id: e.worker_id,
             relatedMaterialId: e.related_material_id
         }));
     } else {
@@ -197,34 +197,6 @@ const getExpensesInternal = async (workId: string): Promise<Expense[]> => {
             paidAmount: Number(e.paidAmount) || 0
         })));
     }
-};
-
-interface PlanItem {
-  stepName: string;
-  duration: number;
-  startOffset: number;
-  materials: {
-      name: string;
-      unit: string;
-      qty: number;
-  }[];
-}
-
-interface ConstructionDetails {
-    bedrooms?: number;
-    bathrooms?: number;
-    kitchens?: number;
-    livingRooms?: number;
-    hasLeisureArea?: boolean;
-}
-
-// --- ENGINE: SMART PLAN GENERATOR ---
-const generateSmartPlan = (_templateId: string, _totalArea: number, _floors: number, _details?: ConstructionDetails): PlanItem[] => {
-    // Simplified Mock Implementation for MVP to avoid unused var errors
-    // In production, this would use the arguments to generate a specific plan
-    const plan: PlanItem[] = [];
-    plan.push({ stepName: "Início", duration: 1, startOffset: 0, materials: [] });
-    return plan; 
 };
 
 // --- SERVICE LAYER ---
@@ -482,26 +454,127 @@ export const dbService = {
   },
 
   createWork: async (work: Omit<Work, 'id' | 'status'>, templateId: string): Promise<Work> => {
+    // SUPABASE IMPLEMENTATION
+    if (supabase) {
+        // 1. Insert Work
+        const { data, error } = await supabase
+            .from('works')
+            .insert({
+                user_id: work.userId,
+                name: work.name,
+                address: work.address,
+                budget_planned: work.budgetPlanned,
+                start_date: work.startDate,
+                end_date: work.endDate,
+                area: work.area,
+                floors: work.floors || 1,
+                notes: work.notes
+            })
+            .select()
+            .single();
+
+        if (error) {
+            console.error("Error creating work in Supabase:", error);
+            throw error;
+        }
+
+        const createdWork: Work = {
+            ...data,
+            userId: data.user_id,
+            budgetPlanned: data.budget_planned,
+            startDate: data.start_date,
+            endDate: data.end_date,
+            floors: data.floors || 1,
+            status: WorkStatus.PLANNING // Default status
+        };
+
+        // 2. Generate Steps from Template
+        const template = WORK_TEMPLATES.find(t => t.id === templateId);
+        const stepsToInsert = [];
+
+        if (template) {
+            const stepDuration = Math.max(1, Math.floor(template.defaultDurationDays / template.includedSteps.length));
+            let currentOffset = 0;
+
+            for (const stepName of template.includedSteps) {
+                const sDate = new Date(work.startDate);
+                sDate.setDate(sDate.getDate() + currentOffset);
+                
+                const eDate = new Date(sDate);
+                eDate.setDate(eDate.getDate() + stepDuration);
+
+                stepsToInsert.push({
+                    work_id: createdWork.id,
+                    name: stepName,
+                    start_date: sDate.toISOString().split('T')[0],
+                    end_date: eDate.toISOString().split('T')[0],
+                    status: 'NAO_INICIADO'
+                });
+                
+                currentOffset += stepDuration;
+            }
+        } else {
+             // Fallback default step if template not found
+             stepsToInsert.push({
+                 work_id: createdWork.id,
+                 name: 'Início da Obra',
+                 start_date: work.startDate,
+                 end_date: work.endDate,
+                 status: 'NAO_INICIADO'
+             });
+        }
+
+        if (stepsToInsert.length > 0) {
+            const { error: stepsError } = await supabase.from('steps').insert(stepsToInsert);
+            if (stepsError) console.error("Error creating steps:", stepsError);
+        }
+
+        return createdWork;
+    } 
+    
+    // LOCAL STORAGE IMPLEMENTATION (Fallback)
     const db = getLocalDb();
     const created: Work = { ...work, id: Math.random().toString(36).substr(2, 9), status: WorkStatus.PLANNING, floors: work.floors || 1 };
     db.works.push(created);
-    saveLocalDb(db);
     
-    // Generate simple steps based on template (Mock)
-    const steps = generateSmartPlan(templateId, work.area, work.floors || 1);
-    steps.forEach(s => {
+    // Generate steps based on template
+    const template = WORK_TEMPLATES.find(t => t.id === templateId);
+    
+    if (template) {
+        const stepDuration = Math.max(1, Math.floor(template.defaultDurationDays / template.includedSteps.length));
+        let currentOffset = 0;
+        
+        template.includedSteps.forEach(s => {
+            const sDate = new Date(work.startDate);
+            sDate.setDate(sDate.getDate() + currentOffset);
+            
+            const eDate = new Date(sDate);
+            eDate.setDate(eDate.getDate() + stepDuration);
+
+            db.steps.push({
+                id: Math.random().toString(36).substr(2, 9),
+                workId: created.id,
+                name: s,
+                startDate: sDate.toISOString().split('T')[0],
+                endDate: eDate.toISOString().split('T')[0],
+                status: StepStatus.NOT_STARTED,
+                isDelayed: false
+            });
+            currentOffset += stepDuration;
+        });
+    } else {
         db.steps.push({
             id: Math.random().toString(36).substr(2, 9),
             workId: created.id,
-            name: s.stepName,
+            name: "Início da Obra",
             startDate: work.startDate,
             endDate: work.endDate,
             status: StepStatus.NOT_STARTED,
             isDelayed: false
         });
-    });
-    saveLocalDb(db);
+    }
     
+    saveLocalDb(db);
     return created;
   },
 
@@ -793,7 +866,7 @@ export const dbService = {
                      url,
                      type: file.type,
                      date: new Date().toISOString()
-                 });
+                  });
                  saveLocalDb(db);
                  resolve(url);
              } else resolve(null);
