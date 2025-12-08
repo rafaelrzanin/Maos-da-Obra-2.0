@@ -45,9 +45,8 @@ const Checkout: React.FC = () => {
     installments: '1'
   });
 
-  // 1. INICIALIZAÇÃO ROBUSTA (CORREÇÃO DO LOADING INFINITO)
+  // 1. INICIALIZAÇÃO ROBUSTA
   useEffect(() => {
-    // Se não tiver usuário, o AuthProvider vai redirecionar, mas desligamos o loading para evitar travamento visual
     if (!user) {
         setLoading(false);
         return;
@@ -65,7 +64,7 @@ const Checkout: React.FC = () => {
             targetPlan = (location.state as any).plan;
         }
 
-        // C. FALLBACK DE SEGURANÇA (Se tudo falhar, usa Mensal)
+        // C. FALLBACK DE SEGURANÇA
         if (!targetPlan || !PLAN_PRICES[targetPlan]) {
             console.warn("Plano não identificado. Usando Fallback: MENSAL.");
             targetPlan = PlanType.MENSAL;
@@ -73,7 +72,6 @@ const Checkout: React.FC = () => {
 
         console.log(`Checkout: Plano definido -> ${targetPlan}`);
 
-        // Define os detalhes
         setPlanDetails({
             type: targetPlan,
             price: PLAN_PRICES[targetPlan],
@@ -82,14 +80,12 @@ const Checkout: React.FC = () => {
 
     } catch (err) {
         console.error("Erro fatal no checkout init:", err);
-        // Mesmo com erro, definimos um plano padrão para o usuário não ficar preso
         setPlanDetails({
             type: PlanType.MENSAL,
             price: PLAN_PRICES[PlanType.MENSAL],
             label: PLAN_LABELS[PlanType.MENSAL]
         });
     } finally {
-        // OBRIGATÓRIO: Desliga o loading independente do que aconteça
         setLoading(false);
     }
   }, [user, location]);
@@ -115,12 +111,13 @@ const Checkout: React.FC = () => {
     setCardData(prev => ({ ...prev, [name]: value }));
   };
 
+  // --- AQUI ESTÁ A CORREÇÃO PRINCIPAL ---
   const handleGeneratePix = async () => {
     if (!user || !planDetails) return;
     setErrorMsg('');
     setProcessing(true);
     
-    // CONFIGURAÇÃO DA API INTERNA (Serverless Function)
+    // Rota da sua API na Vercel
     const API_URL = "/api/create-pix";
     
     try {
@@ -129,12 +126,8 @@ const Checkout: React.FC = () => {
       const cpf = (profile?.cpf || '00000000000').replace(/\D/g, '');
       const phone = (profile?.whatsapp || '0000000000').replace(/\D/g, '');
       
-      // UUID único para esta transação
-      const identifier = generateUUID();
-
-      // Body do pedido
       const payload = {
-        identifier: identifier,
+        identifier: generateUUID(),
         amount: planDetails.price, 
         client: {
           name: user.name,
@@ -144,9 +137,8 @@ const Checkout: React.FC = () => {
         }
       };
 
-      console.log("--- INICIANDO REQUEST PIX (VIA PROXY) ---");
+      console.log("--- ENVIANDO PEDIDO PIX ---");
       
-      // TENTATIVA DE INTEGRAÇÃO REAL VIA BACKEND
       const response = await fetch(API_URL, {
           method: 'POST',
           headers: {
@@ -155,35 +147,46 @@ const Checkout: React.FC = () => {
           body: JSON.stringify(payload)
       });
 
-      // Se a resposta da API não for ok, lança erro para cair no catch (fallback)
       if (!response.ok) {
           const errorData = await response.json().catch(() => ({})); 
-          console.error("API Error Response:", errorData);
-          throw new Error(`Erro na API: ${response.status}`);
+          console.error("Erro na API:", errorData);
+          throw new Error(errorData.mensagem || `Erro HTTP: ${response.status}`);
       }
 
       const data = await response.json();
+      console.log("Resposta Recebida do Backend:", data);
       
-      // Verifica sucesso na estrutura da Neon
-      if (data && (data.qrcode || data.emv)) {
+      // --- LÓGICA DE PARSING DA NEON PAY ---
+      // A Neon retorna: { point_of_interaction: { transaction_data: { qr_code_base64, qr_code } } }
+      const neonData = data.point_of_interaction?.transaction_data;
+
+      if (neonData && neonData.qr_code_base64) {
+          setPixData({
+              qr_code_base64: neonData.qr_code_base64, 
+              // Na Neon, o campo 'qr_code' contém a string copia-e-cola
+              copy_paste_code: neonData.qr_code 
+          });
+          setProcessing(false); // Para o loading
+          return; 
+      }
+      
+      // Fallback para outros formatos (caso mude o gateway no futuro)
+      if (data.qrcode || data.emv || data.payload) {
           setPixData({
               qr_code_base64: data.qrcode?.base64 || data.qrcode || '', 
               copy_paste_code: data.emv || data.qrcode?.emv || data.code || ''
           });
           setProcessing(false);
-          return; 
+          return;
       }
       
-      throw new Error("Resposta da API incompleta ou inválida");
+      throw new Error("Estrutura de resposta desconhecida (QR Code não encontrado).");
 
     } catch (error: any) {
-      // MODO DE SEGURANÇA / FALLBACK
-      console.warn("--- FALHA NA INTEGRAÇÃO REAL (USANDO MOCK) ---");
-      console.error(error);
-      
-      alert("Aviso: Falha na comunicação com o banco. Gerando QR Code de Demonstração.");
+      console.error("Falha ao gerar Pix Real:", error);
+      alert("Aviso: Houve uma falha na comunicação bancária. Gerando QR Code de demonstração.");
 
-      // Geração de Pix Mockado para não travar o fluxo visual
+      // Geração de Pix Mockado (Fallback)
       const mockData = await dbService.generatePix(planDetails.price, {
         name: user.name,
         email: user.email,
@@ -192,6 +195,7 @@ const Checkout: React.FC = () => {
       setPixData(mockData);
 
     } finally {
+      // Garante que o loading pare sempre
       setProcessing(false);
     }
   };
@@ -204,12 +208,10 @@ const Checkout: React.FC = () => {
     setProcessing(true);
 
     try {
-        // Validação básica frontend
         if (cardData.number.length < 16) throw new Error("Número do cartão inválido");
         if (cardData.cvv.length < 3) throw new Error("CVV inválido");
         if (!cardData.expiry.includes('/')) throw new Error("Validade inválida");
 
-        // SIMULAÇÃO DE PROCESSAMENTO DE CARTÃO
         await new Promise(resolve => setTimeout(resolve, 2000));
         
         const success = true; 
@@ -251,7 +253,7 @@ const Checkout: React.FC = () => {
       }
   };
 
-  // UI DE LOADING (Evita piscar conteúdo não carregado)
+  // UI DE LOADING
   if (loading) return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-950">
       <div className="w-16 h-16 border-4 border-secondary border-t-transparent rounded-full animate-spin mb-4"></div>
@@ -259,7 +261,6 @@ const Checkout: React.FC = () => {
     </div>
   );
 
-  // Se loading=false mas planDetails ainda é null (improvável devido ao fallback), retorna null
   if (!planDetails) return null;
 
   return (
