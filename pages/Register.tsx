@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react'; // Removi o useEffect daqui
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { HardHat, ArrowRight, User, Mail, Lock, Phone, FileText, Loader2, ShieldCheck } from 'lucide-react';
 
@@ -36,10 +36,7 @@ export default function Register() {
     e.preventDefault();
     setIsLoading(true);
 
-    // SIMULAÇÃO: Aqui você enviaria para sua API de criar usuário (Supabase/Auth)
-    // await authService.signUp(...)
-    
-    // Por enquanto, salvamos no LocalStorage para o Checkout usar esses dados
+    // Salva no LocalStorage para o Checkout usar
     localStorage.setItem('tempUser', JSON.stringify({
       ...formData,
       cpf: formData.cpf.replace(/\D/g, '') // Salva CPF limpo
@@ -47,7 +44,6 @@ export default function Register() {
 
     // Delay premium para sensação de processamento
     setTimeout(() => {
-        // Redireciona para o Checkout mantendo o plano
         navigate(`/checkout?plan=${planParam}`);
     }, 1500);
   };
