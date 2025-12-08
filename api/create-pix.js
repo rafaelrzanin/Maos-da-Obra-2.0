@@ -1,48 +1,53 @@
 // api/create-pix.js
 export default async function handler(req, res) {
-  // CORS
+  // Configuração CORS Padrão
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,POST');
   res.setHeader(
     'Access-Control-Allow-Headers',
-    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization'
+    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization, Token, x-api-key'
   );
 
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   try {
-    console.log("--> [API] Iniciando (Tentativa Basic Auth)...");
+    console.log("--> [API] Iniciando tentativa com URL correta...");
 
-    // --- COLOQUE SUA CHAVE AQUI DENTRO DAS ASPAS ---
-    const apiKey = "qrmhhjnlrugspa070mv7u63n1999m7pb9i4h48vdc62y9ufbd7ajrxxsfj815ng8"; 
-    // -----------------------------------------------
+    // 1. SUA CHAVE AQUI (Mantenha Hardcoded para testar)
+    // Se a chave não funcionar aqui, ela está inválida ou expirada.
+    const apiKey = "SUA-CHAVE-AQUI-COLE-DENTRO-DAS-ASPAS"; 
 
-    // TRANSFORMA EM BASIC AUTH (Codifica para Base64)
-    // O padrão é "Basic chave:senha". Como não tem senha, usamos "chave:"
-    const basicAuth = 'Basic ' + Buffer.from(apiKey + ':').toString('base64');
-
+    // Tratamento do Body
     let bodyData = req.body;
     if (typeof bodyData === 'string') bodyData = JSON.parse(bodyData);
 
-    // LOG DE SEGURANÇA (Para conferir se o header está sendo gerado)
-    console.log(`--> Header Gerado: ${basicAuth.substring(0, 15)}...`);
+    // 2. CORREÇÃO DA URL (De 'app' para 'api')
+    const url = 'https://api.neonpay.com.br/v1/gateway/pix/receive';
+    
+    console.log(`--> Enviando para: ${url}`);
 
-    const response = await fetch('https://app.neonpay.com.br/api/v1/gateway/pix/receive', {
+    // 3. ESTRATÉGIA "SHOTGUN" (Envia a chave em todos os lugares possíveis)
+    // Assim não tem como o Gateway dizer que não viu.
+    const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': basicAuth, // Tenta Basic Auth
-        'x-api-key': apiKey         // Tenta Header alternativo (redundância)
+        // Tenta com Bearer
+        'Authorization': `Bearer ${apiKey}`,
+        // Tenta em headers alternativos que gateways costumam usar
+        'x-api-key': apiKey,
+        'Token': apiKey
       },
       body: JSON.stringify(bodyData)
     });
 
     const data = await response.json();
-    console.log("--> [API] Status Neon:", response.status);
+    console.log("--> [API] Status:", response.status);
 
     if (!response.ok) {
-        console.error("--> [API] Erro Neon:", JSON.stringify(data, null, 2));
+        // Log detalhado do erro
+        console.error("--> [API] Erro detalhado:", JSON.stringify(data, null, 2));
     }
 
     return res.status(response.status).json(data);
