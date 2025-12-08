@@ -83,31 +83,60 @@ export default function Checkout() {
       definePlan(newPlan);
   };
 
-  // --- LÓGICA DE GERAÇÃO REAL DE PIX ---
+// --- LÓGICA REAL DE GERAÇÃO DE PIX (CORRIGIDA) ---
   const handlePixGenerate = async () => {
       setProcessing(true);
       setErrorMsg('');
       try {
-          // CHAMADA REAL PARA SUA API (Neon Pay)
+          if (!user || !planDetails) throw new Error("Dados do usuário ou plano ausentes.");
+
+          // 1. PREPARAÇÃO DOS DADOS PARA O NEON PAY (CONFORME DOC)
+          const clientPayload = {
+              name: user.name,
+              email: user.email,
+              phone: user.phone.replace(/\D/g, ''), // Limpa o telefone para API
+              // O CPF deve ser formatado para passar na validação do Neon Pay
+              document: user.cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4")
+          };
+
+          const payload = {
+              identifier: `MDO-${Date.now()}`, // ID Único OBRIGATÓRIO
+              amount: planDetails.price, // Valor em Reais (Float)
+              client: clientPayload, // Objeto Cliente OBRIGATÓRIO
+              dueDate: new Date(Date.now() + (86400000 * 2)).toISOString().split('T')[0], // Vencimento em 2 dias
+              metadata: {
+                  plan_id: planDetails.id,
+                  type: 'Subscription_Acquisition'
+              }
+          };
+
+          // 2. CHAMADA REAL PARA SUA API (Neon Pay)
           const response = await fetch('/api/create-pix', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                  amount: planDetails?.price,
-                  description: `Mãos da Obra - ${planDetails?.name}`,
-                  payer: user // Dados do usuário recém-cadastrado
-              })
+              body: JSON.stringify(payload)
           });
+          
           const data = await response.json();
-          if (!response.ok) throw new Error(data.message || 'Erro ao gerar PIX');
+
+          if (!response.ok) {
+              const errorDetails = data.details ? JSON.stringify(data.details) : data.message;
+              console.error("Neon Pay Error:", errorDetails);
+              throw new Error(data.message || 'Erro ao gerar PIX. Tente novamente.');
+          }
           
-          // Verifica se o backend Neon Pay retornou o código de copia e cola (emv)
-          if (data.qrcode_text || data.emv) setPixCode(data.qrcode_text || data.emv);
-          else throw new Error("Código PIX não retornado pelo banco. Verifique as chaves Neon Pay.");
-          
+          // O retorno do Neon Pay tem o código PIX em 'pix.code' (Copia e Cola)
+          if (data.pix && data.pix.code) {
+             setPixCode(data.pix.code);
+          } else {
+             throw new Error("Neon Pay não retornou o código PIX. Verifique o Backend.");
+          }
+
       } catch (err: any) { 
-          setErrorMsg(err.message || "Erro ao gerar PIX. Tente novamente."); 
-      } finally { setProcessing(false); }
+          setErrorMsg(err.message || "Erro ao gerar PIX. Verifique as chaves e o Backend."); 
+      } finally { 
+          setProcessing(false); 
+      }
   };
 
   // --- LÓGICA DE PAGAMENTO REAL DO CARTÃO ---
