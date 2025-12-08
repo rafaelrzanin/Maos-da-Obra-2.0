@@ -74,11 +74,10 @@ export default function Checkout() {
       const parsedUser = JSON.parse(savedUser);
       let documentValue = parsedUser.cpf || parsedUser.document || parsedUser.id_doc;
 
-      // --- VALIDAÇÃO CRÍTICA DO CPF/DOCUMENTO (Força o retorno ao registro se CPF faltar) ---
+      // --- VALIDAÇÃO CRÍTICA DO CPF/DOCUMENTO ---
       if (!documentValue) {
          setErrorMsg("Erro: CPF/Documento não foi salvo no registro. Por favor, registre novamente.");
          setLoading(false);
-         // Não usa 'navigate' aqui para evitar erros de ciclo/405
          return;
       }
       // ---------------------------------------------------------------------------------------
