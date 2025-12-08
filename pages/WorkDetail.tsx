@@ -248,7 +248,7 @@ const ReportsView: React.FC<{ workId: string, onBack: () => void }> = ({ workId,
             }));
         } else if (activeTab === 'STEPS') {
             sheetName = "Cronograma";
-            data = steps.map(s => {
+            data = steps.map((s, idx) => {
                 const isLate = s.isDelayed;
                 let status = 'Planejamento';
                 if (s.status === StepStatus.COMPLETED) status = 'Concluído';
@@ -256,6 +256,7 @@ const ReportsView: React.FC<{ workId: string, onBack: () => void }> = ({ workId,
                 if (isLate) status += ' (Atrasado)';
                 
                 return {
+                    '#': idx + 1,
                     Etapa: s.name,
                     Início: formatDateDisplay(s.startDate),
                     Fim: formatDateDisplay(s.endDate),
@@ -427,7 +428,7 @@ const ReportsView: React.FC<{ workId: string, onBack: () => void }> = ({ workId,
                              <span>Etapa</span><span>Status & Prazo</span>
                          </div>
                          <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                             {steps.map(step => {
+                             {steps.map((step, idx) => {
                                  const isDone = step.status === StepStatus.COMPLETED;
                                  const isInProgress = step.status === StepStatus.IN_PROGRESS;
                                  const isNotStarted = step.status === StepStatus.NOT_STARTED;
@@ -437,7 +438,7 @@ const ReportsView: React.FC<{ workId: string, onBack: () => void }> = ({ workId,
                                      <div key={step.id} className="p-4 flex justify-between items-center hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors break-inside-avoid">
                                          <div className="flex items-center gap-3">
                                              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs text-white ${isDone ? 'bg-green-500' : isLate ? 'bg-red-500' : isInProgress ? 'bg-orange-500' : 'bg-slate-300 dark:bg-slate-700'}`}>
-                                                 <i className={`fa-solid ${isDone ? 'fa-check' : isLate ? 'fa-exclamation' : isInProgress ? 'fa-play' : 'fa-clock'}`}></i>
+                                                 {idx + 1}
                                              </div>
                                              <div>
                                                  <p className={`font-bold text-sm ${isDone ? 'text-slate-400 line-through' : 'text-primary dark:text-white'}`}>{step.name}</p>
@@ -681,10 +682,9 @@ const StepsTab: React.FC<{ workId: string, refreshWork: () => void }> = ({ workI
     <div className="animate-in fade-in duration-500">
       <div className="flex items-center justify-between mb-8"><SectionHeader title="Cronograma" subtitle="Toque para mudar o status." /><button onClick={() => setIsCreateModalOpen(true)} className="bg-primary hover:bg-slate-800 text-white w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg hover:shadow-xl transition-all hover:scale-105 active:scale-95"><i className="fa-solid fa-plus text-lg"></i></button></div>
       <div className="space-y-4">{steps.map((step, idx) => { const isComplete = step.status === StepStatus.COMPLETED; const isInProgress = step.status === StepStatus.IN_PROGRESS; 
-        // Use robust isDelayed flag from service
         const isLate = step.isDelayed; 
         
-        return (<div key={step.id} className={`group relative p-5 rounded-3xl border transition-all duration-300 ${isComplete ? 'bg-slate-50 dark:bg-slate-900 border-slate-100 dark:border-slate-800 opacity-60' : isInProgress ? 'bg-white dark:bg-slate-900 border-secondary/30 ring-1 ring-secondary/20 shadow-lg shadow-secondary/5' : isLate ? 'bg-white dark:bg-slate-900 border-red-200 dark:border-red-900/30 shadow-sm' : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 shadow-sm hover:shadow-md hover:border-slate-300'}`}>{idx < steps.length - 1 && (<div className="absolute left-9 bottom-[-20px] top-[60px] w-0.5 bg-slate-100 dark:bg-slate-800 z-0"></div>)}<div className="flex items-center gap-5 relative z-10"><button onClick={(e) => { e.stopPropagation(); toggleStatus(step); }} className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300 shadow-sm border-2 ${isComplete ? 'bg-success border-success text-white' : isInProgress ? 'bg-secondary border-secondary text-white' : isLate ? 'bg-white border-red-300 text-red-500' : 'bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-transparent hover:border-secondary'}`}><i className={`fa-solid ${isComplete ? 'fa-check' : isInProgress ? 'fa-play text-[10px]' : isLate ? 'fa-exclamation' : 'fa-check'}`}></i></button><div onClick={() => setEditingStep(step)} className="cursor-pointer flex-1"><div className="flex justify-between items-start"><h4 className={`text-base font-bold mb-1 ${isComplete ? 'line-through text-slate-400' : 'text-primary dark:text-white'}`}>{step.name}</h4><div className="opacity-0 group-hover:opacity-100 transition-opacity"><i className="fa-solid fa-pen text-slate-300 hover:text-secondary"></i></div></div><div className="flex items-center flex-wrap gap-3 text-xs font-medium"><span className="text-slate-500 dark:text-slate-400 flex items-center gap-1 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md"><i className="fa-regular fa-calendar"></i>{formatDateDisplay(step.startDate)} - {formatDateDisplay(step.endDate)}</span>{isLate && <span className="text-red-600 bg-red-50 dark:bg-red-900/20 px-2 py-0.5 rounded-md uppercase tracking-wide font-bold">Atrasado</span>}{isInProgress && <span className="text-secondary bg-orange-50 dark:bg-orange-900/20 px-2 py-0.5 rounded-md uppercase tracking-wide font-bold">Em Andamento</span>}</div></div></div></div>)})}</div>
+        return (<div key={step.id} className={`group relative p-5 rounded-3xl border transition-all duration-300 ${isComplete ? 'bg-slate-50 dark:bg-slate-900 border-slate-100 dark:border-slate-800 opacity-60' : isInProgress ? 'bg-white dark:bg-slate-900 border-secondary/30 ring-1 ring-secondary/20 shadow-lg shadow-secondary/5' : isLate ? 'bg-white dark:bg-slate-900 border-red-200 dark:border-red-900/30 shadow-sm' : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 shadow-sm hover:shadow-md hover:border-slate-300'}`}>{idx < steps.length - 1 && (<div className="absolute left-9 bottom-[-20px] top-[60px] w-0.5 bg-slate-100 dark:bg-slate-800 z-0"></div>)}<div className="flex items-center gap-5 relative z-10"><button onClick={(e) => { e.stopPropagation(); toggleStatus(step); }} className={`w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300 shadow-sm border-2 font-bold text-xs ${isComplete ? 'bg-success border-success text-white' : isInProgress ? 'bg-secondary border-secondary text-white' : isLate ? 'bg-white border-red-300 text-red-500' : 'bg-white dark:bg-slate-800 border-slate-300 dark:border-slate-600 text-slate-400 hover:border-secondary hover:text-secondary'}`}>{isComplete ? <i className="fa-solid fa-check"></i> : String(idx + 1).padStart(2, '0')}</button><div onClick={() => setEditingStep(step)} className="cursor-pointer flex-1"><div className="flex justify-between items-start"><h4 className={`text-base font-bold mb-1 ${isComplete ? 'line-through text-slate-400' : 'text-primary dark:text-white'}`}>{step.name}</h4><div className="opacity-0 group-hover:opacity-100 transition-opacity"><i className="fa-solid fa-pen text-slate-300 hover:text-secondary"></i></div></div><div className="flex items-center flex-wrap gap-3 text-xs font-medium"><span className="text-slate-500 dark:text-slate-400 flex items-center gap-1 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-md"><i className="fa-regular fa-calendar"></i>{formatDateDisplay(step.startDate)} - {formatDateDisplay(step.endDate)}</span>{isLate && <span className="text-red-600 bg-red-50 dark:bg-red-900/20 px-2 py-0.5 rounded-md uppercase tracking-wide font-bold">Atrasado</span>}{isInProgress && <span className="text-secondary bg-orange-50 dark:bg-orange-900/20 px-2 py-0.5 rounded-md uppercase tracking-wide font-bold">Em Andamento</span>}</div></div></div></div>)})}</div>
       {isCreateModalOpen && (<div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-primary/60 backdrop-blur-sm animate-in fade-in"><div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-8 shadow-2xl animate-in zoom-in-95"><h3 className="text-xl font-bold text-primary dark:text-white mb-6">Nova Etapa</h3><form onSubmit={handleCreateStep} className="space-y-5"><div><label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Nome</label><input placeholder="Ex: Pintar Sala" className="w-full px-4 py-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none" value={newStepName} onChange={e => setNewStepName(e.target.value)} required /></div><div><label className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2 block">Data</label><input type="date" className="w-full px-4 py-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none" value={newStepDate} onChange={e => setNewStepDate(e.target.value)} required /></div><div className="flex gap-3 pt-2"><button type="button" onClick={() => setIsCreateModalOpen(false)} className="flex-1 py-4 rounded-xl font-bold text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800">Cancelar</button><button type="submit" className="flex-1 py-4 rounded-xl bg-primary text-white font-bold hover:bg-slate-800 shadow-lg">Salvar</button></div></form></div></div>)}
       {editingStep && (<div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-primary/60 backdrop-blur-sm animate-in fade-in"><div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-8 shadow-2xl animate-in zoom-in-95"><div className="flex justify-between items-center mb-6"><h3 className="text-xl font-bold text-primary dark:text-white">Editar Etapa</h3><button onClick={() => handleDeleteClick(editingStep.id)} className="w-8 h-8 rounded-full bg-red-50 text-red-500 flex items-center justify-center hover:bg-red-100"><i className="fa-solid fa-trash text-sm"></i></button></div><form onSubmit={handleUpdateStep} className="space-y-5"><input className="w-full px-4 py-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white font-bold text-lg outline-none" value={editingStep.name} onChange={e => setEditingStep({...editingStep, name: e.target.value})} /><div className="grid grid-cols-2 gap-3"><div><label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Início</label><input type="date" className="w-full px-3 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm outline-none dark:text-white" value={editingStep.startDate} onChange={e => setEditingStep({...editingStep, startDate: e.target.value})} /></div><div><label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Fim</label><input type="date" className="w-full px-3 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-sm outline-none dark:text-white" value={editingStep.endDate} onChange={e => setEditingStep({...editingStep, endDate: e.target.value})} /></div></div><div className="flex gap-3 pt-2"><button type="button" onClick={() => setEditingStep(null)} className="flex-1 py-4 rounded-xl font-bold text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800">Cancelar</button><button type="submit" className="flex-1 py-4 rounded-xl bg-primary text-white font-bold hover:bg-slate-800 shadow-lg">Atualizar</button></div></form></div></div>)}
       <ZeModal isOpen={zeModal.isOpen} title={zeModal.title} message={zeModal.message} onConfirm={zeModal.onConfirm} onCancel={() => setZeModal({isOpen: false, title: '', message: '', onConfirm: () => {}})} />
@@ -708,12 +708,19 @@ const MaterialsTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ work
             dbService.getMaterials(workId),
             dbService.getSteps(workId)
         ]);
-        setSteps(stepData);
+        
+        // Ensure steps are sorted by date/sequence
+        const sortedSteps = stepData.sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
+        setSteps(sortedSteps);
+
         const grouped: Record<string, Material[]> = {};
         matData.forEach(m => {
-            const cat = m.category || 'Geral';
-            if (!grouped[cat]) grouped[cat] = [];
-            grouped[cat].push(m);
+            // Group primarily by linked Step Name, or fallback to category
+            const linkedStep = sortedSteps.find(s => s.id === m.stepId);
+            const groupKey = linkedStep ? linkedStep.name : (m.category || 'Geral');
+            
+            if (!grouped[groupKey]) grouped[groupKey] = [];
+            grouped[groupKey].push(m);
         });
         setGroupedMaterials(grouped);
     };
@@ -759,12 +766,32 @@ const MaterialsTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ work
         } 
     }
     
-    const sortedCategories = Object.keys(groupedMaterials).sort();
+    // Sort keys based on step order if possible
+    const sortedCategories = Object.keys(groupedMaterials).sort((a, b) => {
+        const indexA = steps.findIndex(s => s.name === a);
+        const indexB = steps.findIndex(s => s.name === b);
+        // If both are found in steps, sort by step index
+        if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+        // If only A is found, it comes first
+        if (indexA !== -1) return -1;
+        if (indexB !== -1) return 1;
+        // Otherwise alphabetical
+        return a.localeCompare(b);
+    });
 
     return (
         <div className="animate-in fade-in duration-500 pb-20">
             <div className="flex items-center justify-between mb-8"><SectionHeader title="Materiais" subtitle="Controle de compras e estoque." /><div className="flex gap-2"><button onClick={() => setIsImportOpen(true)} className="bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-secondary w-12 h-12 rounded-2xl flex items-center justify-center transition-all"><i className="fa-solid fa-cloud-arrow-down text-lg"></i></button><button onClick={() => setIsCreateOpen(true)} className="bg-primary text-white w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg transition-all"><i className="fa-solid fa-plus text-lg"></i></button></div></div>
-            {sortedCategories.map(cat => (<div key={cat} className="mb-8 last:mb-0"><h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2"><i className="fa-solid fa-layer-group text-secondary"></i> {cat}</h3><div className="space-y-3">{groupedMaterials[cat].map(m => {
+            {sortedCategories.map(cat => {
+                // Find index number if it's a step
+                const stepIdx = steps.findIndex(s => s.name === cat);
+                const numberPrefix = stepIdx !== -1 ? String(stepIdx + 1).padStart(2, '0') : '';
+
+                return (
+                <div key={cat} className="mb-8 last:mb-0"><h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                    {numberPrefix && <span className="text-secondary bg-secondary/10 w-6 h-6 rounded-md flex items-center justify-center text-xs">{numberPrefix}</span>}
+                    {cat}
+                </h3><div className="space-y-3">{groupedMaterials[cat].map(m => {
                 // Logic for Material Status (Pending, Partial, Completed)
                 const isCompleted = m.purchasedQty >= m.plannedQty;
                 const isPartial = m.purchasedQty > 0 && m.purchasedQty < m.plannedQty;
@@ -802,7 +829,8 @@ const MaterialsTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ work
                         </div>
                     </div>
                 );
-            })}</div></div>))}
+            })}</div></div>
+            )})}
             
             {/* IMPORT MODAL (ADDED TO FIX UNUSED VARS) */}
             {isImportOpen && (
