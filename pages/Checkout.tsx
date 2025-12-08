@@ -175,7 +175,6 @@ const handleCreditCardSubmit = async (e: React.FormEvent) => {
         if (cardData.cvv.length < 3) throw new Error("CVV inválido");
 
         // --- CORREÇÃO: Cria o objeto client com o 'document' (CPF) ---
-        // O valor user.cpf VEM do localStorage, e o backend precisa do 'document'.
         const clientPayload = {
             name: user.name,
             email: user.email,
@@ -184,7 +183,11 @@ const handleCreditCardSubmit = async (e: React.FormEvent) => {
         };
         // -------------------------------------------------------------
 
-        const response = await fetch('/api/create-card', {
+        // --- CORREÇÃO DE URL: Usando URL Absoluta para contornar roteamento do Vercel ---
+        const apiUrl = `https://${window.location.host}/api/create-card`;
+
+
+        const response = await fetch(apiUrl, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -198,6 +201,11 @@ const handleCreditCardSubmit = async (e: React.FormEvent) => {
         
         // ... restante do código de erro e sucesso
         
+        // Se a resposta for 405, lança um erro para mostrar a mensagem
+        if (response.status === 405) {
+             throw new Error("Erro de Servidor (405): Método POST não permitido. Contacte o suporte.");
+        }
+
         const result = await response.json();
         if (!response.ok) throw new Error(result.message || "Transação recusada.");
 
