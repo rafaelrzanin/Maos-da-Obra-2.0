@@ -62,12 +62,13 @@ export default async function handler(req, res) {
             name: client.name,
             email: client.email,
             phone: client.phone,
-            document: client.document,
+            // CORREÇÃO ESSENCIAL: O campo document é obrigatório pela Neon Pay.
+            document: client.document, 
             address: { 
                 country: "BR",
                 state: "SP",
                 city: "São Paulo",
-                // CORREÇÃO: Adicionando o campo 'neighborhood' (Bairro), que a API exige.
+                // Necessário para validação da Neon
                 neighborhood: "Centro", 
                 zipCode: "01001-000",
                 street: "Rua Digital",
