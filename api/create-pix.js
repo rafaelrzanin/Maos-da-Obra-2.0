@@ -16,7 +16,7 @@ export default async function handler(req, res) {
 
     // 1. SUA CHAVE AQUI (Mantenha Hardcoded para testar)
     // Se a chave não funcionar aqui, ela está inválida ou expirada.
-    const apiKey = "SUA-CHAVE-AQUI-COLE-DENTRO-DAS-ASPAS"; 
+    const apiKey = "qrmhhjnlrugspa070mv7u63n1999m7pb9i4h48vdc62y9ufbd7ajrxxsfj815ng8"; 
 
     // Tratamento do Body
     let bodyData = req.body;
