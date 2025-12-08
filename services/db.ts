@@ -100,7 +100,6 @@ const syncSupabaseUser = async (): Promise<User | null> => {
         let { data: profile } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
         
         if (!profile) {
-             // Fallback profile creation if not exists (should be handled by signup usually)
              const { data: newProfile, error } = await supabase.from('profiles').insert({
                 id: session.user.id,
                 email: session.user.email,
@@ -157,7 +156,7 @@ const getStepsInternal = async (workId: string): Promise<Step[]> => {
     const todayStr = getLocalTodayString();
     
     if (supabase) {
-        const { data } = await supabase.from('steps').select('*').eq('work_id', workId);
+        const { data } = await supabase.from('steps').select('*').eq('work_id', workId).order('start_date', { ascending: true });
         return (data || []).map(s => {
              const isDelayed = (s.status !== StepStatus.COMPLETED) && (todayStr > s.end_date);
              return {
@@ -170,7 +169,8 @@ const getStepsInternal = async (workId: string): Promise<Step[]> => {
         });
     } else {
         const db = getLocalDb();
-        return Promise.resolve(db.steps.filter(s => s.workId === workId).map(s => {
+        const steps = db.steps.filter(s => s.workId === workId).sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
+        return Promise.resolve(steps.map(s => {
             const isDelayed = (s.status !== StepStatus.COMPLETED) && (todayStr > s.endDate);
             return { ...s, isDelayed };
         }));
@@ -179,7 +179,7 @@ const getStepsInternal = async (workId: string): Promise<Step[]> => {
 
 const getExpensesInternal = async (workId: string): Promise<Expense[]> => {
     if (supabase) {
-        const { data } = await supabase.from('expenses').select('*').eq('work_id', workId);
+        const { data } = await supabase.from('expenses').select('*').eq('work_id', workId).order('date', { ascending: false });
         return (data || []).map(e => ({
             ...e,
             workId: e.work_id,
@@ -195,8 +195,23 @@ const getExpensesInternal = async (workId: string): Promise<Expense[]> => {
             ...e,
             amount: Number(e.amount) || 0,
             paidAmount: Number(e.paidAmount) || 0
-        })));
+        })).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
     }
+};
+
+// --- HELPER: MATCH MATERIAL TO STEP (Smart Linking) ---
+const findMatchingMaterials = (stepName: string) => {
+    // Normalize step name for matching (e.g., "Fundações" -> "Fundação")
+    const normalize = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    const target = normalize(stepName);
+
+    // Find a package in FULL_MATERIAL_PACKAGES that loosely matches the step name
+    const pkg = FULL_MATERIAL_PACKAGES.find(p => {
+        const cat = normalize(p.category);
+        return target.includes(cat) || cat.includes(target);
+    });
+
+    return pkg ? pkg.items : [];
 };
 
 // --- SERVICE LAYER ---
@@ -278,7 +293,6 @@ export const dbService = {
   
   signup: async (name: string, email: string, whatsapp: string, password?: string, cpf?: string, planType?: string | null): Promise<User | null> => {
     if (supabase) {
-        // 1. Create Auth User
         const { data, error } = await supabase.auth.signUp({
             email,
             password: password || '',
@@ -292,14 +306,11 @@ export const dbService = {
         
         await new Promise(r => setTimeout(r, 1000));
         
-        // 2. Update Profile with Extra Fields (CPF, Plan, etc)
-        // Note: The trigger usually creates the profile on insert, so we UPDATE here
         await supabase.from('profiles').update({ 
             name: name,
             whatsapp: whatsapp,
             cpf: cpf,
-            plan_type: planType, // Saving the plan intent (e.g. 'mensal')
-            // Don't set subscription_expires_at yet if they haven't paid, OR set to null explicitly
+            plan_type: planType, 
             subscription_expires_at: null 
         }).eq('id', data.user.id);
 
@@ -407,20 +418,19 @@ export const dbService = {
               body: { amount, customer }
           });
           if (error) throw error;
-          return data; // Expected { qr_code_base64, copy_paste_code }
+          return data;
       }
       
-      // MOCK PIX RESPONSE
       await new Promise(r => setTimeout(r, 1500));
       return {
-          qr_code_base64: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", // 1x1 Pixel Mock
+          qr_code_base64: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
           copy_paste_code: "00020126580014BR.GOV.BCB.PIX0136123e4567-e89b-12d3-a456-426614174000520400005303986540410.005802BR5913Maos Da Obra6008Brasilia62070503***6304ABCD"
       };
   },
 
   getWorks: async (userId: string): Promise<Work[]> => {
     if (supabase) {
-        const { data } = await supabase.from('works').select('*').eq('user_id', userId);
+        const { data } = await supabase.from('works').select('*').eq('user_id', userId).order('created_at', { ascending: false });
         return (data || []).map(w => ({
             ...w,
             userId: w.user_id,
@@ -453,11 +463,14 @@ export const dbService = {
     }
   },
 
+  // --- CRITICAL FIX: CREATE WORK WITH FULL BACKBONE (Steps + Linked Materials) ---
   createWork: async (work: Omit<Work, 'id' | 'status'>, templateId: string): Promise<Work> => {
-    // SUPABASE IMPLEMENTATION
+    const template = WORK_TEMPLATES.find(t => t.id === templateId);
+    
+    // 1. SUPABASE IMPLEMENTATION
     if (supabase) {
-        // 1. Insert Work
-        const { data, error } = await supabase
+        // Insert Work
+        const { data: workData, error: workError } = await supabase
             .from('works')
             .insert({
                 user_id: work.userId,
@@ -473,25 +486,19 @@ export const dbService = {
             .select()
             .single();
 
-        if (error) {
-            console.error("Error creating work in Supabase:", error);
-            throw error;
-        }
+        if (workError) throw workError;
 
-        const createdWork: Work = {
-            ...data,
-            userId: data.user_id,
-            budgetPlanned: data.budget_planned,
-            startDate: data.start_date,
-            endDate: data.end_date,
-            floors: data.floors || 1,
-            status: WorkStatus.PLANNING // Default status
+        const createdWork = {
+            ...workData,
+            userId: workData.user_id,
+            budgetPlanned: workData.budget_planned,
+            startDate: workData.start_date,
+            endDate: workData.end_date,
+            floors: workData.floors || 1,
+            status: WorkStatus.PLANNING
         };
 
-        // 2. Generate Steps from Template
-        const template = WORK_TEMPLATES.find(t => t.id === templateId);
-        const stepsToInsert = [];
-
+        // Generate Steps & Materials
         if (template) {
             const stepDuration = Math.max(1, Math.floor(template.defaultDurationDays / template.includedSteps.length));
             let currentOffset = 0;
@@ -499,78 +506,89 @@ export const dbService = {
             for (const stepName of template.includedSteps) {
                 const sDate = new Date(work.startDate);
                 sDate.setDate(sDate.getDate() + currentOffset);
-                
                 const eDate = new Date(sDate);
                 eDate.setDate(eDate.getDate() + stepDuration);
 
-                stepsToInsert.push({
+                // Insert Step
+                const { data: stepData, error: stepError } = await supabase.from('steps').insert({
                     work_id: createdWork.id,
                     name: stepName,
                     start_date: sDate.toISOString().split('T')[0],
                     end_date: eDate.toISOString().split('T')[0],
                     status: 'NAO_INICIADO'
-                });
-                
+                }).select().single();
+
+                if (!stepError && stepData) {
+                    // LINK MATERIALS TO THIS STEP
+                    const relatedMaterials = findMatchingMaterials(stepName);
+                    if (relatedMaterials.length > 0) {
+                        const materialsToInsert = relatedMaterials.map(m => ({
+                            work_id: createdWork.id,
+                            name: m.name,
+                            unit: m.unit,
+                            planned_qty: 0,
+                            purchased_qty: 0,
+                            category: stepName, // Use Step Name as Category for grouping
+                            step_id: stepData.id // LINKED!
+                        }));
+                        await supabase.from('materials').insert(materialsToInsert);
+                    }
+                }
                 currentOffset += stepDuration;
             }
-        } else {
-             // Fallback default step if template not found
-             stepsToInsert.push({
-                 work_id: createdWork.id,
-                 name: 'Início da Obra',
-                 start_date: work.startDate,
-                 end_date: work.endDate,
-                 status: 'NAO_INICIADO'
-             });
         }
-
-        if (stepsToInsert.length > 0) {
-            const { error: stepsError } = await supabase.from('steps').insert(stepsToInsert);
-            if (stepsError) console.error("Error creating steps:", stepsError);
-        }
-
         return createdWork;
     } 
     
-    // LOCAL STORAGE IMPLEMENTATION (Fallback)
+    // 2. LOCAL STORAGE IMPLEMENTATION (Fallback)
     const db = getLocalDb();
-    const created: Work = { ...work, id: Math.random().toString(36).substr(2, 9), status: WorkStatus.PLANNING, floors: work.floors || 1 };
+    const created: Work = { 
+        ...work, 
+        id: Math.random().toString(36).substr(2, 9), 
+        status: WorkStatus.PLANNING, 
+        floors: work.floors || 1 
+    };
     db.works.push(created);
-    
-    // Generate steps based on template
-    const template = WORK_TEMPLATES.find(t => t.id === templateId);
     
     if (template) {
         const stepDuration = Math.max(1, Math.floor(template.defaultDurationDays / template.includedSteps.length));
         let currentOffset = 0;
         
-        template.includedSteps.forEach(s => {
+        template.includedSteps.forEach(stepName => {
             const sDate = new Date(work.startDate);
             sDate.setDate(sDate.getDate() + currentOffset);
-            
             const eDate = new Date(sDate);
             eDate.setDate(eDate.getDate() + stepDuration);
 
+            const stepId = Math.random().toString(36).substr(2, 9);
+            
+            // Insert Step
             db.steps.push({
-                id: Math.random().toString(36).substr(2, 9),
+                id: stepId,
                 workId: created.id,
-                name: s,
+                name: stepName,
                 startDate: sDate.toISOString().split('T')[0],
                 endDate: eDate.toISOString().split('T')[0],
                 status: StepStatus.NOT_STARTED,
                 isDelayed: false
             });
+
+            // Insert Materials Linked to Step
+            const relatedMaterials = findMatchingMaterials(stepName);
+            relatedMaterials.forEach(m => {
+                db.materials.push({
+                    id: Math.random().toString(36).substr(2, 9),
+                    workId: created.id,
+                    name: m.name,
+                    unit: m.unit,
+                    plannedQty: 0,
+                    purchasedQty: 0,
+                    category: stepName,
+                    stepId: stepId // LINKED!
+                });
+            });
+
             currentOffset += stepDuration;
-        });
-    } else {
-        db.steps.push({
-            id: Math.random().toString(36).substr(2, 9),
-            workId: created.id,
-            name: "Início da Obra",
-            startDate: work.startDate,
-            endDate: work.endDate,
-            status: StepStatus.NOT_STARTED,
-            isDelayed: false
         });
     }
     
@@ -629,7 +647,11 @@ export const dbService = {
       saveLocalDb(db);
   },
   
-  getMaterials: async (workId: string) => { const db = getLocalDb(); return Promise.resolve(db.materials.filter(m => m.workId === workId)); },
+  getMaterials: async (workId: string) => { 
+      const db = getLocalDb(); 
+      // Ensure we sort materials roughly by sequence if possible, or by category
+      return Promise.resolve(db.materials.filter(m => m.workId === workId)); 
+  },
   
   addMaterial: async (material: Omit<Material, 'id'>) => {
       const db = getLocalDb();
@@ -637,6 +659,7 @@ export const dbService = {
       saveLocalDb(db);
   },
   
+  // --- UPDATED: UPDATE MATERIAL & POST FINANCE LINKED TO STEP ---
   updateMaterial: async (material: Material, cost?: number, addedQty?: number) => {
       const db = getLocalDb();
       const idx = db.materials.findIndex(m => m.id === material.id);
@@ -645,6 +668,7 @@ export const dbService = {
           saveLocalDb(db);
       }
       
+      // If purchase happened, post to finance LINKED TO THE SAME STEP
       if (cost && cost > 0) {
           await insertExpenseInternal({
               workId: material.workId,
@@ -654,7 +678,8 @@ export const dbService = {
               quantity: addedQty || 1,
               category: ExpenseCategory.MATERIAL,
               date: new Date().toISOString().split('T')[0],
-              relatedMaterialId: material.id
+              relatedMaterialId: material.id,
+              stepId: material.stepId // CRITICAL: Links financial record to the step sequence
           });
       }
   },
