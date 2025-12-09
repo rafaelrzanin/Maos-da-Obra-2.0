@@ -56,12 +56,17 @@ const getLocalDb = (): DbSchema => {
     localStorage.setItem(DB_KEY, JSON.stringify(initialDb));
     return initialDb;
   }
-  const db = JSON.parse(stored);
-  if (!db.files) db.files = [];
-  if (!db.photos) db.photos = [];
-  if (!db.suppliers) db.suppliers = [];
-  if (!db.workers) db.workers = [];
-  return db;
+  try {
+    const db = JSON.parse(stored);
+    if (!db.files) db.files = [];
+    if (!db.photos) db.photos = [];
+    if (!db.suppliers) db.suppliers = [];
+    if (!db.workers) db.workers = [];
+    if (!db.notifications) db.notifications = [];
+    return db;
+  } catch (e) {
+    return initialDb;
+  }
 };
 
 const saveLocalDb = (db: DbSchema) => {
@@ -97,10 +102,10 @@ const syncSupabaseUser = async (): Promise<User | null> => {
     const { data: { session } } = await supabase.auth.getSession();
     
     if (session?.user) {
-        let { data: profile } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
+        const { data: profile, error } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
         
-        if (!profile) {
-             const { data: newProfile, error } = await supabase.from('profiles').insert({
+        if (!profile && !error) {
+             const { data: newProfile } = await supabase.from('profiles').insert({
                 id: session.user.id,
                 email: session.user.email,
                 name: session.user.user_metadata.full_name || session.user.email?.split('@')[0] || 'Usuário',
@@ -108,8 +113,10 @@ const syncSupabaseUser = async (): Promise<User | null> => {
                 subscription_expires_at: null
              }).select().single();
              
-             if (newProfile) profile = newProfile;
-             else if (error) console.error("Error creating profile:", error);
+             if (newProfile) {
+                localStorage.setItem(SESSION_KEY, JSON.stringify(newProfile));
+                return newProfile as User;
+             }
         }
 
         if (profile) {
@@ -118,100 +125,6 @@ const syncSupabaseUser = async (): Promise<User | null> => {
         }
     }
     return null;
-};
-
-// --- INTERNAL HELPERS (Avoid Circular Dependency) ---
-const insertExpenseInternal = async (expense: Omit<Expense, 'id'>) => {
-    const safeAmount = Number(expense.amount) || 0;
-    const safePaid = Number(expense.paidAmount) || 0;
-    const safeQty = Number(expense.quantity) || 1;
-
-    if (supabase) {
-        await supabase.from('expenses').insert({
-            work_id: expense.workId,
-            description: expense.description,
-            amount: safeAmount,
-            paid_amount: safePaid,
-            quantity: safeQty,
-            category: expense.category,
-            date: expense.date,
-            step_id: expense.stepId,
-            worker_id: expense.workerId,
-            related_material_id: expense.relatedMaterialId
-        });
-    } else {
-        const db = getLocalDb();
-        db.expenses.push({ 
-            ...expense, 
-            amount: safeAmount,
-            paidAmount: safePaid,
-            quantity: safeQty,
-            id: Math.random().toString(36).substr(2, 9) 
-        });
-        saveLocalDb(db);
-    }
-};
-
-const getStepsInternal = async (workId: string): Promise<Step[]> => {
-    const todayStr = getLocalTodayString();
-    
-    if (supabase) {
-        const { data } = await supabase.from('steps').select('*').eq('work_id', workId).order('start_date', { ascending: true });
-        return (data || []).map(s => {
-             const isDelayed = (s.status !== StepStatus.COMPLETED) && (todayStr > s.end_date);
-             return {
-                 ...s,
-                 workId: s.work_id,
-                 startDate: s.start_date,
-                 endDate: s.end_date,
-                 isDelayed
-             };
-        });
-    } else {
-        const db = getLocalDb();
-        const steps = db.steps.filter(s => s.workId === workId).sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
-        return Promise.resolve(steps.map(s => {
-            const isDelayed = (s.status !== StepStatus.COMPLETED) && (todayStr > s.endDate);
-            return { ...s, isDelayed };
-        }));
-    }
-};
-
-const getExpensesInternal = async (workId: string): Promise<Expense[]> => {
-    if (supabase) {
-        const { data } = await supabase.from('expenses').select('*').eq('work_id', workId).order('date', { ascending: false });
-        return (data || []).map(e => ({
-            ...e,
-            workId: e.work_id,
-            paidAmount: Number(e.paid_amount) || 0,
-            amount: Number(e.amount) || 0,
-            stepId: e.step_id,
-            worker_id: e.worker_id,
-            relatedMaterialId: e.related_material_id
-        }));
-    } else {
-        const db = getLocalDb();
-        return Promise.resolve(db.expenses.filter(e => e.workId === workId).map(e => ({
-            ...e,
-            amount: Number(e.amount) || 0,
-            paidAmount: Number(e.paidAmount) || 0
-        })).sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
-    }
-};
-
-// --- HELPER: MATCH MATERIAL TO STEP (Smart Linking) ---
-const findMatchingMaterials = (stepName: string) => {
-    // Normalize step name for matching (e.g., "Fundações" -> "Fundação")
-    const normalize = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-    const target = normalize(stepName);
-
-    // Find a package in FULL_MATERIAL_PACKAGES that loosely matches the step name
-    const pkg = FULL_MATERIAL_PACKAGES.find(p => {
-        const cat = normalize(p.category);
-        return target.includes(cat) || cat.includes(target);
-    });
-
-    return pkg ? pkg.items : [];
 };
 
 // --- SERVICE LAYER ---
@@ -276,18 +189,13 @@ export const dbService = {
         }
         return null;
     } else {
-        return new Promise((resolve) => {
-            setTimeout(() => {
-                const db = getLocalDb();
-                const user = db.users.find(u => u.email === email);
-                if (user) {
-                    localStorage.setItem(SESSION_KEY, JSON.stringify(user));
-                    resolve(user);
-                } else {
-                    resolve(null);
-                }
-            }, 500); 
-        });
+        const db = getLocalDb();
+        const user = db.users.find(u => u.email === email);
+        if (user) {
+            localStorage.setItem(SESSION_KEY, JSON.stringify(user));
+            return user;
+        }
+        return null;
     }
   },
   
@@ -299,12 +207,7 @@ export const dbService = {
             options: { data: { name, whatsapp } }
         });
         
-        if (error || !data.user) { 
-            console.error("Signup Error", error); 
-            return null; 
-        }
-        
-        await new Promise(r => setTimeout(r, 1000));
+        if (error || !data.user) return null;
         
         await supabase.from('profiles').update({ 
             name: name,
@@ -319,28 +222,31 @@ export const dbService = {
         return profile as User;
 
     } else {
-        return new Promise((resolve) => {
-            const db = getLocalDb();
-            const newUser: User = {
-                id: Math.random().toString(36).substr(2, 9),
-                name,
-                email,
-                whatsapp,
-                cpf,
-                plan: planType as PlanType || null,
-                subscriptionExpiresAt: undefined
-            };
-            db.users.push(newUser);
-            saveLocalDb(db);
-            localStorage.setItem(SESSION_KEY, JSON.stringify(newUser));
-            resolve(newUser);
-        });
+        const db = getLocalDb();
+        const newUser: User = {
+            id: Math.random().toString(36).substr(2, 9),
+            name,
+            email,
+            whatsapp,
+            cpf,
+            plan: planType as PlanType || null,
+            subscriptionExpiresAt: undefined
+        };
+        db.users.push(newUser);
+        saveLocalDb(db);
+        localStorage.setItem(SESSION_KEY, JSON.stringify(newUser));
+        return newUser;
     }
   },
 
   getCurrentUser: (): User | null => {
     const stored = localStorage.getItem(SESSION_KEY);
-    return stored ? JSON.parse(stored) : null;
+    if (!stored) return null;
+    try {
+        return JSON.parse(stored);
+    } catch {
+        return null;
+    }
   },
 
   updateUser: async (userId: string, data: { name?: string, whatsapp?: string }, newPassword?: string): Promise<User | null> => {
@@ -401,48 +307,13 @@ export const dbService = {
      }
   },
 
-  // --- CHECKOUT & PIX HELPERS ---
   getUserProfile: async (userId: string) => {
       if (supabase) {
-          const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
-          if (error) throw error;
+          const { data } = await supabase.from('profiles').select('*').eq('id', userId).single();
           return data;
       }
       const db = getLocalDb();
       return db.users.find(u => u.id === userId);
-  },
-
-  generatePix: async (amount: number, customer: { name: string, email: string, cpf: string }) => {
-      if (supabase) {
-          const { data, error } = await supabase.functions.invoke('create-pix', {
-              body: { amount, customer }
-          });
-          if (error) throw error;
-          return data;
-      }
-      
-      await new Promise(r => setTimeout(r, 1500));
-      return {
-          qr_code_base64: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
-          copy_paste_code: "00020126580014BR.GOV.BCB.PIX0136123e4567-e89b-12d3-a456-426614174000520400005303986540410.005802BR5913Maos Da Obra6008Brasilia62070503***6304ABCD"
-      };
-  },
-
-  getWorks: async (userId: string): Promise<Work[]> => {
-    if (supabase) {
-        const { data } = await supabase.from('works').select('*').eq('user_id', userId).order('created_at', { ascending: false });
-        return (data || []).map(w => ({
-            ...w,
-            userId: w.user_id,
-            budgetPlanned: w.budget_planned,
-            startDate: w.start_date,
-            endDate: w.end_date,
-            floors: w.floors || 1
-        }));
-    } else {
-        const db = getLocalDb();
-        return Promise.resolve(db.works.filter(w => w.userId === userId));
-    }
   },
 
   getWorkById: async (workId: string): Promise<Work | undefined> => {
@@ -459,449 +330,465 @@ export const dbService = {
         };
     } else {
         const db = getLocalDb();
-        return Promise.resolve(db.works.find(w => w.id === workId));
+        return db.works.find(w => w.id === workId);
     }
   },
 
-  // --- CRITICAL FIX: CREATE WORK WITH FULL BACKBONE (Steps + Linked Materials) ---
-  createWork: async (work: Omit<Work, 'id' | 'status'>, templateId: string): Promise<Work> => {
-    const template = WORK_TEMPLATES.find(t => t.id === templateId);
-    
-    // 1. SUPABASE IMPLEMENTATION
+  getWorks: async (userId: string): Promise<Work[]> => {
     if (supabase) {
-        // Insert Work
-        const { data: workData, error: workError } = await supabase
-            .from('works')
-            .insert({
-                user_id: work.userId,
-                name: work.name,
-                address: work.address,
-                budget_planned: work.budgetPlanned,
-                start_date: work.startDate,
-                end_date: work.endDate,
-                area: work.area,
-                floors: work.floors || 1,
-                notes: work.notes
-            })
-            .select()
-            .single();
-
-        if (workError) throw workError;
-
-        const createdWork = {
-            ...workData,
-            userId: workData.user_id,
-            budgetPlanned: workData.budget_planned,
-            startDate: workData.start_date,
-            endDate: workData.end_date,
-            floors: workData.floors || 1,
-            status: WorkStatus.PLANNING
-        };
-
-        // Generate Steps & Materials
-        if (template) {
-            const stepDuration = Math.max(1, Math.floor(template.defaultDurationDays / template.includedSteps.length));
-            let currentOffset = 0;
-
-            for (const stepName of template.includedSteps) {
-                const sDate = new Date(work.startDate);
-                sDate.setDate(sDate.getDate() + currentOffset);
-                const eDate = new Date(sDate);
-                eDate.setDate(eDate.getDate() + stepDuration);
-
-                // Insert Step
-                const { data: stepData, error: stepError } = await supabase.from('steps').insert({
-                    work_id: createdWork.id,
-                    name: stepName,
-                    start_date: sDate.toISOString().split('T')[0],
-                    end_date: eDate.toISOString().split('T')[0],
-                    status: 'NAO_INICIADO'
-                }).select().single();
-
-                if (!stepError && stepData) {
-                    // LINK MATERIALS TO THIS STEP
-                    const relatedMaterials = findMatchingMaterials(stepName);
-                    if (relatedMaterials.length > 0) {
-                        const materialsToInsert = relatedMaterials.map(m => ({
-                            work_id: createdWork.id,
-                            name: m.name,
-                            unit: m.unit,
-                            planned_qty: 0,
-                            purchased_qty: 0,
-                            category: stepName, // Use Step Name as Category for grouping
-                            step_id: stepData.id // LINKED!
-                        }));
-                        await supabase.from('materials').insert(materialsToInsert);
-                    }
-                }
-                currentOffset += stepDuration;
-            }
-        }
-        return createdWork;
-    } 
-    
-    // 2. LOCAL STORAGE IMPLEMENTATION (Fallback)
-    const db = getLocalDb();
-    const created: Work = { 
-        ...work, 
-        id: Math.random().toString(36).substr(2, 9), 
-        status: WorkStatus.PLANNING, 
-        floors: work.floors || 1 
-    };
-    db.works.push(created);
-    
-    if (template) {
-        const stepDuration = Math.max(1, Math.floor(template.defaultDurationDays / template.includedSteps.length));
-        let currentOffset = 0;
-        
-        template.includedSteps.forEach(stepName => {
-            const sDate = new Date(work.startDate);
-            sDate.setDate(sDate.getDate() + currentOffset);
-            const eDate = new Date(sDate);
-            eDate.setDate(eDate.getDate() + stepDuration);
-
-            const stepId = Math.random().toString(36).substr(2, 9);
-            
-            // Insert Step
-            db.steps.push({
-                id: stepId,
-                workId: created.id,
-                name: stepName,
-                startDate: sDate.toISOString().split('T')[0],
-                endDate: eDate.toISOString().split('T')[0],
-                status: StepStatus.NOT_STARTED,
-                isDelayed: false
-            });
-
-            // Insert Materials Linked to Step
-            const relatedMaterials = findMatchingMaterials(stepName);
-            relatedMaterials.forEach(m => {
-                db.materials.push({
-                    id: Math.random().toString(36).substr(2, 9),
-                    workId: created.id,
-                    name: m.name,
-                    unit: m.unit,
-                    plannedQty: 0,
-                    purchasedQty: 0,
-                    category: stepName,
-                    stepId: stepId // LINKED!
-                });
-            });
-
-            currentOffset += stepDuration;
-        });
+        const { data } = await supabase.from('works').select('*').eq('user_id', userId).order('created_at', { ascending: false });
+        return (data || []).map(w => ({
+            ...w,
+            userId: w.user_id,
+            budgetPlanned: w.budget_planned,
+            startDate: w.start_date,
+            endDate: w.end_date,
+            floors: w.floors || 1
+        }));
+    } else {
+        const db = getLocalDb();
+        return db.works.filter(w => w.userId === userId);
     }
+  },
+
+  // Missing methods start here
+
+  calculateWorkStats: async (workId: string) => {
+    const db = getLocalDb();
+    const workExpenses = db.expenses.filter(e => e.workId === workId);
+    const totalSpent = workExpenses.reduce((acc, e) => acc + (e.amount || 0), 0);
     
+    const workSteps = db.steps.filter(s => s.workId === workId);
+    const completed = workSteps.filter(s => s.status === StepStatus.COMPLETED).length;
+    const progress = workSteps.length > 0 ? Math.round((completed / workSteps.length) * 100) : 0;
+    
+    const today = getLocalTodayString();
+    const delayedSteps = workSteps.filter(s => s.status !== StepStatus.COMPLETED && s.endDate < today).length;
+
+    return { totalSpent, progress, delayedSteps };
+  },
+
+  getDailySummary: async (workId: string) => {
+    const db = getLocalDb();
+    const today = getLocalTodayString();
+    const steps = db.steps.filter(s => s.workId === workId);
+    const delayedSteps = steps.filter(s => s.status !== StepStatus.COMPLETED && s.endDate < today).length;
+    const completedSteps = steps.filter(s => s.status === StepStatus.COMPLETED).length;
+    const pendingMaterials = db.materials.filter(m => m.workId === workId && m.purchasedQty < m.plannedQty).length;
+    
+    return { completedSteps, delayedSteps, pendingMaterials, totalSteps: steps.length };
+  },
+
+  getNotifications: async (userId: string): Promise<Notification[]> => {
+    const db = getLocalDb();
+    return db.notifications.filter(n => n.userId === userId && !n.read).sort((a,b) => b.date.localeCompare(a.date));
+  },
+
+  dismissNotification: async (notificationId: string) => {
+    const db = getLocalDb();
+    const idx = db.notifications.findIndex(n => n.id === notificationId);
+    if (idx > -1) {
+        db.notifications[idx].read = true;
+        saveLocalDb(db);
+    }
+  },
+
+  clearAllNotifications: async (userId: string) => {
+    const db = getLocalDb();
+    db.notifications = db.notifications.map(n => n.userId === userId ? { ...n, read: true } : n);
     saveLocalDb(db);
-    return created;
+  },
+
+  generateSmartNotifications: async (userId: string, workId: string) => {
+    const db = getLocalDb();
+    const today = getLocalTodayString();
+    const steps = db.steps.filter(s => s.workId === workId);
+    const delayed = steps.filter(s => s.status !== StepStatus.COMPLETED && s.endDate < today);
+    
+    delayed.forEach(s => {
+        const title = "Etapa Atrasada";
+        const message = `A etapa "${s.name}" expirou em ${s.endDate}.`;
+        if (!db.notifications.find(n => n.userId === userId && n.title === title && n.message === message)) {
+            db.notifications.push({
+                id: Math.random().toString(36).substr(2, 9),
+                userId,
+                title,
+                message,
+                date: new Date().toISOString(),
+                read: false,
+                type: 'WARNING'
+            });
+        }
+    });
+    saveLocalDb(db);
+  },
+
+  getSteps: async (workId: string): Promise<Step[]> => {
+    const db = getLocalDb();
+    const today = getLocalTodayString();
+    return db.steps.filter(s => s.workId === workId).map(s => ({
+        ...s,
+        isDelayed: s.status !== StepStatus.COMPLETED && s.endDate < today
+    }));
   },
 
   deleteWork: async (workId: string) => {
-      const db = getLocalDb();
-      db.works = db.works.filter(w => w.id !== workId);
-      db.steps = db.steps.filter(s => s.workId !== workId);
-      db.expenses = db.expenses.filter(e => e.workId !== workId);
-      db.materials = db.materials.filter(m => m.workId !== workId);
-      saveLocalDb(db);
+    const db = getLocalDb();
+    db.works = db.works.filter(w => w.id !== workId);
+    db.steps = db.steps.filter(s => s.workId !== workId);
+    db.expenses = db.expenses.filter(e => e.workId !== workId);
+    db.materials = db.materials.filter(m => m.workId !== workId);
+    db.photos = db.photos.filter(p => p.workId !== workId);
+    db.files = db.files.filter(f => f.workId !== workId);
+    saveLocalDb(db);
   },
 
-  getSteps: getStepsInternal,
-  
-  updateStep: async (step: Step) => {
-      const db = getLocalDb();
-      const idx = db.steps.findIndex(s => s.id === step.id);
-      if (idx > -1) {
-          db.steps[idx] = step;
-          saveLocalDb(db);
-      }
-  },
-  
-  addStep: async (step: Omit<Step, 'id' | 'isDelayed'>) => {
-      const db = getLocalDb();
-      db.steps.push({ ...step, id: Math.random().toString(36).substr(2, 9), isDelayed: false });
-      saveLocalDb(db);
-  },
-  
-  deleteStep: async (stepId: string) => {
-      const db = getLocalDb();
-      db.steps = db.steps.filter(s => s.id !== stepId);
-      saveLocalDb(db);
-  },
-  
-  getExpenses: getExpensesInternal,
-  
-  addExpense: async (expense: Omit<Expense, 'id'>) => { await insertExpenseInternal(expense); },
-  
-  updateExpense: async (expense: Expense) => {
-      const db = getLocalDb();
-      const idx = db.expenses.findIndex(e => e.id === expense.id);
-      if (idx > -1) {
-          db.expenses[idx] = expense;
-          saveLocalDb(db);
-      }
-  },
-  
-  deleteExpense: async (id: string) => {
-      const db = getLocalDb();
-      db.expenses = db.expenses.filter(e => e.id !== id);
-      saveLocalDb(db);
-  },
-  
-  getMaterials: async (workId: string) => { 
-      const db = getLocalDb(); 
-      // Ensure we sort materials roughly by sequence if possible, or by category
-      return Promise.resolve(db.materials.filter(m => m.workId === workId)); 
-  },
-  
-  addMaterial: async (material: Omit<Material, 'id'>) => {
-      const db = getLocalDb();
-      db.materials.push({ ...material, id: Math.random().toString(36).substr(2, 9) });
-      saveLocalDb(db);
-  },
-  
-  // --- UPDATED: UPDATE MATERIAL & POST FINANCE LINKED TO STEP ---
-  updateMaterial: async (material: Material, cost?: number, addedQty?: number) => {
-      const db = getLocalDb();
-      const idx = db.materials.findIndex(m => m.id === material.id);
-      if (idx > -1) {
-          db.materials[idx] = material;
-          saveLocalDb(db);
-      }
-      
-      // If purchase happened, post to finance LINKED TO THE SAME STEP
-      if (cost && cost > 0) {
-          await insertExpenseInternal({
-              workId: material.workId,
-              description: `Compra: ${material.name}`,
-              amount: cost,
-              paidAmount: cost,
-              quantity: addedQty || 1,
-              category: ExpenseCategory.MATERIAL,
-              date: new Date().toISOString().split('T')[0],
-              relatedMaterialId: material.id,
-              stepId: material.stepId // CRITICAL: Links financial record to the step sequence
-          });
-      }
-  },
-  
-  deleteMaterial: async (id: string) => {
-      const db = getLocalDb();
-      db.materials = db.materials.filter(m => m.id !== id);
-      saveLocalDb(db);
-  },
-  
-  importMaterialPackage: async (workId: string, category: string) => {
-      const db = getLocalDb();
-      const pkg = FULL_MATERIAL_PACKAGES.find(p => p.category === category);
-      let count = 0;
-      if (pkg) {
-          pkg.items.forEach(item => {
-              db.materials.push({
-                  id: Math.random().toString(36).substr(2, 9),
-                  workId,
-                  name: item.name,
-                  unit: item.unit,
-                  plannedQty: 0,
-                  purchasedQty: 0,
-                  category: category
-              });
-              count++;
-          });
-          saveLocalDb(db);
-      }
-      return count;
+  createWork: async (workData: Partial<Work>, templateId: string): Promise<Work> => {
+    const db = getLocalDb();
+    const id = Math.random().toString(36).substr(2, 9);
+    const newWork: Work = {
+        id,
+        status: WorkStatus.PLANNING,
+        userId: workData.userId!,
+        name: workData.name!,
+        address: workData.address!,
+        budgetPlanned: workData.budgetPlanned!,
+        startDate: workData.startDate!,
+        endDate: workData.endDate!,
+        area: workData.area!,
+        floors: workData.floors || 1,
+        bedrooms: workData.bedrooms,
+        bathrooms: workData.bathrooms,
+        kitchens: workData.kitchens,
+        livingRooms: workData.livingRooms,
+        hasLeisureArea: workData.hasLeisureArea,
+        notes: workData.notes || ''
+    };
+    
+    db.works.push(newWork);
+
+    // Initial steps based on template
+    const template = WORK_TEMPLATES.find(t => t.id === templateId);
+    if (template) {
+        let currentStart = new Date(newWork.startDate);
+        template.includedSteps.forEach(stepName => {
+            const end = new Date(currentStart);
+            end.setDate(end.getDate() + 7); // Default step duration
+            db.steps.push({
+                id: Math.random().toString(36).substr(2, 9),
+                workId: id,
+                name: stepName,
+                startDate: currentStart.toISOString().split('T')[0],
+                endDate: end.toISOString().split('T')[0],
+                status: StepStatus.NOT_STARTED,
+                isDelayed: false
+            });
+            currentStart = new Date(end);
+        });
+        
+        // Initial materials
+        FULL_MATERIAL_PACKAGES.forEach(pkg => {
+            pkg.items.slice(0, 3).forEach(item => { // Limit initial materials
+                db.materials.push({
+                    id: Math.random().toString(36).substr(2, 9),
+                    workId: id,
+                    name: item.name,
+                    plannedQty: 10,
+                    purchasedQty: 0,
+                    unit: item.unit,
+                    category: pkg.category
+                });
+            });
+        });
+    }
+
+    saveLocalDb(db);
+    return newWork;
   },
 
-  getNotifications: async (userId: string): Promise<Notification[]> => { const db = getLocalDb(); return Promise.resolve(db.notifications.filter(n => n.userId === userId)); },
-  dismissNotification: async (id: string) => { const db = getLocalDb(); db.notifications = db.notifications.filter(n => n.id !== id); saveLocalDb(db); },
-  clearAllNotifications: async (userId: string) => { const db = getLocalDb(); db.notifications = db.notifications.filter(n => n.userId !== userId); saveLocalDb(db); },
-  
-  generateSmartNotifications: async (userId: string, _workId: string) => { 
-      const db = getLocalDb();
-      const today = getLocalTodayString();
-      const user = db.users.find(u => u.id === userId);
-      const lastCheckKey = `${NOTIFICATION_CHECK_KEY}_${userId}`;
-      const lastCheck = localStorage.getItem(lastCheckKey);
-
-      if (lastCheck === today) return; 
-
-      if (user && user.subscriptionExpiresAt) {
-          const expires = new Date(user.subscriptionExpiresAt);
-          const now = new Date();
-          const diffTime = expires.getTime() - now.getTime();
-          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-          if (diffDays > 0 && diffDays <= 5) {
-              db.notifications.push({
-                  id: Math.random().toString(36).substr(2, 9),
-                  userId,
-                  title: 'Renovação Necessária',
-                  message: `Sua assinatura expira em ${diffDays} dias.`,
-                  type: 'WARNING',
-                  read: false,
-                  date: new Date().toISOString()
-              });
-          }
-      }
-      saveLocalDb(db);
-      localStorage.setItem(lastCheckKey, today);
-  },
-  
-  getDailySummary: async (workId: string) => { 
-      const steps = await getStepsInternal(workId);
-      const materials = await dbService.getMaterials(workId);
-      const completed = steps.filter(s => s.status === StepStatus.COMPLETED).length;
-      const delayed = steps.filter(s => s.isDelayed).length;
-      const pendingMaterials = materials.filter(m => m.purchasedQty < m.plannedQty).length;
-      return { completedSteps: completed, delayedSteps: delayed, pendingMaterials, totalSteps: steps.length };
-  },
-  
-  calculateWorkStats: async (workId: string) => { 
-      const expenses = await getExpensesInternal(workId);
-      const steps = await getStepsInternal(workId);
-      const totalSpent = expenses.reduce((acc, curr) => acc + (Number(curr.paidAmount) || 0), 0);
-      const completedSteps = steps.filter(s => s.status === StepStatus.COMPLETED).length;
-      return { totalSpent, progress: steps.length === 0 ? 0 : Math.round((completedSteps / steps.length) * 100), delayedSteps: steps.filter(s => s.isDelayed).length }; 
+  getWorkers: async (userId: string): Promise<Worker[]> => {
+    const db = getLocalDb();
+    return db.workers.filter(w => w.userId === userId);
   },
 
-  getSuppliers: async (userId: string) => {
-      const db = getLocalDb();
-      return db.suppliers.filter(s => s.userId === userId);
-  },
-  addSupplier: async (supplier: Omit<Supplier, 'id'>) => {
-      const db = getLocalDb();
-      db.suppliers.push({ ...supplier, id: Math.random().toString(36).substr(2, 9) });
-      saveLocalDb(db);
-  },
-  updateSupplier: async (supplier: Supplier) => {
-      const db = getLocalDb();
-      const idx = db.suppliers.findIndex(s => s.id === supplier.id);
-      if (idx > -1) {
-          db.suppliers[idx] = supplier;
-          saveLocalDb(db);
-      }
-  },
-  deleteSupplier: async (id: string) => {
-      const db = getLocalDb();
-      db.suppliers = db.suppliers.filter(s => s.id !== id);
-      saveLocalDb(db);
+  getJobRoles: async (): Promise<string[]> => {
+    return STANDARD_JOB_ROLES;
   },
 
-  getWorkers: async (userId: string) => {
-      const db = getLocalDb();
-      return db.workers.filter(w => w.userId === userId);
+  getSuppliers: async (userId: string): Promise<Supplier[]> => {
+    const db = getLocalDb();
+    return db.suppliers.filter(s => s.userId === userId);
   },
-  addWorker: async (worker: Omit<Worker, 'id'>) => {
-      const db = getLocalDb();
-      db.workers.push({ ...worker, id: Math.random().toString(36).substr(2, 9) });
-      saveLocalDb(db);
+
+  getSupplierCategories: async (): Promise<string[]> => {
+    return STANDARD_SUPPLIER_CATEGORIES;
   },
-  updateWorker: async (worker: Worker) => {
-      const db = getLocalDb();
-      const idx = db.workers.findIndex(w => w.id === worker.id);
-      if (idx > -1) {
-          db.workers[idx] = worker;
-          saveLocalDb(db);
-      }
+
+  addWorker: async (data: Partial<Worker>): Promise<Worker> => {
+    const db = getLocalDb();
+    const newWorker: Worker = {
+        id: Math.random().toString(36).substr(2, 9),
+        userId: data.userId!,
+        name: data.name!,
+        role: data.role!,
+        phone: data.phone!,
+        notes: data.notes
+    };
+    db.workers.push(newWorker);
+    saveLocalDb(db);
+    return newWorker;
   },
+
+  updateWorker: async (data: Worker): Promise<Worker> => {
+    const db = getLocalDb();
+    const idx = db.workers.findIndex(w => w.id === data.id);
+    if (idx > -1) {
+        db.workers[idx] = data;
+        saveLocalDb(db);
+    }
+    return data;
+  },
+
   deleteWorker: async (id: string) => {
-      const db = getLocalDb();
-      db.workers = db.workers.filter(w => w.id !== id);
-      saveLocalDb(db);
+    const db = getLocalDb();
+    db.workers = db.workers.filter(w => w.id !== id);
+    saveLocalDb(db);
   },
 
-  getJobRoles: async () => STANDARD_JOB_ROLES,
-  getSupplierCategories: async () => STANDARD_SUPPLIER_CATEGORIES,
+  addSupplier: async (data: Partial<Supplier>): Promise<Supplier> => {
+    const db = getLocalDb();
+    const newSupplier: Supplier = {
+        id: Math.random().toString(36).substr(2, 9),
+        userId: data.userId!,
+        name: data.name!,
+        category: data.category!,
+        phone: data.phone!,
+        notes: data.notes
+    };
+    db.suppliers.push(newSupplier);
+    saveLocalDb(db);
+    return newSupplier;
+  },
 
-  getPhotos: async (workId: string) => {
-      const db = getLocalDb();
-      return db.photos.filter(p => p.workId === workId);
+  updateSupplier: async (data: Supplier): Promise<Supplier> => {
+    const db = getLocalDb();
+    const idx = db.suppliers.findIndex(s => s.id === data.id);
+    if (idx > -1) {
+        db.suppliers[idx] = data;
+        saveLocalDb(db);
+    }
+    return data;
   },
-  uploadPhoto: async (workId: string, file: File, type: 'BEFORE' | 'AFTER' | 'PROGRESS') => {
-      const db = getLocalDb();
-      if (supabase) {
-          const url = await uploadToBucket(file, `${workId}/photos`);
-          if (url) {
-              const newPhoto = { id: Math.random().toString(36).substr(2,9), workId, url, description: file.name, date: new Date().toISOString(), type };
-              // Since we don't have a real supabase table for photos in this mock, we save locally ref
-              db.photos.push(newPhoto);
-              saveLocalDb(db);
-              return url;
-          }
-      }
-      return new Promise<string | null>((resolve) => {
-          const reader = new FileReader();
-          reader.onload = (e) => {
-             if (e.target?.result) {
-                 const url = e.target.result as string;
-                 db.photos.push({
-                     id: Math.random().toString(36).substr(2, 9),
-                     workId,
-                     url,
-                     description: file.name,
-                     date: new Date().toISOString(),
-                     type
-                 });
-                 saveLocalDb(db);
-                 resolve(url);
-             } else resolve(null);
-          };
-          reader.readAsDataURL(file);
-      });
+
+  deleteSupplier: async (id: string) => {
+    const db = getLocalDb();
+    db.suppliers = db.suppliers.filter(s => s.id !== id);
+    saveLocalDb(db);
   },
+
+  getPhotos: async (workId: string): Promise<WorkPhoto[]> => {
+    const db = getLocalDb();
+    return db.photos.filter(p => p.workId === workId);
+  },
+
+  uploadPhoto: async (workId: string, file: File, type: string) => {
+    const db = getLocalDb();
+    // In local mode, store as data URL
+    const reader = new FileReader();
+    reader.onloadend = () => {
+        db.photos.push({
+            id: Math.random().toString(36).substr(2, 9),
+            workId,
+            url: reader.result as string,
+            description: file.name,
+            date: new Date().toISOString(),
+            type: 'PROGRESS'
+        });
+        saveLocalDb(db);
+    };
+    reader.readAsDataURL(file);
+  },
+
   deletePhoto: async (id: string) => {
-      const db = getLocalDb();
-      db.photos = db.photos.filter(p => p.id !== id);
-      saveLocalDb(db);
+    const db = getLocalDb();
+    db.photos = db.photos.filter(p => p.id !== id);
+    saveLocalDb(db);
   },
 
-  getFiles: async (workId: string) => {
-      const db = getLocalDb();
-      return db.files.filter(f => f.workId === workId);
+  getFiles: async (workId: string): Promise<WorkFile[]> => {
+    const db = getLocalDb();
+    return db.files.filter(f => f.workId === workId);
   },
+
   uploadFile: async (workId: string, file: File, category: string) => {
-      const db = getLocalDb();
-      if (supabase) {
-          const url = await uploadToBucket(file, `${workId}/files`);
-          if (url) {
-              const newFile = {
-                     id: Math.random().toString(36).substr(2, 9),
-                     workId,
-                     name: file.name,
-                     category: category as any,
-                     url,
-                     type: file.type,
-                     date: new Date().toISOString()
-              };
-              db.files.push(newFile);
-              saveLocalDb(db);
-              return url;
-          }
-      }
-      return new Promise<string | null>((resolve) => {
-          const reader = new FileReader();
-          reader.onload = (e) => {
-             if (e.target?.result) {
-                 const url = e.target.result as string;
-                 db.files.push({
-                     id: Math.random().toString(36).substr(2, 9),
-                     workId,
-                     name: file.name,
-                     category: category as any,
-                     url,
-                     type: file.type,
-                     date: new Date().toISOString()
-                  });
-                 saveLocalDb(db);
-                 resolve(url);
-             } else resolve(null);
-          };
-          reader.readAsDataURL(file);
-      });
+    const db = getLocalDb();
+    const reader = new FileReader();
+    reader.onloadend = () => {
+        db.files.push({
+            id: Math.random().toString(36).substr(2, 9),
+            workId,
+            name: file.name,
+            category: category as any,
+            url: reader.result as string,
+            type: file.type,
+            date: new Date().toISOString()
+        });
+        saveLocalDb(db);
+    };
+    reader.readAsDataURL(file);
   },
+
   deleteFile: async (id: string) => {
-      const db = getLocalDb();
-      db.files = db.files.filter(f => f.id !== id);
-      saveLocalDb(db);
+    const db = getLocalDb();
+    db.files = db.files.filter(f => f.id !== id);
+    saveLocalDb(db);
+  },
+
+  getExpenses: async (workId: string): Promise<Expense[]> => {
+    const db = getLocalDb();
+    return db.expenses.filter(e => e.workId === workId);
+  },
+
+  addExpense: async (data: Partial<Expense>): Promise<Expense> => {
+    const db = getLocalDb();
+    const newExpense: Expense = {
+        id: Math.random().toString(36).substr(2, 9),
+        workId: data.workId!,
+        description: data.description!,
+        amount: data.amount!,
+        paidAmount: data.paidAmount || 0,
+        category: data.category!,
+        date: data.date!,
+        stepId: data.stepId,
+        quantity: data.quantity
+    };
+    db.expenses.push(newExpense);
+    saveLocalDb(db);
+    return newExpense;
+  },
+
+  updateExpense: async (data: Expense): Promise<Expense> => {
+    const db = getLocalDb();
+    const idx = db.expenses.findIndex(e => e.id === data.id);
+    if (idx > -1) {
+        db.expenses[idx] = data;
+        saveLocalDb(db);
+    }
+    return data;
+  },
+
+  deleteExpense: async (id: string) => {
+    const db = getLocalDb();
+    db.expenses = db.expenses.filter(e => e.id !== id);
+    saveLocalDb(db);
+  },
+
+  getMaterials: async (workId: string): Promise<Material[]> => {
+    const db = getLocalDb();
+    return db.materials.filter(m => m.workId === workId);
+  },
+
+  addMaterial: async (data: Partial<Material>): Promise<Material> => {
+    const db = getLocalDb();
+    const newMat: Material = {
+        id: Math.random().toString(36).substr(2, 9),
+        workId: data.workId!,
+        name: data.name!,
+        plannedQty: data.plannedQty!,
+        purchasedQty: data.purchasedQty || 0,
+        unit: data.unit!,
+        category: data.category
+    };
+    db.materials.push(newMat);
+    saveLocalDb(db);
+    return newMat;
+  },
+
+  importMaterialPackage: async (workId: string, category: string): Promise<number> => {
+    const db = getLocalDb();
+    const pkg = FULL_MATERIAL_PACKAGES.find(p => p.category === category);
+    if (!pkg) return 0;
+    
+    pkg.items.forEach(item => {
+        db.materials.push({
+            id: Math.random().toString(36).substr(2, 9),
+            workId,
+            name: item.name,
+            plannedQty: 1,
+            purchasedQty: 0,
+            unit: item.unit,
+            category
+        });
+    });
+    saveLocalDb(db);
+    return pkg.items.length;
+  },
+
+  updateMaterial: async (data: Material, cost?: number, qtyAdded?: number): Promise<Material> => {
+    const db = getLocalDb();
+    const idx = db.materials.findIndex(m => m.id === data.id);
+    if (idx > -1) {
+        db.materials[idx] = data;
+        if (cost && cost > 0) {
+            db.expenses.push({
+                id: Math.random().toString(36).substr(2, 9),
+                workId: data.workId,
+                description: `Compra: ${data.name} (${qtyAdded} ${data.unit})`,
+                amount: cost,
+                paidAmount: cost,
+                category: ExpenseCategory.MATERIAL,
+                date: getLocalTodayString(),
+                relatedMaterialId: data.id
+            });
+        }
+        saveLocalDb(db);
+    }
+    return data;
+  },
+
+  deleteMaterial: async (id: string) => {
+    const db = getLocalDb();
+    db.materials = db.materials.filter(m => m.id !== id);
+    saveLocalDb(db);
+  },
+
+  addStep: async (data: Partial<Step>): Promise<Step> => {
+    const db = getLocalDb();
+    const newStep: Step = {
+        id: Math.random().toString(36).substr(2, 9),
+        workId: data.workId!,
+        name: data.name!,
+        startDate: data.startDate!,
+        endDate: data.endDate!,
+        status: data.status || StepStatus.NOT_STARTED,
+        isDelayed: false
+    };
+    db.steps.push(newStep);
+    saveLocalDb(db);
+    return newStep;
+  },
+
+  updateStep: async (data: Step): Promise<Step> => {
+    const db = getLocalDb();
+    const idx = db.steps.findIndex(s => s.id === data.id);
+    if (idx > -1) {
+        db.steps[idx] = data;
+        saveLocalDb(db);
+    }
+    return data;
+  },
+
+  deleteStep: async (id: string) => {
+    const db = getLocalDb();
+    db.steps = db.steps.filter(s => s.id !== id);
+    saveLocalDb(db);
+  },
+
+  generatePix: async (amount: number, user: { name: string, email: string, cpf: string }) => {
+    // Return mock data
+    return {
+        qr_code_base64: 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=MOCKPIXCODE',
+        copy_paste_code: '00020126580014br.gov.bcb.pix013600000000-0000-0000-0000-000000000000520400005303986540' + amount.toFixed(2) + '5802BR5913MAOS DA OBRA6008SAO PAULO62070503***6304'
+    };
   }
 };
