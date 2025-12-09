@@ -9,7 +9,6 @@ import { supabase } from './supabase';
 // --- LOCAL STORAGE FALLBACK CONSTANTS ---
 const DB_KEY = 'maos_db_v1';
 const SESSION_KEY = 'maos_session_v1';
-const NOTIFICATION_CHECK_KEY = 'maos_last_notif_check';
 
 // --- HELPER: GET LOCAL YYYY-MM-DD STRING ---
 const getLocalTodayString = () => {
@@ -72,28 +71,6 @@ const getLocalDb = (): DbSchema => {
 const saveLocalDb = (db: DbSchema) => {
   localStorage.setItem(DB_KEY, JSON.stringify(db));
 };
-
-// --- HELPER: FILE UPLOAD ---
-const uploadToBucket = async (file: File, path: string): Promise<string | null> => {
-    if (!supabase) return null;
-    try {
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
-        const filePath = `${path}/${fileName}`;
-
-        const { error: uploadError } = await supabase.storage
-            .from('work_assets')
-            .upload(filePath, file);
-
-        if (uploadError) throw uploadError;
-
-        const { data } = supabase.storage.from('work_assets').getPublicUrl(filePath);
-        return data.publicUrl;
-    } catch (error) {
-        console.error("Upload Error:", error);
-        return null;
-    }
-}
 
 // --- HELPER: SYNC SUPABASE USER (INTERNAL) ---
 const syncSupabaseUser = async (): Promise<User | null> => {
@@ -591,7 +568,7 @@ export const dbService = {
     return db.photos.filter(p => p.workId === workId);
   },
 
-  uploadPhoto: async (workId: string, file: File, type: string) => {
+  uploadPhoto: async (workId: string, file: File, _type: string) => {
     const db = getLocalDb();
     // In local mode, store as data URL
     const reader = new FileReader();
@@ -784,7 +761,7 @@ export const dbService = {
     saveLocalDb(db);
   },
 
-  generatePix: async (amount: number, user: { name: string, email: string, cpf: string }) => {
+  generatePix: async (amount: number, _user: { name: string, email: string, cpf: string }) => {
     // Return mock data
     return {
         qr_code_base64: 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=MOCKPIXCODE',
