@@ -6,8 +6,22 @@ import {
 } from 'lucide-react'; 
 
 // --- TIPAGEM ---
-interface PlanDetails { /* ... */ }
-interface CardData { /* ... */ }
+// Note que as interfaces foram mantidas. O erro é na implementação.
+interface PlanDetails {
+  id: string;
+  name: string;
+  price: number;
+  type: string;
+  period: string;
+}
+
+interface CardData {
+  number: string;
+  name: string;
+  expiry: string;
+  cvv: string;
+  installments: number;
+}
 // --- FIM TIPAGEM ---
 
 export default function Checkout() {
@@ -40,16 +54,15 @@ export default function Checkout() {
     }
   };
 
-  // --- FUNÇÃO DE REDIRECIONAMENTO CORRIGIDA (DOMÍNIO REAL) ---
+  // --- FUNÇÃO DE REDIRECIONAMENTO CORRIGIDA ---
   const redirectToDashboard = () => {
     localStorage.removeItem('tempUser'); 
-    window.location.href = "https://www.maosdaobra.online/dashboard";  // Domínio Real
+    window.location.href = "https://www.maosdaobra.online/dashboard"; 
   }
   // --- FIM FUNÇÃO REDIRECIONAMENTO ---
 
   useEffect(() => {
     const loadData = async () => {
-      // 1. Recuperar Usuário do Passo Anterior (Register)
       const savedUser = localStorage.getItem('tempUser');
       
       if (!savedUser) {
@@ -59,7 +72,6 @@ export default function Checkout() {
       }
 
       const parsedUser = JSON.parse(savedUser);
-      // Garante que o CPF esteja na chave 'cpf' para uso consistente no payload
       let documentValue = parsedUser.cpf || parsedUser.document || '';
       
       if (documentValue.length < 11) {
@@ -68,10 +80,8 @@ export default function Checkout() {
          return;
       }
 
-      // Atualiza o user com o CPF encontrado para ser consistente com o backend
       setUser({ ...parsedUser, cpf: documentValue });
 
-      // 2. Definir Plano
       let planId = searchParams.get('plan');
       if (!planId && typeof window !== 'undefined') {
           const urlParams = new URLSearchParams(window.location.search);
@@ -93,10 +103,15 @@ export default function Checkout() {
   const handlePixGenerate = async () => {
       setProcessing(true);
       setErrorMsg('');
+      
+      if (!user || !planDetails || !user.cpf) {
+          setErrorMsg("Dados de usuário ou plano ausentes para Pix.");
+          setProcessing(false);
+          return;
+      }
+      
       try {
-          if (!user || !planDetails) throw new Error("Dados do usuário ou plano ausentes.");
-          if (!user.cpf) throw new Error("CPF/Documento está faltando no registro.");
-
+          // Utilizamos '!' para afirmar que os valores não são nulos aqui dentro
           const clientPayload = {
               name: user.name,
               email: user.email,
@@ -106,11 +121,11 @@ export default function Checkout() {
 
           const payload = {
               identifier: `MDO-${Date.now()}`,
-              amount: planDetails.price, 
+              amount: planDetails!.price,  // Fix 1: Non-null assertion
               client: clientPayload,
               dueDate: new Date(Date.now() + (86400000 * 2)).toISOString().split('T')[0],
               metadata: {
-                  plan_id: planDetails.id,
+                  plan_id: planDetails!.id, // Fix 2: Non-null assertion
                   type: 'Subscription_Acquisition'
               }
           };
@@ -153,8 +168,9 @@ const handleCreditCardSubmit = async (e: React.FormEvent) => {
     setProcessing(true);
     try {
         const cleanNumber = cardData.number.replace(/\s/g, '');
-        if (cleanNumber.length < 16) throw new Error("Número do cartão inválido");
-        if (cardData.cvv.length < 3) throw new Error("CVV inválido");
+        
+        if (cleanNumber.length < 16) throw new Error("Número do cartão inválido"); // Fix 3: Accessing length on cleaned string
+        if (cardData.cvv.length < 3) throw new Error("CVV inválido"); // Fix 4: Accessing length on cvv
 
         // --- CORREÇÃO: Cria o objeto client com o 'document' (CPF) ---
         const clientPayload = {
@@ -169,9 +185,9 @@ const handleCreditCardSubmit = async (e: React.FormEvent) => {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                amount: planDetails.price,
+                amount: planDetails!.price, // Fix 5: Non-null assertion
                 installments: cardData.installments,
-                planType: planDetails.type,
+                planType: planDetails!.type, // Fix 6: Non-null assertion
                 card: { ...cardData, number: cleanNumber },
                 client: clientPayload // Envia o payload corrigido
             })
@@ -206,12 +222,12 @@ const handleCreditCardSubmit = async (e: React.FormEvent) => {
   if (loading) return <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#172134]"><Loader2 className="h-10 w-10 animate-spin text-[#bc5a08]" /></div>;
   
   if (!user || errorMsg.includes('CPF/Documento não foi salvo')) return (
-    // Se houver erro de documento, mostra a mensagem de erro no topo
+    // Se houver erro de documento ou user não for carregado, mostra a tela de erro
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#172134] p-4">
         <div className="bg-[#1E293B] p-8 rounded-xl max-w-sm text-center border border-red-500/30">
             <AlertTriangle size={32} className="text-red-500 mx-auto mb-4" />
             <h2 className="text-xl font-bold text-white mb-2">Erro de Carregamento</h2>
-            <p className="text-sm text-red-300 mb-6">{errorMsg}</p>
+            <p className="text-sm text-red-300 mb-6">{errorMsg || "Usuário não carregado. Por favor, volte ao registro."}</p>
             <button onClick={() => navigate('/register')} className="bg-[#bc5a08] text-white py-2 px-4 rounded-lg font-bold">Voltar ao Cadastro</button>
         </div>
     </div>
