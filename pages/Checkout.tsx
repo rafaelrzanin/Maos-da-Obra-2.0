@@ -1,26 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { 
-  CreditCard, QrCode, ShieldCheck, Loader2, 
-  Copy, HardHat, ChevronDown, UserCheck, AlertTriangle, CheckCircle
+import { 
+  CreditCard, QrCode, ShieldCheck, Loader2, CheckCircle, 
+  Copy, HardHat, ChevronDown, UserCheck, AlertTriangle
 } from 'lucide-react'; 
 
 // --- TIPAGEM ---
-interface PlanDetails {
-  id: string;
-  name: string;
-  price: number;
-  type: string;
-  period: string;
-}
-
-interface CardData {
-  number: string;
-  name: string;
-  expiry: string;
-  cvv: string;
-  installments: number;
-}
+interface PlanDetails { /* ... */ }
+interface CardData { /* ... */ }
 // --- FIM TIPAGEM ---
 
 export default function Checkout() {
@@ -53,10 +40,10 @@ export default function Checkout() {
     }
   };
 
-  // --- FUNÇÃO DE REDIRECIONAMENTO ---
+  // --- FUNÇÃO DE REDIRECIONAMENTO CORRIGIDA (DOMÍNIO REAL) ---
   const redirectToDashboard = () => {
     localStorage.removeItem('tempUser'); 
-    window.location.href = "https://www.maosdaobra.online/dashboard"; 
+    window.location.href = "https://www.maosdaobra.online/dashboard";  // Domínio Real
   }
   // --- FIM FUNÇÃO REDIRECIONAMENTO ---
 
@@ -71,19 +58,18 @@ export default function Checkout() {
           return;
       }
 
-      const parsedUser = JSON.parse(savedUser);
-      let documentValue = parsedUser.cpf || parsedUser.document || parsedUser.id_doc;
+      const parsedUser = JSON.parse(savedUser);
+      // Garante que o CPF esteja na chave 'cpf' para uso consistente no payload
+      let documentValue = parsedUser.cpf || parsedUser.document || '';
+      
+      if (documentValue.length < 11) {
+         setErrorMsg("Erro: CPF/Documento não foi salvo no registro. Volte para o cadastro.");
+         setLoading(false);
+         return;
+      }
 
-      // --- VALIDAÇÃO CRÍTICA DO CPF/DOCUMENTO ---
-      if (!documentValue) {
-         setErrorMsg("Erro: CPF/Documento não foi salvo no registro. Por favor, registre novamente.");
-         setLoading(false);
-         return;
-      }
-      // ---------------------------------------------------------------------------------------
-
-      // Atualiza o user com o CPF encontrado para ser consistente com o backend
-      setUser({ ...parsedUser, cpf: documentValue, document: documentValue });
+      // Atualiza o user com o CPF encontrado para ser consistente com o backend
+      setUser({ ...parsedUser, cpf: documentValue });
 
       // 2. Definir Plano
       let planId = searchParams.get('plan');
@@ -109,16 +95,13 @@ export default function Checkout() {
       setErrorMsg('');
       try {
           if (!user || !planDetails) throw new Error("Dados do usuário ou plano ausentes.");
-          // Validação de documento na geração PIX
-          if (!user.cpf) throw new Error("CPF/Documento está faltando no registro.");
+          if (!user.cpf) throw new Error("CPF/Documento está faltando no registro.");
 
-
-          // O clientPayload para PIX já inclui o CPF
           const clientPayload = {
               name: user.name,
               email: user.email,
               phone: user.phone.replace(/\D/g, ''),
-              document: user.cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4") // Usa user.cpf
+              document: user.cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4") 
           };
 
           const payload = {
@@ -159,62 +142,50 @@ export default function Checkout() {
       }
   };
 
- // --- FUNÇÃO DE PAGAMENTO COM CARTÃO (CORRIGIDA) ---
+ // --- FUNÇÃO DE PAGAMENTO COM CARTÃO ---
 const handleCreditCardSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    // Validação forte do CPF/Documento
-    if (!planDetails || !user || !user.cpf) { 
-       setErrorMsg("Erro: CPF/Documento não foi carregado corretamente para o usuário. Volte e registre novamente.");
-       return;
-    } 
-    setErrorMsg('');
-    setProcessing(true);
-    try {
-        const cleanNumber = cardData.number.replace(/\s/g, '');
-        if (cleanNumber.length < 16) throw new Error("Número do cartão inválido");
-        if (cardData.cvv.length < 3) throw new Error("CVV inválido");
+    e.preventDefault();
+    if (!planDetails || !user || !user.cpf) { 
+       setErrorMsg("Erro: CPF/Documento não foi carregado corretamente para o usuário. Volte e registre novamente.");
+       return;
+    } 
+    setErrorMsg('');
+    setProcessing(true);
+    try {
+        const cleanNumber = cardData.number.replace(/\s/g, '');
+        if (cleanNumber.length < 16) throw new Error("Número do cartão inválido");
+        if (cardData.cvv.length < 3) throw new Error("CVV inválido");
 
-        // --- CORREÇÃO: Cria o objeto client com o 'document' (CPF) ---
-        const clientPayload = {
-            name: user.name,
-            email: user.email,
-            phone: user.phone,
-            document: user.cpf, // Assume que o CPF está na propriedade 'cpf' do objeto 'user'
-        };
-        // -------------------------------------------------------------
+        // --- CORREÇÃO: Cria o objeto client com o 'document' (CPF) ---
+        const clientPayload = {
+            name: user.name,
+            email: user.email,
+            phone: user.phone,
+            document: user.cpf, // Usa user.cpf (que foi validado no useEffect)
+        };
+        // -------------------------------------------------------------
 
-        // --- CORREÇÃO DE URL: Voltando para o URL Relativo (Padrão Next.js/Vercel) ---
-        const apiUrl = '/api/create-card';
+        const response = await fetch('/api/create-card', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                amount: planDetails.price,
+                installments: cardData.installments,
+                planType: planDetails.type,
+                card: { ...cardData, number: cleanNumber },
+                client: clientPayload // Envia o payload corrigido
+            })
+        });
 
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.message || "Transação recusada.");
 
-        const response = await fetch(apiUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                amount: planDetails.price,
-                installments: cardData.installments,
-                planType: planDetails.type,
-                card: { ...cardData, number: cleanNumber },
-                client: clientPayload // Envia o payload corrigido
-            })
-        });
-        
-        // ... restante do código de erro e sucesso
-        
-        // Se a resposta for 405, lança um erro para mostrar a mensagem
-        if (response.status === 405) {
-             throw new Error("Erro de Servidor (405): O servidor Vercel bloqueou o método POST. O ficheiro create-card.js precisa de ser reimplantado.");
-        }
+        // SUCESSO REAL (Cartão): Redireciona para o App
+        redirectToDashboard();
 
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.message || "Transação recusada.");
-
-        // SUCESSO REAL (Cartão): Redireciona para o App
-        redirectToDashboard();
-
-    } catch (err: any) {
-        setErrorMsg(err.message || "Erro ao processar cartão.");
-    } finally { setProcessing(false); }
+    } catch (err: any) {
+        setErrorMsg(err.message || "Erro ao processar cartão.");
+    } finally { setProcessing(false); }
 };
 
   const handleCopyPix = () => {
@@ -234,7 +205,17 @@ const handleCreditCardSubmit = async (e: React.FormEvent) => {
 
   if (loading) return <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#172134]"><Loader2 className="h-10 w-10 animate-spin text-[#bc5a08]" /></div>;
   
-  if (!user) return null;
+  if (!user || errorMsg.includes('CPF/Documento não foi salvo')) return (
+    // Se houver erro de documento, mostra a mensagem de erro no topo
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#172134] p-4">
+        <div className="bg-[#1E293B] p-8 rounded-xl max-w-sm text-center border border-red-500/30">
+            <AlertTriangle size={32} className="text-red-500 mx-auto mb-4" />
+            <h2 className="text-xl font-bold text-white mb-2">Erro de Carregamento</h2>
+            <p className="text-sm text-red-300 mb-6">{errorMsg}</p>
+            <button onClick={() => navigate('/register')} className="bg-[#bc5a08] text-white py-2 px-4 rounded-lg font-bold">Voltar ao Cadastro</button>
+        </div>
+    </div>
+  );
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-[#172134] font-sans selection:bg-[#bc5a08] selection:text-white">
@@ -351,7 +332,7 @@ const handleCreditCardSubmit = async (e: React.FormEvent) => {
                 )}
 
                </div>
-              </div>
+            </div>
         </div>
       </div>
     </div>
