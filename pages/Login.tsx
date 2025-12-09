@@ -1,10 +1,11 @@
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../App';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { dbService } from '../services/db';
 
 const Login: React.FC = () => {
-  const { login, signup, user } = useAuth();
+  const { login, signup, user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   
@@ -17,294 +18,120 @@ const Login: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
 
-  // Check URL params for plan
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const plan = params.get('plan');
     if (plan) {
       setSelectedPlan(plan);
-      setIsLogin(false); // Auto switch to signup if plan is present
+      setIsLogin(false);
     }
   }, [location.search]);
 
-  // Handle redirect after login (for existing sessions)
+  // Se já estiver logado, redireciona IMEDIATAMENTE
   useEffect(() => {
-    if (user && !loading) {
-        // Only redirect via effect if we are NOT in the middle of a submission process
-        // to avoid race conditions with manual redirects
-        console.log("Auth Effect: User detected, redirecting...");
-        if (selectedPlan) {
-            navigate('/checkout'); 
-        } else {
-            navigate('/');
-        }
+    if (user && !authLoading) {
+        navigate(selectedPlan ? '/checkout' : '/', { replace: true });
     }
-  }, [user, navigate, selectedPlan]); // Removed loading dependency to allow effect on mount
-
-  const formatCPF = (value: string) => {
-    return value
-      .replace(/\D/g, '') // Remove non-digits
-      .replace(/(\d{3})(\d)/, '$1.$2')
-      .replace(/(\d{3})(\d)/, '$1.$2')
-      .replace(/(\d{3})(\d{1,2})/, '$1-$2')
-      .replace(/(-\d{2})\d+?$/, '$1');
-  };
-
-  const handleCpfChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setCpf(formatCPF(e.target.value));
-  };
+  }, [user, navigate, selectedPlan, authLoading]);
 
   const handleSubmit = async (e: React.FormEvent) => {
-    // 1. PREVENT DEFAULT MUST BE FIRST
     e.preventDefault();
-    console.log("1. Submit iniciado via botão (Prevent Default Executado)");
-
+    if (loading) return;
     setLoading(true);
 
     try {
         if (isLogin) {
-            console.log("2. Tentando Login...");
             const success = await login(email, password);
-            console.log("3. Resultado Login:", success);
-            
-            if (!success) {
-                alert('Falha ao entrar. Verifique seus dados.');
-            }
-            // Redirect is handled by context/effect or we can do it here explicitly
+            if (!success) alert('Dados incorretos.');
         } else {
-            console.log("2. Tentando Signup...", { name, email, cpf, selectedPlan });
-            
-            if (!name) { alert('Preciso saber seu nome.'); setLoading(false); return; }
-            if (!cpf || cpf.length < 14) { alert('CPF é obrigatório para o cadastro.'); setLoading(false); return; }
-            
-            // 3. AWAIT EXPLICIT RETURN
-            const success = await signup(name, email, whatsapp, password, cpf, selectedPlan);
-            console.log("3. Resultado Signup (Boolean):", success);
-            
-            // 4. CHECK SUCCESS BEFORE REDIRECT
-            if (success) {
-                console.log("4. Sucesso confirmado! Redirecionando agora...");
-                
-                // Force explicit navigation to override any effect lag
-                if (selectedPlan) {
-                    console.log("-> Indo para /checkout");
-                    navigate('/checkout');
-                } else {
-                    console.log("-> Indo para /");
-                    navigate('/');
-                }
-            } else {
-                console.warn("4. Falha no cadastro (retorno false do signup)");
-                alert("Não foi possível criar a conta. Verifique se o e-mail já está em uso ou tente novamente.");
+            if (!name || !cpf || cpf.length < 14) {
+                alert('Nome e CPF são obrigatórios.');
+                setLoading(false);
+                return;
             }
+            const success = await signup(name, email, whatsapp, password, cpf, selectedPlan);
+            if (!success) alert("Falha ao criar conta.");
         }
     } catch (error) {
-        console.error("ERRO CRÍTICO NO SUBMIT:", error);
-        alert("Ocorreu um erro inesperado no sistema.");
+        alert("Erro no sistema.");
     } finally {
-        // Only stop loading if we failed, otherwise keep loading while redirecting to avoid flicker
-        // But since we are strict, let's stop it to be safe against hung states
-        // setLoading(false); 
-        // Better:
-        if (isLogin || !user) {
-             setLoading(false);
-        }
+        setLoading(false);
     }
   };
 
   const handleSocialLogin = async (provider: 'google') => {
     setLoading(true);
-    
     const { error } = await dbService.loginSocial(provider);
-    
     if (error) {
-        console.error("Erro no login social:", error);
-        alert("Não foi possível conectar com o provedor social. Tente novamente.");
+        alert("Erro no login Google.");
         setLoading(false);
     }
   };
 
   return (
-    <div className="relative min-h-screen w-full overflow-hidden font-sans flex items-center justify-center p-4 bg-slate-900">
-      
-      {/* 1. BACKGROUND LAYER (Cinematic Photo) */}
+    <div className="relative min-h-screen w-full flex items-center justify-center p-4 bg-slate-900 font-sans">
       <div className="absolute inset-0 z-0">
           <img 
-            src="https://images.unsplash.com/photo-1600585154340-be6161a56a0c?q=80&w=2070&auto=format&fit=crop" 
-            className="w-full h-full object-cover opacity-60 animate-[pulse_20s_ease-in-out_infinite_alternate] scale-105"
-            alt="Luxury Background"
+            src="https://images.unsplash.com/photo-1600585154340-be6161a56a0c?q=80&w=2070" 
+            className="w-full h-full object-cover opacity-60"
+            alt="Background"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-black/30"></div>
       </div>
 
-      {/* 2. GLASS CONTENT WRAPPER */}
-      <div className="relative z-10 w-full max-w-md animate-in fade-in zoom-in-95 duration-700">
-          
-          {/* Logo Header */}
-          <div className="text-center mb-8 flex flex-col items-center drop-shadow-2xl">
-              <div className="w-20 h-20 bg-gradient-to-br from-amber-500 to-orange-600 rounded-3xl flex items-center justify-center text-white text-3xl mb-4 shadow-[0_0_30px_rgba(217,119,6,0.6)] transform rotate-6 border-2 border-white/20 ring-4 ring-black/20">
+      <div className="relative z-10 w-full max-w-md animate-in fade-in zoom-in-95">
+          <div className="text-center mb-8 flex flex-col items-center">
+              <div className="w-20 h-20 bg-gradient-to-br from-amber-500 to-orange-600 rounded-3xl flex items-center justify-center text-white text-3xl mb-4 shadow-xl rotate-6">
                   <i className="fa-solid fa-helmet-safety"></i>
               </div>
-              <h1 className="text-3xl font-black text-white tracking-tight leading-none drop-shadow-lg">
-                  MÃOS DA <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-200 to-orange-400">OBRA</span>
+              <h1 className="text-3xl font-black text-white">
+                  MÃOS DA <span className="text-amber-400">OBRA</span>
               </h1>
-              <p className="text-white/90 text-sm font-medium tracking-wide mt-2 drop-shadow-md text-shadow-sm">
-                  O controle da sua obra na palma da sua mão
-              </p>
+              <p className="text-white/90 text-sm mt-2 font-medium">Controle na palma da sua mão</p>
           </div>
 
-          {/* 3. THE GLASS CARD */}
-          <div className="backdrop-blur-xl bg-black/70 border border-white/10 rounded-[2.5rem] p-8 shadow-2xl relative overflow-hidden group ring-1 ring-white/5">
-              
-              {/* Shine Effect */}
-              <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-transparent via-white/30 to-transparent opacity-50"></div>
-              
-              <div className="text-center mb-6">
-                  <h2 className="text-xl font-bold text-white mb-1">
-                      {isLogin ? 'Bem-vindo de volta' : 'Criar Conta Exclusiva'}
-                  </h2>
-                  <p className="text-sm text-slate-300">
-                      {selectedPlan 
-                        ? `Você selecionou o plano ${selectedPlan}. Crie sua conta para continuar.`
-                        : (isLogin ? 'Gerencie sua obra com maestria.' : 'Comece a construir seu sonho.')
-                      }
-                  </p>
-              </div>
+          <div className="backdrop-blur-xl bg-black/70 border border-white/10 rounded-[2.5rem] p-8 shadow-2xl">
+              <h2 className="text-xl font-bold text-white text-center mb-6">
+                  {isLogin ? 'Bem-vindo de volta' : 'Crie sua conta'}
+              </h2>
 
               <form onSubmit={handleSubmit} className="space-y-4">
-                  
                   {!isLogin && (
                     <>
-                        <div className="relative group">
-                            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                <i className="fa-solid fa-user text-white/50 group-focus-within:text-amber-400 transition-colors"></i>
-                            </div>
-                            <input 
-                                type="text" 
-                                value={name}
-                                onChange={(e) => setName(e.target.value)}
-                                placeholder="Nome Completo"
-                                className="block w-full pl-11 pr-4 py-3.5 bg-white/10 border border-white/10 rounded-xl text-white placeholder-white/40 focus:bg-black/50 focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 transition-all outline-none"
-                            />
-                        </div>
-                        
-                        {/* CPF Field */}
-                        <div className="relative group">
-                            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                <i className="fa-solid fa-id-card text-white/50 group-focus-within:text-amber-400 transition-colors"></i>
-                            </div>
-                            <input 
-                                type="text" 
-                                value={cpf}
-                                onChange={handleCpfChange}
-                                placeholder="CPF (000.000.000-00)"
-                                maxLength={14}
-                                className="block w-full pl-11 pr-4 py-3.5 bg-white/10 border border-white/10 rounded-xl text-white placeholder-white/40 focus:bg-black/50 focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 transition-all outline-none"
-                            />
-                        </div>
+                        <input type="text" placeholder="Nome Completo" value={name} onChange={e => setName(e.target.value)}
+                            className="w-full px-4 py-3 bg-white/10 border border-white/10 rounded-xl text-white outline-none focus:border-amber-500/50" />
+                        <input type="text" placeholder="CPF" value={cpf} onChange={e => setCpf(e.target.value)}
+                            className="w-full px-4 py-3 bg-white/10 border border-white/10 rounded-xl text-white outline-none focus:border-amber-500/50" />
                     </>
                   )}
-
-                  <div className="relative group">
-                      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                          <i className="fa-solid fa-envelope text-white/50 group-focus-within:text-amber-400 transition-colors"></i>
-                      </div>
-                      <input 
-                          type="email" 
-                          value={email}
-                          onChange={(e) => setEmail(e.target.value)}
-                          placeholder="E-mail"
-                          className="block w-full pl-11 pr-4 py-3.5 bg-white/10 border border-white/10 rounded-xl text-white placeholder-white/40 focus:bg-black/50 focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 transition-all outline-none"
-                      />
-                  </div>
-
+                  <input type="email" placeholder="E-mail" value={email} onChange={e => setEmail(e.target.value)}
+                      className="w-full px-4 py-3 bg-white/10 border border-white/10 rounded-xl text-white outline-none focus:border-amber-500/50" />
                   {!isLogin && (
-                     <div className="relative group">
-                        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                            <i className="fa-brands fa-whatsapp text-white/50 group-focus-within:text-amber-400 transition-colors"></i>
-                        </div>
-                        <input 
-                            type="tel" 
-                            value={whatsapp}
-                            onChange={(e) => setWhatsapp(e.target.value)}
-                            placeholder="WhatsApp"
-                            className="block w-full pl-11 pr-4 py-3.5 bg-white/10 border border-white/10 rounded-xl text-white placeholder-white/40 focus:bg-black/50 focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 transition-all outline-none"
-                        />
-                    </div>
+                    <input type="tel" placeholder="WhatsApp" value={whatsapp} onChange={e => setWhatsapp(e.target.value)}
+                        className="w-full px-4 py-3 bg-white/10 border border-white/10 rounded-xl text-white outline-none focus:border-amber-500/50" />
                   )}
+                  <input type="password" placeholder="Senha" value={password} onChange={e => setPassword(e.target.value)}
+                      className="w-full px-4 py-3 bg-white/10 border border-white/10 rounded-xl text-white outline-none focus:border-amber-500/50" />
 
-                  <div className="relative group">
-                      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                          <i className="fa-solid fa-lock text-white/50 group-focus-within:text-amber-400 transition-colors"></i>
-                      </div>
-                      <input 
-                          type="password" 
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                          placeholder="Senha"
-                          className="block w-full pl-11 pr-4 py-3.5 bg-white/10 border border-white/10 rounded-xl text-white placeholder-white/40 focus:bg-black/50 focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/50 transition-all outline-none"
-                      />
-                  </div>
-
-                  {isLogin && (
-                      <div className="flex justify-end">
-                          <a href="#" className="text-xs font-bold text-white/70 hover:text-white transition-colors">Esqueceu a senha?</a>
-                      </div>
-                  )}
-
-                  <button 
-                    type="submit"
-                    disabled={loading}
-                    className="w-full py-4 mt-2 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-white font-bold rounded-xl shadow-lg shadow-orange-900/40 transform active:scale-[0.98] transition-all flex items-center justify-center gap-2 border border-white/10 disabled:opacity-70 disabled:cursor-wait"
-                  >
-                      {loading ? <i className="fa-solid fa-circle-notch fa-spin"></i> : (isLogin ? 'Entrar Agora' : (selectedPlan ? 'Ir para Pagamento' : 'Cadastrar Grátis'))}
-                      {!loading && <i className="fa-solid fa-arrow-right"></i>}
+                  <button type="submit" disabled={loading}
+                    className="w-full py-4 bg-amber-500 text-white font-bold rounded-xl shadow-lg hover:bg-amber-400 active:scale-95 transition-all flex items-center justify-center gap-2">
+                      {loading ? <i className="fa-solid fa-circle-notch fa-spin"></i> : (isLogin ? 'Entrar' : 'Cadastrar')}
                   </button>
-
-                  {/* Divider */}
-                  <div className="relative py-4">
-                      <div className="absolute inset-0 flex items-center">
-                          <div className="w-full border-t border-white/10"></div>
-                      </div>
-                      <div className="relative flex justify-center">
-                          <span className="bg-transparent px-2 text-[10px] text-white/50 uppercase tracking-widest bg-black/40 backdrop-blur-sm rounded-full">Ou entre com</span>
-                      </div>
-                  </div>
-
-                  {/* Social Login - Glass Style */}
-                  <div className="mt-4">
-                      <button 
-                          type="button"
-                          onClick={() => handleSocialLogin('google')} 
-                          className="w-full flex items-center justify-center gap-2 h-12 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-white transition-all hover:-translate-y-0.5 active:scale-95"
-                      >
+                  
+                  <div className="mt-4 flex flex-col gap-3">
+                      <button type="button" onClick={() => handleSocialLogin('google')} 
+                          className="w-full h-12 rounded-xl bg-white/5 border border-white/10 text-white flex items-center justify-center gap-2">
                           <img src="https://www.svgrepo.com/show/475656/google-color.svg" className="w-5 h-5" alt="Google" />
-                          <span className="text-sm font-bold">Continuar com Google</span>
+                          <span className="text-sm font-bold">Entrar com Google</span>
+                      </button>
+                      <button type="button" onClick={() => setIsLogin(!isLogin)} className="text-amber-400 text-sm font-bold underline">
+                        {isLogin ? 'Criar uma conta' : 'Já tenho conta'}
                       </button>
                   </div>
               </form>
           </div>
-          
-          {/* Footer Text */}
-          <div className="text-center mt-6">
-              <p className="text-sm text-white/70 drop-shadow-md">
-                  {isLogin ? 'Não tem conta?' : 'Já é membro?'}
-                  <button 
-                    onClick={() => {
-                        setIsLogin(!isLogin);
-                        // Reset erro states if any
-                    }}
-                    type="button"
-                    className="ml-2 font-bold text-amber-400 hover:text-amber-300 transition-colors underline decoration-amber-400/50 underline-offset-4"
-                  >
-                      {isLogin ? 'Criar conta' : 'Fazer Login'}
-                  </button>
-              </p>
-          </div>
-
       </div>
     </div>
   );
 };
-
 export default Login;
