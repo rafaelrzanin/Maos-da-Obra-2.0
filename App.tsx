@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, createContext, useContext, useMemo } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { User, PlanType } from './types';
@@ -108,11 +107,10 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
 
 // Layout Component
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, loading, logout, isSubscriptionValid, refreshUser, updatePlan } = useAuth();
+  const { user, loading, logout, isSubscriptionValid, updatePlan } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   useEffect(() => {
       const params = new URLSearchParams(location.search);
@@ -151,11 +149,6 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             </span>
             <span>MÃOS DA OBRA</span>
         </h1>
-        {isSubscriptionValid && (
-            <button onClick={() => setIsMobileMenuOpen(true)} className="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center">
-                <i className="fa-solid fa-bars text-lg"></i>
-            </button>
-        )}
       </div>
 
       {/* Sidebar Desktop */}
@@ -186,7 +179,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
       <main className="flex-1 p-4 md:p-8 overflow-y-auto">
         {!isSubscriptionValid && isSettingsPage && (
-            <div className="bg-red-500 text-white p-4 rounded-xl mb-6 flex items-center justify-between shadow-lg">
+            <div className="bg-danger text-white p-4 rounded-xl mb-6 flex items-center justify-between shadow-lg">
                 <p className="text-sm font-bold"><i className="fa-solid fa-lock mr-2"></i> Assinatura Inativa. Escolha um plano abaixo para liberar o acesso.</p>
                 <button onClick={logout} className="text-xs bg-white/20 px-3 py-2 rounded-lg font-bold">Sair</button>
             </div>
