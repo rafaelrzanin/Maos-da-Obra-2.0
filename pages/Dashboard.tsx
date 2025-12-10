@@ -104,22 +104,34 @@ const Dashboard: React.FC = () => {
   };
 
   const confirmDelete = async () => {
-      if (zeModal.workId) {
-          await dbService.deleteWork(zeModal.workId);
-          
-          // Refresh List
-          const updatedWorks = works.filter(w => w.id !== zeModal.workId);
-          setWorks(updatedWorks);
-          setZeModal({isOpen: false, title: '', message: ''});
-
-          // Handle Focus
-          if (focusWork && focusWork.id === zeModal.workId) {
-              if (updatedWorks.length > 0) {
-                  handleSwitchWork(updatedWorks[0]);
-              } else {
-                  setFocusWork(null);
-                  setLoading(false);
-              }
+      if (zeModal.workId && user) {
+          try {
+            setLoading(true);
+            await dbService.deleteWork(zeModal.workId);
+            
+            // Reload works from source to be safe
+            const updatedWorks = await dbService.getWorks(user.id);
+            setWorks(updatedWorks);
+            setZeModal({isOpen: false, title: '', message: ''});
+  
+            // Handle Focus
+            if (updatedWorks.length > 0) {
+                // If the deleted work was the focused one, switch to the first available
+                // If another work was focused, keep it, unless it's gone
+                const stillExists = updatedWorks.find(w => w.id === focusWork?.id);
+                if (stillExists) {
+                    handleSwitchWork(stillExists);
+                } else {
+                    handleSwitchWork(updatedWorks[0]);
+                }
+            } else {
+                setFocusWork(null);
+                setLoading(false);
+            }
+          } catch (e) {
+              console.error("Erro ao apagar", e);
+              alert("Erro ao excluir obra. Tente novamente.");
+              setLoading(false);
           }
       }
   };
