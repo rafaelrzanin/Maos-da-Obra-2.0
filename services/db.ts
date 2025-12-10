@@ -1,3 +1,4 @@
+
 import { 
   User, Work, Step, Expense, Material, WorkPhoto, WorkFile,
   PlanType, WorkStatus, StepStatus, Notification,
@@ -559,14 +560,14 @@ export const dbService = {
                 await supabase.from('steps').insert(stepsPayload);
             }
 
-            // Materials logic
+            // Materials logic (Standard Initial - Basic 3)
             const materialsPayload: any[] = [];
             FULL_MATERIAL_PACKAGES.forEach(pkg => {
                 pkg.items.slice(0, 3).forEach(item => {
                     materialsPayload.push({
                         work_id: newWork.id,
                         name: item.name,
-                        planned_qty: 10,
+                        planned_qty: Math.ceil(newWork.area * (item.multiplier || 0)), // Initial smart calc
                         purchased_qty: 0,
                         unit: item.unit,
                         category: pkg.category
@@ -632,7 +633,7 @@ export const dbService = {
                     id: Math.random().toString(36).substr(2, 9),
                     workId: id,
                     name: item.name,
-                    plannedQty: 10,
+                    plannedQty: Math.ceil(newWork.area * (item.multiplier || 0)),
                     purchasedQty: 0,
                     unit: item.unit,
                     category: pkg.category
@@ -940,37 +941,82 @@ export const dbService = {
     return newMat;
   },
 
-  importMaterialPackage: async (workId: string, category: string): Promise<number> => {
-    const pkg = FULL_MATERIAL_PACKAGES.find(p => p.category === category);
-    if (!pkg) return 0;
+  importMaterialPackage: async (workId: string, category: string, onlyPending: boolean = false): Promise<number> => {
+    // 1. Get Work Data for Area Calculation
+    const work = await dbService.getWorkById(workId);
+    if (!work) return 0;
     
-    if (supabase) {
-        const items = pkg.items.map(item => ({
-            work_id: workId,
-            name: item.name,
-            planned_qty: 1,
-            purchased_qty: 0,
-            unit: item.unit,
-            category
-        }));
-        await supabase.from('materials').insert(items);
-        return pkg.items.length;
+    // 2. Determine Categories to Import
+    let targetCategories: string[] = [];
+    
+    if (category === 'ALL_PENDING') {
+        const steps = await dbService.getSteps(workId);
+        // Filter steps that are NOT completed (Not Started or In Progress)
+        const pendingSteps = steps.filter(s => s.status !== StepStatus.COMPLETED);
+        
+        // Map pending steps to Material Categories (Fuzzy Match or Direct Logic)
+        pendingSteps.forEach(step => {
+            // Check if step name matches a material category keyword
+            const foundPackage = FULL_MATERIAL_PACKAGES.find(pkg => {
+                // Simple keyword check: if Step is "Fundações", matches package "Fundação"
+                const normalize = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+                return normalize(step.name).includes(normalize(pkg.category)) || 
+                       normalize(pkg.category).includes(normalize(step.name));
+            });
+            if (foundPackage) {
+                targetCategories.push(foundPackage.category);
+            }
+        });
+        
+        // Remove duplicates
+        targetCategories = [...new Set(targetCategories)];
+        
+        // If no match found but pending steps exist, verify if we should add basic packages
+        // For MVP, just target found matches.
+    } else {
+        targetCategories = [category];
     }
 
-    const db = getLocalDb();
-    pkg.items.forEach(item => {
-        db.materials.push({
-            id: Math.random().toString(36).substr(2, 9),
-            workId,
-            name: item.name,
-            plannedQty: 1,
-            purchasedQty: 0,
-            unit: item.unit,
-            category
-        });
-    });
-    saveLocalDb(db);
-    return pkg.items.length;
+    let totalImported = 0;
+
+    for (const cat of targetCategories) {
+        const pkg = FULL_MATERIAL_PACKAGES.find(p => p.category === cat);
+        if (!pkg) continue;
+
+        if (supabase) {
+            const items = pkg.items.map(item => ({
+                work_id: workId,
+                name: item.name,
+                planned_qty: Math.ceil(work.area * (item.multiplier || 0)), // SMART CALCULATION
+                purchased_qty: 0,
+                unit: item.unit,
+                category: cat
+            }));
+            // Remove items with 0 qty if preferred, or keep as 0 for user to fill. 
+            // Keeping > 0 makes more sense for "Smart" calc, but user might want checklist.
+            // Let's keep all, but calc applies where multiplier exists.
+            
+            await supabase.from('materials').insert(items);
+            totalImported += items.length;
+        } else {
+            const db = getLocalDb();
+            pkg.items.forEach(item => {
+                db.materials.push({
+                    id: Math.random().toString(36).substr(2, 9),
+                    workId,
+                    name: item.name,
+                    plannedQty: Math.ceil(work.area * (item.multiplier || 0)),
+                    purchasedQty: 0,
+                    unit: item.unit,
+                    category: cat
+                });
+            });
+            saveLocalDb(db);
+            totalImported += pkg.items.length;
+        }
+    }
+
+    return totalImported;
   },
 
   updateMaterial: async (data: Material, cost?: number, qtyAdded?: number): Promise<Material> => {
