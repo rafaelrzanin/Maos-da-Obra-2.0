@@ -256,20 +256,163 @@ const WorkDetail: React.FC = () => {
 
     // --- SUB-VIEWS (MORE TAB) ---
     if (subView !== 'NONE') {
-        // [Existing Subview Code omitted for brevity, it remains the same structure as previous answer, focusing on the changes requested]
-        // Retaining the same structure for subviews to ensure user experience consistency.
         return (
             <div className="min-h-screen bg-slate-50 dark:bg-slate-950 pb-20">
+                {/* Header Subview */}
                 <div className="bg-white dark:bg-slate-900 sticky top-0 z-30 px-4 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center gap-4 shadow-sm">
                     <button onClick={() => setSubView('NONE')} className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 hover:bg-slate-200 transition-colors">
                         <i className="fa-solid fa-arrow-left"></i>
                     </button>
                     <h2 className="text-lg font-bold text-primary dark:text-white uppercase tracking-wide">
-                        Voltar
+                        {subView === 'TEAM' && 'Minha Equipe'}
+                        {subView === 'SUPPLIERS' && 'Fornecedores'}
+                        {subView === 'REPORTS' && 'Relatórios'}
+                        {subView === 'BONUS_IA' && 'Zé da Obra AI'}
+                        {subView === 'CONTRACTS' && 'Modelos de Contrato'}
+                        {subView === 'CHECKLIST' && 'Checklists Anti-Erro'}
+                        {subView === 'CALCULATORS' && 'Calculadoras'}
+                        {subView === 'PHOTOS' && 'Fotos da Obra'}
+                        {subView === 'FILES' && 'Arquivos'}
                     </h2>
                 </div>
-                {/* Simplified placeholder for subviews since the core logic change is in tabs */}
-                 <div className="p-8 text-center text-slate-500">Funcionalidade de submenu mantida.</div>
+
+                <div className="p-4 max-w-3xl mx-auto animate-in slide-in-from-right-10">
+                    {/* TEAM LIST */}
+                    {subView === 'TEAM' && (
+                        <div className="space-y-3">
+                            {workers.length === 0 && <p className="text-center text-slate-500 py-8">Nenhum profissional cadastrado.</p>}
+                            {workers.map(w => (
+                                <div key={w.id} className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 flex justify-between items-center shadow-sm">
+                                    <div>
+                                        <h4 className="font-bold text-primary dark:text-white">{w.name}</h4>
+                                        <p className="text-sm text-slate-500">{w.role}</p>
+                                    </div>
+                                    <a href={`https://wa.me/55${w.phone.replace(/\D/g, '')}`} target="_blank" className="w-10 h-10 bg-green-100 text-green-600 rounded-full flex items-center justify-center">
+                                        <i className="fa-brands fa-whatsapp text-xl"></i>
+                                    </a>
+                                </div>
+                            ))}
+                            <button onClick={() => alert("Funcionalidade de adicionar equipe em breve.")} className="w-full py-4 rounded-xl border-2 border-dashed border-slate-300 text-slate-400 font-bold hover:bg-slate-50 transition-colors">+ Adicionar Profissional</button>
+                        </div>
+                    )}
+
+                    {/* SUPPLIERS LIST */}
+                    {subView === 'SUPPLIERS' && (
+                        <div className="space-y-3">
+                             <p className="text-center text-slate-500 py-8">Gestão de fornecedores em breve.</p>
+                        </div>
+                    )}
+
+                    {/* AI CHAT */}
+                    {subView === 'BONUS_IA' && (
+                        <div className="flex flex-col h-[80vh]">
+                            <div className="flex-1 bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-inner overflow-y-auto mb-4 border border-slate-200 dark:border-slate-800">
+                                <div className="flex gap-4 mb-6">
+                                    <img src={ZE_AVATAR} className="w-12 h-12 rounded-full border-2 border-slate-200" onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK}/>
+                                    <div className="bg-slate-100 dark:bg-slate-800 p-3 rounded-tr-xl rounded-b-xl text-sm">
+                                        <p className="font-bold text-secondary mb-1">Zé da Obra</p>
+                                        <p>Opa! Mestre de obras na área. Pode perguntar qualquer coisa sobre traço de concreto, elétrica, encanamento ou dúvidas gerais que eu te ajudo!</p>
+                                    </div>
+                                </div>
+                                {aiResponse && (
+                                    <div className="flex gap-4 mb-6 animate-in fade-in">
+                                        <img src={ZE_AVATAR} className="w-12 h-12 rounded-full border-2 border-slate-200" onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK}/>
+                                        <div className="bg-slate-100 dark:bg-slate-800 p-3 rounded-tr-xl rounded-b-xl text-sm">
+                                            <p className="font-bold text-secondary mb-1">Zé da Obra</p>
+                                            <p className="whitespace-pre-wrap">{aiResponse}</p>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                            <div className="flex gap-2">
+                                <input 
+                                    value={aiMessage} 
+                                    onChange={e => setAiMessage(e.target.value)}
+                                    placeholder="Ex: Qual o traço para contrapiso?" 
+                                    className="flex-1 p-4 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-secondary"
+                                />
+                                <button onClick={handleAiAsk} disabled={aiLoading} className="w-14 bg-secondary text-white rounded-xl flex items-center justify-center shadow-lg">
+                                    {aiLoading ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-paper-plane"></i>}
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* REPORTS */}
+                    {subView === 'REPORTS' && (
+                        <div className="space-y-4">
+                            <div onClick={handlePrint} className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-4 cursor-pointer hover:border-secondary transition-colors group">
+                                <div className="w-14 h-14 bg-red-100 text-red-600 rounded-xl flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">
+                                    <i className="fa-solid fa-file-pdf"></i>
+                                </div>
+                                <div>
+                                    <h3 className="font-bold text-lg text-primary dark:text-white">Relatório em PDF</h3>
+                                    <p className="text-sm text-slate-500">Cronograma, Materiais e Financeiro prontos para impressão.</p>
+                                </div>
+                            </div>
+                            <div onClick={exportXLS} className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-4 cursor-pointer hover:border-secondary transition-colors group">
+                                <div className="w-14 h-14 bg-green-100 text-green-600 rounded-xl flex items-center justify-center text-2xl group-hover:scale-110 transition-transform">
+                                    <i className="fa-solid fa-file-excel"></i>
+                                </div>
+                                <div>
+                                    <h3 className="font-bold text-lg text-primary dark:text-white">Exportar para Excel</h3>
+                                    <p className="text-sm text-slate-500">Baixe a planilha completa para editar no computador.</p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* CONTRACTS */}
+                    {subView === 'CONTRACTS' && (
+                        <div className="space-y-4">
+                            {CONTRACT_TEMPLATES.map(ct => (
+                                <div key={ct.id} className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                                    <div className="flex justify-between items-start mb-2">
+                                        <h4 className="font-bold text-primary dark:text-white">{ct.title}</h4>
+                                        <button 
+                                            onClick={() => {navigator.clipboard.writeText(ct.contentTemplate); alert("Modelo copiado!");}}
+                                            className="text-xs font-bold text-secondary bg-secondary/10 px-2 py-1 rounded hover:bg-secondary hover:text-white transition-colors"
+                                        >
+                                            Copiar Texto
+                                        </button>
+                                    </div>
+                                    <p className="text-xs text-slate-500 mb-3">{ct.description}</p>
+                                    <div className="bg-slate-50 dark:bg-slate-800 p-3 rounded-lg text-[10px] font-mono text-slate-600 dark:text-slate-400 h-24 overflow-hidden relative">
+                                        {ct.contentTemplate}
+                                        <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-slate-50 dark:from-slate-800 to-transparent"></div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {/* CHECKLISTS */}
+                    {subView === 'CHECKLIST' && (
+                        <div className="space-y-4">
+                            {STANDARD_CHECKLISTS.map((cl, idx) => (
+                                <div key={idx} className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
+                                    <button 
+                                        onClick={() => setActiveChecklist(activeChecklist === cl.category ? null : cl.category)}
+                                        className="w-full p-4 flex justify-between items-center text-left hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                                    >
+                                        <span className="font-bold text-sm text-primary dark:text-white">{cl.category}</span>
+                                        <i className={`fa-solid fa-chevron-down transition-transform ${activeChecklist === cl.category ? 'rotate-180' : ''}`}></i>
+                                    </button>
+                                    {activeChecklist === cl.category && (
+                                        <div className="p-4 pt-0 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
+                                            {cl.items.map((item, i) => (
+                                                <label key={i} className="flex items-start gap-3 py-2 cursor-pointer">
+                                                    <input type="checkbox" className="mt-1 rounded border-slate-300 text-secondary focus:ring-secondary" />
+                                                    <span className="text-sm text-slate-600 dark:text-slate-300 leading-tight">{item}</span>
+                                                </label>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
             </div>
         );
     }
@@ -523,12 +666,48 @@ const WorkDetail: React.FC = () => {
                                 <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xl"><i className="fa-solid fa-helmet-safety"></i></div>
                                 <span className="font-bold text-sm text-primary dark:text-white">Equipe</span>
                             </button>
-                            {/* ... Rest of buttons similar to previous structure ... */}
+                            <button onClick={() => setSubView('SUPPLIERS')} className="p-5 bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm hover:border-secondary transition-all flex flex-col items-center gap-3">
+                                <div className="w-12 h-12 bg-orange-100 text-orange-600 rounded-full flex items-center justify-center text-xl"><i className="fa-solid fa-truck-fast"></i></div>
+                                <span className="font-bold text-sm text-primary dark:text-white">Fornecedores</span>
+                            </button>
+                            <button onClick={() => setSubView('REPORTS')} className="p-5 bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm hover:border-secondary transition-all flex flex-col items-center gap-3">
+                                <div className="w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center text-xl"><i className="fa-solid fa-file-pdf"></i></div>
+                                <span className="font-bold text-sm text-primary dark:text-white">Relatórios</span>
+                            </button>
                             <button onClick={() => setSubView('CHECKLIST')} className="p-5 bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm hover:border-secondary transition-all flex flex-col items-center gap-3">
                                 <div className="w-12 h-12 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-xl"><i className="fa-solid fa-list-check"></i></div>
                                 <span className="font-bold text-sm text-primary dark:text-white">Checklists</span>
                             </button>
+                            <button onClick={() => setSubView('CONTRACTS')} className="p-5 bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm hover:border-secondary transition-all flex flex-col items-center gap-3">
+                                <div className="w-12 h-12 bg-slate-100 text-slate-600 rounded-full flex items-center justify-center text-xl"><i className="fa-solid fa-file-signature"></i></div>
+                                <span className="font-bold text-sm text-primary dark:text-white">Contratos</span>
+                            </button>
+                             <button onClick={() => setSubView('PHOTOS')} className="p-5 bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm hover:border-secondary transition-all flex flex-col items-center gap-3">
+                                <div className="w-12 h-12 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center text-xl"><i className="fa-solid fa-camera"></i></div>
+                                <span className="font-bold text-sm text-primary dark:text-white">Fotos</span>
+                            </button>
                         </div>
+
+                        {/* Zé AI Promo */}
+                        <div onClick={() => setSubView('BONUS_IA')} className="bg-gradient-to-r from-secondary to-amber-600 rounded-2xl p-6 text-white shadow-lg cursor-pointer transform transition-transform active:scale-95 relative overflow-hidden group">
+                             <div className="absolute top-0 right-0 w-32 h-32 bg-white/20 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2 group-hover:scale-110 transition-transform"></div>
+                             <div className="flex items-center gap-4 relative z-10">
+                                 <img src={ZE_AVATAR} className="w-16 h-16 rounded-full border-2 border-white bg-slate-800" onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK}/>
+                                 <div className="flex-1">
+                                     <h3 className="text-lg font-black uppercase italic">Zé da Obra AI</h3>
+                                     <p className="text-xs opacity-90 leading-tight mb-2">Seu assistente virtual 24h. Tire dúvidas sobre traço, elétrica e mais.</p>
+                                     <span className="bg-white text-secondary text-[10px] font-bold px-2 py-1 rounded shadow-sm">
+                                         Acessar Agora
+                                     </span>
+                                 </div>
+                             </div>
+                        </div>
+
+                        {/* Calculators Link */}
+                         <button onClick={() => alert("Calculadoras em breve!")} className="w-full bg-slate-800 text-white p-4 rounded-2xl flex items-center justify-between shadow-lg">
+                            <span className="font-bold flex items-center gap-3"><i className="fa-solid fa-calculator text-secondary"></i> Calculadoras de Material</span>
+                            <i className="fa-solid fa-chevron-right text-slate-500"></i>
+                        </button>
                     </div>
                 )}
             </div>
