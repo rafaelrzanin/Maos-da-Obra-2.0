@@ -452,12 +452,16 @@ export const dbService = {
 
   deleteWork: async (workId: string) => {
     if (supabase) {
-        await supabase.from('works').delete().eq('id', workId);
-        // Supabase configured with CASCADE delete usually handles children, 
-        // but explicit delete is safer if cascades aren't set
-        await supabase.from('steps').delete().eq('work_id', workId);
-        await supabase.from('materials').delete().eq('work_id', workId);
+        // EXCLUSÃO MANUAL EM ORDEM DE DEPENDÊNCIA
+        // Importante: Deletar filhos antes do pai para evitar erro de FK constraint se CASCADE não estiver configurado
         await supabase.from('expenses').delete().eq('work_id', workId);
+        await supabase.from('materials').delete().eq('work_id', workId);
+        await supabase.from('steps').delete().eq('work_id', workId);
+        await supabase.from('work_photos').delete().eq('work_id', workId);
+        await supabase.from('work_files').delete().eq('work_id', workId);
+        
+        // Por fim, deleta a obra
+        await supabase.from('works').delete().eq('id', workId);
     } else {
         const db = getLocalDb();
         db.works = db.works.filter(w => w.id !== workId);
@@ -472,25 +476,55 @@ export const dbService = {
 
   createWork: async (workData: Partial<Work>, templateId: string): Promise<Work> => {
     if (supabase) {
-        const { data, error } = await supabase.from('works').insert({
-            user_id: workData.userId,
-            name: workData.name,
-            address: workData.address,
-            budget_planned: workData.budgetPlanned,
-            start_date: workData.startDate,
-            end_date: workData.endDate,
-            area: workData.area,
-            floors: workData.floors,
-            bedrooms: workData.bedrooms,
-            bathrooms: workData.bathrooms,
-            kitchens: workData.kitchens,
-            living_rooms: workData.livingRooms,
-            has_leisure_area: workData.hasLeisureArea,
-            notes: workData.notes,
-            status: WorkStatus.PLANNING
-        }).select().single();
+        // TENTATIVA 1: Inserir com todos os campos novos (Fallback para Schema Antigo)
+        let data, error;
+        
+        try {
+            const result = await supabase.from('works').insert({
+                user_id: workData.userId,
+                name: workData.name,
+                address: workData.address,
+                budget_planned: workData.budgetPlanned,
+                start_date: workData.startDate,
+                end_date: workData.endDate,
+                area: workData.area,
+                floors: workData.floors,
+                bedrooms: workData.bedrooms,
+                bathrooms: workData.bathrooms,
+                kitchens: workData.kitchens,
+                living_rooms: workData.livingRooms,
+                has_leisure_area: workData.hasLeisureArea,
+                notes: workData.notes,
+                status: WorkStatus.PLANNING
+            }).select().single();
+            
+            data = result.data;
+            error = result.error;
+            
+        } catch (e) {
+            console.warn("Falha na criação detalhada, tentando fallback básico...", e);
+            error = e;
+        }
 
-        if (error || !data) throw new Error("Erro ao criar obra no Supabase: " + (error?.message || 'Unknown'));
+        // TENTATIVA 2: Fallback se der erro (provável falta de colunas no DB)
+        if (error || !data) {
+             const fallbackResult = await supabase.from('works').insert({
+                user_id: workData.userId,
+                name: workData.name,
+                address: workData.address,
+                budget_planned: workData.budgetPlanned,
+                start_date: workData.startDate,
+                end_date: workData.endDate,
+                area: workData.area,
+                notes: workData.notes,
+                status: WorkStatus.PLANNING
+            }).select().single();
+            
+            if (fallbackResult.error) {
+                throw new Error("Erro Crítico: Não foi possível criar a obra nem com dados básicos. " + fallbackResult.error.message);
+            }
+            data = fallbackResult.data;
+        }
 
         const newWork = {
             ...data,
