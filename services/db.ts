@@ -1,12 +1,12 @@
 import { supabase } from './supabase';
-import { User, Work, Step, Material, Worker, Supplier, PlanType, StepStatus, Notification, WorkStatus, Expense } from '../types';
+import { User, Work, Step, Material, Worker, Supplier, PlanType, StepStatus, Notification, WorkStatus, Expense, WorkPhoto, WorkFile } from '../types';
 import { FULL_MATERIAL_PACKAGES, WORK_TEMPLATES } from './standards';
 
 const STORAGE_KEY = 'maos_db_v1';
 
 const getLocalDb = () => {
     const s = localStorage.getItem(STORAGE_KEY);
-    return s ? JSON.parse(s) : { users: [], works: [], steps: [], materials: [], expenses: [], workers: [], suppliers: [], notifications: [] };
+    return s ? JSON.parse(s) : { users: [], works: [], steps: [], materials: [], expenses: [], workers: [], suppliers: [], notifications: [], photos: [], files: [] };
 };
 
 const saveLocalDb = (data: any) => localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
@@ -26,7 +26,6 @@ export const dbService = {
   syncSession: async () => {
       if (supabase) {
           const { data: { session: _session } } = await supabase.auth.getSession();
-          // Logic to sync session if needed
       }
       return dbService.getCurrentUser();
   },
@@ -107,21 +106,40 @@ export const dbService = {
   createWork: async (workData: Partial<Work>, templateId: string): Promise<Work> => {
       const db = getLocalDb();
       const newWork: Work = {
-          ...workData as Work,
           id: Math.random().toString(36).substr(2, 9),
+          userId: workData.userId!,
+          name: workData.name || 'Nova Obra',
+          address: workData.address || '',
+          budgetPlanned: workData.budgetPlanned || 0,
+          startDate: workData.startDate || new Date().toISOString().split('T')[0],
+          endDate: workData.endDate || new Date().toISOString().split('T')[0],
+          area: workData.area || 0,
+          floors: workData.floors,
+          bedrooms: workData.bedrooms,
+          bathrooms: workData.bathrooms,
+          kitchens: workData.kitchens,
+          livingRooms: workData.livingRooms,
+          hasLeisureArea: workData.hasLeisureArea,
+          notes: workData.notes || '',
           status: WorkStatus.PLANNING
       };
+      
       db.works.push(newWork);
       
+      // Inteligência de Geração de Etapas baseada no Template
       const template = WORK_TEMPLATES.find(t => t.id === templateId);
-      if (template) {
-         // Sort steps to ensure chronological order creation if template is ordered
+      
+      if (template && template.includedSteps) {
+         const totalDuration = template.defaultDurationDays || 90;
+         const stepDuration = Math.max(2, Math.floor(totalDuration / template.includedSteps.length));
+         
          template.includedSteps.forEach((stepName, idx) => {
-             // Create dates based on idx to spread them out slightly for demo
              const startDate = new Date(newWork.startDate);
-             startDate.setDate(startDate.getDate() + (idx * 15)); // 15 days per step estimate
+             // Escalonamento simples: cada etapa começa um pouco depois da anterior
+             startDate.setDate(startDate.getDate() + (idx * stepDuration)); 
+             
              const endDate = new Date(startDate);
-             endDate.setDate(endDate.getDate() + 14);
+             endDate.setDate(endDate.getDate() + stepDuration);
 
              db.steps.push({
                  id: Math.random().toString(36).substr(2, 9),
@@ -133,6 +151,17 @@ export const dbService = {
                  isDelayed: false
              });
          });
+      } else {
+          // Fallback se não houver template: Criar etapa genérica
+          db.steps.push({
+             id: Math.random().toString(36).substr(2, 9),
+             workId: newWork.id,
+             name: 'Início da Obra',
+             startDate: newWork.startDate,
+             endDate: newWork.endDate,
+             status: StepStatus.NOT_STARTED,
+             isDelayed: false
+          });
       }
       
       saveLocalDb(db);
@@ -141,7 +170,17 @@ export const dbService = {
 
   deleteWork: async (workId: string) => {
       const db = getLocalDb();
+      
+      // EXCLUSÃO EM CASCATA (Limpa tudo relacionado à obra)
       db.works = db.works.filter((w: Work) => w.id !== workId);
+      db.steps = db.steps.filter((s: Step) => s.workId !== workId);
+      db.materials = db.materials.filter((m: Material) => m.workId !== workId);
+      db.expenses = db.expenses.filter((e: Expense) => e.workId !== workId);
+      
+      // Limpa arrays opcionais se existirem
+      if (db.photos) db.photos = db.photos.filter((p: WorkPhoto) => p.workId !== workId);
+      if (db.files) db.files = db.files.filter((f: WorkFile) => f.workId !== workId);
+      
       saveLocalDb(db);
   },
 
@@ -234,7 +273,6 @@ export const dbService = {
     
     if (category === 'ALL_PENDING') {
         const steps = await dbService.getSteps(workId);
-        // "Smart" logic: if no steps found, maybe assume standard construction steps for robustness
         const pendingSteps = steps.filter(s => s.status !== StepStatus.COMPLETED);
         
         pendingSteps.forEach(step => {
@@ -243,8 +281,7 @@ export const dbService = {
                 const stepNorm = normalize(step.name);
                 const pkgNorm = normalize(pkg.category);
                 
-                // Enhanced matching for plurals (Fundação vs Fundações)
-                // Check if one contains the stem of the other (first 5 chars)
+                // Enhanced matching logic
                 const stepStem = stepNorm.substring(0, 5);
                 const pkgStem = pkgNorm.substring(0, 5);
 
@@ -265,13 +302,8 @@ export const dbService = {
     for (const cat of targetCategories) {
         const pkg = FULL_MATERIAL_PACKAGES.find(p => p.category === cat);
         if (!pkg) continue;
-
-        if (supabase) {
-             // Supabase logic omitted for brevity in local demo, assuming local DB primarily
-        } 
         
         const db = getLocalDb();
-        // Check duplicates to avoid adding same material twice
         const existingMaterials = db.materials.filter((m: Material) => m.workId === workId && m.category === cat);
         
         pkg.items.forEach(item => {
