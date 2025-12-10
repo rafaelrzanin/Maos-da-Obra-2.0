@@ -5,7 +5,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { dbService } from '../services/db';
 
 const Login: React.FC = () => {
-  const { login, signup, user, loading: authLoading } = useAuth();
+  const { login, signup, user, loading: authLoading, isSubscriptionValid } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   
@@ -30,17 +30,22 @@ const Login: React.FC = () => {
 
   // Main redirect logic
   useEffect(() => {
-    // Only redirect if user exists and we are not in a local loading state (to avoid flickers)
-    // and auth is done loading
-    if (user && !authLoading && !loading) {
+    // Only redirect if user exists and auth is done loading
+    if (user && !authLoading) {
+        // 1. Se tem um plano selecionado na URL (fluxo de compra), vai pro Checkout
         if (selectedPlan) {
             navigate('/checkout', { replace: true });
-        } else {
-            // New account flow: go to settings to choose plan
+        } 
+        // 2. Se já tem assinatura válida (Vitalício ou Ativo), vai pro Dashboard
+        else if (isSubscriptionValid) {
+            navigate('/', { replace: true });
+        } 
+        // 3. Se é conta nova ou expirada sem plano selecionado, vai para Configurações escolher
+        else {
             navigate('/settings', { replace: true });
         }
     }
-  }, [user, navigate, selectedPlan, authLoading, loading]);
+  }, [user, navigate, selectedPlan, authLoading, isSubscriptionValid]);
 
   // Helper for CPF mask
   const handleCpfChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -64,9 +69,9 @@ const Login: React.FC = () => {
             const success = await login(email, password);
             if (!success) {
                 alert('Dados incorretos ou usuário não encontrado.');
-                setLoading(false); // Stop loading on error
+                setLoading(false); // Stop loading on error to allow retry
             } 
-            // If success, useEffect will handle redirect, but we can leave loading true to prevent UI flash
+            // If success, useEffect will handle redirect.
         } else {
             // Signup Flow
             const cleanCpf = cpf.replace(/\D/g, '');
@@ -83,11 +88,6 @@ const Login: React.FC = () => {
                 setLoading(false);
             }
             // If success, user state updates, triggering useEffect -> navigate
-            // Keeping loading=true makes the transition smoother until unmount
-            // However, to be safe against loops, we can set loading false after a timeout if navigation doesn't happen
-            if(success) {
-                setTimeout(() => setLoading(false), 2000); // Safety fallback
-            }
         }
     } catch (error) {
         alert("Erro no sistema. Verifique sua conexão.");
@@ -155,7 +155,7 @@ const Login: React.FC = () => {
                       {loading ? (
                         <>
                             <i className="fa-solid fa-circle-notch fa-spin"></i>
-                            <span>Processando...</span>
+                            <span>Acessando...</span>
                         </>
                       ) : (isLogin ? 'Entrar' : 'Cadastrar')}
                   </button>
