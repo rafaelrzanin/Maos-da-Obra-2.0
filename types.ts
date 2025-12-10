@@ -79,7 +79,7 @@ export interface Expense {
   paidAmount?: number; 
   quantity?: number; 
   date: string;
-  category: ExpenseCategory;
+  category: ExpenseCategory | string;
   relatedMaterialId?: string; 
   stepId?: string; 
   workerId?: string; 
@@ -95,6 +95,7 @@ export interface Material {
   id: string;
   workId: string;
   name: string;
+  brand?: string; // New field for brand/specification
   plannedQty: number;
   purchasedQty: number;
   unit: string;
