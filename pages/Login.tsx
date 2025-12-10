@@ -18,6 +18,7 @@ const Login: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
 
+  // Detect plan from URL
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const plan = params.get('plan');
@@ -27,25 +28,25 @@ const Login: React.FC = () => {
     }
   }, [location.search]);
 
-  // Se já estiver logado, redireciona
+  // Main redirect logic
   useEffect(() => {
-    if (user && !authLoading) {
-        // CORREÇÃO DE FLUXO:
-        // Se tem plano selecionado (veio de um link de plano) -> Checkout
-        // Se NÃO tem plano (criou conta direto) -> Settings (Tela de Planos) para escolher
+    // Only redirect if user exists and we are not in a local loading state (to avoid flickers)
+    // and auth is done loading
+    if (user && !authLoading && !loading) {
         if (selectedPlan) {
             navigate('/checkout', { replace: true });
         } else {
+            // New account flow: go to settings to choose plan
             navigate('/settings', { replace: true });
         }
     }
-  }, [user, navigate, selectedPlan, authLoading]);
+  }, [user, navigate, selectedPlan, authLoading, loading]);
 
-  // Helper para máscara de CPF
+  // Helper for CPF mask
   const handleCpfChange = (e: React.ChangeEvent<HTMLInputElement>) => {
       let v = e.target.value.replace(/\D/g, '');
       if (v.length > 11) v = v.slice(0, 11);
-      // Aplica máscara visual simples se desejar, mas o valor puro é o que importa
+      
       if (v.length > 9) v = v.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
       else if (v.length > 6) v = v.replace(/(\d{3})(\d{3})(\d{1,3})/, "$1.$2.$3");
       else if (v.length > 3) v = v.replace(/(\d{3})(\d{1,3})/, "$1.$2");
@@ -61,9 +62,13 @@ const Login: React.FC = () => {
     try {
         if (isLogin) {
             const success = await login(email, password);
-            if (!success) alert('Dados incorretos.');
+            if (!success) {
+                alert('Dados incorretos ou usuário não encontrado.');
+                setLoading(false); // Stop loading on error
+            } 
+            // If success, useEffect will handle redirect, but we can leave loading true to prevent UI flash
         } else {
-            // VALIDAÇÃO DE CPF CORRIGIDA
+            // Signup Flow
             const cleanCpf = cpf.replace(/\D/g, '');
             
             if (!name || cleanCpf.length !== 11) {
@@ -72,14 +77,21 @@ const Login: React.FC = () => {
                 return;
             }
             
-            // Passamos o selectedPlan se existir, mas o redirecionamento principal ocorre no useEffect
             const success = await signup(name, email, whatsapp, password, cpf, selectedPlan);
-            if (!success) alert("Falha ao criar conta.");
+            if (!success) {
+                alert("Falha ao criar conta. Tente novamente.");
+                setLoading(false);
+            }
+            // If success, user state updates, triggering useEffect -> navigate
+            // Keeping loading=true makes the transition smoother until unmount
+            // However, to be safe against loops, we can set loading false after a timeout if navigation doesn't happen
+            if(success) {
+                setTimeout(() => setLoading(false), 2000); // Safety fallback
+            }
         }
     } catch (error) {
-        alert("Erro no sistema.");
+        alert("Erro no sistema. Verifique sua conexão.");
         console.error(error);
-    } finally {
         setLoading(false);
     }
   };
@@ -139,8 +151,13 @@ const Login: React.FC = () => {
                       className="w-full px-4 py-3 bg-white/10 border border-white/10 rounded-xl text-white outline-none focus:border-amber-500/50" />
 
                   <button type="submit" disabled={loading}
-                    className="w-full py-4 bg-amber-500 text-white font-bold rounded-xl shadow-lg hover:bg-amber-400 active:scale-95 transition-all flex items-center justify-center gap-2">
-                      {loading ? <i className="fa-solid fa-circle-notch fa-spin"></i> : (isLogin ? 'Entrar' : 'Cadastrar')}
+                    className="w-full py-4 bg-amber-500 text-white font-bold rounded-xl shadow-lg hover:bg-amber-400 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-wait">
+                      {loading ? (
+                        <>
+                            <i className="fa-solid fa-circle-notch fa-spin"></i>
+                            <span>Processando...</span>
+                        </>
+                      ) : (isLogin ? 'Entrar' : 'Cadastrar')}
                   </button>
                   
                   <div className="mt-4 flex flex-col gap-3">
