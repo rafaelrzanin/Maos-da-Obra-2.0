@@ -151,27 +151,27 @@ export const dbService = {
                  isDelayed: false
              });
 
-             // INTELIGÊNCIA DE MATERIAIS - CORRELAÇÃO MAIS FORTE
+             // INTELIGÊNCIA DE MATERIAIS - CORRELAÇÃO DE PALAVRAS-CHAVE
              const normalize = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
              const stepNorm = normalize(stepName);
 
-             // Mapeamento direto de palavras-chave da etapa para categorias de material
-             // Isso garante que se a etapa é "Fundações", pegamos os materiais de "Fundação"
+             // Mapeamento manual de pacotes para garantir que "Fundações" pegue "Fundação"
              const pkg = FULL_MATERIAL_PACKAGES.find(p => {
                  const pkgNorm = normalize(p.category);
                  
-                 // Lógica de "Contém" bidirecional + casos específicos
-                 if (stepNorm.includes(pkgNorm)) return true; // Ex: Step "Fundações" inclui Pkg "Fundação"
-                 if (pkgNorm.includes(stepNorm)) return true;
+                 // 1. Match exato parcial (ex: "Fundação" em "Fundações")
+                 if (stepNorm.includes(pkgNorm.substring(0, 4))) return true; 
                  
-                 // Casos especiais
+                 // 2. Mapeamentos específicos
                  if (stepNorm.includes('parede') && pkgNorm.includes('alvenaria')) return true;
-                 if (stepNorm.includes('laje') && pkgNorm.includes('alvenaria')) return true; // Ferro/Cimento
+                 if (stepNorm.includes('laje') && pkgNorm.includes('alvenaria')) return true;
                  if (stepNorm.includes('agua') && pkgNorm.includes('hidraulica')) return true;
+                 if (stepNorm.includes('esgoto') && pkgNorm.includes('hidraulica')) return true;
                  if (stepNorm.includes('fiacao') && pkgNorm.includes('eletrica')) return true;
+                 if (stepNorm.includes('luz') && pkgNorm.includes('eletrica')) return true;
                  if (stepNorm.includes('piso') && pkgNorm.includes('acabamento')) return true;
                  if (stepNorm.includes('azulejo') && pkgNorm.includes('acabamento')) return true;
-                 if (stepNorm.includes('pintura') && pkgNorm.includes('pintura')) return true;
+                 if (stepNorm.includes('chapisco') && pkgNorm.includes('alvenaria')) return true; // Cimento/Areia
 
                  return false;
              });
@@ -182,12 +182,12 @@ export const dbService = {
                         id: Math.random().toString(36).substr(2, 9),
                         workId: newWork.id,
                         name: item.name,
-                        brand: '', // Brand start empty
+                        brand: '',
                         plannedQty: Math.ceil(newWork.area * (item.multiplier || 0)),
                         purchasedQty: 0,
                         unit: item.unit,
                         category: pkg.category,
-                        stepId: newStepId // VÍNCULO DIRETO COM A ETAPA
+                        stepId: newStepId // VÍNCULO DIRETO COM A ETAPA CRIADA
                      });
                  });
              }
@@ -252,6 +252,14 @@ export const dbService = {
       const db = getLocalDb();
       return db.steps.filter((s: Step) => s.workId === workId);
   },
+  
+  // --- ADD STEP FUNCTION ---
+  addStep: async (step: Step) => {
+      const db = getLocalDb();
+      db.steps.push(step);
+      saveLocalDb(db);
+  },
+
   updateStep: async (step: Step) => {
       const db = getLocalDb();
       const idx = db.steps.findIndex((s: Step) => s.id === step.id);
@@ -273,22 +281,40 @@ export const dbService = {
       return db.materials.filter((m: Material) => m.workId === workId);
   },
 
-  // --- ADD MANUAL MATERIAL (Com Vínculo de Etapa) ---
-  addMaterial: async (material: Material) => {
+  // --- ADD MANUAL MATERIAL (Enhanced) ---
+  addMaterial: async (material: Material, purchaseDetails?: { qty: number, cost: number, date: string }) => {
       const db = getLocalDb();
+      
+      // Se houver compra imediata, atualiza o qty comprado
+      if (purchaseDetails && purchaseDetails.qty > 0) {
+          material.purchasedQty = purchaseDetails.qty;
+      }
+      
       db.materials.push(material);
+
+      // Se houver compra imediata, gera o expense
+      if (purchaseDetails && purchaseDetails.qty > 0) {
+          db.expenses.push({
+              id: Math.random().toString(36).substr(2, 9),
+              workId: material.workId,
+              description: `Compra: ${purchaseDetails.qty} ${material.unit} de ${material.name} (${material.brand || 'Novo'})`,
+              amount: purchaseDetails.cost,
+              date: purchaseDetails.date,
+              category: 'Material',
+              relatedMaterialId: material.id,
+              stepId: material.stepId // Vincula à mesma etapa
+          });
+      }
+
       saveLocalDb(db);
   },
   
-  // --- ADD MANUAL EXPENSE (Com Vínculo de Etapa) ---
   addExpense: async (expense: Expense) => {
       const db = getLocalDb();
       db.expenses.push(expense);
       saveLocalDb(db);
   },
 
-  // FUNÇÃO CRÍTICA: ATUALIZA MATERIAL E GERA GASTO
-  // Atualizada para suportar Brand (Marca)
   registerMaterialPurchase: async (
       materialId: string, 
       updatedName: string, 
@@ -304,7 +330,6 @@ export const dbService = {
       if (idx >= 0) {
           const oldMaterial = db.materials[idx];
           
-          // 1. Atualizar dados do material (Nome, Marca, Planejado, Unidade) e incrementar comprado
           db.materials[idx] = {
               ...oldMaterial,
               name: updatedName,
@@ -314,7 +339,6 @@ export const dbService = {
               purchasedQty: oldMaterial.purchasedQty + purchaseQty
           };
 
-          // 2. Se houve compra (qty > 0), gerar gasto no financeiro vinculado à etapa
           if (purchaseQty > 0) {
               db.expenses.push({
                   id: Math.random().toString(36).substr(2, 9),
@@ -324,7 +348,7 @@ export const dbService = {
                   date: new Date().toISOString(),
                   category: 'Material',
                   relatedMaterialId: materialId,
-                  stepId: oldMaterial.stepId // Vincula à mesma etapa do material
+                  stepId: oldMaterial.stepId
               });
           }
 
