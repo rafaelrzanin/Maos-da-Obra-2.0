@@ -308,7 +308,7 @@ export const dbService = {
   },
 
   // Mantido para compatibilidade, mas o registerMaterialPurchase é o principal agora
-  updateMaterial: async (material: Material, cost: number, _addedQty: number) => {
+  updateMaterial: async (material: Material, _cost: number, _addedQty: number) => {
       const db = getLocalDb();
       const idx = db.materials.findIndex((m: Material) => m.id === material.id);
       if (idx >= 0) {
