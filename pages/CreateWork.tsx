@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../App';
 import { dbService } from '../services/db';
-import { WORK_TEMPLATES } from '../services/standards';
+import { WORK_TEMPLATES, ZE_AVATAR, ZE_AVATAR_FALLBACK } from '../services/standards';
 
 const CreateWork: React.FC = () => {
   const { user } = useAuth();
@@ -12,6 +12,7 @@ const CreateWork: React.FC = () => {
   const [currentStep, setCurrentStep] = useState(1);
   const totalSteps = 3;
   const [loading, setLoading] = useState(false);
+  const [aiProcessingStage, setAiProcessingStage] = useState<string | null>(null);
 
   // Form Data
   const [formData, setFormData] = useState({
@@ -88,6 +89,19 @@ const CreateWork: React.FC = () => {
       }
   };
 
+  const simulateAiProcessing = async () => {
+      setAiProcessingStage("Conectando com Engenheiro Virtual...");
+      await new Promise(r => setTimeout(r, 1200));
+      setAiProcessingStage("Analisando dimensões e estrutura...");
+      await new Promise(r => setTimeout(r, 1500));
+      setAiProcessingStage("Calculando volume de concreto e materiais...");
+      await new Promise(r => setTimeout(r, 1500));
+      setAiProcessingStage("Gerando cronograma físico-financeiro...");
+      await new Promise(r => setTimeout(r, 1200));
+      setAiProcessingStage("Finalizando seu plano de obra...");
+      await new Promise(r => setTimeout(r, 800));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
@@ -95,15 +109,15 @@ const CreateWork: React.FC = () => {
 
     setLoading(true);
 
-    // Calculate end date based on template duration
-    const duration = selectedTemplate?.defaultDurationDays || 90;
-    const start = new Date(formData.startDate);
-    const end = new Date(start);
-    end.setDate(end.getDate() + duration);
-
     try {
-        // UNIFIED CREATION: Both Construction and Renovation now use the smart generator
-        // We pass 'selectedTemplateId' so the DB service knows which materials/steps to generate.
+        await simulateAiProcessing();
+
+        // Calculate end date based on template duration
+        const duration = selectedTemplate?.defaultDurationDays || 90;
+        const start = new Date(formData.startDate);
+        const end = new Date(start);
+        end.setDate(end.getDate() + duration);
+
         const newWork = await dbService.createWork({
           userId: user.id,
           name: formData.name,
@@ -119,12 +133,13 @@ const CreateWork: React.FC = () => {
           livingRooms: Number(formData.livingRooms),
           hasLeisureArea: formData.hasLeisureArea,
           notes: selectedTemplate?.label || ''
-        }, selectedTemplateId); // Pass the Template ID directly
+        }, selectedTemplateId);
 
         navigate(`/work/${newWork.id}`);
     } catch (error) {
         console.error(error);
-        alert("Erro ao criar obra. Tente novamente.");
+        setAiProcessingStage(null); // Close modal
+        alert("Erro ao criar obra. Verifique sua conexão e tente novamente.");
     } finally {
         setLoading(false);
     }
@@ -141,6 +156,42 @@ const CreateWork: React.FC = () => {
           </div>
       </div>
   );
+
+  // AI Loading Overlay
+  if (aiProcessingStage) {
+      return (
+          <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-gradient-premium p-6 text-white animate-in fade-in duration-500">
+              <div className="relative mb-8">
+                  <div className="w-32 h-32 rounded-full p-1 bg-gradient-to-br from-secondary to-orange-500 animate-pulse relative z-10">
+                      <img 
+                        src={ZE_AVATAR} 
+                        alt="Zé" 
+                        className="w-full h-full object-cover rounded-full border-4 border-slate-900 bg-slate-800"
+                        onError={(e) => { 
+                            const target = e.currentTarget;
+                            if (target.src !== ZE_AVATAR_FALLBACK) {
+                                target.src = ZE_AVATAR_FALLBACK;
+                            }
+                        }}
+                      />
+                  </div>
+                  <div className="absolute inset-0 bg-secondary rounded-full blur-2xl opacity-40 animate-ping"></div>
+              </div>
+              
+              <h2 className="text-2xl font-black mb-4 text-center tracking-tight animate-in slide-in-from-bottom-2">
+                  Zé da Obra AI
+              </h2>
+              
+              <div className="h-2 w-64 bg-slate-800 rounded-full overflow-hidden mb-6 border border-slate-700">
+                  <div className="h-full bg-secondary animate-progress-indeterminate"></div>
+              </div>
+              
+              <p className="text-lg font-medium text-slate-300 text-center animate-pulse">
+                  {aiProcessingStage}
+              </p>
+          </div>
+      );
+  }
 
   // Step Content Renderer
   const renderStepContent = () => {
@@ -368,44 +419,56 @@ const CreateWork: React.FC = () => {
             return (
                 <div className="animate-in fade-in slide-in-from-right-8 duration-500">
                     <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 md:p-8 shadow-2xl shadow-slate-200/50 dark:shadow-black/50 border border-slate-100 dark:border-slate-800">
-                        <h2 className="text-2xl font-black text-primary dark:text-white mb-2 tracking-tight">Cálculo Virtual</h2>
-                        <p className="text-slate-500 dark:text-slate-400 mb-8 font-medium">Nosso sistema está pronto para gerar seu plano.</p>
+                        <div className="flex items-center gap-4 mb-6">
+                            <div className="w-16 h-16 rounded-full p-1 bg-gradient-to-br from-secondary to-orange-500 shadow-xl">
+                                <img src={ZE_AVATAR} alt="Zé" className="w-full h-full object-cover rounded-full bg-slate-800 border-2 border-white" onError={(e) => { e.currentTarget.src = ZE_AVATAR_FALLBACK; }} />
+                            </div>
+                            <div>
+                                <h2 className="text-2xl font-black text-primary dark:text-white leading-tight">Engenheiro Virtual</h2>
+                                <p className="text-slate-500 dark:text-slate-400 font-medium text-sm">Pronto para calcular sua obra.</p>
+                            </div>
+                        </div>
 
                         <div className="space-y-6">
                             {/* The "Magic" Box */}
-                            <div className="relative overflow-hidden bg-gradient-to-br from-blue-600 to-indigo-700 rounded-3xl p-8 text-white shadow-xl shadow-blue-500/20 group">
-                                <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 group-hover:bg-white/20 transition-colors"></div>
-                                <div className="absolute bottom-0 left-0 w-32 h-32 bg-black/10 rounded-full blur-2xl translate-y-1/2 -translate-x-1/2"></div>
+                            <div className="relative overflow-hidden bg-slate-900 rounded-3xl p-8 text-white shadow-xl shadow-slate-900/30 group">
+                                <div className="absolute top-0 right-0 w-64 h-64 bg-secondary/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 group-hover:bg-secondary/30 transition-colors"></div>
                                 
-                                <div className="relative z-10 flex flex-col items-center text-center">
-                                    <div className="w-20 h-20 bg-white/20 backdrop-blur-md border border-white/20 rounded-full flex items-center justify-center mb-4 shadow-lg animate-pulse">
-                                        <i className="fa-solid fa-wand-magic-sparkles text-3xl text-white"></i>
-                                    </div>
-                                    <h3 className="text-xl font-black mb-2 tracking-wide">Engenheiro Virtual</h3>
-                                    <p className="text-blue-100 text-sm font-medium mb-6 max-w-xs mx-auto">
-                                        Vou criar automaticamente o cronograma físico-financeiro e a lista de materiais para:
-                                    </p>
+                                <div className="relative z-10">
+                                    <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
+                                        <i className="fa-solid fa-list-check text-secondary"></i>
+                                        Resumo do Projeto
+                                    </h3>
                                     
-                                    <div className="flex flex-wrap justify-center gap-2">
-                                        {needsDetailedInputs ? (
-                                            <>
-                                                {workCategory === 'CONSTRUCTION' && <span className="bg-white/20 backdrop-blur-sm border border-white/10 text-white text-xs font-bold px-4 py-1.5 rounded-full shadow-sm">{formData.floors} Pavimentos</span>}
-                                                <span className="bg-white/20 backdrop-blur-sm border border-white/10 text-white text-xs font-bold px-4 py-1.5 rounded-full shadow-sm">{formData.bedrooms} Quartos</span>
-                                                <span className="bg-white/20 backdrop-blur-sm border border-white/10 text-white text-xs font-bold px-4 py-1.5 rounded-full shadow-sm">{formData.bathrooms} Banheiros</span>
-                                                {formData.hasLeisureArea && <span className="bg-white/20 backdrop-blur-sm border border-white/10 text-white text-xs font-bold px-4 py-1.5 rounded-full shadow-sm">Área de Lazer</span>}
-                                            </>
-                                        ) : (
-                                            <span className="bg-white/20 backdrop-blur-sm border border-white/10 text-white text-xs font-bold px-4 py-1.5 rounded-full shadow-sm">{selectedTemplate?.label} ({formData.area} m²)</span>
+                                    <div className="space-y-3 mb-6">
+                                        <div className="flex justify-between items-center border-b border-white/10 pb-2">
+                                            <span className="text-slate-400 text-sm">Projeto</span>
+                                            <span className="font-bold">{formData.name}</span>
+                                        </div>
+                                        <div className="flex justify-between items-center border-b border-white/10 pb-2">
+                                            <span className="text-slate-400 text-sm">Tipo</span>
+                                            <span className="font-bold">{needsDetailedInputs ? 'Construção' : selectedTemplate?.label}</span>
+                                        </div>
+                                        <div className="flex justify-between items-center border-b border-white/10 pb-2">
+                                            <span className="text-slate-400 text-sm">Área Total</span>
+                                            <span className="font-bold">{formData.area} m²</span>
+                                        </div>
+                                        {needsDetailedInputs && (
+                                            <div className="flex flex-wrap gap-2 pt-2">
+                                                <span className="bg-white/10 text-xs px-3 py-1 rounded-full">{formData.floors} Pavimentos</span>
+                                                <span className="bg-white/10 text-xs px-3 py-1 rounded-full">{formData.bedrooms} Quartos</span>
+                                                <span className="bg-white/10 text-xs px-3 py-1 rounded-full">{formData.bathrooms} Banhos</span>
+                                            </div>
                                         )}
                                     </div>
-                                </div>
-                            </div>
 
-                            <div className="text-center bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl border border-slate-100 dark:border-slate-700">
-                                <p className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-1">Nota</p>
-                                <p className="text-sm font-bold text-slate-600 dark:text-slate-300">
-                                    Você poderá ajustar quantidades e prazos manualmente depois.
-                                </p>
+                                    <div className="bg-white/5 p-4 rounded-xl border border-white/10 flex items-start gap-3">
+                                        <i className="fa-solid fa-wand-magic-sparkles text-secondary mt-1"></i>
+                                        <p className="text-sm text-slate-300 leading-relaxed">
+                                            Vou utilizar inteligência artificial para estimar a quantidade de tijolos, cimento e o tempo necessário para cada etapa.
+                                        </p>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -427,7 +490,7 @@ const CreateWork: React.FC = () => {
                 Passo {currentStep} de {totalSteps}
             </span>
             <h1 className="text-3xl font-black text-slate-800 dark:text-white tracking-tight">
-                {currentStep === 1 ? 'Nova Obra' : currentStep === 2 ? 'Configuração' : 'Resumo'}
+                {currentStep === 1 ? 'Nova Obra' : currentStep === 2 ? 'Configuração' : 'Resumo Inteligente'}
             </h1>
           </div>
           
@@ -470,15 +533,7 @@ const CreateWork: React.FC = () => {
                     disabled={loading}
                     className="flex-1 bg-green-600 hover:bg-green-700 text-white font-black text-sm uppercase tracking-wide py-5 rounded-2xl transition-all shadow-xl shadow-green-600/30 flex items-center justify-center gap-3 hover:-translate-y-1 active:translate-y-0 disabled:opacity-70 disabled:cursor-wait"
                 >
-                    {loading ? (
-                        <>
-                           <i className="fa-solid fa-circle-notch fa-spin"></i> Calculando...
-                        </>
-                    ) : (
-                        <>
-                           <i className="fa-solid fa-check"></i> Gerar Obra
-                        </>
-                    )}
+                    <i className="fa-solid fa-wand-magic-sparkles"></i> Gerar Obra com IA
                 </button>
                )
            )}
