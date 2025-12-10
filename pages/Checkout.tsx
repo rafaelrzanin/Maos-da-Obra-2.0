@@ -6,7 +6,6 @@ import {
 } from 'lucide-react'; 
 
 // --- TIPAGEM ---
-// Note que as interfaces foram mantidas. O erro é na implementação.
 interface PlanDetails {
   id: string;
   name: string;
@@ -54,7 +53,7 @@ export default function Checkout() {
     }
   };
 
-  // --- FUNÇÃO DE REDIRECIONAMENTO CORRIGIDA ---
+  // --- FUNÇÃO DE REDIRECIONAMENTO CORRIGIDA (DOMÍNIO REAL) ---
   const redirectToDashboard = () => {
     localStorage.removeItem('tempUser'); 
     window.location.href = "https://www.maosdaobra.online/dashboard"; 
@@ -111,7 +110,6 @@ export default function Checkout() {
       }
       
       try {
-          // Utilizamos '!' para afirmar que os valores não são nulos aqui dentro
           const clientPayload = {
               name: user.name,
               email: user.email,
@@ -121,11 +119,11 @@ export default function Checkout() {
 
           const payload = {
               identifier: `MDO-${Date.now()}`,
-              amount: planDetails!.price,  // Fix 1: Non-null assertion
+              amount: planDetails.price, 
               client: clientPayload,
               dueDate: new Date(Date.now() + (86400000 * 2)).toISOString().split('T')[0],
               metadata: {
-                  plan_id: planDetails!.id, // Fix 2: Non-null assertion
+                  plan_id: planDetails.id,
                   type: 'Subscription_Acquisition'
               }
           };
@@ -169,8 +167,8 @@ const handleCreditCardSubmit = async (e: React.FormEvent) => {
     try {
         const cleanNumber = cardData.number.replace(/\s/g, '');
         
-        if (cleanNumber.length < 16) throw new Error("Número do cartão inválido"); // Fix 3: Accessing length on cleaned string
-        if (cardData.cvv.length < 3) throw new Error("CVV inválido"); // Fix 4: Accessing length on cvv
+        if (cleanNumber.length < 16) throw new Error("Número do cartão inválido");
+        if (cardData.cvv.length < 3) throw new Error("CVV inválido");
 
         // --- CORREÇÃO: Cria o objeto client com o 'document' (CPF) ---
         const clientPayload = {
@@ -185,9 +183,9 @@ const handleCreditCardSubmit = async (e: React.FormEvent) => {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                amount: planDetails!.price, // Fix 5: Non-null assertion
+                amount: planDetails.price,
                 installments: cardData.installments,
-                planType: planDetails!.type, // Fix 6: Non-null assertion
+                planType: planDetails.type,
                 card: { ...cardData, number: cleanNumber },
                 client: clientPayload // Envia o payload corrigido
             })
@@ -205,8 +203,23 @@ const handleCreditCardSubmit = async (e: React.FormEvent) => {
 };
 
   const handleCopyPix = () => {
-    // O método de cópia foi alterado para ser mais robusto em diferentes ambientes
-    if (pixCode) { document.execCommand('copy', false, pixCode); setPixCopied(true); setTimeout(() => setPixCopied(false), 3000); }
+     // O método de cópia mais robusto para React
+     if (pixCode) {
+        navigator.clipboard.writeText(pixCode).then(() => {
+            setPixCopied(true); 
+            setTimeout(() => setPixCopied(false), 3000);
+        }).catch(() => {
+             // Fallback para o document.execCommand (se o navigator falhar)
+             const tempInput = document.createElement('textarea');
+             tempInput.value = pixCode;
+             document.body.appendChild(tempInput);
+             tempInput.select();
+             document.execCommand('copy');
+             document.body.removeChild(tempInput);
+             setPixCopied(true);
+             setTimeout(() => setPixCopied(false), 3000);
+        });
+     }
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -222,7 +235,7 @@ const handleCreditCardSubmit = async (e: React.FormEvent) => {
   if (loading) return <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#172134]"><Loader2 className="h-10 w-10 animate-spin text-[#bc5a08]" /></div>;
   
   if (!user || errorMsg.includes('CPF/Documento não foi salvo')) return (
-    // Se houver erro de documento ou user não for carregado, mostra a tela de erro
+    // Se houver erro de documento, mostra a mensagem de erro no topo
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#172134] p-4">
         <div className="bg-[#1E293B] p-8 rounded-xl max-w-sm text-center border border-red-500/30">
             <AlertTriangle size={32} className="text-red-500 mx-auto mb-4" />
@@ -314,8 +327,8 @@ const handleCreditCardSubmit = async (e: React.FormEvent) => {
                             </div>
                         ) : (
                             <div className="space-y-6 animate-in fade-in">
-                                <div className="bg-white p-4 rounded-xl inline-block shadow-lg"><img src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(pixCode)}`} alt="QR Code" className="w-48 h-48" /></div>
-                                <div className="bg-[#0f1623] p-4 rounded-xl border border-white/5 text-left"><label className="text-xs text-gray-500 mb-2 block uppercase font-bold">Copia e Cola</label><div className="flex gap-2"><input readOnly value={pixCode} className="w-full bg-transparent border-none text-gray-300 text-xs font-mono p-0 truncate outline-none" /><button onClick={handleCopyPix} className="text-[#bc5a08] hover:text-white transition-colors">{pixCopied ? <CheckCircle size={20} /> : <Copy size={20} />}</button></div></div>
+                                <div className="bg-white p-4 rounded-xl inline-block shadow-lg"><img src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(pixCode!)}`} alt="QR Code" className="w-48 h-48" /></div>
+                                <div className="bg-[#0f1623] p-4 rounded-xl border border-white/5 text-left"><label className="text-xs text-gray-500 mb-2 block uppercase font-bold">Copia e Cola</label><div className="flex gap-2"><input readOnly value={pixCode!} className="w-full bg-transparent border-none text-gray-300 text-xs font-mono p-0 truncate outline-none" /><button onClick={handleCopyPix} className="text-[#bc5a08] hover:text-white transition-colors">{pixCopied ? <CheckCircle size={20} /> : <Copy size={20} />}</button></div></div>
                                 
                                 {/* BOTão INJETADO PARA ACESSAR O APP */}
                                 <button onClick={redirectToDashboard} className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 rounded-xl transition-all shadow-lg shadow-green-900/20 flex items-center justify-center gap-2">
@@ -329,17 +342,17 @@ const handleCreditCardSubmit = async (e: React.FormEvent) => {
                 {/* CARTÃO */}
                 {paymentMethod === 'card' && (
                     <form onSubmit={handleCreditCardSubmit} className="space-y-5">
-                        <div><label className="block text-xs font-bold text-gray-400 mb-2 uppercase ml-1">Número do Cartão</label><div className="relative"><input type="text" name="number" placeholder="0000 0000 0000 0000" value={cardData.number} onChange={handleInputChange} className="w-full bg-[#0f1623] border border-gray-700 text-white px-4 py-4 rounded-xl focus:ring-1 focus:ring-[#bc5a08] outline-none pl-12" required /><CreditCard className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" size={20} /></div></div>
+                        <div><label className="block text-xs font-bold text-gray-400 mb-2 uppercase ml-1">Número do Cartão</label><div className="relative"><input type="text" name="number" placeholder="0000 0000 0000 0000" value={cardData.number} onChange={handleInputChange} className="w-full bg-[#0f1623] border border-gray-700 text-white px-4 py-4 rounded-xl focus:ring-1 focus:ring-[#bc5a08] outline-none pl-12" required /><CreditCard size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" /></div></div>
                         <div><label className="block text-xs font-bold text-gray-400 mb-2 uppercase ml-1">Nome Completo</label><input type="text" name="name" placeholder="Como no cartão" value={cardData.name} onChange={(e) => setCardData({...cardData, name: e.target.value.toUpperCase()})} className="w-full bg-[#0f1623] border border-gray-700 text-white px-4 py-4 rounded-xl focus:ring-1 focus:ring-[#bc5a08] outline-none" required /></div>
                         <div className="grid grid-cols-2 gap-5">
                             <div><label className="block text-xs font-bold text-gray-400 mb-2 uppercase ml-1">Validade</label><input type="text" name="expiry" placeholder="MM/AA" value={cardData.expiry} onChange={handleInputChange} className="w-full bg-[#0f1623] border border-gray-700 text-white px-4 py-4 rounded-xl focus:ring-1 focus:ring-[#bc5a08] outline-none text-center" required /></div>
-                            <div><label className="block text-xs font-bold text-gray-400 mb-2 uppercase ml-1">CVV</label><div className="relative"><input type="text" name="cvv" placeholder="123" value={cardData.cvv} onChange={handleInputChange} className="w-full bg-[#0f1623] border border-gray-700 text-white px-4 py-4 rounded-xl focus:ring-1 focus:ring-[#bc5a08] outline-none text-center" required /><ShieldCheck className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500" size={16} /></div></div>
+                            <div><label className="block text-xs font-bold text-gray-400 mb-2 uppercase ml-1">CVV</label><div className="relative"><input type="text" name="cvv" placeholder="123" value={cardData.cvv} onChange={handleInputChange} className="w-full bg-[#0f1623] border border-gray-700 text-white px-4 py-4 rounded-xl focus:ring-1 focus:ring-[#bc5a08] outline-none text-center" required /><ShieldCheck size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500" /></div></div>
                         </div>
                         <div>
                             <label className="block text-xs font-bold text-gray-400 mb-2 uppercase ml-1">Parcelamento</label>
-                            <div className="relative"><select name="installments" value={cardData.installments} onChange={handleInputChange} className="w-full bg-[#0f1623] border border-gray-700 text-white px-4 py-4 rounded-xl focus:ring-1 focus:ring-[#bc5a08] outline-none appearance-none cursor-pointer"><option value={1}>1x de R$ {planDetails?.price.toFixed(2)} (Sem juros)</option><option value={2}>2x de R$ {(planDetails?.price! / 2).toFixed(2)}</option><option value={3}>3x de R$ {(planDetails?.price! / 3).toFixed(2)}</option></select><ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 w-4 h-4 pointer-events-none" /></div>
+                            <div className="relative"><select name="installments" value={cardData.installments} onChange={handleInputChange} className="w-full bg-[#0f1623] border border-gray-700 text-white px-4 py-4 rounded-xl focus:ring-1 focus:ring-[#bc5a08] outline-none appearance-none cursor-pointer"><option value={1}>1x de R$ {planDetails!.price.toFixed(2)} (Sem juros)</option><option value={2}>2x de R$ {(planDetails!.price / 2).toFixed(2)}</option><option value={3}>3x de R$ {(planDetails!.price / 3).toFixed(2)}</option></select><ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500" /></div>
                         </div>
-                        <button type="submit" disabled={processing} className="w-full mt-4 text-white font-bold py-4 rounded-xl shadow-lg hover:shadow-orange-900/20 flex items-center justify-center gap-2 disabled:opacity-50" style={{ backgroundColor: '#bc5a08' }}>{processing ? <><Loader2 className="animate-spin" /> Processando...</> : `Pagar R$ ${planDetails?.price.toFixed(2)}`}</button>
+                        <button type="submit" disabled={processing} className="w-full mt-4 text-white font-bold py-4 rounded-xl shadow-lg hover:shadow-orange-900/20 flex items-center justify-center gap-2 disabled:opacity-50" style={{ backgroundColor: '#bc5a08' }}>{processing ? <><Loader2 className="animate-spin" /> Processando...</> : `Pagar R$ ${planDetails!.price.toFixed(2)}`}</button>
                         
                         <div className="text-center pt-2">
                             <span className="text-xs text-gray-500 flex items-center justify-center gap-1"><ShieldCheck size={12} /> Ambiente seguro e criptografado</span>
