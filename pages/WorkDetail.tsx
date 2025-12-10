@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import { dbService } from '../services/db';
-import { Work, Worker, Supplier, Material, Step, Expense, StepStatus, ExpenseCategory, ChecklistItem } from '../types';
+import { Work, Worker, Supplier, Material, Step, Expense, StepStatus } from '../types';
 import { ZeModal } from '../components/ZeModal';
-import { FULL_MATERIAL_PACKAGES, STANDARD_CHECKLISTS, CONTRACT_TEMPLATES, ZE_AVATAR, ZE_AVATAR_FALLBACK } from '../services/standards';
+import { STANDARD_CHECKLISTS, CONTRACT_TEMPLATES, ZE_AVATAR, ZE_AVATAR_FALLBACK } from '../services/standards';
 import { aiService } from '../services/ai';
 
 // --- TYPES FOR VIEW STATE ---
@@ -22,6 +22,7 @@ const WorkDetail: React.FC = () => {
     const [materials, setMaterials] = useState<Material[]>([]);
     const [expenses, setExpenses] = useState<Expense[]>([]);
     const [workers, setWorkers] = useState<Worker[]>([]);
+    // @ts-ignore - unused but kept for future structure if needed
     const [suppliers, setSuppliers] = useState<Supplier[]>([]);
     
     // --- UI STATE ---
@@ -95,11 +96,8 @@ const WorkDetail: React.FC = () => {
             title: "Excluir Etapa",
             message: "Tem certeza? Isso pode afetar o cronograma.",
             onConfirm: async () => {
-                // In a real scenario, dbService.deleteStep(stepId);
-                // For MVP, we filter locally then save (assuming dbService has update capabilities or we mock it)
-                // Let's assume user accepts visual deletion for now or implement deleteStep in dbService if needed.
-                // Since deleteStep isn't in the interface provided in prompt, I'll simulate a refresh
-                alert("Funcionalidade de exclusão simulada."); 
+                await dbService.deleteStep(stepId);
+                await load();
                 setZeModal(prev => ({ ...prev, isOpen: false }));
             }
         });
