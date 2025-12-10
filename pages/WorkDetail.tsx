@@ -30,7 +30,6 @@ const WorkDetail: React.FC = () => {
     
     // Materials UI State
     const [isImportOpen, setIsImportOpen] = useState(false);
-    const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [editingMaterial, setEditingMaterial] = useState<Material | null>(null);
     const [editCost, setEditCost] = useState('');
     const [qtyToAdd, setQtyToAdd] = useState('');
@@ -246,9 +245,6 @@ const WorkDetail: React.FC = () => {
                             <div className="flex gap-2">
                                 <button onClick={() => setIsImportOpen(true)} className="bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:text-secondary w-12 h-12 rounded-2xl flex items-center justify-center transition-all">
                                     <i className="fa-solid fa-cloud-arrow-down text-lg"></i>
-                                </button>
-                                <button onClick={() => setIsCreateOpen(true)} className="bg-primary text-white w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg transition-all">
-                                    <i className="fa-solid fa-plus text-lg"></i>
                                 </button>
                             </div>
                         </div>
