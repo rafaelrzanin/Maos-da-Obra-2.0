@@ -1,3 +1,4 @@
+
 export enum PlanType {
   MENSAL = 'MENSAL',
   SEMESTRAL = 'SEMESTRAL',
@@ -9,8 +10,8 @@ export interface User {
   name: string;
   email: string;
   whatsapp?: string;
-  cpf?: string; // Added field
-  plan: PlanType;
+  cpf?: string; 
+  plan?: PlanType | null; // Changed to optional/null
   subscriptionExpiresAt?: string;
 }
 
@@ -35,9 +36,8 @@ export interface Work {
   budgetPlanned: number;
   startDate: string;
   endDate: string;
-  area: number; // m2
-  floors?: number; // Quantity of floors (pavimentos)
-  // Detailed specs for better estimation
+  area: number; 
+  floors?: number; 
   bedrooms?: number;
   bathrooms?: number;
   kitchens?: number;
@@ -57,8 +57,8 @@ export interface Step {
   id: string;
   workId: string;
   name: string;
-  startDate: string; // Changed from plannedDate
-  endDate: string;   // Added
+  startDate: string; 
+  endDate: string;   
   realDate?: string;
   status: StepStatus;
   isDelayed: boolean;
@@ -75,14 +75,14 @@ export interface Expense {
   id: string;
   workId: string;
   description: string;
-  amount: number; // Total Value (Valor Total da Nota/Serviço)
-  paidAmount?: number; // Amount actually paid (Valor Pago)
-  quantity?: number; // Qty (e.g., 2 diárias, 5 sacos)
+  amount: number; 
+  paidAmount?: number; 
+  quantity?: number; 
   date: string;
   category: ExpenseCategory;
-  relatedMaterialId?: string; // Link to material
-  stepId?: string; // Link to specific step
-  workerId?: string; // Link to worker (New)
+  relatedMaterialId?: string; 
+  stepId?: string; 
+  workerId?: string; 
 }
 
 export enum MaterialStatus {
@@ -98,8 +98,8 @@ export interface Material {
   plannedQty: number;
   purchasedQty: number;
   unit: string;
-  stepId?: string; // Optional link to a specific step
-  category?: string; // Visual grouping
+  stepId?: string; 
+  category?: string; 
 }
 
 export interface StandardMaterial {
@@ -117,7 +117,6 @@ export interface WorkPhoto {
   type: 'BEFORE' | 'AFTER' | 'PROGRESS';
 }
 
-// --- NOVOS TIPOS PARA ARQUIVOS ---
 export enum FileCategory {
   ARCHITECTURAL = 'Arquitetônico',
   STRUCTURAL = 'Estrutural',
@@ -133,8 +132,8 @@ export interface WorkFile {
   workId: string;
   name: string;
   category: FileCategory;
-  url: string; // Base64 data URI
-  type: string; // MIME type (pdf, image, etc)
+  url: string; 
+  type: string; 
   date: string;
 }
 
@@ -148,7 +147,6 @@ export interface Notification {
   type: 'INFO' | 'WARNING' | 'SUCCESS' | 'ERROR';
 }
 
-// --- TOOLS TYPES ---
 export interface ChecklistItem {
   id: string;
   text: string;
@@ -165,10 +163,9 @@ export interface ContractTemplate {
   id: string;
   title: string;
   description: string;
-  contentTemplate: string; // Text with placeholders
+  contentTemplate: string; 
 }
 
-// --- TEAM & SUPPLIERS ---
 export interface Supplier {
   id: string;
   userId: string;
