@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { User, Work, Step, Material, Expense, Worker, Supplier, PlanType, StepStatus, Notification, WorkStatus } from '../types';
+import { User, Work, Step, Material, Worker, Supplier, PlanType, StepStatus, Notification, WorkStatus } from '../types';
 import { FULL_MATERIAL_PACKAGES, WORK_TEMPLATES } from './standards';
 
 const STORAGE_KEY = 'maos_db_v1';
@@ -25,15 +25,15 @@ export const dbService = {
 
   syncSession: async () => {
       if (supabase) {
-          const { data: { session } } = await supabase.auth.getSession();
+          const { data: { session: _session } } = await supabase.auth.getSession();
           // Logic to sync session if needed
       }
       return dbService.getCurrentUser();
   },
 
-  onAuthChange: (callback: (user: User | null) => void) => {
+  onAuthChange: (_callback: (user: User | null) => void) => {
       if (supabase) {
-          const { data } = supabase.auth.onAuthStateChange((event, session) => {
+          const { data } = supabase.auth.onAuthStateChange((_event, _session) => {
               // handle session
           });
           return () => data.subscription.unsubscribe();
@@ -41,7 +41,7 @@ export const dbService = {
       return () => {};
   },
 
-  login: async (email: string, password?: string): Promise<User | null> => {
+  login: async (email: string, _password?: string): Promise<User | null> => {
       const db = getLocalDb();
       const user = db.users.find((u: User) => u.email === email);
       if (user) {
@@ -51,7 +51,7 @@ export const dbService = {
       return null;
   },
 
-  signup: async (name: string, email: string, whatsapp: string, password?: string, cpf?: string, plan?: string | null): Promise<User | null> => {
+  signup: async (name: string, email: string, whatsapp: string, _password?: string, cpf?: string, plan?: string | null): Promise<User | null> => {
       const db = getLocalDb();
       const newUser: User = { 
           id: Math.random().toString(36).substr(2, 9), 
@@ -92,7 +92,7 @@ export const dbService = {
       }
   },
 
-  loginSocial: async (provider: string) => { return { error: null }; },
+  loginSocial: async (_provider: string) => { return { error: null }; },
 
   getWorks: async (userId: string): Promise<Work[]> => {
       const db = getLocalDb();
@@ -115,7 +115,7 @@ export const dbService = {
       
       const template = WORK_TEMPLATES.find(t => t.id === templateId);
       if (template) {
-         template.includedSteps.forEach((stepName, idx) => {
+         template.includedSteps.forEach((stepName, _idx) => {
              db.steps.push({
                  id: Math.random().toString(36).substr(2, 9),
                  workId: newWork.id,
@@ -138,21 +138,21 @@ export const dbService = {
       saveLocalDb(db);
   },
 
-  calculateWorkStats: async (workId: string) => {
+  calculateWorkStats: async (_workId: string) => {
       return { totalSpent: 0, progress: 0, delayedSteps: 0 };
   },
 
-  getDailySummary: async (workId: string) => {
+  getDailySummary: async (_workId: string) => {
       return { completedSteps: 0, delayedSteps: 0, pendingMaterials: 0, totalSteps: 0 };
   },
 
-  getNotifications: async (userId: string): Promise<Notification[]> => {
+  getNotifications: async (_userId: string): Promise<Notification[]> => {
       return [];
   },
 
-  dismissNotification: async (id: string) => {},
-  clearAllNotifications: async (userId: string) => {},
-  generateSmartNotifications: async (userId: string, workId: string) => {},
+  dismissNotification: async (_id: string) => {},
+  clearAllNotifications: async (_userId: string) => {},
+  generateSmartNotifications: async (_userId: string, _workId: string) => {},
 
   getSteps: async (workId: string): Promise<Step[]> => {
       const db = getLocalDb();
@@ -164,7 +164,7 @@ export const dbService = {
       return db.materials.filter((m: Material) => m.workId === workId);
   },
 
-  updateMaterial: async (material: Material, cost: number, addedQty: number) => {
+  updateMaterial: async (material: Material, cost: number, _addedQty: number) => {
       const db = getLocalDb();
       const idx = db.materials.findIndex((m: Material) => m.id === material.id);
       if (idx >= 0) {
@@ -292,7 +292,7 @@ export const dbService = {
   getJobRoles: async () => ['Pedreiro', 'Servente', 'Mestre de Obras'],
   getSupplierCategories: async () => ['Material de Construção', 'Elétrica', 'Hidráulica'],
 
-  updateUser: async (id: string, data: any, password?: string) => {
+  updateUser: async (id: string, data: any, _password?: string) => {
       const db = getLocalDb();
       const idx = db.users.findIndex((u: User) => u.id === id);
       if (idx >= 0) {
@@ -301,9 +301,9 @@ export const dbService = {
           localStorage.setItem('maos_user', JSON.stringify(db.users[idx]));
       }
   },
-  getUserProfile: async (id: string) => dbService.getCurrentUser(),
+  getUserProfile: async (_id: string) => dbService.getCurrentUser(),
 
-  generatePix: async (amount: number, payer: any) => {
+  generatePix: async (_amount: number, _payer: any) => {
       return { qr_code_base64: '', copy_paste_code: '000201010212...' };
   }
 };
