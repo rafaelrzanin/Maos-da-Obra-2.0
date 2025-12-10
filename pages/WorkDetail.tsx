@@ -31,10 +31,23 @@ const WorkDetail: React.FC = () => {
     
     // --- MODALS STATE ---
     const [stepModal, setStepModal] = useState<{ isOpen: boolean, step: Step | null }>({ isOpen: false, step: null });
-    const [materialModal, setMaterialModal] = useState<{ isOpen: boolean, material: Material | null }>({ isOpen: false, material: null });
-    const [purchaseCost, setPurchaseCost] = useState('');
-    const [purchaseQty, setPurchaseQty] = useState('');
     
+    // NOVO MODAL DE MATERIAL (EDIT + COMPRA)
+    const [materialModal, setMaterialModal] = useState<{ isOpen: boolean, material: Material | null }>({ isOpen: false, material: null });
+    // Campos do Modal de Material
+    const [matName, setMatName] = useState('');
+    const [matPlannedQty, setMatPlannedQty] = useState('');
+    const [matUnit, setMatUnit] = useState('');
+    const [matBuyQty, setMatBuyQty] = useState('');
+    const [matBuyCost, setMatBuyCost] = useState('');
+
+    // MODAL DE ADICIONAR MATERIAL (PLUS BUTTON)
+    const [addMatModal, setAddMatModal] = useState(false);
+    const [newMatName, setNewMatName] = useState('');
+    const [newMatQty, setNewMatQty] = useState('');
+    const [newMatUnit, setNewMatUnit] = useState('un');
+    const [newMatStepId, setNewMatStepId] = useState('');
+
     const [zeModal, setZeModal] = useState({ isOpen: false, title: '', message: '', onConfirm: () => {} });
 
     // --- AI CHAT STATE ---
@@ -112,28 +125,56 @@ const WorkDetail: React.FC = () => {
         }
     };
 
-    // --- MATERIAL LOGIC (Purchase Flow) ---
-    const handleMaterialClick = (material: Material) => {
-        setPurchaseQty('');
-        setPurchaseCost('');
+    // --- MATERIAL LOGIC (Open Modal, Edit & Buy) ---
+    const openMaterialModal = (material: Material) => {
         setMaterialModal({ isOpen: true, material });
+        // Carrega valores editáveis
+        setMatName(material.name);
+        setMatPlannedQty(String(material.plannedQty));
+        setMatUnit(material.unit);
+        // Reseta campos de compra
+        setMatBuyQty('');
+        setMatBuyCost('');
     };
 
-    const submitPurchase = async (e: React.FormEvent) => {
+    const handleSaveMaterial = async (e: React.FormEvent) => {
         e.preventDefault();
         if (materialModal.material) {
-            const addedQty = Number(purchaseQty);
-            const cost = Number(purchaseCost);
+            const purchaseQty = Number(matBuyQty) || 0;
+            const purchaseCost = Number(matBuyCost) || 0;
             
-            if (addedQty <= 0) return;
+            await dbService.registerMaterialPurchase(
+                materialModal.material.id,
+                matName,
+                Number(matPlannedQty),
+                matUnit,
+                purchaseQty,
+                purchaseCost
+            );
 
-            const updatedMaterial = {
-                ...materialModal.material,
-                purchasedQty: materialModal.material.purchasedQty + addedQty
-            };
-
-            await dbService.updateMaterial(updatedMaterial, cost, addedQty);
             setMaterialModal({ isOpen: false, material: null });
+            load();
+        }
+    };
+
+    // --- ADD NEW MATERIAL LOGIC ---
+    const handleAddNewMaterial = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (work && newMatName && newMatQty && newMatStepId) {
+            await dbService.addMaterial({
+                id: Math.random().toString(36).substr(2, 9),
+                workId: work.id,
+                name: newMatName,
+                plannedQty: Number(newMatQty),
+                purchasedQty: 0,
+                unit: newMatUnit,
+                stepId: newMatStepId,
+                category: 'Geral'
+            });
+            setAddMatModal(false);
+            setNewMatName('');
+            setNewMatQty('');
+            setNewMatStepId('');
             load();
         }
     };
@@ -407,7 +448,7 @@ const WorkDetail: React.FC = () => {
                     </div>
                 )}
 
-                {/* 2. MATERIALS TAB */}
+                {/* 2. MATERIALS TAB (COM HIERARQUIA DE ETAPAS) */}
                 {activeTab === 'MATERIALS' && (
                     <div className="space-y-6 animate-in fade-in">
                         <div className="flex justify-between items-end mb-2 px-2">
@@ -415,54 +456,70 @@ const WorkDetail: React.FC = () => {
                                 <h2 className="text-2xl font-black text-primary dark:text-white">Materiais</h2>
                                 <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Controle de Compras</p>
                             </div>
-                            <button onClick={() => dbService.importMaterialPackage(work.id, 'ALL_PENDING').then(() => load())} className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 w-10 h-10 rounded-xl flex items-center justify-center hover:bg-secondary hover:text-white transition-all">
-                                <i className="fa-solid fa-wand-magic-sparkles"></i>
+                            <button onClick={() => setAddMatModal(true)} className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 w-10 h-10 rounded-xl flex items-center justify-center hover:bg-secondary hover:text-white transition-all shadow-sm">
+                                <i className="fa-solid fa-plus"></i>
                             </button>
                         </div>
 
-                        {/* Group by category logic same as steps order */}
+                        {/* LISTA AGRUPADA POR ETAPAS */}
                         {steps.map((step, idx) => {
-                            // Find materials matching step name approx
-                            const stepMaterials = materials.filter(m => {
-                                const normalize = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-                                return normalize(m.category || '').includes(normalize(step.name)) || normalize(step.name).includes(normalize(m.category || ''));
-                            });
-
-                            if (stepMaterials.length === 0) return null;
+                            // Filtra materiais que pertencem EXATAMENTE a esta etapa
+                            const stepMaterials = materials.filter(m => m.stepId === step.id);
+                            
+                            // Também pode ter materiais antigos sem stepId, mas a nova logica força o vinculo.
+                            // Se nao tiver materiais, mostra vazio ou nao mostra nada. 
+                            // O usuário quer ver a sequência, então mostramos o cabeçalho da etapa.
 
                             return (
                                 <div key={step.id}>
-                                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 pl-2 flex items-center gap-2">
+                                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 pl-2 flex items-center gap-2 mt-4">
                                         <span className="w-5 h-5 rounded bg-slate-200 dark:bg-slate-800 text-slate-500 flex items-center justify-center text-[10px]">{String(idx+1).padStart(2,'0')}</span>
                                         {step.name}
                                     </h3>
+                                    
                                     <div className="space-y-3">
+                                        {stepMaterials.length === 0 && (
+                                            <div className="px-4 py-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-dashed border-slate-200 dark:border-slate-700 text-center">
+                                                <p className="text-xs text-slate-400">Nenhum material cadastrado nesta etapa.</p>
+                                            </div>
+                                        )}
+
                                         {stepMaterials.map(mat => {
                                             const progress = Math.min(100, (mat.purchasedQty / mat.plannedQty) * 100);
                                             const isComplete = mat.purchasedQty >= mat.plannedQty;
-                                            const isStarted = mat.purchasedQty > 0;
+                                            const isPartial = mat.purchasedQty > 0 && !isComplete;
                                             
-                                            let statusColor = isComplete ? 'bg-green-500' : isStarted ? 'bg-orange-500' : 'bg-slate-200';
-                                            let borderColor = isComplete ? 'border-green-200 dark:border-green-900/30' : isStarted ? 'border-orange-200 dark:border-orange-900/30' : 'border-slate-100 dark:border-slate-800';
+                                            // Status de Cor: Amarelo se parcial, Verde se completo
+                                            let borderColor = 'border-slate-100 dark:border-slate-800';
+                                            let statusBadge = null;
+
+                                            if (isComplete) {
+                                                borderColor = 'border-green-200 dark:border-green-900/30';
+                                                statusBadge = <span className="text-[10px] font-bold px-2 py-0.5 rounded uppercase bg-green-100 text-green-700">OK</span>;
+                                            } else if (isPartial) {
+                                                borderColor = 'border-amber-200 dark:border-amber-900/30'; // Amarelo
+                                                statusBadge = <span className="text-[10px] font-bold px-2 py-0.5 rounded uppercase bg-amber-100 text-amber-700">Parcial</span>;
+                                            } else {
+                                                statusBadge = <span className="text-[10px] font-bold px-2 py-0.5 rounded uppercase bg-slate-100 text-slate-500">Pendente</span>;
+                                            }
 
                                             return (
                                                 <div 
                                                     key={mat.id} 
-                                                    onClick={() => handleMaterialClick(mat)}
+                                                    onClick={() => openMaterialModal(mat)}
                                                     className={`bg-white dark:bg-slate-900 p-4 rounded-2xl border shadow-sm cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md ${borderColor}`}
                                                 >
                                                     <div className="flex justify-between mb-2">
                                                         <span className="font-bold text-primary dark:text-white">{mat.name}</span>
-                                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${isComplete ? 'bg-green-100 text-green-700' : isStarted ? 'bg-orange-100 text-orange-700' : 'bg-slate-100 text-slate-500'}`}>
-                                                            {isComplete ? 'OK' : isStarted ? 'Parcial' : 'Pendente'}
-                                                        </span>
+                                                        {statusBadge}
                                                     </div>
                                                     <div className="flex items-center gap-3">
+                                                        {/* Barra de Progresso */}
                                                         <div className="flex-1 h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                                                            <div className={`h-full transition-all duration-500 ${statusColor}`} style={{ width: `${progress}%` }}></div>
+                                                            <div className={`h-full transition-all duration-500 ${isComplete ? 'bg-green-500' : 'bg-amber-500'}`} style={{ width: `${progress}%` }}></div>
                                                         </div>
-                                                        <div className="text-xs font-mono font-bold text-slate-500">
-                                                            {mat.purchasedQty}/{mat.plannedQty} {mat.unit}
+                                                        <div className="text-xs font-mono font-bold text-slate-500 whitespace-nowrap">
+                                                            {mat.purchasedQty} / {mat.plannedQty} {mat.unit}
                                                         </div>
                                                     </div>
                                                 </div>
@@ -473,21 +530,28 @@ const WorkDetail: React.FC = () => {
                             );
                         })}
                         
-                        {materials.length === 0 && (
-                            <div className="text-center py-10 opacity-50">
-                                <i className="fa-solid fa-box-open text-4xl mb-2 text-slate-300"></i>
-                                <p className="text-sm">Nenhum material cadastrado.</p>
-                            </div>
+                        {/* Materiais "Gerais" (sem stepId vinculado) se houver */}
+                        {materials.filter(m => !m.stepId).length > 0 && (
+                             <div className="mt-8">
+                                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 pl-2">Geral / Sem Etapa</h3>
+                                <div className="space-y-3">
+                                    {materials.filter(m => !m.stepId).map(mat => (
+                                        <div key={mat.id} onClick={() => openMaterialModal(mat)} className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm cursor-pointer">
+                                            <p className="font-bold text-primary dark:text-white">{mat.name}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                             </div>
                         )}
                     </div>
                 )}
 
-                {/* 3. FINANCIAL TAB */}
+                {/* 3. FINANCIAL TAB (AGRUPADO POR ETAPAS) */}
                 {activeTab === 'FINANCIAL' && (
                     <div className="space-y-6 animate-in fade-in">
                         <div className="px-2">
                             <h2 className="text-2xl font-black text-primary dark:text-white">Financeiro</h2>
-                            <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Fluxo de Caixa</p>
+                            <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Fluxo de Caixa por Etapa</p>
                         </div>
                         
                         {/* Summary Card */}
@@ -502,27 +566,57 @@ const WorkDetail: React.FC = () => {
                             </div>
                         </div>
 
-                        <div className="space-y-4">
-                            {expenses.map(exp => (
-                                <div key={exp.id} className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 flex items-center justify-between shadow-sm">
-                                    <div className="flex items-center gap-4">
-                                        <div className="w-10 h-10 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-400">
-                                            <i className="fa-solid fa-receipt"></i>
-                                        </div>
-                                        <div>
-                                            <p className="font-bold text-primary dark:text-white text-sm">{exp.description}</p>
-                                            <p className="text-[10px] text-slate-400 uppercase tracking-wide">{new Date(exp.date).toLocaleDateString()} • {exp.category}</p>
-                                        </div>
+                        {/* LISTAGEM POR ETAPA */}
+                        {steps.map((step, idx) => {
+                            const stepExpenses = expenses.filter(e => e.stepId === step.id);
+                            if (stepExpenses.length === 0) return null;
+
+                            return (
+                                <div key={step.id}>
+                                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 pl-2 flex items-center gap-2 mt-4">
+                                        <span className="w-5 h-5 rounded bg-slate-200 dark:bg-slate-800 text-slate-500 flex items-center justify-center text-[10px]">{String(idx+1).padStart(2,'0')}</span>
+                                        {step.name}
+                                    </h3>
+                                    <div className="space-y-3">
+                                        {stepExpenses.map(exp => (
+                                            <div key={exp.id} className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 flex items-center justify-between shadow-sm">
+                                                <div className="flex items-center gap-4">
+                                                    <div className="w-10 h-10 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-400">
+                                                        <i className="fa-solid fa-receipt"></i>
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-bold text-primary dark:text-white text-sm">{exp.description}</p>
+                                                        <p className="text-[10px] text-slate-400 uppercase tracking-wide">{new Date(exp.date).toLocaleDateString()} • {exp.category}</p>
+                                                    </div>
+                                                </div>
+                                                <span className="font-bold text-primary dark:text-white">- R$ {Number(exp.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                            </div>
+                                        ))}
                                     </div>
-                                    <span className="font-bold text-primary dark:text-white">- R$ {Number(exp.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                                 </div>
-                            ))}
-                             {expenses.length === 0 && (
-                                <div className="text-center py-10 opacity-50">
-                                    <p className="text-sm">Nenhum gasto registrado ainda.</p>
+                            );
+                        })}
+
+                        {/* Gastos Sem Etapa */}
+                        {expenses.filter(e => !e.stepId).length > 0 && (
+                            <div className="mt-6">
+                                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3 pl-2">Outros Gastos</h3>
+                                <div className="space-y-3">
+                                    {expenses.filter(e => !e.stepId).map(exp => (
+                                        <div key={exp.id} className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 flex items-center justify-between shadow-sm">
+                                            <p className="font-bold text-sm text-primary dark:text-white">{exp.description}</p>
+                                            <span className="font-bold text-primary dark:text-white">- R$ {Number(exp.amount).toLocaleString('pt-BR')}</span>
+                                        </div>
+                                    ))}
                                 </div>
-                            )}
-                        </div>
+                            </div>
+                        )}
+                        
+                        {expenses.length === 0 && (
+                            <div className="text-center py-10 opacity-50">
+                                <p className="text-sm">Nenhum gasto registrado ainda.</p>
+                            </div>
+                        )}
                     </div>
                 )}
 
@@ -639,34 +733,114 @@ const WorkDetail: React.FC = () => {
                 </div>
             )}
 
-            {/* Material Purchase Modal */}
+            {/* MATERIAL MODAL (EDIT + PURCHASE) */}
             {materialModal.isOpen && materialModal.material && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-6 shadow-2xl overflow-y-auto max-h-[90vh]">
+                         <div className="flex items-center gap-3 mb-4">
+                             <div className="w-12 h-12 bg-secondary/10 text-secondary rounded-xl flex items-center justify-center text-xl"><i className="fa-solid fa-pen-to-square"></i></div>
+                             <div>
+                                 <h3 className="text-lg font-bold text-primary dark:text-white leading-tight">Detalhes do Material</h3>
+                                 <p className="text-xs text-slate-500">Edite ou lance uma compra</p>
+                             </div>
+                         </div>
+                         <form onSubmit={handleSaveMaterial} className="space-y-4">
+                            
+                            {/* SECTION: EDITABLE FIELDS */}
+                            <div className="space-y-3 p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-100 dark:border-slate-800">
+                                <div>
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Nome do Material / Marca</label>
+                                    <input className="w-full p-2 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700 font-bold text-primary dark:text-white" value={matName} onChange={e => setMatName(e.target.value)} />
+                                </div>
+                                <div className="flex gap-3">
+                                    <div className="flex-1">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Qtd. Sugerida</label>
+                                        <input type="number" className="w-full p-2 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700 font-bold text-primary dark:text-white" value={matPlannedQty} onChange={e => setMatPlannedQty(e.target.value)} />
+                                    </div>
+                                    <div className="w-20">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Unidade</label>
+                                        <input className="w-full p-2 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700 font-bold text-primary dark:text-white text-center" value={matUnit} onChange={e => setMatUnit(e.target.value)} />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* SECTION: READ ONLY (ALREADY PURCHASED) */}
+                            <div className="p-4 bg-slate-100 dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 flex justify-between items-center">
+                                <span className="text-xs font-bold text-slate-500 uppercase">Já Comprado (Total)</span>
+                                <span className="text-xl font-black text-slate-700 dark:text-white">
+                                    {materialModal.material.purchasedQty} <span className="text-sm font-medium text-slate-400">{materialModal.material.unit}</span>
+                                </span>
+                            </div>
+
+                            {/* SECTION: PURCHASE ACTION */}
+                            <div className="p-4 bg-secondary/5 border-2 border-dashed border-secondary/30 rounded-2xl">
+                                <h4 className="text-xs font-black text-secondary uppercase tracking-widest mb-3 flex items-center gap-2">
+                                    <i className="fa-solid fa-cart-plus"></i> Nova Compra
+                                </h4>
+                                <div className="grid grid-cols-2 gap-3 mb-3">
+                                    <div>
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase">Qtd. Comprada (+)</label>
+                                        <input type="number" className="w-full p-2 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700 font-bold text-lg" placeholder="0" value={matBuyQty} onChange={e => setMatBuyQty(e.target.value)} />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-bold text-slate-500 uppercase">Valor Total (R$)</label>
+                                        <input type="number" className="w-full p-2 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700 font-bold text-lg" placeholder="0,00" value={matBuyCost} onChange={e => setMatBuyCost(e.target.value)} />
+                                    </div>
+                                </div>
+                                <p className="text-[10px] text-slate-500 leading-tight">
+                                    Ao salvar com quantidade maior que 0, um lançamento será criado automaticamente no Financeiro na mesma etapa deste material.
+                                </p>
+                            </div>
+
+                            <div className="flex gap-2 pt-2">
+                                <button type="button" onClick={() => setMaterialModal({isOpen: false, material: null})} className="flex-1 py-3 font-bold text-slate-500 hover:bg-slate-100 rounded-xl">Cancelar</button>
+                                <button type="submit" className="flex-1 py-3 font-bold bg-green-600 text-white rounded-xl shadow-lg">Salvar Alterações</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* ADD MATERIAL MODAL (PLUS BUTTON) */}
+            {addMatModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
                     <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-6 shadow-2xl">
                          <div className="flex items-center gap-3 mb-4">
-                             <div className="w-12 h-12 bg-secondary/10 text-secondary rounded-xl flex items-center justify-center text-xl"><i className="fa-solid fa-cart-plus"></i></div>
+                             <div className="w-12 h-12 bg-primary/10 text-primary rounded-xl flex items-center justify-center text-xl"><i className="fa-solid fa-plus"></i></div>
                              <div>
-                                 <h3 className="text-lg font-bold text-primary dark:text-white leading-tight">Lançar Compra</h3>
-                                 <p className="text-xs text-slate-500">{materialModal.material.name}</p>
+                                 <h3 className="text-lg font-bold text-primary dark:text-white leading-tight">Adicionar Material</h3>
+                                 <p className="text-xs text-slate-500">Novo item na lista</p>
                              </div>
                          </div>
-                         <form onSubmit={submitPurchase} className="space-y-4">
+                         <form onSubmit={handleAddNewMaterial} className="space-y-4">
                             <div>
-                                <label className="text-xs font-bold text-slate-500 uppercase">Quantidade Comprada (+)</label>
-                                <div className="flex items-center gap-2">
-                                    <input type="number" autoFocus className="flex-1 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-lg font-bold" value={purchaseQty} onChange={e => setPurchaseQty(e.target.value)} placeholder="0" />
-                                    <span className="font-bold text-slate-400">{materialModal.material.unit}</span>
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Nome do Material</label>
+                                <input required className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold" placeholder="Ex: Cimento CP-II" value={newMatName} onChange={e => setNewMatName(e.target.value)} />
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Qtd. Prevista</label>
+                                    <input required type="number" className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold" placeholder="0" value={newMatQty} onChange={e => setNewMatQty(e.target.value)} />
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Unidade</label>
+                                    <input required className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold" placeholder="un, kg, m²" value={newMatUnit} onChange={e => setNewMatUnit(e.target.value)} />
                                 </div>
                             </div>
                             <div>
-                                <label className="text-xs font-bold text-slate-500 uppercase">Valor Total Gasto (R$)</label>
-                                <input type="number" step="0.01" className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-lg font-bold" value={purchaseCost} onChange={e => setPurchaseCost(e.target.value)} placeholder="0,00" />
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Vincular à Etapa</label>
+                                <select required className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold text-sm" value={newMatStepId} onChange={e => setNewMatStepId(e.target.value)}>
+                                    <option value="">Selecione uma etapa...</option>
+                                    {steps.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                                    <option value="GENERAL">Geral (Sem etapa específica)</option>
+                                </select>
                             </div>
+                            
                             <div className="flex gap-2 pt-2">
-                                <button type="button" onClick={() => setMaterialModal({isOpen: false, material: null})} className="flex-1 py-3 font-bold text-slate-500 hover:bg-slate-100 rounded-xl">Cancelar</button>
-                                <button type="submit" className="flex-1 py-3 font-bold bg-green-600 text-white rounded-xl shadow-lg">Confirmar</button>
+                                <button type="button" onClick={() => setAddMatModal(false)} className="flex-1 py-3 font-bold text-slate-500 hover:bg-slate-100 rounded-xl">Cancelar</button>
+                                <button type="submit" className="flex-1 py-3 font-bold bg-primary text-white rounded-xl shadow-lg">Adicionar</button>
                             </div>
-                        </form>
+                         </form>
                     </div>
                 </div>
             )}
