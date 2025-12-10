@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { dbService } from '../services/db';
@@ -672,8 +673,27 @@ const StepsTab: React.FC<{ workId: string, refreshWork: () => void }> = ({ workI
   const loadSteps = async () => { const s = await dbService.getSteps(workId); setSteps(s.sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())); };
   useEffect(() => { loadSteps(); }, [workId]);
 
-  const toggleStatus = async (step: Step) => { let newStatus = StepStatus.IN_PROGRESS; if (step.status === StepStatus.NOT_STARTED) newStatus = StepStatus.IN_PROGRESS; else if (step.status === StepStatus.IN_PROGRESS) newStatus = StepStatus.COMPLETED; else newStatus = StepStatus.NOT_STARTED; await updateStepStatus(step, newStatus); };
-  const updateStepStatus = async (step: Step, status: StepStatus) => { await dbService.updateStep({ ...step, status }); loadSteps(); refreshWork(); }
+  const toggleStatus = async (step: Step) => { 
+      let newStatus: StepStatus;
+      
+      // LOGIC FIX: Ensure cycle works correctly (Not Started -> In Progress -> Completed -> Not Started)
+      if (step.status === StepStatus.NOT_STARTED) {
+          newStatus = StepStatus.IN_PROGRESS;
+      } else if (step.status === StepStatus.IN_PROGRESS) {
+          newStatus = StepStatus.COMPLETED;
+      } else {
+          newStatus = StepStatus.NOT_STARTED;
+      }
+      
+      await updateStepStatus(step, newStatus); 
+  };
+  
+  const updateStepStatus = async (step: Step, status: StepStatus) => { 
+      await dbService.updateStep({ ...step, status }); 
+      await loadSteps(); // Refresh local list
+      refreshWork(); // Refresh parent stats
+  }
+  
   const handleCreateStep = async (e: React.FormEvent) => { e.preventDefault(); await dbService.addStep({ workId, name: newStepName, startDate: newStepDate, endDate: newStepDate, status: StepStatus.NOT_STARTED }); setIsCreateModalOpen(false); setNewStepName(''); setNewStepDate(''); loadSteps(); };
   const handleUpdateStep = async (e: React.FormEvent) => { e.preventDefault(); if (editingStep) { await dbService.updateStep(editingStep); setEditingStep(null); loadSteps(); refreshWork(); } };
   const handleDeleteClick = (stepId: string) => { setZeModal({ isOpen: true, title: "Apagar Etapa", message: "Tem certeza?", onConfirm: async () => { await dbService.deleteStep(stepId); setEditingStep(null); setZeModal(prev => ({...prev, isOpen: false})); loadSteps(); refreshWork(); } }); };
@@ -734,9 +754,9 @@ const MaterialsTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ work
     };
     
     // Now used in the Import Modal
-    const handleImport = async (category: string) => { 
-        const count = await dbService.importMaterialPackage(workId, category); 
-        alert(`${count} materiais adicionados.`); 
+    const handleImport = async (category: string, onlyPending: boolean = false) => { 
+        const count = await dbService.importMaterialPackage(workId, category, onlyPending); 
+        alert(`${count} materiais adicionados com sucesso.`); 
         setIsImportOpen(false); 
         await load(); 
         onUpdate(); 
@@ -832,7 +852,7 @@ const MaterialsTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ work
             })}</div></div>
             )})}
             
-            {/* IMPORT MODAL (ADDED TO FIX UNUSED VARS) */}
+            {/* IMPORT MODAL (UPDATED WITH SMART GENERATE) */}
             {isImportOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
                     <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-6 shadow-2xl max-h-[80vh] overflow-y-auto">
@@ -840,7 +860,22 @@ const MaterialsTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ work
                             <h3 className="text-xl font-bold text-primary dark:text-white">Importar Lista</h3>
                             <button onClick={() => setIsImportOpen(false)} className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"><i className="fa-solid fa-xmark"></i></button>
                         </div>
-                        <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">Selecione um pacote padrão para adicionar itens rapidamente.</p>
+                        
+                        <div className="mb-6 p-4 bg-gradient-premium rounded-2xl text-white shadow-lg relative overflow-hidden group cursor-pointer hover:scale-[1.02] transition-transform" onClick={() => handleImport('ALL_PENDING', true)}>
+                            <div className="absolute top-0 right-0 w-24 h-24 bg-white/10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2"></div>
+                            <div className="flex items-center gap-3 relative z-10">
+                                <div className="w-10 h-10 rounded-full bg-secondary/20 flex items-center justify-center text-secondary border border-secondary/30 text-xl">
+                                    <i className="fa-solid fa-wand-magic-sparkles"></i>
+                                </div>
+                                <div className="flex-1">
+                                    <h4 className="font-bold text-sm">Geração Inteligente</h4>
+                                    <p className="text-[10px] text-slate-300 opacity-90 leading-tight mt-1">Calcular materiais apenas para as <strong className="text-white">etapas pendentes</strong> com base na área da obra.</p>
+                                </div>
+                                <i className="fa-solid fa-chevron-right text-white/50"></i>
+                            </div>
+                        </div>
+
+                        <p className="text-xs font-bold uppercase text-slate-400 mb-3 tracking-wider">Ou importe por categoria</p>
                         <div className="space-y-3">
                             {FULL_MATERIAL_PACKAGES.map((pkg, idx) => (
                                 <button 
@@ -848,7 +883,7 @@ const MaterialsTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ work
                                     onClick={() => handleImport(pkg.category)}
                                     className="w-full text-left p-4 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-primary dark:hover:border-primary transition-all flex items-center justify-between group"
                                 >
-                                    <span className="font-bold text-primary dark:text-white">{pkg.category}</span>
+                                    <span className="font-bold text-primary dark:text-white text-sm">{pkg.category}</span>
                                     <span className="text-xs text-slate-400 group-hover:text-primary dark:group-hover:text-white transition-colors">{pkg.items.length} itens</span>
                                 </button>
                             ))}
@@ -1010,7 +1045,7 @@ const ExpensesTab: React.FC<{ workId: string, onUpdate: () => void }> = ({ workI
             {isCreateOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
                     <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-8 shadow-2xl overflow-y-auto max-h-[90vh]">
-                        <h3 className="text-xl font-bold text-primary dark:text-white mb-6">{editingId ? 'Editar Pagamento' : 'Novo Gasto'}</h3>
+                        <h3 className="text-xl font-bold text-primary dark:text-white">{editingId ? 'Editar Pagamento' : 'Novo Gasto'}</h3>
                         <form onSubmit={handleSave} className="space-y-4">
                             <div>
                                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1 block">Tipo</label>
