@@ -234,6 +234,12 @@ export const dbService = {
           saveLocalDb(db);
       }
   },
+  
+  deleteStep: async (id: string) => {
+      const db = getLocalDb();
+      db.steps = db.steps.filter((s: Step) => s.id !== id);
+      saveLocalDb(db);
+  },
 
   getExpenses: async (workId: string): Promise<Expense[]> => {
       const db = getLocalDb();
