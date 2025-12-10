@@ -41,6 +41,7 @@ interface AuthContextType {
   updatePlan: (plan: PlanType) => Promise<void>;
   refreshUser: () => Promise<void>;
   isSubscriptionValid: boolean;
+  isNewAccount: boolean;
 }
 
 const AuthContext = createContext<AuthContextType>(null!);
@@ -51,6 +52,9 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
   const [loading, setLoading] = useState(true);
 
   const isSubscriptionValid = useMemo(() => user ? dbService.isSubscriptionActive(user) : false, [user]);
+  
+  // Define se é uma conta nova (nunca teve assinatura válida ou data de expiração nunca foi setada)
+  const isNewAccount = useMemo(() => user ? !user.subscriptionExpiresAt : true, [user]);
 
   useEffect(() => {
     const sync = async () => {
@@ -99,7 +103,7 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, signup, logout, updatePlan, refreshUser, isSubscriptionValid }}>
+    <AuthContext.Provider value={{ user, loading, login, signup, logout, updatePlan, refreshUser, isSubscriptionValid, isNewAccount }}>
       {children}
     </AuthContext.Provider>
   );
@@ -107,7 +111,7 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
 
 // Layout Component
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, loading, logout, isSubscriptionValid, updatePlan } = useAuth();
+  const { user, loading, logout, isSubscriptionValid, isNewAccount, updatePlan } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
@@ -231,9 +235,25 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
       <main className="flex-1 p-4 md:p-8 overflow-y-auto">
         {!isSubscriptionValid && isSettingsPage && (
-            <div className="bg-danger text-white p-4 rounded-xl mb-6 flex items-center justify-between shadow-lg">
-                <p className="text-sm font-bold"><i className="fa-solid fa-lock mr-2"></i> Assinatura Inativa. Escolha um plano abaixo para liberar o acesso.</p>
-                <button onClick={logout} className="text-xs bg-white/20 px-3 py-2 rounded-lg font-bold">Sair</button>
+            <div className={`p-4 rounded-xl mb-6 flex items-center justify-between shadow-lg ${
+                isNewAccount 
+                    ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white' 
+                    : 'bg-danger text-white'
+            }`}>
+                <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-xl">
+                        <i className={`fa-solid ${isNewAccount ? 'fa-rocket' : 'fa-lock'}`}></i>
+                    </div>
+                    <div>
+                        <p className="text-sm font-bold uppercase tracking-wide opacity-90">
+                            {isNewAccount ? 'Falta pouco!' : 'Acesso Bloqueado'}
+                        </p>
+                        <p className="text-sm font-bold">
+                            {isNewAccount ? 'Escolha um plano para começar a usar.' : 'Sua assinatura expirou. Renove para continuar.'}
+                        </p>
+                    </div>
+                </div>
+                <button onClick={logout} className="text-xs bg-white/20 px-3 py-2 rounded-lg font-bold hover:bg-white/30 transition-colors">Sair</button>
             </div>
         )}
         {children}
