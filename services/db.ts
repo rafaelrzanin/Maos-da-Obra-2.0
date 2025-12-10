@@ -126,7 +126,6 @@ export const dbService = {
       
       db.works.push(newWork);
       
-      // Inteligência de Geração de Etapas e Materiais
       const template = WORK_TEMPLATES.find(t => t.id === templateId);
       
       if (template && template.includedSteps) {
@@ -152,13 +151,29 @@ export const dbService = {
                  isDelayed: false
              });
 
-             // Tentar vincular materiais a esta etapa automaticamente
+             // INTELIGÊNCIA DE MATERIAIS - CORRELAÇÃO MAIS FORTE
              const normalize = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
              const stepNorm = normalize(stepName);
 
+             // Mapeamento direto de palavras-chave da etapa para categorias de material
+             // Isso garante que se a etapa é "Fundações", pegamos os materiais de "Fundação"
              const pkg = FULL_MATERIAL_PACKAGES.find(p => {
                  const pkgNorm = normalize(p.category);
-                 return stepNorm.includes(pkgNorm) || pkgNorm.includes(stepNorm) || (stepNorm.includes('piso') && pkgNorm.includes('acabamento'));
+                 
+                 // Lógica de "Contém" bidirecional + casos específicos
+                 if (stepNorm.includes(pkgNorm)) return true; // Ex: Step "Fundações" inclui Pkg "Fundação"
+                 if (pkgNorm.includes(stepNorm)) return true;
+                 
+                 // Casos especiais
+                 if (stepNorm.includes('parede') && pkgNorm.includes('alvenaria')) return true;
+                 if (stepNorm.includes('laje') && pkgNorm.includes('alvenaria')) return true; // Ferro/Cimento
+                 if (stepNorm.includes('agua') && pkgNorm.includes('hidraulica')) return true;
+                 if (stepNorm.includes('fiacao') && pkgNorm.includes('eletrica')) return true;
+                 if (stepNorm.includes('piso') && pkgNorm.includes('acabamento')) return true;
+                 if (stepNorm.includes('azulejo') && pkgNorm.includes('acabamento')) return true;
+                 if (stepNorm.includes('pintura') && pkgNorm.includes('pintura')) return true;
+
+                 return false;
              });
 
              if (pkg) {
@@ -167,6 +182,7 @@ export const dbService = {
                         id: Math.random().toString(36).substr(2, 9),
                         workId: newWork.id,
                         name: item.name,
+                        brand: '', // Brand start empty
                         plannedQty: Math.ceil(newWork.area * (item.multiplier || 0)),
                         purchasedQty: 0,
                         unit: item.unit,
@@ -177,7 +193,6 @@ export const dbService = {
              }
          });
       } else {
-          // Fallback
           const stepId = Math.random().toString(36).substr(2, 9);
           db.steps.push({
              id: stepId,
@@ -258,17 +273,26 @@ export const dbService = {
       return db.materials.filter((m: Material) => m.workId === workId);
   },
 
-  // ADICIONAR MATERIAL MANUALMENTE (Botão Mais)
+  // --- ADD MANUAL MATERIAL (Com Vínculo de Etapa) ---
   addMaterial: async (material: Material) => {
       const db = getLocalDb();
       db.materials.push(material);
       saveLocalDb(db);
   },
+  
+  // --- ADD MANUAL EXPENSE (Com Vínculo de Etapa) ---
+  addExpense: async (expense: Expense) => {
+      const db = getLocalDb();
+      db.expenses.push(expense);
+      saveLocalDb(db);
+  },
 
   // FUNÇÃO CRÍTICA: ATUALIZA MATERIAL E GERA GASTO
+  // Atualizada para suportar Brand (Marca)
   registerMaterialPurchase: async (
       materialId: string, 
       updatedName: string, 
+      updatedBrand: string,
       updatedPlannedQty: number,
       updatedUnit: string,
       purchaseQty: number, 
@@ -280,10 +304,11 @@ export const dbService = {
       if (idx >= 0) {
           const oldMaterial = db.materials[idx];
           
-          // 1. Atualizar dados do material (Nome, Planejado, Unidade) e incrementar comprado
+          // 1. Atualizar dados do material (Nome, Marca, Planejado, Unidade) e incrementar comprado
           db.materials[idx] = {
               ...oldMaterial,
               name: updatedName,
+              brand: updatedBrand,
               plannedQty: updatedPlannedQty,
               unit: updatedUnit,
               purchasedQty: oldMaterial.purchasedQty + purchaseQty
@@ -294,7 +319,7 @@ export const dbService = {
               db.expenses.push({
                   id: Math.random().toString(36).substr(2, 9),
                   workId: oldMaterial.workId,
-                  description: `Compra: ${purchaseQty} ${updatedUnit} de ${updatedName}`,
+                  description: `Compra: ${purchaseQty} ${updatedUnit} de ${updatedName} (${updatedBrand || 'Genérico'})`,
                   amount: purchaseCost,
                   date: new Date().toISOString(),
                   category: 'Material',
@@ -307,7 +332,7 @@ export const dbService = {
       }
   },
 
-  // Mantido para compatibilidade, mas o registerMaterialPurchase é o principal agora
+  // Mantido para compatibilidade
   updateMaterial: async (material: Material, _cost: number, _addedQty: number) => {
       const db = getLocalDb();
       const idx = db.materials.findIndex((m: Material) => m.id === material.id);
@@ -318,11 +343,9 @@ export const dbService = {
   },
 
   importMaterialPackage: async (workId: string, category: string): Promise<number> => {
-    // Importação genérica mantida para fallback
     const work = await dbService.getWorkById(workId);
     if (!work) return 0;
     
-    // Tenta achar uma etapa compatível genérica
     const steps = await dbService.getSteps(workId);
     const targetStep = steps.find(s => s.status !== StepStatus.COMPLETED) || steps[0];
 
