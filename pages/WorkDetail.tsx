@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { dbService } from '../services/db';
-import { Work, Worker, Supplier, Material, Step, StepStatus } from '../types';
+import { Work, Worker, Supplier, Material, Step } from '../types';
 import { ZeModal } from '../components/ZeModal';
 import { FULL_MATERIAL_PACKAGES } from '../services/standards';
 
