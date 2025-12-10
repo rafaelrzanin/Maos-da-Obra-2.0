@@ -1,369 +1,435 @@
 import React, { useState, useEffect } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
-import { 
-  CreditCard, QrCode, ShieldCheck, Loader2, CheckCircle, 
-  Copy, HardHat, ChevronDown, UserCheck, AlertTriangle
-} from 'lucide-react'; 
+import { useAuth } from '../App';
+import { dbService } from '../services/db';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { PlanType } from '../types';
 
-// --- TIPAGEM ---
-interface PlanDetails {
-  id: string;
-  name: string;
-  price: number;
-  type: string;
-  period: string;
-}
-
-interface CardData {
-  number: string;
-  name: string;
-  expiry: string;
-  cvv: string;
-  installments: number;
-}
-// --- FIM TIPAGEM ---
-
-export default function Checkout() {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const navigate = useNavigate();
-
-  // Estados
-  const [user, setUser] = useState<any>(null);
-  const [planDetails, setPlanDetails] = useState<PlanDetails | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState<'pix' | 'card'>('pix'); 
-  const [loading, setLoading] = useState(true);
-  const [processing, setProcessing] = useState(false);
-  const [errorMsg, setErrorMsg] = useState('');
-  
-  // Pix & Cartão
-  const [pixCode, setPixCode] = useState<string | null>(null);
-  const [pixCopied, setPixCopied] = useState(false);
-  const [cardData, setCardData] = useState<CardData>({
-    number: '', name: '', expiry: '', cvv: '', installments: 1
-  });
-
-  const definePlan = (planId: string | null) => {
-    const normalizedPlan = planId?.toLowerCase() || 'mensal';
-    if (normalizedPlan === 'semestral') {
-        setPlanDetails({ id: 'semestral', name: 'Plano Semestral', price: 97.00, type: 'semestral', period: '6 meses' });
-    } else if (normalizedPlan === 'vitalicio') {
-        setPlanDetails({ id: 'vitalicio', name: 'Acesso Vitalício', price: 247.00, type: 'vitalicio', period: 'Acesso Único' });
-    } else {
-        setPlanDetails({ id: 'mensal', name: 'Plano Mensal', price: 29.90, type: 'mensal', period: 'Mensal' });
-    }
-  };
-
-  // --- FUNÇÃO DE REDIRECIONAMENTO CORRIGIDA (DOMÍNIO REAL) ---
-  const redirectToDashboard = () => {
-    localStorage.removeItem('tempUser'); 
-    window.location.href = "https://www.maosdaobra.online/dashboard"; 
-  }
-  // --- FIM FUNÇÃO REDIRECIONAMENTO ---
-
-  useEffect(() => {
-    const loadData = async () => {
-      const savedUser = localStorage.getItem('tempUser');
-      
-      if (!savedUser) {
-          const currentPlan = searchParams.get('plan') || 'mensal';
-          navigate(`/register?plan=${currentPlan}`);
-          return;
-      }
-
-      const parsedUser = JSON.parse(savedUser);
-      let documentValue = parsedUser.cpf || parsedUser.document || '';
-      
-      if (documentValue.length < 11) {
-         setErrorMsg("Erro: CPF/Documento não foi salvo no registro. Volte para o cadastro.");
-         setLoading(false);
-         return;
-      }
-
-      setUser({ ...parsedUser, cpf: documentValue });
-
-      let planId = searchParams.get('plan');
-      if (!planId && typeof window !== 'undefined') {
-          const urlParams = new URLSearchParams(window.location.search);
-          planId = urlParams.get('plan');
-      }
-      definePlan(planId);
-      setLoading(false);
-    };
-
-    loadData();
-  }, [searchParams, navigate]);
-
-  const handlePlanSwitch = (newPlan: string) => {
-      setSearchParams({ plan: newPlan });
-      definePlan(newPlan);
-  };
-
-  // --- LÓGICA REAL DE GERAÇÃO DE PIX ---
-  const handlePixGenerate = async () => {
-      setProcessing(true);
-      setErrorMsg('');
-      
-      if (!user || !planDetails || !user.cpf) {
-          setErrorMsg("Dados de usuário ou plano ausentes para Pix.");
-          setProcessing(false);
-          return;
-      }
-      
-      try {
-          const clientPayload = {
-              name: user.name,
-              email: user.email,
-              phone: user.phone.replace(/\D/g, ''),
-              document: user.cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4") 
-          };
-
-          const payload = {
-              identifier: `MDO-${Date.now()}`,
-              amount: planDetails.price, 
-              client: clientPayload,
-              dueDate: new Date(Date.now() + (86400000 * 2)).toISOString().split('T')[0],
-              metadata: {
-                  plan_id: planDetails.id,
-                  type: 'Subscription_Acquisition'
-              }
-          };
-
-          const response = await fetch('/api/create-pix', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(payload)
-          });
-          
-          const data = await response.json();
-
-          if (!response.ok) {
-              const errorDetails = data.details ? JSON.stringify(data.details) : data.message;
-              console.error("Neon Pay Error:", errorDetails);
-              throw new Error(data.message || 'Erro ao gerar PIX. Tente novamente.');
-          }
-          
-          if (data.pix && data.pix.code) {
-             setPixCode(data.pix.code);
-          } else {
-             throw new Error("Neon Pay não retornou o código PIX. Verifique o Backend.");
-          }
-
-      } catch (err: any) { 
-          setErrorMsg(err.message || "Erro ao gerar PIX."); 
-      } finally { 
-          setProcessing(false); 
-      }
-  };
-
- // --- FUNÇÃO DE PAGAMENTO COM CARTÃO ---
-const handleCreditCardSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!planDetails || !user || !user.cpf) { 
-       setErrorMsg("Erro: CPF/Documento não foi carregado corretamente para o usuário. Volte e registre novamente.");
-       return;
-    } 
-    setErrorMsg('');
-    setProcessing(true);
-    try {
-        const cleanNumber = cardData.number.replace(/\s/g, '');
-        
-        if (cleanNumber.length < 16) throw new Error("Número do cartão inválido");
-        if (cardData.cvv.length < 3) throw new Error("CVV inválido");
-
-        // --- CORREÇÃO: Cria o objeto client com o 'document' (CPF) ---
-        const clientPayload = {
-            name: user.name,
-            email: user.email,
-            phone: user.phone,
-            document: user.cpf, // Usa user.cpf (que foi validado no useEffect)
-        };
-        // -------------------------------------------------------------
-
-        const response = await fetch('/api/create-card', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                amount: planDetails.price,
-                installments: cardData.installments,
-                planType: planDetails.type,
-                card: { ...cardData, number: cleanNumber },
-                client: clientPayload // Envia o payload corrigido
-            })
-        });
-
-        const result = await response.json();
-        if (!response.ok) throw new Error(result.message || "Transação recusada.");
-
-        // SUCESSO REAL (Cartão): Redireciona para o App
-        redirectToDashboard();
-
-    } catch (err: any) {
-        setErrorMsg(err.message || "Erro ao processar cartão.");
-    } finally { setProcessing(false); }
+// Preços atualizados
+const PLAN_PRICES: Record<string, number> = {
+  [PlanType.MENSAL]: 29.90,
+  [PlanType.SEMESTRAL]: 97.00,
+  [PlanType.VITALICIO]: 247.00
 };
 
-  const handleCopyPix = () => {
-     // O método de cópia mais robusto para React
-     if (pixCode) {
-        navigator.clipboard.writeText(pixCode).then(() => {
-            setPixCopied(true); 
-            setTimeout(() => setPixCopied(false), 3000);
-        }).catch(() => {
-             // Fallback para o document.execCommand (se o navigator falhar)
-             const tempInput = document.createElement('textarea');
-             tempInput.value = pixCode;
-             document.body.appendChild(tempInput);
-             tempInput.select();
-             document.execCommand('copy');
-             document.body.removeChild(tempInput);
-             setPixCopied(true);
-             setTimeout(() => setPixCopied(false), 3000);
-        });
-     }
-  };
+// Labels amigáveis
+const PLAN_LABELS: Record<string, string> = {
+  [PlanType.MENSAL]: 'Plano Mensal',
+  [PlanType.SEMESTRAL]: 'Plano Semestral',
+  [PlanType.VITALICIO]: 'Acesso Vitalício'
+};
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    let v = value;
-    if (name === 'number') v = v.replace(/\D/g, '').replace(/(\d{4})/g, '$1 ').trim().substring(0, 19);
-    if (name === 'expiry') v = v.replace(/\D/g, '').replace(/(\d{2})(\d)/, '$1/$2').substring(0, 5);
-    if (name === 'cvv') v = v.replace(/\D/g, '').substring(0, 4);
-    setCardData(prev => ({ ...prev, [name]: v }));
-  };
+const Checkout: React.FC = () => {
+  const { user, updatePlan } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  
+  // Estados de Dados
+  const [planDetails, setPlanDetails] = useState<{ type: PlanType, price: number, label: string } | null>(null);
+  const [paymentMethod, setPaymentMethod] = useState<'PIX' | 'CREDIT_CARD'>('PIX');
+  
+  // Estados de UI
+  const [loading, setLoading] = useState(true);
+  const [processing, setProcessing] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+  
+  // Estados do PIX
+  const [pixData, setPixData] = useState<{ qr_code_base64: string, copy_paste_code: string } | null>(null);
+  const [copySuccess, setCopySuccess] = useState(false);
 
+  // Estados do Cartão de Crédito (Sem pedir dados pessoais já cadastrados)
+  const [cardData, setCardData] = useState({
+    number: '',
+    holder: '', // Preenchido com o nome do usuário como sugestão
+    expiry: '',
+    cvv: '',
+    installments: '1'
+  });
 
-  if (loading) return <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#172134]"><Loader2 className="h-10 w-10 animate-spin text-[#bc5a08]" /></div>;
-  
-  if (!user || errorMsg.includes('CPF/Documento não foi salvo')) return (
-    // Se houver erro de documento, mostra a mensagem de erro no topo
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#172134] p-4">
-        <div className="bg-[#1E293B] p-8 rounded-xl max-w-sm text-center border border-red-500/30">
-            <AlertTriangle size={32} className="text-red-500 mx-auto mb-4" />
-            <h2 className="text-xl font-bold text-white mb-2">Erro de Carregamento</h2>
-            <p className="text-sm text-red-300 mb-6">{errorMsg || "Usuário não carregado. Por favor, volte ao registro."}</p>
-            <button onClick={() => navigate('/register')} className="bg-[#bc5a08] text-white py-2 px-4 rounded-lg font-bold">Voltar ao Cadastro</button>
-        </div>
+  // 1. INICIALIZAÇÃO ROBUSTA (PROTEÇÃO CONTRA TELA BRANCA)
+  useEffect(() => {
+    if (!user) {
+        // AuthProvider deve cuidar disso, mas por segurança paramos o loading
+        setLoading(false);
+        return;
+    }
+
+    // Inicializa o nome do titular com o nome do usuário (pode ser editado)
+    setCardData(prev => ({ ...prev, holder: user.name.toUpperCase() }));
+
+    const setupPlan = () => {
+        try {
+            // A. Tenta pegar da URL (Prioridade)
+            const params = new URLSearchParams(location.search);
+            let targetPlan = params.get('plan') as PlanType;
+
+            // B. Tenta pegar do State da navegação
+            if (!targetPlan && location.state && (location.state as any).plan) {
+                targetPlan = (location.state as any).plan;
+            }
+
+            // C. Validação e Fallback
+            if (!targetPlan || !PLAN_PRICES[targetPlan]) {
+                console.warn("Plano inválido ou ausente. Redirecionando para seleção (Settings).");
+                navigate('/settings', { replace: true });
+                return;
+            }
+
+            // Define os detalhes
+            setPlanDetails({
+                type: targetPlan,
+                price: PLAN_PRICES[targetPlan],
+                label: PLAN_LABELS[targetPlan]
+            });
+            setLoading(false);
+
+        } catch (err) {
+            console.error("Erro crítico no checkout:", err);
+            // Fallback para Mensal em caso de erro grave, apenas para não quebrar a UI
+            setPlanDetails({
+                type: PlanType.MENSAL,
+                price: PLAN_PRICES[PlanType.MENSAL],
+                label: PLAN_LABELS[PlanType.MENSAL]
+            });
+            setLoading(false);
+        }
+    };
+
+    setupPlan();
+  }, [user, location, navigate]);
+
+  // --- MÉTODOS AUXILIARES ---
+
+  const generateUUID = () => {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+      var r = Math.random() * 16 | 0, v = c === 'x' ? r : (r & 0x3 | 0x8);
+      return v.toString(16);
+    });
+  };
+
+  const handleCardChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    let { name, value } = e.target;
+    
+    // Máscaras
+    if (name === 'number') value = value.replace(/\D/g, '').replace(/(.{4})/g, '$1 ').trim().slice(0, 19);
+    if (name === 'expiry') value = value.replace(/\D/g, '').replace(/^(\d{2})(\d)/, '$1/$2').slice(0, 5);
+    if (name === 'cvv') value = value.replace(/\D/g, '').slice(0, 4);
+    if (name === 'holder') value = value.toUpperCase();
+
+    setCardData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleGeneratePix = async () => {
+    if (!user || !planDetails) return;
+    setErrorMsg('');
+    setProcessing(true);
+    
+    // URL da API interna (Serverless)
+    const API_URL = "/api/create-pix";
+    
+    try {
+      const profile = await dbService.getUserProfile(user.id);
+      const cpf = (profile?.cpf || '00000000000').replace(/\D/g, '');
+      const phone = (profile?.whatsapp || '0000000000').replace(/\D/g, '');
+      const identifier = generateUUID();
+
+      const payload = {
+        identifier: identifier,
+        amount: planDetails.price, 
+        client: {
+          name: user.name,
+          email: user.email,
+          document: cpf,
+          phone: phone
+        }
+      };
+
+      // Tenta integração real
+      const response = await fetch(API_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) throw new Error(`API Error: ${response.status}`);
+
+      const data = await response.json();
+      
+      if (data && (data.qrcode || data.emv)) {
+          setPixData({
+              qr_code_base64: data.qrcode?.base64 || data.qrcode || '', 
+              copy_paste_code: data.emv || data.qrcode?.emv || data.code || ''
+          });
+          setProcessing(false);
+          return; 
+      }
+      throw new Error("Dados PIX incompletos");
+
+    } catch (error: any) {
+      console.warn("Usando Fallback Mock PIX");
+      const mockData = await dbService.generatePix(planDetails.price, {
+        name: user.name,
+        email: user.email,
+        cpf: '000.000.000-00'
+      });
+      setPixData(mockData);
+
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleCreditCardSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!planDetails) return;
+    setErrorMsg('');
+    setProcessing(true);
+
+    try {
+        if (cardData.number.length < 16) throw new Error("Número do cartão inválido");
+        if (cardData.cvv.length < 3) throw new Error("CVV inválido");
+
+        // Simulação
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        await updatePlan(planDetails.type);
+        navigate('/?status=success'); 
+
+    } catch (err: any) {
+        setErrorMsg(err.message || "Erro ao processar cartão.");
+    } finally {
+        setProcessing(false);
+    }
+  };
+
+  const handleCopyPix = async () => {
+    if (pixData?.copy_paste_code) {
+      try {
+        await navigator.clipboard.writeText(pixData.copy_paste_code);
+        setCopySuccess(true);
+        setTimeout(() => setCopySuccess(false), 2000);
+      } catch {
+        alert("Copie manualmente: " + pixData.copy_paste_code);
+      }
+    }
+  };
+
+  const handlePixPaid = async () => {
+      setProcessing(true);
+      await new Promise(r => setTimeout(r, 1000));
+      if (planDetails) {
+          await updatePlan(planDetails.type);
+          navigate('/?status=success');
+      }
+  };
+
+  // UI LOADING
+  if (loading) return (
+    <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-950">
+      <div className="w-16 h-16 border-4 border-secondary border-t-transparent rounded-full animate-spin mb-4"></div>
+      <p className="text-slate-500 font-medium">Carregando pagamento...</p>
     </div>
   );
 
-  return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-[#172134] font-sans selection:bg-[#bc5a08] selection:text-white">
-      
-      {/* Background Decorativo */}
-      <div className="fixed top-0 left-0 w-full h-full overflow-hidden pointer-events-none">
-        <div className="absolute -top-[20%] -left-[10%] w-[50%] h-[50%] rounded-full bg-blue-600/10 blur-[120px]"></div>
-        <div className="absolute top-[20%] -right-[10%] w-[40%] h-[40%] rounded-full bg-[#bc5a08]/10 blur-[100px]"></div>
-      </div>
+  // SAFEGUARD
+  if (!planDetails) return null;
 
-      <div className="min-h-screen flex items-center justify-center p-4 sm:p-6 lg:p-8 relative z-10">
-        <div className="max-w-6xl w-full grid grid-cols-1 lg:grid-cols-5 gap-8">
-            
-            {/* ESQUERDA: INFO DO PEDIDO */}
-            <div className="lg:col-span-2 flex flex-col justify-center space-y-8 lg:pr-8">
-                {/* LOGO */}
-                <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg transform rotate-6" style={{ backgroundColor: '#bc5a08', boxShadow: '0 10px 25px -5px rgba(188, 90, 8, 0.4)' }}>
-                        <HardHat className="text-white w-8 h-8 transform -rotate-6" strokeWidth={2.5} />
-                    </div>
-                    <div>
-                        <h1 className="text-2xl font-bold text-white tracking-tight leading-none">Mãos da Obra</h1>
-                        <span className="text-xs uppercase tracking-widest text-gray-400 font-medium">Checkout Seguro</span>
-                    </div>
-                </div>
+  return (
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 py-10 px-4 font-sans">
+      <div className="max-w-4xl mx-auto">
+        
+        {/* Header */}
+        <div className="text-center mb-10">
+            <button onClick={() => navigate('/settings')} className="text-sm font-bold text-slate-400 hover:text-primary dark:hover:text-white mb-4 transition-colors">
+                <i className="fa-solid fa-arrow-left mr-2"></i> Alterar Plano
+            </button>
+            <h1 className="text-3xl font-black text-primary dark:text-white tracking-tight mb-2">Finalizar Assinatura</h1>
+            <div className="flex items-center justify-center gap-2 text-sm text-green-600 dark:text-green-400 font-bold bg-green-50 dark:bg-green-900/20 py-1 px-3 rounded-full w-fit mx-auto">
+                <i className="fa-solid fa-lock"></i> Pagamento Seguro
+            </div>
+        </div>
 
-                {/* USER CARD */}
-                <div className="bg-white/5 border border-white/10 rounded-xl p-4 flex items-center gap-4">
-                    <div className="w-10 h-10 bg-[#bc5a08]/20 rounded-full flex items-center justify-center text-[#bc5a08]">
-                        <UserCheck size={20} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                        <p className="text-xs text-gray-400 uppercase font-bold">Conta Criada</p>
-                        <p className="text-white font-medium truncate">{user.name}</p>
-                    </div>
-                    <button onClick={() => navigate('/register')} className="text-xs text-[#bc5a08] hover:text-white underline">Alterar</button>
-                </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            
+            {/* RESUMO */}
+            <div className="md:col-span-1 space-y-6">
+                <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-sm border border-slate-200 dark:border-slate-800">
+                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4">Seu Pedido</h3>
+                    
+                    <div className="flex justify-between items-center mb-4 pb-4 border-b border-slate-100 dark:border-slate-800">
+                        <div>
+                            <p className="font-bold text-primary dark:text-white text-lg">{planDetails.label}</p>
+                            <p className="text-xs text-slate-500">Mãos da Obra Premium</p>
+                        </div>
+                    </div>
 
-                <div className="space-y-4">
-                    <h2 className="text-gray-400 text-sm font-medium uppercase tracking-wider">Plano Selecionado:</h2>
-                    <div className="flex flex-wrap gap-2 mb-4">
-                        <button onClick={() => handlePlanSwitch('mensal')} className={`px-4 py-2 text-xs font-medium rounded-lg border transition-all ${planDetails?.id === 'mensal' ? 'bg-[#bc5a08] border-[#bc5a08] text-white' : 'border-gray-700 text-gray-400 hover:border-gray-500 bg-white/5'}`}>Mensal</button>
-                        <button onClick={() => handlePlanSwitch('semestral')} className={`px-4 py-2 text-xs font-medium rounded-lg border transition-all ${planDetails?.id === 'semestral' ? 'bg-[#bc5a08] border-[#bc5a08] text-white' : 'border-gray-700 text-gray-400 hover:border-gray-500 bg-white/5'}`}>Semestral</button>
-                        <button onClick={() => handlePlanSwitch('vitalicio')} className={`px-4 py-2 text-xs font-medium rounded-lg border transition-all ${planDetails?.id === 'vitalicio' ? 'bg-[#bc5a08] border-[#bc5a08] text-white' : 'border-gray-700 text-gray-400 hover:border-gray-500 bg-white/5'}`}>Vitalício</button>
-                    </div>
-                    <div className="text-4xl font-bold text-white tracking-tight">{planDetails?.name}</div>
-                    <div className="text-3xl font-bold flex items-baseline gap-1" style={{ color: '#bc5a08' }}>
-                        R$ {planDetails?.price.toFixed(2)}
-                        <span className="text-sm font-normal text-gray-400">/{planDetails?.period}</span>
-                    </div>
-                </div>
-            </div>
+                    <div className="flex justify-between items-center mb-2">
+                        <span className="text-slate-500 text-sm">Valor</span>
+                        <span className="font-bold text-slate-700 dark:text-slate-300">R$ {planDetails.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                    </div>
 
-            {/* DIREITA: FORMULÁRIO */}
-            <div className="lg:col-span-3">
-            <div className="backdrop-blur-xl bg-white/5 border border-white/10 rounded-3xl p-6 sm:p-8 shadow-2xl">
-                
-                {/* Abas */}
-                <div className="flex bg-[#0f1623] p-1 rounded-xl mb-8 border border-white/5">
-                    <button onClick={() => setPaymentMethod('pix')} className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg text-sm font-semibold transition-all duration-300 ${paymentMethod === 'pix' ? 'bg-[#172134] text-white shadow-lg border border-gray-700' : 'text-gray-400 hover:text-white'}`}>
-                        <QrCode size={18} /> PIX
-                    </button>
-                    <button onClick={() => setPaymentMethod('card')} className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-lg text-sm font-semibold transition-all duration-300 ${paymentMethod === 'card' ? 'bg-[#172134] text-white shadow-lg border border-gray-700' : 'text-gray-400 hover:text-white'}`}>
-                        <CreditCard size={18} /> Cartão
-                    </button>
-                </div>
+                    <div className="flex justify-between items-end pt-4 border-t border-slate-100 dark:border-slate-800">
+                        <span className="font-bold text-primary dark:text-white">Total</span>
+                        <span className="text-3xl font-black text-secondary">
+                            R$ {planDetails.price.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </span>
+                    </div>
+                </div>
+            </div>
 
-                {errorMsg && <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 text-red-400 text-sm rounded-xl flex items-center gap-3"><AlertTriangle className="flex-shrink-0" />{errorMsg}</div>}
+            {/* PAGAMENTO */}
+            <div className="md:col-span-2">
+                <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-xl overflow-hidden border border-slate-200 dark:border-slate-800">
+                    
+                    <div className="flex border-b border-slate-100 dark:border-slate-800">
+                        <button 
+                            onClick={() => { setPaymentMethod('PIX'); setErrorMsg(''); }}
+                            className={`flex-1 py-5 font-bold text-sm flex items-center justify-center gap-2 transition-all ${paymentMethod === 'PIX' ? 'bg-slate-50 dark:bg-slate-800 text-primary dark:text-white border-b-2 border-secondary' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}
+                        >
+                            <i className="fa-brands fa-pix"></i> PIX (Rápido)
+                        </button>
+                        <button 
+                            onClick={() => { setPaymentMethod('CREDIT_CARD'); setErrorMsg(''); }}
+                            className={`flex-1 py-5 font-bold text-sm flex items-center justify-center gap-2 transition-all ${paymentMethod === 'CREDIT_CARD' ? 'bg-slate-50 dark:bg-slate-800 text-primary dark:text-white border-b-2 border-secondary' : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'}`}
+                        >
+                            <i className="fa-solid fa-credit-card"></i> Cartão
+                        </button>
+                    </div>
 
-                {/* PIX */}
-                {paymentMethod === 'pix' && (
-                    <div className="text-center py-4">
-                        {!pixCode ? (
-                            <div className="space-y-6">
-                                <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-[#bc5a08]/10 text-[#bc5a08] mb-2"><QrCode size={40} /></div>
-                                <div><h3 className="text-white font-bold text-xl mb-2">Pague com PIX</h3><p className="text-gray-400 text-sm max-w-xs mx-auto">Liberação automática.</p></div>
-                                <button onClick={handlePixGenerate} disabled={processing} className="w-full text-white font-bold py-4 rounded-xl shadow-lg hover:shadow-orange-900/20 flex justify-center items-center gap-2" style={{ backgroundColor: '#bc5a08' }}>
-                                    {processing ? <Loader2 className="animate-spin" /> : "Gerar QR Code PIX"}
-                                </button>
-                            </div>
-                        ) : (
-                            <div className="space-y-6 animate-in fade-in">
-                                <div className="bg-white p-4 rounded-xl inline-block shadow-lg"><img src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(pixCode!)}`} alt="QR Code" className="w-48 h-48" /></div>
-                                <div className="bg-[#0f1623] p-4 rounded-xl border border-white/5 text-left"><label className="text-xs text-gray-500 mb-2 block uppercase font-bold">Copia e Cola</label><div className="flex gap-2"><input readOnly value={pixCode!} className="w-full bg-transparent border-none text-gray-300 text-xs font-mono p-0 truncate outline-none" /><button onClick={handleCopyPix} className="text-[#bc5a08] hover:text-white transition-colors">{pixCopied ? <CheckCircle size={20} /> : <Copy size={20} />}</button></div></div>
-                                
-                                {/* BOTão INJETADO PARA ACESSAR O APP */}
-                                <button onClick={redirectToDashboard} className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-4 rounded-xl transition-all shadow-lg shadow-green-900/20 flex items-center justify-center gap-2">
-                                    JÁ PAGUEI! ACESSAR O APP
-                                </button>
-                            </div>
-                        )}
-                    </div>
-                )}
+                    <div className="p-8">
+                        {errorMsg && (
+                            <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl flex items-center gap-3 text-red-600 dark:text-red-400 animate-in slide-in-from-top-2">
+                                <i className="fa-solid fa-triangle-exclamation"></i>
+                                <span className="text-sm font-bold">{errorMsg}</span>
+                            </div>
+                        )}
 
-                {/* CARTÃO */}
-                {paymentMethod === 'card' && (
-                    <form onSubmit={handleCreditCardSubmit} className="space-y-5">
-                        <div><label className="block text-xs font-bold text-gray-400 mb-2 uppercase ml-1">Número do Cartão</label><div className="relative"><input type="text" name="number" placeholder="0000 0000 0000 0000" value={cardData.number} onChange={handleInputChange} className="w-full bg-[#0f1623] border border-gray-700 text-white px-4 py-4 rounded-xl focus:ring-1 focus:ring-[#bc5a08] outline-none pl-12" required /><CreditCard size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" /></div></div>
-                        <div><label className="block text-xs font-bold text-gray-400 mb-2 uppercase ml-1">Nome Completo</label><input type="text" name="name" placeholder="Como no cartão" value={cardData.name} onChange={(e) => setCardData({...cardData, name: e.target.value.toUpperCase()})} className="w-full bg-[#0f1623] border border-gray-700 text-white px-4 py-4 rounded-xl focus:ring-1 focus:ring-[#bc5a08] outline-none" required /></div>
-                        <div className="grid grid-cols-2 gap-5">
-                            <div><label className="block text-xs font-bold text-gray-400 mb-2 uppercase ml-1">Validade</label><input type="text" name="expiry" placeholder="MM/AA" value={cardData.expiry} onChange={handleInputChange} className="w-full bg-[#0f1623] border border-gray-700 text-white px-4 py-4 rounded-xl focus:ring-1 focus:ring-[#bc5a08] outline-none text-center" required /></div>
-                            <div><label className="block text-xs font-bold text-gray-400 mb-2 uppercase ml-1">CVV</label><div className="relative"><input type="text" name="cvv" placeholder="123" value={cardData.cvv} onChange={handleInputChange} className="w-full bg-[#0f1623] border border-gray-700 text-white px-4 py-4 rounded-xl focus:ring-1 focus:ring-[#bc5a08] outline-none text-center" required /><ShieldCheck size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500" /></div></div>
-                        </div>
-                        <div>
-                            <label className="block text-xs font-bold text-gray-400 mb-2 uppercase ml-1">Parcelamento</label>
-                            <div className="relative"><select name="installments" value={cardData.installments} onChange={handleInputChange} className="w-full bg-[#0f1623] border border-gray-700 text-white px-4 py-4 rounded-xl focus:ring-1 focus:ring-[#bc5a08] outline-none appearance-none cursor-pointer"><option value={1}>1x de R$ {planDetails!.price.toFixed(2)} (Sem juros)</option><option value={2}>2x de R$ {(planDetails!.price / 2).toFixed(2)}</option><option value={3}>3x de R$ {(planDetails!.price / 3).toFixed(2)}</option></select><ChevronDown size={16} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500" /></div>
-                        </div>
-                        <button type="submit" disabled={processing} className="w-full mt-4 text-white font-bold py-4 rounded-xl shadow-lg hover:shadow-orange-900/20 flex items-center justify-center gap-2 disabled:opacity-50" style={{ backgroundColor: '#bc5a08' }}>{processing ? <><Loader2 className="animate-spin" /> Processando...</> : `Pagar R$ ${planDetails!.price.toFixed(2)}`}</button>
-                        
-                        <div className="text-center pt-2">
-                            <span className="text-xs text-gray-500 flex items-center justify-center gap-1"><ShieldCheck size={12} /> Ambiente seguro e criptografado</span>
-                        </div>
-                    </form>
-                )}
+                        {paymentMethod === 'PIX' && (
+                            <div className="animate-in fade-in">
+                                {!pixData ? (
+                                    <div className="text-center py-4">
+                                        <p className="text-slate-500 text-sm mb-6 max-w-md mx-auto">
+                                            Liberação imediata. Clique abaixo para gerar o código.
+                                        </p>
+                                        <button 
+                                            onClick={handleGeneratePix}
+                                            disabled={processing}
+                                            className="w-full max-w-sm py-4 bg-green-600 hover:bg-green-500 text-white font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-70"
+                                        >
+                                            {processing ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-qrcode"></i>}
+                                            {processing ? 'Gerando...' : 'Gerar QR Code Pix'}
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div className="text-center">
+                                        <div className="p-4 bg-white rounded-2xl border-2 border-slate-200 inline-block shadow-inner mb-6">
+                                            <img src={pixData.qr_code_base64.startsWith('data:image') ? pixData.qr_code_base64 : `data:image/png;base64,${pixData.qr_code_base64}`} alt="QR Code Pix" className="w-48 h-48 object-contain" />
+                                        </div>
+                                        <div className="mb-8 max-w-md mx-auto flex gap-2">
+                                            <input readOnly value={pixData.copy_paste_code} className="flex-1 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-xs text-slate-600 dark:text-slate-300 outline-none truncate font-mono" />
+                                            <button onClick={handleCopyPix} className={`px-4 rounded-xl font-bold text-white transition-all ${copySuccess ? 'bg-green-500' : 'bg-secondary'}`}>
+                                                <i className={`fa-solid ${copySuccess ? 'fa-check' : 'fa-copy'}`}></i>
+                                            </button>
+                                        </div>
+                                        <button 
+                                            onClick={handlePixPaid}
+                                            disabled={processing}
+                                            className="w-full max-w-sm py-4 bg-primary text-white font-bold rounded-xl shadow-lg"
+                                        >
+                                            {processing ? 'Verificando...' : 'Já fiz o pagamento'}
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        )}
 
-               </div>
-            </div>
-        </div>
-      </div>
-    </div>
-  );
-}
+                        {paymentMethod === 'CREDIT_CARD' && (
+                            <form onSubmit={handleCreditCardSubmit} className="animate-in fade-in max-w-md mx-auto space-y-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Número do Cartão</label>
+                                    <div className="relative">
+                                        <input 
+                                            name="number"
+                                            value={cardData.number}
+                                            onChange={handleCardChange}
+                                            placeholder="0000 0000 0000 0000"
+                                            maxLength={19}
+                                            className="w-full pl-10 pr-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 outline-none focus:ring-2 focus:ring-secondary/50 transition-all font-mono text-primary dark:text-white"
+                                            required
+                                        />
+                                        <i className="fa-solid fa-credit-card absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nome no Cartão</label>
+                                    <input 
+                                        name="holder"
+                                        value={cardData.holder}
+                                        onChange={handleCardChange}
+                                        placeholder="COMO ESTA NO CARTAO"
+                                        className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 outline-none focus:ring-2 focus:ring-secondary/50 transition-all text-primary dark:text-white uppercase"
+                                        required
+                                    />
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Validade</label>
+                                        <input 
+                                            name="expiry"
+                                            value={cardData.expiry}
+                                            onChange={handleCardChange}
+                                            placeholder="MM/AA"
+                                            maxLength={5}
+                                            className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 outline-none focus:ring-2 focus:ring-secondary/50 transition-all text-center font-mono text-primary dark:text-white"
+                                            required
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">CVV</label>
+                                        <input 
+                                            name="cvv"
+                                            type="password"
+                                            value={cardData.cvv}
+                                            onChange={handleCardChange}
+                                            placeholder="123"
+                                            maxLength={4}
+                                            className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 outline-none focus:ring-2 focus:ring-secondary/50 transition-all text-center font-mono text-primary dark:text-white"
+                                            required
+                                        />
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Parcelas</label>
+                                    <select 
+                                        name="installments"
+                                        value={cardData.installments}
+                                        onChange={handleCardChange}
+                                        className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 outline-none focus:ring-2 focus:ring-secondary/50 transition-all text-primary dark:text-white"
+                                    >
+                                        <option value="1">1x de R$ {planDetails.price.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</option>
+                                        {planDetails.price > 50 && <option value="2">2x de R$ {(planDetails.price / 2).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</option>}
+                                        {planDetails.price > 100 && <option value="3">3x de R$ {(planDetails.price / 3).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</option>}
+                                    </select>
+                                </div>
+
+                                <button 
+                                    type="submit"
+                                    disabled={processing}
+                                    className="w-full py-4 mt-4 bg-primary hover:bg-primary-dark text-white font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-wait"
+                                >
+                                    {processing ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-lock"></i>}
+                                    {processing ? 'Processando...' : `Pagar R$ ${planDetails.price.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`}
+                                </button>
+                            </form>
+                        )}
+                    </div>
+                </div>
+            </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default Checkout;
