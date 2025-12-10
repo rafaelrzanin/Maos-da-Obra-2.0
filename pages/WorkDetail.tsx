@@ -193,7 +193,7 @@ const WorkDetail: React.FC = () => {
                             </div>
                         ) : (
                             <div className="relative border-l-2 border-slate-200 dark:border-slate-800 ml-4 space-y-8">
-                                {steps.map((step, idx) => {
+                                {steps.map((step) => {
                                     const isDone = step.status === StepStatus.COMPLETED;
                                     const date = new Date(step.startDate);
                                     const month = date.toLocaleDateString('pt-BR', { month: 'short' }).toUpperCase();
