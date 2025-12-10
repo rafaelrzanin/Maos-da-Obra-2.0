@@ -5,7 +5,7 @@ import { PlanType } from '../types';
 import { LIFETIME_BONUSES } from '../services/standards';
 
 const Settings: React.FC = () => {
-  const { user, isSubscriptionValid } = useAuth();
+  const { user, isSubscriptionValid, isNewAccount } = useAuth();
   const navigate = useNavigate();
   const [showBonusModal, setShowBonusModal] = useState(false);
 
@@ -51,7 +51,7 @@ const Settings: React.FC = () => {
   const handleSubscribe = (planId: PlanType) => {
     if (!user) return;
     
-    // Navegação interna para a página de Checkout com State
+    // Navegação interna para a página de Checkout com State e Query
     navigate(`/checkout?plan=${planId}`, {
         state: {
             plan: planId
@@ -63,28 +63,27 @@ const Settings: React.FC = () => {
 
   return (
     <div className="max-w-6xl mx-auto pb-12 pt-4 px-4">
-      {/* Show Header only if valid, or a different header if locked (controlled in App.tsx layout mainly, but text here helps) */}
       <h1 className="text-3xl font-bold text-text-main dark:text-white mb-2">
           {isSubscriptionValid ? 'Minha Assinatura' : 'Escolha seu Plano'}
       </h1>
       <p className="text-text-body dark:text-slate-400 mb-10">
           {isSubscriptionValid 
             ? 'Gerencie seu plano atual.' 
-            : 'Para começar a usar o Mãos da Obra, ative uma assinatura.'}
+            : 'Para começar a usar o Mãos da Obra, selecione uma das opções abaixo.'}
       </p>
       
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         {plans.map(plan => {
-          const isCurrentPlanType = user.plan === plan.id;
           const isVitalicio = plan.id === PlanType.VITALICIO;
           
-          // Logic for Button State:
-          // 1. If it's the current plan type AND subscription is valid => "Current Plan" (Disabled)
-          // 2. If it's the current plan type BUT subscription is INVALID (Expired) => "Renew" (Enabled)
-          // 3. Otherwise => "Subscribe" (Enabled)
+          // Lógica de Estado do Plano:
+          // 1. isNewAccount: Usuário acabou de criar conta. NENHUM plano é "Atual" ou "Expirado". Todos são selecionáveis.
+          // 2. !isNewAccount e mesmo ID: É o plano que o usuário tinha.
           
-          const isActiveCurrent = isCurrentPlanType && isSubscriptionValid;
-          const isExpiredCurrent = isCurrentPlanType && !isSubscriptionValid;
+          const isMyOldPlan = !isNewAccount && user.plan === plan.id;
+          
+          const isActiveCurrent = isMyOldPlan && isSubscriptionValid;
+          const isExpiredCurrent = isMyOldPlan && !isSubscriptionValid;
 
           return (
             <div 
@@ -105,7 +104,8 @@ const Settings: React.FC = () => {
                 </div>
               )}
 
-              {plan.savings && !isCurrentPlanType && (
+              {/* Badges de Economia (Mostra se não for o plano atual ativo) */}
+              {plan.savings && !isActiveCurrent && (
                  <div className={`absolute -top-3 left-1/2 transform -translate-x-1/2 ${isVitalicio ? 'bg-premium' : 'bg-success'} text-white text-[10px] font-bold px-4 py-1 rounded-full uppercase tracking-wider shadow-sm`}>
                    {plan.savings}
                  </div>
@@ -155,11 +155,11 @@ const Settings: React.FC = () => {
                 }`}
               >
                 {isActiveCurrent ? (
-                  'Plano Ativo'
+                  'Plano Atual'
                 ) : isExpiredCurrent ? (
                   'Renovar Agora'
                 ) : (
-                  'Quero este plano'
+                  'Assinar Agora'
                 )}
               </button>
             </div>
