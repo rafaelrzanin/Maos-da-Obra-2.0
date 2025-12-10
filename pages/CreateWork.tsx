@@ -90,16 +90,20 @@ const CreateWork: React.FC = () => {
   };
 
   const simulateAiProcessing = async () => {
-      setAiProcessingStage("Conectando com Engenheiro Virtual...");
-      await new Promise(r => setTimeout(r, 1200));
-      setAiProcessingStage("Analisando dimensões e estrutura...");
-      await new Promise(r => setTimeout(r, 1500));
-      setAiProcessingStage("Calculando volume de concreto e materiais...");
-      await new Promise(r => setTimeout(r, 1500));
-      setAiProcessingStage("Gerando cronograma físico-financeiro...");
-      await new Promise(r => setTimeout(r, 1200));
-      setAiProcessingStage("Finalizando seu plano de obra...");
-      await new Promise(r => setTimeout(r, 800));
+      const messages = [
+          "Conectando com a base de engenharia...",
+          `Analisando dimensões (${formData.area}m²) e estrutura...`,
+          `Calculando materiais para ${formData.bathrooms} banheiros...`,
+          "Otimizando cronograma físico-financeiro...",
+          "Validando etapas da obra...",
+          "Gerando plano mestre..."
+      ];
+
+      for (const msg of messages) {
+          setAiProcessingStage(msg);
+          // Varia o tempo para parecer "pensando"
+          await new Promise(r => setTimeout(r, 800 + Math.random() * 800));
+      }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -138,8 +142,8 @@ const CreateWork: React.FC = () => {
         navigate(`/work/${newWork.id}`);
     } catch (error) {
         console.error(error);
-        setAiProcessingStage(null); // Close modal
-        alert("Erro ao criar obra. Verifique sua conexão e tente novamente.");
+        setAiProcessingStage(null); 
+        alert("Ops! Ocorreu um erro técnico ao salvar. Tente novamente em instantes.");
     } finally {
         setLoading(false);
     }
@@ -157,11 +161,11 @@ const CreateWork: React.FC = () => {
       </div>
   );
 
-  // AI Loading Overlay
+  // AI Loading Overlay ("Notoriety")
   if (aiProcessingStage) {
       return (
           <div className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-gradient-premium p-6 text-white animate-in fade-in duration-500">
-              <div className="relative mb-8">
+              <div className="relative mb-10 scale-125">
                   <div className="w-32 h-32 rounded-full p-1 bg-gradient-to-br from-secondary to-orange-500 animate-pulse relative z-10">
                       <img 
                         src={ZE_AVATAR} 
@@ -175,20 +179,25 @@ const CreateWork: React.FC = () => {
                         }}
                       />
                   </div>
+                  {/* Glow Effect */}
                   <div className="absolute inset-0 bg-secondary rounded-full blur-2xl opacity-40 animate-ping"></div>
               </div>
               
-              <h2 className="text-2xl font-black mb-4 text-center tracking-tight animate-in slide-in-from-bottom-2">
-                  Zé da Obra AI
+              <h2 className="text-3xl font-black mb-6 text-center tracking-tight animate-in slide-in-from-bottom-2">
+                  Engenheiro Virtual
               </h2>
               
-              <div className="h-2 w-64 bg-slate-800 rounded-full overflow-hidden mb-6 border border-slate-700">
-                  <div className="h-full bg-secondary animate-progress-indeterminate"></div>
+              <div className="w-full max-w-xs mb-8">
+                  <div className="h-2 w-full bg-slate-800 rounded-full overflow-hidden border border-slate-700">
+                      <div className="h-full bg-secondary animate-progress-indeterminate"></div>
+                  </div>
               </div>
               
-              <p className="text-lg font-medium text-slate-300 text-center animate-pulse">
-                  {aiProcessingStage}
-              </p>
+              <div className="h-8 flex items-center justify-center">
+                  <p className="text-xl font-medium text-slate-300 text-center animate-pulse transition-all duration-300">
+                      {aiProcessingStage}
+                  </p>
+              </div>
           </div>
       );
   }
