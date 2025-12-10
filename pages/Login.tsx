@@ -27,12 +27,31 @@ const Login: React.FC = () => {
     }
   }, [location.search]);
 
-  // Se já estiver logado, redireciona IMEDIATAMENTE
+  // Se já estiver logado, redireciona
   useEffect(() => {
     if (user && !authLoading) {
-        navigate(selectedPlan ? '/checkout' : '/', { replace: true });
+        // CORREÇÃO DE FLUXO:
+        // Se tem plano selecionado (veio de um link de plano) -> Checkout
+        // Se NÃO tem plano (criou conta direto) -> Settings (Tela de Planos) para escolher
+        if (selectedPlan) {
+            navigate('/checkout', { replace: true });
+        } else {
+            navigate('/settings', { replace: true });
+        }
     }
   }, [user, navigate, selectedPlan, authLoading]);
+
+  // Helper para máscara de CPF
+  const handleCpfChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+      let v = e.target.value.replace(/\D/g, '');
+      if (v.length > 11) v = v.slice(0, 11);
+      // Aplica máscara visual simples se desejar, mas o valor puro é o que importa
+      if (v.length > 9) v = v.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
+      else if (v.length > 6) v = v.replace(/(\d{3})(\d{3})(\d{1,3})/, "$1.$2.$3");
+      else if (v.length > 3) v = v.replace(/(\d{3})(\d{1,3})/, "$1.$2");
+      
+      setCpf(v);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -44,16 +63,22 @@ const Login: React.FC = () => {
             const success = await login(email, password);
             if (!success) alert('Dados incorretos.');
         } else {
-            if (!name || !cpf || cpf.length < 14) {
-                alert('Nome e CPF são obrigatórios.');
+            // VALIDAÇÃO DE CPF CORRIGIDA
+            const cleanCpf = cpf.replace(/\D/g, '');
+            
+            if (!name || cleanCpf.length !== 11) {
+                alert('Nome e um CPF válido (11 números) são obrigatórios.');
                 setLoading(false);
                 return;
             }
+            
+            // Passamos o selectedPlan se existir, mas o redirecionamento principal ocorre no useEffect
             const success = await signup(name, email, whatsapp, password, cpf, selectedPlan);
             if (!success) alert("Falha ao criar conta.");
         }
     } catch (error) {
         alert("Erro no sistema.");
+        console.error(error);
     } finally {
         setLoading(false);
     }
@@ -100,7 +125,7 @@ const Login: React.FC = () => {
                     <>
                         <input type="text" placeholder="Nome Completo" value={name} onChange={e => setName(e.target.value)}
                             className="w-full px-4 py-3 bg-white/10 border border-white/10 rounded-xl text-white outline-none focus:border-amber-500/50" />
-                        <input type="text" placeholder="CPF" value={cpf} onChange={e => setCpf(e.target.value)}
+                        <input type="text" placeholder="CPF" value={cpf} onChange={handleCpfChange}
                             className="w-full px-4 py-3 bg-white/10 border border-white/10 rounded-xl text-white outline-none focus:border-amber-500/50" />
                     </>
                   )}
