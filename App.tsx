@@ -196,17 +196,19 @@ const App: React.FC = () => {
     <BrowserRouter>
       <ThemeProvider>
         <AuthProvider>
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} /> {/* <-- Linha 139: ROTA CORRIGIDA */}
-            <Route path="/" element={<Layout><Dashboard /></Layout>} />
-            <Route path="/create" element={<Layout><CreateWork /></Layout>} />
-            <Route path="/work/:id" element={<Layout><WorkDetail /></Layout>} />
-            <Route path="/settings" element={<Layout><Settings /></Layout>} />
-            <Route path="/checkout" element={<Layout><Checkout /></Layout>} />
-            <Route path="/profile" element={<Layout><Profile /></Layout>} />
-            <Route path="/tutorials" element={<Layout><VideoTutorials /></Layout>} />
-          </Routes>
+         <Routes>
+                <Route path="/login" element={<Login />} />
+                <Route path="/register" element={<Register />} /> 
+                <Route path="/checkout" element={<Checkout />} /> {/* MOVIDO PARA FORA DO LAYOUT */}
+                
+                {/* ROTAS PROTEGIDAS (DENTRO DO LAYOUT) */}
+                <Route path="/" element={<Layout><Dashboard /></Layout>} />
+                <Route path="/create" element={<Layout><CreateWork /></Layout>} />
+                <Route path="/work/:id" element={<Layout><WorkDetail /></Layout>} />
+                <Route path="/settings" element={<Layout><Settings /></Layout>} />
+                <Route path="/profile" element={<Layout><Profile /></Layout>} />
+                <Route path="/tutorials" element={<Layout><VideoTutorials /></Layout>} />
+            </Routes>
         </AuthProvider>
       </ThemeProvider>
     </BrowserRouter>
