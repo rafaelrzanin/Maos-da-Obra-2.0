@@ -80,7 +80,7 @@ const Dashboard: React.FC = () => {
         // Filter Next Steps (Top 3 Pending)
         const nextSteps = steps
             .filter(s => s.status !== StepStatus.COMPLETED)
-            .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
+            .sort((a: Step, b: Step) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
             .slice(0, 3);
         setUpcomingSteps(nextSteps);
 
@@ -236,7 +236,7 @@ const Dashboard: React.FC = () => {
                          <div className="p-3 bg-slate-50 dark:bg-slate-800 border-b border-slate-100 dark:border-slate-700">
                              <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">Minhas Obras</p>
                          </div>
-                         {works.map(w => (
+                         {works.map((w: Work) => (
                              <div
                                 key={w.id}
                                 className={`w-full px-5 py-4 text-sm font-medium border-b last:border-0 border-slate-50 dark:border-slate-800 flex items-center justify-between group hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer ${focusWork.id === w.id ? 'bg-slate-50 dark:bg-slate-800/50' : ''}`}
