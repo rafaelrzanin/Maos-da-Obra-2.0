@@ -601,9 +601,6 @@ const WorkDetail: React.FC = () => {
                         const originalIdx = steps.findIndex(s => s.id === step.id); // For correct numbering
                         const stepMaterials = materials ? materials.filter(m => m.stepId === step.id) : [];
                         
-                        // FIX: Do NOT skip steps just because they are empty. Show them as "No materials".
-                        // This prevents the visual jumping of indices (e.g. 1 -> 3 -> 6)
-                        
                         return (
                             <div key={step.id} className="mb-8 rounded-3xl overflow-hidden shadow-sm border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900">
                                 {/* DISTINCT STEP HEADER */}
@@ -690,7 +687,6 @@ const WorkDetail: React.FC = () => {
                         if (stepExpenses.length === 0) return null;
 
                         const isGeneral = step.id === 'general';
-                        const stepLabel = isGeneral ? step.name : `${String(idx + 1).padStart(2, '0')} - ${step.name}`;
 
                         // Group by Description (Product/Service)
                         const groupedByDescription: {[key: string]: Expense[]} = {};
