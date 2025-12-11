@@ -1,3 +1,4 @@
+
 import { supabase } from './supabase';
 import { User, Work, Step, Material, Worker, Supplier, PlanType, StepStatus, Notification, WorkStatus, Expense, WorkPhoto, WorkFile } from '../types';
 import { FULL_MATERIAL_PACKAGES, WORK_TEMPLATES } from './standards';
@@ -42,7 +43,8 @@ export const dbService = {
 
   login: async (email: string, _password?: string): Promise<User | null> => {
       const db = getLocalDb();
-      const user = db.users.find((u: User) => u.email === email);
+      // Case insensitive check
+      const user = db.users.find((u: User) => u.email.trim().toLowerCase() === email.trim().toLowerCase());
       if (user) {
           localStorage.setItem('maos_user', JSON.stringify(user));
           return user;
@@ -52,10 +54,14 @@ export const dbService = {
 
   signup: async (name: string, email: string, whatsapp: string, _password?: string, cpf?: string, plan?: string | null): Promise<User | null> => {
       const db = getLocalDb();
+      // Check if exists first to avoid duplicates
+      const existing = db.users.find((u: User) => u.email.trim().toLowerCase() === email.trim().toLowerCase());
+      if (existing) return null;
+
       const newUser: User = { 
           id: Math.random().toString(36).substr(2, 9), 
           name, 
-          email, 
+          email: email.trim(), 
           whatsapp, 
           cpf, 
           plan: plan as PlanType || null,
@@ -65,6 +71,16 @@ export const dbService = {
       saveLocalDb(db);
       localStorage.setItem('maos_user', JSON.stringify(newUser));
       return newUser;
+  },
+
+  resetPassword: async (email: string): Promise<boolean> => {
+      // Simulate API call delay
+      await new Promise(r => setTimeout(r, 1500));
+      const db = getLocalDb();
+      const user = db.users.find((u: User) => u.email.trim().toLowerCase() === email.trim().toLowerCase());
+      // In a real app we would send an email here. 
+      // For MVP/Local, we return true if user exists to simulate success.
+      return !!user;
   },
 
   logout: () => {
@@ -91,7 +107,29 @@ export const dbService = {
       }
   },
 
-  loginSocial: async (_provider: string) => { return { error: null }; },
+  loginSocial: async (_provider: string) => { 
+      // MOCK GOOGLE LOGIN IMPLEMENTATION
+      await new Promise(r => setTimeout(r, 1500)); // Simulate network
+      
+      const db = getLocalDb();
+      const mockEmail = "usuario.google@exemplo.com";
+      let user = db.users.find((u: User) => u.email === mockEmail);
+      
+      if (!user) {
+          user = {
+              id: "google_user_" + Math.random().toString(36).substr(2, 9),
+              name: "Usuário Google",
+              email: mockEmail,
+              whatsapp: "",
+              plan: null
+          };
+          db.users.push(user);
+          saveLocalDb(db);
+      }
+      
+      localStorage.setItem('maos_user', JSON.stringify(user));
+      return { user, error: null }; 
+  },
 
   getWorks: async (userId: string): Promise<Work[]> => {
       const db = getLocalDb();
