@@ -452,7 +452,8 @@ export const dbService = {
       }
   },
 
-  updateMaterial: async (material: Material, _cost: number, _addedQty: number) => {
+  // Updates only material definition, not stock/expenses
+  updateMaterial: async (material: Material) => {
       const db = getLocalDb();
       const idx = db.materials.findIndex((m: Material) => m.id === material.id);
       if (idx >= 0) {
