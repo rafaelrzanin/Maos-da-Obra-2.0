@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, createContext, useContext, useMemo } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { User, PlanType } from './types';
@@ -119,11 +120,21 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
   useEffect(() => {
       const params = new URLSearchParams(location.search);
-      if (params.get('status') === 'success' && user) {
-          updatePlan(user.plan || PlanType.MENSAL).then(() => {
-              alert("Pagamento confirmado!");
+      const status = params.get('status');
+      const planParam = params.get('plan') as PlanType | null;
+
+      if (status === 'success' && user) {
+          // CORREÇÃO: Prioriza o plano vindo da URL para evitar que o estado antigo (MENSAL) sobrescreva o novo (VITALÍCIO)
+          if (planParam) {
+              updatePlan(planParam).then(() => {
+                  alert("Pagamento confirmado! Plano atualizado com sucesso.");
+                  navigate(location.pathname, { replace: true });
+              });
+          } else {
+              // Se não vier plano na URL, apenas limpa a query string (Checkout já fez o update)
+              // Não tentamos adivinhar o plano para não causar o bug de reversão.
               navigate(location.pathname, { replace: true });
-          });
+          }
       }
   }, [location.search, user, updatePlan, navigate, location.pathname]);
 
