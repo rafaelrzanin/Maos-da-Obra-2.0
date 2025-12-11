@@ -1048,15 +1048,45 @@ const WorkDetail: React.FC = () => {
                     </h1>
                     <div className="w-6"></div> 
                 </div>
+                
+                {/* DESKTOP TABS (HIDDEN ON MOBILE) */}
+                {subView === 'NONE' && (
+                    <div className="hidden md:flex items-center justify-center gap-6 mt-4">
+                        <button 
+                            onClick={() => setActiveTab('SCHEDULE')} 
+                            className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all font-bold text-sm ${activeTab === 'SCHEDULE' ? 'bg-secondary/10 text-secondary' : 'text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                        >
+                            <i className="fa-solid fa-calendar-days"></i> Cronograma
+                        </button>
+                        <button 
+                            onClick={() => setActiveTab('MATERIALS')} 
+                            className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all font-bold text-sm ${activeTab === 'MATERIALS' ? 'bg-secondary/10 text-secondary' : 'text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                        >
+                            <i className="fa-solid fa-layer-group"></i> Materiais
+                        </button>
+                        <button 
+                            onClick={() => setActiveTab('FINANCIAL')} 
+                            className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all font-bold text-sm ${activeTab === 'FINANCIAL' ? 'bg-secondary/10 text-secondary' : 'text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                        >
+                            <i className="fa-solid fa-chart-pie"></i> Financeiro
+                        </button>
+                        <button 
+                            onClick={() => setActiveTab('MORE')} 
+                            className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all font-bold text-sm ${activeTab === 'MORE' ? 'bg-secondary/10 text-secondary' : 'text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
+                        >
+                            <i className="fa-solid fa-bars"></i> Mais
+                        </button>
+                    </div>
+                )}
             </div>
 
-            <div className="flex-1 p-4 pb-32 overflow-y-auto">
+            <div className="flex-1 p-4 pb-32 md:pb-8 overflow-y-auto">
                 {subView !== 'NONE' ? renderSubViewContent() : renderMainTab()}
             </div>
 
-            {/* MAIN NAVIGATION BOTTOM BAR (Only visible on main tabs) */}
+            {/* MAIN NAVIGATION BOTTOM BAR (Only visible on main tabs AND MOBILE) */}
             {subView === 'NONE' && (
-                <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 pb-safe z-40 shadow-[0_-5px_20px_rgba(0,0,0,0.05)] no-print">
+                <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 pb-safe z-40 shadow-[0_-5px_20px_rgba(0,0,0,0.05)] no-print">
                     <div className="flex justify-around items-center max-w-4xl mx-auto h-16">
                         <button onClick={() => setActiveTab('SCHEDULE')} className={`flex flex-col items-center justify-center w-full h-full gap-1 transition-all ${activeTab === 'SCHEDULE' ? 'text-secondary' : 'text-slate-400'}`}><i className={`fa-solid fa-calendar-days text-xl ${activeTab === 'SCHEDULE' ? 'scale-110' : ''}`}></i><span className="text-[10px] font-bold uppercase">Cronograma</span></button>
                         <button onClick={() => setActiveTab('MATERIALS')} className={`flex flex-col items-center justify-center w-full h-full gap-1 transition-all ${activeTab === 'MATERIALS' ? 'text-secondary' : 'text-slate-400'}`}><i className={`fa-solid fa-layer-group text-xl ${activeTab === 'MATERIALS' ? 'scale-110' : ''}`}></i><span className="text-[10px] font-bold uppercase">Materiais</span></button>
