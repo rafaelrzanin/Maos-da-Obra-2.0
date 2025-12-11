@@ -1,8 +1,10 @@
+
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../App';
 import { dbService } from '../services/db';
 import { WORK_TEMPLATES, ZE_AVATAR, ZE_AVATAR_FALLBACK } from '../services/standards';
+import { WorkStatus } from '../types';
 
 const CreateWork: React.FC = () => {
   const { user } = useAuth();
@@ -136,6 +138,7 @@ const CreateWork: React.FC = () => {
           kitchens: Number(formData.kitchens),
           livingRooms: Number(formData.livingRooms),
           hasLeisureArea: formData.hasLeisureArea,
+          status: WorkStatus.PLANNING,
           notes: selectedTemplate?.label || ''
         }, selectedTemplateId);
 
