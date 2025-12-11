@@ -2,6 +2,7 @@ import {
   User, Work, Step, Material, Expense, Worker, Supplier, 
   WorkPhoto, WorkFile, Notification, PlanType, StepStatus
 } from '../types';
+import { WORK_TEMPLATES, FULL_MATERIAL_PACKAGES } from './standards';
 
 const DB_KEY = 'maos_da_obra_db';
 
@@ -63,42 +64,32 @@ export const dbService = {
      
      let user = db.users.find((u: User) => u.email === cleanEmail);
      
-     // --- SAFETY NET: DEMO USER & DATA RECOVERY ---
-     if (cleanEmail === 'teste@maosdaobra.app') {
-         if (!user) {
-             // Cria o usuário demo se não existir
-             user = {
-                 id: 'demo-user-id',
-                 name: 'Zé da Obra (Demo)',
-                 email: 'teste@maosdaobra.app',
-                 whatsapp: '51999999999',
-                 plan: PlanType.VITALICIO,
-                 subscriptionExpiresAt: new Date(Date.now() + 36500 * 24 * 60 * 60 * 1000).toISOString()
-             };
-             if (!Array.isArray(db.users)) db.users = [];
-             db.users.push(user);
-         }
-
-         // RECUPERAÇÃO DE DADOS: Se houver obras mas elas não pertencem a este ID (ex: perda de sessão antiga),
-         // vincula elas ao usuário demo para não aparecer tudo em branco.
-         if (db.works.length > 0) {
-             const worksNotOwned = db.works.filter((w: Work) => w.userId !== user!.id);
-             if (worksNotOwned.length > 0) {
-                 // Adota as obras órfãs
-                 db.works = db.works.map((w: Work) => ({ ...w, userId: user!.id }));
-                 // Workers e Suppliers também precisam ser migrados
-                 db.workers = db.workers.map((w: Worker) => ({ ...w, userId: user!.id }));
-                 db.suppliers = db.suppliers.map((s: Supplier) => ({ ...s, userId: user!.id }));
-                 console.log(`[System] Recuperados ${worksNotOwned.length} obras para o usuário demo.`);
-             }
-         }
-         
+     // --- FALLBACK: CREATE TEST USER IF NOT EXISTS (Tecnicamente obrigatório se o banco estiver vazio) ---
+     if (cleanEmail === 'teste@maosdaobra.com' && !user) {
+         user = {
+             id: 'user-teste-id',
+             name: 'Usuário Teste',
+             email: 'teste@maosdaobra.com',
+             whatsapp: '11999999999',
+             plan: PlanType.VITALICIO,
+             subscriptionExpiresAt: new Date(Date.now() + 36500 * 24 * 60 * 60 * 1000).toISOString() // 100 anos
+         };
+         if (!Array.isArray(db.users)) db.users = [];
+         db.users.push(user);
          saveLocalDb(db);
-         localStorage.setItem('maos_user', JSON.stringify(user));
-         return user;
      }
 
-     if (user) { 
+     if (user) {
+         // RECUPERAÇÃO DE DADOS ÓRFÃOS (Segurança para não perder dados se o ID mudou)
+         if (db.works.length > 0) {
+             const worksNotOwned = db.works.filter((w: Work) => w.userId !== user!.id && w.userId === 'demo-user-id');
+             if (worksNotOwned.length > 0) {
+                 db.works.forEach((w: Work) => { if(w.userId === 'demo-user-id') w.userId = user!.id; });
+                 db.steps.forEach((s: Step) => { /* steps don't have userId, linked via workId */ });
+                 saveLocalDb(db);
+             }
+         }
+
          localStorage.setItem('maos_user', JSON.stringify(user));
          return user;
      }
@@ -187,14 +178,72 @@ export const dbService = {
       return db.works.find((w: Work) => w.id === id);
   },
 
-  createWork: async (data: Partial<Work>, _templateId?: string): Promise<Work> => {
+  createWork: async (data: Partial<Work>, templateId?: string): Promise<Work> => {
       const db = getLocalDb();
       const newWork: Work = {
           id: Math.random().toString(36).substr(2, 9),
           status: StepStatus.NOT_STARTED,
           ...data
       } as Work;
+      
+      // 1. Save Work
       db.works.push(newWork);
+
+      // 2. Generate Steps from Template (RESTAURADO)
+      if (templateId) {
+          const template = WORK_TEMPLATES.find(t => t.id === templateId);
+          if (template) {
+              const startDate = new Date(newWork.startDate);
+              const stepDuration = Math.floor(template.defaultDurationDays / template.includedSteps.length);
+              
+              template.includedSteps.forEach((stepName, index) => {
+                  const stepStart = new Date(startDate);
+                  stepStart.setDate(startDate.getDate() + (index * stepDuration));
+                  
+                  const stepEnd = new Date(stepStart);
+                  stepEnd.setDate(stepStart.getDate() + stepDuration);
+
+                  const newStep: Step = {
+                      id: Math.random().toString(36).substr(2, 9),
+                      workId: newWork.id,
+                      name: stepName,
+                      startDate: stepStart.toISOString(),
+                      endDate: stepEnd.toISOString(),
+                      status: StepStatus.NOT_STARTED,
+                      isDelayed: false
+                  };
+                  db.steps.push(newStep);
+
+                  // 3. Generate Materials for this Step (RESTAURADO)
+                  // Simple matching logic: find a catalog category that matches the step name somewhat
+                  const catalog = FULL_MATERIAL_PACKAGES.find(c => 
+                      stepName.toLowerCase().includes(c.category.split(' ')[0].toLowerCase()) ||
+                      c.category.toLowerCase().includes(stepName.toLowerCase())
+                  );
+
+                  if (catalog) {
+                      catalog.items.forEach(item => {
+                          // Calculate quantity based on area/size if multiplier exists
+                          let qty = 1;
+                          if (item.multiplier) {
+                              qty = Math.ceil(item.multiplier * (newWork.area || 50));
+                          }
+                          
+                          db.materials.push({
+                              id: Math.random().toString(36).substr(2, 9),
+                              workId: newWork.id,
+                              stepId: newStep.id,
+                              name: item.name,
+                              unit: item.unit,
+                              plannedQty: qty,
+                              purchasedQty: 0
+                          });
+                      });
+                  }
+              });
+          }
+      }
+
       saveLocalDb(db);
       return newWork;
   },
@@ -338,7 +387,7 @@ export const dbService = {
       saveLocalDb(db);
   },
 
-  // Lógica Financeira Acumulativa Corrigida
+  // Lógica Financeira Acumulativa (CORREÇÃO PEDIDA)
   getPaymentHistory: async (workId: string, description: string, excludeId?: string): Promise<{ totalPaid: number, lastTotalAgreed: number }> => {
       const db = getLocalDb();
       if (!description) return { totalPaid: 0, lastTotalAgreed: 0 };
@@ -346,8 +395,7 @@ export const dbService = {
       const normalize = (str: string) => str.toLowerCase().trim();
       const targetDesc = normalize(description);
 
-      // Filtra despesas com a mesma descrição e obra, excluindo o item atual (se for edição)
-      // ISSO GARANTE QUE "JÁ PAGO" SEJA SÓ O PASSADO
+      // Soma de TUDO que já foi pago com essa descrição, exceto o lançamento atual (se for edição)
       const relevant = db.expenses.filter((e: Expense) => 
           e.workId === workId && 
           normalize(e.description) === targetDesc &&
@@ -356,7 +404,7 @@ export const dbService = {
       
       const totalPaid = relevant.reduce((acc: number, curr: Expense) => acc + (Number(curr.amount) || 0), 0);
       
-      // Busca o último "Total Combinado" para preencher automaticamente
+      // Pega o último "total combinado" definido em qualquer registro anterior
       const lastAgreedItem = relevant
         .sort((a: Expense, b: Expense) => new Date(b.date).getTime() - new Date(a.date).getTime())
         .find((e: Expense) => e.totalAgreed && Number(e.totalAgreed) > 0);
