@@ -554,7 +554,7 @@ const WorkDetail: React.FC = () => {
                         </div>
                     </div>
 
-                    {filteredSteps.map((step, idx) => {
+                    {filteredSteps.map((step) => {
                         const originalIdx = steps.findIndex(s => s.id === step.id); // For correct numbering
                         const stepMaterials = materials ? materials.filter(m => m.stepId === step.id) : [];
                         
