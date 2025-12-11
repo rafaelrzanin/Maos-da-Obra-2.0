@@ -2,19 +2,21 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
+import { useAuth } from '../App';
 import { dbService } from '../services/db';
-import { Work, Worker, Supplier, Material, Step, Expense, StepStatus, WorkPhoto, WorkFile, FileCategory, ExpenseCategory } from '../types';
+import { Work, Worker, Supplier, Material, Step, Expense, StepStatus, WorkPhoto, WorkFile, FileCategory, ExpenseCategory, PlanType } from '../types';
 import { ZeModal } from '../components/ZeModal';
 import { STANDARD_CHECKLISTS, CONTRACT_TEMPLATES, STANDARD_JOB_ROLES, STANDARD_SUPPLIER_CATEGORIES, ZE_AVATAR, ZE_AVATAR_FALLBACK } from '../services/standards';
 import { aiService } from '../services/ai';
 
 // --- TYPES FOR VIEW STATE ---
 type MainTab = 'SCHEDULE' | 'MATERIALS' | 'FINANCIAL' | 'MORE';
-type SubView = 'NONE' | 'TEAM' | 'SUPPLIERS' | 'REPORTS' | 'PHOTOS' | 'FILES' | 'BONUS_IA' | 'BONUS_IA_CHAT' | 'CALCULATORS' | 'CONTRACTS' | 'CHECKLIST';
+type SubView = 'NONE' | 'TEAM' | 'SUPPLIERS' | 'REPORTS' | 'PHOTOS' | 'PROJECTS' | 'BONUS_IA' | 'BONUS_IA_CHAT' | 'CALCULATORS' | 'CONTRACTS' | 'CHECKLIST';
 
 const WorkDetail: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
+    const { user } = useAuth();
     
     // --- CORE DATA STATE ---
     const [work, setWork] = useState<Work | null>(null);
@@ -32,6 +34,9 @@ const WorkDetail: React.FC = () => {
     const [subView, setSubView] = useState<SubView>('NONE');
     const [uploading, setUploading] = useState(false);
     
+    // --- PREMIUM CHECK ---
+    const isPremium = user?.plan === PlanType.VITALICIO;
+
     // --- MODALS STATE ---
     // STEP MODALS
     const [addStepModal, setAddStepModal] = useState(false);
@@ -403,61 +408,111 @@ const WorkDetail: React.FC = () => {
             switch(subView) {
                 // --- 1. GESTÃO DE EQUIPE ---
                 case 'TEAM': return (
-                    <div className="space-y-4">
-                        <button onClick={() => openPersonModal('WORKER')} className="w-full py-4 rounded-xl border-2 border-dashed border-primary/30 text-primary font-bold hover:bg-primary/5 transition-colors flex items-center justify-center gap-2">
-                            <i className="fa-solid fa-plus"></i> Adicionar Profissional
-                        </button>
-                        {workers.map(w => (
-                            <div key={w.id} className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 flex items-center justify-between shadow-sm animate-in slide-in-from-bottom-2">
-                                <div className="flex items-center gap-4 cursor-pointer flex-1" onClick={() => openPersonModal('WORKER', w)}>
-                                    <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 text-xl">
-                                        <i className="fa-solid fa-user-helmet-safety"></i>
-                                    </div>
-                                    <div>
-                                        <h4 className="font-bold text-primary dark:text-white">{w.name}</h4>
-                                        <p className="text-sm text-secondary font-bold">{w.role}</p>
-                                    </div>
+                    <div className="space-y-6">
+                        <div className="bg-blue-50 dark:bg-blue-900/20 p-6 rounded-3xl border border-blue-100 dark:border-blue-900 mb-2">
+                            <h3 className="text-xl font-bold text-primary dark:text-white mb-1">Minha Equipe</h3>
+                            <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
+                                Cadastre quem faz sua obra acontecer.
+                            </p>
+                            <button 
+                                onClick={() => openPersonModal('WORKER')} 
+                                className="w-full py-4 rounded-2xl border-2 border-dashed border-blue-300 dark:border-blue-700 text-blue-600 dark:text-blue-400 font-bold hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors flex items-center justify-center gap-2 group"
+                            >
+                                <div className="w-8 h-8 rounded-full bg-blue-200 dark:bg-blue-800 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                    <i className="fa-solid fa-plus text-sm"></i>
                                 </div>
-                                <div className="flex items-center gap-3">
-                                    <a href={`https://wa.me/55${w.phone.replace(/\D/g, '')}`} target="_blank" className="w-10 h-10 rounded-full bg-green-100 text-green-600 flex items-center justify-center hover:scale-110 transition-transform">
-                                        <i className="fa-brands fa-whatsapp text-lg"></i>
-                                    </a>
-                                    <button onClick={() => handleDeletePerson(w.id, 'WORKER')} className="w-10 h-10 rounded-full bg-red-50 text-red-500 flex items-center justify-center hover:bg-red-100">
-                                        <i className="fa-solid fa-trash-can"></i>
-                                    </button>
-                                </div>
+                                Adicionar Novo Profissional
+                            </button>
+                        </div>
+
+                        {workers.length === 0 ? (
+                            <div className="text-center py-10 opacity-50">
+                                <i className="fa-solid fa-helmet-safety text-4xl mb-2 text-slate-300"></i>
+                                <p className="text-sm font-medium">Nenhum profissional cadastrado.</p>
                             </div>
-                        ))}
+                        ) : (
+                            <div className="space-y-3">
+                                {workers.map(w => (
+                                    <div key={w.id} className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm hover:shadow-md transition-all flex items-center justify-between">
+                                        <div className="flex items-center gap-4 cursor-pointer flex-1" onClick={() => openPersonModal('WORKER', w)}>
+                                            <div className="w-14 h-14 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 text-2xl shadow-inner">
+                                                <i className="fa-solid fa-user-helmet-safety"></i>
+                                            </div>
+                                            <div>
+                                                <h4 className="font-bold text-primary dark:text-white text-lg">{w.name}</h4>
+                                                <p className="text-xs font-bold text-secondary uppercase tracking-wider">{w.role}</p>
+                                                {w.phone && <p className="text-xs text-slate-400 mt-1"><i className="fa-solid fa-phone mr-1"></i> {w.phone}</p>}
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            {w.phone && (
+                                                <a href={`https://wa.me/55${w.phone.replace(/\D/g, '')}`} target="_blank" className="w-10 h-10 rounded-xl bg-green-50 text-green-600 flex items-center justify-center hover:bg-green-100 transition-colors border border-green-100">
+                                                    <i className="fa-brands fa-whatsapp text-lg"></i>
+                                                </a>
+                                            )}
+                                            <button onClick={() => handleDeletePerson(w.id, 'WORKER')} className="w-10 h-10 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center justify-center transition-colors">
+                                                <i className="fa-solid fa-trash-can"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 );
 
                 // --- 2. GESTÃO DE FORNECEDORES ---
                 case 'SUPPLIERS': return (
-                    <div className="space-y-4">
-                        <button onClick={() => openPersonModal('SUPPLIER')} className="w-full py-4 rounded-xl border-2 border-dashed border-primary/30 text-primary font-bold hover:bg-primary/5 transition-colors flex items-center justify-center gap-2">
-                            <i className="fa-solid fa-plus"></i> Adicionar Fornecedor
-                        </button>
-                        {suppliers.map(s => (
-                            <div key={s.id} className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 flex items-center justify-between shadow-sm animate-in slide-in-from-bottom-2">
-                                <div className="flex items-center gap-4 cursor-pointer flex-1" onClick={() => openPersonModal('SUPPLIER', s)}>
-                                    <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 text-xl">
-                                        <i className="fa-solid fa-store"></i>
-                                    </div>
-                                    <div>
-                                        <h4 className="font-bold text-primary dark:text-white">{s.name}</h4>
-                                        <p className="text-sm text-secondary font-bold">{s.category}</p>
-                                    </div>
+                    <div className="space-y-6">
+                        <div className="bg-amber-50 dark:bg-amber-900/20 p-6 rounded-3xl border border-amber-100 dark:border-amber-900 mb-2">
+                            <h3 className="text-xl font-bold text-primary dark:text-white mb-1">Fornecedores</h3>
+                            <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
+                                Lojas e prestadores de serviço parceiros.
+                            </p>
+                            <button 
+                                onClick={() => openPersonModal('SUPPLIER')} 
+                                className="w-full py-4 rounded-2xl border-2 border-dashed border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-500 font-bold hover:bg-amber-100 dark:hover:bg-amber-900/40 transition-colors flex items-center justify-center gap-2 group"
+                            >
+                                <div className="w-8 h-8 rounded-full bg-amber-200 dark:bg-amber-800 flex items-center justify-center group-hover:scale-110 transition-transform">
+                                    <i className="fa-solid fa-plus text-sm"></i>
                                 </div>
-                                <div className="flex items-center gap-3">
-                                    <a href={`https://wa.me/55${s.phone.replace(/\D/g, '')}`} target="_blank" className="w-10 h-10 rounded-full bg-green-100 text-green-600 flex items-center justify-center hover:scale-110 transition-transform">
-                                        <i className="fa-brands fa-whatsapp text-lg"></i>
-                                    </a>
-                                    <button onClick={() => handleDeletePerson(s.id, 'SUPPLIER')} className="w-10 h-10 rounded-full bg-red-50 text-red-500 flex items-center justify-center hover:bg-red-100">
-                                        <i className="fa-solid fa-trash-can"></i>
-                                    </button>
-                                </div>
+                                Adicionar Novo Fornecedor
+                            </button>
+                        </div>
+
+                        {suppliers.length === 0 ? (
+                            <div className="text-center py-10 opacity-50">
+                                <i className="fa-solid fa-store text-4xl mb-2 text-slate-300"></i>
+                                <p className="text-sm font-medium">Nenhum fornecedor cadastrado.</p>
                             </div>
-                        ))}
+                        ) : (
+                            <div className="space-y-3">
+                                {suppliers.map(s => (
+                                    <div key={s.id} className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm hover:shadow-md transition-all flex items-center justify-between">
+                                        <div className="flex items-center gap-4 cursor-pointer flex-1" onClick={() => openPersonModal('SUPPLIER', s)}>
+                                            <div className="w-14 h-14 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 text-2xl shadow-inner">
+                                                <i className="fa-solid fa-store"></i>
+                                            </div>
+                                            <div>
+                                                <h4 className="font-bold text-primary dark:text-white text-lg">{s.name}</h4>
+                                                <p className="text-xs font-bold text-secondary uppercase tracking-wider">{s.category}</p>
+                                                {s.phone && <p className="text-xs text-slate-400 mt-1"><i className="fa-solid fa-phone mr-1"></i> {s.phone}</p>}
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            {s.phone && (
+                                                <a href={`https://wa.me/55${s.phone.replace(/\D/g, '')}`} target="_blank" className="w-10 h-10 rounded-xl bg-green-50 text-green-600 flex items-center justify-center hover:bg-green-100 transition-colors border border-green-100">
+                                                    <i className="fa-brands fa-whatsapp text-lg"></i>
+                                                </a>
+                                            )}
+                                            <button onClick={() => handleDeletePerson(s.id, 'SUPPLIER')} className="w-10 h-10 rounded-xl bg-slate-50 dark:bg-slate-800 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center justify-center transition-colors">
+                                                <i className="fa-solid fa-trash-can"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
                     </div>
                 );
 
@@ -478,93 +533,78 @@ const WorkDetail: React.FC = () => {
 
                         {/* Export Buttons */}
                         <div className="flex gap-4">
-                            <button onClick={() => window.print()} className="flex-1 py-3 bg-red-50 text-red-600 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-red-100 transition-colors">
-                                <i className="fa-solid fa-file-pdf"></i> PDF
+                            <button onClick={() => window.print()} className="flex-1 py-3 bg-red-50 text-red-600 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-red-100 transition-colors shadow-sm">
+                                <i className="fa-solid fa-file-pdf"></i> Imprimir PDF
                             </button>
-                            <button onClick={handleExportExcel} className="flex-1 py-3 bg-green-50 text-green-600 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-green-100 transition-colors">
-                                <i className="fa-solid fa-file-excel"></i> Excel
+                            <button onClick={handleExportExcel} className="flex-1 py-3 bg-green-50 text-green-600 rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-green-100 transition-colors shadow-sm">
+                                <i className="fa-solid fa-file-excel"></i> Baixar Excel
                             </button>
                         </div>
                         
                         {/* Report Content */}
-                        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-4 shadow-sm min-h-[300px]">
+                        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-lg min-h-[300px]">
                             {reportTab === 'CRONO' && (
-                                <div className="space-y-2">
-                                    <div className="flex justify-between text-xs font-black text-slate-400 uppercase border-b pb-2">
-                                        <span>Etapa</span><span>Status</span>
-                                    </div>
+                                <div className="space-y-4">
                                     {steps.map((s, i) => (
-                                        <div key={s.id} className="flex justify-between items-center py-2 border-b border-slate-50 dark:border-slate-800 last:border-0">
-                                            <div className="flex items-center gap-3">
-                                                <span className="text-xs font-bold text-slate-300">{String(i+1).padStart(2,'0')}</span>
-                                                <span className="text-sm font-medium">{s.name}</span>
+                                        <div key={s.id} className="flex justify-between items-center py-3 border-b border-slate-100 dark:border-slate-800 last:border-0">
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-xs font-black text-slate-500">
+                                                    {String(i+1).padStart(2,'0')}
+                                                </div>
+                                                <div>
+                                                    <span className="text-sm font-bold block">{s.name}</span>
+                                                    <span className="text-[10px] text-slate-400 uppercase font-medium">{new Date(s.startDate).toLocaleDateString()} - {new Date(s.endDate).toLocaleDateString()}</span>
+                                                </div>
                                             </div>
-                                            <span className={`text-[10px] font-bold px-2 py-1 rounded uppercase ${s.status === 'CONCLUIDO' ? 'bg-green-100 text-green-700' : s.status === 'EM_ANDAMENTO' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'}`}>
-                                                {s.status === 'CONCLUIDO' ? 'Concluído' : s.status === 'EM_ANDAMENTO' ? 'Em And.' : 'Pendente'}
+                                            <span className={`text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-wide ${s.status === 'CONCLUIDO' ? 'bg-green-100 text-green-700' : s.status === 'EM_ANDAMENTO' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'}`}>
+                                                {s.status === 'CONCLUIDO' ? 'Concluído' : s.status === 'EM_ANDAMENTO' ? 'Andamento' : 'Pendente'}
                                             </span>
                                         </div>
                                     ))}
                                 </div>
                             )}
-                            {/* NEW: HIERARCHICAL MATERIAL REPORT */}
                             {reportTab === 'MAT' && (
                                 <div className="space-y-6">
                                     {steps.map((step, i) => {
                                         const stepMaterials = materials.filter(m => m.stepId === step.id);
-                                        // If no materials for this step and it's done, skip or show empty state if desired. 
-                                        // Showing all steps maintains the "skeleton".
-                                        
-                                        const allBought = stepMaterials.length > 0 && stepMaterials.every(m => m.purchasedQty >= m.plannedQty);
-                                        
+                                        if (stepMaterials.length === 0) return null;
                                         return (
-                                            <div key={step.id} className="border-b border-slate-100 dark:border-slate-800 pb-4 last:border-0">
-                                                <div className="flex items-center gap-3 mb-2">
-                                                    <div className={`w-6 h-6 rounded-md flex items-center justify-center text-xs font-black ${allBought ? 'bg-green-500 text-white' : 'bg-slate-200 dark:bg-slate-800 text-slate-600'}`}>
-                                                        {String(i+1).padStart(2,'0')}
-                                                    </div>
-                                                    <h4 className="text-sm font-bold text-primary dark:text-white uppercase tracking-wide">{step.name}</h4>
+                                            <div key={step.id}>
+                                                <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 border-b border-slate-100 dark:border-slate-800 pb-2">{step.name}</h4>
+                                                <div className="space-y-2">
+                                                    {stepMaterials.map(m => (
+                                                        <div key={m.id} className="flex justify-between items-center text-sm">
+                                                            <span className="font-medium text-slate-700 dark:text-slate-300">• {m.name}</span>
+                                                            <span className={`text-xs font-mono font-bold ${m.purchasedQty >= m.plannedQty ? 'text-green-600' : 'text-slate-400'}`}>
+                                                                {m.purchasedQty} / {m.plannedQty} {m.unit}
+                                                            </span>
+                                                        </div>
+                                                    ))}
                                                 </div>
-                                                
-                                                {stepMaterials.length === 0 ? (
-                                                    <p className="text-xs text-slate-400 pl-9 italic">Nenhum material cadastrado nesta etapa.</p>
-                                                ) : (
-                                                    <div className="pl-9 space-y-2">
-                                                        {stepMaterials.map(m => {
-                                                            const status = m.purchasedQty >= m.plannedQty ? 'OK' : m.purchasedQty > 0 ? 'PARTIAL' : 'NONE';
-                                                            return (
-                                                                <div key={m.id} className="flex justify-between items-center text-sm">
-                                                                    <span className="text-slate-600 dark:text-slate-300 truncate max-w-[60%]">• {m.name}</span>
-                                                                    <div className="flex items-center gap-2">
-                                                                        <span className="text-xs font-mono text-slate-400">{m.purchasedQty}/{m.plannedQty} {m.unit}</span>
-                                                                        <div className={`w-2 h-2 rounded-full ${status === 'OK' ? 'bg-green-500' : status === 'PARTIAL' ? 'bg-orange-400' : 'bg-slate-300'}`}></div>
-                                                                    </div>
-                                                                </div>
-                                                            );
-                                                        })}
-                                                    </div>
-                                                )}
                                             </div>
                                         );
                                     })}
                                 </div>
                             )}
                             {reportTab === 'FIN' && (
-                                <div className="space-y-2">
-                                    <div className="flex justify-between text-xs font-black text-slate-400 uppercase border-b pb-2">
-                                        <span>Descrição</span><span>Valor</span>
-                                    </div>
+                                <div className="space-y-4">
                                     {expenses.map(e => (
-                                        <div key={e.id} className="flex justify-between items-center py-2 border-b border-slate-50 dark:border-slate-800 last:border-0">
-                                            <div>
-                                                <p className="text-sm font-medium">{e.description}</p>
-                                                <p className="text-[10px] text-slate-400">{new Date(e.date).toLocaleDateString()}</p>
+                                        <div key={e.id} className="flex justify-between items-center py-3 border-b border-slate-100 dark:border-slate-800 last:border-0">
+                                            <div className="flex items-center gap-3">
+                                                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs ${e.category === 'Material' ? 'bg-amber-100 text-amber-600' : 'bg-blue-100 text-blue-600'}`}>
+                                                    <i className={`fa-solid ${e.category === 'Material' ? 'fa-box' : 'fa-user'}`}></i>
+                                                </div>
+                                                <div>
+                                                    <p className="text-sm font-bold">{e.description}</p>
+                                                    <p className="text-[10px] text-slate-400">{new Date(e.date).toLocaleDateString()}</p>
+                                                </div>
                                             </div>
                                             <span className="text-sm font-bold text-slate-700 dark:text-slate-300">R$ {e.amount.toLocaleString('pt-BR')}</span>
                                         </div>
                                     ))}
-                                    <div className="pt-4 mt-2 border-t border-slate-200 dark:border-slate-700 flex justify-between items-center">
-                                        <span className="font-bold">Total Gasto</span>
-                                        <span className="text-xl font-black text-secondary">R$ {expenses.reduce((a,b)=>a+b.amount,0).toLocaleString('pt-BR')}</span>
+                                    <div className="pt-6 mt-4 border-t-2 border-slate-100 dark:border-slate-800 flex justify-between items-center">
+                                        <span className="font-black text-primary dark:text-white uppercase tracking-widest">Total Gasto</span>
+                                        <span className="text-2xl font-black text-secondary">R$ {expenses.reduce((a,b)=>a+b.amount,0).toLocaleString('pt-BR')}</span>
                                     </div>
                                 </div>
                             )}
@@ -574,26 +614,35 @@ const WorkDetail: React.FC = () => {
 
                 // --- 4. FOTOS ---
                 case 'PHOTOS': return (
-                    <div className="space-y-4">
-                        <label className="block w-full py-8 border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl text-center cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors relative">
-                            {uploading ? (
-                                <div className="flex flex-col items-center justify-center">
-                                    <i className="fa-solid fa-circle-notch fa-spin text-3xl text-secondary mb-2"></i>
-                                    <p className="text-sm font-bold text-slate-500">Enviando foto...</p>
-                                </div>
-                            ) : (
-                                <>
-                                    <i className="fa-solid fa-camera text-3xl text-slate-400 mb-2"></i>
-                                    <p className="text-sm font-bold text-slate-500">Toque para adicionar foto</p>
-                                    <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, 'PHOTO')} disabled={uploading} />
-                                </>
-                            )}
-                        </label>
+                    <div className="space-y-6">
+                        <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 text-center">
+                            <div className="w-16 h-16 rounded-full bg-pink-100 dark:bg-pink-900/30 text-pink-600 dark:text-pink-400 flex items-center justify-center text-3xl mx-auto mb-4">
+                                <i className="fa-solid fa-camera-retro"></i>
+                            </div>
+                            <h3 className="text-lg font-bold text-primary dark:text-white">Galeria de Progresso</h3>
+                            <p className="text-sm text-slate-500 mb-6">Registre o antes, durante e depois.</p>
+                            
+                            <label className="block w-full py-4 border-2 border-dashed border-pink-200 dark:border-pink-900 bg-pink-50 dark:bg-pink-900/10 rounded-2xl cursor-pointer hover:bg-pink-100 dark:hover:bg-pink-900/20 transition-all group">
+                                {uploading ? (
+                                    <div className="flex flex-col items-center justify-center gap-2">
+                                        <i className="fa-solid fa-circle-notch fa-spin text-2xl text-pink-600"></i>
+                                        <span className="text-sm font-bold text-pink-600">Enviando...</span>
+                                    </div>
+                                ) : (
+                                    <div className="flex flex-col items-center justify-center gap-2">
+                                        <i className="fa-solid fa-cloud-arrow-up text-2xl text-pink-400 group-hover:text-pink-600 transition-colors"></i>
+                                        <span className="text-sm font-bold text-pink-600 dark:text-pink-400">Toque para enviar foto (JPG/PNG)</span>
+                                    </div>
+                                )}
+                                <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, 'PHOTO')} disabled={uploading} />
+                            </label>
+                        </div>
+
                         <div className="grid grid-cols-2 gap-4">
                             {photos.map((p) => (
-                                <div key={p.id} className="aspect-square bg-slate-100 rounded-xl overflow-hidden relative group">
-                                    <img src={p.url} className="w-full h-full object-cover" alt="Obra" />
-                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                <div key={p.id} className="aspect-square bg-white dark:bg-slate-900 rounded-2xl overflow-hidden relative group shadow-sm border border-slate-200 dark:border-slate-800">
+                                    <img src={p.url} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" alt="Obra" />
+                                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-3">
                                         <span className="text-white text-xs font-bold">{new Date(p.date).toLocaleDateString()}</span>
                                     </div>
                                 </div>
@@ -602,34 +651,43 @@ const WorkDetail: React.FC = () => {
                     </div>
                 );
 
-                // --- 5. ARQUIVOS ---
-                case 'FILES': return (
-                    <div className="space-y-4">
-                        <label className="block w-full py-6 border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl text-center cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors relative">
-                            {uploading ? (
-                                <div className="flex flex-col items-center justify-center">
-                                    <i className="fa-solid fa-circle-notch fa-spin text-3xl text-secondary mb-2"></i>
-                                    <p className="text-sm font-bold text-slate-500">Enviando arquivo...</p>
-                                </div>
-                            ) : (
-                                <>
-                                    <i className="fa-solid fa-folder-plus text-3xl text-slate-400 mb-2"></i>
-                                    <p className="text-sm font-bold text-slate-500">Adicionar Projeto/PDF</p>
-                                    <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'FILE')} disabled={uploading} />
-                                </>
-                            )}
-                        </label>
-                        <div className="space-y-2">
+                // --- 5. ARQUIVOS (RENAMED TO PROJETOS & PLANTAS) ---
+                case 'PROJECTS': return (
+                    <div className="space-y-6">
+                        <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-200 dark:border-slate-800 text-center">
+                            <div className="w-16 h-16 rounded-full bg-teal-100 dark:bg-teal-900/30 text-teal-600 dark:text-teal-400 flex items-center justify-center text-3xl mx-auto mb-4">
+                                <i className="fa-solid fa-compass-drafting"></i>
+                            </div>
+                            <h3 className="text-lg font-bold text-primary dark:text-white">Central de Projetos</h3>
+                            <p className="text-sm text-slate-500 mb-6">Arquitetônico, Elétrico, Hidráulico e Documentos.</p>
+                            
+                            <label className="block w-full py-4 border-2 border-dashed border-teal-200 dark:border-teal-900 bg-teal-50 dark:bg-teal-900/10 rounded-2xl cursor-pointer hover:bg-teal-100 dark:hover:bg-teal-900/20 transition-all group">
+                                {uploading ? (
+                                    <div className="flex flex-col items-center justify-center gap-2">
+                                        <i className="fa-solid fa-circle-notch fa-spin text-2xl text-teal-600"></i>
+                                        <span className="text-sm font-bold text-teal-600">Enviando...</span>
+                                    </div>
+                                ) : (
+                                    <div className="flex flex-col items-center justify-center gap-2">
+                                        <i className="fa-solid fa-file-arrow-up text-2xl text-teal-400 group-hover:text-teal-600 transition-colors"></i>
+                                        <span className="text-sm font-bold text-teal-600 dark:text-teal-400">Adicionar Arquivo (PDF, DWG, DXF)</span>
+                                    </div>
+                                )}
+                                <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'FILE')} disabled={uploading} />
+                            </label>
+                        </div>
+
+                        <div className="space-y-3">
                             {files.map(f => (
-                                <div key={f.id} className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 flex items-center gap-4 shadow-sm">
-                                    <div className="w-10 h-10 rounded-lg bg-red-50 text-red-500 flex items-center justify-center text-xl">
+                                <div key={f.id} className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 flex items-center gap-4 shadow-sm hover:shadow-md transition-all group">
+                                    <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-800 text-red-500 flex items-center justify-center text-2xl group-hover:bg-red-50 transition-colors">
                                         <i className="fa-solid fa-file-pdf"></i>
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <p className="font-bold text-sm truncate">{f.name}</p>
-                                        <p className="text-xs text-slate-400">{new Date(f.date).toLocaleDateString()}</p>
+                                        <p className="font-bold text-sm text-primary dark:text-white truncate">{f.name}</p>
+                                        <p className="text-xs text-slate-400 mt-0.5">{new Date(f.date).toLocaleDateString()}</p>
                                     </div>
-                                    <a href={f.url} download={f.name} className="p-2 text-primary hover:text-secondary">
+                                    <a href={f.url} download={f.name} className="w-10 h-10 rounded-xl bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-primary dark:text-white hover:bg-slate-200 transition-colors">
                                         <i className="fa-solid fa-download"></i>
                                     </a>
                                 </div>
@@ -640,13 +698,31 @@ const WorkDetail: React.FC = () => {
 
                 // --- 6. BONUS IA (LANDING) ---
                 case 'BONUS_IA': return (
-                    <div className="flex flex-col items-center justify-center h-[70vh] text-center p-6 animate-in zoom-in-95">
+                    <div className="flex flex-col items-center justify-center min-h-[70vh] p-6 animate-in zoom-in-95 relative">
+                        {/* Premium Check Overlay */}
+                        {!isPremium && (
+                            <div className="absolute inset-0 z-50 bg-white/80 dark:bg-slate-950/80 backdrop-blur-sm flex flex-col items-center justify-center p-8 text-center rounded-3xl">
+                                <div className="w-20 h-20 bg-premium text-white rounded-full flex items-center justify-center text-4xl mb-6 shadow-xl shadow-purple-500/30">
+                                    <i className="fa-solid fa-lock"></i>
+                                </div>
+                                <h3 className="text-2xl font-black text-primary dark:text-white mb-2">Engenheiro Virtual Bloqueado</h3>
+                                <p className="text-slate-500 dark:text-slate-400 mb-8 max-w-xs">
+                                    O Zé da Obra IA está disponível exclusivamente para membros Vitalícios.
+                                </p>
+                                <button onClick={() => navigate('/settings')} className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold py-4 px-8 rounded-2xl shadow-xl hover:scale-105 transition-transform w-full animate-pulse">
+                                    Liberar Acesso Vitalício
+                                </button>
+                            </div>
+                        )}
+
                         <div className="w-32 h-32 rounded-full p-1 bg-gradient-to-br from-secondary to-orange-500 shadow-2xl mb-6 relative">
                             <img src={ZE_AVATAR} className="w-full h-full object-cover rounded-full border-4 border-slate-900 bg-slate-800" onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK} />
                             <div className="absolute -bottom-2 -right-2 bg-green-500 text-white text-xs font-bold px-3 py-1 rounded-full border-2 border-white">ONLINE</div>
                         </div>
                         <h2 className="text-3xl font-black text-primary dark:text-white mb-2">Zé da Obra <span className="text-secondary">AI</span></h2>
-                        <p className="text-slate-500 max-w-xs mb-8">Seu engenheiro virtual disponível 24h. Tire dúvidas sobre traço de concreto, elétrica, pintura e muito mais.</p>
+                        <p className="text-slate-500 max-w-xs text-center mb-8">
+                            Seu engenheiro virtual disponível 24h. Tire dúvidas sobre traço de concreto, elétrica, pintura e muito mais.
+                        </p>
                         <button 
                             onClick={() => setSubView('BONUS_IA_CHAT')}
                             className="w-full max-w-sm py-4 bg-gradient-premium text-white font-bold rounded-2xl shadow-xl flex items-center justify-center gap-3 hover:scale-105 transition-transform"
@@ -657,12 +733,14 @@ const WorkDetail: React.FC = () => {
                 );
 
                 // --- 7. BONUS IA (CHAT) ---
-                case 'BONUS_IA_CHAT': return (
+                case 'BONUS_IA_CHAT': 
+                    if (!isPremium) return null; // Double check
+                    return (
                     <div className="flex flex-col h-[80vh]">
                         <div className="flex-1 bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-inner overflow-y-auto mb-4 border border-slate-200 dark:border-slate-800">
                              <div className="flex gap-4 mb-6">
                                 <img src={ZE_AVATAR} className="w-10 h-10 rounded-full border border-slate-200" onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK}/>
-                                <div className="bg-slate-100 dark:bg-slate-800 p-3 rounded-tr-xl rounded-b-xl text-sm">
+                                <div className="bg-slate-100 dark:bg-slate-800 p-3 rounded-tr-xl rounded-b-xl text-sm shadow-sm">
                                     <p className="font-bold text-secondary mb-1">Zé da Obra</p>
                                     <p>Opa! Mestre de obras na área. O que tá pegando?</p>
                                 </div>
@@ -670,7 +748,7 @@ const WorkDetail: React.FC = () => {
                             {aiResponse && (
                                 <div className="flex gap-4 mb-6 animate-in fade-in">
                                     <img src={ZE_AVATAR} className="w-10 h-10 rounded-full border border-slate-200" onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK}/>
-                                    <div className="bg-slate-100 dark:bg-slate-800 p-3 rounded-tr-xl rounded-b-xl text-sm">
+                                    <div className="bg-slate-100 dark:bg-slate-800 p-3 rounded-tr-xl rounded-b-xl text-sm shadow-sm">
                                         <p className="font-bold text-secondary mb-1">Zé da Obra</p>
                                         <p className="whitespace-pre-wrap">{aiResponse}</p>
                                     </div>
@@ -682,7 +760,7 @@ const WorkDetail: React.FC = () => {
                                 value={aiMessage} 
                                 onChange={e => setAiMessage(e.target.value)}
                                 placeholder="Pergunte ao Zé..." 
-                                className="flex-1 p-4 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-secondary"
+                                className="flex-1 p-4 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-secondary transition-colors"
                             />
                             <button onClick={handleAiAsk} disabled={aiLoading} className="w-14 bg-secondary text-white rounded-xl flex items-center justify-center shadow-lg">
                                 {aiLoading ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-paper-plane"></i>}
@@ -691,88 +769,108 @@ const WorkDetail: React.FC = () => {
                     </div>
                 );
 
-                // --- 8. CALCULADORAS ---
+                // --- 8. CALCULADORAS (PREMIUM) ---
                 case 'CALCULATORS': return (
-                    <div className="space-y-6">
-                        <div className="grid grid-cols-3 gap-2 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
-                            {['PISO', 'PAREDE', 'PINTURA'].map(t => (
-                                <button key={t} onClick={() => {setCalcType(t as any); setCalcArea(''); setCalcResult([])}} className={`py-2 text-xs font-bold rounded-lg transition-all ${calcType === t ? 'bg-white shadow text-primary' : 'text-slate-500'}`}>
-                                    {t}
-                                </button>
-                            ))}
-                        </div>
+                    <div className="space-y-6 relative">
+                        {!isPremium && <PremiumLockOverlay title="Calculadoras de Engenharia" />}
+                        
+                        <div className={`transition-all ${!isPremium ? 'opacity-20 blur-sm pointer-events-none' : ''}`}>
+                            <div className="grid grid-cols-3 gap-2 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl mb-6">
+                                {['PISO', 'PAREDE', 'PINTURA'].map(t => (
+                                    <button key={t} onClick={() => {setCalcType(t as any); setCalcArea(''); setCalcResult([])}} className={`py-2 text-xs font-bold rounded-lg transition-all ${calcType === t ? 'bg-white shadow text-primary' : 'text-slate-500'}`}>
+                                        {t}
+                                    </button>
+                                ))}
+                            </div>
 
-                        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
-                            <label className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-2 block">Área Total (m²)</label>
-                            <input type="number" value={calcArea} onChange={e => setCalcArea(e.target.value)} placeholder="0" className="w-full p-4 text-2xl font-black bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 outline-none focus:border-secondary" />
-                            
-                            {calcResult.length > 0 && (
-                                <div className="mt-6 space-y-3 pt-6 border-t border-slate-100 dark:border-slate-800 animate-in slide-in-from-bottom-2">
-                                    <h4 className="text-sm font-bold text-secondary uppercase">Resultado Estimado</h4>
-                                    {calcResult.map((res, i) => (
-                                        <div key={i} className="flex items-center gap-3 font-bold text-primary dark:text-white">
-                                            <i className="fa-solid fa-check text-green-500"></i> {res}
-                                        </div>
-                                    ))}
-                                    <p className="text-[10px] text-slate-400 mt-2">*Valores aproximados. Consulte um profissional.</p>
+                            <div className="bg-white dark:bg-slate-900 p-8 rounded-3xl border border-slate-200 dark:border-slate-800 shadow-xl text-center">
+                                <label className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-4 block">Área Total (m²)</label>
+                                <div className="relative max-w-[200px] mx-auto mb-8">
+                                    <input type="number" value={calcArea} onChange={e => setCalcArea(e.target.value)} placeholder="0" className="w-full p-4 text-4xl font-black bg-slate-50 dark:bg-slate-800 rounded-2xl border-2 border-slate-200 dark:border-slate-700 outline-none focus:border-secondary text-center" />
+                                    <span className="absolute right-4 bottom-4 text-slate-400 font-bold text-lg pointer-events-none">m²</span>
                                 </div>
-                            )}
+                                
+                                {calcResult.length > 0 ? (
+                                    <div className="space-y-3 pt-6 border-t border-slate-100 dark:border-slate-800 animate-in slide-in-from-bottom-2 text-left">
+                                        <h4 className="text-sm font-bold text-secondary uppercase mb-3">Material Estimado</h4>
+                                        {calcResult.map((res, i) => (
+                                            <div key={i} className="flex items-center gap-3 font-bold text-primary dark:text-white bg-slate-50 dark:bg-slate-800 p-3 rounded-xl">
+                                                <i className="fa-solid fa-check-circle text-green-500 text-xl"></i> {res}
+                                            </div>
+                                        ))}
+                                        <p className="text-[10px] text-slate-400 mt-2 text-center">*Valores aproximados com 10% de margem.</p>
+                                    </div>
+                                ) : (
+                                    <p className="text-sm text-slate-400 italic">Digite a área acima para calcular.</p>
+                                )}
+                            </div>
                         </div>
                     </div>
                 );
 
-                // --- 9. CONTRATOS ---
+                // --- 9. CONTRATOS (PREMIUM) ---
                 case 'CONTRACTS': return (
-                    <div className="space-y-4">
-                        {CONTRACT_TEMPLATES.map(ct => (
-                            <div 
-                                key={ct.id} 
-                                onClick={() => setViewContract({ title: ct.title, content: ct.contentTemplate })}
-                                className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm hover:border-secondary transition-all cursor-pointer group"
-                            >
-                                <div className="flex justify-between items-start mb-2">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 bg-slate-100 dark:bg-slate-800 text-slate-500 rounded-lg flex items-center justify-center group-hover:bg-secondary group-hover:text-white transition-colors">
-                                            <i className="fa-solid fa-file-contract"></i>
+                    <div className="space-y-4 relative">
+                        {!isPremium && <PremiumLockOverlay title="Modelos de Contrato" />}
+                        
+                        <div className={`transition-all ${!isPremium ? 'opacity-20 blur-sm pointer-events-none' : ''}`}>
+                            {CONTRACT_TEMPLATES.map(ct => (
+                                <div 
+                                    key={ct.id} 
+                                    onClick={() => setViewContract({ title: ct.title, content: ct.contentTemplate })}
+                                    className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm hover:border-secondary transition-all cursor-pointer group"
+                                >
+                                    <div className="flex justify-between items-start">
+                                        <div className="flex items-center gap-4">
+                                            <div className="w-12 h-12 bg-indigo-50 dark:bg-indigo-900/20 text-indigo-500 rounded-xl flex items-center justify-center group-hover:bg-secondary group-hover:text-white transition-colors">
+                                                <i className="fa-solid fa-file-contract text-xl"></i>
+                                            </div>
+                                            <div>
+                                                <h4 className="font-bold text-primary dark:text-white text-lg">{ct.title}</h4>
+                                                <p className="text-xs text-slate-500 font-medium">Toque para visualizar e copiar</p>
+                                            </div>
                                         </div>
-                                        <div>
-                                            <h4 className="font-bold text-primary dark:text-white">{ct.title}</h4>
-                                            <p className="text-xs text-slate-500 font-normal">Toque para visualizar</p>
-                                        </div>
+                                        <i className="fa-solid fa-chevron-right text-slate-300 mt-4"></i>
                                     </div>
-                                    <i className="fa-solid fa-chevron-right text-slate-300"></i>
                                 </div>
-                            </div>
-                        ))}
+                            ))}
+                        </div>
                     </div>
                 );
                 
-                // --- 10. CHECKLIST ---
+                // --- 10. CHECKLIST (PREMIUM) ---
                 case 'CHECKLIST': return (
-                    <div className="space-y-4">
-                        {STANDARD_CHECKLISTS.map((cl, idx) => (
-                            <div key={idx} className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden">
-                                <button 
-                                    onClick={() => setActiveChecklist(activeChecklist === cl.category ? null : cl.category)}
-                                    className="w-full p-4 flex justify-between items-center text-left hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-                                >
-                                    <span className="font-bold text-sm flex items-center gap-2">
-                                        <i className="fa-solid fa-list-check text-slate-400"></i> {cl.category}
-                                    </span>
-                                    <i className={`fa-solid fa-chevron-down transition-transform ${activeChecklist === cl.category ? 'rotate-180' : ''}`}></i>
-                                </button>
-                                {activeChecklist === cl.category && (
-                                    <div className="p-4 pt-0 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/50">
-                                        {cl.items.map((item, i) => (
-                                            <label key={i} className="flex items-start gap-3 py-3 cursor-pointer border-b border-slate-100 last:border-0 border-dashed">
-                                                <input type="checkbox" className="mt-1 rounded border-slate-300 text-secondary focus:ring-secondary w-5 h-5" />
-                                                <span className="text-sm text-slate-600 dark:text-slate-300 leading-tight">{item}</span>
-                                            </label>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        ))}
+                    <div className="space-y-4 relative">
+                        {!isPremium && <PremiumLockOverlay title="Checklist Profissional" />}
+
+                        <div className={`transition-all ${!isPremium ? 'opacity-20 blur-sm pointer-events-none' : ''}`}>
+                            {STANDARD_CHECKLISTS.map((cl, idx) => (
+                                <div key={idx} className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
+                                    <button 
+                                        onClick={() => setActiveChecklist(activeChecklist === cl.category ? null : cl.category)}
+                                        className="w-full p-5 flex justify-between items-center text-left hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                                    >
+                                        <span className="font-bold text-sm flex items-center gap-3">
+                                            <div className="w-8 h-8 rounded-lg bg-green-100 dark:bg-green-900/30 flex items-center justify-center text-green-600">
+                                                <i className="fa-solid fa-list-check"></i>
+                                            </div>
+                                            {cl.category}
+                                        </span>
+                                        <i className={`fa-solid fa-chevron-down transition-transform ${activeChecklist === cl.category ? 'rotate-180' : ''}`}></i>
+                                    </button>
+                                    {activeChecklist === cl.category && (
+                                        <div className="p-5 pt-0 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/30">
+                                            {cl.items.map((item, i) => (
+                                                <label key={i} className="flex items-start gap-3 py-3 cursor-pointer border-b border-dashed border-slate-200 dark:border-slate-700 last:border-0 hover:bg-white/50 rounded-lg px-2 transition-colors">
+                                                    <input type="checkbox" className="mt-1 rounded border-slate-300 text-secondary focus:ring-secondary w-5 h-5" />
+                                                    <span className="text-sm text-slate-600 dark:text-slate-300 leading-tight">{item}</span>
+                                                </label>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                        </div>
                     </div>
                 );
 
@@ -791,12 +889,12 @@ const WorkDetail: React.FC = () => {
                         {subView === 'SUPPLIERS' && 'Fornecedores'}
                         {subView === 'REPORTS' && 'Relatórios'}
                         {subView === 'PHOTOS' && 'Galeria de Fotos'}
-                        {subView === 'FILES' && 'Projetos e Arquivos'}
-                        {subView === 'BONUS_IA' && 'Inteligência Artificial'}
+                        {subView === 'PROJECTS' && 'Projetos e Plantas'}
+                        {subView === 'BONUS_IA' && 'Engenheiro Virtual'}
                         {subView === 'BONUS_IA_CHAT' && 'Chat com Zé da Obra'}
                         {subView === 'CALCULATORS' && 'Calculadoras'}
-                        {subView === 'CONTRACTS' && 'Modelos de Contrato'}
-                        {subView === 'CHECKLIST' && 'Checklist de Obra'}
+                        {subView === 'CONTRACTS' && 'Contratos Premium'}
+                        {subView === 'CHECKLIST' && 'Checklist Técnico'}
                     </h2>
                 </div>
                 <div className="p-4 max-w-3xl mx-auto animate-in slide-in-from-right-10">
@@ -805,6 +903,25 @@ const WorkDetail: React.FC = () => {
             </div>
         );
     }
+
+    // --- PREMIUM LOCK OVERLAY COMPONENT ---
+    const PremiumLockOverlay = ({ title }: { title: string }) => (
+        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center text-center p-6 animate-in fade-in">
+            <div className="w-20 h-20 bg-gradient-to-br from-purple-600 to-indigo-700 rounded-full flex items-center justify-center text-white text-3xl shadow-xl shadow-purple-500/30 mb-6">
+                <i className="fa-solid fa-lock"></i>
+            </div>
+            <h3 className="text-2xl font-black text-primary dark:text-white mb-2">{title} Bloqueado</h3>
+            <p className="text-slate-500 mb-8 max-w-xs">
+                Esta ferramenta exclusiva está disponível apenas para membros do <strong>Plano Vitalício</strong>.
+            </p>
+            <button 
+                onClick={() => navigate('/settings')}
+                className="w-full max-w-xs py-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold rounded-2xl shadow-xl hover:scale-105 active:scale-95 transition-all animate-pulse"
+            >
+                Quero Acesso Vitalício
+            </button>
+        </div>
+    );
 
     // =================================================================================================
     // MAIN TAB VIEW
@@ -986,9 +1103,9 @@ const WorkDetail: React.FC = () => {
                                     <div className="w-12 h-12 bg-pink-50 text-pink-600 rounded-xl flex items-center justify-center text-xl group-hover:bg-pink-100 transition-colors"><i className="fa-solid fa-camera-retro"></i></div>
                                     <span className="font-bold text-xs text-primary dark:text-white">Fotos</span>
                                 </button>
-                                <button onClick={() => setSubView('FILES')} className="group p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm hover:border-secondary transition-all flex flex-col items-center gap-2">
+                                <button onClick={() => setSubView('PROJECTS')} className="group p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm hover:border-secondary transition-all flex flex-col items-center gap-2">
                                     <div className="w-12 h-12 bg-teal-50 text-teal-600 rounded-xl flex items-center justify-center text-xl group-hover:bg-teal-100 transition-colors"><i className="fa-solid fa-folder-open"></i></div>
-                                    <span className="font-bold text-xs text-primary dark:text-white">Arquivos</span>
+                                    <span className="font-bold text-xs text-primary dark:text-white">Projetos</span>
                                 </button>
                             </div>
                         </div>
@@ -1011,32 +1128,50 @@ const WorkDetail: React.FC = () => {
 
                                 <div onClick={() => setSubView('BONUS_IA')} className="bg-white/10 hover:bg-white/15 p-4 rounded-2xl border border-white/10 mb-4 cursor-pointer flex items-center gap-4 transition-all backdrop-blur-sm group">
                                     <div className="relative">
-                                        <img src={ZE_AVATAR} className="w-14 h-14 rounded-full border-2 border-secondary bg-slate-800 object-cover" onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK}/>
+                                        <img src={ZE_AVATAR} className={`w-14 h-14 rounded-full border-2 border-secondary bg-slate-800 object-cover ${!isPremium ? 'grayscale opacity-70' : ''}`} onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK}/>
                                         <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 border-2 border-slate-800 rounded-full"></div>
+                                        {!isPremium && (
+                                            <div className="absolute inset-0 flex items-center justify-center bg-black/50 rounded-full">
+                                                <i className="fa-solid fa-lock text-white text-lg"></i>
+                                            </div>
+                                        )}
                                     </div>
                                     <div>
                                         <h4 className="font-bold text-white text-base group-hover:text-secondary transition-colors">Zé da Obra AI</h4>
                                         <p className="text-xs text-slate-300">Tire dúvidas técnicas 24h</p>
                                     </div>
                                     <div className="ml-auto w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-white/50 group-hover:bg-secondary group-hover:text-white transition-all">
-                                        <i className="fa-solid fa-comment-dots"></i>
+                                        {isPremium ? <i className="fa-solid fa-comment-dots"></i> : <i className="fa-solid fa-lock"></i>}
                                     </div>
                                 </div>
 
                                 <div className="grid grid-cols-3 gap-3">
-                                    <button onClick={() => setSubView('CALCULATORS')} className="p-3 bg-white/5 hover:bg-white/10 rounded-xl border border-white/5 flex flex-col items-center gap-2 text-center transition-colors group">
-                                        <i className="fa-solid fa-calculator text-slate-300 group-hover:text-secondary text-2xl mb-1 transition-colors"></i>
-                                        <span className="text-[10px] font-bold text-white uppercase tracking-wide">Calculadoras</span>
-                                    </button>
-                                    <button onClick={() => setSubView('CONTRACTS')} className="p-3 bg-white/5 hover:bg-white/10 rounded-xl border border-white/5 flex flex-col items-center gap-2 text-center transition-colors group">
-                                        <i className="fa-solid fa-file-signature text-slate-300 group-hover:text-secondary text-2xl mb-1 transition-colors"></i>
-                                        <span className="text-[10px] font-bold text-white uppercase tracking-wide">Contratos</span>
-                                    </button>
-                                    <button onClick={() => setSubView('CHECKLIST')} className="p-3 bg-white/5 hover:bg-white/10 rounded-xl border border-white/5 flex flex-col items-center gap-2 text-center transition-colors group">
-                                        <i className="fa-solid fa-clipboard-check text-slate-300 group-hover:text-secondary text-2xl mb-1 transition-colors"></i>
-                                        <span className="text-[10px] font-bold text-white uppercase tracking-wide">Checklist</span>
-                                    </button>
+                                    {['CALCULATORS', 'CONTRACTS', 'CHECKLIST'].map(item => (
+                                        <button 
+                                            key={item}
+                                            onClick={() => setSubView(item as SubView)} 
+                                            className={`p-3 bg-white/5 hover:bg-white/10 rounded-xl border border-white/5 flex flex-col items-center gap-2 text-center transition-colors group ${!isPremium ? 'opacity-70' : ''}`}
+                                        >
+                                            <div className="relative">
+                                                <i className={`fa-solid ${item === 'CALCULATORS' ? 'fa-calculator' : item === 'CONTRACTS' ? 'fa-file-signature' : 'fa-clipboard-check'} text-slate-300 group-hover:text-secondary text-2xl mb-1 transition-colors`}></i>
+                                                {!isPremium && (
+                                                    <div className="absolute -top-2 -right-2 bg-black/80 rounded-full w-4 h-4 flex items-center justify-center">
+                                                        <i className="fa-solid fa-lock text-[8px] text-white"></i>
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <span className="text-[10px] font-bold text-white uppercase tracking-wide">
+                                                {item === 'CALCULATORS' ? 'Calculadoras' : item === 'CONTRACTS' ? 'Contratos' : 'Checklist'}
+                                            </span>
+                                        </button>
+                                    ))}
                                 </div>
+                                
+                                {!isPremium && (
+                                    <button onClick={() => navigate('/settings')} className="w-full mt-4 py-3 bg-gradient-to-r from-secondary to-yellow-500 text-white font-bold rounded-xl text-xs uppercase tracking-widest shadow-lg shadow-yellow-500/20 animate-pulse hover:scale-[1.02] transition-transform">
+                                        Liberar Acesso Vitalício
+                                    </button>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -1088,7 +1223,7 @@ const WorkDetail: React.FC = () => {
                 </div>
             </div>
 
-            {/* --- MODALS --- */}
+            {/* --- MODALS (FIXED POSITION) --- */}
             
             {/* ADD STEP MODAL */}
             {addStepModal && (
