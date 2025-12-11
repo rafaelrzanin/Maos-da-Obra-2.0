@@ -268,15 +268,18 @@ const WorkDetail: React.FC = () => {
         }
     };
 
-    // Auto-fill logic when adding new expense
+    // Auto-fill logic when inputting description (Works for both Add and Edit to recalculate if desc changes)
     const handleDescriptionBlur = async () => {
-        if (expenseModal.mode === 'ADD' && work && expDesc) {
-            const history = await dbService.getPaymentHistory(work.id, expDesc);
-            if (history.totalPaid > 0 || history.lastTotalAgreed > 0) {
-                setExpPrevPaid(String(history.totalPaid));
-                if (!expTotalAgreed && history.lastTotalAgreed > 0) {
-                    setExpTotalAgreed(String(history.lastTotalAgreed));
-                }
+        if (work && expDesc) {
+            // If Editing, exclude current ID from history. If Adding, exclude nothing.
+            const excludeId = expenseModal.mode === 'EDIT' ? expenseModal.id : undefined;
+            const history = await dbService.getPaymentHistory(work.id, expDesc, excludeId);
+            
+            setExpPrevPaid(String(history.totalPaid));
+            
+            // Only auto-fill Total Agreed if not already set by the user in this session
+            if (!expTotalAgreed && history.lastTotalAgreed > 0) {
+                setExpTotalAgreed(String(history.lastTotalAgreed));
             }
         }
     };
@@ -1337,17 +1340,16 @@ const WorkDetail: React.FC = () => {
                             </div>
 
                             <div className="grid grid-cols-2 gap-2">
-                                {/* 2. Already Paid */}
+                                {/* 2. Already Paid (LOCKED) */}
                                 <div className="relative">
                                     <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Já Pago (Histórico)</label>
                                     <div className="relative">
                                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">R$</span>
                                         <input 
-                                            type="number" 
-                                            placeholder="0.00" 
+                                            type="text" 
+                                            readOnly // LOCK IT
                                             value={expPrevPaid} 
-                                            onChange={e => setExpPrevPaid(e.target.value)} 
-                                            className="w-full pl-10 p-3 bg-slate-100 dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-500 font-bold" 
+                                            className="w-full pl-10 p-3 bg-slate-200 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-500 font-bold cursor-not-allowed" 
                                         />
                                     </div>
                                 </div>
