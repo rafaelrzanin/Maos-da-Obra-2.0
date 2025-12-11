@@ -1,3 +1,4 @@
+
 import { supabase } from './supabase';
 import { User, Work, Step, Material, Worker, Supplier, PlanType, StepStatus, Notification, WorkStatus, Expense, WorkPhoto, WorkFile } from '../types';
 import { FULL_MATERIAL_PACKAGES, WORK_TEMPLATES } from './standards';
@@ -155,7 +156,7 @@ export const dbService = {
              const normalize = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
              const stepNorm = normalize(stepName);
 
-             // Mapeamento manual de pacotes para garantir que "Fundações" pegue "Fundação"
+             // Mapeamento manual de pacotes
              const pkg = FULL_MATERIAL_PACKAGES.find(p => {
                  const pkgNorm = normalize(p.category);
                  
@@ -163,6 +164,7 @@ export const dbService = {
                  if (stepNorm.includes(pkgNorm.substring(0, 4))) return true; 
                  
                  // 2. Mapeamentos específicos
+                 if (stepNorm.includes('limpeza') && pkgNorm.includes('limpeza e preparacao')) return true;
                  if (stepNorm.includes('parede') && pkgNorm.includes('alvenaria')) return true;
                  if (stepNorm.includes('laje') && pkgNorm.includes('alvenaria')) return true;
                  if (stepNorm.includes('agua') && pkgNorm.includes('hidraulica')) return true;
@@ -171,24 +173,31 @@ export const dbService = {
                  if (stepNorm.includes('luz') && pkgNorm.includes('eletrica')) return true;
                  if (stepNorm.includes('piso') && pkgNorm.includes('acabamento')) return true;
                  if (stepNorm.includes('azulejo') && pkgNorm.includes('acabamento')) return true;
-                 if (stepNorm.includes('chapisco') && pkgNorm.includes('alvenaria')) return true; // Cimento/Areia
+                 if (stepNorm.includes('chapisco') && pkgNorm.includes('alvenaria')) return true; 
+                 if ((stepNorm.includes('louca') || stepNorm.includes('metal') || stepNorm.includes('banheiro') || stepNorm.includes('instala')) && pkgNorm.includes('loucas e metais')) return true;
+                 if ((stepNorm.includes('entrega') || stepNorm.includes('final')) && pkgNorm.includes('limpeza final')) return true;
 
                  return false;
              });
 
              if (pkg) {
                  pkg.items.forEach(item => {
-                     db.materials.push({
-                        id: Math.random().toString(36).substr(2, 9),
-                        workId: newWork.id,
-                        name: item.name,
-                        brand: '',
-                        plannedQty: Math.ceil(newWork.area * (item.multiplier || 0)),
-                        purchasedQty: 0,
-                        unit: item.unit,
-                        category: pkg.category,
-                        stepId: newStepId // VÍNCULO DIRETO COM A ETAPA CRIADA
-                     });
+                     const calculatedQty = Math.ceil(newWork.area * (item.multiplier || 0));
+                     
+                     // SÓ ADICIONA SE A QUANTIDADE FOR MAIOR QUE ZERO
+                     if (calculatedQty > 0) {
+                         db.materials.push({
+                            id: Math.random().toString(36).substr(2, 9),
+                            workId: newWork.id,
+                            name: item.name,
+                            brand: '',
+                            plannedQty: calculatedQty,
+                            purchasedQty: 0,
+                            unit: item.unit,
+                            category: pkg.category,
+                            stepId: newStepId
+                         });
+                     }
                  });
              }
          });
@@ -253,7 +262,6 @@ export const dbService = {
       return db.steps.filter((s: Step) => s.workId === workId);
   },
   
-  // --- ADD STEP FUNCTION ---
   addStep: async (step: Step) => {
       const db = getLocalDb();
       db.steps.push(step);
@@ -281,18 +289,12 @@ export const dbService = {
       return db.materials.filter((m: Material) => m.workId === workId);
   },
 
-  // --- ADD MANUAL MATERIAL (Enhanced) ---
   addMaterial: async (material: Material, purchaseDetails?: { qty: number, cost: number, date: string }) => {
       const db = getLocalDb();
-      
-      // Se houver compra imediata, atualiza o qty comprado
       if (purchaseDetails && purchaseDetails.qty > 0) {
           material.purchasedQty = purchaseDetails.qty;
       }
-      
       db.materials.push(material);
-
-      // Se houver compra imediata, gera o expense
       if (purchaseDetails && purchaseDetails.qty > 0) {
           db.expenses.push({
               id: Math.random().toString(36).substr(2, 9),
@@ -302,10 +304,9 @@ export const dbService = {
               date: purchaseDetails.date,
               category: 'Material',
               relatedMaterialId: material.id,
-              stepId: material.stepId // Vincula à mesma etapa
+              stepId: material.stepId
           });
       }
-
       saveLocalDb(db);
   },
   
@@ -326,10 +327,8 @@ export const dbService = {
   ) => {
       const db = getLocalDb();
       const idx = db.materials.findIndex((m: Material) => m.id === materialId);
-      
       if (idx >= 0) {
           const oldMaterial = db.materials[idx];
-          
           db.materials[idx] = {
               ...oldMaterial,
               name: updatedName,
@@ -338,7 +337,6 @@ export const dbService = {
               unit: updatedUnit,
               purchasedQty: oldMaterial.purchasedQty + purchaseQty
           };
-
           if (purchaseQty > 0) {
               db.expenses.push({
                   id: Math.random().toString(36).substr(2, 9),
@@ -351,12 +349,10 @@ export const dbService = {
                   stepId: oldMaterial.stepId
               });
           }
-
           saveLocalDb(db);
       }
   },
 
-  // Mantido para compatibilidade
   updateMaterial: async (material: Material, _cost: number, _addedQty: number) => {
       const db = getLocalDb();
       const idx = db.materials.findIndex((m: Material) => m.id === material.id);
@@ -369,30 +365,28 @@ export const dbService = {
   importMaterialPackage: async (workId: string, category: string): Promise<number> => {
     const work = await dbService.getWorkById(workId);
     if (!work) return 0;
-    
     const steps = await dbService.getSteps(workId);
     const targetStep = steps.find(s => s.status !== StepStatus.COMPLETED) || steps[0];
-
     const pkg = FULL_MATERIAL_PACKAGES.find(p => p.category === category);
     if (!pkg) return 0;
-
     let totalImported = 0;
     const db = getLocalDb();
-    
     pkg.items.forEach(item => {
-        db.materials.push({
-            id: Math.random().toString(36).substr(2, 9),
-            workId,
-            name: item.name,
-            plannedQty: Math.ceil(work.area * (item.multiplier || 0)),
-            purchasedQty: 0,
-            unit: item.unit,
-            category: category,
-            stepId: targetStep?.id
-        });
-        totalImported++;
+        const calculatedQty = Math.ceil(work.area * (item.multiplier || 0));
+        if (calculatedQty > 0) {
+            db.materials.push({
+                id: Math.random().toString(36).substr(2, 9),
+                workId,
+                name: item.name,
+                plannedQty: calculatedQty,
+                purchasedQty: 0,
+                unit: item.unit,
+                category: category,
+                stepId: targetStep?.id
+            });
+            totalImported++;
+        }
     });
-    
     saveLocalDb(db);
     return totalImported;
   },
