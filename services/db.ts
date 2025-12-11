@@ -1,4 +1,3 @@
-
 import { 
   User, Work, Step, Material, Expense, Worker, Supplier, 
   WorkPhoto, WorkFile, Notification, PlanType, StepStatus
@@ -24,8 +23,6 @@ const getLocalDb = () => {
     if (!data) return emptyDb;
     
     const parsed = JSON.parse(data);
-    // Merge ensures that if new arrays are added to the code (like suppliers),
-    // they are initialized even if the localStorage has old data.
     return { ...emptyDb, ...parsed };
   } catch {
     return emptyDb;
@@ -66,25 +63,37 @@ export const dbService = {
      
      let user = db.users.find((u: User) => u.email === cleanEmail);
      
-     // --- SAFETY NET: DEMO USER ---
-     // If the user tries to login as Test/Demo, we FORCE its existence.
-     // This solves the issue of "Account doesn't exist" during development/testing.
+     // --- SAFETY NET: DEMO USER & DATA RECOVERY ---
      if (cleanEmail === 'teste@maosdaobra.app') {
          if (!user) {
+             // Cria o usuário demo se não existir
              user = {
                  id: 'demo-user-id',
                  name: 'Zé da Obra (Demo)',
                  email: 'teste@maosdaobra.app',
                  whatsapp: '51999999999',
                  plan: PlanType.VITALICIO,
-                 subscriptionExpiresAt: new Date(Date.now() + 36500 * 24 * 60 * 60 * 1000).toISOString() // 100 years
+                 subscriptionExpiresAt: new Date(Date.now() + 36500 * 24 * 60 * 60 * 1000).toISOString()
              };
-             // Ensure the array exists before pushing
              if (!Array.isArray(db.users)) db.users = [];
              db.users.push(user);
-             saveLocalDb(db);
          }
-         // Force session update
+
+         // RECUPERAÇÃO DE DADOS: Se houver obras mas elas não pertencem a este ID (ex: perda de sessão antiga),
+         // vincula elas ao usuário demo para não aparecer tudo em branco.
+         if (db.works.length > 0) {
+             const worksNotOwned = db.works.filter((w: Work) => w.userId !== user!.id);
+             if (worksNotOwned.length > 0) {
+                 // Adota as obras órfãs
+                 db.works = db.works.map((w: Work) => ({ ...w, userId: user!.id }));
+                 // Workers e Suppliers também precisam ser migrados
+                 db.workers = db.workers.map((w: Worker) => ({ ...w, userId: user!.id }));
+                 db.suppliers = db.suppliers.map((s: Supplier) => ({ ...s, userId: user!.id }));
+                 console.log(`[System] Recuperados ${worksNotOwned.length} obras para o usuário demo.`);
+             }
+         }
+         
+         saveLocalDb(db);
          localStorage.setItem('maos_user', JSON.stringify(user));
          return user;
      }
@@ -329,6 +338,7 @@ export const dbService = {
       saveLocalDb(db);
   },
 
+  // Lógica Financeira Acumulativa Corrigida
   getPaymentHistory: async (workId: string, description: string, excludeId?: string): Promise<{ totalPaid: number, lastTotalAgreed: number }> => {
       const db = getLocalDb();
       if (!description) return { totalPaid: 0, lastTotalAgreed: 0 };
@@ -336,6 +346,8 @@ export const dbService = {
       const normalize = (str: string) => str.toLowerCase().trim();
       const targetDesc = normalize(description);
 
+      // Filtra despesas com a mesma descrição e obra, excluindo o item atual (se for edição)
+      // ISSO GARANTE QUE "JÁ PAGO" SEJA SÓ O PASSADO
       const relevant = db.expenses.filter((e: Expense) => 
           e.workId === workId && 
           normalize(e.description) === targetDesc &&
@@ -344,6 +356,7 @@ export const dbService = {
       
       const totalPaid = relevant.reduce((acc: number, curr: Expense) => acc + (Number(curr.amount) || 0), 0);
       
+      // Busca o último "Total Combinado" para preencher automaticamente
       const lastAgreedItem = relevant
         .sort((a: Expense, b: Expense) => new Date(b.date).getTime() - new Date(a.date).getTime())
         .find((e: Expense) => e.totalAgreed && Number(e.totalAgreed) > 0);
