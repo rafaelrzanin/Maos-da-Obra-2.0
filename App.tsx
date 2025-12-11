@@ -132,7 +132,6 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               });
           } else {
               // Se não vier plano na URL, apenas limpa a query string (Checkout já fez o update)
-              // Não tentamos adivinhar o plano para não causar o bug de reversão.
               navigate(location.pathname, { replace: true });
           }
       }
@@ -156,9 +155,9 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   ];
 
   return (
-    <div className="min-h-screen bg-surface dark:bg-slate-950 flex flex-col md:flex-row font-sans text-text-body dark:text-slate-300">
+    <div className="min-h-screen bg-surface dark:bg-slate-950 flex flex-col md:flex-row font-sans text-text-body dark:text-slate-300 overflow-hidden">
       {/* Mobile Header */}
-      <div className="md:hidden bg-primary dark:bg-slate-900 text-white p-4 flex justify-between items-center shadow-md sticky top-0 z-50">
+      <div className="md:hidden bg-primary dark:bg-slate-900 text-white p-4 flex justify-between items-center shadow-md sticky top-0 z-50 shrink-0">
         <h1 className="font-bold text-lg tracking-tight flex items-center gap-2">
             <span className="bg-secondary text-white w-8 h-8 rounded-lg flex items-center justify-center">
                 <i className="fa-solid fa-helmet-safety text-sm"></i>
@@ -218,14 +217,17 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         </div>
       )}
 
-      {/* Sidebar Desktop */}
+      {/* Sidebar Desktop - FIXED LAYOUT */}
       {isSubscriptionValid && (
-      <aside className="hidden md:flex flex-col w-72 bg-gradient-premium text-white h-screen sticky top-0 border-r border-white/5">
-        <div className="p-8 pb-4 flex items-center gap-4">
+      <aside className="hidden md:flex flex-col w-72 bg-gradient-premium text-white h-screen sticky top-0 border-r border-white/5 overflow-hidden">
+        {/* Header Logo */}
+        <div className="p-8 pb-4 flex items-center gap-4 shrink-0">
           <div className="w-12 h-12 bg-gradient-gold rounded-xl flex items-center justify-center transform rotate-3 shrink-0"><i className="fa-solid fa-helmet-safety text-2xl"></i></div>
           <h1 className="font-extrabold tracking-tight leading-none text-xl">MÃOS DA<br/>OBRA</h1>
         </div>
-        <nav className="flex-1 px-4 py-6 space-y-2">
+        
+        {/* Scrollable Navigation */}
+        <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto custom-scrollbar">
           {navItems.map(item => (
               <button key={item.path} onClick={() => navigate(item.path)} className={`w-full flex items-center p-3.5 rounded-xl text-sm font-semibold transition-all ${location.pathname === item.path ? 'bg-white/10 shadow-lg border border-white/5 relative' : 'text-slate-400 hover:text-white'}`}>
                 {location.pathname === item.path && <div className="absolute left-0 top-0 bottom-0 w-1 bg-secondary"></div>}
@@ -233,18 +235,25 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               </button>
           ))}
         </nav>
-        <div className="p-4 mx-4 mb-4 rounded-2xl bg-black/20 border border-white/5">
-           <div className="flex items-center gap-3 mb-4">
-               <div className="w-10 h-10 rounded-full bg-gradient-to-br from-slate-700 border border-white/10 flex items-center justify-center font-bold">{user.name.charAt(0)}</div>
-               <div className="min-w-0 flex-1"><p className="text-sm font-bold truncate">{user.name}</p><p className="text-[10px] text-secondary font-bold">{user.plan || 'Bloqueado'}</p></div>
-               <button onClick={toggleTheme} className="text-slate-400"><i className={`fa-solid ${theme === 'dark' ? 'fa-sun' : 'fa-moon'}`}></i></button>
-           </div>
-           <button onClick={logout} className="w-full py-2 rounded-lg bg-white/5 hover:text-red-400 text-xs font-bold transition-colors">Sair</button>
+        
+        {/* Fixed Footer Card */}
+        <div className="p-4 shrink-0">
+            <div className="rounded-2xl bg-black/20 border border-white/5 p-4">
+                <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-slate-700 border border-white/10 flex items-center justify-center font-bold shrink-0">{user.name.charAt(0)}</div>
+                    <div className="min-w-0 flex-1 overflow-hidden">
+                        <p className="text-sm font-bold truncate">{user.name}</p>
+                        <p className="text-[10px] text-secondary font-bold">{user.plan || 'Bloqueado'}</p>
+                    </div>
+                    <button onClick={toggleTheme} className="text-slate-400 hover:text-white shrink-0"><i className={`fa-solid ${theme === 'dark' ? 'fa-sun' : 'fa-moon'}`}></i></button>
+                </div>
+                <button onClick={logout} className="w-full py-2 rounded-lg bg-white/5 hover:bg-red-500/20 hover:text-red-400 text-xs font-bold transition-colors">Sair</button>
+            </div>
         </div>
       </aside>
       )}
 
-      <main className="flex-1 p-4 md:p-8 overflow-y-auto">
+      <main className="flex-1 p-4 md:p-8 overflow-y-auto h-screen">
         {!isSubscriptionValid && isSettingsPage && (
             <div className={`p-4 rounded-xl mb-6 flex items-center justify-between shadow-lg ${
                 isNewAccount 
