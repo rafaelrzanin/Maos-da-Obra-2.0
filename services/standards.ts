@@ -1,5 +1,4 @@
 
-
 // Standard Libraries for Construction Management
 
 // --- AVATAR CONFIG ---
@@ -141,12 +140,18 @@ export interface MaterialCatalog {
 // FULL BACKUP CATALOG COM ESTIMATIVAS INTELIGENTES
 export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
   {
-    category: 'Limpeza e Preparação',
+    category: 'Limpeza de Obra',
     items: [
       { name: 'Sacos de Entulho (Ráfia)', unit: 'un', multiplier: 0.5 },
       { name: 'Caçamba de Entulho', unit: 'un', multiplier: 0.05 },
       { name: 'Enxada / Pá', unit: 'un', multiplier: 0.02 },
       { name: 'Carrinho de Mão', unit: 'un', multiplier: 0.01 },
+      { name: 'EPIs Básicos (Luvas/Óculos)', unit: 'kit', multiplier: 0.02 }
+    ]
+  },
+  {
+    category: 'Fundação Estrutural',
+    items: [
       { name: 'Cimento CP-II (Fundação)', unit: 'sacos', multiplier: 0.3 },
       { name: 'Areia Média', unit: 'm³', multiplier: 0.04 },
       { name: 'Brita 1', unit: 'm³', multiplier: 0.04 },
@@ -161,7 +166,7 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
     category: 'Alvenaria',
     items: [
       { name: 'Tijolo Cerâmico 8 furos', unit: 'milheiro', multiplier: 0.07 },
-      { name: 'Bloco de Concreto (Se necessário)', unit: 'un', multiplier: 0.001 }, // Baixo multiplicador para garantir não vir zerado se selecionado
+      { name: 'Bloco de Concreto (Se necessário)', unit: 'un', multiplier: 0.001 }, 
       { name: 'Cimento CP-II', unit: 'sacos', multiplier: 0.2 },
       { name: 'Cal Hidratada (Liga)', unit: 'sacos', multiplier: 0.2 },
       { name: 'Areia Média', unit: 'm³', multiplier: 0.05 },
@@ -178,7 +183,7 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
       { name: 'Ripas', unit: 'm', multiplier: 3.5 },
       { name: 'Prego de Telheiro', unit: 'kg', multiplier: 0.02 },
       { name: 'Manta Térmica', unit: 'rolos', multiplier: 0.02 },
-      { name: 'Caixa D\'água 1000L', unit: 'un', multiplier: 0.01 } // Garante 1un
+      { name: 'Caixa D\'água 1000L', unit: 'un', multiplier: 0.01 }
     ]
   },
   {
@@ -191,7 +196,7 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
       { name: 'Cabo Flexível 1.5mm', unit: 'rolos', multiplier: 0.03 },
       { name: 'Cabo Flexível 6mm', unit: 'm', multiplier: 0.5 },
       { name: 'Disjuntores', unit: 'un', multiplier: 0.15 },
-      { name: 'Quadro de Distribuição', unit: 'un', multiplier: 0.01 }, // Garante 1un
+      { name: 'Quadro de Distribuição', unit: 'un', multiplier: 0.01 },
       { name: 'Fita Isolante', unit: 'un', multiplier: 0.05 }
     ]
   },
@@ -221,7 +226,7 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
   {
     category: 'Louças e Metais',
     items: [
-      { name: 'Vaso Sanitário com Caixa Acoplada', unit: 'un', multiplier: 0.02 }, // ~1 a cada 50m2 ou min 1
+      { name: 'Vaso Sanitário com Caixa Acoplada', unit: 'un', multiplier: 0.02 },
       { name: 'Cuba / Pia de Banheiro', unit: 'un', multiplier: 0.02 },
       { name: 'Torneira de Banheiro', unit: 'un', multiplier: 0.02 },
       { name: 'Torneira de Cozinha', unit: 'un', multiplier: 0.01 },
