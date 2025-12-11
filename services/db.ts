@@ -155,51 +155,75 @@ export const dbService = {
              const normalize = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
              const stepNorm = normalize(stepName);
 
-             // Mapeamento manual de pacotes - LÓGICA REFINADA
+             // Mapeamento manual de pacotes - LÓGICA REFINADA E EXPANDIDA
              const pkg = FULL_MATERIAL_PACKAGES.find(p => {
                  const pkgNorm = normalize(p.category);
                  
-                 // 1. Limpeza de Obra (e.g. "Limpeza do terreno", "Retirada de entulho", "Demolição")
-                 // Exclui 'Final' para não conflitar com Limpeza Final
+                 // 1. Limpeza de Obra / Canteiro
                  if ((stepNorm.includes('limpeza') || stepNorm.includes('entulho') || stepNorm.includes('demolicao')) 
                      && !stepNorm.includes('final') 
-                     && pkgNorm.includes('limpeza de obra')) {
+                     && pkgNorm.includes('limpeza')) {
                      return true;
                  }
                  
-                 // 2. Fundação (e.g. "Fundações")
+                 // 2. Fundação
                  if (stepNorm.includes('fundacao') && pkgNorm.includes('fundacao')) return true;
 
-                 // 3. Alvenaria Estrutural (e.g. "Levantamento de paredes")
-                 // Exclui explicitamente 'reboco' para não adicionar tijolos no reboco
-                 if ((stepNorm.includes('parede') || stepNorm.includes('alvenaria')) 
-                     && !stepNorm.includes('reboco')
+                 // 3. Alvenaria Estrutural
+                 if ((stepNorm.includes('parede') || stepNorm.includes('alvenaria') || stepNorm.includes('bloco')) 
+                     && !stepNorm.includes('reboco') && !stepNorm.includes('pintura')
                      && pkgNorm.includes('alvenaria')) {
                      return true;
                  }
 
-                 // 4. Chapisco e Reboco
+                 // 4. Impermeabilização (Nova Categoria)
+                 if (stepNorm.includes('impermeabiliza') && pkgNorm.includes('impermeabiliza')) return true;
+
+                 // 5. Chapisco e Reboco
                  if ((stepNorm.includes('reboco') || stepNorm.includes('chapisco')) && pkgNorm.includes('chapisco')) return true;
 
-                 // 5. Contrapiso (específico para diferenciar de Pisos/Acabamento)
+                 // 6. Contrapiso
                  if (stepNorm.includes('contrapiso') && pkgNorm.includes('contrapiso')) return true;
 
-                 // 6. Pisos e Revestimentos (e.g. "Pisos", "Azulejos")
-                 // Deve conter 'piso' ou 'azulejo', mas NÃO 'contrapiso'
+                 // 7. Gesso e Drywall (Nova Categoria)
+                 if ((stepNorm.includes('gesso') || stepNorm.includes('forro')) && pkgNorm.includes('gesso')) return true;
+
+                 // 8. Pisos e Revestimentos (Geral)
                  if ((stepNorm.includes('piso') || stepNorm.includes('azulejo') || stepNorm.includes('revestimento')) 
-                     && !stepNorm.includes('contrapiso')
-                     && pkgNorm.includes('pisos e revestimentos')) {
+                     && !stepNorm.includes('contrapiso') && !stepNorm.includes('protecao')
+                     && pkgNorm.includes('pisos')) {
                      return true;
                  }
 
-                 // 7. Instalações
-                 if ((stepNorm.includes('agua') || stepNorm.includes('esgoto') || stepNorm.includes('hidraulica')) && pkgNorm.includes('hidraulica')) return true;
-                 if ((stepNorm.includes('fiacao') || stepNorm.includes('luz') || stepNorm.includes('eletrica')) && pkgNorm.includes('eletrica')) return true;
+                 // 9. Marmoraria (Nova Categoria)
+                 if ((stepNorm.includes('marmore') || stepNorm.includes('granito') || stepNorm.includes('bancada')) 
+                     && pkgNorm.includes('marmoraria')) {
+                     return true;
+                 }
 
-                 // 8. Louças e Metais
-                 if ((stepNorm.includes('louca') || stepNorm.includes('metal') || stepNorm.includes('banheiro') || stepNorm.includes('instala')) && pkgNorm.includes('loucas e metais')) return true;
+                 // 10. Esquadrias e Vidros (Nova Categoria)
+                 if ((stepNorm.includes('janela') || stepNorm.includes('porta') || stepNorm.includes('vidro') || stepNorm.includes('esquadria'))
+                     && pkgNorm.includes('esquadria')) {
+                     return true;
+                 }
 
-                 // 9. Limpeza Final
+                 // 11. Instalações Hidráulicas (Tubulação vs Acabamento)
+                 if ((stepNorm.includes('agua') || stepNorm.includes('esgoto') || stepNorm.includes('tubulacao')) 
+                     && !stepNorm.includes('louca')
+                     && pkgNorm.includes('tubulacao')) return true;
+
+                 // 12. Louças e Metais
+                 if ((stepNorm.includes('louca') || stepNorm.includes('metal') || stepNorm.includes('torneira')) 
+                     && pkgNorm.includes('loucas')) return true;
+
+                 // 13. Instalações Elétricas (Infra vs Acabamento)
+                 if ((stepNorm.includes('fiacao') || stepNorm.includes('eletrica')) && !stepNorm.includes('luminaria') && pkgNorm.includes('infra')) return true;
+                 if ((stepNorm.includes('luminaria') || stepNorm.includes('luz')) && pkgNorm.includes('acabamento')) return true;
+
+                 // 14. Pintura
+                 if (stepNorm.includes('pintura') && pkgNorm.includes('pintura')) return true;
+
+                 // 15. Limpeza Final
                  if ((stepNorm.includes('entrega') || stepNorm.includes('final')) && pkgNorm.includes('limpeza final')) return true;
 
                  return false;
@@ -207,6 +231,7 @@ export const dbService = {
 
              if (pkg) {
                  pkg.items.forEach(item => {
+                     // Cálculo base: Área total * Multiplicador
                      const calculatedQty = Math.ceil(newWork.area * (item.multiplier || 0));
                      
                      // SÓ ADICIONA SE A QUANTIDADE FOR MAIOR QUE ZERO
