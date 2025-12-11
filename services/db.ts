@@ -151,90 +151,34 @@ export const dbService = {
                  isDelayed: false
              });
 
-             // INTELIGÊNCIA DE MATERIAIS - CORRELAÇÃO DE PALAVRAS-CHAVE
+             // INTELIGÊNCIA DE MATERIAIS
              const normalize = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
              const stepNorm = normalize(stepName);
 
-             // Mapeamento manual de pacotes - LÓGICA REFINADA E EXPANDIDA
              const pkg = FULL_MATERIAL_PACKAGES.find(p => {
                  const pkgNorm = normalize(p.category);
-                 
-                 // 1. Limpeza de Obra / Canteiro
-                 if ((stepNorm.includes('limpeza') || stepNorm.includes('entulho') || stepNorm.includes('demolicao')) 
-                     && !stepNorm.includes('final') 
-                     && pkgNorm.includes('limpeza')) {
-                     return true;
-                 }
-                 
-                 // 2. Fundação
+                 if ((stepNorm.includes('limpeza') || stepNorm.includes('entulho') || stepNorm.includes('demolicao')) && !stepNorm.includes('final') && pkgNorm.includes('limpeza')) return true;
                  if (stepNorm.includes('fundacao') && pkgNorm.includes('fundacao')) return true;
-
-                 // 3. Alvenaria Estrutural
-                 if ((stepNorm.includes('parede') || stepNorm.includes('alvenaria') || stepNorm.includes('bloco')) 
-                     && !stepNorm.includes('reboco') && !stepNorm.includes('pintura')
-                     && pkgNorm.includes('alvenaria')) {
-                     return true;
-                 }
-
-                 // 4. Impermeabilização (Nova Categoria)
+                 if ((stepNorm.includes('parede') || stepNorm.includes('alvenaria') || stepNorm.includes('bloco')) && !stepNorm.includes('reboco') && !stepNorm.includes('pintura') && pkgNorm.includes('alvenaria')) return true;
                  if (stepNorm.includes('impermeabiliza') && pkgNorm.includes('impermeabiliza')) return true;
-
-                 // 5. Chapisco e Reboco
                  if ((stepNorm.includes('reboco') || stepNorm.includes('chapisco')) && pkgNorm.includes('chapisco')) return true;
-
-                 // 6. Contrapiso
                  if (stepNorm.includes('contrapiso') && pkgNorm.includes('contrapiso')) return true;
-
-                 // 7. Gesso e Drywall (Nova Categoria)
                  if ((stepNorm.includes('gesso') || stepNorm.includes('forro')) && pkgNorm.includes('gesso')) return true;
-
-                 // 8. Pisos e Revestimentos (Geral)
-                 if ((stepNorm.includes('piso') || stepNorm.includes('azulejo') || stepNorm.includes('revestimento')) 
-                     && !stepNorm.includes('contrapiso') && !stepNorm.includes('protecao')
-                     && pkgNorm.includes('pisos')) {
-                     return true;
-                 }
-
-                 // 9. Marmoraria (Nova Categoria)
-                 if ((stepNorm.includes('marmore') || stepNorm.includes('granito') || stepNorm.includes('bancada')) 
-                     && pkgNorm.includes('marmoraria')) {
-                     return true;
-                 }
-
-                 // 10. Esquadrias e Vidros (Nova Categoria)
-                 if ((stepNorm.includes('janela') || stepNorm.includes('porta') || stepNorm.includes('vidro') || stepNorm.includes('esquadria'))
-                     && pkgNorm.includes('esquadria')) {
-                     return true;
-                 }
-
-                 // 11. Instalações Hidráulicas (Tubulação vs Acabamento)
-                 if ((stepNorm.includes('agua') || stepNorm.includes('esgoto') || stepNorm.includes('tubulacao')) 
-                     && !stepNorm.includes('louca')
-                     && pkgNorm.includes('tubulacao')) return true;
-
-                 // 12. Louças e Metais
-                 if ((stepNorm.includes('louca') || stepNorm.includes('metal') || stepNorm.includes('torneira')) 
-                     && pkgNorm.includes('loucas')) return true;
-
-                 // 13. Instalações Elétricas (Infra vs Acabamento)
+                 if ((stepNorm.includes('piso') || stepNorm.includes('azulejo') || stepNorm.includes('revestimento')) && !stepNorm.includes('contrapiso') && !stepNorm.includes('protecao') && pkgNorm.includes('pisos')) return true;
+                 if ((stepNorm.includes('marmore') || stepNorm.includes('granito') || stepNorm.includes('bancada')) && pkgNorm.includes('marmoraria')) return true;
+                 if ((stepNorm.includes('janela') || stepNorm.includes('porta') || stepNorm.includes('vidro') || stepNorm.includes('esquadria')) && pkgNorm.includes('esquadria')) return true;
+                 if ((stepNorm.includes('agua') || stepNorm.includes('esgoto') || stepNorm.includes('tubulacao')) && !stepNorm.includes('louca') && pkgNorm.includes('tubulacao')) return true;
+                 if ((stepNorm.includes('louca') || stepNorm.includes('metal') || stepNorm.includes('torneira')) && pkgNorm.includes('loucas')) return true;
                  if ((stepNorm.includes('fiacao') || stepNorm.includes('eletrica')) && !stepNorm.includes('luminaria') && pkgNorm.includes('infra')) return true;
                  if ((stepNorm.includes('luminaria') || stepNorm.includes('luz')) && pkgNorm.includes('acabamento')) return true;
-
-                 // 14. Pintura
                  if (stepNorm.includes('pintura') && pkgNorm.includes('pintura')) return true;
-
-                 // 15. Limpeza Final
                  if ((stepNorm.includes('entrega') || stepNorm.includes('final')) && pkgNorm.includes('limpeza final')) return true;
-
                  return false;
              });
 
              if (pkg) {
                  pkg.items.forEach(item => {
-                     // Cálculo base: Área total * Multiplicador
                      const calculatedQty = Math.ceil(newWork.area * (item.multiplier || 0));
-                     
-                     // SÓ ADICIONA SE A QUANTIDADE FOR MAIOR QUE ZERO
                      if (calculatedQty > 0) {
                          db.materials.push({
                             id: Math.random().toString(36).substr(2, 9),
@@ -497,5 +441,41 @@ export const dbService = {
 
   generatePix: async (_amount: number, _payer: any) => {
       return { qr_code_base64: '', copy_paste_code: '000201010212...' };
+  },
+
+  // --- FOTOS E ARQUIVOS (LOCAL STORAGE MVP) ---
+  getPhotos: async (workId: string): Promise<WorkPhoto[]> => {
+      const db = getLocalDb();
+      return db.photos ? db.photos.filter((p: WorkPhoto) => p.workId === workId) : [];
+  },
+  addPhoto: async (photo: WorkPhoto) => {
+      const db = getLocalDb();
+      if(!db.photos) db.photos = [];
+      db.photos.push(photo);
+      saveLocalDb(db);
+  },
+  deletePhoto: async (id: string) => {
+      const db = getLocalDb();
+      if(db.photos) {
+          db.photos = db.photos.filter((p: WorkPhoto) => p.id !== id);
+          saveLocalDb(db);
+      }
+  },
+  getFiles: async (workId: string): Promise<WorkFile[]> => {
+      const db = getLocalDb();
+      return db.files ? db.files.filter((f: WorkFile) => f.workId === workId) : [];
+  },
+  addFile: async (file: WorkFile) => {
+      const db = getLocalDb();
+      if(!db.files) db.files = [];
+      db.files.push(file);
+      saveLocalDb(db);
+  },
+  deleteFile: async (id: string) => {
+      const db = getLocalDb();
+      if(db.files) {
+          db.files = db.files.filter((f: WorkFile) => f.id !== id);
+          saveLocalDb(db);
+      }
   }
 };
