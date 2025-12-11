@@ -1,3 +1,4 @@
+
 import { 
   User, Work, Step, Material, Expense, Worker, Supplier, 
   WorkPhoto, WorkFile, Notification, PlanType, StepStatus
@@ -20,7 +21,12 @@ const getLocalDb = () => {
   };
   try {
     const data = localStorage.getItem(DB_KEY);
-    return data ? JSON.parse(data) : emptyDb;
+    if (!data) return emptyDb;
+    
+    const parsed = JSON.parse(data);
+    // Merge ensures that if new arrays are added to the code (like suppliers),
+    // they are initialized even if the localStorage has old data.
+    return { ...emptyDb, ...parsed };
   } catch {
     return emptyDb;
   }
@@ -34,7 +40,11 @@ export const dbService = {
   // Auth
   getCurrentUser: (): User | null => {
     const json = localStorage.getItem('maos_user');
-    return json ? JSON.parse(json) : null;
+    try {
+        return json ? JSON.parse(json) : null;
+    } catch {
+        return null;
+    }
   },
   
   syncSession: async (): Promise<User | null> => {
@@ -52,7 +62,33 @@ export const dbService = {
 
   login: async (email: string, _password?: string): Promise<User | null> => {
      const db = getLocalDb();
-     const user = db.users.find((u: User) => u.email === email);
+     const cleanEmail = email.trim().toLowerCase();
+     
+     let user = db.users.find((u: User) => u.email === cleanEmail);
+     
+     // --- SAFETY NET: DEMO USER ---
+     // If the user tries to login as Test/Demo, we FORCE its existence.
+     // This solves the issue of "Account doesn't exist" during development/testing.
+     if (cleanEmail === 'teste@maosdaobra.app') {
+         if (!user) {
+             user = {
+                 id: 'demo-user-id',
+                 name: 'Zé da Obra (Demo)',
+                 email: 'teste@maosdaobra.app',
+                 whatsapp: '51999999999',
+                 plan: PlanType.VITALICIO,
+                 subscriptionExpiresAt: new Date(Date.now() + 36500 * 24 * 60 * 60 * 1000).toISOString() // 100 years
+             };
+             // Ensure the array exists before pushing
+             if (!Array.isArray(db.users)) db.users = [];
+             db.users.push(user);
+             saveLocalDb(db);
+         }
+         // Force session update
+         localStorage.setItem('maos_user', JSON.stringify(user));
+         return user;
+     }
+
      if (user) { 
          localStorage.setItem('maos_user', JSON.stringify(user));
          return user;
@@ -62,12 +98,14 @@ export const dbService = {
 
   signup: async (name: string, email: string, whatsapp: string, _password?: string, cpf?: string, planType?: string | null): Promise<User | null> => {
       const db = getLocalDb();
-      if (db.users.find((u: User) => u.email === email)) return null;
+      const cleanEmail = email.trim().toLowerCase();
+
+      if (db.users.find((u: User) => u.email === cleanEmail)) return null;
       
       const newUser: User = {
           id: Math.random().toString(36).substr(2, 9),
           name,
-          email,
+          email: cleanEmail,
           whatsapp,
           cpf,
           plan: (planType as PlanType) || null,
@@ -298,17 +336,14 @@ export const dbService = {
       const normalize = (str: string) => str.toLowerCase().trim();
       const targetDesc = normalize(description);
 
-      // Filter expenses with same description, excluding current edit
       const relevant = db.expenses.filter((e: Expense) => 
           e.workId === workId && 
           normalize(e.description) === targetDesc &&
           e.id !== excludeId
       );
       
-      // Strict number conversion for safety
       const totalPaid = relevant.reduce((acc: number, curr: Expense) => acc + (Number(curr.amount) || 0), 0);
       
-      // Find most recent Agreed Amount
       const lastAgreedItem = relevant
         .sort((a: Expense, b: Expense) => new Date(b.date).getTime() - new Date(a.date).getTime())
         .find((e: Expense) => e.totalAgreed && Number(e.totalAgreed) > 0);
@@ -408,7 +443,7 @@ export const dbService = {
   },
 
   generateSmartNotifications: async (_userId: string, _workId: string) => {
-      // Mock implementation - Prefix arguments to ignore unused
+      // Mock implementation
   },
 
   generatePix: async (amount: number, _user: any) => {
