@@ -892,115 +892,444 @@ const WorkDetail: React.FC = () => {
                 </div>
             );
 
-            // ... (Other subviews from previous code)
-            // To ensure brevity and not cut off important logic, I am including the critical missing part here and assuming existing subviews are kept.
-            // I will re-include REPORTS, PHOTOS, CALCULATORS, BONUS_IA, BONUS_IA_CHAT, CONTRACTS, CHECKLIST, PROJECTS.
-            
             case 'REPORTS': return (
                 <div className="space-y-6">
-                    <div className="flex gap-2 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl no-print">
-                        {['CRONO', 'MAT', 'FIN'].map((rt) => (
-                            <button key={rt} onClick={() => setReportTab(rt as any)} className={`flex-1 py-2 rounded-lg text-xs font-bold ${reportTab === rt ? 'bg-white shadow text-primary' : 'text-slate-500'}`}>
-                                {rt === 'CRONO' ? 'Cronograma' : rt === 'MAT' ? 'Materiais' : 'Financeiro'}
-                            </button>
-                        ))}
+                    {/* Header Controls (Buttons Moved Top) */}
+                    <div className="flex flex-col md:flex-row justify-between items-center gap-4 bg-slate-100 dark:bg-slate-800 p-1.5 rounded-2xl no-print shadow-sm border border-slate-200 dark:border-slate-700">
+                        <div className="flex w-full md:w-auto gap-1">
+                            {['CRONO', 'MAT', 'FIN'].map((rt) => (
+                                <button key={rt} onClick={() => setReportTab(rt as any)} className={`flex-1 md:flex-none px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-wide transition-all ${reportTab === rt ? 'bg-white text-primary shadow-md transform scale-105' : 'text-slate-500 hover:bg-white/50'}`}>
+                                    {rt === 'CRONO' ? 'Cronograma' : rt === 'MAT' ? 'Materiais' : 'Financeiro'}
+                                </button>
+                            ))}
+                        </div>
+                        <div className="flex w-full md:w-auto gap-2">
+                            <button onClick={handlePrintPDF} className="flex-1 md:flex-none py-2.5 px-4 bg-slate-800 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-slate-700 transition-colors shadow-lg"><i className="fa-solid fa-print"></i> <span className="text-xs uppercase tracking-wider">Imprimir</span></button>
+                            <button onClick={handleExportExcel} className="flex-1 md:flex-none py-2.5 px-4 bg-green-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-green-700 transition-colors shadow-lg"><i className="fa-solid fa-file-excel"></i> <span className="text-xs uppercase tracking-wider">Excel</span></button>
+                        </div>
                     </div>
-                    <div className="bg-white dark:bg-white dark:text-black rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm print:shadow-none print:border-0 print:rounded-none">
-                        <div className="hidden print:block p-8 border-b-2 border-slate-100">
+
+                    {/* PRINT-FRIENDLY CONTAINER */}
+                    <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-xl print:shadow-none print:border-0 print:rounded-none text-slate-800">
+                        
+                        {/* Header for Print/PDF */}
+                        <div className="p-8 border-b-2 border-slate-100 bg-slate-50/50">
                             <div className="flex justify-between items-start">
                                 <div>
-                                    <h1 className="text-3xl font-black text-slate-900 mb-1">MÃOS DA OBRA</h1>
-                                    <p className="text-sm font-bold text-slate-500">Relatório Geral da Obra</p>
+                                    <h1 className="text-4xl font-black text-slate-900 mb-1 tracking-tight">MÃOS DA OBRA</h1>
+                                    <p className="text-sm font-bold text-slate-500 uppercase tracking-widest">Relatório Analítico</p>
                                 </div>
                                 <div className="text-right">
-                                    <h2 className="text-xl font-bold text-slate-800">{work.name}</h2>
-                                    <p className="text-sm text-slate-500">Data: {new Date().toLocaleDateString()}</p>
+                                    <h2 className="text-2xl font-bold text-slate-800">{work.name}</h2>
+                                    <p className="text-sm font-medium text-slate-500">Emitido em: {new Date().toLocaleDateString()}</p>
                                 </div>
                             </div>
-                            <div className="mt-6 p-4 bg-slate-50 rounded-xl border border-slate-200 grid grid-cols-3 gap-4">
-                                <div><span className="text-xs font-bold text-slate-400 uppercase">Orçamento</span><p className="text-lg font-black text-slate-800">R$ {work.budgetPlanned.toLocaleString('pt-BR')}</p></div>
-                                <div><span className="text-xs font-bold text-slate-400 uppercase">Gasto Total</span><p className="text-lg font-black text-red-600">R$ {expenses.reduce((a, b) => a + Number(b.amount), 0).toLocaleString('pt-BR')}</p></div>
-                                <div><span className="text-xs font-bold text-slate-400 uppercase">Status</span><p className="text-lg font-black text-blue-600">{expenses.length} lançamentos</p></div>
-                            </div>
                         </div>
-                        <table className="w-full text-left text-sm">
-                            <thead className="bg-slate-50 dark:bg-slate-100 border-b border-slate-200 dark:border-slate-200">
-                                <tr><th className="px-6 py-4 font-bold text-slate-500 uppercase text-xs">Item / Descrição</th><th className="px-6 py-4 font-bold text-slate-500 uppercase text-xs text-right">Detalhes / Valor</th></tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100 dark:divide-slate-200">
-                                {reportTab === 'CRONO' && steps.map((s) => (
-                                    <tr key={s.id} className="hover:bg-slate-50">
-                                        <td className="px-6 py-4"><p className="font-bold text-slate-800">{s.name}</p><p className="text-xs text-slate-500">{parseDateNoTimezone(s.startDate)} - {parseDateNoTimezone(s.endDate)}</p></td>
-                                        <td className="px-6 py-4 text-right"><span className={`inline-block text-[10px] font-bold px-3 py-1 rounded-full ${s.status === 'CONCLUIDO' ? 'bg-green-100 text-green-700' : s.status === 'EM_ANDAMENTO' ? 'bg-orange-100 text-orange-700' : 'bg-slate-100 text-slate-500'}`}>{s.status === 'CONCLUIDO' ? 'CONCLUÍDO' : s.status === 'EM_ANDAMENTO' ? 'EM ANDAMENTO' : 'PENDENTE'}</span></td>
-                                    </tr>
-                                ))}
-                                {reportTab === 'MAT' && materials.map((m) => (
-                                    <tr key={m.id} className="hover:bg-slate-50">
-                                        <td className="px-6 py-4"><p className="font-bold text-slate-800">{m.name}</p><p className="text-xs text-slate-500">{m.brand || 'Marca não inf.'}</p></td>
-                                        <td className="px-6 py-4 text-right"><div className="font-mono font-bold text-slate-700">{m.purchasedQty} / {m.plannedQty} {m.unit}</div><div className="w-24 h-1.5 bg-slate-200 rounded-full ml-auto mt-1 overflow-hidden"><div className="h-full bg-blue-500" style={{width: `${Math.min((m.purchasedQty/m.plannedQty)*100, 100)}%`}}></div></div></td>
-                                    </tr>
-                                ))}
-                                {reportTab === 'FIN' && expenses.map((e) => (
-                                    <tr key={e.id} className="hover:bg-slate-50">
-                                        <td className="px-6 py-4"><p className="font-bold text-slate-800">{e.description}</p><p className="text-xs text-slate-500 flex items-center gap-2"><span>{parseDateNoTimezone(e.date)}</span><span className="w-1 h-1 rounded-full bg-slate-300"></span><span>{e.category}</span></p></td>
-                                        <td className="px-6 py-4 text-right"><p className="font-bold text-slate-800">R$ {e.amount.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>{e.totalAgreed && (<p className="text-[10px] text-slate-500 font-bold mt-0.5">Parcial de R$ {e.totalAgreed.toLocaleString('pt-BR')}</p>)}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+
+                        <div className="p-8 min-h-[500px]">
+                            
+                            {/* --- RELATÓRIO DE CRONOGRAMA --- */}
+                            {reportTab === 'CRONO' && (
+                                <div className="space-y-8">
+                                    {/* Summary Cards */}
+                                    <div className="grid grid-cols-3 gap-4">
+                                        <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 text-center">
+                                            <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-1">Pendentes</p>
+                                            <p className="text-3xl font-black text-slate-700">
+                                                {steps.filter(s => s.status === 'NAO_INICIADO' && s.endDate >= new Date().toISOString().split('T')[0]).length}
+                                            </p>
+                                        </div>
+                                        <div className="p-4 bg-green-50 rounded-2xl border border-green-100 text-center">
+                                            <p className="text-xs font-black text-green-600 uppercase tracking-widest mb-1">Concluídos</p>
+                                            <p className="text-3xl font-black text-green-700">
+                                                {steps.filter(s => s.status === 'CONCLUIDO').length}
+                                            </p>
+                                        </div>
+                                        <div className="p-4 bg-red-50 rounded-2xl border border-red-100 text-center">
+                                            <p className="text-xs font-black text-red-600 uppercase tracking-widest mb-1">Atrasados</p>
+                                            <p className="text-3xl font-black text-red-700">
+                                                {steps.filter(s => s.endDate < new Date().toISOString().split('T')[0] && s.status !== 'CONCLUIDO').length}
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    {/* HERO CARD: EM ANDAMENTO */}
+                                    {steps.filter(s => s.status === 'EM_ANDAMENTO').length > 0 && (
+                                        <div className="p-6 bg-gradient-to-r from-orange-500 to-amber-500 text-white rounded-2xl shadow-lg relative overflow-hidden">
+                                            <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/4"></div>
+                                            <div className="relative z-10 flex items-center justify-between">
+                                                <div>
+                                                    <h3 className="text-lg font-black uppercase tracking-widest mb-2 flex items-center gap-2">
+                                                        <i className="fa-solid fa-person-digging"></i> Em Execução Agora
+                                                    </h3>
+                                                    <div className="space-y-1">
+                                                        {steps.filter(s => s.status === 'EM_ANDAMENTO').map(s => (
+                                                            <div key={s.id} className="text-2xl font-bold">{s.name}</div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                                <div className="text-right">
+                                                    <span className="text-4xl font-black">{steps.filter(s => s.status === 'EM_ANDAMENTO').length}</span>
+                                                    <p className="text-xs font-bold uppercase opacity-80">Etapas Ativas</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Detailed List */}
+                                    <div className="border rounded-2xl overflow-hidden">
+                                        <table className="w-full text-left text-sm">
+                                            <thead className="bg-slate-50 border-b">
+                                                <tr>
+                                                    <th className="px-6 py-4 font-bold text-slate-500 uppercase text-xs w-2/3">Etapa / Descrição</th>
+                                                    <th className="px-6 py-4 font-bold text-slate-500 uppercase text-xs text-right w-1/3">Status / Prazo</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-100">
+                                                {steps.map((s) => {
+                                                    const today = new Date().toISOString().split('T')[0];
+                                                    // FIX: Delayed status priority logic
+                                                    const isDelayed = s.endDate < today && s.status !== 'CONCLUIDO';
+                                                    
+                                                    let statusBadge = '';
+                                                    let rowClass = 'hover:bg-slate-50';
+
+                                                    if (s.status === 'CONCLUIDO') {
+                                                        statusBadge = '<span class="inline-block px-3 py-1 rounded-full bg-green-100 text-green-700 font-bold text-[10px] uppercase">Concluído</span>';
+                                                    } else if (isDelayed) {
+                                                        statusBadge = '<span class="inline-block px-3 py-1 rounded-full bg-red-100 text-red-700 font-bold text-[10px] uppercase">Atrasado</span>';
+                                                        rowClass = 'bg-red-50/30 hover:bg-red-50/50';
+                                                    } else if (s.status === 'EM_ANDAMENTO') {
+                                                        statusBadge = '<span class="inline-block px-3 py-1 rounded-full bg-orange-100 text-orange-700 font-bold text-[10px] uppercase">Em Andamento</span>';
+                                                    } else {
+                                                        statusBadge = '<span class="inline-block px-3 py-1 rounded-full bg-slate-100 text-slate-500 font-bold text-[10px] uppercase">Pendente</span>';
+                                                    }
+
+                                                    return (
+                                                        <tr key={s.id} className={rowClass}>
+                                                            <td className="px-6 py-4">
+                                                                <p className="font-bold text-slate-800 text-base">{s.name}</p>
+                                                                <p className="text-xs text-slate-500 mt-1">Previsão: {parseDateNoTimezone(s.startDate)} até {parseDateNoTimezone(s.endDate)}</p>
+                                                            </td>
+                                                            <td className="px-6 py-4 text-right" dangerouslySetInnerHTML={{__html: statusBadge}}></td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* --- RELATÓRIO DE MATERIAIS (Agrupado por Etapa) --- */}
+                            {reportTab === 'MAT' && (
+                                <div className="space-y-8">
+                                    {[...steps, { id: 'SEM_ETAPA', name: 'Materiais Gerais / Estoque', startDate: '', endDate: '', status: 'NAO_INICIADO' }].map((step) => {
+                                        const stepMats = materials.filter(m => {
+                                            if (step.id === 'SEM_ETAPA') return !m.stepId;
+                                            return m.stepId === step.id;
+                                        });
+
+                                        if (stepMats.length === 0) return null;
+
+                                        return (
+                                            <div key={step.id} className="border rounded-2xl overflow-hidden mb-6 break-inside-avoid">
+                                                <div className="bg-slate-100 px-6 py-3 border-b border-slate-200 flex justify-between items-center">
+                                                    <h3 className="font-black text-slate-700 uppercase tracking-wide text-sm">{step.name}</h3>
+                                                    <span className="text-xs font-bold text-slate-500">{stepMats.length} itens</span>
+                                                </div>
+                                                <table className="w-full text-left text-sm">
+                                                    <thead className="bg-slate-50 border-b">
+                                                        <tr>
+                                                            <th className="px-6 py-3 font-bold text-slate-400 uppercase text-[10px]">Material</th>
+                                                            <th className="px-6 py-3 font-bold text-slate-400 uppercase text-[10px] text-right">Status de Compra</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody className="divide-y divide-slate-100">
+                                                        {stepMats.map(m => {
+                                                            const percent = Math.min((m.purchasedQty / m.plannedQty) * 100, 100);
+                                                            return (
+                                                                <tr key={m.id} className="hover:bg-slate-50">
+                                                                    <td className="px-6 py-3">
+                                                                        <p className="font-bold text-slate-800">{m.name}</p>
+                                                                        <p className="text-xs text-slate-500">{m.brand || 'Marca não especificada'}</p>
+                                                                    </td>
+                                                                    <td className="px-6 py-3 text-right">
+                                                                        <div className="flex items-center justify-end gap-3">
+                                                                            <div className="text-right">
+                                                                                <p className="font-mono font-bold text-slate-700">{m.purchasedQty} / {m.plannedQty} <span className="text-xs text-slate-400">{m.unit}</span></p>
+                                                                            </div>
+                                                                            <div className="w-20 h-2 bg-slate-200 rounded-full overflow-hidden">
+                                                                                <div className={`h-full ${percent >= 100 ? 'bg-green-500' : 'bg-blue-500'}`} style={{width: `${percent}%`}}></div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </td>
+                                                                </tr>
+                                                            );
+                                                        })}
+                                                    </tbody>
+                                                </table>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+
+                            {/* --- RELATÓRIO FINANCEIRO (Extrato por Etapa) --- */}
+                            {reportTab === 'FIN' && (
+                                <div className="space-y-8">
+                                    
+                                    {/* Resumo Topo */}
+                                    <div className="p-6 bg-slate-900 text-white rounded-2xl flex justify-between items-center shadow-lg">
+                                        <div>
+                                            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Total Investido</p>
+                                            <p className="text-3xl font-black">R$ {expenses.reduce((a, b) => a + Number(b.amount), 0).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Previsão Inicial</p>
+                                            <p className="text-xl font-bold opacity-80">R$ {work.budgetPlanned.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
+                                        </div>
+                                    </div>
+
+                                    {[...steps, { id: 'Geral', name: 'Despesas Gerais / Administrativas', startDate: '', endDate: '', status: 'NAO_INICIADO' }].map((step) => {
+                                        const stepExpenses = expenses.filter(e => {
+                                            if (step.id === 'Geral') return !e.stepId;
+                                            return e.stepId === step.id;
+                                        });
+
+                                        if (stepExpenses.length === 0) return null;
+
+                                        // Subgroup
+                                        const laborExps = stepExpenses.filter(e => e.category === 'Mão de Obra');
+                                        const matExps = stepExpenses.filter(e => e.category === 'Material');
+                                        const otherExps = stepExpenses.filter(e => e.category !== 'Mão de Obra' && e.category !== 'Material');
+
+                                        const stepTotal = stepExpenses.reduce((a, b) => a + Number(b.amount), 0);
+
+                                        return (
+                                            <div key={step.id} className="border rounded-2xl overflow-hidden mb-8 break-inside-avoid shadow-sm">
+                                                <div className="bg-slate-50 px-6 py-4 border-b border-slate-200 flex justify-between items-center">
+                                                    <h3 className="font-black text-slate-800 uppercase tracking-wide text-sm border-l-4 border-slate-800 pl-3">{step.name}</h3>
+                                                    <span className="font-bold text-slate-800 bg-white px-3 py-1 rounded-lg border border-slate-200 shadow-sm">R$ {stepTotal.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                                                </div>
+                                                
+                                                <div className="p-2">
+                                                    {/* LABOR */}
+                                                    {laborExps.length > 0 && (
+                                                        <div className="mb-4">
+                                                            <h4 className="px-4 py-2 text-xs font-black text-blue-600 uppercase tracking-widest border-b border-blue-100 bg-blue-50/50">Mão de Obra</h4>
+                                                            {laborExps.map(e => (
+                                                                <div key={e.id} className="flex justify-between items-center px-4 py-3 border-b border-dashed border-slate-100 last:border-0 hover:bg-slate-50">
+                                                                    <div>
+                                                                        <p className="font-bold text-slate-700 text-sm">{e.description}</p>
+                                                                        <p className="text-[10px] text-slate-400">{parseDateNoTimezone(e.date)}</p>
+                                                                    </div>
+                                                                    <div className="text-right">
+                                                                        <p className="font-bold text-slate-700 text-sm">R$ {e.amount.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
+                                                                        {e.totalAgreed && <p className="text-[9px] text-slate-400 font-bold">Total: {e.totalAgreed.toLocaleString('pt-BR')}</p>}
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+
+                                                    {/* MATERIALS */}
+                                                    {matExps.length > 0 && (
+                                                        <div className="mb-4">
+                                                            <h4 className="px-4 py-2 text-xs font-black text-amber-600 uppercase tracking-widest border-b border-amber-100 bg-amber-50/50">Materiais</h4>
+                                                            {matExps.map(e => (
+                                                                <div key={e.id} className="flex justify-between items-center px-4 py-3 border-b border-dashed border-slate-100 last:border-0 hover:bg-slate-50">
+                                                                    <div>
+                                                                        <p className="font-bold text-slate-700 text-sm">{e.description}</p>
+                                                                        <p className="text-[10px] text-slate-400">{parseDateNoTimezone(e.date)}</p>
+                                                                    </div>
+                                                                    <p className="font-bold text-slate-700 text-sm">R$ {e.amount.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+
+                                                    {/* OTHERS */}
+                                                    {otherExps.length > 0 && (
+                                                        <div>
+                                                            <h4 className="px-4 py-2 text-xs font-black text-slate-500 uppercase tracking-widest border-b border-slate-100 bg-slate-50/50">Outros / Taxas</h4>
+                                                            {otherExps.map(e => (
+                                                                <div key={e.id} className="flex justify-between items-center px-4 py-3 border-b border-dashed border-slate-100 last:border-0 hover:bg-slate-50">
+                                                                    <div>
+                                                                        <p className="font-bold text-slate-700 text-sm">{e.description}</p>
+                                                                        <p className="text-[10px] text-slate-400">{parseDateNoTimezone(e.date)}</p>
+                                                                    </div>
+                                                                    <p className="font-bold text-slate-700 text-sm">R$ {e.amount.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+
+                        </div>
                     </div>
-                    <div className="flex gap-3 no-print">
-                        <button onClick={handlePrintPDF} className="flex-1 py-3 bg-slate-800 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-slate-700 shadow-lg transition-all"><i className="fa-solid fa-print"></i> Imprimir / PDF</button>
-                        <button onClick={handleExportExcel} className="flex-1 py-3 bg-green-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-green-700 shadow-lg transition-all"><i className="fa-solid fa-file-excel"></i> Baixar Excel</button>
-                    </div>
-                    <style>{`@media print {.no-print { display: none !important; } body { background: white; color: black; } nav, aside, .bottom-nav { display: none !important; } main { padding: 0 !important; margin: 0 !important; height: auto !important; overflow: visible !important; } table { width: 100% !important; } td, th { padding: 8px 12px !important; border-bottom: 1px solid #ddd !important; }}`}</style>
+
+                    {/* PRINT STYLES */}
+                    <style>{`
+                        @media print {
+                            .no-print { display: none !important; }
+                            body { background: white; color: black; }
+                            nav, aside, .bottom-nav { display: none !important; }
+                            main { padding: 0 !important; margin: 0 !important; height: auto !important; overflow: visible !important; }
+                            /* Ensure table fits */
+                            table { width: 100% !important; }
+                            td, th { padding: 8px 12px !important; border-bottom: 1px solid #ddd !important; }
+                            /* Force Background Colors */
+                            * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+                        }
+                    `}</style>
                 </div>
             );
 
             case 'PHOTOS': return (
                 <div className="space-y-6">
-                    <label className="block w-full py-8 border-2 border-dashed border-pink-300 bg-pink-50 rounded-2xl cursor-pointer hover:bg-pink-100 transition-all text-center"><i className="fa-solid fa-camera text-2xl text-pink-400 mb-2"></i><span className="block text-sm font-bold text-pink-600">{uploading ? 'Enviando...' : 'Adicionar Foto'}</span><input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, 'PHOTO')} disabled={uploading} /></label>
-                    <div className="grid grid-cols-2 gap-4">{photos.map(p => (<div key={p.id} className="relative group rounded-xl overflow-hidden shadow-sm"><img src={p.url} className="w-full aspect-square object-cover" alt="Obra" /><div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"><span className="text-white text-xs font-bold">{parseDateNoTimezone(p.date)}</span></div></div>))}</div>
+                    <label className="block w-full py-8 border-2 border-dashed border-pink-300 bg-pink-50 rounded-2xl cursor-pointer hover:bg-pink-100 transition-all text-center">
+                        <i className="fa-solid fa-camera text-2xl text-pink-400 mb-2"></i>
+                        <span className="block text-sm font-bold text-pink-600">{uploading ? 'Enviando...' : 'Adicionar Foto'}</span>
+                        <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, 'PHOTO')} disabled={uploading} />
+                    </label>
+                    <div className="grid grid-cols-2 gap-4">
+                        {photos.map(p => (
+                            <div key={p.id} className="relative group rounded-xl overflow-hidden shadow-sm">
+                                <img src={p.url} className="w-full aspect-square object-cover" alt="Obra" />
+                                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                    <span className="text-white text-xs font-bold">{parseDateNoTimezone(p.date)}</span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
                 </div>
             );
 
             case 'CALCULATORS': return (
                 <div className="space-y-6">
-                    <div className="grid grid-cols-3 gap-2">{['PISO', 'PAREDE', 'PINTURA'].map(t => (<button key={t} onClick={() => {setCalcType(t as any); setCalcResult([])}} className={`flex flex-col items-center justify-center py-4 rounded-xl border-2 font-bold text-xs transition-all gap-2 ${calcType === t ? 'border-secondary bg-secondary/10 text-secondary' : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-400'}`}><i className={`fa-solid ${t === 'PISO' ? 'fa-layer-group' : t === 'PAREDE' ? 'fa-building' : 'fa-paint-roller'} text-xl`}></i>{t}</button>))}</div>
+                    <div className="grid grid-cols-3 gap-2">
+                        {['PISO', 'PAREDE', 'PINTURA'].map(t => (
+                            <button key={t} onClick={() => {setCalcType(t as any); setCalcResult([])}} className={`flex flex-col items-center justify-center py-4 rounded-xl border-2 font-bold text-xs transition-all gap-2 ${calcType === t ? 'border-secondary bg-secondary/10 text-secondary' : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-400'}`}>
+                                <i className={`fa-solid ${t === 'PISO' ? 'fa-layer-group' : t === 'PAREDE' ? 'fa-building' : 'fa-paint-roller'} text-xl`}></i>
+                                {t}
+                            </button>
+                        ))}
+                    </div>
                     <div className="bg-gradient-to-br from-slate-800 to-slate-900 text-white p-8 rounded-3xl shadow-xl relative overflow-hidden">
                         <div className="absolute top-0 right-0 w-32 h-32 bg-secondary/20 rounded-full blur-3xl"></div>
                         <h3 className="text-lg font-bold mb-6 text-center uppercase tracking-widest text-secondary">Calculadora de {calcType}</h3>
-                        <div className="relative mb-8"><input type="number" value={calcArea} onChange={e => setCalcArea(e.target.value)} placeholder="0" className="w-full bg-white/10 border border-white/20 rounded-2xl p-4 text-center text-3xl font-black text-white outline-none focus:border-secondary transition-colors" /><span className="absolute right-4 top-1/2 -translate-y-1/2 text-white/30 font-bold">m²</span></div>
-                        <div className="space-y-3">{calcResult.length > 0 ? calcResult.map((res, i) => (<div key={i} className="bg-white/10 p-3 rounded-xl flex items-center gap-3 backdrop-blur-sm"><i className="fa-solid fa-check text-green-400"></i> <span className="font-bold text-sm">{res}</span></div>)) : <p className="text-center text-white/30 text-sm">Digite a área para calcular.</p>}</div>
+                        <div className="relative mb-8">
+                            <input type="number" value={calcArea} onChange={e => setCalcArea(e.target.value)} placeholder="0" className="w-full bg-white/10 border border-white/20 rounded-2xl p-4 text-center text-3xl font-black text-white outline-none focus:border-secondary transition-colors" />
+                            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-white/30 font-bold">m²</span>
+                        </div>
+                        <div className="space-y-3">
+                            {calcResult.length > 0 ? calcResult.map((res, i) => (
+                                <div key={i} className="bg-white/10 p-3 rounded-xl flex items-center gap-3 backdrop-blur-sm"><i className="fa-solid fa-check text-green-400"></i> <span className="font-bold text-sm">{res}</span></div>
+                            )) : <p className="text-center text-white/30 text-sm">Digite a área para calcular.</p>}
+                        </div>
                     </div>
                 </div>
             );
 
+            // Reusing existing components for other subviews to save space, but ensuring they are rendered
             case 'BONUS_IA': return (
                 <div className="flex flex-col items-center justify-center min-h-[70vh] p-6 text-center animate-in fade-in">
                     <div className="w-full max-w-sm bg-gradient-to-br from-slate-900 to-slate-950 rounded-[2.5rem] p-8 shadow-2xl relative overflow-hidden border border-slate-800 group">
                         <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20"></div>
                         <div className="absolute -top-20 -right-20 w-40 h-40 bg-secondary/30 rounded-full blur-3xl animate-pulse"></div>
-                        <div className="relative z-10 flex flex-col items-center"><div className="w-28 h-28 rounded-full border-4 border-slate-800 p-1 bg-gradient-gold shadow-[0_0_30px_rgba(217,119,6,0.4)] mb-6 transform hover:scale-105 transition-transform duration-500"><img src={ZE_AVATAR} className="w-full h-full object-cover rounded-full bg-white" onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK}/></div><h2 className="text-3xl font-black text-white mb-2 tracking-tight">Zé da Obra <span className="text-secondary">AI</span></h2><div className="h-1 w-12 bg-secondary rounded-full mb-6"></div><p className="text-slate-400 text-sm mb-8 leading-relaxed font-medium">Seu engenheiro virtual particular.</p>{isPremium ? (<button onClick={() => setSubView('BONUS_IA_CHAT')} className="w-full py-4 bg-gradient-gold text-white font-black rounded-2xl shadow-lg hover:shadow-orange-500/20 hover:scale-105 transition-all flex items-center justify-center gap-3 group-hover:animate-pulse"><span>INICIAR CONVERSA</span><i className="fa-solid fa-comments"></i></button>) : (<button onClick={() => navigate('/settings')} className="w-full py-4 bg-slate-800 text-slate-500 font-bold rounded-2xl border border-slate-700 flex items-center justify-center gap-2 hover:bg-slate-700 transition-colors"><i className="fa-solid fa-lock"></i> BLOQUEADO (PREMIUM)</button>)}</div>
+                        <div className="relative z-10 flex flex-col items-center">
+                            <div className="w-28 h-28 rounded-full border-4 border-slate-800 p-1 bg-gradient-gold shadow-[0_0_30px_rgba(217,119,6,0.4)] mb-6 transform hover:scale-105 transition-transform duration-500">
+                                <img src={ZE_AVATAR} className="w-full h-full object-cover rounded-full bg-white" onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK}/>
+                            </div>
+                            <h2 className="text-3xl font-black text-white mb-2 tracking-tight">Zé da Obra <span className="text-secondary">AI</span></h2>
+                            <div className="h-1 w-12 bg-secondary rounded-full mb-6"></div>
+                            <p className="text-slate-400 text-sm mb-8 leading-relaxed font-medium">Seu engenheiro virtual particular.</p>
+                            {isPremium ? (
+                                <button onClick={() => setSubView('BONUS_IA_CHAT')} className="w-full py-4 bg-gradient-gold text-white font-black rounded-2xl shadow-lg hover:shadow-orange-500/20 hover:scale-105 transition-all flex items-center justify-center gap-3 group-hover:animate-pulse"><span>INICIAR CONVERSA</span><i className="fa-solid fa-comments"></i></button>
+                            ) : (
+                                <button onClick={() => navigate('/settings')} className="w-full py-4 bg-slate-800 text-slate-500 font-bold rounded-2xl border border-slate-700 flex items-center justify-center gap-2 hover:bg-slate-700 transition-colors"><i className="fa-solid fa-lock"></i> BLOQUEADO (PREMIUM)</button>
+                            )}
+                        </div>
                     </div>
                 </div>
             );
 
-            case 'BONUS_IA_CHAT': if (!isPremium) return null; return (
+            case 'BONUS_IA_CHAT': 
+                if (!isPremium) return null;
+                return (
                 <div className="flex flex-col h-[80vh]">
                     <div className="flex-1 bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-inner overflow-y-auto mb-4 border border-slate-200 dark:border-slate-800">
-                        <div className="flex gap-4 mb-6"><img src={ZE_AVATAR} className="w-10 h-10 rounded-full border border-slate-200" onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK}/><div className="bg-slate-100 dark:bg-slate-800 p-3 rounded-tr-xl rounded-b-xl text-sm shadow-sm"><p className="font-bold text-secondary mb-1">Zé da Obra</p><p>Opa! Mestre de obras na área.</p></div></div>
-                        {aiResponse && (<div className="flex gap-4 mb-6 animate-in fade-in"><img src={ZE_AVATAR} className="w-10 h-10 rounded-full border border-slate-200" onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK}/><div className="bg-slate-100 dark:bg-slate-800 p-3 rounded-tr-xl rounded-b-xl text-sm shadow-sm"><p className="font-bold text-secondary mb-1">Zé da Obra</p><p className="whitespace-pre-wrap">{aiResponse}</p></div></div>)}
+                            <div className="flex gap-4 mb-6">
+                            <img src={ZE_AVATAR} className="w-10 h-10 rounded-full border border-slate-200" onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK}/>
+                            <div className="bg-slate-100 dark:bg-slate-800 p-3 rounded-tr-xl rounded-b-xl text-sm shadow-sm"><p className="font-bold text-secondary mb-1">Zé da Obra</p><p>Opa! Mestre de obras na área.</p></div>
+                        </div>
+                        {aiResponse && (
+                            <div className="flex gap-4 mb-6 animate-in fade-in">
+                                <img src={ZE_AVATAR} className="w-10 h-10 rounded-full border border-slate-200" onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK}/>
+                                <div className="bg-slate-100 dark:bg-slate-800 p-3 rounded-tr-xl rounded-b-xl text-sm shadow-sm"><p className="font-bold text-secondary mb-1">Zé da Obra</p><p className="whitespace-pre-wrap">{aiResponse}</p></div>
+                            </div>
+                        )}
                     </div>
-                    <div className="flex gap-2"><input value={aiMessage} onChange={e => setAiMessage(e.target.value)} placeholder="Pergunte ao Zé..." className="flex-1 p-4 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-secondary transition-colors"/><button onClick={handleAiAsk} disabled={aiLoading} className="w-14 bg-secondary text-white rounded-xl flex items-center justify-center shadow-lg hover:bg-orange-600 transition-colors">{aiLoading ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-paper-plane"></i>}</button></div>
+                    <div className="flex gap-2">
+                        <input value={aiMessage} onChange={e => setAiMessage(e.target.value)} placeholder="Pergunte ao Zé..." className="flex-1 p-4 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-secondary transition-colors"/>
+                        <button onClick={handleAiAsk} disabled={aiLoading} className="w-14 bg-secondary text-white rounded-xl flex items-center justify-center shadow-lg hover:bg-orange-600 transition-colors">{aiLoading ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-paper-plane"></i>}</button>
+                    </div>
                 </div>
             );
 
-            case 'CONTRACTS': return (<div className="space-y-4">{CONTRACT_TEMPLATES.map(ct => (<div key={ct.id} onClick={() => setViewContract({ title: ct.title, content: ct.contentTemplate })} className="group bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-secondary/50 cursor-pointer shadow-sm transition-all hover:translate-x-1"><div className="flex items-center gap-4"><div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center text-xl group-hover:bg-indigo-600 group-hover:text-white transition-colors"><i className="fa-solid fa-file-contract"></i></div><div><h4 className="font-bold text-primary dark:text-white">{ct.title}</h4><p className="text-xs text-slate-500">Toque para abrir modelo</p></div></div></div>))}</div>);
+            case 'CONTRACTS': return (
+                <div className="space-y-4">
+                    {CONTRACT_TEMPLATES.map(ct => (
+                        <div key={ct.id} onClick={() => setViewContract({ title: ct.title, content: ct.contentTemplate })} className="group bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-secondary/50 cursor-pointer shadow-sm transition-all hover:translate-x-1">
+                            <div className="flex items-center gap-4">
+                                <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center text-xl group-hover:bg-indigo-600 group-hover:text-white transition-colors"><i className="fa-solid fa-file-contract"></i></div>
+                                <div><h4 className="font-bold text-primary dark:text-white">{ct.title}</h4><p className="text-xs text-slate-500">Toque para abrir modelo</p></div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            );
 
-            case 'CHECKLIST': return (<div className="space-y-4">{STANDARD_CHECKLISTS.map((cl, idx) => (<div key={idx} className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm"><button onClick={() => setActiveChecklist(activeChecklist === cl.category ? null : cl.category)} className="w-full p-5 flex justify-between items-center text-left hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"><span className="font-bold text-sm flex items-center gap-3 text-primary dark:text-white"><div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${activeChecklist === cl.category ? 'bg-green-500 text-white' : 'bg-green-100 text-green-600'}`}><i className="fa-solid fa-list-check"></i></div>{cl.category}</span><i className={`fa-solid fa-chevron-down transition-transform text-slate-400 ${activeChecklist === cl.category ? 'rotate-180' : ''}`}></i></button>{activeChecklist === cl.category && (<div className="p-5 pt-0 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/30 animate-in slide-in-from-top-2">{cl.items.map((item, i) => (<label key={i} className="flex items-start gap-3 py-3 cursor-pointer border-b border-dashed border-slate-200 dark:border-slate-700 last:border-0 hover:bg-white/50 rounded-lg px-2 transition-colors"><input type="checkbox" className="mt-1 rounded border-slate-300 text-secondary focus:ring-secondary w-5 h-5" /><span className="text-sm text-slate-600 dark:text-slate-300 leading-tight">{item}</span></label>))}</div>)}</div>))}</div>);
+            case 'CHECKLIST': return (
+                <div className="space-y-4">
+                    {STANDARD_CHECKLISTS.map((cl, idx) => (
+                        <div key={idx} className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
+                            <button onClick={() => setActiveChecklist(activeChecklist === cl.category ? null : cl.category)} className="w-full p-5 flex justify-between items-center text-left hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+                                <span className="font-bold text-sm flex items-center gap-3 text-primary dark:text-white"><div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${activeChecklist === cl.category ? 'bg-green-500 text-white' : 'bg-green-100 text-green-600'}`}><i className="fa-solid fa-list-check"></i></div>{cl.category}</span>
+                                <i className={`fa-solid fa-chevron-down transition-transform text-slate-400 ${activeChecklist === cl.category ? 'rotate-180' : ''}`}></i>
+                            </button>
+                            {activeChecklist === cl.category && (
+                                <div className="p-5 pt-0 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/30 animate-in slide-in-from-top-2">
+                                    {cl.items.map((item, i) => (
+                                        <label key={i} className="flex items-start gap-3 py-3 cursor-pointer border-b border-dashed border-slate-200 dark:border-slate-700 last:border-0 hover:bg-white/50 rounded-lg px-2 transition-colors">
+                                            <input type="checkbox" className="mt-1 rounded border-slate-300 text-secondary focus:ring-secondary w-5 h-5" />
+                                            <span className="text-sm text-slate-600 dark:text-slate-300 leading-tight">{item}</span>
+                                        </label>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            );
 
-            case 'PROJECTS': return (<div className="space-y-6"><label className="block w-full py-8 border-2 border-dashed border-teal-300 bg-teal-50 rounded-2xl cursor-pointer hover:bg-teal-100 transition-all text-center"><i className="fa-solid fa-file-pdf text-2xl text-teal-400 mb-2"></i><span className="block text-sm font-bold text-teal-600">{uploading ? 'Enviando...' : 'Adicionar PDF/Projeto'}</span><input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'FILE')} disabled={uploading} /></label><div className="space-y-2">{files.map(f => <div key={f.id} className="p-4 bg-white rounded-xl border flex items-center gap-3"><i className="fa-solid fa-file text-slate-400"></i> <span className="text-sm font-bold truncate flex-1">{f.name}</span><a href={f.url} download={f.name}><i className="fa-solid fa-download text-primary"></i></a></div>)}</div></div>);
+            // PROJECTS reuse
+            case 'PROJECTS': return (
+                <div className="space-y-6">
+                    <label className="block w-full py-8 border-2 border-dashed border-teal-300 bg-teal-50 rounded-2xl cursor-pointer hover:bg-teal-100 transition-all text-center">
+                        <i className="fa-solid fa-file-pdf text-2xl text-teal-400 mb-2"></i>
+                        <span className="block text-sm font-bold text-teal-600">{uploading ? 'Enviando...' : 'Adicionar PDF/Projeto'}</span>
+                        <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'FILE')} disabled={uploading} />
+                    </label>
+                    <div className="space-y-2">{files.map(f => <div key={f.id} className="p-4 bg-white rounded-xl border flex items-center gap-3"><i className="fa-solid fa-file text-slate-400"></i> <span className="text-sm font-bold truncate flex-1">{f.name}</span><a href={f.url} download={f.name}><i className="fa-solid fa-download text-primary"></i></a></div>)}</div>
+                </div>
+            );
 
             default: return null;
         }
