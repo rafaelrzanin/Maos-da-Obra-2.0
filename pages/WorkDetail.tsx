@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
@@ -370,10 +371,10 @@ const WorkDetail: React.FC = () => {
 
         if (personMode === 'WORKER') {
             if (personId) await dbService.updateWorker({ ...payload, id: personId, role: personRole });
-            else await dbService.addWorker({ ...payload, role: personRole });
+            else await dbService.addWorker({ ...payload, role: personRole, id: '' });
         } else {
             if (personId) await dbService.updateSupplier({ ...payload, id: personId, category: personRole });
-            else await dbService.addSupplier({ ...payload, category: personRole });
+            else await dbService.addSupplier({ ...payload, category: personRole, id: '' });
         }
         
         await load();
@@ -1365,4 +1366,26 @@ const WorkDetail: React.FC = () => {
 
             {/* CONTRACT VIEWER MODAL */}
             {viewContract && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-lg p-6 shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+                        <div className="flex justify-between items-center mb-4 pb-4 border-b border-slate-100 dark:border-slate-800">
+                            <h3 className="text-xl font-bold text-primary dark:text-white">{viewContract.title}</h3>
+                            <button onClick={() => setViewContract(null)} className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500"><i className="fa-solid fa-xmark"></i></button>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-4 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 mb-4">
+                            <pre className="whitespace-pre-wrap font-mono text-xs text-slate-600 dark:text-slate-300 leading-relaxed">{viewContract.content}</pre>
+                        </div>
+                        <div className="flex gap-3">
+                            <button onClick={() => {navigator.clipboard.writeText(viewContract.content); alert("Copiado!"); setViewContract(null);}} className="flex-1 py-3 bg-slate-100 dark:bg-slate-800 text-primary dark:text-white font-bold rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"><i className="fa-regular fa-copy mr-2"></i> Copiar</button>
+                            <button onClick={() => {const blob = new Blob([viewContract.content], {type: "application/msword"}); const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = `${viewContract.title}.doc`; link.click();}} className="flex-1 py-3 bg-primary text-white font-bold rounded-xl hover:bg-primary-light transition-colors"><i className="fa-solid fa-download mr-2"></i> Baixar Word</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            <ZeModal isOpen={zeModal.isOpen} title={zeModal.title} message={zeModal.message} onConfirm={zeModal.onConfirm} onCancel={() => setZeModal(prev => ({ ...prev, isOpen: false }))} />
+        </div>
+    );
+};
+
+export default WorkDetail;
