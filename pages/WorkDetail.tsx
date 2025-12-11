@@ -396,6 +396,8 @@ const WorkDetail: React.FC = () => {
             notes: personNotes
         };
 
+        // Note: passing 'temp-id' to satisfy TS Worker/Supplier interface.
+        // dbService overwrites this ID with a unique one upon creation.
         if (personMode === 'WORKER') {
             if (personId) await dbService.updateWorker({ ...payload, id: personId, role: personRole });
             else await dbService.addWorker({ ...payload, role: personRole, id: 'temp-id' });
@@ -808,7 +810,7 @@ const WorkDetail: React.FC = () => {
         return null;
     };
 
-    // --- RENDER SUBVIEW ---
+    // ... (Mantendo renderSubViewContent inalterado) ...
     const renderSubViewContent = () => {
         switch(subView) {
             case 'TEAM': return (
@@ -824,7 +826,6 @@ const WorkDetail: React.FC = () => {
                         {workers.map(w => (
                             <div key={w.id} className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm flex items-center justify-between">
                                 <div className="flex items-center gap-4 cursor-pointer flex-1" onClick={() => openPersonModal('WORKER', w)}>
-                                    {/* FIXED ICON: HELMET */}
                                     <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 text-xl"><i className="fa-solid fa-helmet-safety"></i></div>
                                     <div><h4 className="font-bold text-primary dark:text-white">{w.name}</h4><p className="text-xs text-slate-500 font-bold">{w.role}</p></div>
                                 </div>
@@ -846,7 +847,6 @@ const WorkDetail: React.FC = () => {
                     </div>
                 </div>
             );
-
             case 'SUPPLIERS': return (
                 <div className="space-y-6">
                     <div className="bg-amber-50 dark:bg-amber-900/20 p-6 rounded-3xl border border-amber-100 dark:border-amber-900 mb-2">
@@ -881,7 +881,7 @@ const WorkDetail: React.FC = () => {
                     </div>
                 </div>
             );
-
+            // ... (Rest of switch cases from previous file content) ...
             case 'REPORTS': return (
                 <div className="space-y-6">
                     {/* Filter Tabs */}
@@ -1008,7 +1008,6 @@ const WorkDetail: React.FC = () => {
                     `}</style>
                 </div>
             );
-
             case 'PHOTOS': return (
                 <div className="space-y-6">
                     <label className="block w-full py-8 border-2 border-dashed border-pink-300 bg-pink-50 rounded-2xl cursor-pointer hover:bg-pink-100 transition-all text-center">
@@ -1028,7 +1027,6 @@ const WorkDetail: React.FC = () => {
                     </div>
                 </div>
             );
-
             case 'CALCULATORS': return (
                 <div className="space-y-6">
                     <div className="grid grid-cols-3 gap-2">
@@ -1054,8 +1052,6 @@ const WorkDetail: React.FC = () => {
                     </div>
                 </div>
             );
-
-            // Reusing existing components for other subviews to save space, but ensuring they are rendered
             case 'BONUS_IA': return (
                 <div className="flex flex-col items-center justify-center min-h-[70vh] p-6 text-center animate-in fade-in">
                     <div className="w-full max-w-sm bg-gradient-to-br from-slate-900 to-slate-950 rounded-[2.5rem] p-8 shadow-2xl relative overflow-hidden border border-slate-800 group">
@@ -1077,7 +1073,6 @@ const WorkDetail: React.FC = () => {
                     </div>
                 </div>
             );
-
             case 'BONUS_IA_CHAT': 
                 if (!isPremium) return null;
                 return (
@@ -1100,7 +1095,6 @@ const WorkDetail: React.FC = () => {
                     </div>
                 </div>
             );
-
             case 'CONTRACTS': return (
                 <div className="space-y-4">
                     {CONTRACT_TEMPLATES.map(ct => (
@@ -1113,7 +1107,6 @@ const WorkDetail: React.FC = () => {
                     ))}
                 </div>
             );
-
             case 'CHECKLIST': return (
                 <div className="space-y-4">
                     {STANDARD_CHECKLISTS.map((cl, idx) => (
@@ -1136,8 +1129,6 @@ const WorkDetail: React.FC = () => {
                     ))}
                 </div>
             );
-
-            // PROJECTS reuse
             case 'PROJECTS': return (
                 <div className="space-y-6">
                     <label className="block w-full py-8 border-2 border-dashed border-teal-300 bg-teal-50 rounded-2xl cursor-pointer hover:bg-teal-100 transition-all text-center">
@@ -1148,7 +1139,6 @@ const WorkDetail: React.FC = () => {
                     <div className="space-y-2">{files.map(f => <div key={f.id} className="p-4 bg-white rounded-xl border flex items-center gap-3"><i className="fa-solid fa-file text-slate-400"></i> <span className="text-sm font-bold truncate flex-1">{f.name}</span><a href={f.url} download={f.name}><i className="fa-solid fa-download text-primary"></i></a></div>)}</div>
                 </div>
             );
-
             default: return null;
         }
     };
@@ -1307,7 +1297,7 @@ const WorkDetail: React.FC = () => {
             {/* EXPENSE MODAL (ADD / EDIT) */}
             {expenseModal.isOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
-                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-6 shadow-2xl">
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-6 shadow-2xl overflow-hidden">
                         <div className="flex justify-between items-center mb-4">
                             <h3 className="text-xl font-bold text-primary dark:text-white">
                                 {expenseModal.mode === 'ADD' ? 'Novo Gasto' : 'Editar Gasto'}
@@ -1319,29 +1309,88 @@ const WorkDetail: React.FC = () => {
                             )}
                         </div>
                         <form onSubmit={handleSaveExpense} className="space-y-4">
-                            <input placeholder="Descrição (ex: Pagamento Pedreiro)" value={expDesc} onChange={e => setExpDesc(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required />
                             
-                            <div className="grid grid-cols-2 gap-2">
-                                <div className="relative">
-                                    <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Valor Pago Agora</label>
-                                    <div className="relative">
-                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">R$</span>
-                                        <input type="number" placeholder="0.00" value={expAmount} onChange={e => setExpAmount(e.target.value)} className="w-full pl-10 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required />
+                            {/* 1. DESCRIPTION (Auto-search key) */}
+                            <div>
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Descrição / Nome do Prestador</label>
+                                <input 
+                                    placeholder="Ex: Pedreiro Zé" 
+                                    value={expDesc} 
+                                    onChange={e => setExpDesc(e.target.value)} 
+                                    className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold text-primary dark:text-white focus:border-secondary focus:ring-1 focus:ring-secondary outline-none transition-all" 
+                                    required 
+                                />
+                            </div>
+                            
+                            {/* 2. CUMULATIVE SECTION */}
+                            <div className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-2xl border border-slate-100 dark:border-slate-800 space-y-3">
+                                <div className="grid grid-cols-2 gap-3">
+                                    {/* Total Agreed - Editable */}
+                                    <div>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Total Combinado</label>
+                                        <div className="relative">
+                                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">R$</span>
+                                            <input 
+                                                type="number" 
+                                                placeholder="0.00" 
+                                                value={expTotalAgreed} 
+                                                onChange={e => setExpTotalAgreed(e.target.value)} 
+                                                className="w-full pl-9 p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 font-bold text-sm" 
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Already Paid - LOCKED / READ ONLY */}
+                                    <div>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-1">
+                                            <i className="fa-solid fa-lock text-[8px]"></i> Já Pago (Histórico)
+                                        </label>
+                                        <div className="relative opacity-70">
+                                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-bold">R$</span>
+                                            <input 
+                                                readOnly
+                                                value={paymentHistory.totalPaid.toFixed(2)}
+                                                className="w-full pl-9 p-2.5 bg-slate-200 dark:bg-slate-800 rounded-xl border border-slate-300 dark:border-slate-700 font-bold text-slate-600 dark:text-slate-400 text-sm cursor-not-allowed" 
+                                            />
+                                        </div>
                                     </div>
                                 </div>
-                                <div className="relative">
-                                    <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Total Combinado</label>
+
+                                {/* Current Payment - Main Input */}
+                                <div>
+                                    <label className="text-[10px] font-black text-green-600 dark:text-green-400 uppercase tracking-widest ml-1">Valor Pagamento Atual</label>
                                     <div className="relative">
-                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">R$</span>
-                                        <input type="number" placeholder="(Opcional)" value={expTotalAgreed} onChange={e => setExpTotalAgreed(e.target.value)} className="w-full pl-10 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" />
+                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-green-600 dark:text-green-400 font-bold text-lg">R$</span>
+                                        <input 
+                                            type="number" 
+                                            placeholder="0.00" 
+                                            value={expAmount} 
+                                            onChange={e => setExpAmount(e.target.value)} 
+                                            className="w-full pl-10 p-3 bg-green-50 dark:bg-green-900/10 rounded-xl border-2 border-green-200 dark:border-green-800 font-black text-xl text-green-700 dark:text-green-400 focus:outline-none focus:border-green-500" 
+                                            required 
+                                        />
                                     </div>
                                 </div>
+
+                                {/* Remaining Calculation Feedback */}
+                                {expTotalAgreed && Number(expTotalAgreed) > 0 && (
+                                    <div className="flex justify-between items-center px-2 pt-1 border-t border-slate-200 dark:border-slate-700/50">
+                                        <span className="text-xs font-bold text-slate-400 uppercase">Restante a Pagar</span>
+                                        <span className={`text-sm font-black ${
+                                            (Number(expTotalAgreed) - (paymentHistory.totalPaid + Number(expAmount))) < 0 
+                                            ? 'text-red-500' 
+                                            : 'text-slate-600 dark:text-slate-300'
+                                        }`}>
+                                            R$ {(Number(expTotalAgreed) - (paymentHistory.totalPaid + Number(expAmount))).toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                                        </span>
+                                    </div>
+                                )}
                             </div>
 
                             <div className="grid grid-cols-2 gap-2">
                                 <div>
-                                    <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Categoria</label>
-                                    <select value={expCategory} onChange={e => setExpCategory(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
+                                    <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Categoria</label>
+                                    <select value={expCategory} onChange={e => setExpCategory(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-sm font-bold">
                                         <option value={ExpenseCategory.LABOR}>Mão de Obra</option>
                                         <option value={ExpenseCategory.MATERIAL}>Material</option>
                                         <option value={ExpenseCategory.PERMITS}>Taxas</option>
@@ -1349,14 +1398,13 @@ const WorkDetail: React.FC = () => {
                                     </select>
                                 </div>
                                 <div>
-                                    <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Data</label>
-                                    <input type="date" value={expDate} onChange={e => setExpDate(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required />
+                                    <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Data</label>
+                                    <input type="date" value={expDate} onChange={e => setExpDate(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-sm font-bold" required />
                                 </div>
                             </div>
                             
-                            {/* STEP SELECTION - ENSURING VISIBILITY */}
                             <div>
-                                <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Etapa Relacionada</label>
+                                <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Etapa Relacionada</label>
                                 <select value={expStepId} onChange={e => setExpStepId(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold text-sm">
                                     <option value="">Sem Etapa (Geral)</option>
                                     {steps.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
@@ -1364,8 +1412,8 @@ const WorkDetail: React.FC = () => {
                             </div>
 
                             <div className="flex gap-2 pt-2">
-                                <button type="button" onClick={() => setExpenseModal({isOpen: false, mode: 'ADD'})} className="flex-1 bg-slate-100 py-3 rounded-xl font-bold">Cancelar</button>
-                                <button type="submit" className="flex-1 bg-primary text-white py-3 rounded-xl font-bold">Salvar</button>
+                                <button type="button" onClick={() => setExpenseModal({isOpen: false, mode: 'ADD'})} className="flex-1 bg-slate-100 dark:bg-slate-800 py-3 rounded-xl font-bold text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">Cancelar</button>
+                                <button type="submit" className="flex-1 bg-primary text-white py-3 rounded-xl font-bold shadow-lg hover:bg-slate-800 transition-colors">Salvar Gasto</button>
                             </div>
                         </form>
                     </div>
