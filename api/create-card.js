@@ -1,3 +1,14 @@
+// NO TOPO de /api/create-card.ts
+// 1. IMPORTAÇÃO E INICIALIZAÇÃO DO SUPABASE
+import { createClient } from '@supabase/supabase-js'; 
+
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY; // Chave de serviço Admin
+const supabase = SUPABASE_URL && SUPABASE_SERVICE_KEY 
+    ? createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+    : null;
+
+
 export default async function handler(req, res) {
   // 1. Configuração de Segurança (CORS) - MANTIDA
   res.setHeader('Access-Control-Allow-Credentials', true);
@@ -20,8 +31,12 @@ export default async function handler(req, res) {
     const publicKey = process.env.NEON_PUBLIC_KEY;
     const secretKey = process.env.NEON_SECRET_KEY;
 
+    // Garante que o Supabase e as chaves Neon estejam configuradas
+    if (!supabase) {
+        return res.status(500).json({ erro: "DB_CONFIG_ERROR", mensagem: "Chaves do Supabase (URL/KEY) não configuradas no servidor." });
+    }
     if (!publicKey || !secretKey) {
-        return res.status(500).json({ erro: "CONFIG_ERROR", mensagem: "Chaves de API não configuradas." });
+        return res.status(500).json({ erro: "CONFIG_ERROR", mensagem: "Chaves de API (NEON_PUBLIC_KEY ou NEON_SECRET_KEY) não configuradas." });
     }
     
     const API_BASE_URL = process.env.NEON_API_BASE_URL || 'https://app.neonpay.com.br/api/v1';
@@ -43,7 +58,6 @@ export default async function handler(req, res) {
     // 3. Define se é Assinatura ou Pagamento Único
     const isSubscription = planType.toUpperCase() !== 'VITALICIO';
     
-    // Endpoints baseados na documentação da Neon Pay
     const subEndpoint = isSubscription ? '/gateway/card/subscription' : '/gateway/card/receive';
     
     console.log(`--> [CARTÃO] Modo: ${isSubscription ? 'ASSINATURA' : 'PAGAMENTO ÚNICO'}`);
@@ -60,7 +74,7 @@ export default async function handler(req, res) {
         .substring(0, 60);
 
     // 4. Monta o Payload (Dados)
-    let payload: any = { // Adicionado 'any' para flexibilidade de tipagem
+    let payload: any = { 
         identifier: body.identifier || `txn_${Date.now()}`,
         amount: numericAmount, 
         clientIp: req.headers['x-forwarded-for'] || "127.0.0.1",
@@ -71,17 +85,16 @@ export default async function handler(req, res) {
             document: client.document, 
             address: { 
                 country: "BR",
-                state: "SP", // Sugestão: Capturar o estado do front-end
-                city: "São Paulo", // Sugestão: Capturar a cidade do front-end
+                state: "SP", 
+                city: "São Paulo", 
                 neighborhood: "Centro", 
                 zipCode: "01001-000",
                 street: "Rua Digital",
                 number: "100"
             }
         },
-        // --- NÓ CRÍTICO DE MÉTODO DE PAGAMENTO ---
         paymentMethod: { 
-            type: "card", // Informa explicitamente o tipo de pagamento
+            type: "card", 
             card: {
                 number: card.number.replace(/\s/g, ''),
                 owner: cleanOwnerName, 
@@ -89,26 +102,23 @@ export default async function handler(req, res) {
                 cvv: card.cvv
             }
         }
-        // ------------------------------------------
     };
 
-    // Ajustes específicos para Assinatura (Subscription)
+    // Ajustes de Assinatura/Produto
     if (isSubscription) {
         payload.subscription = {
             periodicityType: "MONTHS",
             periodicity: planType.toUpperCase() === 'SEMESTRAL' ? 6 : 1, 
             firstChargeIn: 0 
         };
-        // Neon Pay exige produtos para Assinaturas
         payload.products = [{
             id: planType.toLowerCase(),
             name: `Plano ${planType}`,
             quantity: 1,
             price: numericAmount
         }];
-
     } else {
-        // Ajustes específicos para Pagamento Único (Vitalício)
+        // Pagamento Único (Vitalício)
         payload.installments = parseInt(installments || 1);
         payload.products = [
             {
@@ -120,13 +130,10 @@ export default async function handler(req, res) {
         ];
     }
 
-    // Loga o payload que está sendo enviado (sem os dados sensíveis do cartão)
-    const logPayload = { ...payload, card: { number: card.number.substring(0, 4) + '****', owner: cleanOwnerName, expiresAt: expiresAtFormatado, cvv: '***' } };
+    const logPayload = { ...payload, paymentMethod: { type: 'card', card: { number: card.number.substring(0, 4) + '****', cvv: '***' } } };
     console.log("--> [CARTÃO] Payload sendo enviado (Debug):", JSON.stringify(logPayload, null, 2));
 
-    // URL COMPLETA para envio
     const finalUrl = `${API_BASE_URL}${subEndpoint}`;
-    console.log(`--> [CARTÃO] Enviando para: ${finalUrl}`);
 
     let response;
     let rawResponseText = '';
@@ -144,20 +151,13 @@ export default async function handler(req, res) {
             body: JSON.stringify(payload)
         });
         
-        // Tenta ler a resposta como texto primeiro
         rawResponseText = await response.text();
         data = JSON.parse(rawResponseText);
 
     } catch (fetchError) {
-        // Tratamento de erros de comunicação (ENOTFOUND, URL, etc.)
-        if (rawResponseText.startsWith('<')) {
-            console.error("--> [CARTÃO] ERRO CRÍTICO HTML/URL.");
-            return res.status(500).json({ 
-                erro: "API_URL_ERROR", 
-                mensagem: "Falha na comunicação com o gateway de pagamento. A URL base da Neon pode estar incorreta." 
-            });
-        }
-        throw fetchError;
+        // Tratamento de erro de comunicação
+        console.error("--> [CARTÃO] Erro de rede/JSON:", fetchError);
+        return res.status(500).json({ erro: "API_COMM_ERROR", mensagem: "Falha na comunicação com o servidor Neon Pay." });
     }
 
 
@@ -171,6 +171,54 @@ export default async function handler(req, res) {
             detalhes: data
         });
     }
+
+    // -----------------------------------------------------------
+    // NOVO BLOCO CRÍTICO: SINCRONIZAÇÃO COM SUPABASE (Após Sucesso)
+    // -----------------------------------------------------------
+    try {
+        const clientEmail = client.email; 
+        const neonTxnId = data.transactionId; // ID da transação Neon Pay
+
+        // Payload de atualização do perfil
+        const updateData = {
+            plan_status: 'ACTIVE', 
+            plan_type: planType.toUpperCase(), 
+            neon_txn_id: neonTxnId,
+            updated_at: new Date().toISOString()
+        };
+
+        // 1. Tenta atualizar o perfil existente (Se o usuário já estiver na tabela profiles)
+        const { error: updateError, data: updatedProfile } = await supabase
+            .from('profiles')
+            .update(updateData)
+            .eq('email', clientEmail)
+            .select();
+
+        if (updateError || !updatedProfile || updatedProfile.length === 0) {
+             // 2. Se a atualização falhar ou não encontrar, tenta criar um novo perfil (Fallback)
+             console.log(`[SUPABASE] Perfil não encontrado. Tentando criar para ${clientEmail}.`);
+             const { error: insertError } = await supabase.from('profiles').insert([
+                 { 
+                     email: clientEmail, 
+                     name: client.name,
+                     cpf: client.document,
+                     ...updateData // Inclui os dados do plano
+                 }
+             ]);
+
+             if (insertError) {
+                 console.error("--> [SUPABASE] ERRO CRÍTICO ao INSERIR perfil:", insertError);
+                 // Não lançamos erro aqui, pois o cliente já pagou.
+             }
+        }
+        
+        console.log(`--> [SUPABASE] Perfil de ${clientEmail} sincronizado com ACTIVE.`);
+        
+    } catch (dbError) {
+        console.error("--> [CARTÃO] ERRO: Falha catastrófica ao sincronizar perfil Supabase:", dbError);
+    }
+    // -----------------------------------------------------------
+
 
     console.log("--> [CARTÃO] Sucesso! ID:", data.transactionId);
     return res.status(200).json(data);
