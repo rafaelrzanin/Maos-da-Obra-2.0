@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
@@ -63,6 +64,7 @@ const WorkDetail: React.FC = () => {
     const [addExpenseModal, setAddExpenseModal] = useState(false);
     const [expDesc, setExpDesc] = useState('');
     const [expAmount, setExpAmount] = useState('');
+    const [expTotalAgreed, setExpTotalAgreed] = useState(''); // Novo: Valor Total do Contrato
     const [expCategory, setExpCategory] = useState('Mão de Obra');
     const [expStepId, setExpStepId] = useState('');
 
@@ -211,7 +213,7 @@ const WorkDetail: React.FC = () => {
                 name: newMatName,
                 brand: newMatBrand,
                 plannedQty: Number(newMatQty),
-                purchasedQty: 0, // Será atualizado dentro do serviço se purchaseDetails existir
+                purchasedQty: 0, 
                 unit: newMatUnit,
                 stepId: newMatStepId,
                 category: 'Geral'
@@ -234,12 +236,13 @@ const WorkDetail: React.FC = () => {
                 workId: work.id,
                 description: expDesc,
                 amount: Number(expAmount),
+                totalAgreed: expTotalAgreed ? Number(expTotalAgreed) : undefined, // Salva o total combinado se existir
                 date: new Date().toISOString(),
                 category: expCategory,
                 stepId: expStepId
             });
             setAddExpenseModal(false);
-            setExpDesc(''); setExpAmount(''); setExpStepId('');
+            setExpDesc(''); setExpAmount(''); setExpStepId(''); setExpTotalAgreed('');
             load();
         }
     };
@@ -524,8 +527,10 @@ const WorkDetail: React.FC = () => {
                                         )}
 
                                         {stepMaterials.map(mat => {
-                                            const progress = Math.min(100, (mat.purchasedQty / mat.plannedQty) * 100);
-                                            const isComplete = mat.purchasedQty >= mat.plannedQty;
+                                            const hasPlanned = mat.plannedQty > 0;
+                                            const progress = hasPlanned ? Math.min(100, (mat.purchasedQty / mat.plannedQty) * 100) : 0;
+                                            // Lógica defensiva: Só completa se tiver planejado > 0 E comprado >= planejado
+                                            const isComplete = hasPlanned && mat.purchasedQty >= mat.plannedQty;
                                             
                                             let borderColor = 'border-slate-100 dark:border-slate-800';
                                             let statusBadge = <span className="text-[10px] font-bold px-2 py-0.5 rounded uppercase bg-slate-100 text-slate-500">Pendente</span>;
@@ -533,6 +538,10 @@ const WorkDetail: React.FC = () => {
                                             if (isComplete) {
                                                 borderColor = 'border-green-200 dark:border-green-900/30';
                                                 statusBadge = <span className="text-[10px] font-bold px-2 py-0.5 rounded uppercase bg-green-100 text-green-700">OK</span>;
+                                            } else if (!hasPlanned && mat.purchasedQty > 0) {
+                                                // Caso comprou algo que era 0 planejado
+                                                borderColor = 'border-blue-200 dark:border-blue-900/30';
+                                                statusBadge = <span className="text-[10px] font-bold px-2 py-0.5 rounded uppercase bg-blue-100 text-blue-700">Extra</span>;
                                             }
 
                                             return (
@@ -615,17 +624,27 @@ const WorkDetail: React.FC = () => {
                                         )}
 
                                         {stepExpenses.map(exp => (
-                                            <div key={exp.id} className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 flex items-center justify-between shadow-sm">
-                                                <div className="flex items-center gap-4">
-                                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${exp.category === 'Material' ? 'bg-amber-100 text-amber-600' : 'bg-blue-100 text-blue-600'}`}>
-                                                        <i className={`fa-solid ${exp.category === 'Material' ? 'fa-box' : 'fa-helmet-safety'}`}></i>
+                                            <div key={exp.id} className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm">
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <div className="flex items-center gap-4">
+                                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${exp.category === 'Material' ? 'bg-amber-100 text-amber-600' : 'bg-blue-100 text-blue-600'}`}>
+                                                            <i className={`fa-solid ${exp.category === 'Material' ? 'fa-box' : 'fa-helmet-safety'}`}></i>
+                                                        </div>
+                                                        <div>
+                                                            <p className="font-bold text-primary dark:text-white text-sm">{exp.description}</p>
+                                                            <p className="text-[10px] text-slate-400 uppercase tracking-wide">{new Date(exp.date).toLocaleDateString()} • {exp.category}</p>
+                                                        </div>
                                                     </div>
-                                                    <div>
-                                                        <p className="font-bold text-primary dark:text-white text-sm">{exp.description}</p>
-                                                        <p className="text-[10px] text-slate-400 uppercase tracking-wide">{new Date(exp.date).toLocaleDateString()} • {exp.category}</p>
-                                                    </div>
+                                                    <span className="font-bold text-primary dark:text-white">- R$ {Number(exp.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                                                 </div>
-                                                <span className="font-bold text-primary dark:text-white">- R$ {Number(exp.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                                
+                                                {/* Show partial payment context if applicable */}
+                                                {exp.totalAgreed && exp.totalAgreed > exp.amount && (
+                                                    <div className="mt-2 ml-14 bg-slate-50 dark:bg-slate-800 rounded-lg p-2 text-xs text-slate-500 flex justify-between items-center">
+                                                        <span>Ref. Contrato: R$ {exp.totalAgreed.toLocaleString('pt-BR')}</span>
+                                                        <span className="font-bold text-amber-600">Restante: R$ {(exp.totalAgreed - exp.amount).toLocaleString('pt-BR')}</span>
+                                                    </div>
+                                                )}
                                             </div>
                                         ))}
                                     </div>
@@ -792,7 +811,7 @@ const WorkDetail: React.FC = () => {
                 </div>
             )}
 
-            {/* ADD EXPENSE MODAL (FINANCIAL) */}
+            {/* ADD EXPENSE MODAL (FINANCIAL) - UPDATED FOR LABOR LOGIC */}
             {addExpenseModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
                     <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-6 shadow-2xl">
@@ -804,14 +823,6 @@ const WorkDetail: React.FC = () => {
                              </div>
                          </div>
                          <form onSubmit={handleAddExpense} className="space-y-4">
-                            <div>
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Descrição</label>
-                                <input required className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold" placeholder="Ex: Diária Pedreiro João" value={expDesc} onChange={e => setExpDesc(e.target.value)} />
-                            </div>
-                            <div>
-                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Valor (R$)</label>
-                                <input required type="number" step="0.01" className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold text-lg" placeholder="0,00" value={expAmount} onChange={e => setExpAmount(e.target.value)} />
-                            </div>
                              <div>
                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Categoria</label>
                                 <select required className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold text-sm" value={expCategory} onChange={e => setExpCategory(e.target.value)}>
@@ -821,6 +832,40 @@ const WorkDetail: React.FC = () => {
                                     <option value="Material">Material (Avulso)</option>
                                 </select>
                             </div>
+                            
+                            {expCategory === 'Mão de Obra' ? (
+                                <div className="p-4 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-3">
+                                    <div>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Descrição</label>
+                                        <input required className="w-full p-2 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700 font-bold" placeholder="Ex: Pagamento Pedreiro João" value={expDesc} onChange={e => setExpDesc(e.target.value)} />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Valor Total Combinado (R$)</label>
+                                        <input required type="number" step="0.01" className="w-full p-2 bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700 font-bold" placeholder="30000" value={expTotalAgreed} onChange={e => setExpTotalAgreed(e.target.value)} />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Valor a Pagar Agora (R$)</label>
+                                        <input required type="number" step="0.01" className="w-full p-2 bg-white dark:bg-slate-900 rounded-lg border-2 border-green-200 dark:border-green-900 text-green-700 dark:text-green-400 font-bold text-lg" placeholder="5000" value={expAmount} onChange={e => setExpAmount(e.target.value)} />
+                                    </div>
+                                    {expTotalAgreed && expAmount && (
+                                        <div className="text-right text-xs font-bold text-slate-500">
+                                            Restante a pagar: <span className="text-primary dark:text-white">R$ {(Number(expTotalAgreed) - Number(expAmount)).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (
+                                <>
+                                    <div>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Descrição</label>
+                                        <input required className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold" placeholder="Ex: Taxa Prefeitura" value={expDesc} onChange={e => setExpDesc(e.target.value)} />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Valor (R$)</label>
+                                        <input required type="number" step="0.01" className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold text-lg" placeholder="0,00" value={expAmount} onChange={e => setExpAmount(e.target.value)} />
+                                    </div>
+                                </>
+                            )}
+
                             <div>
                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Vincular à Etapa</label>
                                 <select required className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold text-sm" value={expStepId} onChange={e => setExpStepId(e.target.value)}>
