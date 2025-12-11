@@ -6,13 +6,34 @@ import { FULL_MATERIAL_PACKAGES, WORK_TEMPLATES } from './standards';
 const STORAGE_KEY = 'maos_db_v1';
 
 const getLocalDb = () => {
-    const s = localStorage.getItem(STORAGE_KEY);
-    const db = s ? JSON.parse(s) : { users: [], works: [], steps: [], materials: [], expenses: [], workers: [], suppliers: [], notifications: [], photos: [], files: [] };
+    let db;
+    try {
+        const s = localStorage.getItem(STORAGE_KEY);
+        db = s ? JSON.parse(s) : null;
+    } catch (e) {
+        console.error("Erro ao ler DB local, resetando...", e);
+        db = null;
+    }
+
+    // Inicialização segura de estrutura
+    if (!db) db = {};
+    if (!Array.isArray(db.users)) db.users = [];
+    if (!Array.isArray(db.works)) db.works = [];
+    if (!Array.isArray(db.steps)) db.steps = [];
+    if (!Array.isArray(db.materials)) db.materials = [];
+    if (!Array.isArray(db.expenses)) db.expenses = [];
+    if (!Array.isArray(db.workers)) db.workers = [];
+    if (!Array.isArray(db.suppliers)) db.suppliers = [];
+    if (!Array.isArray(db.notifications)) db.notifications = [];
+    if (!Array.isArray(db.photos)) db.photos = [];
+    if (!Array.isArray(db.files)) db.files = [];
 
     // --- AUTO-SEED TEST USER (VITALICIO) ---
-    // Cria automaticamente um usuário de teste se não existir
     const testEmail = 'teste@maosdaobra.app';
-    if (!db.users.find((u: User) => u.email === testEmail)) {
+    const hasUser = db.users.find((u: User) => u.email.toLowerCase() === testEmail.toLowerCase());
+    
+    if (!hasUser) {
+        console.log("Criando usuário de teste automático...");
         const testUser: User = {
             id: 'user_test_vitalicio',
             name: 'Usuário Teste (Vitalício)',
@@ -34,8 +55,12 @@ const saveLocalDb = (data: any) => localStorage.setItem(STORAGE_KEY, JSON.string
 
 export const dbService = {
   getCurrentUser: (): User | null => {
-      const u = localStorage.getItem('maos_user');
-      return u ? JSON.parse(u) : null;
+      try {
+          const u = localStorage.getItem('maos_user');
+          return u ? JSON.parse(u) : null;
+      } catch {
+          return null;
+      }
   },
   
   isSubscriptionActive: (user: User): boolean => {
@@ -45,6 +70,9 @@ export const dbService = {
   },
 
   syncSession: async () => {
+      // Force Seed check on startup
+      getLocalDb(); 
+      
       if (supabase) {
           const { data: { session: _session } } = await supabase.auth.getSession();
       }
@@ -63,9 +91,17 @@ export const dbService = {
 
   login: async (email: string, _password?: string): Promise<User | null> => {
       const db = getLocalDb();
-      // Case insensitive check
+      // Case insensitive check robusto
       const user = db.users.find((u: User) => u.email.trim().toLowerCase() === email.trim().toLowerCase());
+      
       if (user) {
+          // Atualiza plano se for o usuário de teste para garantir acesso
+          if (user.email === 'teste@maosdaobra.app' && user.plan !== PlanType.VITALICIO) {
+              user.plan = PlanType.VITALICIO;
+              user.subscriptionExpiresAt = '2099-12-31T23:59:59.000Z';
+              saveLocalDb(db);
+          }
+
           localStorage.setItem('maos_user', JSON.stringify(user));
           return user;
       }
@@ -74,7 +110,6 @@ export const dbService = {
 
   signup: async (name: string, email: string, whatsapp: string, _password?: string, cpf?: string, plan?: string | null): Promise<User | null> => {
       const db = getLocalDb();
-      // Check if exists first to avoid duplicates
       const existing = db.users.find((u: User) => u.email.trim().toLowerCase() === email.trim().toLowerCase());
       if (existing) return null;
 
@@ -94,12 +129,9 @@ export const dbService = {
   },
 
   resetPassword: async (email: string): Promise<boolean> => {
-      // Simulate API call delay
       await new Promise(r => setTimeout(r, 1500));
       const db = getLocalDb();
       const user = db.users.find((u: User) => u.email.trim().toLowerCase() === email.trim().toLowerCase());
-      // In a real app we would send an email here. 
-      // For MVP/Local, we return true if user exists to simulate success.
       return !!user;
   },
 
@@ -128,8 +160,7 @@ export const dbService = {
   },
 
   loginSocial: async (_provider: string) => { 
-      // MOCK GOOGLE LOGIN IMPLEMENTATION
-      await new Promise(r => setTimeout(r, 1500)); // Simulate network
+      await new Promise(r => setTimeout(r, 1500)); 
       
       const db = getLocalDb();
       const mockEmail = "usuario.google@exemplo.com";
@@ -198,7 +229,6 @@ export const dbService = {
 
              const newStepId = Math.random().toString(36).substr(2, 9);
 
-             // Criar Etapa
              db.steps.push({
                  id: newStepId,
                  workId: newWork.id,
@@ -209,7 +239,6 @@ export const dbService = {
                  isDelayed: false
              });
 
-             // INTELIGÊNCIA DE MATERIAIS
              const normalize = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
              const stepNorm = normalize(stepName);
 
@@ -508,16 +537,13 @@ export const dbService = {
   },
   addPhoto: async (photo: WorkPhoto) => {
       const db = getLocalDb();
-      if(!db.photos) db.photos = [];
       db.photos.push(photo);
       saveLocalDb(db);
   },
   deletePhoto: async (id: string) => {
       const db = getLocalDb();
-      if(db.photos) {
-          db.photos = db.photos.filter((p: WorkPhoto) => p.id !== id);
-          saveLocalDb(db);
-      }
+      db.photos = db.photos.filter((p: WorkPhoto) => p.id !== id);
+      saveLocalDb(db);
   },
   getFiles: async (workId: string): Promise<WorkFile[]> => {
       const db = getLocalDb();
@@ -525,15 +551,12 @@ export const dbService = {
   },
   addFile: async (file: WorkFile) => {
       const db = getLocalDb();
-      if(!db.files) db.files = [];
       db.files.push(file);
       saveLocalDb(db);
   },
   deleteFile: async (id: string) => {
       const db = getLocalDb();
-      if(db.files) {
-          db.files = db.files.filter((f: WorkFile) => f.id !== id);
-          saveLocalDb(db);
-      }
+      db.files = db.files.filter((f: WorkFile) => f.id !== id);
+      saveLocalDb(db);
   }
 };
