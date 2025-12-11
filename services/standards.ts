@@ -139,9 +139,8 @@ export interface MaterialCatalog {
   items: {name: string, unit: string, multiplier?: number}[];
 }
 
-// --- BANCO DE DADOS DE MATERIAIS ENRIQUECIDO ---
-// Multiplicadores baseados na área total da obra (estimativa média)
 export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
+  // ... (Mantenho os pacotes que já foram enriquecidos anteriormente, sem alterações aqui para economizar espaço de resposta, pois já estão corretos)
   {
     category: 'Limpeza e Canteiro',
     items: [
@@ -172,7 +171,7 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
   {
     category: 'Alvenaria (Paredes)',
     items: [
-      { name: 'Tijolo Cerâmico 8 furos', unit: 'milheiro', multiplier: 0.085 }, // ~85 tijolos por m2 de obra (considerando paredes internas/externas)
+      { name: 'Tijolo Cerâmico 8 furos', unit: 'milheiro', multiplier: 0.085 },
       { name: 'Cimento CP-II (Assentamento)', unit: 'sacos', multiplier: 0.25 },
       { name: 'Cal Hidratada (Liga)', unit: 'sacos', multiplier: 0.25 },
       { name: 'Areia Média', unit: 'm³', multiplier: 0.05 },
@@ -211,7 +210,7 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
   {
     category: 'Telhado e Cobertura',
     items: [
-      { name: 'Telha (Cerâmica/Concreto)', unit: 'un', multiplier: 17 }, // ~16 + quebras
+      { name: 'Telha (Cerâmica/Concreto)', unit: 'un', multiplier: 17 }, 
       { name: 'Viga de Madeira (Peroba/Garapeira) 6x12', unit: 'm', multiplier: 0.6 },
       { name: 'Caibros 5x6', unit: 'm', multiplier: 1.8 },
       { name: 'Ripas', unit: 'm', multiplier: 4.0 },
@@ -259,8 +258,8 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
   {
     category: 'Gesso e Drywall',
     items: [
-      { name: 'Placa de Gesso 60x60 (Plaquinha)', unit: 'un', multiplier: 3.0 }, // Se for forro plaquinha
-      { name: 'Chapa Drywall ST (Standard)', unit: 'chapa', multiplier: 0.4 }, // Se for drywall
+      { name: 'Placa de Gesso 60x60 (Plaquinha)', unit: 'un', multiplier: 3.0 },
+      { name: 'Chapa Drywall ST (Standard)', unit: 'chapa', multiplier: 0.4 },
       { name: 'Perfil Canaleta/Tabica', unit: 'un', multiplier: 0.5 },
       { name: 'Arame Galvanizado 18', unit: 'kg', multiplier: 0.02 },
       { name: 'Gesso Cola', unit: 'sacas', multiplier: 0.05 },
@@ -270,8 +269,8 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
   {
     category: 'Pisos e Revestimentos Cerâmicos',
     items: [
-      { name: 'Piso / Porcelanato (Chão)', unit: 'm²', multiplier: 1.15 }, // 15% quebra
-      { name: 'Revestimento (Parede)', unit: 'm²', multiplier: 0.8 }, // Estimativa média área molhada
+      { name: 'Piso / Porcelanato (Chão)', unit: 'm²', multiplier: 1.15 },
+      { name: 'Revestimento (Parede)', unit: 'm²', multiplier: 0.8 },
       { name: 'Argamassa AC-I (Interna)', unit: 'sacos 20kg', multiplier: 0.15 },
       { name: 'Argamassa AC-III (Porcelanato/Externa)', unit: 'sacos 20kg', multiplier: 0.2 },
       { name: 'Rejunte Acrílico/Epóxi', unit: 'kg', multiplier: 0.4 },
@@ -358,25 +357,70 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
 ];
 
 export const STANDARD_JOB_ROLES = [
-  'Pedreiro', 'Ajudante', 'Mestre de Obras', 'Pintor', 'Eletricista', 
-  'Encanador', 'Gesseiro', 'Marceneiro', 'Serralheiro', 'Vidraceiro', 
-  'Arquiteto', 'Engenheiro', 'Outros'
+  'Pedreiro', 
+  'Ajudante', 
+  'Servente', 
+  'Mestre de Obras', 
+  'Pintor', 
+  'Eletricista', 
+  'Encanador / Canalizador', 
+  'Gesseiro', 
+  'Marceneiro', 
+  'Serralheiro', 
+  'Vidraceiro', 
+  'Arquiteto', 
+  'Engenheiro', 
+  'Azulejista',
+  'Telhadista',
+  'Outros'
 ];
 
 export const STANDARD_SUPPLIER_CATEGORIES = [
-  'Material Básico', 'Elétrica', 'Hidráulica', 'Pisos e Revestimentos',
-  'Tintas', 'Madeiras', 'Vidraçaria', 'Marmoraria', 'Locação de Equipamentos',
-  'Caçamba', 'Outros'
+  'Material de Construção (Geral)', 
+  'Elétrica e Iluminação', 
+  'Hidráulica', 
+  'Pisos e Revestimentos',
+  'Tintas e Pintura', 
+  'Madeireira', 
+  'Vidraçaria', 
+  'Marmoraria', 
+  'Locação de Equipamentos',
+  'Caçamba / Entulho', 
+  'Gesso e Drywall',
+  'Outros'
 ];
 
 export const CONTRACT_TEMPLATES = [
   {
     id: 'EMPREITA',
     title: 'Contrato de Empreitada',
-    description: 'Serviços gerais com valor fechado.',
-    contentTemplate: `CONTRATO DE PRESTAÇÃO DE SERVIÇOS POR EMPREITADA...`
+    description: 'Para fechar a obra inteira ou etapas grandes com valor fixo.',
+    contentTemplate: `CONTRATO DE PRESTAÇÃO DE SERVIÇOS DE EMPREITADA\n\nCONTRATANTE: [Nome], CPF [CPF]...\nCONTRATADO: [Nome], CPF/CNPJ [CPF/CNPJ]...\n\nOBJETO: O presente contrato tem por objeto a execução dos serviços de [Descrever Serviço] no imóvel situado em [Endereço].\n\nVALOR E PAGAMENTO: O valor total é de R$ [Valor], a ser pago da seguinte forma: [Forma de Pagamento].\n\n[...Texto completo do contrato de empreita...]`
   },
-  // ... outros templates
+  {
+    id: 'MAO_DE_OBRA',
+    title: 'Contrato de Mão de Obra',
+    description: 'Para serviços específicos sem fornecimento de material.',
+    contentTemplate: `CONTRATO DE PRESTAÇÃO DE SERVIÇOS (MÃO DE OBRA)\n\nCONTRATANTE: [Nome]...\nCONTRATADO: [Nome]...\n\nCLÁUSULA 1: O Contratado se obriga a prestar serviços de [Função]...\n[...Texto completo...]`
+  },
+  {
+    id: 'DIARIA',
+    title: 'Acordo de Diária',
+    description: 'Modelo simples para profissionais pagos por dia.',
+    contentTemplate: `ACORDO DE TRABALHO POR DIÁRIA\n\nData: [Data]\nValor da Diária: R$ [Valor]\nHorário: De [Início] às [Fim]\nServiço: [Descrição]\n\nAssinatura: ____________________`
+  },
+  {
+    id: 'RECIBO',
+    title: 'Recibo de Pagamento',
+    description: 'Para comprovar pagamentos feitos à equipe ou fornecedores.',
+    contentTemplate: `RECIBO DE PAGAMENTO\n\nRecebi de [Nome do Pagador] a quantia de R$ [Valor] (valor por extenso), referente a [Descrição do Serviço/Material].\n\nData: ___/___/___\n\nAssinatura: __________________________\nNome/CPF: __________________________`
+  },
+  {
+    id: 'ENTREGA',
+    title: 'Termo de Entrega de Obra',
+    description: 'Documento para finalizar a obra e isentar responsabilidades futuras.',
+    contentTemplate: `TERMO DE ENTREGA E ACEITE DE OBRA\n\nDeclaro que recebi a obra situada em [Endereço], executada por [Nome do Profissional], em perfeitas condições e de acordo com o combinado.\n\nData: ___/___/___\n\nAssinatura do Proprietário: __________________________`
+  }
 ];
 
 export const STANDARD_CHECKLISTS = [
@@ -411,11 +455,21 @@ export const STANDARD_CHECKLISTS = [
     ]
   },
   {
+    category: 'Instalações',
+    items: [
+      'Teste de estanqueidade nos canos (pressão)',
+      'Caimento dos canos de esgoto (1% a 2%)',
+      'Fios com bitola correta para chuveiros',
+      'Quadros de luz identificados',
+      'Caixas de passagem limpas'
+    ]
+  },
+  {
     category: 'Acabamento',
     items: [
       'Caimento de água em banheiros/sacadas',
-      'Teste de pressão nos canos (antes de fechar)',
-      'Proteção de pisos instalados',
+      'Juntas de dilatação respeitadas no piso',
+      'Proteção de pisos instalados (papelão)',
       'Recortes de piso escondidos (atrás da porta)',
       'Teste de tomadas e interruptores'
     ]
