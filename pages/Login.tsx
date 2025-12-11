@@ -101,16 +101,14 @@ const Login: React.FC = () => {
     }
   };
 
+  const handleDemoLogin = async () => {
+      setLoading(true);
+      await login('teste@maosdaobra.app', '123456');
+      // No need to navigate manually, useEffect handles it
+  };
+
   const handleSocialLogin = async (provider: 'google') => {
     setLoading(true);
-    // loginSocial now returns { user, error } so we can update context if needed
-    // However, App.tsx AuthContext listens to dbService changes implicitly or we need to trigger a refresh.
-    // In dbService.loginSocial we now update localStorage, so calling refreshUser from context is ideal, 
-    // but a simple window reload or context refetch works too. 
-    // The cleanest way in this architecture without exposing 'setUser' is relying on the fact 
-    // that dbService.loginSocial now mimics a login. We should call `login` with a special flag 
-    // or just assume if it returns success, we reload page or wait for useEffect.
-    
     const { user: socialUser, error } = await dbService.loginSocial(provider);
     
     if (error) {
@@ -130,7 +128,6 @@ const Login: React.FC = () => {
       try {
           const exists = await dbService.resetPassword(forgotEmail);
           setForgotStatus('SENT');
-          // In production, checking 'exists' might reveal registered emails, but for MVP it's fine.
           if (!exists) {
               // Optionally handle "user not found" message differently if desired
           }
@@ -208,11 +205,19 @@ const Login: React.FC = () => {
                   </button>
                   
                   <div className="mt-4 flex flex-col gap-3">
+                      {/* --- TEST LOGIN SHORTCUT --- */}
+                      <button type="button" disabled={loading} onClick={handleDemoLogin} 
+                          className="w-full h-12 rounded-xl bg-purple-600/80 border border-purple-500 text-white flex items-center justify-center gap-2 hover:bg-purple-600 transition-colors animate-pulse">
+                          <i className="fa-solid fa-rocket"></i>
+                          <span className="text-sm font-bold">Acesso Demo (Vitalício)</span>
+                      </button>
+                      
                       <button type="button" disabled={loading} onClick={() => handleSocialLogin('google')} 
                           className="w-full h-12 rounded-xl bg-white/5 border border-white/10 text-white flex items-center justify-center gap-2 hover:bg-white/10 transition-colors">
                           <img src="https://www.svgrepo.com/show/475656/google-color.svg" className="w-5 h-5" alt="Google" />
                           <span className="text-sm font-bold">Entrar com Google</span>
                       </button>
+                      
                       <button type="button" onClick={() => setIsLogin(!isLogin)} className="text-amber-400 text-sm font-bold underline">
                         {isLogin ? 'Criar uma conta' : 'Já tenho conta'}
                       </button>
