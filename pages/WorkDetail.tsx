@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
@@ -12,14 +13,13 @@ import { aiService } from '../services/ai';
 type MainTab = 'SCHEDULE' | 'MATERIALS' | 'FINANCIAL' | 'MORE';
 type SubView = 'NONE' | 'TEAM' | 'SUPPLIERS' | 'REPORTS' | 'PHOTOS' | 'PROJECTS' | 'BONUS_IA' | 'BONUS_IA_CHAT' | 'CALCULATORS' | 'CONTRACTS' | 'CHECKLIST';
 
-// --- DATE HELPERS (FIX TIMEZONE LAG) ---
+// --- DATE HELPERS ---
 const parseDateNoTimezone = (dateStr: string) => {
     if (!dateStr) return '';
-    // Handle potential ISO strings with time by taking only the date part
     const cleanDate = dateStr.split('T')[0];
     const parts = cleanDate.split('-');
     if (parts.length === 3) {
-        return `${parts[2]}/${parts[1]}/${parts[0]}`; // DD/MM/YYYY
+        return `${parts[2]}/${parts[1]}/${parts[0]}`; 
     }
     return dateStr;
 };
@@ -49,7 +49,6 @@ const WorkDetail: React.FC = () => {
     const isPremium = user?.plan === PlanType.VITALICIO;
 
     // --- MODALS STATE ---
-    // STEP MODALS (ADD & EDIT)
     const [stepModalMode, setStepModalMode] = useState<'ADD' | 'EDIT'>('ADD');
     const [isStepModalOpen, setIsStepModalOpen] = useState(false);
     const [currentStepId, setCurrentStepId] = useState<string | null>(null);
@@ -57,7 +56,6 @@ const WorkDetail: React.FC = () => {
     const [stepStart, setStepStart] = useState('');
     const [stepEnd, setStepEnd] = useState('');
     
-    // MATERIAL MODALS (EDIT & ADD)
     const [materialModal, setMaterialModal] = useState<{ isOpen: boolean, material: Material | null }>({ isOpen: false, material: null });
     const [matName, setMatName] = useState('');
     const [matBrand, setMatBrand] = useState('');
@@ -76,7 +74,6 @@ const WorkDetail: React.FC = () => {
     const [newMatBuyQty, setNewMatBuyQty] = useState('');
     const [newMatBuyCost, setNewMatBuyCost] = useState('');
 
-    // EXPENSE MODAL
     const [addExpenseModal, setAddExpenseModal] = useState(false);
     const [expDesc, setExpDesc] = useState('');
     const [expAmount, setExpAmount] = useState('');
@@ -84,7 +81,6 @@ const WorkDetail: React.FC = () => {
     const [expCategory, setExpCategory] = useState<string>(ExpenseCategory.LABOR);
     const [expStepId, setExpStepId] = useState('');
 
-    // TEAM & SUPPLIER MODALS
     const [isPersonModalOpen, setIsPersonModalOpen] = useState(false);
     const [personMode, setPersonMode] = useState<'WORKER'|'SUPPLIER'>('WORKER');
     const [personId, setPersonId] = useState<string | null>(null); 
@@ -93,25 +89,17 @@ const WorkDetail: React.FC = () => {
     const [personPhone, setPersonPhone] = useState('');
     const [personNotes, setPersonNotes] = useState('');
 
-    // CONTRACT VIEWER MODAL
     const [viewContract, setViewContract] = useState<{title: string, content: string} | null>(null);
-
     const [zeModal, setZeModal] = useState({ isOpen: false, title: '', message: '', onConfirm: () => {} });
 
-    // AI CHAT
+    // AI & TOOLS
     const [aiMessage, setAiMessage] = useState('');
     const [aiResponse, setAiResponse] = useState('');
     const [aiLoading, setAiLoading] = useState(false);
-
-    // CALCULATORS
     const [calcType, setCalcType] = useState<'PISO'|'PAREDE'|'PINTURA'>('PISO');
     const [calcArea, setCalcArea] = useState('');
     const [calcResult, setCalcResult] = useState<string[]>([]);
-
-    // CHECKLIST
     const [activeChecklist, setActiveChecklist] = useState<string | null>(null);
-
-    // REPORT TABS
     const [reportTab, setReportTab] = useState<'CRONO'|'MAT'|'FIN'>('CRONO');
 
     // --- LOAD DATA ---
@@ -131,7 +119,6 @@ const WorkDetail: React.FC = () => {
                 dbService.getFiles(w.id)
             ]);
             
-            // Safety checks to ensure arrays
             setSteps(s ? s.sort((a,b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()) : []);
             setMaterials(m || []);
             setExpenses(e ? e.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()) : []);
@@ -145,25 +132,7 @@ const WorkDetail: React.FC = () => {
 
     useEffect(() => { load(); }, [id]);
 
-    // --- STEP HANDLERS ---
-
-    const openAddStep = () => {
-        setStepModalMode('ADD');
-        setStepName('');
-        setStepStart(new Date().toISOString().split('T')[0]);
-        setStepEnd(new Date().toISOString().split('T')[0]);
-        setIsStepModalOpen(true);
-    };
-
-    const openEditStep = (step: Step) => {
-        setStepModalMode('EDIT');
-        setCurrentStepId(step.id);
-        setStepName(step.name);
-        // Important: split 'T' to avoid timezone shifts when setting the date input
-        setStepStart(step.startDate.split('T')[0]); 
-        setStepEnd(step.endDate.split('T')[0]);
-        setIsStepModalOpen(true);
-    };
+    // --- HANDLERS ---
 
     const handleSaveStep = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -190,10 +159,9 @@ const WorkDetail: React.FC = () => {
                 });
             }
         }
-        
         setIsStepModalOpen(false);
         setStepName('');
-        await load(); // Reload to refresh list
+        await load();
     };
 
     const handleStepStatusClick = async (step: Step) => {
@@ -205,8 +173,6 @@ const WorkDetail: React.FC = () => {
         await dbService.updateStep({ ...step, status: newStatus });
         await load();
     };
-
-    // --- MATERIAL HANDLERS ---
 
     const handleAddMaterial = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -246,16 +212,17 @@ const WorkDetail: React.FC = () => {
             Number(matBuyQty),
             Number(matBuyCost)
         );
-        
         setMaterialModal({ isOpen: false, material: null });
         await load();
     };
 
-    // --- EXPENSE HANDLERS ---
-
     const handleAddExpense = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!work || !expDesc) return;
+        
+        // Ensure linking to step if selected
+        const finalStepId = expStepId || undefined;
+
         await dbService.addExpense({
             id: Math.random().toString(36).substr(2, 9),
             workId: work.id,
@@ -263,7 +230,7 @@ const WorkDetail: React.FC = () => {
             amount: Number(expAmount),
             date: new Date().toISOString(),
             category: expCategory,
-            stepId: expStepId || undefined,
+            stepId: finalStepId,
             totalAgreed: expTotalAgreed ? Number(expTotalAgreed) : undefined
         });
         setAddExpenseModal(false);
@@ -271,7 +238,6 @@ const WorkDetail: React.FC = () => {
         await load();
     };
 
-    // --- PHOTO / FILE UPLOAD ---
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'PHOTO' | 'FILE') => {
         if (e.target.files && e.target.files[0] && work) {
             setUploading(true);
@@ -308,7 +274,6 @@ const WorkDetail: React.FC = () => {
         }
     };
 
-    // --- TEAM & SUPPLIER MANAGEMENT ---
     const openPersonModal = (mode: 'WORKER' | 'SUPPLIER', item?: Worker | Supplier) => {
         setPersonMode(mode);
         if (item) {
@@ -347,7 +312,7 @@ const WorkDetail: React.FC = () => {
             else await dbService.addSupplier({ ...payload, category: personRole });
         }
         
-        await load(); // CRITICAL: Refresh data so it appears in list immediately
+        await load();
         setIsPersonModalOpen(false);
     };
 
@@ -365,61 +330,35 @@ const WorkDetail: React.FC = () => {
         });
     };
 
-    // --- CALCULATORS ---
+    // CALCULATORS
     useEffect(() => {
         if (!calcArea) { setCalcResult([]); return; }
         const area = Number(calcArea);
         if (calcType === 'PISO') {
-            const piso = Math.ceil(area * 1.15); // 15% quebra
-            const argamassa = Math.ceil(area * 4); // ~4kg/m2
-            const rejunte = Math.ceil(area * 0.3); // ~300g/m2
-            setCalcResult([
-                `${piso} m² de Piso (com quebra)`,
-                `${argamassa} kg de Argamassa AC-II/III`,
-                `${rejunte} kg de Rejunte`
-            ]);
+            const piso = Math.ceil(area * 1.15); 
+            const argamassa = Math.ceil(area * 4); 
+            const rejunte = Math.ceil(area * 0.3); 
+            setCalcResult([`${piso} m² de Piso (com quebra)`, `${argamassa} kg de Argamassa AC-II/III`, `${rejunte} kg de Rejunte`]);
         } else if (calcType === 'PAREDE') {
             const tijolos = Math.ceil(area * 30); 
             const cimento = Math.ceil(area * 5); 
-            setCalcResult([
-                `${tijolos} Blocos/Tijolos`,
-                `~${Math.ceil(cimento/50)} Sacos de Cimento`
-            ]);
+            setCalcResult([`${tijolos} Blocos/Tijolos`, `~${Math.ceil(cimento/50)} Sacos de Cimento`]);
         } else if (calcType === 'PINTURA') {
             const litros = Math.ceil(area / 10);
-            setCalcResult([
-                `${litros * 2} Litros de Tinta (2 demãos)`,
-                `${Math.ceil(area/30)} L de Selador`
-            ]);
+            setCalcResult([`${litros * 2} Litros de Tinta (2 demãos)`, `${Math.ceil(area/30)} L de Selador`]);
         }
     }, [calcArea, calcType]);
 
-    // --- REPORTS EXPORT ---
+    // EXPORT
     const handleExportExcel = () => {
         const wb = XLSX.utils.book_new();
-        
-        // Cronograma Sheet
-        const wsCrono = XLSX.utils.json_to_sheet(steps.map(s => ({
-            Etapa: s.name,
-            Inicio: parseDateNoTimezone(s.startDate),
-            Fim: parseDateNoTimezone(s.endDate),
-            Status: s.status === 'CONCLUIDO' ? 'Concluído' : s.status === 'EM_ANDAMENTO' ? 'Em Andamento' : 'Pendente'
-        })));
+        const wsCrono = XLSX.utils.json_to_sheet(steps.map(s => ({ Etapa: s.name, Inicio: parseDateNoTimezone(s.startDate), Fim: parseDateNoTimezone(s.endDate), Status: s.status })));
         XLSX.utils.book_append_sheet(wb, wsCrono, "Cronograma");
-
-        // Materiais Sheet
-        const wsMat = XLSX.utils.json_to_sheet(materials.map(m => ({
-            Material: m.name,
-            Qtd_Planejada: m.plannedQty,
-            Qtd_Comprada: m.purchasedQty,
-            Status: m.purchasedQty >= m.plannedQty ? 'OK' : 'Pendente'
-        })));
+        const wsMat = XLSX.utils.json_to_sheet(materials.map(m => ({ Material: m.name, Qtd: m.plannedQty, Comprado: m.purchasedQty })));
         XLSX.utils.book_append_sheet(wb, wsMat, "Materiais");
-
-        XLSX.writeFile(wb, `Relatorio_Obra_${work?.name.replace(/ /g, '_')}.xlsx`);
+        XLSX.writeFile(wb, `Obra_${work?.name}.xlsx`);
     };
 
-    // --- AI CHAT ---
     const handleAiAsk = async () => {
         if (!aiMessage.trim()) return;
         setAiLoading(true);
@@ -432,260 +371,7 @@ const WorkDetail: React.FC = () => {
     if (loading) return <div className="h-screen flex items-center justify-center"><i className="fa-solid fa-circle-notch fa-spin text-3xl text-primary"></i></div>;
     if (!work) return null;
 
-    // =================================================================================================
-    // SUB-VIEWS RENDER
-    // =================================================================================================
-    if (subView !== 'NONE') {
-        const renderSubViewContent = () => {
-            switch(subView) {
-                case 'TEAM': return (
-                    <div className="space-y-6">
-                        <div className="bg-blue-50 dark:bg-blue-900/20 p-6 rounded-3xl border border-blue-100 dark:border-blue-900 mb-2">
-                            <h3 className="text-xl font-bold text-primary dark:text-white mb-1">Minha Equipe</h3>
-                            <button onClick={() => openPersonModal('WORKER')} className="w-full mt-4 py-4 rounded-2xl bg-blue-600 text-white font-bold hover:bg-blue-700 transition-colors shadow-lg shadow-blue-600/20 flex items-center justify-center gap-2">
-                                <i className="fa-solid fa-plus"></i> Adicionar Profissional
-                            </button>
-                        </div>
-                        <div className="space-y-3">
-                            {workers.length === 0 && <p className="text-center text-slate-400 py-10">Nenhum profissional cadastrado.</p>}
-                            {workers.map(w => (
-                                <div key={w.id} className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm flex items-center justify-between">
-                                    <div className="flex items-center gap-4 cursor-pointer flex-1" onClick={() => openPersonModal('WORKER', w)}>
-                                        <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 text-xl"><i className="fa-solid fa-user-helmet-safety"></i></div>
-                                        <div><h4 className="font-bold text-primary dark:text-white">{w.name}</h4><p className="text-xs text-slate-500 font-bold">{w.role}</p></div>
-                                    </div>
-                                    <button onClick={() => handleDeletePerson(w.id, 'WORKER')} className="w-10 h-10 rounded-xl text-red-500 hover:bg-red-50 transition-colors"><i className="fa-solid fa-trash"></i></button>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                );
-
-                case 'SUPPLIERS': return (
-                    <div className="space-y-6">
-                        <div className="bg-amber-50 dark:bg-amber-900/20 p-6 rounded-3xl border border-amber-100 dark:border-amber-900 mb-2">
-                            <h3 className="text-xl font-bold text-primary dark:text-white mb-1">Fornecedores</h3>
-                            <button onClick={() => openPersonModal('SUPPLIER')} className="w-full mt-4 py-4 rounded-2xl bg-amber-600 text-white font-bold hover:bg-amber-700 transition-colors shadow-lg shadow-amber-600/20 flex items-center justify-center gap-2">
-                                <i className="fa-solid fa-plus"></i> Adicionar Fornecedor
-                            </button>
-                        </div>
-                        <div className="space-y-3">
-                            {suppliers.length === 0 && <p className="text-center text-slate-400 py-10">Nenhum fornecedor cadastrado.</p>}
-                            {suppliers.map(s => (
-                                <div key={s.id} className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm flex items-center justify-between">
-                                    <div className="flex items-center gap-4 cursor-pointer flex-1" onClick={() => openPersonModal('SUPPLIER', s)}>
-                                        <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 text-xl"><i className="fa-solid fa-store"></i></div>
-                                        <div><h4 className="font-bold text-primary dark:text-white">{s.name}</h4><p className="text-xs text-slate-500 font-bold">{s.category}</p></div>
-                                    </div>
-                                    <button onClick={() => handleDeletePerson(s.id, 'SUPPLIER')} className="w-10 h-10 rounded-xl text-red-500 hover:bg-red-50 transition-colors"><i className="fa-solid fa-trash"></i></button>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                );
-
-                case 'REPORTS': return (
-                    <div className="space-y-6">
-                        <div className="flex gap-2 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
-                            {['CRONO', 'MAT', 'FIN'].map((rt) => (
-                                <button key={rt} onClick={() => setReportTab(rt as any)} className={`flex-1 py-2 rounded-lg text-xs font-bold ${reportTab === rt ? 'bg-white shadow text-primary' : 'text-slate-500'}`}>
-                                    {rt === 'CRONO' ? 'Cronograma' : rt === 'MAT' ? 'Materiais' : 'Financeiro'}
-                                </button>
-                            ))}
-                        </div>
-                        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-lg min-h-[300px]">
-                            {/* Report Logic */}
-                            {reportTab === 'CRONO' && steps.map((s,i) => <div key={s.id} className="flex justify-between py-2 border-b border-slate-50 dark:border-slate-800"><span className="text-sm font-bold">{i+1}. {s.name}</span><span className="text-xs text-slate-500">{parseDateNoTimezone(s.endDate)}</span></div>)}
-                            {reportTab === 'MAT' && materials.map((m) => <div key={m.id} className="flex justify-between py-2 border-b border-slate-50 dark:border-slate-800"><span className="text-sm">{m.name}</span><span className="text-xs font-bold">{m.purchasedQty}/{m.plannedQty}</span></div>)}
-                            {reportTab === 'FIN' && expenses.map((e) => <div key={e.id} className="flex justify-between py-2 border-b border-slate-50 dark:border-slate-800"><span className="text-sm">{e.description}</span><span className="text-xs font-bold text-red-500">- R$ {e.amount}</span></div>)}
-                        </div>
-                        <button onClick={handleExportExcel} className="w-full py-3 bg-green-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-green-700 shadow-lg"><i className="fa-solid fa-file-excel"></i> Baixar Excel</button>
-                    </div>
-                );
-
-                case 'CALCULATORS': return (
-                    <div className="space-y-6">
-                        <div className="grid grid-cols-3 gap-2">
-                            {['PISO', 'PAREDE', 'PINTURA'].map(t => (
-                                <button key={t} onClick={() => {setCalcType(t as any); setCalcResult([])}} className={`flex flex-col items-center justify-center py-4 rounded-xl border-2 font-bold text-xs transition-all gap-2 ${calcType === t ? 'border-secondary bg-secondary/10 text-secondary' : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-400'}`}>
-                                    <i className={`fa-solid ${t === 'PISO' ? 'fa-layer-group' : t === 'PAREDE' ? 'fa-building' : 'fa-paint-roller'} text-xl`}></i>
-                                    {t}
-                                </button>
-                            ))}
-                        </div>
-                        <div className="bg-gradient-to-br from-slate-800 to-slate-900 text-white p-8 rounded-3xl shadow-xl relative overflow-hidden">
-                            <div className="absolute top-0 right-0 w-32 h-32 bg-secondary/20 rounded-full blur-3xl"></div>
-                            <h3 className="text-lg font-bold mb-6 text-center uppercase tracking-widest text-secondary">Calculadora de {calcType}</h3>
-                            <div className="relative mb-8">
-                                <input type="number" value={calcArea} onChange={e => setCalcArea(e.target.value)} placeholder="0" className="w-full bg-white/10 border border-white/20 rounded-2xl p-4 text-center text-3xl font-black text-white outline-none focus:border-secondary transition-colors" />
-                                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-white/30 font-bold">m²</span>
-                            </div>
-                            <div className="space-y-3">
-                                {calcResult.length > 0 ? calcResult.map((res, i) => (
-                                    <div key={i} className="bg-white/10 p-3 rounded-xl flex items-center gap-3 backdrop-blur-sm"><i className="fa-solid fa-check text-green-400"></i> <span className="font-bold text-sm">{res}</span></div>
-                                )) : <p className="text-center text-white/30 text-sm">Digite a área para calcular.</p>}
-                            </div>
-                        </div>
-                    </div>
-                );
-
-                case 'BONUS_IA': return (
-                    <div className="flex flex-col items-center justify-center min-h-[70vh] p-6 text-center animate-in fade-in">
-                        <div className="w-full max-w-sm bg-gradient-to-br from-slate-900 to-slate-950 rounded-[2.5rem] p-8 shadow-2xl relative overflow-hidden border border-slate-800 group">
-                            {/* Animated Background */}
-                            <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20"></div>
-                            <div className="absolute -top-20 -right-20 w-40 h-40 bg-secondary/30 rounded-full blur-3xl animate-pulse"></div>
-                            
-                            <div className="relative z-10 flex flex-col items-center">
-                                <div className="w-28 h-28 rounded-full border-4 border-slate-800 p-1 bg-gradient-gold shadow-[0_0_30px_rgba(217,119,6,0.4)] mb-6 transform hover:scale-105 transition-transform duration-500">
-                                    <img src={ZE_AVATAR} className="w-full h-full object-cover rounded-full bg-white" onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK}/>
-                                </div>
-                                <h2 className="text-3xl font-black text-white mb-2 tracking-tight">Zé da Obra <span className="text-secondary">AI</span></h2>
-                                <div className="h-1 w-12 bg-secondary rounded-full mb-6"></div>
-                                <p className="text-slate-400 text-sm mb-8 leading-relaxed font-medium">
-                                    Seu engenheiro virtual particular. Tire dúvidas técnicas, calcule materiais e resolva problemas 24h por dia.
-                                </p>
-                                
-                                {isPremium ? (
-                                    <button onClick={() => setSubView('BONUS_IA_CHAT')} className="w-full py-4 bg-gradient-gold text-white font-black rounded-2xl shadow-lg hover:shadow-orange-500/20 hover:scale-105 transition-all flex items-center justify-center gap-3 group-hover:animate-pulse">
-                                        <span>INICIAR CONVERSA</span>
-                                        <i className="fa-solid fa-comments"></i>
-                                    </button>
-                                ) : (
-                                    <button onClick={() => navigate('/settings')} className="w-full py-4 bg-slate-800 text-slate-500 font-bold rounded-2xl border border-slate-700 flex items-center justify-center gap-2 hover:bg-slate-700 transition-colors">
-                                        <i className="fa-solid fa-lock"></i> BLOQUEADO (PREMIUM)
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                );
-
-                case 'BONUS_IA_CHAT': 
-                    if (!isPremium) return null;
-                    return (
-                    <div className="flex flex-col h-[80vh]">
-                        <div className="flex-1 bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-inner overflow-y-auto mb-4 border border-slate-200 dark:border-slate-800">
-                             <div className="flex gap-4 mb-6">
-                                <img src={ZE_AVATAR} className="w-10 h-10 rounded-full border border-slate-200" onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK}/>
-                                <div className="bg-slate-100 dark:bg-slate-800 p-3 rounded-tr-xl rounded-b-xl text-sm shadow-sm">
-                                    <p className="font-bold text-secondary mb-1">Zé da Obra</p>
-                                    <p>Opa! Mestre de obras na área. O que tá pegando?</p>
-                                </div>
-                            </div>
-                            {aiResponse && (
-                                <div className="flex gap-4 mb-6 animate-in fade-in">
-                                    <img src={ZE_AVATAR} className="w-10 h-10 rounded-full border border-slate-200" onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK}/>
-                                    <div className="bg-slate-100 dark:bg-slate-800 p-3 rounded-tr-xl rounded-b-xl text-sm shadow-sm">
-                                        <p className="font-bold text-secondary mb-1">Zé da Obra</p>
-                                        <p className="whitespace-pre-wrap">{aiResponse}</p>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                        <div className="flex gap-2">
-                            <input 
-                                value={aiMessage} 
-                                onChange={e => setAiMessage(e.target.value)}
-                                placeholder="Pergunte ao Zé..." 
-                                className="flex-1 p-4 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-secondary transition-colors"
-                            />
-                            <button onClick={handleAiAsk} disabled={aiLoading} className="w-14 bg-secondary text-white rounded-xl flex items-center justify-center shadow-lg hover:bg-orange-600 transition-colors">
-                                {aiLoading ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-paper-plane"></i>}
-                            </button>
-                        </div>
-                    </div>
-                );
-
-                case 'CONTRACTS': return (
-                    <div className="space-y-4">
-                        {CONTRACT_TEMPLATES.map(ct => (
-                            <div key={ct.id} onClick={() => setViewContract({ title: ct.title, content: ct.contentTemplate })} className="group bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-secondary/50 cursor-pointer shadow-sm transition-all hover:translate-x-1">
-                                <div className="flex items-center gap-4">
-                                    <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center text-xl group-hover:bg-indigo-600 group-hover:text-white transition-colors"><i className="fa-solid fa-file-contract"></i></div>
-                                    <div><h4 className="font-bold text-primary dark:text-white">{ct.title}</h4><p className="text-xs text-slate-500">Toque para abrir modelo</p></div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                );
-
-                case 'CHECKLIST': return (
-                    <div className="space-y-4">
-                        {STANDARD_CHECKLISTS.map((cl, idx) => (
-                            <div key={idx} className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
-                                <button onClick={() => setActiveChecklist(activeChecklist === cl.category ? null : cl.category)} className="w-full p-5 flex justify-between items-center text-left hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
-                                    <span className="font-bold text-sm flex items-center gap-3 text-primary dark:text-white">
-                                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${activeChecklist === cl.category ? 'bg-green-500 text-white' : 'bg-green-100 text-green-600'}`}>
-                                            <i className="fa-solid fa-list-check"></i>
-                                        </div>
-                                        {cl.category}
-                                    </span>
-                                    <i className={`fa-solid fa-chevron-down transition-transform text-slate-400 ${activeChecklist === cl.category ? 'rotate-180' : ''}`}></i>
-                                </button>
-                                {activeChecklist === cl.category && (
-                                    <div className="p-5 pt-0 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/30 animate-in slide-in-from-top-2">
-                                        {cl.items.map((item, i) => (
-                                            <label key={i} className="flex items-start gap-3 py-3 cursor-pointer border-b border-dashed border-slate-200 dark:border-slate-700 last:border-0 hover:bg-white/50 rounded-lg px-2 transition-colors">
-                                                <input type="checkbox" className="mt-1 rounded border-slate-300 text-secondary focus:ring-secondary w-5 h-5" />
-                                                <span className="text-sm text-slate-600 dark:text-slate-300 leading-tight">{item}</span>
-                                            </label>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        ))}
-                    </div>
-                );
-
-                // ... other subviews (PHOTOS, PROJECTS) kept simple or same as before
-                case 'PHOTOS': return (
-                    <div className="space-y-6">
-                        <label className="block w-full py-8 border-2 border-dashed border-pink-300 bg-pink-50 rounded-2xl cursor-pointer hover:bg-pink-100 transition-all text-center">
-                            <i className="fa-solid fa-camera text-2xl text-pink-400 mb-2"></i>
-                            <span className="block text-sm font-bold text-pink-600">{uploading ? 'Enviando...' : 'Adicionar Foto'}</span>
-                            <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, 'PHOTO')} disabled={uploading} />
-                        </label>
-                        <div className="grid grid-cols-2 gap-3">
-                            {photos.map(p => <img key={p.id} src={p.url} className="w-full aspect-square object-cover rounded-xl shadow-sm" alt="Obra" />)}
-                        </div>
-                    </div>
-                );
-                case 'PROJECTS': return (
-                    <div className="space-y-6">
-                        <label className="block w-full py-8 border-2 border-dashed border-teal-300 bg-teal-50 rounded-2xl cursor-pointer hover:bg-teal-100 transition-all text-center">
-                            <i className="fa-solid fa-file-pdf text-2xl text-teal-400 mb-2"></i>
-                            <span className="block text-sm font-bold text-teal-600">{uploading ? 'Enviando...' : 'Adicionar PDF/Projeto'}</span>
-                            <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'FILE')} disabled={uploading} />
-                        </label>
-                        <div className="space-y-2">{files.map(f => <div key={f.id} className="p-4 bg-white rounded-xl border flex items-center gap-3"><i className="fa-solid fa-file text-slate-400"></i> <span className="text-sm font-bold truncate flex-1">{f.name}</span><a href={f.url} download={f.name}><i className="fa-solid fa-download text-primary"></i></a></div>)}</div>
-                    </div>
-                );
-
-                default: return null;
-            }
-        };
-
-        return (
-            <div className="min-h-screen bg-slate-50 dark:bg-slate-950 pb-20 font-sans">
-                <div className="bg-white dark:bg-slate-900 sticky top-0 z-30 px-4 py-4 border-b border-slate-200 dark:border-slate-800 flex items-center gap-4 shadow-sm">
-                    <button onClick={() => setSubView('NONE')} className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 hover:bg-slate-200 transition-colors">
-                        <i className="fa-solid fa-arrow-left"></i>
-                    </button>
-                    <h2 className="text-lg font-bold text-primary dark:text-white uppercase tracking-wide truncate">
-                        {subView === 'TEAM' ? 'Minha Equipe' : subView === 'SUPPLIERS' ? 'Fornecedores' : subView === 'REPORTS' ? 'Relatórios' : subView === 'BONUS_IA' ? 'Engenheiro Virtual' : 'Detalhes'}
-                    </h2>
-                </div>
-                <div className="p-4 max-w-3xl mx-auto animate-in slide-in-from-right-10">
-                    {renderSubViewContent()}
-                </div>
-            </div>
-        );
-    }
-
-    // =================================================================================================
-    // MAIN TAB VIEW
-    // =================================================================================================
+    // --- RENDER CONTENT ---
 
     const renderMainTab = () => {
         if (activeTab === 'SCHEDULE') {
@@ -696,29 +382,42 @@ const WorkDetail: React.FC = () => {
                             <h2 className="text-2xl font-black text-primary dark:text-white">Cronograma</h2>
                             <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Etapas da Obra</p>
                         </div>
-                        <button onClick={openAddStep} className="bg-primary text-white w-10 h-10 rounded-xl shadow-lg flex items-center justify-center hover:scale-105 transition-transform"><i className="fa-solid fa-plus"></i></button>
+                        <button onClick={() => { setStepModalMode('ADD'); setStepName(''); setStepStart(new Date().toISOString().split('T')[0]); setStepEnd(new Date().toISOString().split('T')[0]); setIsStepModalOpen(true); }} className="bg-primary text-white w-10 h-10 rounded-xl shadow-lg flex items-center justify-center hover:scale-105 transition-transform"><i className="fa-solid fa-plus"></i></button>
                     </div>
                     {steps.map((step, idx) => {
                          const stepNum = String(idx + 1).padStart(2, '0');
                          const isDone = step.status === StepStatus.COMPLETED;
-                         const statusColor = step.status === StepStatus.COMPLETED ? 'bg-green-500 border-green-500 text-white' : step.status === StepStatus.IN_PROGRESS ? 'bg-secondary border-secondary text-white' : 'bg-transparent border-slate-300 dark:border-slate-600';
+                         const isInProgress = step.status === StepStatus.IN_PROGRESS;
+                         
+                         let statusBadgeClass = 'bg-slate-100 text-slate-500';
+                         let statusText = 'Pendente';
+                         
+                         if (isDone) {
+                             statusBadgeClass = 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400';
+                             statusText = 'Concluído';
+                         } else if (isInProgress) {
+                             statusBadgeClass = 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400';
+                             statusText = 'Em Andamento';
+                         }
 
                          return (
                             <div key={step.id} className={`group bg-white dark:bg-slate-900 p-5 rounded-2xl border shadow-sm transition-all hover:shadow-md relative overflow-hidden ${isDone ? 'border-green-200 dark:border-green-900/30' : 'border-slate-100 dark:border-slate-800'}`}>
                                 <div className="flex items-center gap-4">
-                                    <button onClick={() => handleStepStatusClick(step)} className={`w-8 h-8 rounded-full border-2 flex items-center justify-center shrink-0 transition-all ${statusColor}`}>
-                                        {isDone && <i className="fa-solid fa-check text-xs"></i>}
-                                        {step.status === StepStatus.IN_PROGRESS && <div className="w-3 h-3 bg-white rounded-full"></div>}
+                                    <button onClick={() => handleStepStatusClick(step)} className={`w-10 h-10 rounded-xl border-2 flex items-center justify-center shrink-0 transition-all ${isDone ? 'bg-green-500 border-green-500 text-white' : isInProgress ? 'bg-secondary border-secondary text-white' : 'border-slate-200 text-slate-300'}`}>
+                                        <i className={`fa-solid ${isDone ? 'fa-check' : isInProgress ? 'fa-hammer' : 'fa-play'}`}></i>
                                     </button>
-                                    <div className="flex-1 cursor-pointer" onClick={() => openEditStep(step)}>
-                                        <div className="flex justify-between items-start">
+                                    <div className="flex-1 cursor-pointer" onClick={() => { setStepModalMode('EDIT'); setCurrentStepId(step.id); setStepName(step.name); setStepStart(step.startDate.split('T')[0]); setStepEnd(step.endDate.split('T')[0]); setIsStepModalOpen(true); }}>
+                                        <div className="flex justify-between items-start mb-2">
                                             <div>
-                                                <span className="text-[10px] font-bold text-slate-400 block mb-0.5">ETAPA {stepNum}</span>
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <span className="text-[10px] font-bold text-slate-400">ETAPA {stepNum}</span>
+                                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${statusBadgeClass}`}>{statusText}</span>
+                                                </div>
                                                 <h3 className={`font-bold text-lg leading-tight ${isDone ? 'text-slate-400 line-through' : 'text-primary dark:text-white'}`}>{step.name}</h3>
                                             </div>
-                                            <div className="text-slate-300 hover:text-secondary p-2 -mr-2"><i className="fa-solid fa-pen-to-square"></i></div>
+                                            <div className="text-slate-300 hover:text-secondary p-1"><i className="fa-solid fa-pen-to-square"></i></div>
                                         </div>
-                                        <div className="flex gap-4 mt-2">
+                                        <div className="flex gap-4">
                                             <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium bg-slate-50 dark:bg-slate-800 px-2 py-1 rounded-md">
                                                 <i className="fa-regular fa-calendar"></i> {parseDateNoTimezone(step.startDate)}
                                             </div>
@@ -746,9 +445,8 @@ const WorkDetail: React.FC = () => {
                         <button onClick={() => setAddMatModal(true)} className="bg-primary text-white w-12 h-12 rounded-xl flex items-center justify-center hover:bg-primary-light transition-all shadow-lg shadow-primary/30"><i className="fa-solid fa-plus text-lg"></i></button>
                     </div>
                     {steps.map((step, idx) => {
-                        // Safe filter for materials
                         const stepMaterials = materials ? materials.filter(m => m.stepId === step.id) : [];
-                        if (stepMaterials.length === 0) return null; // Don't show empty steps in materials tab
+                        if (stepMaterials.length === 0) return null;
                         
                         return (
                             <div key={step.id} className="mb-8">
@@ -798,17 +496,26 @@ const WorkDetail: React.FC = () => {
                         <h3 className="text-4xl font-black mb-4 tracking-tight">R$ {expenses.reduce((sum, e) => sum + Number(e.amount), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h3>
                         <div className="flex items-center gap-2 text-xs opacity-70 bg-white/10 w-fit px-3 py-1 rounded-full"><i className="fa-solid fa-wallet"></i> Orçamento: R$ {work.budgetPlanned.toLocaleString('pt-BR')}</div>
                     </div>
-                    {expenses.map(exp => (
-                        <div key={exp.id} className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm mb-3">
-                            <div className="flex items-center justify-between mb-2">
-                                <div className="flex items-center gap-4">
-                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${exp.category === 'Material' ? 'bg-amber-100 text-amber-600' : 'bg-blue-100 text-blue-600'}`}><i className={`fa-solid ${exp.category === 'Material' ? 'fa-box' : 'fa-helmet-safety'}`}></i></div>
-                                    <div><p className="font-bold text-primary dark:text-white text-sm">{exp.description}</p><p className="text-[10px] text-slate-400 uppercase tracking-wide">{parseDateNoTimezone(exp.date.split('T')[0])} • {exp.category}</p></div>
+                    {expenses.map(exp => {
+                        const relatedStep = steps.find(s => s.id === exp.stepId);
+                        return (
+                            <div key={exp.id} className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm mb-3">
+                                <div className="flex items-center justify-between mb-2">
+                                    <div className="flex items-center gap-4">
+                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${exp.category === 'Material' ? 'bg-amber-100 text-amber-600' : 'bg-blue-100 text-blue-600'}`}><i className={`fa-solid ${exp.category === 'Material' ? 'fa-box' : 'fa-helmet-safety'}`}></i></div>
+                                        <div>
+                                            <p className="font-bold text-primary dark:text-white text-sm">{exp.description}</p>
+                                            <div className="flex flex-wrap gap-2 mt-1">
+                                                <span className="text-[10px] bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded text-slate-500 uppercase tracking-wide">{parseDateNoTimezone(exp.date.split('T')[0])}</span>
+                                                {relatedStep && <span className="text-[10px] bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300 px-2 py-0.5 rounded font-bold"><i className="fa-solid fa-link mr-1"></i>{relatedStep.name}</span>}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <span className="font-bold text-primary dark:text-white">R$ {Number(exp.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                                 </div>
-                                <span className="font-bold text-primary dark:text-white">- R$ {Number(exp.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                             </div>
-                        </div>
-                    ))}
+                        );
+                    })}
                 </div>
             );
         }
@@ -887,34 +594,277 @@ const WorkDetail: React.FC = () => {
                 </div>
             );
         }
-
         return null;
+    };
+
+    // --- RENDER SUBVIEW ---
+    const renderSubViewContent = () => {
+        switch(subView) {
+            case 'TEAM': return (
+                <div className="space-y-6">
+                    <div className="bg-blue-50 dark:bg-blue-900/20 p-6 rounded-3xl border border-blue-100 dark:border-blue-900 mb-2">
+                        <h3 className="text-xl font-bold text-primary dark:text-white mb-1">Minha Equipe</h3>
+                        <button onClick={() => openPersonModal('WORKER')} className="w-full mt-4 py-4 rounded-2xl bg-blue-600 text-white font-bold hover:bg-blue-700 transition-colors shadow-lg shadow-blue-600/20 flex items-center justify-center gap-2">
+                            <i className="fa-solid fa-plus"></i> Adicionar Profissional
+                        </button>
+                    </div>
+                    <div className="space-y-3">
+                        {workers.length === 0 && <p className="text-center text-slate-400 py-10">Nenhum profissional cadastrado.</p>}
+                        {workers.map(w => (
+                            <div key={w.id} className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm flex items-center justify-between">
+                                <div className="flex items-center gap-4 cursor-pointer flex-1" onClick={() => openPersonModal('WORKER', w)}>
+                                    <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 text-xl"><i className="fa-solid fa-user-helmet-safety"></i></div>
+                                    <div><h4 className="font-bold text-primary dark:text-white">{w.name}</h4><p className="text-xs text-slate-500 font-bold">{w.role}</p></div>
+                                </div>
+                                <button onClick={() => handleDeletePerson(w.id, 'WORKER')} className="w-10 h-10 rounded-xl text-red-500 hover:bg-red-50 transition-colors"><i className="fa-solid fa-trash"></i></button>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+
+            case 'SUPPLIERS': return (
+                <div className="space-y-6">
+                    <div className="bg-amber-50 dark:bg-amber-900/20 p-6 rounded-3xl border border-amber-100 dark:border-amber-900 mb-2">
+                        <h3 className="text-xl font-bold text-primary dark:text-white mb-1">Fornecedores</h3>
+                        <button onClick={() => openPersonModal('SUPPLIER')} className="w-full mt-4 py-4 rounded-2xl bg-amber-600 text-white font-bold hover:bg-amber-700 transition-colors shadow-lg shadow-amber-600/20 flex items-center justify-center gap-2">
+                            <i className="fa-solid fa-plus"></i> Adicionar Fornecedor
+                        </button>
+                    </div>
+                    <div className="space-y-3">
+                        {suppliers.length === 0 && <p className="text-center text-slate-400 py-10">Nenhum fornecedor cadastrado.</p>}
+                        {suppliers.map(s => (
+                            <div key={s.id} className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm flex items-center justify-between">
+                                <div className="flex items-center gap-4 cursor-pointer flex-1" onClick={() => openPersonModal('SUPPLIER', s)}>
+                                    <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 text-xl"><i className="fa-solid fa-store"></i></div>
+                                    <div><h4 className="font-bold text-primary dark:text-white">{s.name}</h4><p className="text-xs text-slate-500 font-bold">{s.category}</p></div>
+                                </div>
+                                <button onClick={() => handleDeletePerson(s.id, 'SUPPLIER')} className="w-10 h-10 rounded-xl text-red-500 hover:bg-red-50 transition-colors"><i className="fa-solid fa-trash"></i></button>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+
+            case 'REPORTS': return (
+                <div className="space-y-6">
+                    <div className="flex gap-2 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
+                        {['CRONO', 'MAT', 'FIN'].map((rt) => (
+                            <button key={rt} onClick={() => setReportTab(rt as any)} className={`flex-1 py-2 rounded-lg text-xs font-bold ${reportTab === rt ? 'bg-white shadow text-primary' : 'text-slate-500'}`}>
+                                {rt === 'CRONO' ? 'Cronograma' : rt === 'MAT' ? 'Materiais' : 'Financeiro'}
+                            </button>
+                        ))}
+                    </div>
+                    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
+                        <table className="w-full text-left text-sm">
+                            <thead className="bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
+                                <tr>
+                                    <th className="px-4 py-3 font-bold text-slate-500 uppercase text-xs">Item</th>
+                                    <th className="px-4 py-3 font-bold text-slate-500 uppercase text-xs text-right">Status/Valor</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                                {reportTab === 'CRONO' && steps.map((s) => (
+                                    <tr key={s.id}>
+                                        <td className="px-4 py-3 font-bold text-primary dark:text-white">{s.name}<br/><span className="text-[10px] font-normal text-slate-400">{parseDateNoTimezone(s.endDate)}</span></td>
+                                        <td className="px-4 py-3 text-right"><span className={`text-[10px] font-bold px-2 py-1 rounded ${s.status === 'CONCLUIDO' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}`}>{s.status === 'CONCLUIDO' ? 'OK' : 'PEND'}</span></td>
+                                    </tr>
+                                ))}
+                                {reportTab === 'MAT' && materials.map((m) => (
+                                    <tr key={m.id}>
+                                        <td className="px-4 py-3 text-primary dark:text-white">{m.name}</td>
+                                        <td className="px-4 py-3 text-right font-mono text-xs">{m.purchasedQty}/{m.plannedQty}</td>
+                                    </tr>
+                                ))}
+                                {reportTab === 'FIN' && expenses.map((e) => (
+                                    <tr key={e.id}>
+                                        <td className="px-4 py-3 text-primary dark:text-white">{e.description}<br/><span className="text-[10px] text-slate-400">{parseDateNoTimezone(e.date)}</span></td>
+                                        <td className="px-4 py-3 text-right font-bold text-primary dark:text-white">R$ {e.amount}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                    <button onClick={handleExportExcel} className="w-full py-3 bg-green-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-green-700 shadow-lg"><i className="fa-solid fa-file-excel"></i> Baixar Excel</button>
+                </div>
+            );
+
+            case 'PHOTOS': return (
+                <div className="space-y-6">
+                    <label className="block w-full py-8 border-2 border-dashed border-pink-300 bg-pink-50 rounded-2xl cursor-pointer hover:bg-pink-100 transition-all text-center">
+                        <i className="fa-solid fa-camera text-2xl text-pink-400 mb-2"></i>
+                        <span className="block text-sm font-bold text-pink-600">{uploading ? 'Enviando...' : 'Adicionar Foto'}</span>
+                        <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, 'PHOTO')} disabled={uploading} />
+                    </label>
+                    <div className="grid grid-cols-2 gap-4">
+                        {photos.map(p => (
+                            <div key={p.id} className="relative group rounded-xl overflow-hidden shadow-sm">
+                                <img src={p.url} className="w-full aspect-square object-cover" alt="Obra" />
+                                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                    <span className="text-white text-xs font-bold">{parseDateNoTimezone(p.date)}</span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+
+            case 'CALCULATORS': return (
+                <div className="space-y-6">
+                    <div className="grid grid-cols-3 gap-2">
+                        {['PISO', 'PAREDE', 'PINTURA'].map(t => (
+                            <button key={t} onClick={() => {setCalcType(t as any); setCalcResult([])}} className={`flex flex-col items-center justify-center py-4 rounded-xl border-2 font-bold text-xs transition-all gap-2 ${calcType === t ? 'border-secondary bg-secondary/10 text-secondary' : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-400'}`}>
+                                <i className={`fa-solid ${t === 'PISO' ? 'fa-layer-group' : t === 'PAREDE' ? 'fa-building' : 'fa-paint-roller'} text-xl`}></i>
+                                {t}
+                            </button>
+                        ))}
+                    </div>
+                    <div className="bg-gradient-to-br from-slate-800 to-slate-900 text-white p-8 rounded-3xl shadow-xl relative overflow-hidden">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-secondary/20 rounded-full blur-3xl"></div>
+                        <h3 className="text-lg font-bold mb-6 text-center uppercase tracking-widest text-secondary">Calculadora de {calcType}</h3>
+                        <div className="relative mb-8">
+                            <input type="number" value={calcArea} onChange={e => setCalcArea(e.target.value)} placeholder="0" className="w-full bg-white/10 border border-white/20 rounded-2xl p-4 text-center text-3xl font-black text-white outline-none focus:border-secondary transition-colors" />
+                            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-white/30 font-bold">m²</span>
+                        </div>
+                        <div className="space-y-3">
+                            {calcResult.length > 0 ? calcResult.map((res, i) => (
+                                <div key={i} className="bg-white/10 p-3 rounded-xl flex items-center gap-3 backdrop-blur-sm"><i className="fa-solid fa-check text-green-400"></i> <span className="font-bold text-sm">{res}</span></div>
+                            )) : <p className="text-center text-white/30 text-sm">Digite a área para calcular.</p>}
+                        </div>
+                    </div>
+                </div>
+            );
+
+            // Reusing existing components for other subviews to save space, but ensuring they are rendered
+            case 'BONUS_IA': return (
+                <div className="flex flex-col items-center justify-center min-h-[70vh] p-6 text-center animate-in fade-in">
+                    <div className="w-full max-w-sm bg-gradient-to-br from-slate-900 to-slate-950 rounded-[2.5rem] p-8 shadow-2xl relative overflow-hidden border border-slate-800 group">
+                        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20"></div>
+                        <div className="absolute -top-20 -right-20 w-40 h-40 bg-secondary/30 rounded-full blur-3xl animate-pulse"></div>
+                        <div className="relative z-10 flex flex-col items-center">
+                            <div className="w-28 h-28 rounded-full border-4 border-slate-800 p-1 bg-gradient-gold shadow-[0_0_30px_rgba(217,119,6,0.4)] mb-6 transform hover:scale-105 transition-transform duration-500">
+                                <img src={ZE_AVATAR} className="w-full h-full object-cover rounded-full bg-white" onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK}/>
+                            </div>
+                            <h2 className="text-3xl font-black text-white mb-2 tracking-tight">Zé da Obra <span className="text-secondary">AI</span></h2>
+                            <div className="h-1 w-12 bg-secondary rounded-full mb-6"></div>
+                            <p className="text-slate-400 text-sm mb-8 leading-relaxed font-medium">Seu engenheiro virtual particular.</p>
+                            {isPremium ? (
+                                <button onClick={() => setSubView('BONUS_IA_CHAT')} className="w-full py-4 bg-gradient-gold text-white font-black rounded-2xl shadow-lg hover:shadow-orange-500/20 hover:scale-105 transition-all flex items-center justify-center gap-3 group-hover:animate-pulse"><span>INICIAR CONVERSA</span><i className="fa-solid fa-comments"></i></button>
+                            ) : (
+                                <button onClick={() => navigate('/settings')} className="w-full py-4 bg-slate-800 text-slate-500 font-bold rounded-2xl border border-slate-700 flex items-center justify-center gap-2 hover:bg-slate-700 transition-colors"><i className="fa-solid fa-lock"></i> BLOQUEADO (PREMIUM)</button>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+
+            case 'BONUS_IA_CHAT': 
+                if (!isPremium) return null;
+                return (
+                <div className="flex flex-col h-[80vh]">
+                    <div className="flex-1 bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-inner overflow-y-auto mb-4 border border-slate-200 dark:border-slate-800">
+                            <div className="flex gap-4 mb-6">
+                            <img src={ZE_AVATAR} className="w-10 h-10 rounded-full border border-slate-200" onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK}/>
+                            <div className="bg-slate-100 dark:bg-slate-800 p-3 rounded-tr-xl rounded-b-xl text-sm shadow-sm"><p className="font-bold text-secondary mb-1">Zé da Obra</p><p>Opa! Mestre de obras na área.</p></div>
+                        </div>
+                        {aiResponse && (
+                            <div className="flex gap-4 mb-6 animate-in fade-in">
+                                <img src={ZE_AVATAR} className="w-10 h-10 rounded-full border border-slate-200" onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK}/>
+                                <div className="bg-slate-100 dark:bg-slate-800 p-3 rounded-tr-xl rounded-b-xl text-sm shadow-sm"><p className="font-bold text-secondary mb-1">Zé da Obra</p><p className="whitespace-pre-wrap">{aiResponse}</p></div>
+                            </div>
+                        )}
+                    </div>
+                    <div className="flex gap-2">
+                        <input value={aiMessage} onChange={e => setAiMessage(e.target.value)} placeholder="Pergunte ao Zé..." className="flex-1 p-4 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-secondary transition-colors"/>
+                        <button onClick={handleAiAsk} disabled={aiLoading} className="w-14 bg-secondary text-white rounded-xl flex items-center justify-center shadow-lg hover:bg-orange-600 transition-colors">{aiLoading ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-paper-plane"></i>}</button>
+                    </div>
+                </div>
+            );
+
+            case 'CONTRACTS': return (
+                <div className="space-y-4">
+                    {CONTRACT_TEMPLATES.map(ct => (
+                        <div key={ct.id} onClick={() => setViewContract({ title: ct.title, content: ct.contentTemplate })} className="group bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-secondary/50 cursor-pointer shadow-sm transition-all hover:translate-x-1">
+                            <div className="flex items-center gap-4">
+                                <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center text-xl group-hover:bg-indigo-600 group-hover:text-white transition-colors"><i className="fa-solid fa-file-contract"></i></div>
+                                <div><h4 className="font-bold text-primary dark:text-white">{ct.title}</h4><p className="text-xs text-slate-500">Toque para abrir modelo</p></div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            );
+
+            case 'CHECKLIST': return (
+                <div className="space-y-4">
+                    {STANDARD_CHECKLISTS.map((cl, idx) => (
+                        <div key={idx} className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
+                            <button onClick={() => setActiveChecklist(activeChecklist === cl.category ? null : cl.category)} className="w-full p-5 flex justify-between items-center text-left hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+                                <span className="font-bold text-sm flex items-center gap-3 text-primary dark:text-white"><div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${activeChecklist === cl.category ? 'bg-green-500 text-white' : 'bg-green-100 text-green-600'}`}><i className="fa-solid fa-list-check"></i></div>{cl.category}</span>
+                                <i className={`fa-solid fa-chevron-down transition-transform text-slate-400 ${activeChecklist === cl.category ? 'rotate-180' : ''}`}></i>
+                            </button>
+                            {activeChecklist === cl.category && (
+                                <div className="p-5 pt-0 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/30 animate-in slide-in-from-top-2">
+                                    {cl.items.map((item, i) => (
+                                        <label key={i} className="flex items-start gap-3 py-3 cursor-pointer border-b border-dashed border-slate-200 dark:border-slate-700 last:border-0 hover:bg-white/50 rounded-lg px-2 transition-colors">
+                                            <input type="checkbox" className="mt-1 rounded border-slate-300 text-secondary focus:ring-secondary w-5 h-5" />
+                                            <span className="text-sm text-slate-600 dark:text-slate-300 leading-tight">{item}</span>
+                                        </label>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            );
+
+            // PROJECTS reuse
+            case 'PROJECTS': return (
+                <div className="space-y-6">
+                    <label className="block w-full py-8 border-2 border-dashed border-teal-300 bg-teal-50 rounded-2xl cursor-pointer hover:bg-teal-100 transition-all text-center">
+                        <i className="fa-solid fa-file-pdf text-2xl text-teal-400 mb-2"></i>
+                        <span className="block text-sm font-bold text-teal-600">{uploading ? 'Enviando...' : 'Adicionar PDF/Projeto'}</span>
+                        <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'FILE')} disabled={uploading} />
+                    </label>
+                    <div className="space-y-2">{files.map(f => <div key={f.id} className="p-4 bg-white rounded-xl border flex items-center gap-3"><i className="fa-solid fa-file text-slate-400"></i> <span className="text-sm font-bold truncate flex-1">{f.name}</span><a href={f.url} download={f.name}><i className="fa-solid fa-download text-primary"></i></a></div>)}</div>
+                </div>
+            );
+
+            default: return null;
+        }
     };
 
     return (
         <div className="max-w-4xl mx-auto min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col font-sans relative">
             <div className="bg-white dark:bg-slate-900 px-6 pt-6 pb-2 sticky top-0 z-20 shadow-sm border-b border-slate-100 dark:border-slate-800">
                 <div className="flex justify-between items-center mb-1">
-                    <button onClick={() => navigate('/')} className="text-slate-400 hover:text-primary dark:hover:text-white"><i className="fa-solid fa-arrow-left text-xl"></i></button>
-                    <h1 className="text-lg font-black text-primary dark:text-white uppercase tracking-tight">{work.name}</h1>
+                    <button onClick={() => subView !== 'NONE' ? setSubView('NONE') : navigate('/')} className="text-slate-400 hover:text-primary dark:hover:text-white"><i className="fa-solid fa-arrow-left text-xl"></i></button>
+                    <h1 className="text-lg font-black text-primary dark:text-white uppercase tracking-tight truncate max-w-[200px]">
+                        {subView !== 'NONE' 
+                            ? (subView === 'TEAM' ? 'Minha Equipe' : subView === 'SUPPLIERS' ? 'Fornecedores' : subView === 'REPORTS' ? 'Relatórios' : 'Detalhes')
+                            : work.name
+                        }
+                    </h1>
                     <div className="w-6"></div> 
                 </div>
             </div>
 
             <div className="flex-1 p-4 pb-32 overflow-y-auto">
-                {renderMainTab()}
+                {subView !== 'NONE' ? renderSubViewContent() : renderMainTab()}
             </div>
 
-            <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 pb-safe z-40 shadow-[0_-5px_20px_rgba(0,0,0,0.05)]">
-                <div className="flex justify-around items-center max-w-4xl mx-auto h-16">
-                    <button onClick={() => setActiveTab('SCHEDULE')} className={`flex flex-col items-center justify-center w-full h-full gap-1 transition-all ${activeTab === 'SCHEDULE' ? 'text-secondary' : 'text-slate-400'}`}><i className={`fa-solid fa-calendar-days text-xl ${activeTab === 'SCHEDULE' ? 'scale-110' : ''}`}></i><span className="text-[10px] font-bold uppercase">Cronograma</span></button>
-                    <button onClick={() => setActiveTab('MATERIALS')} className={`flex flex-col items-center justify-center w-full h-full gap-1 transition-all ${activeTab === 'MATERIALS' ? 'text-secondary' : 'text-slate-400'}`}><i className={`fa-solid fa-layer-group text-xl ${activeTab === 'MATERIALS' ? 'scale-110' : ''}`}></i><span className="text-[10px] font-bold uppercase">Materiais</span></button>
-                    <button onClick={() => setActiveTab('FINANCIAL')} className={`flex flex-col items-center justify-center w-full h-full gap-1 transition-all ${activeTab === 'FINANCIAL' ? 'text-secondary' : 'text-slate-400'}`}><i className={`fa-solid fa-chart-pie text-xl ${activeTab === 'FINANCIAL' ? 'scale-110' : ''}`}></i><span className="text-[10px] font-bold uppercase">Financeiro</span></button>
-                    <button onClick={() => setActiveTab('MORE')} className={`flex flex-col items-center justify-center w-full h-full gap-1 transition-all ${activeTab === 'MORE' ? 'text-secondary' : 'text-slate-400'}`}><i className={`fa-solid fa-bars text-xl ${activeTab === 'MORE' ? 'scale-110' : ''}`}></i><span className="text-[10px] font-bold uppercase">Mais</span></button>
+            {/* MAIN NAVIGATION BOTTOM BAR (Only visible on main tabs) */}
+            {subView === 'NONE' && (
+                <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 pb-safe z-40 shadow-[0_-5px_20px_rgba(0,0,0,0.05)]">
+                    <div className="flex justify-around items-center max-w-4xl mx-auto h-16">
+                        <button onClick={() => setActiveTab('SCHEDULE')} className={`flex flex-col items-center justify-center w-full h-full gap-1 transition-all ${activeTab === 'SCHEDULE' ? 'text-secondary' : 'text-slate-400'}`}><i className={`fa-solid fa-calendar-days text-xl ${activeTab === 'SCHEDULE' ? 'scale-110' : ''}`}></i><span className="text-[10px] font-bold uppercase">Cronograma</span></button>
+                        <button onClick={() => setActiveTab('MATERIALS')} className={`flex flex-col items-center justify-center w-full h-full gap-1 transition-all ${activeTab === 'MATERIALS' ? 'text-secondary' : 'text-slate-400'}`}><i className={`fa-solid fa-layer-group text-xl ${activeTab === 'MATERIALS' ? 'scale-110' : ''}`}></i><span className="text-[10px] font-bold uppercase">Materiais</span></button>
+                        <button onClick={() => setActiveTab('FINANCIAL')} className={`flex flex-col items-center justify-center w-full h-full gap-1 transition-all ${activeTab === 'FINANCIAL' ? 'text-secondary' : 'text-slate-400'}`}><i className={`fa-solid fa-chart-pie text-xl ${activeTab === 'FINANCIAL' ? 'scale-110' : ''}`}></i><span className="text-[10px] font-bold uppercase">Financeiro</span></button>
+                        <button onClick={() => setActiveTab('MORE')} className={`flex flex-col items-center justify-center w-full h-full gap-1 transition-all ${activeTab === 'MORE' ? 'text-secondary' : 'text-slate-400'}`}><i className={`fa-solid fa-bars text-xl ${activeTab === 'MORE' ? 'scale-110' : ''}`}></i><span className="text-[10px] font-bold uppercase">Mais</span></button>
+                    </div>
                 </div>
-            </div>
+            )}
 
-            {/* --- MODALS --- */}
+            {/* --- ALL MODALS (RENDERED AT ROOT LEVEL) --- */}
             
             {/* ADD/EDIT STEP MODAL */}
             {isStepModalOpen && (
@@ -995,7 +945,13 @@ const WorkDetail: React.FC = () => {
                         <form onSubmit={handleAddExpense} className="space-y-4">
                             <input placeholder="Descrição (ex: Pagamento Pedreiro)" value={expDesc} onChange={e => setExpDesc(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required />
                             <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">R$</span><input type="number" placeholder="Valor Pago" value={expAmount} onChange={e => setExpAmount(e.target.value)} className="w-full pl-10 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required /></div>
-                            <div className="grid grid-cols-2 gap-2"><select value={expCategory} onChange={e => setExpCategory(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700"><option value={ExpenseCategory.LABOR}>Mão de Obra</option><option value={ExpenseCategory.MATERIAL}>Material</option><option value={ExpenseCategory.PERMITS}>Taxas</option><option value={ExpenseCategory.OTHER}>Outros</option></select><select value={expStepId} onChange={e => setExpStepId(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700"><option value="">Geral</option>{steps.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</select></div>
+                            <div className="grid grid-cols-2 gap-2"><select value={expCategory} onChange={e => setExpCategory(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700"><option value={ExpenseCategory.LABOR}>Mão de Obra</option><option value={ExpenseCategory.MATERIAL}>Material</option><option value={ExpenseCategory.PERMITS}>Taxas</option><option value={ExpenseCategory.OTHER}>Outros</option></select>
+                            
+                            {/* STEP SELECTION - ENSURING VISIBILITY */}
+                            <select value={expStepId} onChange={e => setExpStepId(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold text-sm">
+                                <option value="">Sem Etapa (Geral)</option>
+                                {steps.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                            </select></div>
                             <div className="flex gap-2"><button type="button" onClick={() => setAddExpenseModal(false)} className="flex-1 bg-slate-100 py-3 rounded-xl font-bold">Cancelar</button><button type="submit" className="flex-1 bg-primary text-white py-3 rounded-xl font-bold">Salvar</button></div>
                         </form>
                     </div>
