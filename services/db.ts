@@ -155,31 +155,51 @@ export const dbService = {
              const normalize = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
              const stepNorm = normalize(stepName);
 
-             // Mapeamento manual de pacotes
+             // Mapeamento manual de pacotes - LÓGICA REFINADA
              const pkg = FULL_MATERIAL_PACKAGES.find(p => {
                  const pkgNorm = normalize(p.category);
                  
-                 // 1. Match exato parcial
-                 if (stepNorm.includes(pkgNorm.substring(0, 4))) return true; 
+                 // 1. Limpeza de Obra (e.g. "Limpeza do terreno", "Retirada de entulho", "Demolição")
+                 // Exclui 'Final' para não conflitar com Limpeza Final
+                 if ((stepNorm.includes('limpeza') || stepNorm.includes('entulho') || stepNorm.includes('demolicao')) 
+                     && !stepNorm.includes('final') 
+                     && pkgNorm.includes('limpeza de obra')) {
+                     return true;
+                 }
                  
-                 // 2. Mapeamentos específicos atualizados
-                 // 'Limpeza' mapeia para 'Limpeza de Obra' (só itens de limpeza)
-                 // EXCLUI 'Limpeza Final' deste check para não duplicar
-                 if ((stepNorm.includes('limpeza') || stepNorm.includes('entulho') || stepNorm.includes('demolicao')) && !stepNorm.includes('final') && pkgNorm.includes('limpeza de obra')) return true;
-                 
-                 // 'Fundações' mapeia para 'Fundação Estrutural' (cimento, ferro, etc)
+                 // 2. Fundação (e.g. "Fundações")
                  if (stepNorm.includes('fundacao') && pkgNorm.includes('fundacao')) return true;
 
-                 if (stepNorm.includes('parede') && pkgNorm.includes('alvenaria')) return true;
-                 if (stepNorm.includes('laje') && pkgNorm.includes('alvenaria')) return true;
-                 if (stepNorm.includes('agua') && pkgNorm.includes('hidraulica')) return true;
-                 if (stepNorm.includes('esgoto') && pkgNorm.includes('hidraulica')) return true;
-                 if (stepNorm.includes('fiacao') && pkgNorm.includes('eletrica')) return true;
-                 if (stepNorm.includes('luz') && pkgNorm.includes('eletrica')) return true;
-                 if (stepNorm.includes('piso') && pkgNorm.includes('acabamento')) return true;
-                 if (stepNorm.includes('azulejo') && pkgNorm.includes('acabamento')) return true;
-                 if (stepNorm.includes('chapisco') && pkgNorm.includes('alvenaria')) return true; 
+                 // 3. Alvenaria Estrutural (e.g. "Levantamento de paredes")
+                 // Exclui explicitamente 'reboco' para não adicionar tijolos no reboco
+                 if ((stepNorm.includes('parede') || stepNorm.includes('alvenaria')) 
+                     && !stepNorm.includes('reboco')
+                     && pkgNorm.includes('alvenaria')) {
+                     return true;
+                 }
+
+                 // 4. Chapisco e Reboco
+                 if ((stepNorm.includes('reboco') || stepNorm.includes('chapisco')) && pkgNorm.includes('chapisco')) return true;
+
+                 // 5. Contrapiso (específico para diferenciar de Pisos/Acabamento)
+                 if (stepNorm.includes('contrapiso') && pkgNorm.includes('contrapiso')) return true;
+
+                 // 6. Pisos e Revestimentos (e.g. "Pisos", "Azulejos")
+                 // Deve conter 'piso' ou 'azulejo', mas NÃO 'contrapiso'
+                 if ((stepNorm.includes('piso') || stepNorm.includes('azulejo') || stepNorm.includes('revestimento')) 
+                     && !stepNorm.includes('contrapiso')
+                     && pkgNorm.includes('pisos e revestimentos')) {
+                     return true;
+                 }
+
+                 // 7. Instalações
+                 if ((stepNorm.includes('agua') || stepNorm.includes('esgoto') || stepNorm.includes('hidraulica')) && pkgNorm.includes('hidraulica')) return true;
+                 if ((stepNorm.includes('fiacao') || stepNorm.includes('luz') || stepNorm.includes('eletrica')) && pkgNorm.includes('eletrica')) return true;
+
+                 // 8. Louças e Metais
                  if ((stepNorm.includes('louca') || stepNorm.includes('metal') || stepNorm.includes('banheiro') || stepNorm.includes('instala')) && pkgNorm.includes('loucas e metais')) return true;
+
+                 // 9. Limpeza Final
                  if ((stepNorm.includes('entrega') || stepNorm.includes('final')) && pkgNorm.includes('limpeza final')) return true;
 
                  return false;
