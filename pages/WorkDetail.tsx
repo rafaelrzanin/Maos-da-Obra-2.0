@@ -565,7 +565,7 @@ const WorkDetail: React.FC = () => {
                             )}
                             {reportTab === 'MAT' && (
                                 <div className="space-y-6">
-                                    {steps.map((step, i) => {
+                                    {steps.map((step) => {
                                         const stepMaterials = materials.filter(m => m.stepId === step.id);
                                         if (stepMaterials.length === 0) return null;
                                         return (
