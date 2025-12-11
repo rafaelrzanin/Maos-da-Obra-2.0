@@ -1,230 +1,530 @@
-// NO TOPO de /api/create-card.ts
-// 1. IMPORTAÇÃO E INICIALIZAÇÃO DO SUPABASE
-import { createClient } from '@supabase/supabase-js'; 
 
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY; // Chave de serviço Admin
-const supabase = SUPABASE_URL && SUPABASE_SERVICE_KEY 
-    ? createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
-    : null;
+import { 
+  User, Work, Step, Material, Expense, Worker, Supplier, 
+  WorkPhoto, WorkFile, Notification, PlanType, StepStatus,
+  ExpenseCategory, FileCategory
+} from '../types';
+import { WORK_TEMPLATES } from './standards';
+import { supabase } from './supabase';
 
+const DB_KEY = 'maos_da_obra_db';
 
-export default async function handler(req, res) {
-  // 1. Configuração de Segurança (CORS) - MANTIDA
-  res.setHeader('Access-Control-Allow-Credentials', true);
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,POST');
-  res.setHeader(
-    'Access-Control-Allow-Headers',
-    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization, x-public-key, x-secret-key'
-  );
+// --- HELPER: Mapeamento de Snake_case (Banco) para CamelCase (App) ---
+const mapProfileFromSupabase = (data: any): User => ({
+    id: data.id,
+    name: data.name || 'Usuário',
+    email: data.email || '',
+    whatsapp: data.whatsapp,
+    cpf: data.cpf,
+    plan: data.plan as PlanType,
+    subscriptionExpiresAt: data.subscription_expires_at
+});
 
-  if (req.method === 'OPTIONS') return res.status(200).end();
-  if (req.method !== 'POST') {
-    return res.status(405).json({ erro: "METHOD_NOT_ALLOWED", mensagem: "Apenas requisições POST são permitidas para esta API." });
-  }
+export const dbService = {
+  
+  // --- AUTHENTICATION & PROFILE ---
 
-  try {
-    console.log("--> [CARTÃO] Iniciando processamento...");
-
-    // 2. Carrega as chaves da Vercel
-    const publicKey = process.env.NEON_PUBLIC_KEY;
-    const secretKey = process.env.NEON_SECRET_KEY;
-
-    // Garante que o Supabase e as chaves Neon estejam configuradas
-    if (!supabase) {
-        return res.status(500).json({ erro: "DB_CONFIG_ERROR", mensagem: "Chaves do Supabase (URL/KEY) não configuradas no servidor." });
+  getCurrentUser: (): User | null => {
+    const json = localStorage.getItem('maos_user');
+    try { return json ? JSON.parse(json) : null; } catch { return null; }
+  },
+  
+  syncSession: async (): Promise<User | null> => {
+    if (!supabase) return dbService.getCurrentUser();
+    
+    // 1. Verificar sessão ativa
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) {
+        localStorage.removeItem('maos_user');
+        return null;
     }
-    if (!publicKey || !secretKey) {
-        return res.status(500).json({ erro: "CONFIG_ERROR", mensagem: "Chaves de API (NEON_PUBLIC_KEY ou NEON_SECRET_KEY) não configuradas." });
-    }
-    
-    const API_BASE_URL = process.env.NEON_API_BASE_URL || 'https://app.neonpay.com.br/api/v1';
 
-    const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
-    const { amount, card, client, installments, planType } = body;
-
-    // Validação de segurança
-    if (!client.document || client.document.length < 11) {
-        return res.status(400).json({ erro: "MISSING_CLIENT_DOCUMENT", mensagem: "Documento (CPF/CNPJ) do cliente é obrigatório." });
-    }
-
-    // Garante que amount seja number e válido
-    const numericAmount = parseFloat(amount);
-    if (isNaN(numericAmount) || numericAmount <= 0) {
-        return res.status(400).json({ erro: "INVALID_AMOUNT", mensagem: "O valor do pagamento é inválido." });
-    }
-
-    // 3. Define se é Assinatura ou Pagamento Único
-    const isSubscription = planType.toUpperCase() !== 'VITALICIO';
-    
-    const subEndpoint = isSubscription ? '/gateway/card/subscription' : '/gateway/card/receive';
-    
-    console.log(`--> [CARTÃO] Modo: ${isSubscription ? 'ASSINATURA' : 'PAGAMENTO ÚNICO'}`);
-
-    // CORREÇÃO DE FORMATO: Expiração (MM/AA -> YYYY-MM)
-    const [mes, anoCurto] = card.expiry.split('/');
-    const anoCompleto = `20${anoCurto}`;
-    const expiresAtFormatado = `${anoCompleto}-${mes}`;
-
-    // CORREÇÃO DE FORMATO DO NOME DO TITULAR
-    const cleanOwnerName = card.name
-        .toUpperCase()
-        .replace(/[^A-Z\s]/g, '')
-        .substring(0, 60);
-
-    // 4. Monta o Payload (Dados)
-    let payload: any = { 
-        identifier: body.identifier || `txn_${Date.now()}`,
-        amount: numericAmount, 
-        clientIp: req.headers['x-forwarded-for'] || "127.0.0.1",
-        client: {
-            name: client.name,
-            email: client.email,
-            phone: client.phone,
-            document: client.document, 
-            address: { 
-                country: "BR",
-                state: "SP", 
-                city: "São Paulo", 
-                neighborhood: "Centro", 
-                zipCode: "01001-000",
-                street: "Rua Digital",
-                number: "100"
-            }
-        },
-        paymentMethod: { 
-            type: "card", 
-            card: {
-                number: card.number.replace(/\s/g, ''),
-                owner: cleanOwnerName, 
-                expiresAt: expiresAtFormatado, 
-                cvv: card.cvv
-            }
-        }
-    };
-
-    // Ajustes de Assinatura/Produto
-    if (isSubscription) {
-        payload.subscription = {
-            periodicityType: "MONTHS",
-            periodicity: planType.toUpperCase() === 'SEMESTRAL' ? 6 : 1, 
-            firstChargeIn: 0 
-        };
-        payload.products = [{
-            id: planType.toLowerCase(),
-            name: `Plano ${planType}`,
-            quantity: 1,
-            price: numericAmount
-        }];
-    } else {
-        // Pagamento Único (Vitalício)
-        payload.installments = parseInt(installments || 1);
-        payload.products = [
-            {
-                id: "vitalicio",
-                name: "Acesso Vitalício",
-                quantity: 1,
-                price: numericAmount
-            }
-        ];
-    }
-
-    const logPayload = { ...payload, paymentMethod: { type: 'card', card: { number: card.number.substring(0, 4) + '****', cvv: '***' } } };
-    console.log("--> [CARTÃO] Payload sendo enviado (Debug):", JSON.stringify(logPayload, null, 2));
-
-    const finalUrl = `${API_BASE_URL}${subEndpoint}`;
-
-    let response;
-    let rawResponseText = '';
-    let data;
-
-    try {
-        // 5. Envia para a Neon
-        response = await fetch(finalUrl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'x-public-key': publicKey,
-                'x-secret-key': secretKey
-            },
-            body: JSON.stringify(payload)
-        });
-        
-        rawResponseText = await response.text();
-        data = JSON.parse(rawResponseText);
-
-    } catch (fetchError) {
-        // Tratamento de erro de comunicação
-        console.error("--> [CARTÃO] Erro de rede/JSON:", fetchError);
-        return res.status(500).json({ erro: "API_COMM_ERROR", mensagem: "Falha na comunicação com o servidor Neon Pay." });
-    }
-
-
-    if (!response.ok) {
-        console.error("--> [CARTÃO] Erro Neon:", JSON.stringify(data, null, 2));
-        const neonMessage = data.message || (data.details && data.details.description) || "Pagamento não autorizado. Verifique os dados do cartão.";
-
-        return res.status(response.status).json({
-            erro: "TRANSACAO_NEGADA",
-            mensagem: neonMessage,
-            detalhes: data
-        });
-    }
-
-    // -----------------------------------------------------------
-    // NOVO BLOCO CRÍTICO: SINCRONIZAÇÃO COM SUPABASE (Após Sucesso)
-    // -----------------------------------------------------------
-    try {
-        const clientEmail = client.email; 
-        const neonTxnId = data.transactionId; // ID da transação Neon Pay
-
-        // Payload de atualização do perfil
-        const updateData = {
-            plan_status: 'ACTIVE', 
-            plan_type: planType.toUpperCase(), 
-            neon_txn_id: neonTxnId,
-            updated_at: new Date().toISOString()
-        };
-
-        // 1. Tenta atualizar o perfil existente (Se o usuário já estiver na tabela profiles)
-        const { error: updateError, data: updatedProfile } = await supabase
-            .from('profiles')
-            .update(updateData)
-            .eq('email', clientEmail)
-            .select();
-
-        if (updateError || !updatedProfile || updatedProfile.length === 0) {
-             // 2. Se a atualização falhar ou não encontrar, tenta criar um novo perfil (Fallback)
-             console.log(`[SUPABASE] Perfil não encontrado. Tentando criar para ${clientEmail}.`);
-             const { error: insertError } = await supabase.from('profiles').insert([
-                 { 
-                     email: clientEmail, 
-                     name: client.name,
-                     cpf: client.document,
-                     ...updateData // Inclui os dados do plano
-                 }
-             ]);
-
-             if (insertError) {
-                 console.error("--> [SUPABASE] ERRO CRÍTICO ao INSERIR perfil:", insertError);
-                 // Não lançamos erro aqui, pois o cliente já pagou.
-             }
-        }
-        
-        console.log(`--> [SUPABASE] Perfil de ${clientEmail} sincronizado com ACTIVE.`);
-        
-    } catch (dbError) {
-        console.error("--> [CARTÃO] ERRO: Falha catastrófica ao sincronizar perfil Supabase:", dbError);
+    // 2. Buscar perfil atualizado
+    const profile = await dbService.getUserProfile(session.user.id);
+    if (profile) {
+        localStorage.setItem('maos_user', JSON.stringify(profile));
+        return profile;
     }
-    // -----------------------------------------------------------
+    
+    // 3. Auto-correção: Se tem sessão mas não tem perfil, cria agora
+    return await dbService.createProfileFromAuth(session.user);
+  },
 
+  onAuthChange: (callback: (user: User | null) => void) => {
+     if (!supabase) return () => {};
+     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+        if (event === 'SIGNED_IN' && session?.user) {
+            let user = await dbService.getUserProfile(session.user.id);
+            if (!user) user = await dbService.createProfileFromAuth(session.user);
+            
+            localStorage.setItem('maos_user', JSON.stringify(user));
+            callback(user);
+        } else if (event === 'SIGNED_OUT') {
+            localStorage.removeItem('maos_user');
+            callback(null);
+        }
+     });
+     return () => subscription.unsubscribe();
+  },
 
-    console.log("--> [CARTÃO] Sucesso! ID:", data.transactionId);
-    return res.status(200).json(data);
+  isSubscriptionActive: (user: User) => {
+    if (user.plan === PlanType.VITALICIO) return true;
+    if (!user.subscriptionExpiresAt) return false;
+    return new Date(user.subscriptionExpiresAt) > new Date();
+  },
 
-  } catch (error) {
-    console.error("--> [CARTÃO] Erro Crítico:", error);
-    return res.status(500).json({ erro: "INTERNAL_ERROR", mensagem: error.message });
-  }
-}
+  // Busca perfil na tabela 'profiles'
+  getUserProfile: async (userId: string): Promise<User | null> => {
+      if (!supabase) return null;
+      try {
+          const { data, error } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', userId)
+              .single();
+          
+          if (error || !data) return null;
+          return mapProfileFromSupabase(data);
+      } catch (e) {
+          console.error("Erro ao buscar perfil:", e);
+          return null;
+      }
+  },
+
+  // Cria perfil na tabela 'profiles' baseado no usuário Auth (Self-healing)
+  createProfileFromAuth: async (authUser: any, metadata: any = {}): Promise<User | null> => {
+      if (!supabase) return null;
+      
+      const newProfile = {
+          id: authUser.id,
+          email: authUser.email,
+          name: metadata.name || authUser.user_metadata?.name || 'Usuário',
+          whatsapp: metadata.whatsapp || authUser.user_metadata?.whatsapp || '',
+          cpf: metadata.cpf || authUser.user_metadata?.cpf || '',
+          plan: metadata.plan || null,
+          subscription_expires_at: metadata.plan ? new Date(Date.now() + 30*24*60*60*1000).toISOString() : null
+      };
+
+      const { error } = await supabase.from('profiles').upsert([newProfile]);
+      
+      if (error) {
+          console.error("Erro ao criar perfil:", error);
+          return null;
+      }
+      return mapProfileFromSupabase(newProfile);
+  },
+
+  login: async (email: string, password?: string): Promise<User | null> => {
+     if (!supabase) throw new Error("Erro de conexão: Supabase não configurado.");
+     if (!password) throw new Error("Senha obrigatória.");
+
+     // 1. Auth com Supabase
+     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+     if (error) throw error;
+     if (!data.user) return null;
+
+     // 2. Busca Perfil
+     let profile = await dbService.getUserProfile(data.user.id);
+     
+     // 3. Fallback Crítico: Se o Auth existe mas o Profile não, cria agora.
+     if (!profile) {
+         console.warn("Perfil ausente para usuário autenticado. Criando...");
+         profile = await dbService.createProfileFromAuth(data.user);
+     }
+
+     if (profile) localStorage.setItem('maos_user', JSON.stringify(profile));
+     return profile;
+  },
+
+  signup: async (name: string, email: string, whatsapp: string, password?: string, cpf?: string, planType?: string | null): Promise<User | null> => {
+      if (!supabase) throw new Error("Supabase não configurado.");
+      if (!password) throw new Error("Senha obrigatória.");
+
+      // 1. Criar Usuário no Auth
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+          email,
+          password,
+          options: { data: { name, whatsapp, cpf } }
+      });
+
+      if (authError) throw authError;
+      if (!authData.user) return null;
+
+      // 2. Inserir na tabela 'profiles'
+      const initialPlan = (planType as PlanType) || null;
+      const profile = await dbService.createProfileFromAuth(authData.user, { name, whatsapp, cpf, plan: initialPlan });
+
+      if (!profile) throw new Error("Conta criada, mas houve erro ao salvar o perfil. Tente fazer login.");
+
+      localStorage.setItem('maos_user', JSON.stringify(profile));
+      return profile;
+  },
+
+  logout: async () => {
+      if (supabase) await supabase.auth.signOut();
+      localStorage.removeItem('maos_user');
+  },
+
+  updateUser: async (userId: string, data: Partial<User>, newPassword?: string) => {
+      if (!supabase) return;
+      
+      // Atualiza tabela profiles
+      const updates: any = {};
+      if (data.name) updates.name = data.name;
+      if (data.whatsapp) updates.whatsapp = data.whatsapp;
+      
+      if (Object.keys(updates).length > 0) {
+          await supabase.from('profiles').update(updates).eq('id', userId);
+      }
+
+      // Atualiza senha se fornecida
+      if (newPassword) {
+          await supabase.auth.updateUser({ password: newPassword });
+      }
+  },
+
+  updatePlan: async (userId: string, plan: PlanType) => {
+      if (!supabase) return;
+      // Define expiração baseada no plano
+      let expires = new Date();
+      if (plan === PlanType.MENSAL) expires.setDate(expires.getDate() + 30);
+      else if (plan === PlanType.SEMESTRAL) expires.setDate(expires.getDate() + 180);
+      else if (plan === PlanType.VITALICIO) expires.setFullYear(expires.getFullYear() + 100);
+
+      await supabase.from('profiles').update({
+          plan: plan,
+          subscription_expires_at: expires.toISOString()
+      }).eq('id', userId);
+  },
+
+  resetPassword: async (email: string) => {
+      if (!supabase) return false;
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: window.location.origin + '/settings',
+      });
+      return !error;
+  },
+
+  loginSocial: async (provider: 'google') => {
+      if (!supabase) return { user: null, error: 'No Supabase' };
+      const { data, error } = await supabase.auth.signInWithOAuth({
+          provider: provider,
+          options: { redirectTo: window.location.origin }
+      });
+      return { user: data, error };
+  },
+
+  // --- DATA METHODS (CRUD) ---
+
+  // 1. WORKS (OBRAS)
+  getWorks: async (userId: string): Promise<Work[]> => {
+      if (!supabase) return [];
+      const { data } = await supabase.from('works').select('*').eq('userId', userId);
+      return (data || []).map(w => ({
+          ...w,
+          budgetPlanned: Number(w.budgetPlanned), // Ensure number
+          area: Number(w.area)
+      }));
+  },
+
+  getWorkById: async (workId: string): Promise<Work | null> => {
+      if (!supabase) return null;
+      const { data, error } = await supabase.from('works').select('*').eq('id', workId).single();
+      if (error || !data) return null;
+      return {
+          ...data,
+          budgetPlanned: Number(data.budgetPlanned),
+          area: Number(data.area)
+      } as Work;
+  },
+
+  createWork: async (work: Omit<Work, 'id'>, templateId?: string): Promise<Work> => {
+      if (!supabase) throw new Error("Offline");
+      
+      // 1. Insert Work
+      const { data, error } = await supabase.from('works').insert([{
+          userId: work.userId,
+          name: work.name,
+          address: work.address,
+          budgetPlanned: work.budgetPlanned,
+          startDate: work.startDate,
+          endDate: work.endDate,
+          area: work.area,
+          status: work.status || 'Planejamento',
+          notes: work.notes
+      }]).select().single();
+
+      if (error || !data) throw error || new Error("Erro ao criar obra");
+      const newWork = data as Work;
+
+      // 2. Apply Template (Steps) if selected
+      if (templateId) {
+          const template = WORK_TEMPLATES.find(t => t.id === templateId);
+          if (template) {
+              const stepsPayload = template.includedSteps.map(stepName => ({
+                  workId: newWork.id,
+                  name: stepName,
+                  startDate: newWork.startDate,
+                  endDate: newWork.endDate,
+                  status: 'NAO_INICIADO',
+                  isDelayed: false
+              }));
+              await supabase.from('steps').insert(stepsPayload);
+          }
+      }
+      return newWork;
+  },
+
+  deleteWork: async (workId: string) => {
+      if (!supabase) return;
+      await supabase.from('works').delete().eq('id', workId);
+  },
+
+  // 2. STEPS (ETAPAS)
+  getSteps: async (workId: string): Promise<Step[]> => {
+      if (!supabase) return [];
+      const { data } = await supabase.from('steps').select('*').eq('workId', workId);
+      return (data || []) as Step[];
+  },
+
+  addStep: async (step: Step) => {
+      if (!supabase) return;
+      await supabase.from('steps').insert([{
+          workId: step.workId,
+          name: step.name,
+          startDate: step.startDate,
+          endDate: step.endDate,
+          status: step.status
+      }]);
+  },
+
+  updateStep: async (step: Step) => {
+      if (!supabase) return;
+      await supabase.from('steps').update({
+          name: step.name,
+          startDate: step.startDate,
+          endDate: step.endDate,
+          status: step.status
+      }).eq('id', step.id);
+  },
+
+  // 3. MATERIALS
+  getMaterials: async (workId: string): Promise<Material[]> => {
+      if (!supabase) return [];
+      const { data } = await supabase.from('materials').select('*').eq('workId', workId);
+      return (data || []) as Material[];
+  },
+
+  addMaterial: async (material: Material, purchaseData?: { qty: number, cost: number, date: string }) => {
+      if (!supabase) return;
+      
+      const { data: matData, error } = await supabase.from('materials').insert([{
+          workId: material.workId,
+          name: material.name,
+          brand: material.brand,
+          plannedQty: material.plannedQty,
+          purchasedQty: purchaseData ? purchaseData.qty : 0,
+          unit: material.unit,
+          stepId: material.stepId
+      }]).select().single();
+
+      if (purchaseData && matData) {
+          await dbService.addExpense({
+              id: '', // DB generates
+              workId: material.workId,
+              description: `Compra: ${material.name}`,
+              amount: purchaseData.cost,
+              date: purchaseData.date,
+              category: ExpenseCategory.MATERIAL,
+              relatedMaterialId: matData.id,
+              stepId: material.stepId
+          });
+      }
+  },
+
+  updateMaterial: async (material: Material) => {
+      if (!supabase) return;
+      await supabase.from('materials').update({
+          name: material.name,
+          brand: material.brand,
+          plannedQty: material.plannedQty,
+          unit: material.unit
+      }).eq('id', material.id);
+  },
+
+  registerMaterialPurchase: async (matId: string, name: string, brand: string, plannedQty: number, unit: string, buyQty: number, cost: number) => {
+      if (!supabase) return;
+      
+      // 1. Get current
+      const { data: current } = await supabase.from('materials').select('purchasedQty, workId, stepId').eq('id', matId).single();
+      if (!current) return;
+
+      // 2. Update Qty
+      const newQty = (current.purchasedQty || 0) + buyQty;
+      await supabase.from('materials').update({ purchasedQty: newQty }).eq('id', matId);
+
+      // 3. Add Expense
+      await dbService.addExpense({
+          id: '',
+          workId: current.workId,
+          description: `Compra: ${name}`,
+          amount: cost,
+          date: new Date().toISOString(),
+          category: ExpenseCategory.MATERIAL,
+          relatedMaterialId: matId,
+          stepId: current.stepId
+      });
+  },
+
+  // 4. EXPENSES (FINANCEIRO)
+  getExpenses: async (workId: string): Promise<Expense[]> => {
+      if (!supabase) return [];
+      const { data } = await supabase.from('expenses').select('*').eq('workId', workId);
+      return (data || []) as Expense[];
+  },
+
+  addExpense: async (expense: Expense) => {
+      if (!supabase) return;
+      await supabase.from('expenses').insert([{
+          workId: expense.workId,
+          description: expense.description,
+          amount: expense.amount,
+          date: expense.date,
+          category: expense.category,
+          stepId: expense.stepId,
+          relatedMaterialId: expense.relatedMaterialId,
+          totalAgreed: expense.totalAgreed
+      }]);
+  },
+
+  updateExpense: async (expense: Expense) => {
+      if (!supabase) return;
+      await supabase.from('expenses').update({
+          description: expense.description,
+          amount: expense.amount,
+          date: expense.date,
+          category: expense.category,
+          stepId: expense.stepId,
+          totalAgreed: expense.totalAgreed
+      }).eq('id', expense.id);
+  },
+
+  deleteExpense: async (id: string) => {
+      if (!supabase) return;
+      await supabase.from('expenses').delete().eq('id', id);
+  },
+
+  // 5. TEAMS & SUPPLIERS
+  getWorkers: async (userId: string): Promise<Worker[]> => {
+      if (!supabase) return [];
+      const { data } = await supabase.from('workers').select('*').eq('userId', userId);
+      return (data || []) as Worker[];
+  },
+  addWorker: async (worker: Omit<Worker, 'id'>) => {
+      if (!supabase) return;
+      await supabase.from('workers').insert([{
+          userId: worker.userId,
+          name: worker.name,
+          role: worker.role,
+          phone: worker.phone,
+          notes: worker.notes
+      }]);
+  },
+  updateWorker: async (worker: Worker) => {
+      if (!supabase) return;
+      await supabase.from('workers').update(worker).eq('id', worker.id);
+  },
+  deleteWorker: async (id: string) => {
+      if (supabase) await supabase.from('workers').delete().eq('id', id);
+  },
+
+  getSuppliers: async (userId: string): Promise<Supplier[]> => {
+      if (!supabase) return [];
+      const { data } = await supabase.from('suppliers').select('*').eq('userId', userId);
+      return (data || []) as Supplier[];
+  },
+  addSupplier: async (supplier: Omit<Supplier, 'id'>) => {
+      if (!supabase) return;
+      await supabase.from('suppliers').insert([{
+          userId: supplier.userId,
+          name: supplier.name,
+          category: supplier.category,
+          phone: supplier.phone,
+          notes: supplier.notes
+      }]);
+  },
+  updateSupplier: async (supplier: Supplier) => {
+      if (!supabase) return;
+      await supabase.from('suppliers').update(supplier).eq('id', supplier.id);
+  },
+  deleteSupplier: async (id: string) => {
+      if (supabase) await supabase.from('suppliers').delete().eq('id', id);
+  },
+
+  // 6. PHOTOS & FILES
+  getPhotos: async (workId: string): Promise<WorkPhoto[]> => {
+      if (!supabase) return [];
+      const { data } = await supabase.from('photos').select('*').eq('workId', workId);
+      return (data || []) as WorkPhoto[];
+  },
+  addPhoto: async (photo: WorkPhoto) => {
+      if (!supabase) return;
+      await supabase.from('photos').insert([{
+          workId: photo.workId,
+          url: photo.url,
+          description: photo.description,
+          date: photo.date,
+          type: photo.type
+      }]);
+  },
+
+  getFiles: async (workId: string): Promise<WorkFile[]> => {
+      if (!supabase) return [];
+      const { data } = await supabase.from('files').select('*').eq('workId', workId);
+      return (data || []) as WorkFile[];
+  },
+  addFile: async (file: WorkFile) => {
+      if (!supabase) return;
+      await supabase.from('files').insert([{
+          workId: file.workId,
+          name: file.name,
+          category: file.category,
+          url: file.url,
+          type: file.type,
+          date: file.date
+      }]);
+  },
+
+  // 7. NOTIFICATIONS & DASHBOARD
+  getNotifications: async (userId: string): Promise<Notification[]> => {
+      return []; 
+  },
+  dismissNotification: async (id: string) => {},
+  clearAllNotifications: async (userId: string) => {},
+  generateSmartNotifications: async (userId: string, workId: string) => {},
+
+  calculateWorkStats: async (workId: string) => {
+      if (!supabase) return { totalSpent: 0, progress: 0, delayedSteps: 0 };
+      
+      const { data: expenses } = await supabase.from('expenses').select('amount').eq('workId', workId);
+      const totalSpent = (expenses || []).reduce((acc, curr) => acc + Number(curr.amount), 0);
+
+      const { data: steps } = await supabase.from('steps').select('status').eq('workId', workId);
+      const totalSteps = steps?.length || 0;
+      const completed = steps?.filter(s => s.status === 'CONCLUIDO').length || 0;
+      const progress = totalSteps > 0 ? Math.round((completed / totalSteps) * 100) : 0;
+
+      return { totalSpent, progress, delayedSteps: 0 };
+  },
+
+  getDailySummary: async (workId: string) => {
+      return { completedSteps: 0, delayedSteps: 0, pendingMaterials: 0, totalSteps: 0 };
+  },
+
+  generatePix: async (amount: number, user: any) => {
+      return {
+          qr_code_base64: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+          copy_paste_code: "00020126360014BR.GOV.BCB.PIX0114+551199999999520400005303986540410.005802BR5913Maos da Obra6008Sao Paulo62070503***6304E2CA"
+      };
+  }
+};
