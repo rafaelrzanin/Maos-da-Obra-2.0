@@ -85,6 +85,9 @@ const WorkDetail: React.FC = () => {
     const [expCategory, setExpCategory] = useState<string>(ExpenseCategory.LABOR);
     const [expStepId, setExpStepId] = useState('');
     const [expDate, setExpDate] = useState('');
+    
+    // FINANCIAL HISTORY STATE
+    const [paymentHistory, setPaymentHistory] = useState({ totalPaid: 0, lastTotalAgreed: 0 });
 
     const [isPersonModalOpen, setIsPersonModalOpen] = useState(false);
     const [personMode, setPersonMode] = useState<'WORKER'|'SUPPLIER'>('WORKER');
@@ -136,6 +139,28 @@ const WorkDetail: React.FC = () => {
     };
 
     useEffect(() => { load(); }, [id]);
+
+    // --- EFFECT: Calculate Financial History on Description Change ---
+    useEffect(() => {
+        const fetchHistory = async () => {
+            if (work && expDesc.trim().length > 2) {
+                // If editing, pass current ID to exclude it from history sum
+                const excludeId = expenseModal.mode === 'EDIT' ? expenseModal.id : undefined;
+                const history = await dbService.getPaymentHistory(work.id, expDesc, excludeId);
+                setPaymentHistory(history);
+                
+                // Auto-fill Total Agreed if not manually set yet (and exists in history)
+                if (!expTotalAgreed && history.lastTotalAgreed > 0) {
+                    setExpTotalAgreed(String(history.lastTotalAgreed));
+                }
+            } else {
+                setPaymentHistory({ totalPaid: 0, lastTotalAgreed: 0 });
+            }
+        };
+        const timer = setTimeout(fetchHistory, 500); // Debounce
+        return () => clearTimeout(timer);
+    }, [expDesc, work, expenseModal.mode, expenseModal.id]);
+
 
     // --- HANDLERS ---
 
@@ -245,6 +270,7 @@ const WorkDetail: React.FC = () => {
         setExpCategory(ExpenseCategory.LABOR);
         setExpStepId('');
         setExpDate(new Date().toISOString().split('T')[0]);
+        setPaymentHistory({ totalPaid: 0, lastTotalAgreed: 0 });
     };
 
     const openEditExpense = (expense: Expense) => {
@@ -255,6 +281,7 @@ const WorkDetail: React.FC = () => {
         setExpCategory(expense.category);
         setExpStepId(expense.stepId || '');
         setExpDate(expense.date.split('T')[0]);
+        // History triggers on effect
     };
 
     const handleSaveExpense = async (e: React.FormEvent) => {
@@ -371,10 +398,10 @@ const WorkDetail: React.FC = () => {
 
         if (personMode === 'WORKER') {
             if (personId) await dbService.updateWorker({ ...payload, id: personId, role: personRole });
-            else await dbService.addWorker({ ...payload, role: personRole, id: '' });
+            else await dbService.addWorker({ ...payload, role: personRole, id: 'temp-id' });
         } else {
             if (personId) await dbService.updateSupplier({ ...payload, id: personId, category: personRole });
-            else await dbService.addSupplier({ ...payload, category: personRole, id: '' });
+            else await dbService.addSupplier({ ...payload, category: personRole, id: 'temp-id' });
         }
         
         await load();
