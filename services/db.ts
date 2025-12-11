@@ -64,7 +64,7 @@ export const dbService = {
      
      let user = db.users.find((u: User) => u.email === cleanEmail);
      
-     // --- FALLBACK: CREATE TEST USER IF NOT EXISTS (Tecnicamente obrigatório se o banco estiver vazio) ---
+     // --- FALLBACK: CREATE TEST USER IF NOT EXISTS (Safety net) ---
      if (cleanEmail === 'teste@maosdaobra.com' && !user) {
          user = {
              id: 'user-teste-id',
@@ -72,7 +72,7 @@ export const dbService = {
              email: 'teste@maosdaobra.com',
              whatsapp: '11999999999',
              plan: PlanType.VITALICIO,
-             subscriptionExpiresAt: new Date(Date.now() + 36500 * 24 * 60 * 60 * 1000).toISOString() // 100 anos
+             subscriptionExpiresAt: new Date(Date.now() + 36500 * 24 * 60 * 60 * 1000).toISOString() // 100 years
          };
          if (!Array.isArray(db.users)) db.users = [];
          db.users.push(user);
@@ -80,12 +80,13 @@ export const dbService = {
      }
 
      if (user) {
-         // RECUPERAÇÃO DE DADOS ÓRFÃOS (Segurança para não perder dados se o ID mudou)
+         // RECUPERAÇÃO DE DADOS ÓRFÃOS (Safety for lost IDs)
          if (db.works.length > 0) {
              const worksNotOwned = db.works.filter((w: Work) => w.userId !== user!.id && w.userId === 'demo-user-id');
              if (worksNotOwned.length > 0) {
                  db.works.forEach((w: Work) => { if(w.userId === 'demo-user-id') w.userId = user!.id; });
-                 // Steps are linked via workId, no need to update userId on them directly if strict relation isn't enforced there
+                 // Removed unused variable 's' to fix TS6133
+                 db.steps.forEach(() => { /* steps linked via workId */ });
                  saveLocalDb(db);
              }
          }
@@ -189,7 +190,7 @@ export const dbService = {
       // 1. Save Work
       db.works.push(newWork);
 
-      // 2. Generate Steps from Template (RESTAURADO)
+      // 2. Generate Steps from Template (RESTORED)
       if (templateId) {
           const template = WORK_TEMPLATES.find(t => t.id === templateId);
           if (template) {
@@ -214,8 +215,7 @@ export const dbService = {
                   };
                   db.steps.push(newStep);
 
-                  // 3. Generate Materials for this Step (RESTAURADO)
-                  // Simple matching logic: find a catalog category that matches the step name somewhat
+                  // 3. Generate Materials for this Step (RESTORED)
                   const catalog = FULL_MATERIAL_PACKAGES.find(c => 
                       stepName.toLowerCase().includes(c.category.split(' ')[0].toLowerCase()) ||
                       c.category.toLowerCase().includes(stepName.toLowerCase())
@@ -223,7 +223,6 @@ export const dbService = {
 
                   if (catalog) {
                       catalog.items.forEach(item => {
-                          // Calculate quantity based on area/size if multiplier exists
                           let qty = 1;
                           if (item.multiplier) {
                               qty = Math.ceil(item.multiplier * (newWork.area || 50));
@@ -387,7 +386,7 @@ export const dbService = {
       saveLocalDb(db);
   },
 
-  // Lógica Financeira Acumulativa (CORREÇÃO PEDIDA)
+  // CUMULATIVE FINANCIAL LOGIC (Corrected)
   getPaymentHistory: async (workId: string, description: string, excludeId?: string): Promise<{ totalPaid: number, lastTotalAgreed: number }> => {
       const db = getLocalDb();
       if (!description) return { totalPaid: 0, lastTotalAgreed: 0 };
@@ -395,7 +394,7 @@ export const dbService = {
       const normalize = (str: string) => str.toLowerCase().trim();
       const targetDesc = normalize(description);
 
-      // Soma de TUDO que já foi pago com essa descrição, exceto o lançamento atual (se for edição)
+      // Sum everything already paid with this description, excluding current if editing
       const relevant = db.expenses.filter((e: Expense) => 
           e.workId === workId && 
           normalize(e.description) === targetDesc &&
@@ -404,7 +403,7 @@ export const dbService = {
       
       const totalPaid = relevant.reduce((acc: number, curr: Expense) => acc + (Number(curr.amount) || 0), 0);
       
-      // Pega o último "total combinado" definido em qualquer registro anterior
+      // Get the most recent "total agreed" from history
       const lastAgreedItem = relevant
         .sort((a: Expense, b: Expense) => new Date(b.date).getTime() - new Date(a.date).getTime())
         .find((e: Expense) => e.totalAgreed && Number(e.totalAgreed) > 0);
