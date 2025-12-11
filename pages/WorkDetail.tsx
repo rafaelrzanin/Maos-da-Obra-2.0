@@ -389,22 +389,41 @@ const WorkDetail: React.FC = () => {
                          const isDone = step.status === StepStatus.COMPLETED;
                          const isInProgress = step.status === StepStatus.IN_PROGRESS;
                          
+                         // Determine Delay (Late) status
+                         const today = new Date().toISOString().split('T')[0];
+                         const isDelayed = step.endDate < today && !isDone;
+
                          let statusBadgeClass = 'bg-slate-100 text-slate-500';
                          let statusText = 'Pendente';
-                         
+                         let cardBorderClass = 'border-slate-100 dark:border-slate-800';
+                         let iconColor = 'border-slate-200 text-slate-300';
+                         let iconClass = 'fa-play';
+
                          if (isDone) {
                              statusBadgeClass = 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400';
                              statusText = 'Concluído';
+                             cardBorderClass = 'border-green-200 dark:border-green-900/30';
+                             iconColor = 'bg-green-500 border-green-500 text-white';
+                             iconClass = 'fa-check';
+                         } else if (isDelayed) {
+                             // Red style for delayed items
+                             statusBadgeClass = 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400';
+                             statusText = 'Atrasado';
+                             cardBorderClass = 'border-red-200 dark:border-red-900/30';
+                             iconColor = 'bg-red-500 border-red-500 text-white animate-pulse';
+                             iconClass = 'fa-triangle-exclamation';
                          } else if (isInProgress) {
                              statusBadgeClass = 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400';
                              statusText = 'Em Andamento';
+                             iconColor = 'bg-secondary border-secondary text-white';
+                             iconClass = 'fa-hammer';
                          }
 
                          return (
-                            <div key={step.id} className={`group bg-white dark:bg-slate-900 p-5 rounded-2xl border shadow-sm transition-all hover:shadow-md relative overflow-hidden ${isDone ? 'border-green-200 dark:border-green-900/30' : 'border-slate-100 dark:border-slate-800'}`}>
+                            <div key={step.id} className={`group bg-white dark:bg-slate-900 p-5 rounded-2xl border shadow-sm transition-all hover:shadow-md relative overflow-hidden ${cardBorderClass}`}>
                                 <div className="flex items-center gap-4">
-                                    <button onClick={() => handleStepStatusClick(step)} className={`w-10 h-10 rounded-xl border-2 flex items-center justify-center shrink-0 transition-all ${isDone ? 'bg-green-500 border-green-500 text-white' : isInProgress ? 'bg-secondary border-secondary text-white' : 'border-slate-200 text-slate-300'}`}>
-                                        <i className={`fa-solid ${isDone ? 'fa-check' : isInProgress ? 'fa-hammer' : 'fa-play'}`}></i>
+                                    <button onClick={() => handleStepStatusClick(step)} className={`w-10 h-10 rounded-xl border-2 flex items-center justify-center shrink-0 transition-all ${iconColor}`}>
+                                        <i className={`fa-solid ${iconClass}`}></i>
                                     </button>
                                     <div className="flex-1 cursor-pointer" onClick={() => { setStepModalMode('EDIT'); setCurrentStepId(step.id); setStepName(step.name); setStepStart(step.startDate.split('T')[0]); setStepEnd(step.endDate.split('T')[0]); setIsStepModalOpen(true); }}>
                                         <div className="flex justify-between items-start mb-2">
@@ -506,41 +525,49 @@ const WorkDetail: React.FC = () => {
                         </div>
                         <button onClick={() => setAddExpenseModal(true)} className="bg-green-600 text-white w-12 h-12 rounded-xl flex items-center justify-center hover:bg-green-700 transition-all shadow-lg shadow-green-600/30"><i className="fa-solid fa-plus text-lg"></i></button>
                     </div>
+                    
                     <div className="bg-gradient-premium p-6 rounded-3xl text-white shadow-xl relative overflow-hidden mb-8">
                         <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2"></div>
                         <p className="text-sm opacity-80 font-medium mb-1">Total Gasto na Obra</p>
                         <h3 className="text-4xl font-black mb-4 tracking-tight">R$ {expenses.reduce((sum, e) => sum + Number(e.amount), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h3>
                         <div className="flex items-center gap-2 text-xs opacity-70 bg-white/10 w-fit px-3 py-1 rounded-full"><i className="fa-solid fa-wallet"></i> Orçamento: R$ {work.budgetPlanned.toLocaleString('pt-BR')}</div>
                     </div>
-                    {expenses.map(exp => {
-                        // Find related step info
-                        const relatedStepIndex = steps.findIndex(s => s.id === exp.stepId);
-                        const relatedStep = steps[relatedStepIndex];
-                        const stepLabel = relatedStep 
-                            ? `${String(relatedStepIndex + 1).padStart(2, '0')} Etapa: ${relatedStep.name}`
-                            : 'Geral / Sem Etapa';
+
+                    {/* Grouped Financial Expenses by Step */}
+                    {[...steps, { id: 'general', name: 'Despesas Gerais / Sem Etapa', startDate: '', endDate: '', status: StepStatus.NOT_STARTED, workId: '', isDelayed: false }].map((step, idx) => {
+                        const stepExpenses = expenses.filter(e => {
+                            if (step.id === 'general') return !e.stepId; // Expenses without stepId
+                            return e.stepId === step.id;
+                        });
+
+                        if (stepExpenses.length === 0) return null;
+
+                        const isGeneral = step.id === 'general';
+                        const stepLabel = isGeneral ? step.name : `${String(idx + 1).padStart(2, '0')} Etapa: ${step.name}`;
 
                         return (
-                            <div key={exp.id} className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm mb-3">
-                                {/* Header: Step Info */}
-                                <div className="mb-2 pb-2 border-b border-slate-50 dark:border-slate-800 flex justify-between items-center">
-                                    <span className="text-[10px] font-bold text-secondary uppercase tracking-wider bg-secondary/5 px-2 py-0.5 rounded">{stepLabel}</span>
-                                    <span className="text-[10px] text-slate-400">{parseDateNoTimezone(exp.date.split('T')[0])}</span>
+                            <div key={step.id} className="mb-6">
+                                <div className="mb-3 pl-2 flex items-center gap-2">
+                                    {!isGeneral && <div className="w-2 h-2 rounded-full bg-secondary"></div>}
+                                    <h3 className={`font-bold uppercase tracking-wide ${isGeneral ? 'text-slate-400 text-xs' : 'text-primary dark:text-white text-sm'}`}>{stepLabel}</h3>
                                 </div>
-
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-4">
-                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${exp.category === 'Material' ? 'bg-amber-100 text-amber-600' : 'bg-blue-100 text-blue-600'}`}>
-                                            <i className={`fa-solid ${exp.category === 'Material' ? 'fa-box' : 'fa-helmet-safety'}`}></i>
+                                <div className="space-y-3">
+                                    {stepExpenses.map(exp => (
+                                        <div key={exp.id} className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm flex items-center justify-between">
+                                            <div className="flex items-center gap-4">
+                                                <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${exp.category === 'Material' ? 'bg-amber-100 text-amber-600' : 'bg-blue-100 text-blue-600'}`}>
+                                                    <i className={`fa-solid ${exp.category === 'Material' ? 'fa-box' : 'fa-helmet-safety'}`}></i>
+                                                </div>
+                                                <div>
+                                                    <p className="font-bold text-primary dark:text-white text-base leading-tight">{exp.description}</p>
+                                                    <p className="text-xs text-slate-500 mt-0.5">
+                                                        {exp.category} • {parseDateNoTimezone(exp.date.split('T')[0])}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <span className="font-bold text-primary dark:text-white text-lg whitespace-nowrap">R$ {Number(exp.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                                         </div>
-                                        <div>
-                                            <p className="font-bold text-primary dark:text-white text-base leading-tight">{exp.description}</p>
-                                            <p className="text-xs text-slate-500 mt-0.5">
-                                                Compra de item ({exp.category})
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <span className="font-bold text-primary dark:text-white text-lg whitespace-nowrap">R$ {Number(exp.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                    ))}
                                 </div>
                             </div>
                         );
@@ -642,7 +669,8 @@ const WorkDetail: React.FC = () => {
                         {workers.map(w => (
                             <div key={w.id} className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm flex items-center justify-between">
                                 <div className="flex items-center gap-4 cursor-pointer flex-1" onClick={() => openPersonModal('WORKER', w)}>
-                                    <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 text-xl"><i className="fa-solid fa-user-helmet-safety"></i></div>
+                                    {/* FIXED ICON: HELMET */}
+                                    <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 text-xl"><i className="fa-solid fa-helmet-safety"></i></div>
                                     <div><h4 className="font-bold text-primary dark:text-white">{w.name}</h4><p className="text-xs text-slate-500 font-bold">{w.role}</p></div>
                                 </div>
                                 <div className="flex gap-2">
