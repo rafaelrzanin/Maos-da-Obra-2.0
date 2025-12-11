@@ -457,16 +457,32 @@ const WorkDetail: React.FC = () => {
                                 <div className="space-y-3">
                                     {stepMaterials.map(mat => {
                                         const hasPlanned = mat.plannedQty > 0;
-                                        const progress = hasPlanned ? Math.min(100, (mat.purchasedQty / mat.plannedQty) * 100) : 0;
-                                        const isComplete = hasPlanned && mat.purchasedQty >= mat.plannedQty;
+                                        const purchased = mat.purchasedQty;
+                                        const progress = hasPlanned ? Math.min(100, (purchased / mat.plannedQty) * 100) : 0;
+                                        
+                                        // Logic for Partial/Complete/Pending
+                                        let statusText = 'Pendente';
+                                        let statusColor = 'bg-slate-100 text-slate-500';
+                                        let barColor = 'bg-slate-200';
+
+                                        if (purchased >= mat.plannedQty) {
+                                            statusText = 'Concluído';
+                                            statusColor = 'bg-green-100 text-green-700';
+                                            barColor = 'bg-green-500';
+                                        } else if (purchased > 0) {
+                                            statusText = 'Parcial';
+                                            statusColor = 'bg-orange-100 text-orange-600';
+                                            barColor = 'bg-secondary'; // Orange/Amber
+                                        }
+
                                         return (
-                                            <div key={mat.id} onClick={() => { setMaterialModal({isOpen: true, material: mat}); setMatName(mat.name); setMatBrand(mat.brand||''); setMatPlannedQty(String(mat.plannedQty)); setMatUnit(mat.unit); setMatBuyQty(''); setMatBuyCost(''); }} className={`bg-white dark:bg-slate-900 p-4 rounded-2xl border shadow-sm cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md ${isComplete ? 'border-green-200 dark:border-green-900/30' : 'border-slate-100 dark:border-slate-800'}`}>
+                                            <div key={mat.id} onClick={() => { setMaterialModal({isOpen: true, material: mat}); setMatName(mat.name); setMatBrand(mat.brand||''); setMatPlannedQty(String(mat.plannedQty)); setMatUnit(mat.unit); setMatBuyQty(''); setMatBuyCost(''); }} className={`bg-white dark:bg-slate-900 p-4 rounded-2xl border shadow-sm cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md ${statusText === 'Concluído' ? 'border-green-200 dark:border-green-900/30' : 'border-slate-100 dark:border-slate-800'}`}>
                                                 <div className="flex justify-between items-start mb-2">
                                                     <div><div className="font-bold text-primary dark:text-white text-base leading-tight">{mat.name}</div>{mat.brand && <div className="text-xs text-slate-400 font-bold uppercase mt-0.5">{mat.brand}</div>}</div>
-                                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${isComplete ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}`}>{isComplete ? 'OK' : 'Pendente'}</span>
+                                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${statusColor}`}>{statusText}</span>
                                                 </div>
                                                 <div className="mt-3 flex items-center gap-3">
-                                                    <div className="flex-1 h-2.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden"><div className={`h-full transition-all duration-500 ${isComplete ? 'bg-green-500' : 'bg-amber-500'}`} style={{ width: `${progress}%` }}></div></div>
+                                                    <div className="flex-1 h-2.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden"><div className={`h-full transition-all duration-500 ${barColor}`} style={{ width: `${progress}%` }}></div></div>
                                                     <div className="text-xs font-mono font-bold text-slate-500 whitespace-nowrap bg-slate-50 dark:bg-slate-800 px-2 py-1 rounded">{mat.purchasedQty}/{mat.plannedQty} {mat.unit}</div>
                                                 </div>
                                             </div>
@@ -497,21 +513,34 @@ const WorkDetail: React.FC = () => {
                         <div className="flex items-center gap-2 text-xs opacity-70 bg-white/10 w-fit px-3 py-1 rounded-full"><i className="fa-solid fa-wallet"></i> Orçamento: R$ {work.budgetPlanned.toLocaleString('pt-BR')}</div>
                     </div>
                     {expenses.map(exp => {
-                        const relatedStep = steps.find(s => s.id === exp.stepId);
+                        // Find related step info
+                        const relatedStepIndex = steps.findIndex(s => s.id === exp.stepId);
+                        const relatedStep = steps[relatedStepIndex];
+                        const stepLabel = relatedStep 
+                            ? `${String(relatedStepIndex + 1).padStart(2, '0')} Etapa: ${relatedStep.name}`
+                            : 'Geral / Sem Etapa';
+
                         return (
-                            <div key={exp.id} className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm mb-3">
-                                <div className="flex items-center justify-between mb-2">
+                            <div key={exp.id} className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm mb-3">
+                                {/* Header: Step Info */}
+                                <div className="mb-2 pb-2 border-b border-slate-50 dark:border-slate-800 flex justify-between items-center">
+                                    <span className="text-[10px] font-bold text-secondary uppercase tracking-wider bg-secondary/5 px-2 py-0.5 rounded">{stepLabel}</span>
+                                    <span className="text-[10px] text-slate-400">{parseDateNoTimezone(exp.date.split('T')[0])}</span>
+                                </div>
+
+                                <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-4">
-                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${exp.category === 'Material' ? 'bg-amber-100 text-amber-600' : 'bg-blue-100 text-blue-600'}`}><i className={`fa-solid ${exp.category === 'Material' ? 'fa-box' : 'fa-helmet-safety'}`}></i></div>
+                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${exp.category === 'Material' ? 'bg-amber-100 text-amber-600' : 'bg-blue-100 text-blue-600'}`}>
+                                            <i className={`fa-solid ${exp.category === 'Material' ? 'fa-box' : 'fa-helmet-safety'}`}></i>
+                                        </div>
                                         <div>
-                                            <p className="font-bold text-primary dark:text-white text-sm">{exp.description}</p>
-                                            <div className="flex flex-wrap gap-2 mt-1">
-                                                <span className="text-[10px] bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded text-slate-500 uppercase tracking-wide">{parseDateNoTimezone(exp.date.split('T')[0])}</span>
-                                                {relatedStep && <span className="text-[10px] bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300 px-2 py-0.5 rounded font-bold"><i className="fa-solid fa-link mr-1"></i>{relatedStep.name}</span>}
-                                            </div>
+                                            <p className="font-bold text-primary dark:text-white text-base leading-tight">{exp.description}</p>
+                                            <p className="text-xs text-slate-500 mt-0.5">
+                                                Compra de item ({exp.category})
+                                            </p>
                                         </div>
                                     </div>
-                                    <span className="font-bold text-primary dark:text-white">R$ {Number(exp.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                    <span className="font-bold text-primary dark:text-white text-lg whitespace-nowrap">R$ {Number(exp.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                                 </div>
                             </div>
                         );
@@ -616,7 +645,19 @@ const WorkDetail: React.FC = () => {
                                     <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 text-xl"><i className="fa-solid fa-user-helmet-safety"></i></div>
                                     <div><h4 className="font-bold text-primary dark:text-white">{w.name}</h4><p className="text-xs text-slate-500 font-bold">{w.role}</p></div>
                                 </div>
-                                <button onClick={() => handleDeletePerson(w.id, 'WORKER')} className="w-10 h-10 rounded-xl text-red-500 hover:bg-red-50 transition-colors"><i className="fa-solid fa-trash"></i></button>
+                                <div className="flex gap-2">
+                                    {w.phone && (
+                                        <a 
+                                            href={`https://wa.me/55${w.phone.replace(/\D/g, '')}`} 
+                                            target="_blank" 
+                                            rel="noopener noreferrer"
+                                            className="w-10 h-10 rounded-xl bg-green-100 text-green-600 hover:bg-green-200 transition-colors flex items-center justify-center"
+                                        >
+                                            <i className="fa-brands fa-whatsapp text-lg"></i>
+                                        </a>
+                                    )}
+                                    <button onClick={() => handleDeletePerson(w.id, 'WORKER')} className="w-10 h-10 rounded-xl text-red-500 hover:bg-red-50 transition-colors"><i className="fa-solid fa-trash"></i></button>
+                                </div>
                             </div>
                         ))}
                     </div>
@@ -639,7 +680,19 @@ const WorkDetail: React.FC = () => {
                                     <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 text-xl"><i className="fa-solid fa-store"></i></div>
                                     <div><h4 className="font-bold text-primary dark:text-white">{s.name}</h4><p className="text-xs text-slate-500 font-bold">{s.category}</p></div>
                                 </div>
-                                <button onClick={() => handleDeletePerson(s.id, 'SUPPLIER')} className="w-10 h-10 rounded-xl text-red-500 hover:bg-red-50 transition-colors"><i className="fa-solid fa-trash"></i></button>
+                                <div className="flex gap-2">
+                                    {s.phone && (
+                                        <a 
+                                            href={`https://wa.me/55${s.phone.replace(/\D/g, '')}`} 
+                                            target="_blank" 
+                                            rel="noopener noreferrer"
+                                            className="w-10 h-10 rounded-xl bg-green-100 text-green-600 hover:bg-green-200 transition-colors flex items-center justify-center"
+                                        >
+                                            <i className="fa-brands fa-whatsapp text-lg"></i>
+                                        </a>
+                                    )}
+                                    <button onClick={() => handleDeletePerson(s.id, 'SUPPLIER')} className="w-10 h-10 rounded-xl text-red-500 hover:bg-red-50 transition-colors"><i className="fa-solid fa-trash"></i></button>
+                                </div>
                             </div>
                         ))}
                     </div>
