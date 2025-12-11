@@ -606,6 +606,9 @@ const WorkDetail: React.FC = () => {
                         {steps.map((step, idx) => {
                             const stepExpenses = expenses.filter(e => e.stepId === step.id);
                             
+                            // HIDE BLANK PHASES IN FINANCIAL VIEW
+                            if (stepExpenses.length === 0) return null;
+
                             return (
                                 <div key={step.id} className="mb-8">
                                     <div className="flex items-center gap-3 mb-4 pl-2 border-b border-slate-200 dark:border-slate-800 pb-2">
@@ -617,12 +620,6 @@ const WorkDetail: React.FC = () => {
                                     </div>
 
                                     <div className="space-y-3">
-                                        {stepExpenses.length === 0 && (
-                                            <div className="px-4 py-4 bg-white/50 dark:bg-slate-800/30 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700 text-center">
-                                                <p className="text-xs text-slate-400">Nenhum lançamento nesta etapa.</p>
-                                            </div>
-                                        )}
-
                                         {stepExpenses.map(exp => (
                                             <div key={exp.id} className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm">
                                                 <div className="flex items-center justify-between mb-2">
