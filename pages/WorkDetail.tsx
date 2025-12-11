@@ -56,6 +56,9 @@ const WorkDetail: React.FC = () => {
     const [stepStart, setStepStart] = useState('');
     const [stepEnd, setStepEnd] = useState('');
     
+    // Material Filter
+    const [materialFilterStepId, setMaterialFilterStepId] = useState<string>('ALL');
+
     const [materialModal, setMaterialModal] = useState<{ isOpen: boolean, material: Material | null }>({ isOpen: false, material: null });
     const [matName, setMatName] = useState('');
     const [matBrand, setMatBrand] = useState('');
@@ -205,15 +208,31 @@ const WorkDetail: React.FC = () => {
         e.preventDefault();
         if (!materialModal.material) return;
         
-        await dbService.registerMaterialPurchase(
-            materialModal.material.id,
-            matName,
-            matBrand,
-            Number(matPlannedQty),
-            matUnit,
-            Number(matBuyQty),
-            Number(matBuyCost)
-        );
+        const hasPurchase = matBuyQty && Number(matBuyQty) > 0;
+
+        // 1. Update Definition
+        const updatedMaterial = {
+            ...materialModal.material,
+            name: matName,
+            brand: matBrand,
+            plannedQty: Number(matPlannedQty),
+            unit: matUnit
+        };
+        await dbService.updateMaterial(updatedMaterial);
+
+        // 2. Register Purchase (if applicable)
+        if (hasPurchase) {
+            await dbService.registerMaterialPurchase(
+                materialModal.material.id,
+                matName,
+                matBrand,
+                Number(matPlannedQty),
+                matUnit,
+                Number(matBuyQty),
+                Number(matBuyCost)
+            );
+        }
+
         setMaterialModal({ isOpen: false, material: null });
         await load();
     };
@@ -504,26 +523,57 @@ const WorkDetail: React.FC = () => {
         }
 
         if (activeTab === 'MATERIALS') {
+             // Filter Logic
+             const filteredSteps = materialFilterStepId === 'ALL' 
+                ? steps 
+                : steps.filter(s => s.id === materialFilterStepId);
+
              return (
                 <div className="space-y-6 animate-in fade-in">
-                    <div className="flex justify-between items-end mb-2 px-2 sticky top-0 z-10 bg-slate-50 dark:bg-slate-950 py-2">
-                        <div>
-                            <h2 className="text-2xl font-black text-primary dark:text-white">Materiais</h2>
-                            <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Controle de Compras</p>
+                    <div className="sticky top-0 z-20 bg-slate-50 dark:bg-slate-950 pb-2">
+                        <div className="flex justify-between items-end mb-2 px-2">
+                            <div>
+                                <h2 className="text-2xl font-black text-primary dark:text-white">Materiais</h2>
+                                <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Controle de Compras</p>
+                            </div>
+                            <button onClick={() => setAddMatModal(true)} className="bg-primary text-white w-12 h-12 rounded-xl flex items-center justify-center hover:bg-primary-light transition-all shadow-lg shadow-primary/30"><i className="fa-solid fa-plus text-lg"></i></button>
                         </div>
-                        <button onClick={() => setAddMatModal(true)} className="bg-primary text-white w-12 h-12 rounded-xl flex items-center justify-center hover:bg-primary-light transition-all shadow-lg shadow-primary/30"><i className="fa-solid fa-plus text-lg"></i></button>
+                        
+                        {/* STEP FILTER DROPDOWN */}
+                        <div className="px-2">
+                            <select 
+                                value={materialFilterStepId}
+                                onChange={(e) => setMaterialFilterStepId(e.target.value)}
+                                className="w-full p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 font-bold text-sm text-slate-600 dark:text-slate-300 shadow-sm focus:border-secondary focus:ring-1 focus:ring-secondary outline-none transition-all"
+                            >
+                                <option value="ALL">Todas as Etapas</option>
+                                {steps.map((s, idx) => (
+                                    <option key={s.id} value={s.id}>{String(idx+1).padStart(2, '0')}. {s.name}</option>
+                                ))}
+                            </select>
+                        </div>
                     </div>
-                    {steps.map((step, idx) => {
+
+                    {filteredSteps.map((step, idx) => {
+                        const originalIdx = steps.findIndex(s => s.id === step.id); // For correct numbering
                         const stepMaterials = materials ? materials.filter(m => m.stepId === step.id) : [];
+                        
+                        if (stepMaterials.length === 0 && materialFilterStepId !== 'ALL') {
+                            return <div key={step.id} className="text-center text-slate-400 py-8 italic text-sm">Sem materiais cadastrados nesta etapa.</div>;
+                        }
                         if (stepMaterials.length === 0) return null;
                         
                         return (
-                            <div key={step.id} className="mb-8">
-                                <div className="flex items-center gap-3 mb-4 pl-2 border-b border-slate-200 dark:border-slate-800 pb-2">
-                                    <div className="w-8 h-8 rounded-lg bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 flex items-center justify-center font-black text-sm">{String(idx+1).padStart(2,'0')}</div>
-                                    <h3 className="font-bold text-lg text-primary dark:text-white">{step.name}</h3>
+                            <div key={step.id} className="mb-8 bg-white/50 dark:bg-slate-900/50 rounded-2xl p-2">
+                                {/* Stronger Visual Separation for Step Header */}
+                                <div className="flex items-center gap-3 mb-4 p-3 bg-white dark:bg-slate-900 rounded-xl shadow-sm border-l-4 border-secondary">
+                                    <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 text-secondary font-black text-sm flex items-center justify-center">
+                                        {String(originalIdx+1).padStart(2,'0')}
+                                    </div>
+                                    <h3 className="font-bold text-lg text-primary dark:text-white uppercase tracking-tight">{step.name}</h3>
                                 </div>
-                                <div className="space-y-3">
+
+                                <div className="space-y-3 px-1">
                                     {stepMaterials.map(mat => {
                                         const hasPlanned = mat.plannedQty > 0;
                                         const purchased = mat.purchasedQty;
@@ -608,7 +658,11 @@ const WorkDetail: React.FC = () => {
                                         const progress = isPartial ? (exp.amount / exp.totalAgreed!) * 100 : 100;
 
                                         return (
-                                            <div key={exp.id} className="relative group bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm transition-all hover:shadow-md">
+                                            <div 
+                                                key={exp.id} 
+                                                onClick={() => openEditExpense(exp)}
+                                                className="relative group bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm transition-all hover:shadow-md cursor-pointer hover:border-secondary/30"
+                                            >
                                                 <div className="flex items-center justify-between mb-2">
                                                     <div className="flex items-center gap-4">
                                                         <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${exp.category === 'Material' ? 'bg-amber-100 text-amber-600' : 'bg-blue-100 text-blue-600'}`}>
@@ -622,6 +676,7 @@ const WorkDetail: React.FC = () => {
                                                         </div>
                                                     </div>
                                                     <div className="text-right">
+                                                        {/* MAIN VALUE IS ALWAYS PAID AMOUNT */}
                                                         <span className="font-bold text-primary dark:text-white text-lg whitespace-nowrap">R$ {Number(exp.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                                                     </div>
                                                 </div>
@@ -630,7 +685,7 @@ const WorkDetail: React.FC = () => {
                                                 {isPartial && (
                                                     <div className="mt-2 pt-2 border-t border-dashed border-slate-100 dark:border-slate-800">
                                                         <div className="flex justify-between text-[10px] uppercase font-bold text-slate-400 mb-1">
-                                                            <span>Parcial</span>
+                                                            <span>Pago: R$ {exp.amount.toLocaleString('pt-BR')}</span>
                                                             <span>Total: R$ {exp.totalAgreed?.toLocaleString('pt-BR')}</span>
                                                         </div>
                                                         <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
@@ -638,14 +693,6 @@ const WorkDetail: React.FC = () => {
                                                         </div>
                                                     </div>
                                                 )}
-
-                                                {/* EDIT BUTTON (Visible on Hover/Touch) */}
-                                                <button 
-                                                    onClick={() => openEditExpense(exp)}
-                                                    className="absolute top-2 right-2 p-2 text-slate-300 hover:text-secondary opacity-0 group-hover:opacity-100 transition-opacity"
-                                                >
-                                                    <i className="fa-solid fa-pen-to-square"></i>
-                                                </button>
                                             </div>
                                         );
                                     })}
@@ -1170,14 +1217,61 @@ const WorkDetail: React.FC = () => {
             {/* EDIT MATERIAL MODAL */}
             {materialModal.isOpen && materialModal.material && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
-                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-6 shadow-2xl">
-                        <h3 className="text-xl font-bold mb-1 text-primary dark:text-white">{materialModal.material.name}</h3>
-                        <p className="text-xs text-slate-500 mb-4 uppercase font-bold">Atualizar Estoque</p>
-                        <form onSubmit={handleUpdateMaterial} className="space-y-4">
-                            <div className="bg-slate-50 dark:bg-slate-800 p-3 rounded-xl border border-slate-200 dark:border-slate-700 flex justify-between items-center"><span className="text-sm font-bold">Planejado:</span><span className="font-mono font-bold">{materialModal.material.plannedQty} {materialModal.material.unit}</span></div>
-                            <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded-xl border border-green-200 dark:border-green-900 flex justify-between items-center"><span className="text-sm font-bold text-green-700 dark:text-green-400">Já Comprado:</span><span className="font-mono font-bold text-green-700 dark:text-green-400">{materialModal.material.purchasedQty} {materialModal.material.unit}</span></div>
-                            <div className="pt-2"><label className="block text-xs font-bold text-slate-400 uppercase mb-1">Nova Compra</label><div className="grid grid-cols-2 gap-2"><input type="number" placeholder="Qtd" value={matBuyQty} onChange={e => setMatBuyQty(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" /><input type="number" placeholder="Valor (R$)" value={matBuyCost} onChange={e => setMatBuyCost(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" /></div></div>
-                            <div className="flex gap-2"><button type="button" onClick={() => setMaterialModal({isOpen: false, material: null})} className="flex-1 bg-slate-100 py-3 rounded-xl font-bold">Cancelar</button><button type="submit" className="flex-1 bg-primary text-white py-3 rounded-xl font-bold">Registrar</button></div>
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-6 shadow-2xl overflow-y-auto max-h-[90vh]">
+                        <h3 className="text-xl font-bold mb-4 text-primary dark:text-white">Editar Material</h3>
+                        
+                        <form onSubmit={handleUpdateMaterial} className="space-y-6">
+                            {/* EDITABLE DEFINITION */}
+                            <div className="space-y-3">
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Nome do Produto</label>
+                                    <input 
+                                        value={matName} 
+                                        onChange={e => setMatName(e.target.value)} 
+                                        className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold"
+                                    />
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Qtd Planejada</label>
+                                        <input 
+                                            type="number"
+                                            value={matPlannedQty} 
+                                            onChange={e => setMatPlannedQty(e.target.value)} 
+                                            className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Unidade</label>
+                                        <input 
+                                            value={matUnit} 
+                                            onChange={e => setMatUnit(e.target.value)} 
+                                            className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* READ-ONLY STATUS */}
+                            <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-xl border border-green-200 dark:border-green-900 flex justify-between items-center">
+                                <span className="text-sm font-bold text-green-700 dark:text-green-400">Total Já Comprado:</span>
+                                <span className="font-mono font-black text-lg text-green-700 dark:text-green-400">{materialModal.material.purchasedQty} {materialModal.material.unit}</span>
+                            </div>
+
+                            {/* OPTIONAL NEW PURCHASE */}
+                            <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
+                                <label className="block text-xs font-black text-secondary uppercase mb-2 tracking-widest"><i className="fa-solid fa-cart-plus"></i> Registrar Nova Compra</label>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <input type="number" placeholder="Qtd" value={matBuyQty} onChange={e => setMatBuyQty(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" />
+                                    <input type="number" placeholder="Valor (R$)" value={matBuyCost} onChange={e => setMatBuyCost(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" />
+                                </div>
+                                <p className="text-[10px] text-slate-400 mt-2">*Preencha apenas se houver nova compra. Se quiser só corrigir o nome/planejado, deixe vazio.</p>
+                            </div>
+
+                            <div className="flex gap-2">
+                                <button type="button" onClick={() => setMaterialModal({isOpen: false, material: null})} className="flex-1 bg-slate-100 py-3 rounded-xl font-bold">Cancelar</button>
+                                <button type="submit" className="flex-1 bg-primary text-white py-3 rounded-xl font-bold shadow-lg">Salvar Alterações</button>
+                            </div>
                         </form>
                     </div>
                 </div>
