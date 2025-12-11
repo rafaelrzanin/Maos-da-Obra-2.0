@@ -140,7 +140,6 @@ export interface MaterialCatalog {
 }
 
 export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
-  // ... (Mantenho os pacotes que já foram enriquecidos anteriormente, sem alterações aqui para economizar espaço de resposta, pois já estão corretos)
   {
     category: 'Limpeza e Canteiro',
     items: [
@@ -425,53 +424,109 @@ export const CONTRACT_TEMPLATES = [
 
 export const STANDARD_CHECKLISTS = [
   {
-    category: 'Início de Obra',
+    category: '01. Serviços Preliminares e Canteiro',
     items: [
-      'Água e Luz ligados no terreno',
-      'Barracão e Banheiro para equipe',
-      'Projetos impressos e plastificados',
-      'Documentação da Prefeitura (Alvará)',
-      'EPIs básicos (Capacete, Botas, Luvas)'
+      'Ligação provisória de água e energia solicitada e instalada',
+      'Placa da obra (se exigido pela prefeitura) instalada',
+      'Barracão e banheiro para operários montados',
+      'Tapume de fechamento do terreno executado',
+      'Limpeza do terreno (capina e retirada de lixo) realizada',
+      'Gabarito da obra (marcação) nivelado e no esquadro',
+      'EPIs básicos (Capacete, Botas, Luvas) comprados e distribuídos',
+      'Caçamba de entulho posicionada (se necessário)',
+      'Documentação (Alvará e Projetos) impressa e disponível na obra'
     ]
   },
   {
-    category: 'Fundação',
+    category: '02. Infraestrutura (Fundação)',
     items: [
-      'Gabarito conferido e nivelado',
-      'Estacas na profundidade correta',
-      'Armaduras sem ferrugem e com espaçadores',
-      'Concreto vibrado corretamente',
-      'Impermeabilização do baldrame feita'
+      'Escavação das estacas/sapatas na profundidade do projeto',
+      'Fundo das valas compactado e limpo',
+      'Armaduras (ferragem) conferidas (bitola e quantidade)',
+      'Espaçadores colocados para garantir o cobrimento do concreto',
+      'Concretagem realizada com vibração adequada',
+      'Impermeabilização das vigas baldrames executada',
+      'Passagem de tubulação de esgoto sob o baldrame verificada',
+      'Aterro interno compactado',
+      'Lona plástica colocada antes do contrapiso (se houver)'
     ]
   },
   {
-    category: 'Alvenaria',
+    category: '03. Supraestrutura (Paredes e Laje)',
     items: [
-      'Prumo e Nível conferidos a cada fiada',
-      'Vergas e Contravergas nas janelas/portas',
-      'Encunhamento (aperto) no topo da parede',
-      'Passagem de conduítes antes de rebocar',
-      'Chapisco aplicado em tudo'
+      'Impermeabilização da base da alvenaria (primeiras fiadas)',
+      'Prumo e nível das paredes conferidos a cada 3 fiadas',
+      'Vergas e contravergas instaladas em portas e janelas',
+      'Amarração das paredes (cantos e encontros) verificada',
+      'Caixas de luz (tomadas/interruptores) chumbadas e niveladas',
+      'Eletrodutos (mangueiras) passados sem amassamentos',
+      'Encunhamento (aperto) entre parede e viga superior feito',
+      'Escoramento da laje (cimbramento) firme e contra-flecha aplicada',
+      'Armadura da laje (negativos e distribuição) conferida',
+      'Concretagem da laje com cura úmida (molhar) por 7 dias'
     ]
   },
   {
-    category: 'Instalações',
+    category: '04. Cobertura e Telhado',
     items: [
-      'Teste de estanqueidade nos canos (pressão)',
-      'Caimento dos canos de esgoto (1% a 2%)',
-      'Fios com bitola correta para chuveiros',
-      'Quadros de luz identificados',
-      'Caixas de passagem limpas'
+      'Madeiramento do telhado tratado contra cupim',
+      'Inclinação do telhado conferida conforme a telha',
+      'Calhas e rufos instalados e testados com água',
+      'Caixa d’água instalada em base elevada e nivelada',
+      'Manta térmica (subcobertura) instalada corretamente',
+      'Telhas fixadas (parafusadas ou amarradas) contra vento',
+      'Vedação das calhas revisada'
     ]
   },
   {
-    category: 'Acabamento',
+    category: '05. Instalações Hidráulicas',
     items: [
-      'Caimento de água em banheiros/sacadas',
-      'Juntas de dilatação respeitadas no piso',
-      'Proteção de pisos instalados (papelão)',
-      'Recortes de piso escondidos (atrás da porta)',
-      'Teste de tomadas e interruptores'
+      'Tubulação de água fria/quente testada sob pressão (estanqueidade)',
+      'Caimento da tubulação de esgoto (mínimo 1% a 2%) conferido',
+      'Tubos de queda de esgoto ventilados',
+      'Registros de gaveta (geral) instalados em cada ambiente',
+      'Registros de pressão (chuveiro) na altura correta',
+      'Caixas sifonadas limpas e com fecho hídrico',
+      'Teste de vazamento nos ralos (encher de água)'
+    ]
+  },
+  {
+    category: '06. Instalações Elétricas',
+    items: [
+      'Fiação passada conforme cores padrão (Azul=Neutro, Verde=Terra)',
+      'Bitola dos fios conferida (Chuveiro 6mm/10mm, Tomadas 2.5mm)',
+      'Aterramento conectado em todas as tomadas',
+      'Quadro de distribuição organizado e identificado',
+      'Disjuntores dimensionados corretamente (sem superaquecer)',
+      'Teste de todas as tomadas e interruptores',
+      'Pontos de iluminação centralizados nos ambientes'
+    ]
+  },
+  {
+    category: '07. Revestimentos e Pisos',
+    items: [
+      'Chapisco e reboco curados (secos) antes do revestimento',
+      'Contrapiso nivelado e com caimento para ralos',
+      'Impermeabilização de áreas molhadas (box, sacada) com teste de 72h',
+      'Argamassa correta utilizada (AC-I, AC-II ou AC-III)',
+      'Dupla colagem feita em peças grandes (>30x30)',
+      'Juntas de dilatação respeitadas conforme fabricante',
+      'Recortes de piso escondidos (atrás da porta ou móveis)',
+      'Proteção do piso instalado (papelão/gesso) imediata'
+    ]
+  },
+  {
+    category: '08. Pintura e Acabamento Final',
+    items: [
+      'Paredes lixadas e livres de poeira',
+      'Selador aplicado antes da massa/tinta',
+      'Recortes de teto e rodapé alinhados',
+      'Vidros e esquadrias limpos (sem respingos de tinta)',
+      'Louças (vaso/pia) fixadas e siliconadas',
+      'Metais (torneiras/acabamentos) instalados sem vazamento',
+      'Portas e janelas abrindo/fechando suavemente',
+      'Limpeza grossa e fina realizada',
+      'Retirada de todo entulho e sobra de material'
     ]
   }
 ];
