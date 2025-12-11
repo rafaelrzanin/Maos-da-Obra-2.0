@@ -64,7 +64,7 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
         setLoading(false);
     };
     sync();
-    const unsubscribe = dbService.onAuthChange((u) => setUser(u));
+    const unsubscribe = dbService.onAuthChange((u: User | null) => setUser(u));
     return () => { unsubscribe(); };
   }, []);
 
