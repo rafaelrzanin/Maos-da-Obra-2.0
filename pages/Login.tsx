@@ -73,8 +73,9 @@ const Login: React.FC = () => {
         if (isLogin) {
             const success = await login(email, password);
             if (!success) {
-                alert('Dados incorretos ou usuário não encontrado.');
-                setLoading(false); // Stop loading on error to allow retry
+                // Se login retornar false, é erro de credencial (geralmente tratado dentro do dbService com throw, mas se retornar false é genérico)
+                alert('E-mail ou senha incorretos.');
+                setLoading(false); 
             } 
             // If success, useEffect will handle redirect.
         } else {
@@ -94,9 +95,15 @@ const Login: React.FC = () => {
             }
             // If success, user state updates, triggering useEffect -> navigate
         }
-    } catch (error) {
-        alert("Erro no sistema. Verifique sua conexão.");
+    } catch (error: any) {
         console.error(error);
+        
+        let msg = "Erro no sistema. Verifique sua conexão.";
+        if (error.message?.includes("Invalid login")) msg = "Senha ou e-mail incorretos.";
+        else if (error.message?.includes("User already registered")) msg = "E-mail já cadastrado.";
+        else if (error.message?.includes("security purposes")) msg = "Muitas tentativas. Aguarde alguns minutos.";
+        
+        alert(msg);
         setLoading(false);
     }
   };
