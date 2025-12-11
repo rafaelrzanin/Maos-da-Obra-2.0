@@ -1,13 +1,11 @@
 
 import { 
   User, Work, Step, Material, Expense, Worker, Supplier, 
-  WorkPhoto, WorkFile, Notification, PlanType, StepStatus,
-  ExpenseCategory, FileCategory
+  WorkPhoto, WorkFile, Notification, PlanType,
+  ExpenseCategory
 } from '../types';
 import { WORK_TEMPLATES } from './standards';
 import { supabase } from './supabase';
-
-const DB_KEY = 'maos_da_obra_db';
 
 // --- HELPER: Mapeamento de Snake_case (Banco) para CamelCase (App) ---
 const mapProfileFromSupabase = (data: any): User => ({
@@ -318,7 +316,7 @@ export const dbService = {
   addMaterial: async (material: Material, purchaseData?: { qty: number, cost: number, date: string }) => {
       if (!supabase) return;
       
-      const { data: matData, error } = await supabase.from('materials').insert([{
+      const { data: matData } = await supabase.from('materials').insert([{
           workId: material.workId,
           name: material.name,
           brand: material.brand,
@@ -359,9 +357,16 @@ export const dbService = {
       const { data: current } = await supabase.from('materials').select('purchasedQty, workId, stepId').eq('id', matId).single();
       if (!current) return;
 
-      // 2. Update Qty
-      const newQty = (current.purchasedQty || 0) + buyQty;
-      await supabase.from('materials').update({ purchasedQty: newQty }).eq('id', matId);
+      // 2. Update Material (Qty, Brand, Name, PlannedQty if changed)
+      const newPurchasedQty = (current.purchasedQty || 0) + buyQty;
+      
+      await supabase.from('materials').update({ 
+          purchasedQty: newPurchasedQty,
+          name: name,
+          brand: brand,
+          plannedQty: plannedQty,
+          unit: unit
+      }).eq('id', matId);
 
       // 3. Add Expense
       await dbService.addExpense({
@@ -496,12 +501,12 @@ export const dbService = {
   },
 
   // 7. NOTIFICATIONS & DASHBOARD
-  getNotifications: async (userId: string): Promise<Notification[]> => {
+  getNotifications: async (_userId: string): Promise<Notification[]> => {
       return []; 
   },
-  dismissNotification: async (id: string) => {},
-  clearAllNotifications: async (userId: string) => {},
-  generateSmartNotifications: async (userId: string, workId: string) => {},
+  dismissNotification: async (_id: string) => {},
+  clearAllNotifications: async (_userId: string) => {},
+  generateSmartNotifications: async (_userId: string, _workId: string) => {},
 
   calculateWorkStats: async (workId: string) => {
       if (!supabase) return { totalSpent: 0, progress: 0, delayedSteps: 0 };
@@ -517,11 +522,11 @@ export const dbService = {
       return { totalSpent, progress, delayedSteps: 0 };
   },
 
-  getDailySummary: async (workId: string) => {
+  getDailySummary: async (_workId: string) => {
       return { completedSteps: 0, delayedSteps: 0, pendingMaterials: 0, totalSteps: 0 };
   },
 
-  generatePix: async (amount: number, user: any) => {
+  generatePix: async (_amount: number, _user: any) => {
       return {
           qr_code_base64: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
           copy_paste_code: "00020126360014BR.GOV.BCB.PIX0114+551199999999520400005303986540410.005802BR5913Maos da Obra6008Sao Paulo62070503***6304E2CA"
