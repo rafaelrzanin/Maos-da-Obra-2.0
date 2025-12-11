@@ -1,476 +1,369 @@
-import { supabase } from './supabase';
-import { User, Work, Step, Material, Worker, Supplier, PlanType, StepStatus, Notification, WorkStatus, Expense, WorkPhoto, WorkFile } from '../types';
-import { FULL_MATERIAL_PACKAGES, WORK_TEMPLATES } from './standards';
 
-const STORAGE_KEY = 'maos_db_v1';
+// Standard Libraries for Construction Management
 
-const getLocalDb = () => {
-    const s = localStorage.getItem(STORAGE_KEY);
-    return s ? JSON.parse(s) : { users: [], works: [], steps: [], materials: [], expenses: [], workers: [], suppliers: [], notifications: [], photos: [], files: [] };
+// --- AVATAR CONFIG ---
+export const ZE_AVATAR = './ze.png';
+export const ZE_AVATAR_FALLBACK = 'https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/People/Construction%20Worker.png';
+
+// --- DICAS DINÂMICAS DO ZÉ ---
+export interface ZeTip {
+  text: string;
+  tag: string;
+}
+
+export const ZE_TIPS: ZeTip[] = [
+  { tag: 'Financeiro', text: 'Evite adiantamentos integrais de mão de obra. Estabeleça um cronograma físico-financeiro e realize pagamentos mediante medição de serviço executado.' },
+  { tag: 'Gestão', text: 'Material faltando para a obra mais que chuva. Verifique o estoque 2 dias antes da próxima etapa começar para não pagar diária de pedreiro parado.' },
+  { tag: 'Contrato', text: 'O combinado não sai caro. Sempre faça um contrato escrito descrevendo exatamente o que será feito e o que NÃO está incluso no orçamento.' },
+  { tag: 'Economia', text: 'Comprar tudo de uma vez pode parecer bom, mas o cimento empedra e o piso quebra. Compre materiais brutos conforme a demanda da etapa.' },
+  { tag: 'Estrutura', text: 'Para garantir a durabilidade, respeite a cura do concreto. Molhe a laje ou pilares por pelo menos 7 dias (cura úmida) para evitar trincas.' },
+  { tag: 'Instalações', text: 'Tire fotos das paredes com a tubulação hidráulica e elétrica antes de rebocar. Isso é um mapa do tesouro para evitar furar canos no futuro.' },
+  { tag: 'Impermeabilização', text: 'Não economize na impermeabilização dos baldrames e áreas molhadas. Resolver infiltração depois de pronto custa 5x mais caro.' },
+  { tag: 'Elétrica', text: 'Nunca use fio mais fino que o especificado para o chuveiro (geralmente 6mm ou 10mm). Fio fino esquenta, gasta mais energia e pode causar incêndio.' },
+  { tag: 'Acabamento', text: 'Proteja o piso recém-instalado com papelão ondulado ou gesso. O tráfego de obra arranha porcelanato com muita facilidade.' },
+  { tag: 'Pintura', text: 'Tinta boa em parede mal lixada não faz milagre. O segredo da pintura perfeita é 80% preparação (lixa/massa) e 20% tinta.' },
+  { tag: 'Caimento', text: 'Antes de pagar o azulejista, jogue um balde de água no banheiro e na sacada. A água tem que correr sozinha para o ralo, sem empoçar.' },
+  { tag: 'Entulho', text: 'Mantenha a obra limpa. Entulho acumulado esconde ferramentas, causa acidentes e passa a impressão de desorganização para a equipe.' }
+];
+
+export const getRandomZeTip = (): ZeTip => {
+  const randomIndex = Math.floor(Math.random() * ZE_TIPS.length);
+  return ZE_TIPS[randomIndex];
 };
 
-const saveLocalDb = (data: any) => localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+export interface PhaseCategory {
+  category: string;
+  steps: string[];
+}
 
-export const dbService = {
-  getCurrentUser: (): User | null => {
-      const u = localStorage.getItem('maos_user');
-      return u ? JSON.parse(u) : null;
+export const STANDARD_PHASES: PhaseCategory[] = [
+  {
+    category: 'Preparação',
+    steps: ['Limpeza do terreno', 'Preparação de Canteiro', 'Demolição', 'Retirada de entulho']
   },
-  
-  isSubscriptionActive: (user: User): boolean => {
-      if (!user.subscriptionExpiresAt && user.plan === PlanType.VITALICIO) return true;
-      if (!user.subscriptionExpiresAt) return false;
-      return new Date(user.subscriptionExpiresAt) > new Date();
+  {
+    category: 'Estrutura e Alvenaria',
+    steps: ['Fundações', 'Levantamento de paredes', 'Lajes e Vigas', 'Telhado']
   },
-
-  syncSession: async () => {
-      if (supabase) {
-          const { data: { session: _session } } = await supabase.auth.getSession();
-      }
-      return dbService.getCurrentUser();
+  {
+    category: 'Instalações',
+    steps: ['Rasgo de paredes', 'Tubulação de Água/Esgoto', 'Fiação Elétrica', 'Pontos de Ar Condicionado']
   },
-
-  onAuthChange: (_callback: (user: User | null) => void) => {
-      if (supabase) {
-          const { data } = supabase.auth.onAuthStateChange((_event, _session) => {
-              // handle session
-          });
-          return () => data.subscription.unsubscribe();
-      }
-      return () => {};
+  {
+    category: 'Acabamento Grosso',
+    steps: ['Chapisco e Reboco', 'Contrapiso', 'Gesso / Forro', 'Impermeabilização']
   },
-
-  login: async (email: string, _password?: string): Promise<User | null> => {
-      const db = getLocalDb();
-      const user = db.users.find((u: User) => u.email === email);
-      if (user) {
-          localStorage.setItem('maos_user', JSON.stringify(user));
-          return user;
-      }
-      return null;
+  {
+    category: 'Acabamento Fino',
+    steps: ['Pisos e Revestimentos', 'Azulejos', 'Marmoraria (Bancadas)', 'Instalação de Louças e Metais', 'Esquadrias (Janelas/Portas)']
   },
-
-  signup: async (name: string, email: string, whatsapp: string, _password?: string, cpf?: string, plan?: string | null): Promise<User | null> => {
-      const db = getLocalDb();
-      const newUser: User = { 
-          id: Math.random().toString(36).substr(2, 9), 
-          name, 
-          email, 
-          whatsapp, 
-          cpf, 
-          plan: plan as PlanType || null,
-          subscriptionExpiresAt: plan === PlanType.VITALICIO ? '2099-12-31' : undefined
-      };
-      db.users.push(newUser);
-      saveLocalDb(db);
-      localStorage.setItem('maos_user', JSON.stringify(newUser));
-      return newUser;
-  },
-
-  logout: () => {
-      if (supabase) supabase.auth.signOut();
-      localStorage.removeItem('maos_user');
-  },
-
-  updatePlan: async (userId: string, plan: PlanType) => {
-      const db = getLocalDb();
-      const userIdx = db.users.findIndex((u: User) => u.id === userId);
-      if (userIdx >= 0) {
-          db.users[userIdx].plan = plan;
-          const now = new Date();
-          if (plan === PlanType.MENSAL) now.setMonth(now.getMonth() + 1);
-          if (plan === PlanType.SEMESTRAL) now.setMonth(now.getMonth() + 6);
-          if (plan === PlanType.VITALICIO) now.setFullYear(2099);
-          db.users[userIdx].subscriptionExpiresAt = now.toISOString();
-          
-          saveLocalDb(db);
-          const currentUser = dbService.getCurrentUser();
-          if (currentUser && currentUser.id === userId) {
-              localStorage.setItem('maos_user', JSON.stringify(db.users[userIdx]));
-          }
-      }
-  },
-
-  loginSocial: async (_provider: string) => { return { error: null }; },
-
-  getWorks: async (userId: string): Promise<Work[]> => {
-      const db = getLocalDb();
-      return db.works.filter((w: Work) => w.userId === userId);
-  },
-
-  getWorkById: async (workId: string): Promise<Work | null> => {
-      const db = getLocalDb();
-      return db.works.find((w: Work) => w.id === workId) || null;
-  },
-
-  createWork: async (workData: Partial<Work>, templateId: string): Promise<Work> => {
-      const db = getLocalDb();
-      const newWork: Work = {
-          id: Math.random().toString(36).substr(2, 9),
-          userId: workData.userId!,
-          name: workData.name || 'Nova Obra',
-          address: workData.address || '',
-          budgetPlanned: workData.budgetPlanned || 0,
-          startDate: workData.startDate || new Date().toISOString().split('T')[0],
-          endDate: workData.endDate || new Date().toISOString().split('T')[0],
-          area: workData.area || 0,
-          floors: workData.floors,
-          bedrooms: workData.bedrooms,
-          bathrooms: workData.bathrooms,
-          kitchens: workData.kitchens,
-          livingRooms: workData.livingRooms,
-          hasLeisureArea: workData.hasLeisureArea,
-          notes: workData.notes || '',
-          status: WorkStatus.PLANNING
-      };
-      
-      db.works.push(newWork);
-      
-      const template = WORK_TEMPLATES.find(t => t.id === templateId);
-      
-      if (template && template.includedSteps) {
-         const totalDuration = template.defaultDurationDays || 90;
-         const stepDuration = Math.max(2, Math.floor(totalDuration / template.includedSteps.length));
-         
-         template.includedSteps.forEach((stepName, idx) => {
-             const startDate = new Date(newWork.startDate);
-             startDate.setDate(startDate.getDate() + (idx * stepDuration)); 
-             const endDate = new Date(startDate);
-             endDate.setDate(endDate.getDate() + stepDuration);
-
-             const newStepId = Math.random().toString(36).substr(2, 9);
-
-             // Criar Etapa
-             db.steps.push({
-                 id: newStepId,
-                 workId: newWork.id,
-                 name: stepName,
-                 startDate: startDate.toISOString().split('T')[0],
-                 endDate: endDate.toISOString().split('T')[0],
-                 status: StepStatus.NOT_STARTED,
-                 isDelayed: false
-             });
-
-             // INTELIGÊNCIA DE MATERIAIS - CORRELAÇÃO DE PALAVRAS-CHAVE
-             const normalize = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-             const stepNorm = normalize(stepName);
-
-             // Mapeamento manual de pacotes - LÓGICA REFINADA
-             const pkg = FULL_MATERIAL_PACKAGES.find(p => {
-                 const pkgNorm = normalize(p.category);
-                 
-                 // 1. Limpeza de Obra (e.g. "Limpeza do terreno", "Retirada de entulho", "Demolição")
-                 // Exclui 'Final' para não conflitar com Limpeza Final
-                 if ((stepNorm.includes('limpeza') || stepNorm.includes('entulho') || stepNorm.includes('demolicao')) 
-                     && !stepNorm.includes('final') 
-                     && pkgNorm.includes('limpeza de obra')) {
-                     return true;
-                 }
-                 
-                 // 2. Fundação (e.g. "Fundações")
-                 if (stepNorm.includes('fundacao') && pkgNorm.includes('fundacao')) return true;
-
-                 // 3. Alvenaria Estrutural (e.g. "Levantamento de paredes")
-                 // Exclui explicitamente 'reboco' para não adicionar tijolos no reboco
-                 if ((stepNorm.includes('parede') || stepNorm.includes('alvenaria')) 
-                     && !stepNorm.includes('reboco')
-                     && pkgNorm.includes('alvenaria')) {
-                     return true;
-                 }
-
-                 // 4. Chapisco e Reboco
-                 if ((stepNorm.includes('reboco') || stepNorm.includes('chapisco')) && pkgNorm.includes('chapisco')) return true;
-
-                 // 5. Contrapiso (específico para diferenciar de Pisos/Acabamento)
-                 if (stepNorm.includes('contrapiso') && pkgNorm.includes('contrapiso')) return true;
-
-                 // 6. Pisos e Revestimentos (e.g. "Pisos", "Azulejos")
-                 // Deve conter 'piso' ou 'azulejo', mas NÃO 'contrapiso'
-                 if ((stepNorm.includes('piso') || stepNorm.includes('azulejo') || stepNorm.includes('revestimento')) 
-                     && !stepNorm.includes('contrapiso')
-                     && pkgNorm.includes('pisos e revestimentos')) {
-                     return true;
-                 }
-
-                 // 7. Instalações
-                 if ((stepNorm.includes('agua') || stepNorm.includes('esgoto') || stepNorm.includes('hidraulica')) && pkgNorm.includes('hidraulica')) return true;
-                 if ((stepNorm.includes('fiacao') || stepNorm.includes('luz') || stepNorm.includes('eletrica')) && pkgNorm.includes('eletrica')) return true;
-
-                 // 8. Louças e Metais
-                 if ((stepNorm.includes('louca') || stepNorm.includes('metal') || stepNorm.includes('banheiro') || stepNorm.includes('instala')) && pkgNorm.includes('loucas e metais')) return true;
-
-                 // 9. Limpeza Final
-                 if ((stepNorm.includes('entrega') || stepNorm.includes('final')) && pkgNorm.includes('limpeza final')) return true;
-
-                 return false;
-             });
-
-             if (pkg) {
-                 pkg.items.forEach(item => {
-                     const calculatedQty = Math.ceil(newWork.area * (item.multiplier || 0));
-                     
-                     // SÓ ADICIONA SE A QUANTIDADE FOR MAIOR QUE ZERO
-                     if (calculatedQty > 0) {
-                         db.materials.push({
-                            id: Math.random().toString(36).substr(2, 9),
-                            workId: newWork.id,
-                            name: item.name,
-                            brand: '',
-                            plannedQty: calculatedQty,
-                            purchasedQty: 0,
-                            unit: item.unit,
-                            category: pkg.category,
-                            stepId: newStepId
-                         });
-                     }
-                 });
-             }
-         });
-      } else {
-          const stepId = Math.random().toString(36).substr(2, 9);
-          db.steps.push({
-             id: stepId,
-             workId: newWork.id,
-             name: 'Início da Obra',
-             startDate: newWork.startDate,
-             endDate: newWork.endDate,
-             status: StepStatus.NOT_STARTED,
-             isDelayed: false
-          });
-      }
-      
-      saveLocalDb(db);
-      return newWork;
-  },
-
-  deleteWork: async (workId: string) => {
-      const db = getLocalDb();
-      db.works = db.works.filter((w: Work) => w.id !== workId);
-      db.steps = db.steps.filter((s: Step) => s.workId !== workId);
-      db.materials = db.materials.filter((m: Material) => m.workId !== workId);
-      db.expenses = db.expenses.filter((e: Expense) => e.workId !== workId);
-      if (db.photos) db.photos = db.photos.filter((p: WorkPhoto) => p.workId !== workId);
-      if (db.files) db.files = db.files.filter((f: WorkFile) => f.workId !== workId);
-      saveLocalDb(db);
-  },
-
-  calculateWorkStats: async (workId: string) => {
-      const db = getLocalDb();
-      const expenses = db.expenses.filter((e: Expense) => e.workId === workId);
-      const steps = db.steps.filter((s: Step) => s.workId === workId);
-      const totalSpent = expenses.reduce((acc: number, curr: Expense) => acc + Number(curr.amount), 0);
-      const completedSteps = steps.filter((s: Step) => s.status === StepStatus.COMPLETED).length;
-      const progress = steps.length > 0 ? Math.round((completedSteps / steps.length) * 100) : 0;
-      const today = new Date().toISOString().split('T')[0];
-      const delayedSteps = steps.filter((s: Step) => s.status !== StepStatus.COMPLETED && s.endDate < today).length;
-      return { totalSpent, progress, delayedSteps };
-  },
-
-  getDailySummary: async (workId: string) => {
-      const db = getLocalDb();
-      const steps = db.steps.filter((s: Step) => s.workId === workId);
-      const materials = db.materials.filter((m: Material) => m.workId === workId);
-      const today = new Date().toISOString().split('T')[0];
-      const completedSteps = steps.filter((s: Step) => s.status === StepStatus.COMPLETED).length;
-      const delayedSteps = steps.filter((s: Step) => s.status !== StepStatus.COMPLETED && s.endDate < today).length;
-      const pendingMaterials = materials.filter((m: Material) => m.purchasedQty < m.plannedQty).length;
-      return { completedSteps, delayedSteps, pendingMaterials, totalSteps: steps.length };
-  },
-
-  getNotifications: async (_userId: string): Promise<Notification[]> => { return []; },
-  dismissNotification: async (_id: string) => {},
-  clearAllNotifications: async (_userId: string) => {},
-  generateSmartNotifications: async (_userId: string, _workId: string) => {},
-
-  getSteps: async (workId: string): Promise<Step[]> => {
-      const db = getLocalDb();
-      return db.steps.filter((s: Step) => s.workId === workId);
-  },
-  
-  addStep: async (step: Step) => {
-      const db = getLocalDb();
-      db.steps.push(step);
-      saveLocalDb(db);
-  },
-
-  updateStep: async (step: Step) => {
-      const db = getLocalDb();
-      const idx = db.steps.findIndex((s: Step) => s.id === step.id);
-      if (idx >= 0) { db.steps[idx] = step; saveLocalDb(db); }
-  },
-  deleteStep: async (id: string) => {
-      const db = getLocalDb();
-      db.steps = db.steps.filter((s: Step) => s.id !== id);
-      saveLocalDb(db);
-  },
-
-  getExpenses: async (workId: string): Promise<Expense[]> => {
-      const db = getLocalDb();
-      return db.expenses.filter((e: Expense) => e.workId === workId).sort((a: Expense, b: Expense) => new Date(b.date).getTime() - new Date(a.date).getTime());
-  },
-
-  getMaterials: async (workId: string): Promise<Material[]> => {
-      const db = getLocalDb();
-      return db.materials.filter((m: Material) => m.workId === workId);
-  },
-
-  addMaterial: async (material: Material, purchaseDetails?: { qty: number, cost: number, date: string }) => {
-      const db = getLocalDb();
-      if (purchaseDetails && purchaseDetails.qty > 0) {
-          material.purchasedQty = purchaseDetails.qty;
-      }
-      db.materials.push(material);
-      if (purchaseDetails && purchaseDetails.qty > 0) {
-          db.expenses.push({
-              id: Math.random().toString(36).substr(2, 9),
-              workId: material.workId,
-              description: `Compra: ${purchaseDetails.qty} ${material.unit} de ${material.name} (${material.brand || 'Novo'})`,
-              amount: purchaseDetails.cost,
-              date: purchaseDetails.date,
-              category: 'Material',
-              relatedMaterialId: material.id,
-              stepId: material.stepId
-          });
-      }
-      saveLocalDb(db);
-  },
-  
-  addExpense: async (expense: Expense) => {
-      const db = getLocalDb();
-      db.expenses.push(expense);
-      saveLocalDb(db);
-  },
-
-  registerMaterialPurchase: async (
-      materialId: string, 
-      updatedName: string, 
-      updatedBrand: string,
-      updatedPlannedQty: number,
-      updatedUnit: string,
-      purchaseQty: number, 
-      purchaseCost: number
-  ) => {
-      const db = getLocalDb();
-      const idx = db.materials.findIndex((m: Material) => m.id === materialId);
-      if (idx >= 0) {
-          const oldMaterial = db.materials[idx];
-          db.materials[idx] = {
-              ...oldMaterial,
-              name: updatedName,
-              brand: updatedBrand,
-              plannedQty: updatedPlannedQty,
-              unit: updatedUnit,
-              purchasedQty: oldMaterial.purchasedQty + purchaseQty
-          };
-          if (purchaseQty > 0) {
-              db.expenses.push({
-                  id: Math.random().toString(36).substr(2, 9),
-                  workId: oldMaterial.workId,
-                  description: `Compra: ${purchaseQty} ${updatedUnit} de ${updatedName} (${updatedBrand || 'Genérico'})`,
-                  amount: purchaseCost,
-                  date: new Date().toISOString(),
-                  category: 'Material',
-                  relatedMaterialId: materialId,
-                  stepId: oldMaterial.stepId
-              });
-          }
-          saveLocalDb(db);
-      }
-  },
-
-  updateMaterial: async (material: Material, _cost: number, _addedQty: number) => {
-      const db = getLocalDb();
-      const idx = db.materials.findIndex((m: Material) => m.id === material.id);
-      if (idx >= 0) {
-          db.materials[idx] = material;
-          saveLocalDb(db);
-      }
-  },
-
-  importMaterialPackage: async (workId: string, category: string): Promise<number> => {
-    const work = await dbService.getWorkById(workId);
-    if (!work) return 0;
-    const steps = await dbService.getSteps(workId);
-    const targetStep = steps.find(s => s.status !== StepStatus.COMPLETED) || steps[0];
-    const pkg = FULL_MATERIAL_PACKAGES.find(p => p.category === category);
-    if (!pkg) return 0;
-    let totalImported = 0;
-    const db = getLocalDb();
-    pkg.items.forEach(item => {
-        const calculatedQty = Math.ceil(work.area * (item.multiplier || 0));
-        if (calculatedQty > 0) {
-            db.materials.push({
-                id: Math.random().toString(36).substr(2, 9),
-                workId,
-                name: item.name,
-                plannedQty: calculatedQty,
-                purchasedQty: 0,
-                unit: item.unit,
-                category: category,
-                stepId: targetStep?.id
-            });
-            totalImported++;
-        }
-    });
-    saveLocalDb(db);
-    return totalImported;
-  },
-
-  getWorkers: async (userId: string): Promise<Worker[]> => {
-      const db = getLocalDb();
-      return db.workers.filter((w: Worker) => w.userId === userId);
-  },
-  addWorker: async (worker: any) => {
-      const db = getLocalDb();
-      db.workers.push({ ...worker, id: Math.random().toString(36).substr(2, 9) });
-      saveLocalDb(db);
-  },
-  updateWorker: async (worker: Worker) => {
-      const db = getLocalDb();
-      const idx = db.workers.findIndex((w: Worker) => w.id === worker.id);
-      if (idx >= 0) { db.workers[idx] = worker; saveLocalDb(db); }
-  },
-  deleteWorker: async (id: string) => {
-      const db = getLocalDb();
-      db.workers = db.workers.filter((w: Worker) => w.id !== id);
-      saveLocalDb(db);
-  },
-
-  getSuppliers: async (userId: string): Promise<Supplier[]> => {
-      const db = getLocalDb();
-      return db.suppliers.filter((s: Supplier) => s.userId === userId);
-  },
-  addSupplier: async (supplier: any) => {
-      const db = getLocalDb();
-      db.suppliers.push({ ...supplier, id: Math.random().toString(36).substr(2, 9) });
-      saveLocalDb(db);
-  },
-  updateSupplier: async (supplier: Supplier) => {
-      const db = getLocalDb();
-      const idx = db.suppliers.findIndex((s: Supplier) => s.id === supplier.id);
-      if (idx >= 0) { db.suppliers[idx] = supplier; saveLocalDb(db); }
-  },
-  deleteSupplier: async (id: string) => {
-      const db = getLocalDb();
-      db.suppliers = db.suppliers.filter((s: Supplier) => s.id !== id);
-      saveLocalDb(db);
-  },
-
-  getJobRoles: async () => ['Pedreiro', 'Servente', 'Mestre de Obras'],
-  getSupplierCategories: async () => ['Material de Construção', 'Elétrica', 'Hidráulica'],
-
-  updateUser: async (id: string, data: any, _password?: string) => {
-      const db = getLocalDb();
-      const idx = db.users.findIndex((u: User) => u.id === id);
-      if (idx >= 0) {
-          db.users[idx] = { ...db.users[idx], ...data };
-          saveLocalDb(db);
-          localStorage.setItem('maos_user', JSON.stringify(db.users[idx]));
-      }
-  },
-  getUserProfile: async (_id: string) => dbService.getCurrentUser(),
-
-  generatePix: async (_amount: number, _payer: any) => {
-      return { qr_code_base64: '', copy_paste_code: '000201010212...' };
+  {
+    category: 'Pintura e Finalização',
+    steps: ['Massa Corrida e Lixamento', 'Pintura Paredes/Tetos', 'Instalação de Luminárias', 'Limpeza Final e Entrega']
   }
-};
+];
+
+export interface WorkTemplate {
+  id: string;
+  label: string;
+  icon: string;
+  description: string;
+  defaultDurationDays: number; 
+  includedSteps: string[];
+}
+
+export const WORK_TEMPLATES: WorkTemplate[] = [
+  {
+    id: 'CONSTRUCAO',
+    label: 'Casa inteira do zero',
+    icon: 'fa-house-chimney',
+    description: 'Começar do terreno vazio até a mudança.',
+    defaultDurationDays: 180,
+    includedSteps: [
+      'Limpeza do terreno', 'Fundações', 'Levantamento de paredes', 'Lajes e Vigas', 'Telhado',
+      'Tubulação de Água/Esgoto', 'Fiação Elétrica', 'Chapisco e Reboco', 'Contrapiso',
+      'Pisos e Revestimentos', 'Gesso / Forro', 'Pintura Paredes/Tetos', 'Instalação de Louças e Metais',
+      'Limpeza Final e Entrega'
+    ]
+  },
+  {
+    id: 'REFORMA_APTO',
+    label: 'Reforma Completa (Casa/Apto)',
+    icon: 'fa-house-user',
+    description: 'Geral: pisos, pintura, gesso e elétrica.',
+    defaultDurationDays: 60,
+    includedSteps: [
+      'Demolição', 'Retirada de entulho', 'Tubulação de Água/Esgoto', 'Fiação Elétrica',
+      'Gesso / Forro', 'Pisos e Revestimentos', 'Azulejos', 'Pintura Paredes/Tetos', 
+      'Instalação de Louças e Metais', 'Instalação de Luminárias', 'Limpeza Final e Entrega'
+    ]
+  },
+  {
+    id: 'BANHEIRO',
+    label: 'Só o Banheiro',
+    icon: 'fa-bath',
+    description: 'Troca de piso, louças e impermeabilização.',
+    defaultDurationDays: 15,
+    includedSteps: [
+      'Demolição', 'Tubulação de Água/Esgoto', 'Impermeabilização', 'Contrapiso', 
+      'Azulejos', 'Pisos e Revestimentos', 'Gesso / Forro', 'Instalação de Louças e Metais', 'Limpeza Final e Entrega'
+    ]
+  },
+  {
+    id: 'COZINHA',
+    label: 'Só a Cozinha',
+    icon: 'fa-kitchen-set',
+    description: 'Azulejos, bancadas e instalações.',
+    defaultDurationDays: 20,
+    includedSteps: [
+      'Demolição', 'Rasgo de paredes', 'Tubulação de Água/Esgoto', 'Fiação Elétrica',
+      'Azulejos', 'Pisos e Revestimentos', 'Marmoraria (Bancadas)', 'Instalação de Louças e Metais', 'Limpeza Final e Entrega'
+    ]
+  },
+  {
+    id: 'PINTURA',
+    label: 'Só Pintura',
+    icon: 'fa-paint-roller',
+    description: 'Renovar as paredes e tetos.',
+    defaultDurationDays: 10,
+    includedSteps: [
+      'Proteção do piso', 'Massa Corrida e Lixamento', 'Pintura Paredes/Tetos', 'Limpeza Final e Entrega'
+    ]
+  }
+];
+
+export interface MaterialCatalog {
+  category: string;
+  items: {name: string, unit: string, multiplier?: number}[];
+}
+
+// FULL BACKUP CATALOG COM ESTIMATIVAS INTELIGENTES E REFINADAS
+export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
+  {
+    category: 'Limpeza de Obra',
+    items: [
+      { name: 'Sacos de Entulho (Ráfia)', unit: 'un', multiplier: 0.5 },
+      { name: 'Caçamba de Entulho', unit: 'un', multiplier: 0.05 },
+      { name: 'Enxada / Pá', unit: 'un', multiplier: 0.02 },
+      { name: 'Carrinho de Mão', unit: 'un', multiplier: 0.01 },
+      { name: 'EPIs Básicos (Luvas/Óculos)', unit: 'kit', multiplier: 0.02 }
+    ]
+  },
+  {
+    category: 'Fundação Estrutural',
+    items: [
+      { name: 'Cimento CP-II (Fundação)', unit: 'sacos', multiplier: 0.3 },
+      { name: 'Areia Média', unit: 'm³', multiplier: 0.04 },
+      { name: 'Brita 1', unit: 'm³', multiplier: 0.04 },
+      { name: 'Pedra de Mão (Rachão)', unit: 'm³', multiplier: 0.02 },
+      { name: 'Vergalhão 3/8 (10mm)', unit: 'barras', multiplier: 0.5 },
+      { name: 'Vergalhão 5/16 (8mm)', unit: 'barras', multiplier: 0.5 },
+      { name: 'Tábua de Pinus (Caixaria)', unit: 'dz', multiplier: 0.1 },
+      { name: 'Impermeabilizante betuminoso', unit: 'latas', multiplier: 0.05 }
+    ]
+  },
+  {
+    category: 'Alvenaria Estrutural',
+    items: [
+      { name: 'Tijolo Cerâmico 8 furos', unit: 'milheiro', multiplier: 0.07 },
+      { name: 'Bloco de Concreto (Se necessário)', unit: 'un', multiplier: 0.001 }, 
+      { name: 'Cimento CP-II (Assentamento)', unit: 'sacos', multiplier: 0.15 },
+      { name: 'Cal Hidratada (Liga)', unit: 'sacos', multiplier: 0.15 },
+      { name: 'Areia Média', unit: 'm³', multiplier: 0.03 },
+      { name: 'Ferro para Vergas (Cabelo)', unit: 'barras', multiplier: 0.1 },
+      { name: 'Aditivo Plastificante', unit: 'litros', multiplier: 0.05 }
+    ]
+  },
+  {
+    category: 'Chapisco e Reboco',
+    items: [
+      { name: 'Cimento CP-II (Reboco)', unit: 'sacos', multiplier: 0.18 },
+      { name: 'Areia Fina/Média', unit: 'm³', multiplier: 0.04 },
+      { name: 'Cal Hidratada (Pintura/Reboco)', unit: 'sacos', multiplier: 0.15 },
+      { name: 'Aditivo Impermeabilizante', unit: 'litros', multiplier: 0.05 }
+    ]
+  },
+  {
+    category: 'Contrapiso',
+    items: [
+      { name: 'Cimento CP-II (Contrapiso)', unit: 'sacos', multiplier: 0.15 },
+      { name: 'Areia Média (Lavada)', unit: 'm³', multiplier: 0.04 },
+      { name: 'Impermeabilizante (Áreas molhadas)', unit: 'litros', multiplier: 0.05 }
+    ]
+  },
+  {
+    category: 'Telhado',
+    items: [
+      { name: 'Telha Cerâmica/Concreto', unit: 'un', multiplier: 16 },
+      { name: 'Viga de Madeira (Peroba/Garapeira)', unit: 'm', multiplier: 0.5 },
+      { name: 'Caibros', unit: 'm', multiplier: 1.5 },
+      { name: 'Ripas', unit: 'm', multiplier: 3.5 },
+      { name: 'Prego de Telheiro', unit: 'kg', multiplier: 0.02 },
+      { name: 'Manta Térmica', unit: 'rolos', multiplier: 0.02 },
+      { name: 'Caixa D\'água 1000L', unit: 'un', multiplier: 0.01 }
+    ]
+  },
+  {
+    category: 'Instalações Elétricas',
+    items: [
+      { name: 'Eletroduto Corrugado (Amarelo)', unit: 'rolos', multiplier: 0.1 },
+      { name: 'Caixa de Luz 4x2', unit: 'un', multiplier: 0.4 },
+      { name: 'Caixa de Luz 4x4', unit: 'un', multiplier: 0.1 },
+      { name: 'Cabo Flexível 2.5mm', unit: 'rolos', multiplier: 0.05 },
+      { name: 'Cabo Flexível 1.5mm', unit: 'rolos', multiplier: 0.03 },
+      { name: 'Cabo Flexível 6mm', unit: 'm', multiplier: 0.5 },
+      { name: 'Disjuntores', unit: 'un', multiplier: 0.15 },
+      { name: 'Quadro de Distribuição', unit: 'un', multiplier: 0.01 },
+      { name: 'Fita Isolante', unit: 'un', multiplier: 0.05 }
+    ]
+  },
+  {
+    category: 'Instalações Hidráulicas',
+    items: [
+      { name: 'Tubo PVC Soldável 25mm', unit: 'barras', multiplier: 0.2 },
+      { name: 'Tubo Esgoto 100mm', unit: 'barras', multiplier: 0.1 },
+      { name: 'Tubo Esgoto 40mm', unit: 'barras', multiplier: 0.15 },
+      { name: 'Joelho 90 graus 25mm', unit: 'un', multiplier: 0.5 },
+      { name: 'Cola para PVC', unit: 'tubo', multiplier: 0.05 },
+      { name: 'Registro de Gaveta', unit: 'un', multiplier: 0.02 },
+      { name: 'Registro de Pressão', unit: 'un', multiplier: 0.03 },
+      { name: 'Caixa Sifonada', unit: 'un', multiplier: 0.05 }
+    ]
+  },
+  {
+    category: 'Pisos e Revestimentos',
+    items: [
+      { name: 'Piso / Porcelanato', unit: 'm²', multiplier: 1.15 },
+      { name: 'Argamassa AC-II/AC-III', unit: 'sacos', multiplier: 0.25 },
+      { name: 'Rejunte', unit: 'kg', multiplier: 0.3 },
+      { name: 'Espaçadores (Niveladores)', unit: 'pct', multiplier: 0.05 },
+      { name: 'Rodapé', unit: 'm', multiplier: 1.1 }
+    ]
+  },
+  {
+    category: 'Louças e Metais',
+    items: [
+      { name: 'Vaso Sanitário com Caixa Acoplada', unit: 'un', multiplier: 0.02 },
+      { name: 'Cuba / Pia de Banheiro', unit: 'un', multiplier: 0.02 },
+      { name: 'Torneira de Banheiro', unit: 'un', multiplier: 0.02 },
+      { name: 'Torneira de Cozinha', unit: 'un', multiplier: 0.01 },
+      { name: 'Chuveiro / Ducha', unit: 'un', multiplier: 0.02 },
+      { name: 'Kit Acessórios (Toalheiro/Papeleira)', unit: 'kit', multiplier: 0.02 },
+      { name: 'Sifão Universal', unit: 'un', multiplier: 0.04 },
+      { name: 'Engate Flexível', unit: 'un', multiplier: 0.04 },
+      { name: 'Válvula de Escoamento (Ralo pia)', unit: 'un', multiplier: 0.04 }
+    ]
+  },
+  {
+    category: 'Pintura',
+    items: [
+      { name: 'Lixa de Parede', unit: 'folhas', multiplier: 0.5 },
+      { name: 'Selador Acrílico', unit: 'latas', multiplier: 0.02 },
+      { name: 'Massa Corrida', unit: 'latas', multiplier: 0.05 },
+      { name: 'Tinta Acrílica', unit: 'latas', multiplier: 0.05 },
+      { name: 'Rolo de Lã e Pincel', unit: 'un', multiplier: 0.04 },
+      { name: 'Fita Crepe', unit: 'rolos', multiplier: 0.05 },
+      { name: 'Lona Plástica', unit: 'm', multiplier: 1 }
+    ]
+  },
+  {
+    category: 'Limpeza Final',
+    items: [
+      { name: 'Ácido para Limpeza de Pedras', unit: 'galão', multiplier: 0.02 },
+      { name: 'Detergente Pós-Obra', unit: 'galão', multiplier: 0.02 },
+      { name: 'Vassoura Piaçava', unit: 'un', multiplier: 0.02 },
+      { name: 'Rodo Grande', unit: 'un', multiplier: 0.01 },
+      { name: 'Panos de Chão (Saco Alvejado)', unit: 'un', multiplier: 0.1 },
+      { name: 'Espátula de Aço', unit: 'un', multiplier: 0.02 },
+      { name: 'Lã de Aço (Bombril)', unit: 'pct', multiplier: 0.05 }
+    ]
+  }
+];
+
+export const STANDARD_JOB_ROLES = [
+  'Pedreiro', 'Ajudante', 'Mestre de Obras', 'Pintor', 'Eletricista', 
+  'Encanador', 'Gesseiro', 'Marceneiro', 'Serralheiro', 'Vidraceiro', 
+  'Arquiteto', 'Engenheiro', 'Outros'
+];
+
+export const STANDARD_SUPPLIER_CATEGORIES = [
+  'Material Básico', 'Elétrica', 'Hidráulica', 'Pisos e Revestimentos',
+  'Tintas', 'Madeiras', 'Vidraçaria', 'Marmoraria', 'Locação de Equipamentos',
+  'Caçamba', 'Outros'
+];
+
+export const CONTRACT_TEMPLATES = [
+  {
+    id: 'EMPREITA',
+    title: 'Contrato de Empreitada',
+    description: 'Serviços gerais com valor fechado.',
+    contentTemplate: `CONTRATO DE PRESTAÇÃO DE SERVIÇOS POR EMPREITADA...`
+  },
+  // ... outros templates
+];
+
+export const STANDARD_CHECKLISTS = [
+  {
+    category: 'Início de Obra',
+    items: [
+      'Água e Luz ligados no terreno',
+      'Barracão e Banheiro para equipe',
+      'Projetos impressos e plastificados',
+      'Documentação da Prefeitura (Alvará)',
+      'EPIs básicos (Capacete, Botas, Luvas)'
+    ]
+  },
+  {
+    category: 'Fundação',
+    items: [
+      'Gabarito conferido e nivelado',
+      'Estacas na profundidade correta',
+      'Armaduras sem ferrugem e com espaçadores',
+      'Concreto vibrado corretamente',
+      'Impermeabilização do baldrame feita'
+    ]
+  },
+  {
+    category: 'Alvenaria',
+    items: [
+      'Prumo e Nível conferidos a cada fiada',
+      'Vergas e Contravergas nas janelas/portas',
+      'Encunhamento (aperto) no topo da parede',
+      'Passagem de conduítes antes de rebocar',
+      'Chapisco aplicado em tudo'
+    ]
+  },
+  {
+    category: 'Acabamento',
+    items: [
+      'Caimento de água em banheiros/sacadas',
+      'Teste de pressão nos canos (antes de fechar)',
+      'Proteção de pisos instalados',
+      'Recortes de piso escondidos (atrás da porta)',
+      'Teste de tomadas e interruptores'
+    ]
+  }
+];
+
+export const LIFETIME_BONUSES = [
+  {
+    icon: 'fa-user-group',
+    title: 'Comunidade VIP no WhatsApp',
+    desc: 'Troque experiências com mestres de obra e engenheiros experientes.'
+  },
+  {
+    icon: 'fa-file-contract',
+    title: 'Pacote de Contratos Blindados',
+    desc: 'Modelos prontos para evitar dores de cabeça com pedreiros e fornecedores.'
+  },
+  {
+    icon: 'fa-calculator',
+    title: 'Calculadoras Avançadas',
+    desc: 'Ferramentas exclusivas para cálculo de concreto, telhado e elétrica.'
+  },
+  {
+    icon: 'fa-robot',
+    title: 'Zé da Obra Ilimitado',
+    desc: 'Acesso prioritário e sem limites ao nosso engenheiro virtual via IA.'
+  }
+];
