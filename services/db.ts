@@ -368,6 +368,25 @@ export const dbService = {
       return db.expenses.filter((e: Expense) => e.workId === workId).sort((a: Expense, b: Expense) => new Date(b.date).getTime() - new Date(a.date).getTime());
   },
 
+  // Helper to get historical payment data for auto-fill logic
+  getPaymentHistory: async (workId: string, description: string, excludeId?: string): Promise<{ totalPaid: number, lastTotalAgreed: number }> => {
+      const db = getLocalDb();
+      const relevant = db.expenses.filter((e: Expense) => 
+          e.workId === workId && 
+          e.description.toLowerCase().trim() === description.toLowerCase().trim() &&
+          e.id !== excludeId
+      );
+      
+      const totalPaid = relevant.reduce((acc: number, curr: Expense) => acc + Number(curr.amount), 0);
+      // Try to find the most recent 'totalAgreed' set for this description
+      const lastAgreedItem = relevant.sort((a: Expense, b: Expense) => new Date(b.date).getTime() - new Date(a.date).getTime()).find((e: Expense) => e.totalAgreed && e.totalAgreed > 0);
+      
+      return { 
+          totalPaid, 
+          lastTotalAgreed: lastAgreedItem ? lastAgreedItem.totalAgreed : 0 
+      };
+  },
+
   getMaterials: async (workId: string): Promise<Material[]> => {
       const db = getLocalDb();
       return db.materials.filter((m: Material) => m.workId === workId);
