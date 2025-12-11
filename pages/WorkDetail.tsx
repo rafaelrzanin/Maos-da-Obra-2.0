@@ -1004,7 +1004,10 @@ const WorkDetail: React.FC = () => {
                 <div className="flex justify-between items-center mb-1">
                     <button onClick={() => subView !== 'NONE' ? setSubView('NONE') : navigate('/')} className="text-slate-400 hover:text-primary dark:hover:text-white"><i className="fa-solid fa-arrow-left text-xl"></i></button>
                     <h1 className="text-lg font-black text-primary dark:text-white uppercase tracking-tight truncate max-w-[200px]">
-                        {subView !== 'NONE' ? 'Detalhes' : work.name}
+                        {subView !== 'NONE' 
+                            ? (subView === 'TEAM' ? 'Minha Equipe' : subView === 'SUPPLIERS' ? 'Fornecedores' : subView === 'REPORTS' ? 'Relatórios' : 'Detalhes')
+                            : work.name
+                        }
                     </h1>
                     <div className="w-6"></div> 
                 </div>
@@ -1014,7 +1017,7 @@ const WorkDetail: React.FC = () => {
                 {subView !== 'NONE' ? renderSubViewContent() : renderMainTab()}
             </div>
 
-            {/* MAIN NAVIGATION BOTTOM BAR */}
+            {/* MAIN NAVIGATION BOTTOM BAR (Only visible on main tabs) */}
             {subView === 'NONE' && (
                 <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 pb-safe z-40 shadow-[0_-5px_20px_rgba(0,0,0,0.05)] no-print">
                     <div className="flex justify-around items-center max-w-4xl mx-auto h-16">
@@ -1026,10 +1029,130 @@ const WorkDetail: React.FC = () => {
                 </div>
             )}
 
-            {/* EXPENSE MODAL (ADD / EDIT) - UPDATE WITH LOCKED LOGIC */}
+            {/* --- ALL MODALS (RENDERED AT ROOT LEVEL) --- */}
+            
+            {/* ADD/EDIT STEP MODAL */}
+            {isStepModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-6 shadow-2xl">
+                        <h3 className="text-xl font-bold mb-4 text-primary dark:text-white">{stepModalMode === 'ADD' ? 'Nova Etapa' : 'Editar Etapa'}</h3>
+                        <form onSubmit={handleSaveStep} className="space-y-4">
+                            <input placeholder="Nome da Etapa" value={stepName} onChange={e => setStepName(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required />
+                            <div className="grid grid-cols-2 gap-2">
+                                <div><label className="text-[10px] uppercase font-bold text-slate-400 ml-1">Início</label><input type="date" value={stepStart} onChange={e => setStepStart(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required /></div>
+                                <div><label className="text-[10px] uppercase font-bold text-slate-400 ml-1">Fim</label><input type="date" value={stepEnd} onChange={e => setStepEnd(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required /></div>
+                            </div>
+                            <div className="flex gap-2 pt-2">
+                                <button type="button" onClick={() => setIsStepModalOpen(false)} className="flex-1 bg-slate-100 dark:bg-slate-800 text-slate-500 py-3 rounded-xl font-bold">Cancelar</button>
+                                <button type="submit" className="flex-1 bg-primary text-white py-3 rounded-xl font-bold">Salvar</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* ADD MATERIAL MODAL */}
+            {addMatModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-6 shadow-2xl overflow-y-auto max-h-[90vh]">
+                        <h3 className="text-xl font-bold mb-4 text-primary dark:text-white">Novo Material</h3>
+                        <form onSubmit={handleAddMaterial} className="space-y-4">
+                            <input placeholder="Nome do Material" value={newMatName} onChange={e => setNewMatName(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required />
+                            <div className="grid grid-cols-2 gap-2">
+                                <input type="number" placeholder="Qtd" value={newMatQty} onChange={e => setNewMatQty(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required />
+                                <input placeholder="Unidade (un, m2)" value={newMatUnit} onChange={e => setNewMatUnit(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required />
+                            </div>
+                            <select value={newMatStepId} onChange={e => setNewMatStepId(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
+                                <option value="">Sem etapa definida</option>
+                                {steps.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                            </select>
+                            
+                            <div className="border-t pt-4 mt-2">
+                                <label className="flex items-center gap-2 mb-2 font-bold text-sm"><input type="checkbox" checked={newMatBuyNow} onChange={e => setNewMatBuyNow(e.target.checked)} className="w-4 h-4" /> Já comprei este material</label>
+                                {newMatBuyNow && (
+                                    <div className="grid grid-cols-2 gap-2 animate-in slide-in-from-top-2">
+                                        <input type="number" placeholder="Qtd Comprada" value={newMatBuyQty} onChange={e => setNewMatBuyQty(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" />
+                                        <input type="number" placeholder="Valor Total (R$)" value={newMatBuyCost} onChange={e => setNewMatBuyCost(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" />
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="flex gap-2">
+                                <button type="button" onClick={() => setAddMatModal(false)} className="flex-1 bg-slate-100 py-3 rounded-xl font-bold">Cancelar</button>
+                                <button type="submit" className="flex-1 bg-primary text-white py-3 rounded-xl font-bold">Salvar</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* EDIT MATERIAL MODAL */}
+            {materialModal.isOpen && materialModal.material && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-6 shadow-2xl overflow-y-auto max-h-[90vh]">
+                        <h3 className="text-xl font-bold mb-4 text-primary dark:text-white">Editar Material</h3>
+                        
+                        <form onSubmit={handleUpdateMaterial} className="space-y-6">
+                            {/* EDITABLE DEFINITION */}
+                            <div className="space-y-3">
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Nome do Produto</label>
+                                    <input 
+                                        value={matName} 
+                                        onChange={e => setMatName(e.target.value)} 
+                                        className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold"
+                                    />
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Qtd Planejada</label>
+                                        <input 
+                                            type="number"
+                                            value={matPlannedQty} 
+                                            onChange={e => setMatPlannedQty(e.target.value)} 
+                                            className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Unidade</label>
+                                        <input 
+                                            value={matUnit} 
+                                            onChange={e => setMatUnit(e.target.value)} 
+                                            className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* READ-ONLY STATUS */}
+                            <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-xl border border-green-200 dark:border-green-900 flex justify-between items-center">
+                                <span className="text-sm font-bold text-green-700 dark:text-green-400">Total Já Comprado:</span>
+                                <span className="font-mono font-black text-lg text-green-700 dark:text-green-400">{materialModal.material.purchasedQty} {materialModal.material.unit}</span>
+                            </div>
+
+                            {/* OPTIONAL NEW PURCHASE */}
+                            <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
+                                <label className="block text-xs font-black text-secondary uppercase mb-2 tracking-widest"><i className="fa-solid fa-cart-plus"></i> Registrar Nova Compra</label>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <input type="number" placeholder="Qtd" value={matBuyQty} onChange={e => setMatBuyQty(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" />
+                                    <input type="number" placeholder="Valor (R$)" value={matBuyCost} onChange={e => setMatBuyCost(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" />
+                                </div>
+                                <p className="text-[10px] text-slate-400 mt-2">*Preencha apenas se houver nova compra. Se quiser só corrigir o nome/planejado, deixe vazio.</p>
+                            </div>
+
+                            <div className="flex gap-2">
+                                <button type="button" onClick={() => setMaterialModal({isOpen: false, material: null})} className="flex-1 bg-slate-100 py-3 rounded-xl font-bold">Cancelar</button>
+                                <button type="submit" className="flex-1 bg-primary text-white py-3 rounded-xl font-bold shadow-lg">Salvar Alterações</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* EXPENSE MODAL (ADD / EDIT) */}
             {expenseModal.isOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
-                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-6 shadow-2xl overflow-hidden">
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-6 shadow-2xl">
                         <div className="flex justify-between items-center mb-4">
                             <h3 className="text-xl font-bold text-primary dark:text-white">
                                 {expenseModal.mode === 'ADD' ? 'Novo Gasto' : 'Editar Gasto'}
@@ -1151,22 +1274,21 @@ const WorkDetail: React.FC = () => {
                     </div>
                 </div>
             )}
-
-            {/* ... Other Modals ... */}
-            {isStepModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
-                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-6 shadow-2xl">
-                        <h3 className="text-xl font-bold mb-4 text-primary dark:text-white">{stepModalMode === 'ADD' ? 'Nova Etapa' : 'Editar Etapa'}</h3>
-                        <form onSubmit={handleSaveStep} className="space-y-4">
-                            <input placeholder="Nome da Etapa" value={stepName} onChange={e => setStepName(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required />
-                            <div className="grid grid-cols-2 gap-2">
-                                <div><label className="text-[10px] uppercase font-bold text-slate-400 ml-1">Início</label><input type="date" value={stepStart} onChange={e => setStepStart(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required /></div>
-                                <div><label className="text-[10px] uppercase font-bold text-slate-400 ml-1">Fim</label><input type="date" value={stepEnd} onChange={e => setStepEnd(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required /></div>
-                            </div>
-                            <div className="flex gap-2 pt-2">
-                                <button type="button" onClick={() => setIsStepModalOpen(false)} className="flex-1 bg-slate-100 dark:bg-slate-800 text-slate-500 py-3 rounded-xl font-bold">Cancelar</button>
-                                <button type="submit" className="flex-1 bg-primary text-white py-3 rounded-xl font-bold">Salvar</button>
-                            </div>
+            
+            {/* TEAM & SUPPLIER FORM MODAL */}
+            {isPersonModalOpen && (
+                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-6 shadow-2xl overflow-y-auto max-h-[90vh]">
+                        <div className="flex items-center gap-3 mb-4">
+                             <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl ${personMode === 'WORKER' ? 'bg-blue-100 text-blue-600' : 'bg-amber-100 text-amber-600'}`}><i className={`fa-solid ${personMode === 'WORKER' ? 'fa-helmet-safety' : 'fa-truck'}`}></i></div>
+                             <div><h3 className="text-lg font-bold text-primary dark:text-white leading-tight">{personId ? 'Editar' : 'Adicionar'} {personMode === 'WORKER' ? 'Profissional' : 'Fornecedor'}</h3></div>
+                        </div>
+                        <form onSubmit={handleSavePerson} className="space-y-4">
+                            <div><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Nome</label><input required className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold" value={personName} onChange={e => setPersonName(e.target.value)} /></div>
+                            <div><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{personMode === 'WORKER' ? 'Função' : 'Categoria'}</label><select required className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold text-sm" value={personRole} onChange={e => setPersonRole(e.target.value)}>{(personMode === 'WORKER' ? STANDARD_JOB_ROLES : STANDARD_SUPPLIER_CATEGORIES).map(r => <option key={r} value={r}>{r}</option>)}</select></div>
+                            <div><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Telefone / WhatsApp</label><input className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold" placeholder="51 99999-9999" value={personPhone} onChange={e => setPersonPhone(e.target.value)} /></div>
+                            <div><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Observações</label><textarea className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold h-20 resize-none" placeholder="Detalhes opcionais..." value={personNotes} onChange={e => setPersonNotes(e.target.value)}></textarea></div>
+                            <div className="flex gap-2 pt-2"><button type="button" onClick={() => setIsPersonModalOpen(false)} className="flex-1 py-3 font-bold text-slate-500 hover:bg-slate-100 rounded-xl">Cancelar</button><button type="submit" className="flex-1 py-3 font-bold bg-primary text-white rounded-xl shadow-lg">Salvar</button></div>
                         </form>
                     </div>
                 </div>
