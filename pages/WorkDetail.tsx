@@ -74,12 +74,14 @@ const WorkDetail: React.FC = () => {
     const [newMatBuyQty, setNewMatBuyQty] = useState('');
     const [newMatBuyCost, setNewMatBuyCost] = useState('');
 
-    const [addExpenseModal, setAddExpenseModal] = useState(false);
+    // EXPENSE MODAL STATE (UNIFIED ADD/EDIT)
+    const [expenseModal, setExpenseModal] = useState<{ isOpen: boolean, mode: 'ADD'|'EDIT', id?: string }>({ isOpen: false, mode: 'ADD' });
     const [expDesc, setExpDesc] = useState('');
     const [expAmount, setExpAmount] = useState('');
     const [expTotalAgreed, setExpTotalAgreed] = useState('');
     const [expCategory, setExpCategory] = useState<string>(ExpenseCategory.LABOR);
     const [expStepId, setExpStepId] = useState('');
+    const [expDate, setExpDate] = useState('');
 
     const [isPersonModalOpen, setIsPersonModalOpen] = useState(false);
     const [personMode, setPersonMode] = useState<'WORKER'|'SUPPLIER'>('WORKER');
@@ -216,26 +218,70 @@ const WorkDetail: React.FC = () => {
         await load();
     };
 
-    const handleAddExpense = async (e: React.FormEvent) => {
+    const openAddExpense = () => {
+        setExpenseModal({ isOpen: true, mode: 'ADD' });
+        setExpDesc('');
+        setExpAmount('');
+        setExpTotalAgreed('');
+        setExpCategory(ExpenseCategory.LABOR);
+        setExpStepId('');
+        setExpDate(new Date().toISOString().split('T')[0]);
+    };
+
+    const openEditExpense = (expense: Expense) => {
+        setExpenseModal({ isOpen: true, mode: 'EDIT', id: expense.id });
+        setExpDesc(expense.description);
+        setExpAmount(String(expense.amount));
+        setExpTotalAgreed(expense.totalAgreed ? String(expense.totalAgreed) : '');
+        setExpCategory(expense.category);
+        setExpStepId(expense.stepId || '');
+        setExpDate(expense.date.split('T')[0]);
+    };
+
+    const handleSaveExpense = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!work || !expDesc) return;
         
-        // Ensure linking to step if selected
         const finalStepId = expStepId || undefined;
+        const finalTotalAgreed = expTotalAgreed ? Number(expTotalAgreed) : undefined;
 
-        await dbService.addExpense({
-            id: Math.random().toString(36).substr(2, 9),
-            workId: work.id,
-            description: expDesc,
-            amount: Number(expAmount),
-            date: new Date().toISOString(),
-            category: expCategory,
-            stepId: finalStepId,
-            totalAgreed: expTotalAgreed ? Number(expTotalAgreed) : undefined
-        });
-        setAddExpenseModal(false);
-        setExpDesc(''); setExpAmount(''); setExpTotalAgreed('');
+        if (expenseModal.mode === 'ADD') {
+            await dbService.addExpense({
+                id: Math.random().toString(36).substr(2, 9),
+                workId: work.id,
+                description: expDesc,
+                amount: Number(expAmount),
+                date: new Date(expDate).toISOString(),
+                category: expCategory,
+                stepId: finalStepId,
+                totalAgreed: finalTotalAgreed
+            });
+        } else if (expenseModal.mode === 'EDIT' && expenseModal.id) {
+            const existing = expenses.find(e => e.id === expenseModal.id);
+            if (existing) {
+                await dbService.updateExpense({
+                    ...existing,
+                    description: expDesc,
+                    amount: Number(expAmount),
+                    date: new Date(expDate).toISOString(),
+                    category: expCategory,
+                    stepId: finalStepId,
+                    totalAgreed: finalTotalAgreed
+                });
+            }
+        }
+        setExpenseModal({ isOpen: false, mode: 'ADD' });
         await load();
+    };
+
+    const handleDeleteExpense = async () => {
+        if (expenseModal.id) {
+            if (window.confirm("Tem certeza que deseja excluir este gasto?")) {
+                await dbService.deleteExpense(expenseModal.id);
+                setExpenseModal({ isOpen: false, mode: 'ADD' });
+                await load();
+            }
+        }
     };
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'PHOTO' | 'FILE') => {
@@ -349,7 +395,7 @@ const WorkDetail: React.FC = () => {
         }
     }, [calcArea, calcType]);
 
-    // EXPORT
+    // EXPORT EXCEL
     const handleExportExcel = () => {
         const wb = XLSX.utils.book_new();
         const wsCrono = XLSX.utils.json_to_sheet(steps.map(s => ({ Etapa: s.name, Inicio: parseDateNoTimezone(s.startDate), Fim: parseDateNoTimezone(s.endDate), Status: s.status })));
@@ -357,6 +403,10 @@ const WorkDetail: React.FC = () => {
         const wsMat = XLSX.utils.json_to_sheet(materials.map(m => ({ Material: m.name, Qtd: m.plannedQty, Comprado: m.purchasedQty })));
         XLSX.utils.book_append_sheet(wb, wsMat, "Materiais");
         XLSX.writeFile(wb, `Obra_${work?.name}.xlsx`);
+    };
+
+    const handlePrintPDF = () => {
+        window.print();
     };
 
     const handleAiAsk = async () => {
@@ -523,7 +573,7 @@ const WorkDetail: React.FC = () => {
                             <h2 className="text-2xl font-black text-primary dark:text-white">Financeiro</h2>
                             <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Fluxo de Caixa</p>
                         </div>
-                        <button onClick={() => setAddExpenseModal(true)} className="bg-green-600 text-white w-12 h-12 rounded-xl flex items-center justify-center hover:bg-green-700 transition-all shadow-lg shadow-green-600/30"><i className="fa-solid fa-plus text-lg"></i></button>
+                        <button onClick={openAddExpense} className="bg-green-600 text-white w-12 h-12 rounded-xl flex items-center justify-center hover:bg-green-700 transition-all shadow-lg shadow-green-600/30"><i className="fa-solid fa-plus text-lg"></i></button>
                     </div>
                     
                     <div className="bg-gradient-premium p-6 rounded-3xl text-white shadow-xl relative overflow-hidden mb-8">
@@ -552,22 +602,53 @@ const WorkDetail: React.FC = () => {
                                     <h3 className={`font-bold uppercase tracking-wide ${isGeneral ? 'text-slate-400 text-xs' : 'text-primary dark:text-white text-sm'}`}>{stepLabel}</h3>
                                 </div>
                                 <div className="space-y-3">
-                                    {stepExpenses.map(exp => (
-                                        <div key={exp.id} className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm flex items-center justify-between">
-                                            <div className="flex items-center gap-4">
-                                                <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${exp.category === 'Material' ? 'bg-amber-100 text-amber-600' : 'bg-blue-100 text-blue-600'}`}>
-                                                    <i className={`fa-solid ${exp.category === 'Material' ? 'fa-box' : 'fa-helmet-safety'}`}></i>
+                                    {stepExpenses.map(exp => {
+                                        // PARTIAL PAYMENT LOGIC
+                                        const isPartial = exp.totalAgreed && exp.totalAgreed > exp.amount;
+                                        const progress = isPartial ? (exp.amount / exp.totalAgreed!) * 100 : 100;
+
+                                        return (
+                                            <div key={exp.id} className="relative group bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm transition-all hover:shadow-md">
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <div className="flex items-center gap-4">
+                                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${exp.category === 'Material' ? 'bg-amber-100 text-amber-600' : 'bg-blue-100 text-blue-600'}`}>
+                                                            <i className={`fa-solid ${exp.category === 'Material' ? 'fa-box' : 'fa-helmet-safety'}`}></i>
+                                                        </div>
+                                                        <div>
+                                                            <p className="font-bold text-primary dark:text-white text-base leading-tight">{exp.description}</p>
+                                                            <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-2">
+                                                                {exp.category} • {parseDateNoTimezone(exp.date.split('T')[0])}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        <span className="font-bold text-primary dark:text-white text-lg whitespace-nowrap">R$ {Number(exp.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                                    </div>
                                                 </div>
-                                                <div>
-                                                    <p className="font-bold text-primary dark:text-white text-base leading-tight">{exp.description}</p>
-                                                    <p className="text-xs text-slate-500 mt-0.5">
-                                                        {exp.category} • {parseDateNoTimezone(exp.date.split('T')[0])}
-                                                    </p>
-                                                </div>
+                                                
+                                                {/* VISUAL FOR PARTIAL PAYMENTS */}
+                                                {isPartial && (
+                                                    <div className="mt-2 pt-2 border-t border-dashed border-slate-100 dark:border-slate-800">
+                                                        <div className="flex justify-between text-[10px] uppercase font-bold text-slate-400 mb-1">
+                                                            <span>Parcial</span>
+                                                            <span>Total: R$ {exp.totalAgreed?.toLocaleString('pt-BR')}</span>
+                                                        </div>
+                                                        <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                                                            <div className="h-full bg-orange-400 rounded-full" style={{width: `${progress}%`}}></div>
+                                                        </div>
+                                                    </div>
+                                                )}
+
+                                                {/* EDIT BUTTON (Visible on Hover/Touch) */}
+                                                <button 
+                                                    onClick={() => openEditExpense(exp)}
+                                                    className="absolute top-2 right-2 p-2 text-slate-300 hover:text-secondary opacity-0 group-hover:opacity-100 transition-opacity"
+                                                >
+                                                    <i className="fa-solid fa-pen-to-square"></i>
+                                                </button>
                                             </div>
-                                            <span className="font-bold text-primary dark:text-white text-lg whitespace-nowrap">R$ {Number(exp.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                                        </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             </div>
                         );
@@ -729,44 +810,128 @@ const WorkDetail: React.FC = () => {
 
             case 'REPORTS': return (
                 <div className="space-y-6">
-                    <div className="flex gap-2 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
+                    {/* Filter Tabs */}
+                    <div className="flex gap-2 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl no-print">
                         {['CRONO', 'MAT', 'FIN'].map((rt) => (
                             <button key={rt} onClick={() => setReportTab(rt as any)} className={`flex-1 py-2 rounded-lg text-xs font-bold ${reportTab === rt ? 'bg-white shadow text-primary' : 'text-slate-500'}`}>
                                 {rt === 'CRONO' ? 'Cronograma' : rt === 'MAT' ? 'Materiais' : 'Financeiro'}
                             </button>
                         ))}
                     </div>
-                    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
+
+                    {/* PRINT-FRIENDLY CONTAINER */}
+                    <div className="bg-white dark:bg-white dark:text-black rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm print:shadow-none print:border-0 print:rounded-none">
+                        
+                        {/* Header for Print/PDF */}
+                        <div className="hidden print:block p-8 border-b-2 border-slate-100">
+                            <div className="flex justify-between items-start">
+                                <div>
+                                    <h1 className="text-3xl font-black text-slate-900 mb-1">MÃOS DA OBRA</h1>
+                                    <p className="text-sm font-bold text-slate-500">Relatório Geral da Obra</p>
+                                </div>
+                                <div className="text-right">
+                                    <h2 className="text-xl font-bold text-slate-800">{work.name}</h2>
+                                    <p className="text-sm text-slate-500">Data: {new Date().toLocaleDateString()}</p>
+                                </div>
+                            </div>
+                            
+                            {/* Summary Stats */}
+                            <div className="mt-6 p-4 bg-slate-50 rounded-xl border border-slate-200 grid grid-cols-3 gap-4">
+                                <div>
+                                    <span className="text-xs font-bold text-slate-400 uppercase">Orçamento</span>
+                                    <p className="text-lg font-black text-slate-800">R$ {work.budgetPlanned.toLocaleString('pt-BR')}</p>
+                                </div>
+                                <div>
+                                    <span className="text-xs font-bold text-slate-400 uppercase">Gasto Total</span>
+                                    <p className="text-lg font-black text-red-600">R$ {expenses.reduce((a, b) => a + Number(b.amount), 0).toLocaleString('pt-BR')}</p>
+                                </div>
+                                <div>
+                                    <span className="text-xs font-bold text-slate-400 uppercase">Status</span>
+                                    <p className="text-lg font-black text-blue-600">{expenses.length} lançamentos</p>
+                                </div>
+                            </div>
+                        </div>
+
                         <table className="w-full text-left text-sm">
-                            <thead className="bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
+                            <thead className="bg-slate-50 dark:bg-slate-100 border-b border-slate-200 dark:border-slate-200">
                                 <tr>
-                                    <th className="px-4 py-3 font-bold text-slate-500 uppercase text-xs">Item</th>
-                                    <th className="px-4 py-3 font-bold text-slate-500 uppercase text-xs text-right">Status/Valor</th>
+                                    <th className="px-6 py-4 font-bold text-slate-500 uppercase text-xs">Item / Descrição</th>
+                                    <th className="px-6 py-4 font-bold text-slate-500 uppercase text-xs text-right">Detalhes / Valor</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                            <tbody className="divide-y divide-slate-100 dark:divide-slate-200">
                                 {reportTab === 'CRONO' && steps.map((s) => (
-                                    <tr key={s.id}>
-                                        <td className="px-4 py-3 font-bold text-primary dark:text-white">{s.name}<br/><span className="text-[10px] font-normal text-slate-400">{parseDateNoTimezone(s.endDate)}</span></td>
-                                        <td className="px-4 py-3 text-right"><span className={`text-[10px] font-bold px-2 py-1 rounded ${s.status === 'CONCLUIDO' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}`}>{s.status === 'CONCLUIDO' ? 'OK' : 'PEND'}</span></td>
+                                    <tr key={s.id} className="hover:bg-slate-50">
+                                        <td className="px-6 py-4">
+                                            <p className="font-bold text-slate-800">{s.name}</p>
+                                            <p className="text-xs text-slate-500">{parseDateNoTimezone(s.startDate)} - {parseDateNoTimezone(s.endDate)}</p>
+                                        </td>
+                                        <td className="px-6 py-4 text-right">
+                                            <span className={`inline-block text-[10px] font-bold px-3 py-1 rounded-full ${s.status === 'CONCLUIDO' ? 'bg-green-100 text-green-700' : s.status === 'EM_ANDAMENTO' ? 'bg-orange-100 text-orange-700' : 'bg-slate-100 text-slate-500'}`}>
+                                                {s.status === 'CONCLUIDO' ? 'CONCLUÍDO' : s.status === 'EM_ANDAMENTO' ? 'EM ANDAMENTO' : 'PENDENTE'}
+                                            </span>
+                                        </td>
                                     </tr>
                                 ))}
                                 {reportTab === 'MAT' && materials.map((m) => (
-                                    <tr key={m.id}>
-                                        <td className="px-4 py-3 text-primary dark:text-white">{m.name}</td>
-                                        <td className="px-4 py-3 text-right font-mono text-xs">{m.purchasedQty}/{m.plannedQty}</td>
+                                    <tr key={m.id} className="hover:bg-slate-50">
+                                        <td className="px-6 py-4">
+                                            <p className="font-bold text-slate-800">{m.name}</p>
+                                            <p className="text-xs text-slate-500">{m.brand || 'Marca não inf.'}</p>
+                                        </td>
+                                        <td className="px-6 py-4 text-right">
+                                            <div className="font-mono font-bold text-slate-700">{m.purchasedQty} / {m.plannedQty} {m.unit}</div>
+                                            <div className="w-24 h-1.5 bg-slate-200 rounded-full ml-auto mt-1 overflow-hidden">
+                                                <div className="h-full bg-blue-500" style={{width: `${Math.min((m.purchasedQty/m.plannedQty)*100, 100)}%`}}></div>
+                                            </div>
+                                        </td>
                                     </tr>
                                 ))}
                                 {reportTab === 'FIN' && expenses.map((e) => (
-                                    <tr key={e.id}>
-                                        <td className="px-4 py-3 text-primary dark:text-white">{e.description}<br/><span className="text-[10px] text-slate-400">{parseDateNoTimezone(e.date)}</span></td>
-                                        <td className="px-4 py-3 text-right font-bold text-primary dark:text-white">R$ {e.amount}</td>
+                                    <tr key={e.id} className="hover:bg-slate-50">
+                                        <td className="px-6 py-4">
+                                            <p className="font-bold text-slate-800">{e.description}</p>
+                                            <p className="text-xs text-slate-500 flex items-center gap-2">
+                                                <span>{parseDateNoTimezone(e.date)}</span>
+                                                <span className="w-1 h-1 rounded-full bg-slate-300"></span>
+                                                <span>{e.category}</span>
+                                            </p>
+                                        </td>
+                                        <td className="px-6 py-4 text-right">
+                                            <p className="font-bold text-slate-800">R$ {e.amount.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
+                                            {e.totalAgreed && (
+                                                <p className="text-[10px] text-slate-500 font-bold mt-0.5">
+                                                    Parcial de R$ {e.totalAgreed.toLocaleString('pt-BR')}
+                                                </p>
+                                            )}
+                                        </td>
                                     </tr>
                                 ))}
                             </tbody>
                         </table>
                     </div>
-                    <button onClick={handleExportExcel} className="w-full py-3 bg-green-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-green-700 shadow-lg"><i className="fa-solid fa-file-excel"></i> Baixar Excel</button>
+
+                    <div className="flex gap-3 no-print">
+                        <button onClick={handlePrintPDF} className="flex-1 py-3 bg-slate-800 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-slate-700 shadow-lg transition-all">
+                            <i className="fa-solid fa-print"></i> Imprimir / PDF
+                        </button>
+                        <button onClick={handleExportExcel} className="flex-1 py-3 bg-green-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-green-700 shadow-lg transition-all">
+                            <i className="fa-solid fa-file-excel"></i> Baixar Excel
+                        </button>
+                    </div>
+
+                    {/* PRINT STYLES */}
+                    <style>{`
+                        @media print {
+                            .no-print { display: none !important; }
+                            body { background: white; color: black; }
+                            nav, aside, .bottom-nav { display: none !important; }
+                            main { padding: 0 !important; margin: 0 !important; height: auto !important; overflow: visible !important; }
+                            /* Ensure table fits */
+                            table { width: 100% !important; }
+                            td, th { padding: 8px 12px !important; border-bottom: 1px solid #ddd !important; }
+                        }
+                    `}</style>
                 </div>
             );
 
@@ -916,7 +1081,7 @@ const WorkDetail: React.FC = () => {
 
     return (
         <div className="max-w-4xl mx-auto min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col font-sans relative">
-            <div className="bg-white dark:bg-slate-900 px-6 pt-6 pb-2 sticky top-0 z-20 shadow-sm border-b border-slate-100 dark:border-slate-800">
+            <div className="bg-white dark:bg-slate-900 px-6 pt-6 pb-2 sticky top-0 z-20 shadow-sm border-b border-slate-100 dark:border-slate-800 no-print">
                 <div className="flex justify-between items-center mb-1">
                     <button onClick={() => subView !== 'NONE' ? setSubView('NONE') : navigate('/')} className="text-slate-400 hover:text-primary dark:hover:text-white"><i className="fa-solid fa-arrow-left text-xl"></i></button>
                     <h1 className="text-lg font-black text-primary dark:text-white uppercase tracking-tight truncate max-w-[200px]">
@@ -935,7 +1100,7 @@ const WorkDetail: React.FC = () => {
 
             {/* MAIN NAVIGATION BOTTOM BAR (Only visible on main tabs) */}
             {subView === 'NONE' && (
-                <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 pb-safe z-40 shadow-[0_-5px_20px_rgba(0,0,0,0.05)]">
+                <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 pb-safe z-40 shadow-[0_-5px_20px_rgba(0,0,0,0.05)] no-print">
                     <div className="flex justify-around items-center max-w-4xl mx-auto h-16">
                         <button onClick={() => setActiveTab('SCHEDULE')} className={`flex flex-col items-center justify-center w-full h-full gap-1 transition-all ${activeTab === 'SCHEDULE' ? 'text-secondary' : 'text-slate-400'}`}><i className={`fa-solid fa-calendar-days text-xl ${activeTab === 'SCHEDULE' ? 'scale-110' : ''}`}></i><span className="text-[10px] font-bold uppercase">Cronograma</span></button>
                         <button onClick={() => setActiveTab('MATERIALS')} className={`flex flex-col items-center justify-center w-full h-full gap-1 transition-all ${activeTab === 'MATERIALS' ? 'text-secondary' : 'text-slate-400'}`}><i className={`fa-solid fa-layer-group text-xl ${activeTab === 'MATERIALS' ? 'scale-110' : ''}`}></i><span className="text-[10px] font-bold uppercase">Materiais</span></button>
@@ -1018,22 +1183,69 @@ const WorkDetail: React.FC = () => {
                 </div>
             )}
 
-            {/* ADD EXPENSE MODAL */}
-            {addExpenseModal && (
+            {/* EXPENSE MODAL (ADD / EDIT) */}
+            {expenseModal.isOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
                     <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-6 shadow-2xl">
-                        <h3 className="text-xl font-bold mb-4 text-primary dark:text-white">Novo Gasto</h3>
-                        <form onSubmit={handleAddExpense} className="space-y-4">
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="text-xl font-bold text-primary dark:text-white">
+                                {expenseModal.mode === 'ADD' ? 'Novo Gasto' : 'Editar Gasto'}
+                            </h3>
+                            {expenseModal.mode === 'EDIT' && (
+                                <button onClick={handleDeleteExpense} className="text-red-500 hover:bg-red-50 p-2 rounded-lg transition-colors">
+                                    <i className="fa-solid fa-trash"></i>
+                                </button>
+                            )}
+                        </div>
+                        <form onSubmit={handleSaveExpense} className="space-y-4">
                             <input placeholder="Descrição (ex: Pagamento Pedreiro)" value={expDesc} onChange={e => setExpDesc(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required />
-                            <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">R$</span><input type="number" placeholder="Valor Pago" value={expAmount} onChange={e => setExpAmount(e.target.value)} className="w-full pl-10 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required /></div>
-                            <div className="grid grid-cols-2 gap-2"><select value={expCategory} onChange={e => setExpCategory(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700"><option value={ExpenseCategory.LABOR}>Mão de Obra</option><option value={ExpenseCategory.MATERIAL}>Material</option><option value={ExpenseCategory.PERMITS}>Taxas</option><option value={ExpenseCategory.OTHER}>Outros</option></select>
+                            
+                            <div className="grid grid-cols-2 gap-2">
+                                <div className="relative">
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Valor Pago Agora</label>
+                                    <div className="relative">
+                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">R$</span>
+                                        <input type="number" placeholder="0.00" value={expAmount} onChange={e => setExpAmount(e.target.value)} className="w-full pl-10 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required />
+                                    </div>
+                                </div>
+                                <div className="relative">
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Total Combinado</label>
+                                    <div className="relative">
+                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">R$</span>
+                                        <input type="number" placeholder="(Opcional)" value={expTotalAgreed} onChange={e => setExpTotalAgreed(e.target.value)} className="w-full pl-10 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Categoria</label>
+                                    <select value={expCategory} onChange={e => setExpCategory(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
+                                        <option value={ExpenseCategory.LABOR}>Mão de Obra</option>
+                                        <option value={ExpenseCategory.MATERIAL}>Material</option>
+                                        <option value={ExpenseCategory.PERMITS}>Taxas</option>
+                                        <option value={ExpenseCategory.OTHER}>Outros</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Data</label>
+                                    <input type="date" value={expDate} onChange={e => setExpDate(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required />
+                                </div>
+                            </div>
                             
                             {/* STEP SELECTION - ENSURING VISIBILITY */}
-                            <select value={expStepId} onChange={e => setExpStepId(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold text-sm">
-                                <option value="">Sem Etapa (Geral)</option>
-                                {steps.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                            </select></div>
-                            <div className="flex gap-2"><button type="button" onClick={() => setAddExpenseModal(false)} className="flex-1 bg-slate-100 py-3 rounded-xl font-bold">Cancelar</button><button type="submit" className="flex-1 bg-primary text-white py-3 rounded-xl font-bold">Salvar</button></div>
+                            <div>
+                                <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Etapa Relacionada</label>
+                                <select value={expStepId} onChange={e => setExpStepId(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold text-sm">
+                                    <option value="">Sem Etapa (Geral)</option>
+                                    {steps.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                                </select>
+                            </div>
+
+                            <div className="flex gap-2 pt-2">
+                                <button type="button" onClick={() => setExpenseModal({isOpen: false, mode: 'ADD'})} className="flex-1 bg-slate-100 py-3 rounded-xl font-bold">Cancelar</button>
+                                <button type="submit" className="flex-1 bg-primary text-white py-3 rounded-xl font-bold">Salvar</button>
+                            </div>
                         </form>
                     </div>
                 </div>
