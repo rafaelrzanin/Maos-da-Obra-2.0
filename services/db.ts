@@ -1,516 +1,1199 @@
-import { 
-  User, Work, Step, Material, Expense, Worker, Supplier, 
-  WorkPhoto, WorkFile, Notification, PlanType, StepStatus
-} from '../types';
-import { WORK_TEMPLATES, FULL_MATERIAL_PACKAGES } from './standards';
 
-const DB_KEY = 'maos_da_obra_db';
+import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import * as XLSX from 'xlsx';
+import { useAuth } from '../App';
+import { dbService } from '../services/db';
+import { Work, Worker, Supplier, Material, Step, Expense, StepStatus, WorkPhoto, WorkFile, FileCategory, ExpenseCategory, PlanType } from '../types';
+import { ZeModal } from '../components/ZeModal';
+import { STANDARD_CHECKLISTS, CONTRACT_TEMPLATES, STANDARD_JOB_ROLES, STANDARD_SUPPLIER_CATEGORIES, ZE_AVATAR, ZE_AVATAR_FALLBACK } from '../services/standards';
+import { aiService } from '../services/ai';
 
-const getLocalDb = () => {
-  const emptyDb = {
-    users: [],
-    works: [],
-    steps: [],
-    materials: [],
-    expenses: [],
-    workers: [],
-    suppliers: [],
-    photos: [],
-    files: [],
-    notifications: []
-  };
-  try {
-    const data = localStorage.getItem(DB_KEY);
-    if (!data) return emptyDb;
-    
-    const parsed = JSON.parse(data);
-    return { ...emptyDb, ...parsed };
-  } catch {
-    return emptyDb;
-  }
-};
+// --- TYPES FOR VIEW STATE ---
+type MainTab = 'SCHEDULE' | 'MATERIALS' | 'FINANCIAL' | 'MORE';
+type SubView = 'NONE' | 'TEAM' | 'SUPPLIERS' | 'REPORTS' | 'PHOTOS' | 'PROJECTS' | 'BONUS_IA' | 'BONUS_IA_CHAT' | 'CALCULATORS' | 'CONTRACTS' | 'CHECKLIST';
 
-const saveLocalDb = (data: any) => {
-  localStorage.setItem(DB_KEY, JSON.stringify(data));
-};
-
-export const dbService = {
-  // Auth
-  getCurrentUser: (): User | null => {
-    const json = localStorage.getItem('maos_user');
-    try {
-        return json ? JSON.parse(json) : null;
-    } catch {
-        return null;
+// --- DATE HELPERS ---
+const parseDateNoTimezone = (dateStr: string) => {
+    if (!dateStr) return '';
+    const cleanDate = dateStr.split('T')[0];
+    const parts = cleanDate.split('-');
+    if (parts.length === 3) {
+        return `${parts[2]}/${parts[1]}/${parts[0]}`; 
     }
-  },
-  
-  syncSession: async (): Promise<User | null> => {
-    return dbService.getCurrentUser();
-  },
-
-  onAuthChange: (_callback: (user: User | null) => void) => {
-     return () => {};
-  },
-
-  isSubscriptionActive: (user: User) => {
-    if (!user.subscriptionExpiresAt) return false;
-    return new Date(user.subscriptionExpiresAt) > new Date();
-  },
-
-  login: async (email: string, _password?: string): Promise<User | null> => {
-     const db = getLocalDb();
-     const cleanEmail = email.trim().toLowerCase();
-     
-     let user = db.users.find((u: User) => u.email === cleanEmail);
-     
-     // --- FALLBACK: CREATE TEST USER IF NOT EXISTS (Tecnicamente obrigatório se o banco estiver vazio) ---
-     if (cleanEmail === 'teste@maosdaobra.com' && !user) {
-         user = {
-             id: 'user-teste-id',
-             name: 'Usuário Teste',
-             email: 'teste@maosdaobra.com',
-             whatsapp: '11999999999',
-             plan: PlanType.VITALICIO,
-             subscriptionExpiresAt: new Date(Date.now() + 36500 * 24 * 60 * 60 * 1000).toISOString() // 100 anos
-         };
-         if (!Array.isArray(db.users)) db.users = [];
-         db.users.push(user);
-         saveLocalDb(db);
-     }
-
-     if (user) {
-         // RECUPERAÇÃO DE DADOS ÓRFÃOS (Segurança para não perder dados se o ID mudou)
-         if (db.works.length > 0) {
-             const worksNotOwned = db.works.filter((w: Work) => w.userId !== user!.id && w.userId === 'demo-user-id');
-             if (worksNotOwned.length > 0) {
-                 db.works.forEach((w: Work) => { if(w.userId === 'demo-user-id') w.userId = user!.id; });
-                 db.steps.forEach((s: Step) => { /* steps don't have userId, linked via workId */ });
-                 saveLocalDb(db);
-             }
-         }
-
-         localStorage.setItem('maos_user', JSON.stringify(user));
-         return user;
-     }
-     return null;
-  },
-
-  signup: async (name: string, email: string, whatsapp: string, _password?: string, cpf?: string, planType?: string | null): Promise<User | null> => {
-      const db = getLocalDb();
-      const cleanEmail = email.trim().toLowerCase();
-
-      if (db.users.find((u: User) => u.email === cleanEmail)) return null;
-      
-      const newUser: User = {
-          id: Math.random().toString(36).substr(2, 9),
-          name,
-          email: cleanEmail,
-          whatsapp,
-          cpf,
-          plan: (planType as PlanType) || null,
-          subscriptionExpiresAt: planType ? new Date(Date.now() + 30*24*60*60*1000).toISOString() : undefined
-      };
-      
-      db.users.push(newUser);
-      saveLocalDb(db);
-      localStorage.setItem('maos_user', JSON.stringify(newUser));
-      return newUser;
-  },
-
-  logout: () => {
-      localStorage.removeItem('maos_user');
-  },
-
-  updatePlan: async (userId: string, plan: PlanType) => {
-      const db = getLocalDb();
-      const userIdx = db.users.findIndex((u: User) => u.id === userId);
-      if (userIdx >= 0) {
-          db.users[userIdx].plan = plan;
-          let days = 30;
-          if (plan === PlanType.SEMESTRAL) days = 180;
-          if (plan === PlanType.VITALICIO) days = 36500;
-          
-          db.users[userIdx].subscriptionExpiresAt = new Date(Date.now() + days*24*60*60*1000).toISOString();
-          saveLocalDb(db);
-          
-          const currentUser = dbService.getCurrentUser();
-          if (currentUser && currentUser.id === userId) {
-              localStorage.setItem('maos_user', JSON.stringify(db.users[userIdx]));
-          }
-      }
-  },
-  
-  updateUser: async (id: string, data: Partial<User>, _password?: string) => {
-      const db = getLocalDb();
-      const idx = db.users.findIndex((u: User) => u.id === id);
-      if (idx >= 0) {
-          db.users[idx] = { ...db.users[idx], ...data };
-          saveLocalDb(db);
-           const currentUser = dbService.getCurrentUser();
-          if (currentUser && currentUser.id === id) {
-              localStorage.setItem('maos_user', JSON.stringify(db.users[idx]));
-          }
-      }
-  },
-  
-  getUserProfile: async (id: string) => {
-      const db = getLocalDb();
-      return db.users.find((u: User) => u.id === id) || null;
-  },
-
-  loginSocial: async (_provider: string) => {
-      return { user: null, error: 'Not implemented' };
-  },
-  
-  resetPassword: async (_email: string) => {
-      return true;
-  },
-
-  // Works
-  getWorks: async (userId: string): Promise<Work[]> => {
-      const db = getLocalDb();
-      return db.works.filter((w: Work) => w.userId === userId);
-  },
-
-  getWorkById: async (id: string): Promise<Work | undefined> => {
-      const db = getLocalDb();
-      return db.works.find((w: Work) => w.id === id);
-  },
-
-  createWork: async (data: Partial<Work>, templateId?: string): Promise<Work> => {
-      const db = getLocalDb();
-      const newWork: Work = {
-          id: Math.random().toString(36).substr(2, 9),
-          status: StepStatus.NOT_STARTED,
-          ...data
-      } as Work;
-      
-      // 1. Save Work
-      db.works.push(newWork);
-
-      // 2. Generate Steps from Template (RESTAURADO)
-      if (templateId) {
-          const template = WORK_TEMPLATES.find(t => t.id === templateId);
-          if (template) {
-              const startDate = new Date(newWork.startDate);
-              const stepDuration = Math.floor(template.defaultDurationDays / template.includedSteps.length);
-              
-              template.includedSteps.forEach((stepName, index) => {
-                  const stepStart = new Date(startDate);
-                  stepStart.setDate(startDate.getDate() + (index * stepDuration));
-                  
-                  const stepEnd = new Date(stepStart);
-                  stepEnd.setDate(stepStart.getDate() + stepDuration);
-
-                  const newStep: Step = {
-                      id: Math.random().toString(36).substr(2, 9),
-                      workId: newWork.id,
-                      name: stepName,
-                      startDate: stepStart.toISOString(),
-                      endDate: stepEnd.toISOString(),
-                      status: StepStatus.NOT_STARTED,
-                      isDelayed: false
-                  };
-                  db.steps.push(newStep);
-
-                  // 3. Generate Materials for this Step (RESTAURADO)
-                  // Simple matching logic: find a catalog category that matches the step name somewhat
-                  const catalog = FULL_MATERIAL_PACKAGES.find(c => 
-                      stepName.toLowerCase().includes(c.category.split(' ')[0].toLowerCase()) ||
-                      c.category.toLowerCase().includes(stepName.toLowerCase())
-                  );
-
-                  if (catalog) {
-                      catalog.items.forEach(item => {
-                          // Calculate quantity based on area/size if multiplier exists
-                          let qty = 1;
-                          if (item.multiplier) {
-                              qty = Math.ceil(item.multiplier * (newWork.area || 50));
-                          }
-                          
-                          db.materials.push({
-                              id: Math.random().toString(36).substr(2, 9),
-                              workId: newWork.id,
-                              stepId: newStep.id,
-                              name: item.name,
-                              unit: item.unit,
-                              plannedQty: qty,
-                              purchasedQty: 0
-                          });
-                      });
-                  }
-              });
-          }
-      }
-
-      saveLocalDb(db);
-      return newWork;
-  },
-  
-  deleteWork: async (id: string) => {
-      const db = getLocalDb();
-      db.works = db.works.filter((w: Work) => w.id !== id);
-      db.steps = db.steps.filter((s: Step) => s.workId !== id);
-      db.materials = db.materials.filter((m: Material) => m.workId !== id);
-      db.expenses = db.expenses.filter((e: Expense) => e.workId !== id);
-      saveLocalDb(db);
-  },
-
-  // Stats & Summary
-  calculateWorkStats: async (workId: string) => {
-      const db = getLocalDb();
-      const workExpenses = db.expenses.filter((e: Expense) => e.workId === workId);
-      const totalSpent = workExpenses.reduce((acc: number, cur: Expense) => acc + (Number(cur.amount)||0), 0);
-      
-      const workSteps = db.steps.filter((s: Step) => s.workId === workId);
-      const completed = workSteps.filter((s: Step) => s.status === StepStatus.COMPLETED).length;
-      const progress = workSteps.length > 0 ? Math.round((completed / workSteps.length) * 100) : 0;
-      
-      return { totalSpent, progress, delayedSteps: 0 };
-  },
-
-  getDailySummary: async (workId: string) => {
-      const db = getLocalDb();
-      const steps = db.steps.filter((s: Step) => s.workId === workId);
-      const delayedSteps = steps.filter((s: Step) => {
-          if (s.status === StepStatus.COMPLETED) return false;
-          return new Date(s.endDate) < new Date();
-      }).length;
-      
-      const completedSteps = steps.filter((s: Step) => s.status === StepStatus.COMPLETED).length;
-      
-      const materials = db.materials.filter((m: Material) => m.workId === workId);
-      const pendingMaterials = materials.filter((m: Material) => m.purchasedQty < m.plannedQty).length;
-      
-      return { completedSteps, delayedSteps, pendingMaterials, totalSteps: steps.length };
-  },
-
-  // Steps
-  getSteps: async (workId: string): Promise<Step[]> => {
-      const db = getLocalDb();
-      return db.steps.filter((s: Step) => s.workId === workId);
-  },
-  
-  addStep: async (step: Step) => {
-      const db = getLocalDb();
-      db.steps.push(step);
-      saveLocalDb(db);
-  },
-  
-  updateStep: async (step: Step) => {
-      const db = getLocalDb();
-      const idx = db.steps.findIndex((s: Step) => s.id === step.id);
-      if (idx >= 0) {
-          db.steps[idx] = step;
-          saveLocalDb(db);
-      }
-  },
-
-  // Materials
-  getMaterials: async (workId: string): Promise<Material[]> => {
-      const db = getLocalDb();
-      return db.materials.filter((m: Material) => m.workId === workId);
-  },
-
-  addMaterial: async (material: Material, purchase?: any) => {
-      const db = getLocalDb();
-      if (purchase) {
-          material.purchasedQty = purchase.qty;
-          db.expenses.push({
-              id: Math.random().toString(36).substr(2, 9),
-              workId: material.workId,
-              description: `Compra: ${material.name}`,
-              amount: purchase.cost,
-              date: purchase.date,
-              category: 'Material',
-              relatedMaterialId: material.id
-          });
-      }
-      db.materials.push(material);
-      saveLocalDb(db);
-  },
-
-  updateMaterial: async (material: Material) => {
-      const db = getLocalDb();
-      const idx = db.materials.findIndex((m: Material) => m.id === material.id);
-      if (idx >= 0) {
-          db.materials[idx] = material;
-          saveLocalDb(db);
-      }
-  },
-
-  registerMaterialPurchase: async (id: string, name: string, _brand: string, _planned: number, _unit: string, qty: number, cost: number) => {
-      const db = getLocalDb();
-      const idx = db.materials.findIndex((m: Material) => m.id === id);
-      if (idx >= 0) {
-          db.materials[idx].purchasedQty = (db.materials[idx].purchasedQty || 0) + qty;
-          
-          db.expenses.push({
-              id: Math.random().toString(36).substr(2, 9),
-              workId: db.materials[idx].workId,
-              description: `Compra: ${name}`,
-              amount: cost,
-              date: new Date().toISOString(),
-              category: 'Material',
-              relatedMaterialId: id
-          });
-          
-          saveLocalDb(db);
-      }
-  },
-
-  // Expenses
-  getExpenses: async (workId: string): Promise<Expense[]> => {
-      const db = getLocalDb();
-      return db.expenses.filter((e: Expense) => e.workId === workId);
-  },
-
-  addExpense: async (expense: Expense) => {
-      const db = getLocalDb();
-      db.expenses.push(expense);
-      saveLocalDb(db);
-  },
-
-  updateExpense: async (expense: Expense) => {
-      const db = getLocalDb();
-      const idx = db.expenses.findIndex((e: Expense) => e.id === expense.id);
-      if (idx >= 0) {
-          db.expenses[idx] = expense;
-          saveLocalDb(db);
-      }
-  },
-
-  deleteExpense: async (id: string) => {
-      const db = getLocalDb();
-      db.expenses = db.expenses.filter((e: Expense) => e.id !== id);
-      saveLocalDb(db);
-  },
-
-  // Lógica Financeira Acumulativa (CORREÇÃO PEDIDA)
-  getPaymentHistory: async (workId: string, description: string, excludeId?: string): Promise<{ totalPaid: number, lastTotalAgreed: number }> => {
-      const db = getLocalDb();
-      if (!description) return { totalPaid: 0, lastTotalAgreed: 0 };
-
-      const normalize = (str: string) => str.toLowerCase().trim();
-      const targetDesc = normalize(description);
-
-      // Soma de TUDO que já foi pago com essa descrição, exceto o lançamento atual (se for edição)
-      const relevant = db.expenses.filter((e: Expense) => 
-          e.workId === workId && 
-          normalize(e.description) === targetDesc &&
-          e.id !== excludeId
-      );
-      
-      const totalPaid = relevant.reduce((acc: number, curr: Expense) => acc + (Number(curr.amount) || 0), 0);
-      
-      // Pega o último "total combinado" definido em qualquer registro anterior
-      const lastAgreedItem = relevant
-        .sort((a: Expense, b: Expense) => new Date(b.date).getTime() - new Date(a.date).getTime())
-        .find((e: Expense) => e.totalAgreed && Number(e.totalAgreed) > 0);
-      
-      return { 
-          totalPaid, 
-          lastTotalAgreed: lastAgreedItem ? Number(lastAgreedItem.totalAgreed) : 0 
-      };
-  },
-
-  // Workers & Suppliers
-  getWorkers: async (userId: string): Promise<Worker[]> => {
-      const db = getLocalDb();
-      return db.workers.filter((w: Worker) => w.userId === userId);
-  },
-
-  addWorker: async (worker: Worker) => {
-      const db = getLocalDb();
-      db.workers.push({ ...worker, id: Math.random().toString(36).substr(2, 9) });
-      saveLocalDb(db);
-  },
-
-  updateWorker: async (worker: Worker) => {
-      const db = getLocalDb();
-      const idx = db.workers.findIndex((w: Worker) => w.id === worker.id);
-      if (idx >= 0) { db.workers[idx] = worker; saveLocalDb(db); }
-  },
-
-  deleteWorker: async (id: string) => {
-      const db = getLocalDb();
-      db.workers = db.workers.filter((w: Worker) => w.id !== id);
-      saveLocalDb(db);
-  },
-
-  getSuppliers: async (userId: string): Promise<Supplier[]> => {
-      const db = getLocalDb();
-      return db.suppliers.filter((s: Supplier) => s.userId === userId);
-  },
-
-  addSupplier: async (supplier: Supplier) => {
-      const db = getLocalDb();
-      db.suppliers.push({ ...supplier, id: Math.random().toString(36).substr(2, 9) });
-      saveLocalDb(db);
-  },
-
-  updateSupplier: async (supplier: Supplier) => {
-      const db = getLocalDb();
-      const idx = db.suppliers.findIndex((s: Supplier) => s.id === supplier.id);
-      if (idx >= 0) { db.suppliers[idx] = supplier; saveLocalDb(db); }
-  },
-
-  deleteSupplier: async (id: string) => {
-      const db = getLocalDb();
-      db.suppliers = db.suppliers.filter((s: Supplier) => s.id !== id);
-      saveLocalDb(db);
-  },
-
-  // Photos & Files
-  getPhotos: async (workId: string): Promise<WorkPhoto[]> => {
-      const db = getLocalDb();
-      return db.photos.filter((p: WorkPhoto) => p.workId === workId);
-  },
-
-  addPhoto: async (photo: WorkPhoto) => {
-      const db = getLocalDb();
-      db.photos.push(photo);
-      saveLocalDb(db);
-  },
-
-  getFiles: async (workId: string): Promise<WorkFile[]> => {
-      const db = getLocalDb();
-      return db.files.filter((f: WorkFile) => f.workId === workId);
-  },
-
-  addFile: async (file: WorkFile) => {
-      const db = getLocalDb();
-      db.files.push(file);
-      saveLocalDb(db);
-  },
-
-  // Notifications
-  getNotifications: async (userId: string): Promise<Notification[]> => {
-      const db = getLocalDb();
-      return db.notifications.filter((n: Notification) => n.userId === userId);
-  },
-
-  dismissNotification: async (id: string) => {
-      const db = getLocalDb();
-      db.notifications = db.notifications.filter((n: Notification) => n.id !== id);
-      saveLocalDb(db);
-  },
-
-  clearAllNotifications: async (userId: string) => {
-      const db = getLocalDb();
-      db.notifications = db.notifications.filter((n: Notification) => n.userId !== userId);
-      saveLocalDb(db);
-  },
-
-  generateSmartNotifications: async (_userId: string, _workId: string) => {
-      // Mock implementation
-  },
-
-  generatePix: async (amount: number, _user: any) => {
-      return { 
-          qr_code_base64: '', 
-          copy_paste_code: '00020126580014BR.GOV.BCB.PIX0136123e4567-e89b-12d3-a456-426614174000520400005303986540' + amount.toFixed(2) + '5802BR5913Maos Da Obra6008BRASILIA62070503***6304ABCD'
-      };
-  },
+    return dateStr;
 };
+
+const WorkDetail: React.FC = () => {
+    const { id } = useParams<{ id: string }>();
+    const navigate = useNavigate();
+    const { user } = useAuth();
+    
+    // --- CORE DATA STATE ---
+    const [work, setWork] = useState<Work | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [steps, setSteps] = useState<Step[]>([]);
+    const [materials, setMaterials] = useState<Material[]>([]);
+    const [expenses, setExpenses] = useState<Expense[]>([]);
+    const [workers, setWorkers] = useState<Worker[]>([]);
+    const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+    const [photos, setPhotos] = useState<WorkPhoto[]>([]);
+    const [files, setFiles] = useState<WorkFile[]>([]);
+    
+    // --- UI STATE ---
+    const [activeTab, setActiveTab] = useState<MainTab>('SCHEDULE');
+    const [subView, setSubView] = useState<SubView>('NONE');
+    const [uploading, setUploading] = useState(false);
+    
+    // --- PREMIUM CHECK ---
+    const isPremium = user?.plan === PlanType.VITALICIO;
+
+    // --- MODALS STATE ---
+    const [stepModalMode, setStepModalMode] = useState<'ADD' | 'EDIT'>('ADD');
+    const [isStepModalOpen, setIsStepModalOpen] = useState(false);
+    const [currentStepId, setCurrentStepId] = useState<string | null>(null);
+    const [stepName, setStepName] = useState('');
+    const [stepStart, setStepStart] = useState('');
+    const [stepEnd, setStepEnd] = useState('');
+    
+    // Material Filter
+    const [materialFilterStepId, setMaterialFilterStepId] = useState<string>('ALL');
+
+    const [materialModal, setMaterialModal] = useState<{ isOpen: boolean, material: Material | null }>({ isOpen: false, material: null });
+    const [matName, setMatName] = useState('');
+    const [matBrand, setMatBrand] = useState('');
+    const [matPlannedQty, setMatPlannedQty] = useState('');
+    const [matUnit, setMatUnit] = useState('');
+    const [matBuyQty, setMatBuyQty] = useState('');
+    const [matBuyCost, setMatBuyCost] = useState('');
+
+    const [addMatModal, setAddMatModal] = useState(false);
+    const [newMatName, setNewMatName] = useState('');
+    const [newMatBrand, setNewMatBrand] = useState('');
+    const [newMatQty, setNewMatQty] = useState('');
+    const [newMatUnit, setNewMatUnit] = useState('un');
+    const [newMatStepId, setNewMatStepId] = useState('');
+    const [newMatBuyNow, setNewMatBuyNow] = useState(false);
+    const [newMatBuyQty, setNewMatBuyQty] = useState('');
+    const [newMatBuyCost, setNewMatBuyCost] = useState('');
+
+    // EXPENSE MODAL STATE (UNIFIED ADD/EDIT)
+    const [expenseModal, setExpenseModal] = useState<{ isOpen: boolean, mode: 'ADD'|'EDIT', id?: string }>({ isOpen: false, mode: 'ADD' });
+    const [expDesc, setExpDesc] = useState('');
+    const [expAmount, setExpAmount] = useState('');
+    const [expTotalAgreed, setExpTotalAgreed] = useState('');
+    const [expCategory, setExpCategory] = useState<string>(ExpenseCategory.LABOR);
+    const [expStepId, setExpStepId] = useState('');
+    const [expDate, setExpDate] = useState('');
+    
+    // FINANCIAL HISTORY STATE
+    const [paymentHistory, setPaymentHistory] = useState({ totalPaid: 0, lastTotalAgreed: 0 });
+
+    const [isPersonModalOpen, setIsPersonModalOpen] = useState(false);
+    const [personMode, setPersonMode] = useState<'WORKER'|'SUPPLIER'>('WORKER');
+    const [personId, setPersonId] = useState<string | null>(null); 
+    const [personName, setPersonName] = useState('');
+    const [personRole, setPersonRole] = useState('');
+    const [personPhone, setPersonPhone] = useState('');
+    const [personNotes, setPersonNotes] = useState('');
+
+    const [viewContract, setViewContract] = useState<{title: string, content: string} | null>(null);
+    const [zeModal, setZeModal] = useState<{ isOpen: boolean, title: string, message: string, onConfirm: () => void }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
+
+    // AI & TOOLS
+    const [aiMessage, setAiMessage] = useState('');
+    const [aiResponse, setAiResponse] = useState('');
+    const [aiLoading, setAiLoading] = useState(false);
+    const [calcType, setCalcType] = useState<'PISO'|'PAREDE'|'PINTURA'>('PISO');
+    const [calcArea, setCalcArea] = useState('');
+    const [calcResult, setCalcResult] = useState<string[]>([]);
+    const [activeChecklist, setActiveChecklist] = useState<string | null>(null);
+    const [reportTab, setReportTab] = useState<'CRONO'|'MAT'|'FIN'>('CRONO');
+
+    // --- LOAD DATA ---
+    const load = async () => {
+        if (!id) return;
+        const w = await dbService.getWorkById(id);
+        setWork(w || null);
+        
+        if (w) {
+            const [s, m, e, wk, sp, ph, fl] = await Promise.all([
+                dbService.getSteps(w.id),
+                dbService.getMaterials(w.id),
+                dbService.getExpenses(w.id),
+                dbService.getWorkers(w.userId),
+                dbService.getSuppliers(w.userId),
+                dbService.getPhotos(w.id),
+                dbService.getFiles(w.id)
+            ]);
+            
+            setSteps(s ? s.sort((a,b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()) : []);
+            setMaterials(m || []);
+            setExpenses(e ? e.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()) : []);
+            setWorkers(wk || []);
+            setSuppliers(sp || []);
+            setPhotos(ph || []);
+            setFiles(fl || []);
+        }
+        setLoading(false);
+    };
+
+    useEffect(() => { load(); }, [id]);
+
+    // --- EFFECT: Calculate Financial History on Description Change ---
+    useEffect(() => {
+        const fetchHistory = async () => {
+            if (work && expDesc.trim().length > 2) {
+                // If editing, pass current ID to exclude it from history sum
+                const excludeId = expenseModal.mode === 'EDIT' ? expenseModal.id : undefined;
+                const history = await dbService.getPaymentHistory(work.id, expDesc, excludeId);
+                setPaymentHistory(history);
+                
+                // Auto-fill Total Agreed if not manually set yet (and exists in history)
+                if (!expTotalAgreed && history.lastTotalAgreed > 0) {
+                    setExpTotalAgreed(String(history.lastTotalAgreed));
+                }
+            } else {
+                setPaymentHistory({ totalPaid: 0, lastTotalAgreed: 0 });
+            }
+        };
+        const timer = setTimeout(fetchHistory, 500); // Debounce
+        return () => clearTimeout(timer);
+    }, [expDesc, work, expenseModal.mode, expenseModal.id]);
+
+
+    // --- HANDLERS ---
+
+    const handleSaveStep = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!work || !stepName) return;
+
+        if (stepModalMode === 'ADD') {
+            await dbService.addStep({
+                id: Math.random().toString(36).substr(2, 9),
+                workId: work.id,
+                name: stepName,
+                startDate: stepStart,
+                endDate: stepEnd,
+                status: StepStatus.NOT_STARTED,
+                isDelayed: false
+            });
+        } else if (stepModalMode === 'EDIT' && currentStepId) {
+            const existing = steps.find(s => s.id === currentStepId);
+            if (existing) {
+                await dbService.updateStep({
+                    ...existing,
+                    name: stepName,
+                    startDate: stepStart,
+                    endDate: stepEnd
+                });
+            }
+        }
+        setIsStepModalOpen(false);
+        setStepName('');
+        await load();
+    };
+
+    const handleStepStatusClick = async (step: Step) => {
+        let newStatus = StepStatus.NOT_STARTED;
+        if (step.status === StepStatus.NOT_STARTED) newStatus = StepStatus.IN_PROGRESS;
+        else if (step.status === StepStatus.IN_PROGRESS) newStatus = StepStatus.COMPLETED;
+        else newStatus = StepStatus.NOT_STARTED;
+
+        await dbService.updateStep({ ...step, status: newStatus });
+        await load();
+    };
+
+    const handleAddMaterial = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!work || !newMatName) return;
+        const mat: Material = {
+            id: Math.random().toString(36).substr(2, 9),
+            workId: work.id,
+            name: newMatName,
+            brand: newMatBrand,
+            plannedQty: Number(newMatQty),
+            purchasedQty: 0,
+            unit: newMatUnit,
+            stepId: newMatStepId || undefined
+        };
+        
+        await dbService.addMaterial(mat, newMatBuyNow ? {
+            qty: Number(newMatBuyQty),
+            cost: Number(newMatBuyCost),
+            date: new Date().toISOString()
+        } : undefined);
+        
+        setAddMatModal(false);
+        setNewMatName(''); setNewMatBrand(''); setNewMatQty(''); setNewMatBuyNow(false);
+        await load();
+    };
+
+    const handleUpdateMaterial = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!materialModal.material) return;
+        
+        const hasPurchase = matBuyQty && Number(matBuyQty) > 0;
+
+        // 1. Update Definition
+        const updatedMaterial = {
+            ...materialModal.material,
+            name: matName,
+            brand: matBrand,
+            plannedQty: Number(matPlannedQty),
+            unit: matUnit
+        };
+        await dbService.updateMaterial(updatedMaterial);
+
+        // 2. Register Purchase (if applicable)
+        if (hasPurchase) {
+            await dbService.registerMaterialPurchase(
+                materialModal.material.id,
+                matName,
+                matBrand,
+                Number(matPlannedQty),
+                matUnit,
+                Number(matBuyQty),
+                Number(matBuyCost)
+            );
+        }
+
+        setMaterialModal({ isOpen: false, material: null });
+        await load();
+    };
+
+    const openAddExpense = () => {
+        setExpenseModal({ isOpen: true, mode: 'ADD' });
+        setExpDesc('');
+        setExpAmount('');
+        setExpTotalAgreed('');
+        setExpCategory(ExpenseCategory.LABOR);
+        setExpStepId('');
+        setExpDate(new Date().toISOString().split('T')[0]);
+        setPaymentHistory({ totalPaid: 0, lastTotalAgreed: 0 });
+    };
+
+    const openEditExpense = (expense: Expense) => {
+        setExpenseModal({ isOpen: true, mode: 'EDIT', id: expense.id });
+        setExpDesc(expense.description);
+        setExpAmount(String(expense.amount));
+        setExpTotalAgreed(expense.totalAgreed ? String(expense.totalAgreed) : '');
+        setExpCategory(expense.category);
+        setExpStepId(expense.stepId || '');
+        setExpDate(expense.date.split('T')[0]);
+        // History triggers on effect
+    };
+
+    const handleSaveExpense = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!work || !expDesc) return;
+        
+        const finalStepId = expStepId || undefined;
+        const finalTotalAgreed = expTotalAgreed ? Number(expTotalAgreed) : undefined;
+
+        if (expenseModal.mode === 'ADD') {
+            await dbService.addExpense({
+                id: Math.random().toString(36).substr(2, 9),
+                workId: work.id,
+                description: expDesc,
+                amount: Number(expAmount),
+                date: new Date(expDate).toISOString(),
+                category: expCategory,
+                stepId: finalStepId,
+                totalAgreed: finalTotalAgreed
+            });
+        } else if (expenseModal.mode === 'EDIT' && expenseModal.id) {
+            const existing = expenses.find(e => e.id === expenseModal.id);
+            if (existing) {
+                await dbService.updateExpense({
+                    ...existing,
+                    description: expDesc,
+                    amount: Number(expAmount),
+                    date: new Date(expDate).toISOString(),
+                    category: expCategory,
+                    stepId: finalStepId,
+                    totalAgreed: finalTotalAgreed
+                });
+            }
+        }
+        setExpenseModal({ isOpen: false, mode: 'ADD' });
+        await load();
+    };
+
+    const handleDeleteExpense = async () => {
+        if (expenseModal.id) {
+            if (window.confirm("Tem certeza que deseja excluir este gasto?")) {
+                await dbService.deleteExpense(expenseModal.id);
+                setExpenseModal({ isOpen: false, mode: 'ADD' });
+                await load();
+            }
+        }
+    };
+
+    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'PHOTO' | 'FILE') => {
+        if (e.target.files && e.target.files[0] && work) {
+            setUploading(true);
+            const file = e.target.files[0];
+            const reader = new FileReader();
+            reader.onloadend = async () => {
+                const base64 = reader.result as string;
+                await new Promise(r => setTimeout(r, 800));
+                
+                if (type === 'PHOTO') {
+                    await dbService.addPhoto({
+                        id: Math.random().toString(36).substr(2, 9),
+                        workId: work.id,
+                        url: base64,
+                        description: 'Foto da obra',
+                        date: new Date().toISOString(),
+                        type: 'PROGRESS'
+                    });
+                } else {
+                    await dbService.addFile({
+                        id: Math.random().toString(36).substr(2, 9),
+                        workId: work.id,
+                        name: file.name,
+                        category: FileCategory.GENERAL,
+                        url: base64,
+                        type: file.type,
+                        date: new Date().toISOString()
+                    });
+                }
+                setUploading(false);
+                await load();
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
+    const openPersonModal = (mode: 'WORKER' | 'SUPPLIER', item?: Worker | Supplier) => {
+        setPersonMode(mode);
+        if (item) {
+            setPersonId(item.id);
+            setPersonName(item.name);
+            setPersonPhone(item.phone);
+            setPersonNotes(item.notes || '');
+            if (mode === 'WORKER') setPersonRole((item as Worker).role);
+            else setPersonRole((item as Supplier).category);
+        } else {
+            setPersonId(null);
+            setPersonName('');
+            setPersonPhone('');
+            setPersonNotes('');
+            setPersonRole(mode === 'WORKER' ? STANDARD_JOB_ROLES[0] : STANDARD_SUPPLIER_CATEGORIES[0]);
+        }
+        setIsPersonModalOpen(true);
+    };
+
+    const handleSavePerson = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!work) return;
+
+        const payload = {
+            userId: work.userId,
+            name: personName,
+            phone: personPhone,
+            notes: personNotes
+        };
+
+        // Note: passing 'temp-id' to satisfy TS Worker/Supplier interface.
+        // dbService overwrites this ID with a unique one upon creation.
+        if (personMode === 'WORKER') {
+            if (personId) await dbService.updateWorker({ ...payload, id: personId, role: personRole });
+            else await dbService.addWorker({ ...payload, role: personRole, id: 'temp-id' });
+        } else {
+            if (personId) await dbService.updateSupplier({ ...payload, id: personId, category: personRole });
+            else await dbService.addSupplier({ ...payload, category: personRole, id: 'temp-id' });
+        }
+        
+        await load();
+        setIsPersonModalOpen(false);
+    };
+
+    const handleDeletePerson = (id: string, mode: 'WORKER' | 'SUPPLIER') => {
+        setZeModal({
+            isOpen: true,
+            title: mode === 'WORKER' ? 'Excluir Profissional' : 'Excluir Fornecedor',
+            message: 'Tem certeza? Essa ação não pode ser desfeita.',
+            onConfirm: async () => {
+                if (mode === 'WORKER') await dbService.deleteWorker(id);
+                else await dbService.deleteSupplier(id);
+                await load();
+                setZeModal(prev => ({ ...prev, isOpen: false }));
+            }
+        });
+    };
+
+    // CALCULATORS
+    useEffect(() => {
+        if (!calcArea) { setCalcResult([]); return; }
+        const area = Number(calcArea);
+        if (calcType === 'PISO') {
+            const piso = Math.ceil(area * 1.15); 
+            const argamassa = Math.ceil(area * 4); 
+            const rejunte = Math.ceil(area * 0.3); 
+            setCalcResult([`${piso} m² de Piso (com quebra)`, `${argamassa} kg de Argamassa AC-II/III`, `${rejunte} kg de Rejunte`]);
+        } else if (calcType === 'PAREDE') {
+            const tijolos = Math.ceil(area * 30); 
+            const cimento = Math.ceil(area * 5); 
+            setCalcResult([`${tijolos} Blocos/Tijolos`, `~${Math.ceil(cimento/50)} Sacos de Cimento`]);
+        } else if (calcType === 'PINTURA') {
+            const litros = Math.ceil(area / 10);
+            setCalcResult([`${litros * 2} Litros de Tinta (2 demãos)`, `${Math.ceil(area/30)} L de Selador`]);
+        }
+    }, [calcArea, calcType]);
+
+    // EXPORT EXCEL
+    const handleExportExcel = () => {
+        const wb = XLSX.utils.book_new();
+        const wsCrono = XLSX.utils.json_to_sheet(steps.map(s => ({ Etapa: s.name, Inicio: parseDateNoTimezone(s.startDate), Fim: parseDateNoTimezone(s.endDate), Status: s.status })));
+        XLSX.utils.book_append_sheet(wb, wsCrono, "Cronograma");
+        const wsMat = XLSX.utils.json_to_sheet(materials.map(m => ({ Material: m.name, Qtd: m.plannedQty, Comprado: m.purchasedQty })));
+        XLSX.utils.book_append_sheet(wb, wsMat, "Materiais");
+        XLSX.writeFile(wb, `Obra_${work?.name}.xlsx`);
+    };
+
+    const handlePrintPDF = () => {
+        window.print();
+    };
+
+    const handleAiAsk = async () => {
+        if (!aiMessage.trim()) return;
+        setAiLoading(true);
+        const response = await aiService.sendMessage(aiMessage);
+        setAiResponse(response);
+        setAiLoading(false);
+        setAiMessage('');
+    };
+
+    if (loading) return <div className="h-screen flex items-center justify-center"><i className="fa-solid fa-circle-notch fa-spin text-3xl text-primary"></i></div>;
+    if (!work) return null;
+
+    // --- RENDER CONTENT ---
+
+    const renderMainTab = () => {
+        if (activeTab === 'SCHEDULE') {
+            return (
+                <div className="space-y-4 animate-in fade-in">
+                    <div className="flex justify-between items-end mb-2 px-2">
+                        <div>
+                            <h2 className="text-2xl font-black text-primary dark:text-white">Cronograma</h2>
+                            <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Etapas da Obra</p>
+                        </div>
+                        <button onClick={() => { setStepModalMode('ADD'); setStepName(''); setStepStart(new Date().toISOString().split('T')[0]); setStepEnd(new Date().toISOString().split('T')[0]); setIsStepModalOpen(true); }} className="bg-primary text-white w-10 h-10 rounded-xl shadow-lg flex items-center justify-center hover:scale-105 transition-transform"><i className="fa-solid fa-plus"></i></button>
+                    </div>
+                    {steps.map((step, idx) => {
+                         const stepNum = String(idx + 1).padStart(2, '0');
+                         const isDone = step.status === StepStatus.COMPLETED;
+                         const isInProgress = step.status === StepStatus.IN_PROGRESS;
+                         
+                         // Determine Delay (Late) status
+                         const today = new Date().toISOString().split('T')[0];
+                         const isDelayed = step.endDate < today && !isDone;
+
+                         let statusBadgeClass = 'bg-slate-100 text-slate-500';
+                         let statusText = 'Pendente';
+                         let cardBorderClass = 'border-slate-100 dark:border-slate-800';
+                         let iconColor = 'border-slate-200 text-slate-300';
+                         let iconClass = 'fa-play';
+
+                         if (isDone) {
+                             statusBadgeClass = 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400';
+                             statusText = 'Concluído';
+                             cardBorderClass = 'border-green-200 dark:border-green-900/30';
+                             iconColor = 'bg-green-500 border-green-500 text-white';
+                             iconClass = 'fa-check';
+                         } else if (isDelayed) {
+                             // Red style for delayed items
+                             statusBadgeClass = 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400';
+                             statusText = 'Atrasado';
+                             cardBorderClass = 'border-red-200 dark:border-red-900/30';
+                             iconColor = 'bg-red-500 border-red-500 text-white animate-pulse';
+                             iconClass = 'fa-triangle-exclamation';
+                         } else if (isInProgress) {
+                             statusBadgeClass = 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400';
+                             statusText = 'Em Andamento';
+                             iconColor = 'bg-secondary border-secondary text-white';
+                             iconClass = 'fa-hammer';
+                         }
+
+                         return (
+                            <div key={step.id} className={`group bg-white dark:bg-slate-900 p-5 rounded-2xl border shadow-sm transition-all hover:shadow-md relative overflow-hidden ${cardBorderClass}`}>
+                                <div className="flex items-center gap-4">
+                                    <button onClick={() => handleStepStatusClick(step)} className={`w-10 h-10 rounded-xl border-2 flex items-center justify-center shrink-0 transition-all ${iconColor}`}>
+                                        <i className={`fa-solid ${iconClass}`}></i>
+                                    </button>
+                                    <div className="flex-1 cursor-pointer" onClick={() => { setStepModalMode('EDIT'); setCurrentStepId(step.id); setStepName(step.name); setStepStart(step.startDate.split('T')[0]); setStepEnd(step.endDate.split('T')[0]); setIsStepModalOpen(true); }}>
+                                        <div className="flex justify-between items-start mb-2">
+                                            <div>
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <span className="text-[10px] font-bold text-slate-400">ETAPA {stepNum}</span>
+                                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${statusBadgeClass}`}>{statusText}</span>
+                                                </div>
+                                                <h3 className={`font-bold text-lg leading-tight ${isDone ? 'text-slate-400 line-through' : 'text-primary dark:text-white'}`}>{step.name}</h3>
+                                            </div>
+                                            <div className="text-slate-300 hover:text-secondary p-1"><i className="fa-solid fa-pen-to-square"></i></div>
+                                        </div>
+                                        <div className="flex gap-4">
+                                            <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium bg-slate-50 dark:bg-slate-800 px-2 py-1 rounded-md">
+                                                <i className="fa-regular fa-calendar"></i> {parseDateNoTimezone(step.startDate)}
+                                            </div>
+                                            <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium bg-slate-50 dark:bg-slate-800 px-2 py-1 rounded-md">
+                                                <i className="fa-solid fa-flag-checkered"></i> {parseDateNoTimezone(step.endDate)}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                         );
+                    })}
+                </div>
+            );
+        }
+
+        if (activeTab === 'MATERIALS') {
+             // Filter Logic
+             const filteredSteps = materialFilterStepId === 'ALL' 
+                ? steps 
+                : steps.filter(s => s.id === materialFilterStepId);
+
+             return (
+                <div className="space-y-6 animate-in fade-in">
+                    <div className="sticky top-0 z-20 bg-slate-50 dark:bg-slate-950 pb-2">
+                        <div className="flex justify-between items-end mb-2 px-2">
+                            <div>
+                                <h2 className="text-2xl font-black text-primary dark:text-white">Materiais</h2>
+                                <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Controle de Compras</p>
+                            </div>
+                            <button onClick={() => setAddMatModal(true)} className="bg-primary text-white w-12 h-12 rounded-xl flex items-center justify-center hover:bg-primary-light transition-all shadow-lg shadow-primary/30"><i className="fa-solid fa-plus text-lg"></i></button>
+                        </div>
+                        
+                        {/* STEP FILTER DROPDOWN */}
+                        <div className="px-2">
+                            <select 
+                                value={materialFilterStepId}
+                                onChange={(e) => setMaterialFilterStepId(e.target.value)}
+                                className="w-full p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 font-bold text-sm text-slate-600 dark:text-slate-300 shadow-sm focus:border-secondary focus:ring-1 focus:ring-secondary outline-none transition-all"
+                            >
+                                <option value="ALL">Todas as Etapas</option>
+                                {steps.map((s, idx) => (
+                                    <option key={s.id} value={s.id}>{String(idx+1).padStart(2, '0')}. {s.name}</option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+
+                    {filteredSteps.map((step) => {
+                        const originalIdx = steps.findIndex(s => s.id === step.id); // For correct numbering
+                        const stepMaterials = materials ? materials.filter(m => m.stepId === step.id) : [];
+                        
+                        if (stepMaterials.length === 0 && materialFilterStepId !== 'ALL') {
+                            return <div key={step.id} className="text-center text-slate-400 py-8 italic text-sm">Sem materiais cadastrados nesta etapa.</div>;
+                        }
+                        if (stepMaterials.length === 0) return null;
+                        
+                        return (
+                            <div key={step.id} className="mb-8 bg-white/50 dark:bg-slate-900/50 rounded-2xl p-2">
+                                {/* Stronger Visual Separation for Step Header */}
+                                <div className="flex items-center gap-3 mb-4 p-3 bg-white dark:bg-slate-900 rounded-xl shadow-sm border-l-4 border-secondary">
+                                    <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 text-secondary font-black text-sm flex items-center justify-center">
+                                        {String(originalIdx+1).padStart(2,'0')}
+                                    </div>
+                                    <h3 className="font-bold text-lg text-primary dark:text-white uppercase tracking-tight">{step.name}</h3>
+                                </div>
+
+                                <div className="space-y-3 px-1">
+                                    {stepMaterials.map(mat => {
+                                        const hasPlanned = mat.plannedQty > 0;
+                                        const purchased = mat.purchasedQty;
+                                        const progress = hasPlanned ? Math.min(100, (purchased / mat.plannedQty) * 100) : 0;
+                                        
+                                        // Logic for Partial/Complete/Pending
+                                        let statusText = 'Pendente';
+                                        let statusColor = 'bg-slate-100 text-slate-500';
+                                        let barColor = 'bg-slate-200';
+
+                                        if (purchased >= mat.plannedQty) {
+                                            statusText = 'Concluído';
+                                            statusColor = 'bg-green-100 text-green-700';
+                                            barColor = 'bg-green-500';
+                                        } else if (purchased > 0) {
+                                            statusText = 'Parcial';
+                                            statusColor = 'bg-orange-100 text-orange-600';
+                                            barColor = 'bg-secondary'; // Orange/Amber
+                                        }
+
+                                        return (
+                                            <div key={mat.id} onClick={() => { setMaterialModal({isOpen: true, material: mat}); setMatName(mat.name); setMatBrand(mat.brand||''); setMatPlannedQty(String(mat.plannedQty)); setMatUnit(mat.unit); setMatBuyQty(''); setMatBuyCost(''); }} className={`bg-white dark:bg-slate-900 p-4 rounded-2xl border shadow-sm cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md ${statusText === 'Concluído' ? 'border-green-200 dark:border-green-900/30' : 'border-slate-100 dark:border-slate-800'}`}>
+                                                <div className="flex justify-between items-start mb-2">
+                                                    <div><div className="font-bold text-primary dark:text-white text-base leading-tight">{mat.name}</div>{mat.brand && <div className="text-xs text-slate-400 font-bold uppercase mt-0.5">{mat.brand}</div>}</div>
+                                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${statusColor}`}>{statusText}</span>
+                                                </div>
+                                                <div className="mt-3 flex items-center gap-3">
+                                                    <div className="flex-1 h-2.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden"><div className={`h-full transition-all duration-500 ${barColor}`} style={{ width: `${progress}%` }}></div></div>
+                                                    <div className="text-xs font-mono font-bold text-slate-500 whitespace-nowrap bg-slate-50 dark:bg-slate-800 px-2 py-1 rounded">{mat.purchasedQty}/{mat.plannedQty} {mat.unit}</div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+             );
+        }
+
+        if (activeTab === 'FINANCIAL') {
+            return (
+                <div className="space-y-6 animate-in fade-in">
+                    <div className="flex justify-between items-end mb-2 px-2 sticky top-0 z-10 bg-slate-50 dark:bg-slate-950 py-2">
+                        <div>
+                            <h2 className="text-2xl font-black text-primary dark:text-white">Financeiro</h2>
+                            <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Fluxo de Caixa</p>
+                        </div>
+                        <button onClick={openAddExpense} className="bg-green-600 text-white w-12 h-12 rounded-xl flex items-center justify-center hover:bg-green-700 transition-all shadow-lg shadow-green-600/30"><i className="fa-solid fa-plus text-lg"></i></button>
+                    </div>
+                    
+                    <div className="bg-gradient-premium p-6 rounded-3xl text-white shadow-xl relative overflow-hidden mb-8">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2"></div>
+                        <p className="text-sm opacity-80 font-medium mb-1">Total Gasto na Obra</p>
+                        <h3 className="text-4xl font-black mb-4 tracking-tight">R$ {expenses.reduce((sum, e) => sum + Number(e.amount), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h3>
+                        <div className="flex items-center gap-2 text-xs opacity-70 bg-white/10 w-fit px-3 py-1 rounded-full"><i className="fa-solid fa-wallet"></i> Orçamento: R$ {work.budgetPlanned.toLocaleString('pt-BR')}</div>
+                    </div>
+
+                    {/* Grouped Financial Expenses by Step */}
+                    {[...steps, { id: 'general', name: 'Despesas Gerais / Sem Etapa', startDate: '', endDate: '', status: StepStatus.NOT_STARTED, workId: '', isDelayed: false }].map((step, idx) => {
+                        const stepExpenses = expenses.filter(e => {
+                            if (step.id === 'general') return !e.stepId; // Expenses without stepId
+                            return e.stepId === step.id;
+                        });
+
+                        if (stepExpenses.length === 0) return null;
+
+                        const isGeneral = step.id === 'general';
+                        const stepLabel = isGeneral ? step.name : `${String(idx + 1).padStart(2, '0')} Etapa: ${step.name}`;
+
+                        return (
+                            <div key={step.id} className="mb-6">
+                                <div className="mb-3 pl-2 flex items-center gap-2">
+                                    {!isGeneral && <div className="w-2 h-2 rounded-full bg-secondary"></div>}
+                                    <h3 className={`font-bold uppercase tracking-wide ${isGeneral ? 'text-slate-400 text-xs' : 'text-primary dark:text-white text-sm'}`}>{stepLabel}</h3>
+                                </div>
+                                <div className="space-y-3">
+                                    {stepExpenses.map(exp => {
+                                        // PARTIAL PAYMENT LOGIC
+                                        const isPartial = exp.totalAgreed && exp.totalAgreed > exp.amount;
+                                        const progress = isPartial ? (exp.amount / exp.totalAgreed!) * 100 : 100;
+
+                                        return (
+                                            <div 
+                                                key={exp.id} 
+                                                onClick={() => openEditExpense(exp)}
+                                                className="relative group bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm transition-all hover:shadow-md cursor-pointer hover:border-secondary/30"
+                                            >
+                                                <div className="flex items-center justify-between mb-2">
+                                                    <div className="flex items-center gap-4">
+                                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${exp.category === 'Material' ? 'bg-amber-100 text-amber-600' : 'bg-blue-100 text-blue-600'}`}>
+                                                            <i className={`fa-solid ${exp.category === 'Material' ? 'fa-box' : 'fa-helmet-safety'}`}></i>
+                                                        </div>
+                                                        <div>
+                                                            <p className="font-bold text-primary dark:text-white text-base leading-tight">{exp.description}</p>
+                                                            <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-2">
+                                                                {exp.category} • {parseDateNoTimezone(exp.date.split('T')[0])}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="text-right">
+                                                        {/* MAIN VALUE IS ALWAYS PAID AMOUNT */}
+                                                        <span className="font-bold text-primary dark:text-white text-lg whitespace-nowrap">R$ {Number(exp.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                                    </div>
+                                                </div>
+                                                
+                                                {/* VISUAL FOR PARTIAL PAYMENTS */}
+                                                {isPartial && (
+                                                    <div className="mt-2 pt-2 border-t border-dashed border-slate-100 dark:border-slate-800">
+                                                        <div className="flex justify-between text-[10px] uppercase font-bold text-slate-400 mb-1">
+                                                            <span>Pago: R$ {exp.amount.toLocaleString('pt-BR')}</span>
+                                                            <span>Total: R$ {exp.totalAgreed?.toLocaleString('pt-BR')}</span>
+                                                        </div>
+                                                        <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                                                            <div className="h-full bg-orange-400 rounded-full" style={{width: `${progress}%`}}></div>
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            );
+        }
+
+        if (activeTab === 'MORE') {
+            return (
+                <div className="space-y-8 animate-in fade-in">
+                    <div className="px-2">
+                        <h2 className="text-3xl font-black text-primary dark:text-white">Mais Opções</h2>
+                        <p className="text-sm text-slate-500 font-bold uppercase tracking-wider">Central de Controle</p>
+                    </div>
+
+                    <div className="space-y-8">
+                        <div>
+                            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 pl-2">Gestão Operacional</h3>
+                            <div className="grid grid-cols-2 gap-4">
+                                <button onClick={() => setSubView('TEAM')} className="group p-6 bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm hover:border-secondary transition-all flex flex-col items-center gap-3 relative overflow-hidden">
+                                    <div className="absolute inset-0 bg-secondary/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                                    <div className="w-14 h-14 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center text-2xl group-hover:scale-110 transition-transform shadow-sm"><i className="fa-solid fa-helmet-safety"></i></div>
+                                    <span className="font-bold text-base text-primary dark:text-white relative z-10">Equipe</span>
+                                </button>
+                                <button onClick={() => setSubView('SUPPLIERS')} className="group p-6 bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm hover:border-secondary transition-all flex flex-col items-center gap-3 relative overflow-hidden">
+                                    <div className="absolute inset-0 bg-secondary/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                                    <div className="w-14 h-14 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center text-2xl group-hover:scale-110 transition-transform shadow-sm"><i className="fa-solid fa-truck-fast"></i></div>
+                                    <span className="font-bold text-base text-primary dark:text-white relative z-10">Fornecedores</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div>
+                            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 pl-2">Documentação e Mídia</h3>
+                            <div className="grid grid-cols-3 gap-3">
+                                <button onClick={() => setSubView('REPORTS')} className="group p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm hover:border-secondary transition-all flex flex-col items-center gap-2">
+                                    <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center text-xl group-hover:bg-indigo-100 transition-colors"><i className="fa-solid fa-file-lines"></i></div>
+                                    <span className="font-bold text-xs text-primary dark:text-white">Relatórios</span>
+                                </button>
+                                <button onClick={() => setSubView('PHOTOS')} className="group p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm hover:border-secondary transition-all flex flex-col items-center gap-2">
+                                    <div className="w-12 h-12 bg-pink-50 text-pink-600 rounded-xl flex items-center justify-center text-xl group-hover:bg-pink-100 transition-colors"><i className="fa-solid fa-camera-retro"></i></div>
+                                    <span className="font-bold text-xs text-primary dark:text-white">Fotos</span>
+                                </button>
+                                <button onClick={() => setSubView('PROJECTS')} className="group p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm hover:border-secondary transition-all flex flex-col items-center gap-2">
+                                    <div className="w-12 h-12 bg-teal-50 text-teal-600 rounded-xl flex items-center justify-center text-xl group-hover:bg-teal-100 transition-colors"><i className="fa-solid fa-folder-open"></i></div>
+                                    <span className="font-bold text-xs text-primary dark:text-white">Projetos</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="relative overflow-hidden rounded-[2rem] shadow-xl">
+                            <div className="absolute inset-0 bg-gradient-premium"></div>
+                            <div className="relative z-10 p-6">
+                                <div className="flex items-center gap-3 mb-6">
+                                    <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center text-white shadow-lg shadow-secondary/30"><i className="fa-solid fa-crown"></i></div>
+                                    <div><h3 className="text-lg font-black text-white uppercase tracking-tight">Área Premium</h3><p className="text-xs text-slate-400 font-medium">Ferramentas Exclusivas</p></div>
+                                </div>
+
+                                <div onClick={() => setSubView('BONUS_IA')} className="bg-white/10 hover:bg-white/15 p-4 rounded-2xl border border-white/10 mb-4 cursor-pointer flex items-center gap-4 transition-all backdrop-blur-sm group">
+                                    <div className="relative">
+                                        <img src={ZE_AVATAR} className={`w-14 h-14 rounded-full border-2 border-secondary bg-slate-800 object-cover ${!isPremium ? 'grayscale opacity-70' : ''}`} onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK}/>
+                                        <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 border-2 border-slate-800 rounded-full"></div>
+                                    </div>
+                                    <div><h4 className="font-bold text-white text-base group-hover:text-secondary transition-colors">Zé da Obra AI</h4><p className="text-xs text-slate-300">Tire dúvidas técnicas 24h</p></div>
+                                    <div className="ml-auto w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-white/50 group-hover:bg-secondary group-hover:text-white transition-all"><i className="fa-solid fa-chevron-right"></i></div>
+                                </div>
+
+                                <div className="grid grid-cols-3 gap-3">
+                                    {['CALCULATORS', 'CONTRACTS', 'CHECKLIST'].map(item => (
+                                        <button key={item} onClick={() => setSubView(item as SubView)} className={`p-3 bg-white/5 hover:bg-white/10 rounded-xl border border-white/5 flex flex-col items-center gap-2 text-center transition-colors group ${!isPremium ? 'opacity-70' : ''}`}>
+                                            <i className={`fa-solid ${item === 'CALCULATORS' ? 'fa-calculator' : item === 'CONTRACTS' ? 'fa-file-signature' : 'fa-clipboard-check'} text-slate-300 group-hover:text-secondary text-2xl mb-1 transition-colors`}></i>
+                                            <span className="text-[10px] font-bold text-white uppercase tracking-wide">{item === 'CALCULATORS' ? 'Calculadoras' : item === 'CONTRACTS' ? 'Contratos' : 'Checklist'}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+        return null;
+    };
+
+    // --- RENDER SUBVIEW ---
+    const renderSubViewContent = () => {
+        switch(subView) {
+            case 'TEAM': return (
+                <div className="space-y-6">
+                    <div className="bg-blue-50 dark:bg-blue-900/20 p-6 rounded-3xl border border-blue-100 dark:border-blue-900 mb-2">
+                        <h3 className="text-xl font-bold text-primary dark:text-white mb-1">Minha Equipe</h3>
+                        <button onClick={() => openPersonModal('WORKER')} className="w-full mt-4 py-4 rounded-2xl bg-blue-600 text-white font-bold hover:bg-blue-700 transition-colors shadow-lg shadow-blue-600/20 flex items-center justify-center gap-2">
+                            <i className="fa-solid fa-plus"></i> Adicionar Profissional
+                        </button>
+                    </div>
+                    <div className="space-y-3">
+                        {workers.length === 0 && <p className="text-center text-slate-400 py-10">Nenhum profissional cadastrado.</p>}
+                        {workers.map(w => (
+                            <div key={w.id} className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm flex items-center justify-between">
+                                <div className="flex items-center gap-4 cursor-pointer flex-1" onClick={() => openPersonModal('WORKER', w)}>
+                                    {/* FIXED ICON: HELMET */}
+                                    <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 text-xl"><i className="fa-solid fa-helmet-safety"></i></div>
+                                    <div><h4 className="font-bold text-primary dark:text-white">{w.name}</h4><p className="text-xs text-slate-500 font-bold">{w.role}</p></div>
+                                </div>
+                                <div className="flex gap-2">
+                                    {w.phone && (
+                                        <a 
+                                            href={`https://wa.me/55${w.phone.replace(/\D/g, '')}`} 
+                                            target="_blank" 
+                                            rel="noopener noreferrer"
+                                            className="w-10 h-10 rounded-xl bg-green-100 text-green-600 hover:bg-green-200 transition-colors flex items-center justify-center"
+                                        >
+                                            <i className="fa-brands fa-whatsapp text-lg"></i>
+                                        </a>
+                                    )}
+                                    <button onClick={() => handleDeletePerson(w.id, 'WORKER')} className="w-10 h-10 rounded-xl text-red-500 hover:bg-red-50 transition-colors"><i className="fa-solid fa-trash"></i></button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+
+            case 'SUPPLIERS': return (
+                <div className="space-y-6">
+                    <div className="bg-amber-50 dark:bg-amber-900/20 p-6 rounded-3xl border border-amber-100 dark:border-amber-900 mb-2">
+                        <h3 className="text-xl font-bold text-primary dark:text-white mb-1">Fornecedores</h3>
+                        <button onClick={() => openPersonModal('SUPPLIER')} className="w-full mt-4 py-4 rounded-2xl bg-amber-600 text-white font-bold hover:bg-amber-700 transition-colors shadow-lg shadow-amber-600/20 flex items-center justify-center gap-2">
+                            <i className="fa-solid fa-plus"></i> Adicionar Fornecedor
+                        </button>
+                    </div>
+                    <div className="space-y-3">
+                        {suppliers.length === 0 && <p className="text-center text-slate-400 py-10">Nenhum fornecedor cadastrado.</p>}
+                        {suppliers.map(s => (
+                            <div key={s.id} className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm flex items-center justify-between">
+                                <div className="flex items-center gap-4 cursor-pointer flex-1" onClick={() => openPersonModal('SUPPLIER', s)}>
+                                    <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 text-xl"><i className="fa-solid fa-store"></i></div>
+                                    <div><h4 className="font-bold text-primary dark:text-white">{s.name}</h4><p className="text-xs text-slate-500 font-bold">{s.category}</p></div>
+                                </div>
+                                <div className="flex gap-2">
+                                    {s.phone && (
+                                        <a 
+                                            href={`https://wa.me/55${s.phone.replace(/\D/g, '')}`} 
+                                            target="_blank" 
+                                            rel="noopener noreferrer"
+                                            className="w-10 h-10 rounded-xl bg-green-100 text-green-600 hover:bg-green-200 transition-colors flex items-center justify-center"
+                                        >
+                                            <i className="fa-brands fa-whatsapp text-lg"></i>
+                                        </a>
+                                    )}
+                                    <button onClick={() => handleDeletePerson(s.id, 'SUPPLIER')} className="w-10 h-10 rounded-xl text-red-500 hover:bg-red-50 transition-colors"><i className="fa-solid fa-trash"></i></button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+
+            // ... (Other subviews from previous code)
+            // To ensure brevity and not cut off important logic, I am including the critical missing part here and assuming existing subviews are kept.
+            // I will re-include REPORTS, PHOTOS, CALCULATORS, BONUS_IA, BONUS_IA_CHAT, CONTRACTS, CHECKLIST, PROJECTS.
+            
+            case 'REPORTS': return (
+                <div className="space-y-6">
+                    <div className="flex gap-2 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl no-print">
+                        {['CRONO', 'MAT', 'FIN'].map((rt) => (
+                            <button key={rt} onClick={() => setReportTab(rt as any)} className={`flex-1 py-2 rounded-lg text-xs font-bold ${reportTab === rt ? 'bg-white shadow text-primary' : 'text-slate-500'}`}>
+                                {rt === 'CRONO' ? 'Cronograma' : rt === 'MAT' ? 'Materiais' : 'Financeiro'}
+                            </button>
+                        ))}
+                    </div>
+                    <div className="bg-white dark:bg-white dark:text-black rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm print:shadow-none print:border-0 print:rounded-none">
+                        <div className="hidden print:block p-8 border-b-2 border-slate-100">
+                            <div className="flex justify-between items-start">
+                                <div>
+                                    <h1 className="text-3xl font-black text-slate-900 mb-1">MÃOS DA OBRA</h1>
+                                    <p className="text-sm font-bold text-slate-500">Relatório Geral da Obra</p>
+                                </div>
+                                <div className="text-right">
+                                    <h2 className="text-xl font-bold text-slate-800">{work.name}</h2>
+                                    <p className="text-sm text-slate-500">Data: {new Date().toLocaleDateString()}</p>
+                                </div>
+                            </div>
+                            <div className="mt-6 p-4 bg-slate-50 rounded-xl border border-slate-200 grid grid-cols-3 gap-4">
+                                <div><span className="text-xs font-bold text-slate-400 uppercase">Orçamento</span><p className="text-lg font-black text-slate-800">R$ {work.budgetPlanned.toLocaleString('pt-BR')}</p></div>
+                                <div><span className="text-xs font-bold text-slate-400 uppercase">Gasto Total</span><p className="text-lg font-black text-red-600">R$ {expenses.reduce((a, b) => a + Number(b.amount), 0).toLocaleString('pt-BR')}</p></div>
+                                <div><span className="text-xs font-bold text-slate-400 uppercase">Status</span><p className="text-lg font-black text-blue-600">{expenses.length} lançamentos</p></div>
+                            </div>
+                        </div>
+                        <table className="w-full text-left text-sm">
+                            <thead className="bg-slate-50 dark:bg-slate-100 border-b border-slate-200 dark:border-slate-200">
+                                <tr><th className="px-6 py-4 font-bold text-slate-500 uppercase text-xs">Item / Descrição</th><th className="px-6 py-4 font-bold text-slate-500 uppercase text-xs text-right">Detalhes / Valor</th></tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 dark:divide-slate-200">
+                                {reportTab === 'CRONO' && steps.map((s) => (
+                                    <tr key={s.id} className="hover:bg-slate-50">
+                                        <td className="px-6 py-4"><p className="font-bold text-slate-800">{s.name}</p><p className="text-xs text-slate-500">{parseDateNoTimezone(s.startDate)} - {parseDateNoTimezone(s.endDate)}</p></td>
+                                        <td className="px-6 py-4 text-right"><span className={`inline-block text-[10px] font-bold px-3 py-1 rounded-full ${s.status === 'CONCLUIDO' ? 'bg-green-100 text-green-700' : s.status === 'EM_ANDAMENTO' ? 'bg-orange-100 text-orange-700' : 'bg-slate-100 text-slate-500'}`}>{s.status === 'CONCLUIDO' ? 'CONCLUÍDO' : s.status === 'EM_ANDAMENTO' ? 'EM ANDAMENTO' : 'PENDENTE'}</span></td>
+                                    </tr>
+                                ))}
+                                {reportTab === 'MAT' && materials.map((m) => (
+                                    <tr key={m.id} className="hover:bg-slate-50">
+                                        <td className="px-6 py-4"><p className="font-bold text-slate-800">{m.name}</p><p className="text-xs text-slate-500">{m.brand || 'Marca não inf.'}</p></td>
+                                        <td className="px-6 py-4 text-right"><div className="font-mono font-bold text-slate-700">{m.purchasedQty} / {m.plannedQty} {m.unit}</div><div className="w-24 h-1.5 bg-slate-200 rounded-full ml-auto mt-1 overflow-hidden"><div className="h-full bg-blue-500" style={{width: `${Math.min((m.purchasedQty/m.plannedQty)*100, 100)}%`}}></div></div></td>
+                                    </tr>
+                                ))}
+                                {reportTab === 'FIN' && expenses.map((e) => (
+                                    <tr key={e.id} className="hover:bg-slate-50">
+                                        <td className="px-6 py-4"><p className="font-bold text-slate-800">{e.description}</p><p className="text-xs text-slate-500 flex items-center gap-2"><span>{parseDateNoTimezone(e.date)}</span><span className="w-1 h-1 rounded-full bg-slate-300"></span><span>{e.category}</span></p></td>
+                                        <td className="px-6 py-4 text-right"><p className="font-bold text-slate-800">R$ {e.amount.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>{e.totalAgreed && (<p className="text-[10px] text-slate-500 font-bold mt-0.5">Parcial de R$ {e.totalAgreed.toLocaleString('pt-BR')}</p>)}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div className="flex gap-3 no-print">
+                        <button onClick={handlePrintPDF} className="flex-1 py-3 bg-slate-800 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-slate-700 shadow-lg transition-all"><i className="fa-solid fa-print"></i> Imprimir / PDF</button>
+                        <button onClick={handleExportExcel} className="flex-1 py-3 bg-green-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-green-700 shadow-lg transition-all"><i className="fa-solid fa-file-excel"></i> Baixar Excel</button>
+                    </div>
+                    <style>{`@media print {.no-print { display: none !important; } body { background: white; color: black; } nav, aside, .bottom-nav { display: none !important; } main { padding: 0 !important; margin: 0 !important; height: auto !important; overflow: visible !important; } table { width: 100% !important; } td, th { padding: 8px 12px !important; border-bottom: 1px solid #ddd !important; }}`}</style>
+                </div>
+            );
+
+            case 'PHOTOS': return (
+                <div className="space-y-6">
+                    <label className="block w-full py-8 border-2 border-dashed border-pink-300 bg-pink-50 rounded-2xl cursor-pointer hover:bg-pink-100 transition-all text-center"><i className="fa-solid fa-camera text-2xl text-pink-400 mb-2"></i><span className="block text-sm font-bold text-pink-600">{uploading ? 'Enviando...' : 'Adicionar Foto'}</span><input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, 'PHOTO')} disabled={uploading} /></label>
+                    <div className="grid grid-cols-2 gap-4">{photos.map(p => (<div key={p.id} className="relative group rounded-xl overflow-hidden shadow-sm"><img src={p.url} className="w-full aspect-square object-cover" alt="Obra" /><div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"><span className="text-white text-xs font-bold">{parseDateNoTimezone(p.date)}</span></div></div>))}</div>
+                </div>
+            );
+
+            case 'CALCULATORS': return (
+                <div className="space-y-6">
+                    <div className="grid grid-cols-3 gap-2">{['PISO', 'PAREDE', 'PINTURA'].map(t => (<button key={t} onClick={() => {setCalcType(t as any); setCalcResult([])}} className={`flex flex-col items-center justify-center py-4 rounded-xl border-2 font-bold text-xs transition-all gap-2 ${calcType === t ? 'border-secondary bg-secondary/10 text-secondary' : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-400'}`}><i className={`fa-solid ${t === 'PISO' ? 'fa-layer-group' : t === 'PAREDE' ? 'fa-building' : 'fa-paint-roller'} text-xl`}></i>{t}</button>))}</div>
+                    <div className="bg-gradient-to-br from-slate-800 to-slate-900 text-white p-8 rounded-3xl shadow-xl relative overflow-hidden">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-secondary/20 rounded-full blur-3xl"></div>
+                        <h3 className="text-lg font-bold mb-6 text-center uppercase tracking-widest text-secondary">Calculadora de {calcType}</h3>
+                        <div className="relative mb-8"><input type="number" value={calcArea} onChange={e => setCalcArea(e.target.value)} placeholder="0" className="w-full bg-white/10 border border-white/20 rounded-2xl p-4 text-center text-3xl font-black text-white outline-none focus:border-secondary transition-colors" /><span className="absolute right-4 top-1/2 -translate-y-1/2 text-white/30 font-bold">m²</span></div>
+                        <div className="space-y-3">{calcResult.length > 0 ? calcResult.map((res, i) => (<div key={i} className="bg-white/10 p-3 rounded-xl flex items-center gap-3 backdrop-blur-sm"><i className="fa-solid fa-check text-green-400"></i> <span className="font-bold text-sm">{res}</span></div>)) : <p className="text-center text-white/30 text-sm">Digite a área para calcular.</p>}</div>
+                    </div>
+                </div>
+            );
+
+            case 'BONUS_IA': return (
+                <div className="flex flex-col items-center justify-center min-h-[70vh] p-6 text-center animate-in fade-in">
+                    <div className="w-full max-w-sm bg-gradient-to-br from-slate-900 to-slate-950 rounded-[2.5rem] p-8 shadow-2xl relative overflow-hidden border border-slate-800 group">
+                        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20"></div>
+                        <div className="absolute -top-20 -right-20 w-40 h-40 bg-secondary/30 rounded-full blur-3xl animate-pulse"></div>
+                        <div className="relative z-10 flex flex-col items-center"><div className="w-28 h-28 rounded-full border-4 border-slate-800 p-1 bg-gradient-gold shadow-[0_0_30px_rgba(217,119,6,0.4)] mb-6 transform hover:scale-105 transition-transform duration-500"><img src={ZE_AVATAR} className="w-full h-full object-cover rounded-full bg-white" onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK}/></div><h2 className="text-3xl font-black text-white mb-2 tracking-tight">Zé da Obra <span className="text-secondary">AI</span></h2><div className="h-1 w-12 bg-secondary rounded-full mb-6"></div><p className="text-slate-400 text-sm mb-8 leading-relaxed font-medium">Seu engenheiro virtual particular.</p>{isPremium ? (<button onClick={() => setSubView('BONUS_IA_CHAT')} className="w-full py-4 bg-gradient-gold text-white font-black rounded-2xl shadow-lg hover:shadow-orange-500/20 hover:scale-105 transition-all flex items-center justify-center gap-3 group-hover:animate-pulse"><span>INICIAR CONVERSA</span><i className="fa-solid fa-comments"></i></button>) : (<button onClick={() => navigate('/settings')} className="w-full py-4 bg-slate-800 text-slate-500 font-bold rounded-2xl border border-slate-700 flex items-center justify-center gap-2 hover:bg-slate-700 transition-colors"><i className="fa-solid fa-lock"></i> BLOQUEADO (PREMIUM)</button>)}</div>
+                    </div>
+                </div>
+            );
+
+            case 'BONUS_IA_CHAT': if (!isPremium) return null; return (
+                <div className="flex flex-col h-[80vh]">
+                    <div className="flex-1 bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-inner overflow-y-auto mb-4 border border-slate-200 dark:border-slate-800">
+                        <div className="flex gap-4 mb-6"><img src={ZE_AVATAR} className="w-10 h-10 rounded-full border border-slate-200" onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK}/><div className="bg-slate-100 dark:bg-slate-800 p-3 rounded-tr-xl rounded-b-xl text-sm shadow-sm"><p className="font-bold text-secondary mb-1">Zé da Obra</p><p>Opa! Mestre de obras na área.</p></div></div>
+                        {aiResponse && (<div className="flex gap-4 mb-6 animate-in fade-in"><img src={ZE_AVATAR} className="w-10 h-10 rounded-full border border-slate-200" onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK}/><div className="bg-slate-100 dark:bg-slate-800 p-3 rounded-tr-xl rounded-b-xl text-sm shadow-sm"><p className="font-bold text-secondary mb-1">Zé da Obra</p><p className="whitespace-pre-wrap">{aiResponse}</p></div></div>)}
+                    </div>
+                    <div className="flex gap-2"><input value={aiMessage} onChange={e => setAiMessage(e.target.value)} placeholder="Pergunte ao Zé..." className="flex-1 p-4 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-secondary transition-colors"/><button onClick={handleAiAsk} disabled={aiLoading} className="w-14 bg-secondary text-white rounded-xl flex items-center justify-center shadow-lg hover:bg-orange-600 transition-colors">{aiLoading ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-paper-plane"></i>}</button></div>
+                </div>
+            );
+
+            case 'CONTRACTS': return (<div className="space-y-4">{CONTRACT_TEMPLATES.map(ct => (<div key={ct.id} onClick={() => setViewContract({ title: ct.title, content: ct.contentTemplate })} className="group bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-secondary/50 cursor-pointer shadow-sm transition-all hover:translate-x-1"><div className="flex items-center gap-4"><div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center text-xl group-hover:bg-indigo-600 group-hover:text-white transition-colors"><i className="fa-solid fa-file-contract"></i></div><div><h4 className="font-bold text-primary dark:text-white">{ct.title}</h4><p className="text-xs text-slate-500">Toque para abrir modelo</p></div></div></div>))}</div>);
+
+            case 'CHECKLIST': return (<div className="space-y-4">{STANDARD_CHECKLISTS.map((cl, idx) => (<div key={idx} className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm"><button onClick={() => setActiveChecklist(activeChecklist === cl.category ? null : cl.category)} className="w-full p-5 flex justify-between items-center text-left hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"><span className="font-bold text-sm flex items-center gap-3 text-primary dark:text-white"><div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${activeChecklist === cl.category ? 'bg-green-500 text-white' : 'bg-green-100 text-green-600'}`}><i className="fa-solid fa-list-check"></i></div>{cl.category}</span><i className={`fa-solid fa-chevron-down transition-transform text-slate-400 ${activeChecklist === cl.category ? 'rotate-180' : ''}`}></i></button>{activeChecklist === cl.category && (<div className="p-5 pt-0 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/30 animate-in slide-in-from-top-2">{cl.items.map((item, i) => (<label key={i} className="flex items-start gap-3 py-3 cursor-pointer border-b border-dashed border-slate-200 dark:border-slate-700 last:border-0 hover:bg-white/50 rounded-lg px-2 transition-colors"><input type="checkbox" className="mt-1 rounded border-slate-300 text-secondary focus:ring-secondary w-5 h-5" /><span className="text-sm text-slate-600 dark:text-slate-300 leading-tight">{item}</span></label>))}</div>)}</div>))}</div>);
+
+            case 'PROJECTS': return (<div className="space-y-6"><label className="block w-full py-8 border-2 border-dashed border-teal-300 bg-teal-50 rounded-2xl cursor-pointer hover:bg-teal-100 transition-all text-center"><i className="fa-solid fa-file-pdf text-2xl text-teal-400 mb-2"></i><span className="block text-sm font-bold text-teal-600">{uploading ? 'Enviando...' : 'Adicionar PDF/Projeto'}</span><input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'FILE')} disabled={uploading} /></label><div className="space-y-2">{files.map(f => <div key={f.id} className="p-4 bg-white rounded-xl border flex items-center gap-3"><i className="fa-solid fa-file text-slate-400"></i> <span className="text-sm font-bold truncate flex-1">{f.name}</span><a href={f.url} download={f.name}><i className="fa-solid fa-download text-primary"></i></a></div>)}</div></div>);
+
+            default: return null;
+        }
+    };
+
+    return (
+        <div className="max-w-4xl mx-auto min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col font-sans relative">
+            <div className="bg-white dark:bg-slate-900 px-6 pt-6 pb-2 sticky top-0 z-20 shadow-sm border-b border-slate-100 dark:border-slate-800 no-print">
+                <div className="flex justify-between items-center mb-1">
+                    <button onClick={() => subView !== 'NONE' ? setSubView('NONE') : navigate('/')} className="text-slate-400 hover:text-primary dark:hover:text-white"><i className="fa-solid fa-arrow-left text-xl"></i></button>
+                    <h1 className="text-lg font-black text-primary dark:text-white uppercase tracking-tight truncate max-w-[200px]">
+                        {subView !== 'NONE' ? 'Detalhes' : work.name}
+                    </h1>
+                    <div className="w-6"></div> 
+                </div>
+            </div>
+
+            <div className="flex-1 p-4 pb-32 overflow-y-auto">
+                {subView !== 'NONE' ? renderSubViewContent() : renderMainTab()}
+            </div>
+
+            {/* MAIN NAVIGATION BOTTOM BAR */}
+            {subView === 'NONE' && (
+                <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 pb-safe z-40 shadow-[0_-5px_20px_rgba(0,0,0,0.05)] no-print">
+                    <div className="flex justify-around items-center max-w-4xl mx-auto h-16">
+                        <button onClick={() => setActiveTab('SCHEDULE')} className={`flex flex-col items-center justify-center w-full h-full gap-1 transition-all ${activeTab === 'SCHEDULE' ? 'text-secondary' : 'text-slate-400'}`}><i className={`fa-solid fa-calendar-days text-xl ${activeTab === 'SCHEDULE' ? 'scale-110' : ''}`}></i><span className="text-[10px] font-bold uppercase">Cronograma</span></button>
+                        <button onClick={() => setActiveTab('MATERIALS')} className={`flex flex-col items-center justify-center w-full h-full gap-1 transition-all ${activeTab === 'MATERIALS' ? 'text-secondary' : 'text-slate-400'}`}><i className={`fa-solid fa-layer-group text-xl ${activeTab === 'MATERIALS' ? 'scale-110' : ''}`}></i><span className="text-[10px] font-bold uppercase">Materiais</span></button>
+                        <button onClick={() => setActiveTab('FINANCIAL')} className={`flex flex-col items-center justify-center w-full h-full gap-1 transition-all ${activeTab === 'FINANCIAL' ? 'text-secondary' : 'text-slate-400'}`}><i className={`fa-solid fa-chart-pie text-xl ${activeTab === 'FINANCIAL' ? 'scale-110' : ''}`}></i><span className="text-[10px] font-bold uppercase">Financeiro</span></button>
+                        <button onClick={() => setActiveTab('MORE')} className={`flex flex-col items-center justify-center w-full h-full gap-1 transition-all ${activeTab === 'MORE' ? 'text-secondary' : 'text-slate-400'}`}><i className={`fa-solid fa-bars text-xl ${activeTab === 'MORE' ? 'scale-110' : ''}`}></i><span className="text-[10px] font-bold uppercase">Mais</span></button>
+                    </div>
+                </div>
+            )}
+
+            {/* EXPENSE MODAL (ADD / EDIT) - UPDATE WITH LOCKED LOGIC */}
+            {expenseModal.isOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-6 shadow-2xl overflow-hidden">
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="text-xl font-bold text-primary dark:text-white">
+                                {expenseModal.mode === 'ADD' ? 'Novo Gasto' : 'Editar Gasto'}
+                            </h3>
+                            {expenseModal.mode === 'EDIT' && (
+                                <button onClick={handleDeleteExpense} className="text-red-500 hover:bg-red-50 p-2 rounded-lg transition-colors">
+                                    <i className="fa-solid fa-trash"></i>
+                                </button>
+                            )}
+                        </div>
+                        <form onSubmit={handleSaveExpense} className="space-y-4">
+                            
+                            {/* 1. DESCRIPTION (Auto-search key) */}
+                            <div>
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Descrição / Nome do Prestador</label>
+                                <input 
+                                    placeholder="Ex: Pedreiro Zé" 
+                                    value={expDesc} 
+                                    onChange={e => setExpDesc(e.target.value)} 
+                                    className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold text-primary dark:text-white focus:border-secondary focus:ring-1 focus:ring-secondary outline-none transition-all" 
+                                    required 
+                                />
+                            </div>
+                            
+                            {/* 2. CUMULATIVE SECTION */}
+                            <div className="bg-slate-50 dark:bg-slate-800/50 p-3 rounded-2xl border border-slate-100 dark:border-slate-800 space-y-3">
+                                <div className="grid grid-cols-2 gap-3">
+                                    {/* Total Agreed - Editable */}
+                                    <div>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Total Combinado</label>
+                                        <div className="relative">
+                                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">R$</span>
+                                            <input 
+                                                type="number" 
+                                                placeholder="0.00" 
+                                                value={expTotalAgreed} 
+                                                onChange={e => setExpTotalAgreed(e.target.value)} 
+                                                className="w-full pl-9 p-2.5 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 font-bold text-sm" 
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Already Paid - LOCKED / READ ONLY */}
+                                    <div>
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1 flex items-center gap-1">
+                                            <i className="fa-solid fa-lock text-[8px]"></i> Já Pago (Histórico)
+                                        </label>
+                                        <div className="relative opacity-70">
+                                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-bold">R$</span>
+                                            <input 
+                                                readOnly
+                                                value={paymentHistory.totalPaid.toFixed(2)}
+                                                className="w-full pl-9 p-2.5 bg-slate-200 dark:bg-slate-800 rounded-xl border border-slate-300 dark:border-slate-700 font-bold text-slate-600 dark:text-slate-400 text-sm cursor-not-allowed" 
+                                            />
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Current Payment - Main Input */}
+                                <div>
+                                    <label className="text-[10px] font-black text-green-600 dark:text-green-400 uppercase tracking-widest ml-1">Pagar Agora</label>
+                                    <div className="relative">
+                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-green-600 dark:text-green-400 font-bold text-lg">R$</span>
+                                        <input 
+                                            type="number" 
+                                            placeholder="0.00" 
+                                            value={expAmount} 
+                                            onChange={e => setExpAmount(e.target.value)} 
+                                            className="w-full pl-10 p-3 bg-green-50 dark:bg-green-900/10 rounded-xl border-2 border-green-200 dark:border-green-800 font-black text-xl text-green-700 dark:text-green-400 focus:outline-none focus:border-green-500" 
+                                            required 
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Remaining Calculation Feedback */}
+                                {expTotalAgreed && Number(expTotalAgreed) > 0 && (
+                                    <div className="flex justify-between items-center px-2 pt-1 border-t border-slate-200 dark:border-slate-700/50">
+                                        <span className="text-xs font-bold text-slate-400 uppercase">Restante a Pagar</span>
+                                        <span className={`text-sm font-black ${
+                                            (Number(expTotalAgreed) - (paymentHistory.totalPaid + Number(expAmount))) < 0 
+                                            ? 'text-red-500' 
+                                            : 'text-slate-600 dark:text-slate-300'
+                                        }`}>
+                                            R$ {(Number(expTotalAgreed) - (paymentHistory.totalPaid + Number(expAmount))).toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                                        </span>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Categoria</label>
+                                    <select value={expCategory} onChange={e => setExpCategory(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-sm font-bold">
+                                        <option value={ExpenseCategory.LABOR}>Mão de Obra</option>
+                                        <option value={ExpenseCategory.MATERIAL}>Material</option>
+                                        <option value={ExpenseCategory.PERMITS}>Taxas</option>
+                                        <option value={ExpenseCategory.OTHER}>Outros</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Data</label>
+                                    <input type="date" value={expDate} onChange={e => setExpDate(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-sm font-bold" required />
+                                </div>
+                            </div>
+                            
+                            <div>
+                                <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Etapa Relacionada</label>
+                                <select value={expStepId} onChange={e => setExpStepId(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold text-sm">
+                                    <option value="">Sem Etapa (Geral)</option>
+                                    {steps.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                                </select>
+                            </div>
+
+                            <div className="flex gap-2 pt-2">
+                                <button type="button" onClick={() => setExpenseModal({isOpen: false, mode: 'ADD'})} className="flex-1 bg-slate-100 dark:bg-slate-800 py-3 rounded-xl font-bold text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">Cancelar</button>
+                                <button type="submit" className="flex-1 bg-primary text-white py-3 rounded-xl font-bold shadow-lg hover:bg-slate-800 transition-colors">Salvar Gasto</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* ... Other Modals ... */}
+            {isStepModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-6 shadow-2xl">
+                        <h3 className="text-xl font-bold mb-4 text-primary dark:text-white">{stepModalMode === 'ADD' ? 'Nova Etapa' : 'Editar Etapa'}</h3>
+                        <form onSubmit={handleSaveStep} className="space-y-4">
+                            <input placeholder="Nome da Etapa" value={stepName} onChange={e => setStepName(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required />
+                            <div className="grid grid-cols-2 gap-2">
+                                <div><label className="text-[10px] uppercase font-bold text-slate-400 ml-1">Início</label><input type="date" value={stepStart} onChange={e => setStepStart(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required /></div>
+                                <div><label className="text-[10px] uppercase font-bold text-slate-400 ml-1">Fim</label><input type="date" value={stepEnd} onChange={e => setStepEnd(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required /></div>
+                            </div>
+                            <div className="flex gap-2 pt-2">
+                                <button type="button" onClick={() => setIsStepModalOpen(false)} className="flex-1 bg-slate-100 dark:bg-slate-800 text-slate-500 py-3 rounded-xl font-bold">Cancelar</button>
+                                <button type="submit" className="flex-1 bg-primary text-white py-3 rounded-xl font-bold">Salvar</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* CONTRACT VIEWER MODAL */}
+            {viewContract && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-lg p-6 shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+                        <div className="flex justify-between items-center mb-4 pb-4 border-b border-slate-100 dark:border-slate-800">
+                            <h3 className="text-xl font-bold text-primary dark:text-white">{viewContract.title}</h3>
+                            <button onClick={() => setViewContract(null)} className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500"><i className="fa-solid fa-xmark"></i></button>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-4 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 mb-4">
+                            <pre className="whitespace-pre-wrap font-mono text-xs text-slate-600 dark:text-slate-300 leading-relaxed">{viewContract.content}</pre>
+                        </div>
+                        <div className="flex gap-3">
+                            <button onClick={() => {navigator.clipboard.writeText(viewContract.content); alert("Copiado!"); setViewContract(null);}} className="flex-1 py-3 bg-slate-100 dark:bg-slate-800 text-primary dark:text-white font-bold rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"><i className="fa-regular fa-copy mr-2"></i> Copiar</button>
+                            <button onClick={() => {const blob = new Blob([viewContract.content], {type: "application/msword"}); const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = `${viewContract.title}.doc`; link.click();}} className="flex-1 py-3 bg-primary text-white font-bold rounded-xl hover:bg-primary-light transition-colors"><i className="fa-solid fa-download mr-2"></i> Baixar Word</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            <ZeModal isOpen={zeModal.isOpen} title={zeModal.title} message={zeModal.message} onConfirm={zeModal.onConfirm} onCancel={() => setZeModal(prev => ({ ...prev, isOpen: false }))} />
+        </div>
+    );
+};
+
+export default WorkDetail;
