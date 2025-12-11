@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
@@ -16,7 +15,9 @@ type SubView = 'NONE' | 'TEAM' | 'SUPPLIERS' | 'REPORTS' | 'PHOTOS' | 'PROJECTS'
 // --- DATE HELPERS (FIX TIMEZONE LAG) ---
 const parseDateNoTimezone = (dateStr: string) => {
     if (!dateStr) return '';
-    const parts = dateStr.split('-');
+    // Handle potential ISO strings with time by taking only the date part
+    const cleanDate = dateStr.split('T')[0];
+    const parts = cleanDate.split('-');
     if (parts.length === 3) {
         return `${parts[2]}/${parts[1]}/${parts[0]}`; // DD/MM/YYYY
     }
@@ -130,13 +131,14 @@ const WorkDetail: React.FC = () => {
                 dbService.getFiles(w.id)
             ]);
             
-            setSteps(s.sort((a,b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()));
-            setMaterials(m);
-            setExpenses(e.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
-            setWorkers(wk);
-            setSuppliers(sp);
-            setPhotos(ph);
-            setFiles(fl);
+            // Safety checks to ensure arrays
+            setSteps(s ? s.sort((a,b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()) : []);
+            setMaterials(m || []);
+            setExpenses(e ? e.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()) : []);
+            setWorkers(wk || []);
+            setSuppliers(sp || []);
+            setPhotos(ph || []);
+            setFiles(fl || []);
         }
         setLoading(false);
     };
@@ -157,8 +159,9 @@ const WorkDetail: React.FC = () => {
         setStepModalMode('EDIT');
         setCurrentStepId(step.id);
         setStepName(step.name);
-        setStepStart(step.startDate); // YYYY-MM-DD
-        setStepEnd(step.endDate);     // YYYY-MM-DD
+        // Important: split 'T' to avoid timezone shifts when setting the date input
+        setStepStart(step.startDate.split('T')[0]); 
+        setStepEnd(step.endDate.split('T')[0]);
         setIsStepModalOpen(true);
     };
 
@@ -177,7 +180,6 @@ const WorkDetail: React.FC = () => {
                 isDelayed: false
             });
         } else if (stepModalMode === 'EDIT' && currentStepId) {
-            // Find existing step to preserve other fields
             const existing = steps.find(s => s.id === currentStepId);
             if (existing) {
                 await dbService.updateStep({
@@ -191,7 +193,7 @@ const WorkDetail: React.FC = () => {
         
         setIsStepModalOpen(false);
         setStepName('');
-        load();
+        await load(); // Reload to refresh list
     };
 
     const handleStepStatusClick = async (step: Step) => {
@@ -228,7 +230,7 @@ const WorkDetail: React.FC = () => {
         
         setAddMatModal(false);
         setNewMatName(''); setNewMatBrand(''); setNewMatQty(''); setNewMatBuyNow(false);
-        load();
+        await load();
     };
 
     const handleUpdateMaterial = async (e: React.FormEvent) => {
@@ -246,7 +248,7 @@ const WorkDetail: React.FC = () => {
         );
         
         setMaterialModal({ isOpen: false, material: null });
-        load();
+        await load();
     };
 
     // --- EXPENSE HANDLERS ---
@@ -266,7 +268,7 @@ const WorkDetail: React.FC = () => {
         });
         setAddExpenseModal(false);
         setExpDesc(''); setExpAmount(''); setExpTotalAgreed('');
-        load();
+        await load();
     };
 
     // --- PHOTO / FILE UPLOAD ---
@@ -300,7 +302,7 @@ const WorkDetail: React.FC = () => {
                     });
                 }
                 setUploading(false);
-                load();
+                await load();
             };
             reader.readAsDataURL(file);
         }
@@ -492,10 +494,10 @@ const WorkDetail: React.FC = () => {
                             ))}
                         </div>
                         <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 p-6 shadow-lg min-h-[300px]">
-                            {/* Report Logic similar to previous but simplified for brevity in this update block */}
+                            {/* Report Logic */}
                             {reportTab === 'CRONO' && steps.map((s,i) => <div key={s.id} className="flex justify-between py-2 border-b border-slate-50 dark:border-slate-800"><span className="text-sm font-bold">{i+1}. {s.name}</span><span className="text-xs text-slate-500">{parseDateNoTimezone(s.endDate)}</span></div>)}
-                            {reportTab === 'MAT' && materials.map((m,i) => <div key={m.id} className="flex justify-between py-2 border-b border-slate-50 dark:border-slate-800"><span className="text-sm">{m.name}</span><span className="text-xs font-bold">{m.purchasedQty}/{m.plannedQty}</span></div>)}
-                            {reportTab === 'FIN' && expenses.map((e,i) => <div key={e.id} className="flex justify-between py-2 border-b border-slate-50 dark:border-slate-800"><span className="text-sm">{e.description}</span><span className="text-xs font-bold text-red-500">- R$ {e.amount}</span></div>)}
+                            {reportTab === 'MAT' && materials.map((m) => <div key={m.id} className="flex justify-between py-2 border-b border-slate-50 dark:border-slate-800"><span className="text-sm">{m.name}</span><span className="text-xs font-bold">{m.purchasedQty}/{m.plannedQty}</span></div>)}
+                            {reportTab === 'FIN' && expenses.map((e) => <div key={e.id} className="flex justify-between py-2 border-b border-slate-50 dark:border-slate-800"><span className="text-sm">{e.description}</span><span className="text-xs font-bold text-red-500">- R$ {e.amount}</span></div>)}
                         </div>
                         <button onClick={handleExportExcel} className="w-full py-3 bg-green-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-green-700 shadow-lg"><i className="fa-solid fa-file-excel"></i> Baixar Excel</button>
                     </div>
@@ -505,7 +507,10 @@ const WorkDetail: React.FC = () => {
                     <div className="space-y-6">
                         <div className="grid grid-cols-3 gap-2">
                             {['PISO', 'PAREDE', 'PINTURA'].map(t => (
-                                <button key={t} onClick={() => {setCalcType(t as any); setCalcResult([])}} className={`py-3 rounded-xl border-2 font-bold text-xs transition-all ${calcType === t ? 'border-secondary bg-secondary/10 text-secondary' : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-400'}`}>{t}</button>
+                                <button key={t} onClick={() => {setCalcType(t as any); setCalcResult([])}} className={`flex flex-col items-center justify-center py-4 rounded-xl border-2 font-bold text-xs transition-all gap-2 ${calcType === t ? 'border-secondary bg-secondary/10 text-secondary' : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-400'}`}>
+                                    <i className={`fa-solid ${t === 'PISO' ? 'fa-layer-group' : t === 'PAREDE' ? 'fa-building' : 'fa-paint-roller'} text-xl`}></i>
+                                    {t}
+                                </button>
                             ))}
                         </div>
                         <div className="bg-gradient-to-br from-slate-800 to-slate-900 text-white p-8 rounded-3xl shadow-xl relative overflow-hidden">
@@ -526,21 +531,28 @@ const WorkDetail: React.FC = () => {
 
                 case 'BONUS_IA': return (
                     <div className="flex flex-col items-center justify-center min-h-[70vh] p-6 text-center animate-in fade-in">
-                        <div className="w-full max-w-sm bg-slate-900 rounded-[2.5rem] p-8 shadow-2xl relative overflow-hidden border border-slate-800">
-                            <div className="absolute inset-0 bg-gradient-to-b from-secondary/20 to-transparent pointer-events-none"></div>
+                        <div className="w-full max-w-sm bg-gradient-to-br from-slate-900 to-slate-950 rounded-[2.5rem] p-8 shadow-2xl relative overflow-hidden border border-slate-800 group">
+                            {/* Animated Background */}
+                            <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20"></div>
+                            <div className="absolute -top-20 -right-20 w-40 h-40 bg-secondary/30 rounded-full blur-3xl animate-pulse"></div>
+                            
                             <div className="relative z-10 flex flex-col items-center">
-                                <div className="w-24 h-24 rounded-full border-4 border-slate-800 p-1 bg-gradient-gold shadow-glow mb-6">
+                                <div className="w-28 h-28 rounded-full border-4 border-slate-800 p-1 bg-gradient-gold shadow-[0_0_30px_rgba(217,119,6,0.4)] mb-6 transform hover:scale-105 transition-transform duration-500">
                                     <img src={ZE_AVATAR} className="w-full h-full object-cover rounded-full bg-white" onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK}/>
                                 </div>
-                                <h2 className="text-2xl font-black text-white mb-2">Engenheiro Virtual</h2>
-                                <p className="text-slate-400 text-sm mb-8 leading-relaxed">A inteligência artificial treinada para responder suas dúvidas de obra 24h por dia.</p>
+                                <h2 className="text-3xl font-black text-white mb-2 tracking-tight">Zé da Obra <span className="text-secondary">AI</span></h2>
+                                <div className="h-1 w-12 bg-secondary rounded-full mb-6"></div>
+                                <p className="text-slate-400 text-sm mb-8 leading-relaxed font-medium">
+                                    Seu engenheiro virtual particular. Tire dúvidas técnicas, calcule materiais e resolva problemas 24h por dia.
+                                </p>
                                 
                                 {isPremium ? (
-                                    <button onClick={() => setSubView('BONUS_IA_CHAT')} className="w-full py-4 bg-gradient-gold text-white font-black rounded-2xl shadow-lg hover:scale-105 transition-transform flex items-center justify-center gap-2">
-                                        <i className="fa-solid fa-comments"></i> ACESSAR AGORA
+                                    <button onClick={() => setSubView('BONUS_IA_CHAT')} className="w-full py-4 bg-gradient-gold text-white font-black rounded-2xl shadow-lg hover:shadow-orange-500/20 hover:scale-105 transition-all flex items-center justify-center gap-3 group-hover:animate-pulse">
+                                        <span>INICIAR CONVERSA</span>
+                                        <i className="fa-solid fa-comments"></i>
                                     </button>
                                 ) : (
-                                    <button onClick={() => navigate('/settings')} className="w-full py-4 bg-slate-800 text-slate-500 font-bold rounded-2xl border border-slate-700 flex items-center justify-center gap-2">
+                                    <button onClick={() => navigate('/settings')} className="w-full py-4 bg-slate-800 text-slate-500 font-bold rounded-2xl border border-slate-700 flex items-center justify-center gap-2 hover:bg-slate-700 transition-colors">
                                         <i className="fa-solid fa-lock"></i> BLOQUEADO (PREMIUM)
                                     </button>
                                 )}
@@ -578,7 +590,7 @@ const WorkDetail: React.FC = () => {
                                 placeholder="Pergunte ao Zé..." 
                                 className="flex-1 p-4 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-secondary transition-colors"
                             />
-                            <button onClick={handleAiAsk} disabled={aiLoading} className="w-14 bg-secondary text-white rounded-xl flex items-center justify-center shadow-lg">
+                            <button onClick={handleAiAsk} disabled={aiLoading} className="w-14 bg-secondary text-white rounded-xl flex items-center justify-center shadow-lg hover:bg-orange-600 transition-colors">
                                 {aiLoading ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-paper-plane"></i>}
                             </button>
                         </div>
@@ -588,10 +600,10 @@ const WorkDetail: React.FC = () => {
                 case 'CONTRACTS': return (
                     <div className="space-y-4">
                         {CONTRACT_TEMPLATES.map(ct => (
-                            <div key={ct.id} onClick={() => setViewContract({ title: ct.title, content: ct.contentTemplate })} className="group bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-secondary/50 cursor-pointer shadow-sm transition-all">
+                            <div key={ct.id} onClick={() => setViewContract({ title: ct.title, content: ct.contentTemplate })} className="group bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-secondary/50 cursor-pointer shadow-sm transition-all hover:translate-x-1">
                                 <div className="flex items-center gap-4">
                                     <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center text-xl group-hover:bg-indigo-600 group-hover:text-white transition-colors"><i className="fa-solid fa-file-contract"></i></div>
-                                    <div><h4 className="font-bold text-primary dark:text-white">{ct.title}</h4><p className="text-xs text-slate-500">Toque para abrir</p></div>
+                                    <div><h4 className="font-bold text-primary dark:text-white">{ct.title}</h4><p className="text-xs text-slate-500">Toque para abrir modelo</p></div>
                                 </div>
                             </div>
                         ))}
@@ -603,11 +615,16 @@ const WorkDetail: React.FC = () => {
                         {STANDARD_CHECKLISTS.map((cl, idx) => (
                             <div key={idx} className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
                                 <button onClick={() => setActiveChecklist(activeChecklist === cl.category ? null : cl.category)} className="w-full p-5 flex justify-between items-center text-left hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
-                                    <span className="font-bold text-sm flex items-center gap-3"><div className="w-8 h-8 rounded-lg bg-green-100 text-green-600 flex items-center justify-center"><i className="fa-solid fa-list-check"></i></div>{cl.category}</span>
-                                    <i className={`fa-solid fa-chevron-down transition-transform ${activeChecklist === cl.category ? 'rotate-180' : ''}`}></i>
+                                    <span className="font-bold text-sm flex items-center gap-3 text-primary dark:text-white">
+                                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${activeChecklist === cl.category ? 'bg-green-500 text-white' : 'bg-green-100 text-green-600'}`}>
+                                            <i className="fa-solid fa-list-check"></i>
+                                        </div>
+                                        {cl.category}
+                                    </span>
+                                    <i className={`fa-solid fa-chevron-down transition-transform text-slate-400 ${activeChecklist === cl.category ? 'rotate-180' : ''}`}></i>
                                 </button>
                                 {activeChecklist === cl.category && (
-                                    <div className="p-5 pt-0 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/30">
+                                    <div className="p-5 pt-0 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/30 animate-in slide-in-from-top-2">
                                         {cl.items.map((item, i) => (
                                             <label key={i} className="flex items-start gap-3 py-3 cursor-pointer border-b border-dashed border-slate-200 dark:border-slate-700 last:border-0 hover:bg-white/50 rounded-lg px-2 transition-colors">
                                                 <input type="checkbox" className="mt-1 rounded border-slate-300 text-secondary focus:ring-secondary w-5 h-5" />
@@ -666,16 +683,6 @@ const WorkDetail: React.FC = () => {
         );
     }
 
-    const PremiumLockOverlay = ({ title }: { title: string }) => (
-        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center text-center p-6 animate-in fade-in">
-            <div className="w-20 h-20 bg-gradient-to-br from-purple-600 to-indigo-700 rounded-full flex items-center justify-center text-white text-3xl shadow-xl shadow-purple-500/30 mb-6">
-                <i className="fa-solid fa-lock"></i>
-            </div>
-            <h3 className="text-2xl font-black text-primary dark:text-white mb-2">{title} Bloqueado</h3>
-            <button onClick={() => navigate('/settings')} className="w-full max-w-xs py-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-bold rounded-2xl shadow-xl animate-pulse">Quero Acesso Vitalício</button>
-        </div>
-    );
-
     // =================================================================================================
     // MAIN TAB VIEW
     // =================================================================================================
@@ -709,7 +716,7 @@ const WorkDetail: React.FC = () => {
                                                 <span className="text-[10px] font-bold text-slate-400 block mb-0.5">ETAPA {stepNum}</span>
                                                 <h3 className={`font-bold text-lg leading-tight ${isDone ? 'text-slate-400 line-through' : 'text-primary dark:text-white'}`}>{step.name}</h3>
                                             </div>
-                                            <div className="text-slate-300 hover:text-secondary"><i className="fa-solid fa-pen-to-square"></i></div>
+                                            <div className="text-slate-300 hover:text-secondary p-2 -mr-2"><i className="fa-solid fa-pen-to-square"></i></div>
                                         </div>
                                         <div className="flex gap-4 mt-2">
                                             <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium bg-slate-50 dark:bg-slate-800 px-2 py-1 rounded-md">
