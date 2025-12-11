@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
@@ -82,7 +81,6 @@ const WorkDetail: React.FC = () => {
     const [expDesc, setExpDesc] = useState('');
     const [expAmount, setExpAmount] = useState('');
     const [expTotalAgreed, setExpTotalAgreed] = useState('');
-    const [expPrevPaid, setExpPrevPaid] = useState(''); // New State for "Already Paid"
     const [expCategory, setExpCategory] = useState<string>(ExpenseCategory.LABOR);
     const [expStepId, setExpStepId] = useState('');
     const [expDate, setExpDate] = useState('');
@@ -243,45 +241,19 @@ const WorkDetail: React.FC = () => {
         setExpDesc('');
         setExpAmount('');
         setExpTotalAgreed('');
-        setExpPrevPaid('0');
         setExpCategory(ExpenseCategory.LABOR);
         setExpStepId('');
         setExpDate(new Date().toISOString().split('T')[0]);
     };
 
-    const openEditExpense = async (expense: Expense) => {
+    const openEditExpense = (expense: Expense) => {
         setExpenseModal({ isOpen: true, mode: 'EDIT', id: expense.id });
         setExpDesc(expense.description);
         setExpAmount(String(expense.amount));
+        setExpTotalAgreed(expense.totalAgreed ? String(expense.totalAgreed) : '');
         setExpCategory(expense.category);
         setExpStepId(expense.stepId || '');
         setExpDate(expense.date.split('T')[0]);
-        
-        // Intelligent History Fetch
-        if (work) {
-            const history = await dbService.getPaymentHistory(work.id, expense.description, expense.id);
-            setExpTotalAgreed(expense.totalAgreed ? String(expense.totalAgreed) : (history.lastTotalAgreed ? String(history.lastTotalAgreed) : ''));
-            setExpPrevPaid(String(history.totalPaid));
-        } else {
-            setExpTotalAgreed(expense.totalAgreed ? String(expense.totalAgreed) : '');
-            setExpPrevPaid('0');
-        }
-    };
-
-    // Auto-fill logic when inputting description (Works for both Add and Edit to recalculate if desc changes)
-    const handleDescriptionBlur = async () => {
-        if (work && expDesc) {
-            // If Editing, exclude current ID from history. If Adding, exclude nothing.
-            const excludeId = expenseModal.mode === 'EDIT' ? expenseModal.id : undefined;
-            const history = await dbService.getPaymentHistory(work.id, expDesc, excludeId);
-            
-            setExpPrevPaid(String(history.totalPaid));
-            
-            // Only auto-fill Total Agreed if not already set by the user in this session
-            if (!expTotalAgreed && history.lastTotalAgreed > 0) {
-                setExpTotalAgreed(String(history.lastTotalAgreed));
-            }
-        }
     };
 
     const handleSaveExpense = async (e: React.FormEvent) => {
@@ -1319,81 +1291,29 @@ const WorkDetail: React.FC = () => {
                             )}
                         </div>
                         <form onSubmit={handleSaveExpense} className="space-y-4">
-                            <input 
-                                placeholder="Descrição (ex: Pagamento Pedreiro Zé)" 
-                                value={expDesc} 
-                                onBlur={handleDescriptionBlur}
-                                onChange={e => setExpDesc(e.target.value)} 
-                                className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold" 
-                                required 
-                            />
+                            <input placeholder="Descrição (ex: Pagamento Pedreiro)" value={expDesc} onChange={e => setExpDesc(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required />
                             
-                            {/* --- THE 3 FINANCIAL FIELDS REQUESTED --- */}
-                            
-                            {/* 1. Total Agreed */}
-                            <div className="relative">
-                                <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Valor Total Combinado (Contrato)</label>
-                                <div className="relative">
-                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">R$</span>
-                                    <input type="number" placeholder="0.00" value={expTotalAgreed} onChange={e => setExpTotalAgreed(e.target.value)} className="w-full pl-10 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold" />
-                                </div>
-                            </div>
-
                             <div className="grid grid-cols-2 gap-2">
-                                {/* 2. Already Paid (LOCKED) */}
                                 <div className="relative">
-                                    <label className="text-[10px] font-black text-slate-400 uppercase ml-1 tracking-widest">Já Pago (Histórico)</label>
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Valor Pago Agora</label>
                                     <div className="relative">
                                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">R$</span>
-                                        <input 
-                                            type="text" 
-                                            readOnly // LOCK IT
-                                            value={expPrevPaid} 
-                                            className="w-full pl-10 p-3 bg-slate-200 dark:bg-slate-800/50 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-500 font-bold cursor-not-allowed" 
-                                        />
+                                        <input type="number" placeholder="0.00" value={expAmount} onChange={e => setExpAmount(e.target.value)} className="w-full pl-10 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required />
                                     </div>
                                 </div>
-
-                                {/* 3. Pay Now */}
                                 <div className="relative">
-                                    <label className="text-[10px] font-black text-green-600 dark:text-green-400 uppercase ml-1 tracking-widest">Pagar Agora</label>
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Total Combinado</label>
                                     <div className="relative">
-                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-green-600 font-bold">R$</span>
-                                        <input 
-                                            type="number" 
-                                            placeholder="0.00" 
-                                            value={expAmount} 
-                                            onChange={e => setExpAmount(e.target.value)} 
-                                            className="w-full pl-10 p-3 bg-green-50 dark:bg-green-900/20 rounded-xl border border-green-200 dark:border-green-900 text-green-700 dark:text-green-400 font-black text-lg focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none transition-all" 
-                                            required 
-                                        />
+                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">R$</span>
+                                        <input type="number" placeholder="(Opcional)" value={expTotalAgreed} onChange={e => setExpTotalAgreed(e.target.value)} className="w-full pl-10 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" />
                                     </div>
                                 </div>
                             </div>
-
-                            {/* PROGRESS BAR VISUALIZER */}
-                            {expTotalAgreed && Number(expTotalAgreed) > 0 && (
-                                <div className="bg-slate-100 dark:bg-slate-800 p-3 rounded-xl border border-slate-200 dark:border-slate-700">
-                                    <div className="flex justify-between text-xs font-bold text-slate-500 mb-1">
-                                        <span>Progresso do Pagamento</span>
-                                        <span>{Math.round(((Number(expPrevPaid) + Number(expAmount)) / Number(expTotalAgreed)) * 100)}%</span>
-                                    </div>
-                                    <div className="h-2 w-full bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden flex">
-                                        {/* History Bar */}
-                                        <div className="h-full bg-slate-400" style={{width: `${Math.min((Number(expPrevPaid) / Number(expTotalAgreed)) * 100, 100)}%`}}></div>
-                                        {/* Current Payment Bar */}
-                                        <div className="h-full bg-green-500 animate-pulse" style={{width: `${Math.min((Number(expAmount) / Number(expTotalAgreed)) * 100, 100 - ((Number(expPrevPaid) / Number(expTotalAgreed)) * 100))}%`}}></div>
-                                    </div>
-                                    <p className="text-[10px] text-slate-400 mt-1 text-center">
-                                        Cinza: Já Pago • Verde: Pagando Agora
-                                    </p>
-                                </div>
-                            )}
 
                             <div className="grid grid-cols-2 gap-2">
                                 <div>
                                     <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Categoria</label>
-                                    <select value={expCategory} onChange={e => setExpCategory(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-sm font-bold">
+                                    <select value={expCategory} onChange={e => setExpCategory(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
                                         <option value={ExpenseCategory.LABOR}>Mão de Obra</option>
                                         <option value={ExpenseCategory.MATERIAL}>Material</option>
                                         <option value={ExpenseCategory.PERMITS}>Taxas</option>
@@ -1402,7 +1322,7 @@ const WorkDetail: React.FC = () => {
                                 </div>
                                 <div>
                                     <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Data</label>
-                                    <input type="date" value={expDate} onChange={e => setExpDate(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-sm font-bold" required />
+                                    <input type="date" value={expDate} onChange={e => setExpDate(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required />
                                 </div>
                             </div>
                             
@@ -1445,26 +1365,4 @@ const WorkDetail: React.FC = () => {
 
             {/* CONTRACT VIEWER MODAL */}
             {viewContract && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
-                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-lg p-6 shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
-                        <div className="flex justify-between items-center mb-4 pb-4 border-b border-slate-100 dark:border-slate-800">
-                            <h3 className="text-xl font-bold text-primary dark:text-white">{viewContract.title}</h3>
-                            <button onClick={() => setViewContract(null)} className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500"><i className="fa-solid fa-xmark"></i></button>
-                        </div>
-                        <div className="flex-1 overflow-y-auto p-4 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 mb-4">
-                            <pre className="whitespace-pre-wrap font-mono text-xs text-slate-600 dark:text-slate-300 leading-relaxed">{viewContract.content}</pre>
-                        </div>
-                        <div className="flex gap-3">
-                            <button onClick={() => {navigator.clipboard.writeText(viewContract.content); alert("Copiado!"); setViewContract(null);}} className="flex-1 py-3 bg-slate-100 dark:bg-slate-800 text-primary dark:text-white font-bold rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"><i className="fa-regular fa-copy mr-2"></i> Copiar</button>
-                            <button onClick={() => {const blob = new Blob([viewContract.content], {type: "application/msword"}); const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = `${viewContract.title}.doc`; link.click();}} className="flex-1 py-3 bg-primary text-white font-bold rounded-xl hover:bg-primary-light transition-colors"><i className="fa-solid fa-download mr-2"></i> Baixar Word</button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            <ZeModal isOpen={zeModal.isOpen} title={zeModal.title} message={zeModal.message} onConfirm={zeModal.onConfirm} onCancel={() => setZeModal(prev => ({ ...prev, isOpen: false }))} />
-        </div>
-    );
-};
-
-export default WorkDetail;
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate
