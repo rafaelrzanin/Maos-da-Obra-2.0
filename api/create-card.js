@@ -1,5 +1,5 @@
 export default async function handler(req, res) {
-  // 1. Configuração de Segurança (CORS)
+  // 1. Configuração de Segurança (CORS) - MANTIDA
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,POST');
@@ -8,10 +8,7 @@ export default async function handler(req, res) {
     'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization, x-public-key, x-secret-key'
   );
 
-  // Responde imediatamente a requisições OPTIONS (pré-voo CORS)
   if (req.method === 'OPTIONS') return res.status(200).end();
-
-  // Garante que apenas o método POST continue
   if (req.method !== 'POST') {
     return res.status(405).json({ erro: "METHOD_NOT_ALLOWED", mensagem: "Apenas requisições POST são permitidas para esta API." });
   }
@@ -24,19 +21,18 @@ export default async function handler(req, res) {
     const secretKey = process.env.NEON_SECRET_KEY;
 
     if (!publicKey || !secretKey) {
-        return res.status(500).json({ erro: "CONFIG_ERROR", mensagem: "Chaves de API (NEON_PUBLIC_KEY ou NEON_SECRET_KEY) não configuradas." });
+        return res.status(500).json({ erro: "CONFIG_ERROR", mensagem: "Chaves de API não configuradas." });
     }
-    
-    // --- URL BASE: (Confirmada pela documentação) ---
-    const API_BASE_URL = process.env.NEON_API_BASE_URL || 'https://app.neonpay.com.br/api/v1';
+    
+    const API_BASE_URL = process.env.NEON_API_BASE_URL || 'https://app.neonpay.com.br/api/v1';
 
     const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
     const { amount, card, client, installments, planType } = body;
 
-    // Validação de segurança: o documento não pode ser nulo ou vazio
-    if (!client.document || client.document.length < 11) {
-        return res.status(400).json({ erro: "MISSING_CLIENT_DOCUMENT", mensagem: "Documento (CPF/CNPJ) do cliente é obrigatório e não foi enviado." });
-    }
+    // Validação de segurança
+    if (!client.document || client.document.length < 11) {
+        return res.status(400).json({ erro: "MISSING_CLIENT_DOCUMENT", mensagem: "Documento (CPF/CNPJ) do cliente é obrigatório." });
+    }
 
     // Garante que amount seja number e válido
     const numericAmount = parseFloat(amount);
@@ -47,44 +43,43 @@ export default async function handler(req, res) {
     // 3. Define se é Assinatura ou Pagamento Único
     const isSubscription = planType.toUpperCase() !== 'VITALICIO';
     
-    // O endpoint completo será API_BASE_URL + /gateway/card/receive ou /subscription
+    // Endpoints baseados na documentação da Neon Pay
     const subEndpoint = isSubscription ? '/gateway/card/subscription' : '/gateway/card/receive';
     
     console.log(`--> [CARTÃO] Modo: ${isSubscription ? 'ASSINATURA' : 'PAGAMENTO ÚNICO'}`);
 
-    // CORREÇÃO DE FORMATO: Transforma 'MM/AA' para 'YYYY-MM' (Exigido pela Neon)
+    // CORREÇÃO DE FORMATO: Expiração (MM/AA -> YYYY-MM)
     const [mes, anoCurto] = card.expiry.split('/');
-    // Assume que AA é do século 21 (ex: 25 => 2025)
     const anoCompleto = `20${anoCurto}`;
     const expiresAtFormatado = `${anoCompleto}-${mes}`;
 
-    // --- CORREÇÃO DE FORMATO DO NOME DO TITULAR (Titular Limpo e Tratado) ---
-    const cleanOwnerName = card.name
-        .toUpperCase()
-        .replace(/[^A-Z\s]/g, '') // Remove caracteres especiais
-        .substring(0, 60); // Limita o tamanho
+    // CORREÇÃO DE FORMATO DO NOME DO TITULAR
+    const cleanOwnerName = card.name
+        .toUpperCase()
+        .replace(/[^A-Z\s]/g, '')
+        .substring(0, 60);
 
     // 4. Monta o Payload (Dados)
-    let payload = {
+    let payload: any = { // Adicionado 'any' para flexibilidade de tipagem
         identifier: body.identifier || `txn_${Date.now()}`,
-        amount: numericAmount, 
+        amount: numericAmount, 
         clientIp: req.headers['x-forwarded-for'] || "127.0.0.1",
         client: {
             name: client.name,
             email: client.email,
             phone: client.phone,
-            document: client.document, 
-            address: { 
+            document: client.document, 
+            address: { 
                 country: "BR",
-                state: "SP",
-                city: "São Paulo",
-                neighborhood: "Centro", 
+                state: "SP", // Sugestão: Capturar o estado do front-end
+                city: "São Paulo", // Sugestão: Capturar a cidade do front-end
+                neighborhood: "Centro", 
                 zipCode: "01001-000",
                 street: "Rua Digital",
                 number: "100"
             }
         },
-       // --- NOVO NÓ CRÍTICO PARA INDICAR QUE É CARTÃO ---
+        // --- NÓ CRÍTICO DE MÉTODO DE PAGAMENTO ---
         paymentMethod: { 
             type: "card", // Informa explicitamente o tipo de pagamento
             card: {
@@ -94,21 +89,24 @@ export default async function handler(req, res) {
                 cvv: card.cvv
             }
         }
+        // ------------------------------------------
     };
 
     // Ajustes específicos para Assinatura (Subscription)
     if (isSubscription) {
         payload.subscription = {
             periodicityType: "MONTHS",
-            periodicity: planType.toUpperCase() === 'SEMESTRAL' ? 6 : 1, // 1 ou 6 meses
-            firstChargeIn: 0 
+            periodicity: planType.toUpperCase() === 'SEMESTRAL' ? 6 : 1, 
+            firstChargeIn: 0 
         };
-        payload.product = {
-            id: planType.toLowerCase(),
-            name: `Plano ${planType}`,
-            quantity: 1,
-            price: numericAmount 
-        };
+        // Neon Pay exige produtos para Assinaturas
+        payload.products = [{
+            id: planType.toLowerCase(),
+            name: `Plano ${planType}`,
+            quantity: 1,
+            price: numericAmount
+        }];
+
     } else {
         // Ajustes específicos para Pagamento Único (Vitalício)
         payload.installments = parseInt(installments || 1);
@@ -122,60 +120,50 @@ export default async function handler(req, res) {
         ];
     }
 
-    // Loga o payload que está sendo enviado (sem os dados sensíveis do cartão)
-    const logPayload = { ...payload, card: { number: card.number.substring(0, 4) + '****', owner: cleanOwnerName, expiresAt: expiresAtFormatado, cvv: '***' } };
-    console.log("--> [CARTÃO] Payload sendo enviado (Debug):", JSON.stringify(logPayload, null, 2));
+    // Loga o payload que está sendo enviado (sem os dados sensíveis do cartão)
+    const logPayload = { ...payload, card: { number: card.number.substring(0, 4) + '****', owner: cleanOwnerName, expiresAt: expiresAtFormatado, cvv: '***' } };
+    console.log("--> [CARTÃO] Payload sendo enviado (Debug):", JSON.stringify(logPayload, null, 2));
 
-    // URL COMPLETA para envio: API_BASE_URL + subEndpoint
+    // URL COMPLETA para envio
     const finalUrl = `${API_BASE_URL}${subEndpoint}`;
     console.log(`--> [CARTÃO] Enviando para: ${finalUrl}`);
 
-    let response;
-    let rawResponseText = '';
-    let data;
+    let response;
+    let rawResponseText = '';
+    let data;
 
     try {
-        // 5. Envia para a Neon
-        response = await fetch(finalUrl, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'x-public-key': publicKey,
-                'x-secret-key': secretKey
-            },
-            body: JSON.stringify(payload)
-        });
-        
-        // Tenta ler a resposta como texto primeiro para capturar erros HTML
-        rawResponseText = await response.text();
-        data = JSON.parse(rawResponseText);
+        // 5. Envia para a Neon
+        response = await fetch(finalUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-public-key': publicKey,
+                'x-secret-key': secretKey
+            },
+            body: JSON.stringify(payload)
+        });
+        
+        // Tenta ler a resposta como texto primeiro
+        rawResponseText = await response.text();
+        data = JSON.parse(rawResponseText);
 
-    } catch (fetchError) {
-        // Captura o erro se a URL estiver errada ou se a resposta não for JSON (erro HTML)
-        if (rawResponseText.startsWith('<')) {
-            console.error("--> [CARTÃO] ERRO CRÍTICO HTML/URL. Resposta não é JSON, mas sim HTML. Resposta:", rawResponseText.substring(0, 150));
-            return res.status(500).json({ 
-                erro: "API_URL_ERROR", 
-                mensagem: "Falha na comunicação com o gateway de pagamento. A URL base da Neon pode estar incorreta." 
-            });
-        }
-        // Se for o erro ENOTFOUND, trata
-        if (fetchError instanceof Error && fetchError.code === 'ENOTFOUND') {
-             console.error("--> [CARTÃO] ERRO CRÍTICO ENOTFOUND. O domínio do Gateway não pôde ser resolvido. Verifique a URL e se as chaves de API estão corretas (a URL pode mudar para Sandbox).");
-             return res.status(503).json({
-                 erro: "GATEWAY_UNREACHABLE",
-                 mensagem: "Não foi possível conectar ao gateway de pagamento (Domínio inválido ou indisponível)."
-             });
-        }
-        // Se for outro erro (ex: problema de rede), trata como erro interno
-        throw fetchError;
-    }
+    } catch (fetchError) {
+        // Tratamento de erros de comunicação (ENOTFOUND, URL, etc.)
+        if (rawResponseText.startsWith('<')) {
+            console.error("--> [CARTÃO] ERRO CRÍTICO HTML/URL.");
+            return res.status(500).json({ 
+                erro: "API_URL_ERROR", 
+                mensagem: "Falha na comunicação com o gateway de pagamento. A URL base da Neon pode estar incorreta." 
+            });
+        }
+        throw fetchError;
+    }
 
 
     if (!response.ok) {
         console.error("--> [CARTÃO] Erro Neon:", JSON.stringify(data, null, 2));
-        // Melhorar a mensagem de erro para o front-end
-        const neonMessage = data.message || (data.details && data.details.description) || "Pagamento não autorizado. Verifique os dados do cartão.";
+        const neonMessage = data.message || (data.details && data.details.description) || "Pagamento não autorizado. Verifique os dados do cartão.";
 
         return res.status(response.status).json({
             erro: "TRANSACAO_NEGADA",
