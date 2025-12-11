@@ -82,7 +82,8 @@ export const WORK_TEMPLATES: WorkTemplate[] = [
     includedSteps: [
       'Limpeza do terreno', 'Fundações', 'Levantamento de paredes', 'Lajes e Vigas', 'Telhado',
       'Tubulação de Água/Esgoto', 'Fiação Elétrica', 'Chapisco e Reboco', 'Contrapiso',
-      'Pisos e Revestimentos', 'Gesso / Forro', 'Pintura Paredes/Tetos', 'Instalação de Louças e Metais',
+      'Impermeabilização', 'Gesso / Forro', 'Pisos e Revestimentos', 'Esquadrias (Janelas/Portas)',
+      'Marmoraria (Bancadas)', 'Pintura Paredes/Tetos', 'Instalação de Louças e Metais', 'Instalação de Luminárias',
       'Limpeza Final e Entrega'
     ]
   },
@@ -94,8 +95,8 @@ export const WORK_TEMPLATES: WorkTemplate[] = [
     defaultDurationDays: 60,
     includedSteps: [
       'Demolição', 'Retirada de entulho', 'Tubulação de Água/Esgoto', 'Fiação Elétrica',
-      'Gesso / Forro', 'Pisos e Revestimentos', 'Azulejos', 'Pintura Paredes/Tetos', 
-      'Instalação de Louças e Metais', 'Instalação de Luminárias', 'Limpeza Final e Entrega'
+      'Gesso / Forro', 'Pisos e Revestimentos', 'Azulejos', 'Marmoraria (Bancadas)',
+      'Pintura Paredes/Tetos', 'Instalação de Louças e Metais', 'Instalação de Luminárias', 'Limpeza Final e Entrega'
     ]
   },
   {
@@ -106,7 +107,8 @@ export const WORK_TEMPLATES: WorkTemplate[] = [
     defaultDurationDays: 15,
     includedSteps: [
       'Demolição', 'Tubulação de Água/Esgoto', 'Impermeabilização', 'Contrapiso', 
-      'Azulejos', 'Pisos e Revestimentos', 'Gesso / Forro', 'Instalação de Louças e Metais', 'Limpeza Final e Entrega'
+      'Azulejos', 'Pisos e Revestimentos', 'Gesso / Forro', 'Marmoraria (Bancadas)',
+      'Instalação de Louças e Metais', 'Limpeza Final e Entrega'
     ]
   },
   {
@@ -137,133 +139,208 @@ export interface MaterialCatalog {
   items: {name: string, unit: string, multiplier?: number}[];
 }
 
-// FULL BACKUP CATALOG COM ESTIMATIVAS INTELIGENTES E REFINADAS
+// --- BANCO DE DADOS DE MATERIAIS ENRIQUECIDO ---
+// Multiplicadores baseados na área total da obra (estimativa média)
 export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
   {
-    category: 'Limpeza de Obra',
+    category: 'Limpeza e Canteiro',
     items: [
-      { name: 'Sacos de Entulho (Ráfia)', unit: 'un', multiplier: 0.5 },
-      { name: 'Caçamba de Entulho', unit: 'un', multiplier: 0.05 },
-      { name: 'Enxada / Pá', unit: 'un', multiplier: 0.02 },
-      { name: 'Carrinho de Mão', unit: 'un', multiplier: 0.01 },
-      { name: 'EPIs Básicos (Luvas/Óculos)', unit: 'kit', multiplier: 0.02 }
+      { name: 'Sacos de Ráfia (Entulho)', unit: 'un', multiplier: 0.8 },
+      { name: 'Caçamba Estacionária', unit: 'un', multiplier: 0.05 },
+      { name: 'Tapume (Madeirite)', unit: 'chapa', multiplier: 0.05 },
+      { name: 'Sarrafo de Madeira (2.5m)', unit: 'dz', multiplier: 0.02 },
+      { name: 'Prego 17x21 (Cabeça dupla)', unit: 'kg', multiplier: 0.01 },
+      { name: 'Lona Preta (Proteção)', unit: 'm', multiplier: 0.2 },
+      { name: 'EPIs (Luvas/Óculos/Capacete)', unit: 'kit', multiplier: 0.02 }
     ]
   },
   {
-    category: 'Fundação Estrutural',
+    category: 'Fundação e Estrutura',
     items: [
-      { name: 'Cimento CP-II (Fundação)', unit: 'sacos', multiplier: 0.3 },
-      { name: 'Areia Média', unit: 'm³', multiplier: 0.04 },
-      { name: 'Brita 1', unit: 'm³', multiplier: 0.04 },
+      { name: 'Cimento CP-II (Estrutural)', unit: 'sacos', multiplier: 0.4 },
+      { name: 'Areia Média (Lavada)', unit: 'm³', multiplier: 0.06 },
+      { name: 'Brita 1', unit: 'm³', multiplier: 0.05 },
       { name: 'Pedra de Mão (Rachão)', unit: 'm³', multiplier: 0.02 },
-      { name: 'Vergalhão 3/8 (10mm)', unit: 'barras', multiplier: 0.5 },
-      { name: 'Vergalhão 5/16 (8mm)', unit: 'barras', multiplier: 0.5 },
-      { name: 'Tábua de Pinus (Caixaria)', unit: 'dz', multiplier: 0.1 },
-      { name: 'Impermeabilizante betuminoso', unit: 'latas', multiplier: 0.05 }
+      { name: 'Vergalhão 3/8 (10mm)', unit: 'barras', multiplier: 0.6 },
+      { name: 'Vergalhão 5/16 (8mm)', unit: 'barras', multiplier: 0.4 },
+      { name: 'Vergalhão 4.2mm (Estribo)', unit: 'barras', multiplier: 0.8 },
+      { name: 'Arame Recozido', unit: 'kg', multiplier: 0.02 },
+      { name: 'Tábua de Pinus (30cm - Caixaria)', unit: 'dz', multiplier: 0.15 },
+      { name: 'Pontalete de Eucalipto', unit: 'dz', multiplier: 0.05 }
     ]
   },
   {
-    category: 'Alvenaria Estrutural',
+    category: 'Alvenaria (Paredes)',
     items: [
-      { name: 'Tijolo Cerâmico 8 furos', unit: 'milheiro', multiplier: 0.07 },
-      { name: 'Bloco de Concreto (Se necessário)', unit: 'un', multiplier: 0.001 }, 
-      { name: 'Cimento CP-II (Assentamento)', unit: 'sacos', multiplier: 0.15 },
-      { name: 'Cal Hidratada (Liga)', unit: 'sacos', multiplier: 0.15 },
-      { name: 'Areia Média', unit: 'm³', multiplier: 0.03 },
-      { name: 'Ferro para Vergas (Cabelo)', unit: 'barras', multiplier: 0.1 },
-      { name: 'Aditivo Plastificante', unit: 'litros', multiplier: 0.05 }
+      { name: 'Tijolo Cerâmico 8 furos', unit: 'milheiro', multiplier: 0.085 }, // ~85 tijolos por m2 de obra (considerando paredes internas/externas)
+      { name: 'Cimento CP-II (Assentamento)', unit: 'sacos', multiplier: 0.25 },
+      { name: 'Cal Hidratada (Liga)', unit: 'sacos', multiplier: 0.25 },
+      { name: 'Areia Média', unit: 'm³', multiplier: 0.05 },
+      { name: 'Ferro para Vergas (Treliça/Cabelo)', unit: 'barras', multiplier: 0.15 },
+      { name: 'Aditivo Plastificante (Vedalit)', unit: 'litros', multiplier: 0.05 }
+    ]
+  },
+  {
+    category: 'Impermeabilização',
+    items: [
+      { name: 'Emulsão Asfáltica (Neutrol)', unit: 'latas 18L', multiplier: 0.02 },
+      { name: 'Manta Líquida (Lajes/Áreas frias)', unit: 'balde 18kg', multiplier: 0.03 },
+      { name: 'Impermeabilizante Rígido (Viaplus Top)', unit: 'cx 18kg', multiplier: 0.02 },
+      { name: 'Tela de Poliéster (Reforço)', unit: 'rolos', multiplier: 0.01 },
+      { name: 'Broxa Retangular', unit: 'un', multiplier: 0.01 }
     ]
   },
   {
     category: 'Chapisco e Reboco',
     items: [
-      { name: 'Cimento CP-II (Reboco)', unit: 'sacos', multiplier: 0.18 },
-      { name: 'Areia Fina/Média', unit: 'm³', multiplier: 0.04 },
-      { name: 'Cal Hidratada (Pintura/Reboco)', unit: 'sacos', multiplier: 0.15 },
-      { name: 'Aditivo Impermeabilizante', unit: 'litros', multiplier: 0.05 }
+      { name: 'Cimento CP-II', unit: 'sacos', multiplier: 0.3 },
+      { name: 'Areia Fina', unit: 'm³', multiplier: 0.06 },
+      { name: 'Cal Hidratada', unit: 'sacos', multiplier: 0.25 },
+      { name: 'Aditivo Impermeabilizante (Vedacit)', unit: 'litros', multiplier: 0.08 },
+      { name: 'Tela de Galinheiro (Reforço)', unit: 'rolos', multiplier: 0.01 }
     ]
   },
   {
     category: 'Contrapiso',
     items: [
-      { name: 'Cimento CP-II (Contrapiso)', unit: 'sacos', multiplier: 0.15 },
-      { name: 'Areia Média (Lavada)', unit: 'm³', multiplier: 0.04 },
-      { name: 'Impermeabilizante (Áreas molhadas)', unit: 'litros', multiplier: 0.05 }
+      { name: 'Cimento CP-II', unit: 'sacos', multiplier: 0.15 },
+      { name: 'Areia Média', unit: 'm³', multiplier: 0.05 },
+      { name: 'Bianco (Aderência)', unit: 'balde', multiplier: 0.01 }
     ]
   },
   {
-    category: 'Telhado',
+    category: 'Telhado e Cobertura',
     items: [
-      { name: 'Telha Cerâmica/Concreto', unit: 'un', multiplier: 16 },
-      { name: 'Viga de Madeira (Peroba/Garapeira)', unit: 'm', multiplier: 0.5 },
-      { name: 'Caibros', unit: 'm', multiplier: 1.5 },
-      { name: 'Ripas', unit: 'm', multiplier: 3.5 },
-      { name: 'Prego de Telheiro', unit: 'kg', multiplier: 0.02 },
-      { name: 'Manta Térmica', unit: 'rolos', multiplier: 0.02 },
-      { name: 'Caixa D\'água 1000L', unit: 'un', multiplier: 0.01 }
+      { name: 'Telha (Cerâmica/Concreto)', unit: 'un', multiplier: 17 }, // ~16 + quebras
+      { name: 'Viga de Madeira (Peroba/Garapeira) 6x12', unit: 'm', multiplier: 0.6 },
+      { name: 'Caibros 5x6', unit: 'm', multiplier: 1.8 },
+      { name: 'Ripas', unit: 'm', multiplier: 4.0 },
+      { name: 'Prego de Telheiro', unit: 'kg', multiplier: 0.03 },
+      { name: 'Manta Térmica (Subcobertura)', unit: 'm²', multiplier: 1.2 },
+      { name: 'Caixa D\'água 1000L', unit: 'un', multiplier: 0.01 },
+      { name: 'Calhas e Rufos', unit: 'm', multiplier: 0.5 }
     ]
   },
   {
-    category: 'Instalações Elétricas',
+    category: 'Instalações Elétricas (Infra)',
     items: [
-      { name: 'Eletroduto Corrugado (Amarelo)', unit: 'rolos', multiplier: 0.1 },
-      { name: 'Caixa de Luz 4x2', unit: 'un', multiplier: 0.4 },
-      { name: 'Caixa de Luz 4x4', unit: 'un', multiplier: 0.1 },
-      { name: 'Cabo Flexível 2.5mm', unit: 'rolos', multiplier: 0.05 },
-      { name: 'Cabo Flexível 1.5mm', unit: 'rolos', multiplier: 0.03 },
-      { name: 'Cabo Flexível 6mm', unit: 'm', multiplier: 0.5 },
-      { name: 'Disjuntores', unit: 'un', multiplier: 0.15 },
-      { name: 'Quadro de Distribuição', unit: 'un', multiplier: 0.01 },
+      { name: 'Eletroduto Corrugado 3/4 (Amarelo)', unit: 'rolos', multiplier: 0.15 },
+      { name: 'Eletroduto Corrugado 1" (Laranja - Laje)', unit: 'rolos', multiplier: 0.05 },
+      { name: 'Caixa de Luz 4x2 (Parede)', unit: 'un', multiplier: 0.5 },
+      { name: 'Caixa de Luz 4x4 (Teto/Parede)', unit: 'un', multiplier: 0.15 },
+      { name: 'Quadro de Distribuição (12/24 din)', unit: 'un', multiplier: 0.01 },
+      { name: 'Cabo Flexível 2.5mm (Tomadas)', unit: 'rolos 100m', multiplier: 0.06 },
+      { name: 'Cabo Flexível 1.5mm (Iluminação)', unit: 'rolos 100m', multiplier: 0.04 },
+      { name: 'Cabo Flexível 6.0mm (Chuveiro)', unit: 'm', multiplier: 0.6 },
+      { name: 'Cabo Flexível 10.0mm (Entrada)', unit: 'm', multiplier: 0.2 },
+      { name: 'Disjuntor Unipolar (10A/16A/20A)', unit: 'un', multiplier: 0.2 },
+      { name: 'Disjuntor Bipolar (40A/50A)', unit: 'un', multiplier: 0.03 },
+      { name: 'Disjuntor DR (Segurança)', unit: 'un', multiplier: 0.01 },
+      { name: 'Haste de Aterramento (Cobre)', unit: 'un', multiplier: 0.02 }
+    ]
+  },
+  {
+    category: 'Instalações Hidráulicas (Tubulação)',
+    items: [
+      { name: 'Tubo Soldável 25mm (Água Fria)', unit: 'barras 6m', multiplier: 0.3 },
+      { name: 'Tubo Soldável 50mm (Alimentação)', unit: 'barras 6m', multiplier: 0.05 },
+      { name: 'Tubo Esgoto 100mm (Primário)', unit: 'barras 6m', multiplier: 0.1 },
+      { name: 'Tubo Esgoto 40mm/50mm (Secundário)', unit: 'barras 6m', multiplier: 0.2 },
+      { name: 'Joelho 90 graus 25mm', unit: 'un', multiplier: 0.8 },
+      { name: 'Tê Soldável 25mm', unit: 'un', multiplier: 0.3 },
+      { name: 'Luva de Correr (Reparo)', unit: 'un', multiplier: 0.05 },
+      { name: 'Cola PVC (Adesivo Plástico)', unit: 'frasco', multiplier: 0.05 },
+      { name: 'Registro de Gaveta 3/4 (Geral)', unit: 'un', multiplier: 0.03 },
+      { name: 'Registro de Pressão 3/4 (Chuveiro)', unit: 'un', multiplier: 0.03 },
+      { name: 'Caixa Sifonada 150x150', unit: 'un', multiplier: 0.04 },
+      { name: 'Ralo Seco', unit: 'un', multiplier: 0.03 }
+    ]
+  },
+  {
+    category: 'Gesso e Drywall',
+    items: [
+      { name: 'Placa de Gesso 60x60 (Plaquinha)', unit: 'un', multiplier: 3.0 }, // Se for forro plaquinha
+      { name: 'Chapa Drywall ST (Standard)', unit: 'chapa', multiplier: 0.4 }, // Se for drywall
+      { name: 'Perfil Canaleta/Tabica', unit: 'un', multiplier: 0.5 },
+      { name: 'Arame Galvanizado 18', unit: 'kg', multiplier: 0.02 },
+      { name: 'Gesso Cola', unit: 'sacas', multiplier: 0.05 },
+      { name: 'Sisal', unit: 'kg', multiplier: 0.01 }
+    ]
+  },
+  {
+    category: 'Pisos e Revestimentos Cerâmicos',
+    items: [
+      { name: 'Piso / Porcelanato (Chão)', unit: 'm²', multiplier: 1.15 }, // 15% quebra
+      { name: 'Revestimento (Parede)', unit: 'm²', multiplier: 0.8 }, // Estimativa média área molhada
+      { name: 'Argamassa AC-I (Interna)', unit: 'sacos 20kg', multiplier: 0.15 },
+      { name: 'Argamassa AC-III (Porcelanato/Externa)', unit: 'sacos 20kg', multiplier: 0.2 },
+      { name: 'Rejunte Acrílico/Epóxi', unit: 'kg', multiplier: 0.4 },
+      { name: 'Espaçadores e Cunhas (Nivelamento)', unit: 'pacote', multiplier: 0.05 },
+      { name: 'Rodapé (Poliestireno ou Cerâmico)', unit: 'm', multiplier: 1.1 }
+    ]
+  },
+  {
+    category: 'Marmoraria e Granitos',
+    items: [
+      { name: 'Bancada Cozinha (Granito/Mármore)', unit: 'm²', multiplier: 0.02 },
+      { name: 'Bancada Banheiro', unit: 'un', multiplier: 0.025 },
+      { name: 'Soleiras (Portas)', unit: 'un', multiplier: 0.08 },
+      { name: 'Peitoril (Janelas)', unit: 'un', multiplier: 0.06 },
+      { name: 'Cuba de Inox (Cozinha)', unit: 'un', multiplier: 0.01 },
+      { name: 'Cuba de Louça (Banheiro)', unit: 'un', multiplier: 0.025 },
+      { name: 'Silicone PU (Vedação)', unit: 'tubo', multiplier: 0.02 }
+    ]
+  },
+  {
+    category: 'Esquadrias e Vidros',
+    items: [
+      { name: 'Porta de Madeira Completa (Interna)', unit: 'un', multiplier: 0.08 },
+      { name: 'Fechadura Interna', unit: 'un', multiplier: 0.08 },
+      { name: 'Dobradiças', unit: 'jogo', multiplier: 0.08 },
+      { name: 'Janela (Alumínio/Vidro)', unit: 'un', multiplier: 0.06 },
+      { name: 'Porta de Entrada (Externa)', unit: 'un', multiplier: 0.01 },
+      { name: 'Espuma Expansiva', unit: 'lata', multiplier: 0.05 }
+    ]
+  },
+  {
+    category: 'Louças e Metais (Acabamento Hidro)',
+    items: [
+      { name: 'Vaso Sanitário com Caixa Acoplada', unit: 'un', multiplier: 0.025 },
+      { name: 'Assento Sanitário', unit: 'un', multiplier: 0.025 },
+      { name: 'Torneira de Banheiro (Misturador)', unit: 'un', multiplier: 0.025 },
+      { name: 'Torneira de Cozinha (Bancada/Parede)', unit: 'un', multiplier: 0.01 },
+      { name: 'Chuveiro / Ducha', unit: 'un', multiplier: 0.025 },
+      { name: 'Kit Acessórios (Toalheiro/Papeleira)', unit: 'kit', multiplier: 0.025 },
+      { name: 'Sifão Universal', unit: 'un', multiplier: 0.05 },
+      { name: 'Engate Flexível', unit: 'un', multiplier: 0.05 },
+      { name: 'Válvula de Escoamento (Ralo pia)', unit: 'un', multiplier: 0.05 }
+    ]
+  },
+  {
+    category: 'Elétrica (Acabamento)',
+    items: [
+      { name: 'Conjunto Tomada 10A (Placa+Módulo)', unit: 'un', multiplier: 0.3 },
+      { name: 'Conjunto Tomada 20A', unit: 'un', multiplier: 0.1 },
+      { name: 'Conjunto Interruptor Simples', unit: 'un', multiplier: 0.1 },
+      { name: 'Conjunto Interruptor Paralelo (Three-way)', unit: 'un', multiplier: 0.05 },
+      { name: 'Plafon / Luminária LED', unit: 'un', multiplier: 0.15 },
       { name: 'Fita Isolante', unit: 'un', multiplier: 0.05 }
-    ]
-  },
-  {
-    category: 'Instalações Hidráulicas',
-    items: [
-      { name: 'Tubo PVC Soldável 25mm', unit: 'barras', multiplier: 0.2 },
-      { name: 'Tubo Esgoto 100mm', unit: 'barras', multiplier: 0.1 },
-      { name: 'Tubo Esgoto 40mm', unit: 'barras', multiplier: 0.15 },
-      { name: 'Joelho 90 graus 25mm', unit: 'un', multiplier: 0.5 },
-      { name: 'Cola para PVC', unit: 'tubo', multiplier: 0.05 },
-      { name: 'Registro de Gaveta', unit: 'un', multiplier: 0.02 },
-      { name: 'Registro de Pressão', unit: 'un', multiplier: 0.03 },
-      { name: 'Caixa Sifonada', unit: 'un', multiplier: 0.05 }
-    ]
-  },
-  {
-    category: 'Pisos e Revestimentos',
-    items: [
-      { name: 'Piso / Porcelanato', unit: 'm²', multiplier: 1.15 },
-      { name: 'Argamassa AC-II/AC-III', unit: 'sacos', multiplier: 0.25 },
-      { name: 'Rejunte', unit: 'kg', multiplier: 0.3 },
-      { name: 'Espaçadores (Niveladores)', unit: 'pct', multiplier: 0.05 },
-      { name: 'Rodapé', unit: 'm', multiplier: 1.1 }
-    ]
-  },
-  {
-    category: 'Louças e Metais',
-    items: [
-      { name: 'Vaso Sanitário com Caixa Acoplada', unit: 'un', multiplier: 0.02 },
-      { name: 'Cuba / Pia de Banheiro', unit: 'un', multiplier: 0.02 },
-      { name: 'Torneira de Banheiro', unit: 'un', multiplier: 0.02 },
-      { name: 'Torneira de Cozinha', unit: 'un', multiplier: 0.01 },
-      { name: 'Chuveiro / Ducha', unit: 'un', multiplier: 0.02 },
-      { name: 'Kit Acessórios (Toalheiro/Papeleira)', unit: 'kit', multiplier: 0.02 },
-      { name: 'Sifão Universal', unit: 'un', multiplier: 0.04 },
-      { name: 'Engate Flexível', unit: 'un', multiplier: 0.04 },
-      { name: 'Válvula de Escoamento (Ralo pia)', unit: 'un', multiplier: 0.04 }
     ]
   },
   {
     category: 'Pintura',
     items: [
-      { name: 'Lixa de Parede', unit: 'folhas', multiplier: 0.5 },
-      { name: 'Selador Acrílico', unit: 'latas', multiplier: 0.02 },
-      { name: 'Massa Corrida', unit: 'latas', multiplier: 0.05 },
-      { name: 'Tinta Acrílica', unit: 'latas', multiplier: 0.05 },
-      { name: 'Rolo de Lã e Pincel', unit: 'un', multiplier: 0.04 },
-      { name: 'Fita Crepe', unit: 'rolos', multiplier: 0.05 },
-      { name: 'Lona Plástica', unit: 'm', multiplier: 1 }
+      { name: 'Lixa de Parede (100/150/220)', unit: 'folhas', multiplier: 0.8 },
+      { name: 'Selador Acrílico (Fundo)', unit: 'latas 18L', multiplier: 0.03 },
+      { name: 'Massa Corrida (Interna)', unit: 'latas 18L', multiplier: 0.08 },
+      { name: 'Massa Acrílica (Externa/Úmida)', unit: 'latas 18L', multiplier: 0.02 },
+      { name: 'Tinta Acrílica Fosca/Semibrilho', unit: 'latas 18L', multiplier: 0.06 },
+      { name: 'Tinta Esmalte (Madeiras/Metais)', unit: 'galão 3.6L', multiplier: 0.02 },
+      { name: 'Aguarrás (Solvente)', unit: 'litros', multiplier: 0.05 },
+      { name: 'Rolo de Lã', unit: 'un', multiplier: 0.04 },
+      { name: 'Trincha / Pincel', unit: 'un', multiplier: 0.04 },
+      { name: 'Fita Crepe', unit: 'rolos', multiplier: 0.1 },
+      { name: 'Lona Plástica (Proteção Pintura)', unit: 'm', multiplier: 1.0 }
     ]
   },
   {
