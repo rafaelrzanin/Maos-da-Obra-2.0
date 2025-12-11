@@ -30,6 +30,7 @@ const WorkDetail: React.FC = () => {
     // --- UI STATE ---
     const [activeTab, setActiveTab] = useState<MainTab>('SCHEDULE');
     const [subView, setSubView] = useState<SubView>('NONE');
+    const [uploading, setUploading] = useState(false);
     
     // --- MODALS STATE ---
     // STEP MODALS
@@ -73,6 +74,9 @@ const WorkDetail: React.FC = () => {
     const [personRole, setPersonRole] = useState('');
     const [personPhone, setPersonPhone] = useState('');
     const [personNotes, setPersonNotes] = useState('');
+
+    // CONTRACT VIEWER MODAL
+    const [viewContract, setViewContract] = useState<{title: string, content: string} | null>(null);
 
     const [zeModal, setZeModal] = useState({ isOpen: false, title: '', message: '', onConfirm: () => {} });
 
@@ -218,10 +222,14 @@ const WorkDetail: React.FC = () => {
     // --- PHOTO / FILE UPLOAD (BASE64 for LocalStorage MVP) ---
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'PHOTO' | 'FILE') => {
         if (e.target.files && e.target.files[0] && work) {
+            setUploading(true);
             const file = e.target.files[0];
             const reader = new FileReader();
             reader.onloadend = async () => {
                 const base64 = reader.result as string;
+                // Artificial delay to show loading state for UX
+                await new Promise(r => setTimeout(r, 800));
+                
                 if (type === 'PHOTO') {
                     // @ts-ignore
                     await dbService.addPhoto({
@@ -244,6 +252,7 @@ const WorkDetail: React.FC = () => {
                         date: new Date().toISOString()
                     });
                 }
+                setUploading(false);
                 load();
             };
             reader.readAsDataURL(file);
@@ -281,6 +290,7 @@ const WorkDetail: React.FC = () => {
             notes: personNotes
         };
 
+        // Wait for DB operation to finish
         if (personMode === 'WORKER') {
             if (personId) await dbService.updateWorker({ ...payload, id: personId, role: personRole });
             else await dbService.addWorker({ ...payload, role: personRole });
@@ -288,8 +298,10 @@ const WorkDetail: React.FC = () => {
             if (personId) await dbService.updateSupplier({ ...payload, id: personId, category: personRole });
             else await dbService.addSupplier({ ...payload, category: personRole });
         }
+        
+        // Refresh data explicitly before closing modal
+        await load();
         setIsPersonModalOpen(false);
-        load();
     };
 
     const handleDeletePerson = (id: string, mode: 'WORKER' | 'SUPPLIER') => {
@@ -300,7 +312,7 @@ const WorkDetail: React.FC = () => {
             onConfirm: async () => {
                 if (mode === 'WORKER') await dbService.deleteWorker(id);
                 else await dbService.deleteSupplier(id);
-                load();
+                await load();
                 setZeModal(prev => ({ ...prev, isOpen: false }));
             }
         });
@@ -494,22 +506,45 @@ const WorkDetail: React.FC = () => {
                                     ))}
                                 </div>
                             )}
+                            {/* NEW: HIERARCHICAL MATERIAL REPORT */}
                             {reportTab === 'MAT' && (
-                                <div className="space-y-2">
-                                    <div className="flex justify-between text-xs font-black text-slate-400 uppercase border-b pb-2">
-                                        <span>Material</span><span>Progresso</span>
-                                    </div>
-                                    {materials.map(m => {
-                                        const status = m.purchasedQty >= m.plannedQty ? 'OK' : m.purchasedQty > 0 ? 'PARTIAL' : 'NONE';
+                                <div className="space-y-6">
+                                    {steps.map((step, i) => {
+                                        const stepMaterials = materials.filter(m => m.stepId === step.id);
+                                        // If no materials for this step and it's done, skip or show empty state if desired. 
+                                        // Showing all steps maintains the "skeleton".
+                                        
+                                        const allBought = stepMaterials.length > 0 && stepMaterials.every(m => m.purchasedQty >= m.plannedQty);
+                                        
                                         return (
-                                            <div key={m.id} className="flex justify-between items-center py-2 border-b border-slate-50 dark:border-slate-800 last:border-0">
-                                                <span className="text-sm font-medium truncate max-w-[60%]">{m.name}</span>
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-xs text-slate-500">{m.purchasedQty}/{m.plannedQty}</span>
-                                                    <div className={`w-3 h-3 rounded-full ${status === 'OK' ? 'bg-green-500' : status === 'PARTIAL' ? 'bg-orange-400' : 'bg-slate-200'}`}></div>
+                                            <div key={step.id} className="border-b border-slate-100 dark:border-slate-800 pb-4 last:border-0">
+                                                <div className="flex items-center gap-3 mb-2">
+                                                    <div className={`w-6 h-6 rounded-md flex items-center justify-center text-xs font-black ${allBought ? 'bg-green-500 text-white' : 'bg-slate-200 dark:bg-slate-800 text-slate-600'}`}>
+                                                        {String(i+1).padStart(2,'0')}
+                                                    </div>
+                                                    <h4 className="text-sm font-bold text-primary dark:text-white uppercase tracking-wide">{step.name}</h4>
                                                 </div>
+                                                
+                                                {stepMaterials.length === 0 ? (
+                                                    <p className="text-xs text-slate-400 pl-9 italic">Nenhum material cadastrado nesta etapa.</p>
+                                                ) : (
+                                                    <div className="pl-9 space-y-2">
+                                                        {stepMaterials.map(m => {
+                                                            const status = m.purchasedQty >= m.plannedQty ? 'OK' : m.purchasedQty > 0 ? 'PARTIAL' : 'NONE';
+                                                            return (
+                                                                <div key={m.id} className="flex justify-between items-center text-sm">
+                                                                    <span className="text-slate-600 dark:text-slate-300 truncate max-w-[60%]">• {m.name}</span>
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span className="text-xs font-mono text-slate-400">{m.purchasedQty}/{m.plannedQty} {m.unit}</span>
+                                                                        <div className={`w-2 h-2 rounded-full ${status === 'OK' ? 'bg-green-500' : status === 'PARTIAL' ? 'bg-orange-400' : 'bg-slate-300'}`}></div>
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                )}
                                             </div>
-                                        )
+                                        );
                                     })}
                                 </div>
                             )}
@@ -540,10 +575,19 @@ const WorkDetail: React.FC = () => {
                 // --- 4. FOTOS ---
                 case 'PHOTOS': return (
                     <div className="space-y-4">
-                        <label className="block w-full py-8 border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl text-center cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
-                            <i className="fa-solid fa-camera text-3xl text-slate-400 mb-2"></i>
-                            <p className="text-sm font-bold text-slate-500">Toque para adicionar foto</p>
-                            <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, 'PHOTO')} />
+                        <label className="block w-full py-8 border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl text-center cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors relative">
+                            {uploading ? (
+                                <div className="flex flex-col items-center justify-center">
+                                    <i className="fa-solid fa-circle-notch fa-spin text-3xl text-secondary mb-2"></i>
+                                    <p className="text-sm font-bold text-slate-500">Enviando foto...</p>
+                                </div>
+                            ) : (
+                                <>
+                                    <i className="fa-solid fa-camera text-3xl text-slate-400 mb-2"></i>
+                                    <p className="text-sm font-bold text-slate-500">Toque para adicionar foto</p>
+                                    <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, 'PHOTO')} disabled={uploading} />
+                                </>
+                            )}
                         </label>
                         <div className="grid grid-cols-2 gap-4">
                             {photos.map((p) => (
@@ -561,10 +605,19 @@ const WorkDetail: React.FC = () => {
                 // --- 5. ARQUIVOS ---
                 case 'FILES': return (
                     <div className="space-y-4">
-                        <label className="block w-full py-6 border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl text-center cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
-                            <i className="fa-solid fa-folder-plus text-3xl text-slate-400 mb-2"></i>
-                            <p className="text-sm font-bold text-slate-500">Adicionar Projeto/PDF</p>
-                            <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'FILE')} />
+                        <label className="block w-full py-6 border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-2xl text-center cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors relative">
+                            {uploading ? (
+                                <div className="flex flex-col items-center justify-center">
+                                    <i className="fa-solid fa-circle-notch fa-spin text-3xl text-secondary mb-2"></i>
+                                    <p className="text-sm font-bold text-slate-500">Enviando arquivo...</p>
+                                </div>
+                            ) : (
+                                <>
+                                    <i className="fa-solid fa-folder-plus text-3xl text-slate-400 mb-2"></i>
+                                    <p className="text-sm font-bold text-slate-500">Adicionar Projeto/PDF</p>
+                                    <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'FILE')} disabled={uploading} />
+                                </>
+                            )}
                         </label>
                         <div className="space-y-2">
                             {files.map(f => (
@@ -672,36 +725,22 @@ const WorkDetail: React.FC = () => {
                 case 'CONTRACTS': return (
                     <div className="space-y-4">
                         {CONTRACT_TEMPLATES.map(ct => (
-                            <div key={ct.id} className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm hover:border-secondary transition-colors group">
+                            <div 
+                                key={ct.id} 
+                                onClick={() => setViewContract({ title: ct.title, content: ct.contentTemplate })}
+                                className="bg-white dark:bg-slate-900 p-5 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm hover:border-secondary transition-all cursor-pointer group"
+                            >
                                 <div className="flex justify-between items-start mb-2">
                                     <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 bg-slate-100 text-slate-500 rounded-lg flex items-center justify-center group-hover:bg-secondary group-hover:text-white transition-colors">
+                                        <div className="w-10 h-10 bg-slate-100 dark:bg-slate-800 text-slate-500 rounded-lg flex items-center justify-center group-hover:bg-secondary group-hover:text-white transition-colors">
                                             <i className="fa-solid fa-file-contract"></i>
                                         </div>
-                                        <h4 className="font-bold text-primary dark:text-white">{ct.title}</h4>
+                                        <div>
+                                            <h4 className="font-bold text-primary dark:text-white">{ct.title}</h4>
+                                            <p className="text-xs text-slate-500 font-normal">Toque para visualizar</p>
+                                        </div>
                                     </div>
-                                </div>
-                                <p className="text-xs text-slate-500 mb-4 pl-[52px]">{ct.description}</p>
-                                <div className="flex gap-2 pl-[52px]">
-                                    <button 
-                                        onClick={() => {navigator.clipboard.writeText(ct.contentTemplate); alert("Modelo copiado!");}}
-                                        className="text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-2 rounded-lg transition-colors"
-                                    >
-                                        <i className="fa-solid fa-copy mr-1"></i> Copiar
-                                    </button>
-                                    <button 
-                                        onClick={() => {
-                                            const blob = new Blob([ct.contentTemplate], {type: "application/msword"});
-                                            const url = URL.createObjectURL(blob);
-                                            const link = document.createElement('a');
-                                            link.href = url;
-                                            link.download = `${ct.title}.doc`;
-                                            link.click();
-                                        }}
-                                        className="text-xs font-bold bg-blue-50 hover:bg-blue-100 text-blue-600 px-3 py-2 rounded-lg transition-colors"
-                                    >
-                                        <i className="fa-solid fa-file-word mr-1"></i> Baixar Word
-                                    </button>
+                                    <i className="fa-solid fa-chevron-right text-slate-300"></i>
                                 </div>
                             </div>
                         ))}
@@ -911,74 +950,91 @@ const WorkDetail: React.FC = () => {
         // --- 4: THE "MAIS" MENU (RESTORED STRUCTURE) ---
         if (activeTab === 'MORE') {
             return (
-                <div className="space-y-6 animate-in fade-in">
+                <div className="space-y-8 animate-in fade-in">
                     <div className="px-2">
-                        <h2 className="text-2xl font-black text-primary dark:text-white">Mais Opções</h2>
-                        <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Gestão & Bônus</p>
+                        <h2 className="text-3xl font-black text-primary dark:text-white">Mais Opções</h2>
+                        <p className="text-sm text-slate-500 font-bold uppercase tracking-wider">Central de Controle</p>
                     </div>
 
-                    <div className="space-y-6">
-                        {/* Section: Gestão */}
+                    <div className="space-y-8">
+                        {/* Section: Gestão (Enhanced Design) */}
                         <div>
-                            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 pl-2">Gestão</h3>
+                            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 pl-2">Gestão Operacional</h3>
                             <div className="grid grid-cols-2 gap-4">
-                                <button onClick={() => setSubView('TEAM')} className="p-5 bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm hover:border-secondary transition-all flex flex-col items-center gap-3">
-                                    <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xl"><i className="fa-solid fa-helmet-safety"></i></div>
-                                    <span className="font-bold text-sm text-primary dark:text-white">Equipe</span>
+                                <button onClick={() => setSubView('TEAM')} className="group p-6 bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm hover:border-secondary transition-all flex flex-col items-center gap-3 relative overflow-hidden">
+                                    <div className="absolute inset-0 bg-secondary/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                                    <div className="w-14 h-14 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center text-2xl group-hover:scale-110 transition-transform shadow-sm"><i className="fa-solid fa-helmet-safety"></i></div>
+                                    <span className="font-bold text-base text-primary dark:text-white relative z-10">Equipe</span>
                                 </button>
-                                <button onClick={() => setSubView('SUPPLIERS')} className="p-5 bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm hover:border-secondary transition-all flex flex-col items-center gap-3">
-                                    <div className="w-12 h-12 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center text-xl"><i className="fa-solid fa-truck"></i></div>
-                                    <span className="font-bold text-sm text-primary dark:text-white">Fornecedores</span>
+                                <button onClick={() => setSubView('SUPPLIERS')} className="group p-6 bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm hover:border-secondary transition-all flex flex-col items-center gap-3 relative overflow-hidden">
+                                    <div className="absolute inset-0 bg-secondary/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                                    <div className="w-14 h-14 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center text-2xl group-hover:scale-110 transition-transform shadow-sm"><i className="fa-solid fa-truck-fast"></i></div>
+                                    <span className="font-bold text-base text-primary dark:text-white relative z-10">Fornecedores</span>
                                 </button>
                             </div>
                         </div>
 
-                        {/* Section: Documentação */}
+                        {/* Section: Documentação (Grid Layout) */}
                         <div>
-                            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3 pl-2">Documentação</h3>
+                            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 pl-2">Documentação e Mídia</h3>
                             <div className="grid grid-cols-3 gap-3">
-                                <button onClick={() => setSubView('REPORTS')} className="p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm hover:border-secondary transition-all flex flex-col items-center gap-2">
-                                    <div className="w-10 h-10 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center text-lg"><i className="fa-solid fa-chart-line"></i></div>
+                                <button onClick={() => setSubView('REPORTS')} className="group p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm hover:border-secondary transition-all flex flex-col items-center gap-2">
+                                    <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center text-xl group-hover:bg-indigo-100 transition-colors"><i className="fa-solid fa-file-chart-column"></i></div>
                                     <span className="font-bold text-xs text-primary dark:text-white">Relatórios</span>
                                 </button>
-                                <button onClick={() => setSubView('PHOTOS')} className="p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm hover:border-secondary transition-all flex flex-col items-center gap-2">
-                                    <div className="w-10 h-10 bg-pink-100 text-pink-600 rounded-full flex items-center justify-center text-lg"><i className="fa-solid fa-camera"></i></div>
+                                <button onClick={() => setSubView('PHOTOS')} className="group p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm hover:border-secondary transition-all flex flex-col items-center gap-2">
+                                    <div className="w-12 h-12 bg-pink-50 text-pink-600 rounded-xl flex items-center justify-center text-xl group-hover:bg-pink-100 transition-colors"><i className="fa-solid fa-camera-retro"></i></div>
                                     <span className="font-bold text-xs text-primary dark:text-white">Fotos</span>
                                 </button>
-                                <button onClick={() => setSubView('FILES')} className="p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm hover:border-secondary transition-all flex flex-col items-center gap-2">
-                                    <div className="w-10 h-10 bg-teal-100 text-teal-600 rounded-full flex items-center justify-center text-lg"><i className="fa-solid fa-folder"></i></div>
+                                <button onClick={() => setSubView('FILES')} className="group p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm hover:border-secondary transition-all flex flex-col items-center gap-2">
+                                    <div className="w-12 h-12 bg-teal-50 text-teal-600 rounded-xl flex items-center justify-center text-xl group-hover:bg-teal-100 transition-colors"><i className="fa-solid fa-folder-open"></i></div>
                                     <span className="font-bold text-xs text-primary dark:text-white">Arquivos</span>
                                 </button>
                             </div>
                         </div>
 
                         {/* Section: Bônus Vitalício (The Premium CTA Area) */}
-                        <div className="bg-gradient-premium p-1 rounded-3xl shadow-xl">
-                            <div className="bg-slate-900 rounded-[22px] p-5">
-                                <div className="flex items-center gap-3 mb-4">
-                                    <div className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center text-white"><i className="fa-solid fa-crown text-sm"></i></div>
-                                    <h3 className="text-sm font-black text-white uppercase tracking-widest">Bônus Vitalício</h3>
-                                </div>
-                                <div onClick={() => setSubView('BONUS_IA')} className="bg-white/5 hover:bg-white/10 p-4 rounded-xl border border-white/10 mb-3 cursor-pointer flex items-center gap-4 transition-colors">
-                                    <img src={ZE_AVATAR} className="w-12 h-12 rounded-full border-2 border-secondary" onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK}/>
+                        <div className="relative overflow-hidden rounded-[2rem] shadow-xl">
+                            <div className="absolute inset-0 bg-gradient-premium"></div>
+                            {/* Decorative Background Elements */}
+                            <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
+                            <div className="absolute bottom-0 left-0 w-24 h-24 bg-secondary/10 rounded-full blur-2xl translate-y-1/2 -translate-x-1/2"></div>
+
+                            <div className="relative z-10 p-6">
+                                <div className="flex items-center gap-3 mb-6">
+                                    <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center text-white shadow-lg shadow-secondary/30"><i className="fa-solid fa-crown"></i></div>
                                     <div>
-                                        <h4 className="font-bold text-white text-sm">Zé da Obra AI</h4>
-                                        <p className="text-xs text-slate-400">Seu engenheiro virtual 24h</p>
+                                        <h3 className="text-lg font-black text-white uppercase tracking-tight">Área Premium</h3>
+                                        <p className="text-xs text-slate-400 font-medium">Ferramentas Exclusivas</p>
                                     </div>
-                                    <i className="fa-solid fa-chevron-right text-white/30 ml-auto"></i>
                                 </div>
+
+                                <div onClick={() => setSubView('BONUS_IA')} className="bg-white/10 hover:bg-white/15 p-4 rounded-2xl border border-white/10 mb-4 cursor-pointer flex items-center gap-4 transition-all backdrop-blur-sm group">
+                                    <div className="relative">
+                                        <img src={ZE_AVATAR} className="w-14 h-14 rounded-full border-2 border-secondary bg-slate-800 object-cover" onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK}/>
+                                        <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 border-2 border-slate-800 rounded-full"></div>
+                                    </div>
+                                    <div>
+                                        <h4 className="font-bold text-white text-base group-hover:text-secondary transition-colors">Zé da Obra AI</h4>
+                                        <p className="text-xs text-slate-300">Tire dúvidas técnicas 24h</p>
+                                    </div>
+                                    <div className="ml-auto w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-white/50 group-hover:bg-secondary group-hover:text-white transition-all">
+                                        <i className="fa-solid fa-comment-dots"></i>
+                                    </div>
+                                </div>
+
                                 <div className="grid grid-cols-3 gap-3">
-                                    <button onClick={() => setSubView('CALCULATORS')} className="p-3 bg-white/5 hover:bg-white/10 rounded-xl border border-white/10 flex flex-col items-center gap-2 text-center">
-                                        <i className="fa-solid fa-calculator text-secondary text-lg"></i>
-                                        <span className="text-[10px] font-bold text-white">Calculadoras</span>
+                                    <button onClick={() => setSubView('CALCULATORS')} className="p-3 bg-white/5 hover:bg-white/10 rounded-xl border border-white/5 flex flex-col items-center gap-2 text-center transition-colors group">
+                                        <i className="fa-solid fa-calculator text-slate-300 group-hover:text-secondary text-2xl mb-1 transition-colors"></i>
+                                        <span className="text-[10px] font-bold text-white uppercase tracking-wide">Calculadoras</span>
                                     </button>
-                                    <button onClick={() => setSubView('CONTRACTS')} className="p-3 bg-white/5 hover:bg-white/10 rounded-xl border border-white/10 flex flex-col items-center gap-2 text-center">
-                                        <i className="fa-solid fa-file-contract text-secondary text-lg"></i>
-                                        <span className="text-[10px] font-bold text-white">Contratos</span>
+                                    <button onClick={() => setSubView('CONTRACTS')} className="p-3 bg-white/5 hover:bg-white/10 rounded-xl border border-white/5 flex flex-col items-center gap-2 text-center transition-colors group">
+                                        <i className="fa-solid fa-file-signature text-slate-300 group-hover:text-secondary text-2xl mb-1 transition-colors"></i>
+                                        <span className="text-[10px] font-bold text-white uppercase tracking-wide">Contratos</span>
                                     </button>
-                                    <button onClick={() => setSubView('CHECKLIST')} className="p-3 bg-white/5 hover:bg-white/10 rounded-xl border border-white/10 flex flex-col items-center gap-2 text-center">
-                                        <i className="fa-solid fa-list-check text-secondary text-lg"></i>
-                                        <span className="text-[10px] font-bold text-white">Checklist</span>
+                                    <button onClick={() => setSubView('CHECKLIST')} className="p-3 bg-white/5 hover:bg-white/10 rounded-xl border border-white/5 flex flex-col items-center gap-2 text-center transition-colors group">
+                                        <i className="fa-solid fa-clipboard-check text-slate-300 group-hover:text-secondary text-2xl mb-1 transition-colors"></i>
+                                        <span className="text-[10px] font-bold text-white uppercase tracking-wide">Checklist</span>
                                     </button>
                                 </div>
                             </div>
@@ -1207,6 +1263,46 @@ const WorkDetail: React.FC = () => {
                                 <button type="submit" className="flex-1 py-3 font-bold bg-primary text-white rounded-xl shadow-lg">Salvar</button>
                             </div>
                         </form>
+                    </div>
+                </div>
+            )}
+
+            {/* CONTRACT VIEWER MODAL */}
+            {viewContract && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-lg p-6 shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+                        <div className="flex justify-between items-center mb-4 pb-4 border-b border-slate-100 dark:border-slate-800">
+                            <h3 className="text-xl font-bold text-primary dark:text-white">{viewContract.title}</h3>
+                            <button onClick={() => setViewContract(null)} className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500">
+                                <i className="fa-solid fa-xmark"></i>
+                            </button>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-4 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 mb-4">
+                            <pre className="whitespace-pre-wrap font-mono text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                                {viewContract.content}
+                            </pre>
+                        </div>
+                        <div className="flex gap-3">
+                            <button 
+                                onClick={() => {navigator.clipboard.writeText(viewContract.content); alert("Copiado!"); setViewContract(null);}}
+                                className="flex-1 py-3 bg-slate-100 dark:bg-slate-800 text-primary dark:text-white font-bold rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                            >
+                                <i className="fa-regular fa-copy mr-2"></i> Copiar
+                            </button>
+                            <button 
+                                onClick={() => {
+                                    const blob = new Blob([viewContract.content], {type: "application/msword"});
+                                    const url = URL.createObjectURL(blob);
+                                    const link = document.createElement('a');
+                                    link.href = url;
+                                    link.download = `${viewContract.title}.doc`;
+                                    link.click();
+                                }}
+                                className="flex-1 py-3 bg-primary text-white font-bold rounded-xl hover:bg-primary-light transition-colors"
+                            >
+                                <i className="fa-solid fa-download mr-2"></i> Baixar Word
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
