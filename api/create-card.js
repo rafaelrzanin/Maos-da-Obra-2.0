@@ -84,12 +84,16 @@ export default async function handler(req, res) {
                 number: "100"
             }
         },
-        card: {
-            number: card.number.replace(/\s/g, ''),
-            owner: cleanOwnerName, // Usa o nome limpo e formatado
-            expiresAt: expiresAtFormatado, // Formato YYYY-MM
-            cvv: card.cvv
-        }
+       // --- NOVO NÓ CRÍTICO PARA INDICAR QUE É CARTÃO ---
+        paymentMethod: { 
+            type: "card", // Informa explicitamente o tipo de pagamento
+            card: {
+                number: card.number.replace(/\s/g, ''),
+                owner: cleanOwnerName, 
+                expiresAt: expiresAtFormatado, 
+                cvv: card.cvv
+            }
+        }
     };
 
     // Ajustes específicos para Assinatura (Subscription)
