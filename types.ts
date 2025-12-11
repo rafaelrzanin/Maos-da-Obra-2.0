@@ -82,7 +82,8 @@ export interface Expense {
   category: ExpenseCategory | string;
   relatedMaterialId?: string; 
   stepId?: string; 
-  workerId?: string; 
+  workerId?: string;
+  totalAgreed?: number; // New field: Valor Combinado (ex: 30k)
 }
 
 export enum MaterialStatus {
