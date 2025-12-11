@@ -200,7 +200,7 @@ const WorkDetail: React.FC = () => {
             totalAgreed: expTotalAgreed ? Number(expTotalAgreed) : undefined
         });
         setAddExpenseModal(false);
-        setExpDesc(''); setExpAmount('');
+        setExpDesc(''); setExpAmount(''); setExpTotalAgreed('');
         load();
     };
 
@@ -1137,6 +1137,14 @@ const WorkDetail: React.FC = () => {
                                 <input type="number" placeholder="Valor Pago" value={expAmount} onChange={e => setExpAmount(e.target.value)} className="w-full pl-10 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required />
                             </div>
                             
+                            <input 
+                                type="number" 
+                                placeholder="Valor Total Combinado (Opcional)" 
+                                value={expTotalAgreed} 
+                                onChange={e => setExpTotalAgreed(e.target.value)} 
+                                className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" 
+                            />
+
                             <div className="grid grid-cols-2 gap-2">
                                 <select value={expCategory} onChange={e => setExpCategory(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
                                     <option value={ExpenseCategory.LABOR}>Mão de Obra</option>
