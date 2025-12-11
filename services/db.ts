@@ -400,6 +400,21 @@ export const dbService = {
       saveLocalDb(db);
   },
 
+  updateExpense: async (expense: Expense) => {
+      const db = getLocalDb();
+      const idx = db.expenses.findIndex((e: Expense) => e.id === expense.id);
+      if (idx >= 0) {
+          db.expenses[idx] = expense;
+          saveLocalDb(db);
+      }
+  },
+
+  deleteExpense: async (id: string) => {
+      const db = getLocalDb();
+      db.expenses = db.expenses.filter((e: Expense) => e.id !== id);
+      saveLocalDb(db);
+  },
+
   registerMaterialPurchase: async (
       materialId: string, 
       updatedName: string, 
