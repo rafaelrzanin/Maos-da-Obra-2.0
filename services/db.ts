@@ -35,6 +35,11 @@ const saveLocalDb = (data: any) => {
   localStorage.setItem(DB_KEY, JSON.stringify(data));
 };
 
+// Helper to normalize strings for comparison (remove accents, lowercase)
+const normalizeStr = (str: string) => {
+    return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+};
+
 export const dbService = {
   // Auth
   getCurrentUser: (): User | null => {
@@ -86,7 +91,6 @@ export const dbService = {
              const worksNotOwned = db.works.filter((w: Work) => w.userId !== user!.id && w.userId === 'demo-user-id');
              if (worksNotOwned.length > 0) {
                  db.works.forEach((w: Work) => { if(w.userId === 'demo-user-id') w.userId = user!.id; });
-                 // Removed unused variable 's' to fix TS6133
                  db.steps.forEach(() => { /* steps linked via workId */ });
                  saveLocalDb(db);
              }
@@ -191,7 +195,7 @@ export const dbService = {
       // 1. Save Work
       db.works.push(newWork);
 
-      // 2. Generate Steps from Template (RESTORED)
+      // 2. Generate Steps from Template (WITH ROBUST MATERIAL MAPPING)
       if (templateId) {
           const template = WORK_TEMPLATES.find(t => t.id === templateId);
           if (template) {
@@ -216,29 +220,100 @@ export const dbService = {
                   };
                   db.steps.push(newStep);
 
-                  // 3. Generate Materials for this Step (RESTORED)
-                  const catalog = FULL_MATERIAL_PACKAGES.find(c => 
-                      stepName.toLowerCase().includes(c.category.split(' ')[0].toLowerCase()) ||
-                      c.category.toLowerCase().includes(stepName.toLowerCase())
-                  );
+                  // 3. ROBUST MATERIAL MAPPING LOGIC
+                  // Instead of weak 'includes', we map keywords to explicit categories in standards.ts
+                  
+                  const nStep = normalizeStr(stepName);
+                  let targetCategory = '';
 
-                  if (catalog) {
-                      catalog.items.forEach(item => {
-                          let qty = 1;
-                          if (item.multiplier) {
-                              qty = Math.ceil(item.multiplier * (newWork.area || 50));
-                          }
-                          
-                          db.materials.push({
-                              id: Math.random().toString(36).substr(2, 9),
-                              workId: newWork.id,
-                              stepId: newStep.id,
-                              name: item.name,
-                              unit: item.unit,
-                              plannedQty: qty,
-                              purchasedQty: 0
+                  // --- RULES ENGINE ---
+                  if (nStep.includes('limpeza') || nStep.includes('canteiro') || nStep.includes('demolicao') || nStep.includes('retirada')) {
+                      targetCategory = 'Limpeza e Canteiro';
+                  }
+                  else if (nStep.includes('fundac') || nStep.includes('sapata') || nStep.includes('baldrame') || nStep.includes('estaca')) {
+                      targetCategory = 'Fundação e Estrutura';
+                  }
+                  else if (nStep.includes('laje') || nStep.includes('viga') || nStep.includes('pilar') || nStep.includes('concreto') || nStep.includes('estrutura')) {
+                      // Slab & Beams also use Foundation materials (Cement, Sand, Stone, Steel)
+                      targetCategory = 'Fundação e Estrutura';
+                  }
+                  else if (nStep.includes('parede') || nStep.includes('alvenaria') || nStep.includes('tijolo') || nStep.includes('levantamento')) {
+                      targetCategory = 'Alvenaria (Paredes)';
+                  }
+                  else if (nStep.includes('impermeabiliz')) {
+                      targetCategory = 'Impermeabilização';
+                  }
+                  else if (nStep.includes('chapisco') || nStep.includes('reboco') || nStep.includes('emboço')) {
+                      targetCategory = 'Chapisco e Reboco';
+                  }
+                  else if (nStep.includes('contrapiso')) {
+                      targetCategory = 'Contrapiso';
+                  }
+                  else if (nStep.includes('telhado') || nStep.includes('cobertura') || nStep.includes('calha')) {
+                      targetCategory = 'Telhado e Cobertura';
+                  }
+                  // INSTALLATIONS (INFRA)
+                  else if ((nStep.includes('eletrica') || nStep.includes('fiacao')) && !nStep.includes('luminaria')) {
+                      targetCategory = 'Instalações Elétricas (Infra)';
+                  }
+                  else if (nStep.includes('tubulacao') || nStep.includes('agua') || nStep.includes('esgoto') || nStep.includes('hidraulica')) {
+                      targetCategory = 'Instalações Hidráulicas (Tubulação)';
+                  }
+                  else if (nStep.includes('rasgo')) { 
+                      targetCategory = 'Instalações Hidráulicas (Tubulação)'; // Usually plumbing/electric chase
+                  }
+                  // FINISHES
+                  else if (nStep.includes('gesso') || nStep.includes('forro') || nStep.includes('drywall')) {
+                      targetCategory = 'Gesso e Drywall';
+                  }
+                  else if (nStep.includes('piso') || nStep.includes('revestimento') || nStep.includes('azulejo') || nStep.includes('porcelanato')) {
+                      targetCategory = 'Pisos e Revestimentos Cerâmicos';
+                  }
+                  else if (nStep.includes('marmore') || nStep.includes('granito') || nStep.includes('bancada')) {
+                      targetCategory = 'Marmoraria e Granitos';
+                  }
+                  else if (nStep.includes('janela') || nStep.includes('porta') || nStep.includes('esquadria') || nStep.includes('vidro')) {
+                      targetCategory = 'Esquadrias e Vidros';
+                  }
+                  // FINAL INSTALLATIONS
+                  else if (nStep.includes('louca') || nStep.includes('metais') || nStep.includes('torneira') || nStep.includes('vaso') || nStep.includes('cubas')) {
+                      targetCategory = 'Louças e Metais (Acabamento Hidro)';
+                  }
+                  else if (nStep.includes('luminaria') || nStep.includes('lampada') || nStep.includes('tomada') || nStep.includes('interruptor')) {
+                      targetCategory = 'Elétrica (Acabamento)';
+                  }
+                  else if (nStep.includes('pintura') || nStep.includes('tinta') || nStep.includes('massa corrida')) {
+                      targetCategory = 'Pintura';
+                  }
+                  else if (nStep.includes('limpeza final') || nStep.includes('entrega')) {
+                      targetCategory = 'Limpeza Final';
+                  }
+
+                  // 4. FIND AND ADD MATERIALS
+                  if (targetCategory) {
+                      const catalog = FULL_MATERIAL_PACKAGES.find(c => c.category === targetCategory);
+                      
+                      if (catalog) {
+                          catalog.items.forEach(item => {
+                              let qty = 1;
+                              if (item.multiplier) {
+                                  // Base qty on Area, ensuring minimum of 1
+                                  const baseQty = Math.ceil(item.multiplier * (newWork.area || 50));
+                                  qty = Math.max(1, baseQty);
+                              }
+                              
+                              db.materials.push({
+                                  id: Math.random().toString(36).substr(2, 9),
+                                  workId: newWork.id,
+                                  stepId: newStep.id,
+                                  name: item.name,
+                                  unit: item.unit,
+                                  plannedQty: qty,
+                                  purchasedQty: 0,
+                                  category: targetCategory // Storing category for easier debug/grouping
+                              });
                           });
-                      });
+                      }
                   }
               });
           }
