@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../App';
 import { dbService } from '../services/db';
@@ -191,7 +192,8 @@ const Checkout: React.FC = () => {
         // Simulação
         await new Promise(resolve => setTimeout(resolve, 2000));
         await updatePlan(planDetails.type);
-        navigate('/?status=success'); 
+        // FIX: Passa o plano explicitamente na URL para garantir a atualização correta no App.tsx
+        navigate(`/?status=success&plan=${planDetails.type}`); 
 
     } catch (err: any) {
         setErrorMsg(err.message || "Erro ao processar cartão.");
@@ -217,7 +219,8 @@ const Checkout: React.FC = () => {
       await new Promise(r => setTimeout(r, 1000));
       if (planDetails) {
           await updatePlan(planDetails.type);
-          navigate('/?status=success');
+          // FIX: Passa o plano explicitamente na URL
+          navigate(`/?status=success&plan=${planDetails.type}`);
       }
   };
 
