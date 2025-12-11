@@ -1,1085 +1,565 @@
 
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import * as XLSX from 'xlsx';
-import { useAuth } from '../App';
-import { dbService } from '../services/db';
-import { Work, Worker, Supplier, Material, Step, Expense, StepStatus, WorkPhoto, WorkFile, FileCategory, ExpenseCategory, PlanType } from '../types';
-import { ZeModal } from '../components/ZeModal';
-import { STANDARD_CHECKLISTS, CONTRACT_TEMPLATES, STANDARD_JOB_ROLES, STANDARD_SUPPLIER_CATEGORIES, ZE_AVATAR, ZE_AVATAR_FALLBACK } from '../services/standards';
-import { aiService } from '../services/ai';
+import { supabase } from './supabase';
+import { User, Work, Step, Material, Worker, Supplier, PlanType, StepStatus, Notification, WorkStatus, Expense, WorkPhoto, WorkFile } from '../types';
+import { FULL_MATERIAL_PACKAGES, WORK_TEMPLATES } from './standards';
 
-// --- TYPES FOR VIEW STATE ---
-type MainTab = 'SCHEDULE' | 'MATERIALS' | 'FINANCIAL' | 'MORE';
-type SubView = 'NONE' | 'TEAM' | 'SUPPLIERS' | 'REPORTS' | 'PHOTOS' | 'PROJECTS' | 'BONUS_IA' | 'BONUS_IA_CHAT' | 'CALCULATORS' | 'CONTRACTS' | 'CHECKLIST';
+const STORAGE_KEY = 'maos_db_v1';
 
-// --- DATE HELPERS ---
-const parseDateNoTimezone = (dateStr: string) => {
-    if (!dateStr) return '';
-    const cleanDate = dateStr.split('T')[0];
-    const parts = cleanDate.split('-');
-    if (parts.length === 3) {
-        return `${parts[2]}/${parts[1]}/${parts[0]}`; 
+const getLocalDb = () => {
+    let db;
+    try {
+        const s = localStorage.getItem(STORAGE_KEY);
+        db = s ? JSON.parse(s) : null;
+    } catch (e) {
+        console.error("Erro ao ler DB local, resetando...", e);
+        db = null;
     }
-    return dateStr;
+
+    // Inicialização segura de estrutura
+    if (!db) db = {};
+    if (!Array.isArray(db.users)) db.users = [];
+    if (!Array.isArray(db.works)) db.works = [];
+    if (!Array.isArray(db.steps)) db.steps = [];
+    if (!Array.isArray(db.materials)) db.materials = [];
+    if (!Array.isArray(db.expenses)) db.expenses = [];
+    if (!Array.isArray(db.workers)) db.workers = [];
+    if (!Array.isArray(db.suppliers)) db.suppliers = [];
+    if (!Array.isArray(db.notifications)) db.notifications = [];
+    if (!Array.isArray(db.photos)) db.photos = [];
+    if (!Array.isArray(db.files)) db.files = [];
+
+    // --- AUTO-SEED TEST USER (VITALICIO) ---
+    const testEmail = 'teste@maosdaobra.app';
+    const hasUser = db.users.find((u: User) => u.email.toLowerCase() === testEmail.toLowerCase());
+    
+    if (!hasUser) {
+        console.log("Criando usuário de teste automático...");
+        const testUser: User = {
+            id: 'user_test_vitalicio',
+            name: 'Usuário Teste (Vitalício)',
+            email: testEmail,
+            whatsapp: '11999999999',
+            cpf: '000.000.000-00',
+            plan: PlanType.VITALICIO,
+            subscriptionExpiresAt: '2099-12-31T23:59:59.000Z'
+        };
+        db.users.push(testUser);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
+    }
+    // ---------------------------------------
+
+    return db;
 };
 
-const WorkDetail: React.FC = () => {
-    const { id } = useParams<{ id: string }>();
-    const navigate = useNavigate();
-    const { user } = useAuth();
-    
-    // --- CORE DATA STATE ---
-    const [work, setWork] = useState<Work | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [steps, setSteps] = useState<Step[]>([]);
-    const [materials, setMaterials] = useState<Material[]>([]);
-    const [expenses, setExpenses] = useState<Expense[]>([]);
-    const [workers, setWorkers] = useState<Worker[]>([]);
-    const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-    const [photos, setPhotos] = useState<WorkPhoto[]>([]);
-    const [files, setFiles] = useState<WorkFile[]>([]);
-    
-    // --- UI STATE ---
-    const [activeTab, setActiveTab] = useState<MainTab>('SCHEDULE');
-    const [subView, setSubView] = useState<SubView>('NONE');
-    const [uploading, setUploading] = useState(false);
-    
-    // --- PREMIUM CHECK ---
-    const isPremium = user?.plan === PlanType.VITALICIO;
+const saveLocalDb = (data: any) => localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
 
-    // --- MODALS STATE ---
-    const [stepModalMode, setStepModalMode] = useState<'ADD' | 'EDIT'>('ADD');
-    const [isStepModalOpen, setIsStepModalOpen] = useState(false);
-    const [currentStepId, setCurrentStepId] = useState<string | null>(null);
-    const [stepName, setStepName] = useState('');
-    const [stepStart, setStepStart] = useState('');
-    const [stepEnd, setStepEnd] = useState('');
-    
-    const [materialModal, setMaterialModal] = useState<{ isOpen: boolean, material: Material | null }>({ isOpen: false, material: null });
-    const [matName, setMatName] = useState('');
-    const [matBrand, setMatBrand] = useState('');
-    const [matPlannedQty, setMatPlannedQty] = useState('');
-    const [matUnit, setMatUnit] = useState('');
-    const [matBuyQty, setMatBuyQty] = useState('');
-    const [matBuyCost, setMatBuyCost] = useState('');
+export const dbService = {
+  getCurrentUser: (): User | null => {
+      try {
+          const u = localStorage.getItem('maos_user');
+          return u ? JSON.parse(u) : null;
+      } catch {
+          return null;
+      }
+  },
+  
+  isSubscriptionActive: (user: User): boolean => {
+      if (!user.subscriptionExpiresAt && user.plan === PlanType.VITALICIO) return true;
+      if (!user.subscriptionExpiresAt) return false;
+      return new Date(user.subscriptionExpiresAt) > new Date();
+  },
 
-    const [addMatModal, setAddMatModal] = useState(false);
-    const [newMatName, setNewMatName] = useState('');
-    const [newMatBrand, setNewMatBrand] = useState('');
-    const [newMatQty, setNewMatQty] = useState('');
-    const [newMatUnit, setNewMatUnit] = useState('un');
-    const [newMatStepId, setNewMatStepId] = useState('');
-    const [newMatBuyNow, setNewMatBuyNow] = useState(false);
-    const [newMatBuyQty, setNewMatBuyQty] = useState('');
-    const [newMatBuyCost, setNewMatBuyCost] = useState('');
+  syncSession: async () => {
+      // Force Seed check on startup
+      getLocalDb(); 
+      
+      if (supabase) {
+          const { data: { session: _session } } = await supabase.auth.getSession();
+      }
+      return dbService.getCurrentUser();
+  },
 
-    const [addExpenseModal, setAddExpenseModal] = useState(false);
-    const [expDesc, setExpDesc] = useState('');
-    const [expAmount, setExpAmount] = useState('');
-    const [expTotalAgreed, setExpTotalAgreed] = useState('');
-    const [expCategory, setExpCategory] = useState<string>(ExpenseCategory.LABOR);
-    const [expStepId, setExpStepId] = useState('');
+  onAuthChange: (_callback: (user: User | null) => void) => {
+      if (supabase) {
+          const { data } = supabase.auth.onAuthStateChange((_event, _session) => {
+              // handle session
+          });
+          return () => data.subscription.unsubscribe();
+      }
+      return () => {};
+  },
 
-    const [isPersonModalOpen, setIsPersonModalOpen] = useState(false);
-    const [personMode, setPersonMode] = useState<'WORKER'|'SUPPLIER'>('WORKER');
-    const [personId, setPersonId] = useState<string | null>(null); 
-    const [personName, setPersonName] = useState('');
-    const [personRole, setPersonRole] = useState('');
-    const [personPhone, setPersonPhone] = useState('');
-    const [personNotes, setPersonNotes] = useState('');
+  login: async (email: string, _password?: string): Promise<User | null> => {
+      const db = getLocalDb();
+      // Case insensitive check robusto
+      const user = db.users.find((u: User) => u.email.trim().toLowerCase() === email.trim().toLowerCase());
+      
+      if (user) {
+          // Atualiza plano se for o usuário de teste para garantir acesso
+          if (user.email === 'teste@maosdaobra.app' && user.plan !== PlanType.VITALICIO) {
+              user.plan = PlanType.VITALICIO;
+              user.subscriptionExpiresAt = '2099-12-31T23:59:59.000Z';
+              saveLocalDb(db);
+          }
 
-    const [viewContract, setViewContract] = useState<{title: string, content: string} | null>(null);
-    const [zeModal, setZeModal] = useState({ isOpen: false, title: '', message: '', onConfirm: () => {} });
+          localStorage.setItem('maos_user', JSON.stringify(user));
+          return user;
+      }
+      return null;
+  },
 
-    // AI & TOOLS
-    const [aiMessage, setAiMessage] = useState('');
-    const [aiResponse, setAiResponse] = useState('');
-    const [aiLoading, setAiLoading] = useState(false);
-    const [calcType, setCalcType] = useState<'PISO'|'PAREDE'|'PINTURA'>('PISO');
-    const [calcArea, setCalcArea] = useState('');
-    const [calcResult, setCalcResult] = useState<string[]>([]);
-    const [activeChecklist, setActiveChecklist] = useState<string | null>(null);
-    const [reportTab, setReportTab] = useState<'CRONO'|'MAT'|'FIN'>('CRONO');
+  signup: async (name: string, email: string, whatsapp: string, _password?: string, cpf?: string, plan?: string | null): Promise<User | null> => {
+      const db = getLocalDb();
+      const existing = db.users.find((u: User) => u.email.trim().toLowerCase() === email.trim().toLowerCase());
+      if (existing) return null;
 
-    // --- LOAD DATA ---
-    const load = async () => {
-        if (!id) return;
-        const w = await dbService.getWorkById(id);
-        setWork(w || null);
-        
-        if (w) {
-            const [s, m, e, wk, sp, ph, fl] = await Promise.all([
-                dbService.getSteps(w.id),
-                dbService.getMaterials(w.id),
-                dbService.getExpenses(w.id),
-                dbService.getWorkers(w.userId),
-                dbService.getSuppliers(w.userId),
-                dbService.getPhotos(w.id),
-                dbService.getFiles(w.id)
-            ]);
-            
-            setSteps(s ? s.sort((a,b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()) : []);
-            setMaterials(m || []);
-            setExpenses(e ? e.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()) : []);
-            setWorkers(wk || []);
-            setSuppliers(sp || []);
-            setPhotos(ph || []);
-            setFiles(fl || []);
-        }
-        setLoading(false);
-    };
+      const newUser: User = { 
+          id: Math.random().toString(36).substr(2, 9), 
+          name, 
+          email: email.trim(), 
+          whatsapp, 
+          cpf, 
+          plan: plan as PlanType || null,
+          subscriptionExpiresAt: plan === PlanType.VITALICIO ? '2099-12-31' : undefined
+      };
+      db.users.push(newUser);
+      saveLocalDb(db);
+      localStorage.setItem('maos_user', JSON.stringify(newUser));
+      return newUser;
+  },
 
-    useEffect(() => { load(); }, [id]);
+  resetPassword: async (email: string): Promise<boolean> => {
+      await new Promise(r => setTimeout(r, 1500));
+      const db = getLocalDb();
+      const user = db.users.find((u: User) => u.email.trim().toLowerCase() === email.trim().toLowerCase());
+      return !!user;
+  },
 
-    // --- HANDLERS ---
+  logout: () => {
+      if (supabase) supabase.auth.signOut();
+      localStorage.removeItem('maos_user');
+  },
 
-    const handleSaveStep = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!work || !stepName) return;
+  updatePlan: async (userId: string, plan: PlanType) => {
+      const db = getLocalDb();
+      const userIdx = db.users.findIndex((u: User) => u.id === userId);
+      if (userIdx >= 0) {
+          db.users[userIdx].plan = plan;
+          const now = new Date();
+          if (plan === PlanType.MENSAL) now.setMonth(now.getMonth() + 1);
+          if (plan === PlanType.SEMESTRAL) now.setMonth(now.getMonth() + 6);
+          if (plan === PlanType.VITALICIO) now.setFullYear(2099);
+          db.users[userIdx].subscriptionExpiresAt = now.toISOString();
+          
+          saveLocalDb(db);
+          const currentUser = dbService.getCurrentUser();
+          if (currentUser && currentUser.id === userId) {
+              localStorage.setItem('maos_user', JSON.stringify(db.users[userIdx]));
+          }
+      }
+  },
 
-        if (stepModalMode === 'ADD') {
-            await dbService.addStep({
+  loginSocial: async (_provider: string) => { 
+      await new Promise(r => setTimeout(r, 1500)); 
+      
+      const db = getLocalDb();
+      const mockEmail = "usuario.google@exemplo.com";
+      let user = db.users.find((u: User) => u.email === mockEmail);
+      
+      if (!user) {
+          user = {
+              id: "google_user_" + Math.random().toString(36).substr(2, 9),
+              name: "Usuário Google",
+              email: mockEmail,
+              whatsapp: "",
+              plan: null
+          };
+          db.users.push(user);
+          saveLocalDb(db);
+      }
+      
+      localStorage.setItem('maos_user', JSON.stringify(user));
+      return { user, error: null }; 
+  },
+
+  getWorks: async (userId: string): Promise<Work[]> => {
+      const db = getLocalDb();
+      return db.works.filter((w: Work) => w.userId === userId);
+  },
+
+  getWorkById: async (workId: string): Promise<Work | null> => {
+      const db = getLocalDb();
+      return db.works.find((w: Work) => w.id === workId) || null;
+  },
+
+  createWork: async (workData: Partial<Work>, templateId: string): Promise<Work> => {
+      const db = getLocalDb();
+      const newWork: Work = {
+          id: Math.random().toString(36).substr(2, 9),
+          userId: workData.userId!,
+          name: workData.name || 'Nova Obra',
+          address: workData.address || '',
+          budgetPlanned: workData.budgetPlanned || 0,
+          startDate: workData.startDate || new Date().toISOString().split('T')[0],
+          endDate: workData.endDate || new Date().toISOString().split('T')[0],
+          area: workData.area || 0,
+          floors: workData.floors,
+          bedrooms: workData.bedrooms,
+          bathrooms: workData.bathrooms,
+          kitchens: workData.kitchens,
+          livingRooms: workData.livingRooms,
+          hasLeisureArea: workData.hasLeisureArea,
+          notes: workData.notes || '',
+          status: WorkStatus.PLANNING
+      };
+      
+      db.works.push(newWork);
+      
+      const template = WORK_TEMPLATES.find(t => t.id === templateId);
+      
+      if (template && template.includedSteps) {
+         const totalDuration = template.defaultDurationDays || 90;
+         const stepDuration = Math.max(2, Math.floor(totalDuration / template.includedSteps.length));
+         
+         template.includedSteps.forEach((stepName, idx) => {
+             const startDate = new Date(newWork.startDate);
+             startDate.setDate(startDate.getDate() + (idx * stepDuration)); 
+             const endDate = new Date(startDate);
+             endDate.setDate(endDate.getDate() + stepDuration);
+
+             const newStepId = Math.random().toString(36).substr(2, 9);
+
+             db.steps.push({
+                 id: newStepId,
+                 workId: newWork.id,
+                 name: stepName,
+                 startDate: startDate.toISOString().split('T')[0],
+                 endDate: endDate.toISOString().split('T')[0],
+                 status: StepStatus.NOT_STARTED,
+                 isDelayed: false
+             });
+
+             const normalize = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+             const stepNorm = normalize(stepName);
+
+             const pkg = FULL_MATERIAL_PACKAGES.find(p => {
+                 const pkgNorm = normalize(p.category);
+                 if ((stepNorm.includes('limpeza') || stepNorm.includes('entulho') || stepNorm.includes('demolicao')) && !stepNorm.includes('final') && pkgNorm.includes('limpeza')) return true;
+                 
+                 // FIX: "Fundação" vs "Fundações" matching using root 'fundac'
+                 if (stepNorm.includes('fundac') && pkgNorm.includes('fundac')) return true;
+                 
+                 if ((stepNorm.includes('parede') || stepNorm.includes('alvenaria') || stepNorm.includes('bloco')) && !stepNorm.includes('reboco') && !stepNorm.includes('pintura') && pkgNorm.includes('alvenaria')) return true;
+                 if (stepNorm.includes('impermeabiliza') && pkgNorm.includes('impermeabiliza')) return true;
+                 if ((stepNorm.includes('reboco') || stepNorm.includes('chapisco')) && pkgNorm.includes('chapisco')) return true;
+                 if (stepNorm.includes('contrapiso') && pkgNorm.includes('contrapiso')) return true;
+                 if ((stepNorm.includes('gesso') || stepNorm.includes('forro')) && pkgNorm.includes('gesso')) return true;
+                 if ((stepNorm.includes('piso') || stepNorm.includes('azulejo') || stepNorm.includes('revestimento')) && !stepNorm.includes('contrapiso') && !stepNorm.includes('protecao') && pkgNorm.includes('pisos')) return true;
+                 if ((stepNorm.includes('marmore') || stepNorm.includes('granito') || stepNorm.includes('bancada')) && pkgNorm.includes('marmoraria')) return true;
+                 if ((stepNorm.includes('janela') || stepNorm.includes('porta') || stepNorm.includes('vidro') || stepNorm.includes('esquadria')) && pkgNorm.includes('esquadria')) return true;
+                 if ((stepNorm.includes('agua') || stepNorm.includes('esgoto') || stepNorm.includes('tubulacao')) && !stepNorm.includes('louca') && pkgNorm.includes('tubulacao')) return true;
+                 if ((stepNorm.includes('louca') || stepNorm.includes('metal') || stepNorm.includes('torneira')) && pkgNorm.includes('loucas')) return true;
+                 if ((stepNorm.includes('fiacao') || stepNorm.includes('eletrica')) && !stepNorm.includes('luminaria') && pkgNorm.includes('infra')) return true;
+                 if ((stepNorm.includes('luminaria') || stepNorm.includes('luz')) && pkgNorm.includes('acabamento')) return true;
+                 if (stepNorm.includes('pintura') && pkgNorm.includes('pintura')) return true;
+                 if ((stepNorm.includes('entrega') || stepNorm.includes('final')) && pkgNorm.includes('limpeza final')) return true;
+                 return false;
+             });
+
+             if (pkg) {
+                 pkg.items.forEach(item => {
+                     const calculatedQty = Math.ceil(newWork.area * (item.multiplier || 0));
+                     if (calculatedQty > 0) {
+                         db.materials.push({
+                            id: Math.random().toString(36).substr(2, 9),
+                            workId: newWork.id,
+                            name: item.name,
+                            brand: '',
+                            plannedQty: calculatedQty,
+                            purchasedQty: 0,
+                            unit: item.unit,
+                            category: pkg.category,
+                            stepId: newStepId
+                         });
+                     }
+                 });
+             }
+         });
+      } else {
+          const stepId = Math.random().toString(36).substr(2, 9);
+          db.steps.push({
+             id: stepId,
+             workId: newWork.id,
+             name: 'Início da Obra',
+             startDate: newWork.startDate,
+             endDate: newWork.endDate,
+             status: StepStatus.NOT_STARTED,
+             isDelayed: false
+          });
+      }
+      
+      saveLocalDb(db);
+      return newWork;
+  },
+
+  deleteWork: async (workId: string) => {
+      const db = getLocalDb();
+      db.works = db.works.filter((w: Work) => w.id !== workId);
+      db.steps = db.steps.filter((s: Step) => s.workId !== workId);
+      db.materials = db.materials.filter((m: Material) => m.workId !== workId);
+      db.expenses = db.expenses.filter((e: Expense) => e.workId !== workId);
+      if (db.photos) db.photos = db.photos.filter((p: WorkPhoto) => p.workId !== workId);
+      if (db.files) db.files = db.files.filter((f: WorkFile) => f.workId !== workId);
+      saveLocalDb(db);
+  },
+
+  calculateWorkStats: async (workId: string) => {
+      const db = getLocalDb();
+      const expenses = db.expenses.filter((e: Expense) => e.workId === workId);
+      const steps = db.steps.filter((s: Step) => s.workId === workId);
+      const totalSpent = expenses.reduce((acc: number, curr: Expense) => acc + Number(curr.amount), 0);
+      const completedSteps = steps.filter((s: Step) => s.status === StepStatus.COMPLETED).length;
+      const progress = steps.length > 0 ? Math.round((completedSteps / steps.length) * 100) : 0;
+      const today = new Date().toISOString().split('T')[0];
+      const delayedSteps = steps.filter((s: Step) => s.status !== StepStatus.COMPLETED && s.endDate < today).length;
+      return { totalSpent, progress, delayedSteps };
+  },
+
+  getDailySummary: async (workId: string) => {
+      const db = getLocalDb();
+      const steps = db.steps.filter((s: Step) => s.workId === workId);
+      const materials = db.materials.filter((m: Material) => m.workId === workId);
+      const today = new Date().toISOString().split('T')[0];
+      const completedSteps = steps.filter((s: Step) => s.status === StepStatus.COMPLETED).length;
+      const delayedSteps = steps.filter((s: Step) => s.status !== StepStatus.COMPLETED && s.endDate < today).length;
+      const pendingMaterials = materials.filter((m: Material) => m.purchasedQty < m.plannedQty).length;
+      return { completedSteps, delayedSteps, pendingMaterials, totalSteps: steps.length };
+  },
+
+  getNotifications: async (_userId: string): Promise<Notification[]> => { return []; },
+  dismissNotification: async (_id: string) => {},
+  clearAllNotifications: async (_userId: string) => {},
+  generateSmartNotifications: async (_userId: string, _workId: string) => {},
+
+  getSteps: async (workId: string): Promise<Step[]> => {
+      const db = getLocalDb();
+      return db.steps.filter((s: Step) => s.workId === workId);
+  },
+  
+  addStep: async (step: Step) => {
+      const db = getLocalDb();
+      db.steps.push(step);
+      saveLocalDb(db);
+  },
+
+  updateStep: async (step: Step) => {
+      const db = getLocalDb();
+      const idx = db.steps.findIndex((s: Step) => s.id === step.id);
+      if (idx >= 0) { db.steps[idx] = step; saveLocalDb(db); }
+  },
+  deleteStep: async (id: string) => {
+      const db = getLocalDb();
+      db.steps = db.steps.filter((s: Step) => s.id !== id);
+      saveLocalDb(db);
+  },
+
+  getExpenses: async (workId: string): Promise<Expense[]> => {
+      const db = getLocalDb();
+      return db.expenses.filter((e: Expense) => e.workId === workId).sort((a: Expense, b: Expense) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  },
+
+  getMaterials: async (workId: string): Promise<Material[]> => {
+      const db = getLocalDb();
+      return db.materials.filter((m: Material) => m.workId === workId);
+  },
+
+  addMaterial: async (material: Material, purchaseDetails?: { qty: number, cost: number, date: string }) => {
+      const db = getLocalDb();
+      if (purchaseDetails && purchaseDetails.qty > 0) {
+          material.purchasedQty = purchaseDetails.qty;
+      }
+      db.materials.push(material);
+      if (purchaseDetails && purchaseDetails.qty > 0) {
+          db.expenses.push({
+              id: Math.random().toString(36).substr(2, 9),
+              workId: material.workId,
+              description: `Compra: ${purchaseDetails.qty} ${material.unit} de ${material.name} (${material.brand || 'Novo'})`,
+              amount: purchaseDetails.cost,
+              date: purchaseDetails.date,
+              category: 'Material',
+              relatedMaterialId: material.id,
+              stepId: material.stepId
+          });
+      }
+      saveLocalDb(db);
+  },
+  
+  addExpense: async (expense: Expense) => {
+      const db = getLocalDb();
+      db.expenses.push(expense);
+      saveLocalDb(db);
+  },
+
+  registerMaterialPurchase: async (
+      materialId: string, 
+      updatedName: string, 
+      updatedBrand: string,
+      updatedPlannedQty: number,
+      updatedUnit: string,
+      purchaseQty: number, 
+      purchaseCost: number
+  ) => {
+      const db = getLocalDb();
+      const idx = db.materials.findIndex((m: Material) => m.id === materialId);
+      if (idx >= 0) {
+          const oldMaterial = db.materials[idx];
+          db.materials[idx] = {
+              ...oldMaterial,
+              name: updatedName,
+              brand: updatedBrand,
+              plannedQty: updatedPlannedQty,
+              unit: updatedUnit,
+              purchasedQty: oldMaterial.purchasedQty + purchaseQty
+          };
+          if (purchaseQty > 0) {
+              db.expenses.push({
+                  id: Math.random().toString(36).substr(2, 9),
+                  workId: oldMaterial.workId,
+                  description: `Compra: ${purchaseQty} ${updatedUnit} de ${updatedName} (${updatedBrand || 'Genérico'})`,
+                  amount: purchaseCost,
+                  date: new Date().toISOString(),
+                  category: 'Material',
+                  relatedMaterialId: materialId,
+                  stepId: oldMaterial.stepId
+              });
+          }
+          saveLocalDb(db);
+      }
+  },
+
+  updateMaterial: async (material: Material, _cost: number, _addedQty: number) => {
+      const db = getLocalDb();
+      const idx = db.materials.findIndex((m: Material) => m.id === material.id);
+      if (idx >= 0) {
+          db.materials[idx] = material;
+          saveLocalDb(db);
+      }
+  },
+
+  importMaterialPackage: async (workId: string, category: string): Promise<number> => {
+    const work = await dbService.getWorkById(workId);
+    if (!work) return 0;
+    const steps = await dbService.getSteps(workId);
+    const targetStep = steps.find(s => s.status !== StepStatus.COMPLETED) || steps[0];
+    const pkg = FULL_MATERIAL_PACKAGES.find(p => p.category === category);
+    if (!pkg) return 0;
+    let totalImported = 0;
+    const db = getLocalDb();
+    pkg.items.forEach(item => {
+        const calculatedQty = Math.ceil(work.area * (item.multiplier || 0));
+        if (calculatedQty > 0) {
+            db.materials.push({
                 id: Math.random().toString(36).substr(2, 9),
-                workId: work.id,
-                name: stepName,
-                startDate: stepStart,
-                endDate: stepEnd,
-                status: StepStatus.NOT_STARTED,
-                isDelayed: false
+                workId,
+                name: item.name,
+                plannedQty: calculatedQty,
+                purchasedQty: 0,
+                unit: item.unit,
+                category: category,
+                stepId: targetStep?.id
             });
-        } else if (stepModalMode === 'EDIT' && currentStepId) {
-            const existing = steps.find(s => s.id === currentStepId);
-            if (existing) {
-                await dbService.updateStep({
-                    ...existing,
-                    name: stepName,
-                    startDate: stepStart,
-                    endDate: stepEnd
-                });
-            }
+            totalImported++;
         }
-        setIsStepModalOpen(false);
-        setStepName('');
-        await load();
-    };
+    });
+    saveLocalDb(db);
+    return totalImported;
+  },
 
-    const handleStepStatusClick = async (step: Step) => {
-        let newStatus = StepStatus.NOT_STARTED;
-        if (step.status === StepStatus.NOT_STARTED) newStatus = StepStatus.IN_PROGRESS;
-        else if (step.status === StepStatus.IN_PROGRESS) newStatus = StepStatus.COMPLETED;
-        else newStatus = StepStatus.NOT_STARTED;
+  getWorkers: async (userId: string): Promise<Worker[]> => {
+      const db = getLocalDb();
+      return db.workers.filter((w: Worker) => w.userId === userId);
+  },
+  addWorker: async (worker: any) => {
+      const db = getLocalDb();
+      db.workers.push({ ...worker, id: Math.random().toString(36).substr(2, 9) });
+      saveLocalDb(db);
+  },
+  updateWorker: async (worker: Worker) => {
+      const db = getLocalDb();
+      const idx = db.workers.findIndex((w: Worker) => w.id === worker.id);
+      if (idx >= 0) { db.workers[idx] = worker; saveLocalDb(db); }
+  },
+  deleteWorker: async (id: string) => {
+      const db = getLocalDb();
+      db.workers = db.workers.filter((w: Worker) => w.id !== id);
+      saveLocalDb(db);
+  },
 
-        await dbService.updateStep({ ...step, status: newStatus });
-        await load();
-    };
+  getSuppliers: async (userId: string): Promise<Supplier[]> => {
+      const db = getLocalDb();
+      return db.suppliers.filter((s: Supplier) => s.userId === userId);
+  },
+  addSupplier: async (supplier: any) => {
+      const db = getLocalDb();
+      db.suppliers.push({ ...supplier, id: Math.random().toString(36).substr(2, 9) });
+      saveLocalDb(db);
+  },
+  updateSupplier: async (supplier: Supplier) => {
+      const db = getLocalDb();
+      const idx = db.suppliers.findIndex((s: Supplier) => s.id === supplier.id);
+      if (idx >= 0) { db.suppliers[idx] = supplier; saveLocalDb(db); }
+  },
+  deleteSupplier: async (id: string) => {
+      const db = getLocalDb();
+      db.suppliers = db.suppliers.filter((s: Supplier) => s.id !== id);
+      saveLocalDb(db);
+  },
 
-    const handleAddMaterial = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!work || !newMatName) return;
-        const mat: Material = {
-            id: Math.random().toString(36).substr(2, 9),
-            workId: work.id,
-            name: newMatName,
-            brand: newMatBrand,
-            plannedQty: Number(newMatQty),
-            purchasedQty: 0,
-            unit: newMatUnit,
-            stepId: newMatStepId || undefined
-        };
-        
-        await dbService.addMaterial(mat, newMatBuyNow ? {
-            qty: Number(newMatBuyQty),
-            cost: Number(newMatBuyCost),
-            date: new Date().toISOString()
-        } : undefined);
-        
-        setAddMatModal(false);
-        setNewMatName(''); setNewMatBrand(''); setNewMatQty(''); setNewMatBuyNow(false);
-        await load();
-    };
+  getJobRoles: async () => ['Pedreiro', 'Servente', 'Mestre de Obras'],
+  getSupplierCategories: async () => ['Material de Construção', 'Elétrica', 'Hidráulica'],
 
-    const handleUpdateMaterial = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!materialModal.material) return;
-        
-        await dbService.registerMaterialPurchase(
-            materialModal.material.id,
-            matName,
-            matBrand,
-            Number(matPlannedQty),
-            matUnit,
-            Number(matBuyQty),
-            Number(matBuyCost)
-        );
-        setMaterialModal({ isOpen: false, material: null });
-        await load();
-    };
+  updateUser: async (id: string, data: any, _password?: string) => {
+      const db = getLocalDb();
+      const idx = db.users.findIndex((u: User) => u.id === id);
+      if (idx >= 0) {
+          db.users[idx] = { ...db.users[idx], ...data };
+          saveLocalDb(db);
+          localStorage.setItem('maos_user', JSON.stringify(db.users[idx]));
+      }
+  },
+  getUserProfile: async (_id: string) => dbService.getCurrentUser(),
 
-    const handleAddExpense = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!work || !expDesc) return;
-        
-        // Ensure linking to step if selected
-        const finalStepId = expStepId || undefined;
+  generatePix: async (_amount: number, _payer: any) => {
+      return { qr_code_base64: '', copy_paste_code: '000201010212...' };
+  },
 
-        await dbService.addExpense({
-            id: Math.random().toString(36).substr(2, 9),
-            workId: work.id,
-            description: expDesc,
-            amount: Number(expAmount),
-            date: new Date().toISOString(),
-            category: expCategory,
-            stepId: finalStepId,
-            totalAgreed: expTotalAgreed ? Number(expTotalAgreed) : undefined
-        });
-        setAddExpenseModal(false);
-        setExpDesc(''); setExpAmount(''); setExpTotalAgreed('');
-        await load();
-    };
-
-    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'PHOTO' | 'FILE') => {
-        if (e.target.files && e.target.files[0] && work) {
-            setUploading(true);
-            const file = e.target.files[0];
-            const reader = new FileReader();
-            reader.onloadend = async () => {
-                const base64 = reader.result as string;
-                await new Promise(r => setTimeout(r, 800));
-                
-                if (type === 'PHOTO') {
-                    await dbService.addPhoto({
-                        id: Math.random().toString(36).substr(2, 9),
-                        workId: work.id,
-                        url: base64,
-                        description: 'Foto da obra',
-                        date: new Date().toISOString(),
-                        type: 'PROGRESS'
-                    });
-                } else {
-                    await dbService.addFile({
-                        id: Math.random().toString(36).substr(2, 9),
-                        workId: work.id,
-                        name: file.name,
-                        category: FileCategory.GENERAL,
-                        url: base64,
-                        type: file.type,
-                        date: new Date().toISOString()
-                    });
-                }
-                setUploading(false);
-                await load();
-            };
-            reader.readAsDataURL(file);
-        }
-    };
-
-    const openPersonModal = (mode: 'WORKER' | 'SUPPLIER', item?: Worker | Supplier) => {
-        setPersonMode(mode);
-        if (item) {
-            setPersonId(item.id);
-            setPersonName(item.name);
-            setPersonPhone(item.phone);
-            setPersonNotes(item.notes || '');
-            if (mode === 'WORKER') setPersonRole((item as Worker).role);
-            else setPersonRole((item as Supplier).category);
-        } else {
-            setPersonId(null);
-            setPersonName('');
-            setPersonPhone('');
-            setPersonNotes('');
-            setPersonRole(mode === 'WORKER' ? STANDARD_JOB_ROLES[0] : STANDARD_SUPPLIER_CATEGORIES[0]);
-        }
-        setIsPersonModalOpen(true);
-    };
-
-    const handleSavePerson = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!work) return;
-
-        const payload = {
-            userId: work.userId,
-            name: personName,
-            phone: personPhone,
-            notes: personNotes
-        };
-
-        if (personMode === 'WORKER') {
-            if (personId) await dbService.updateWorker({ ...payload, id: personId, role: personRole });
-            else await dbService.addWorker({ ...payload, role: personRole });
-        } else {
-            if (personId) await dbService.updateSupplier({ ...payload, id: personId, category: personRole });
-            else await dbService.addSupplier({ ...payload, category: personRole });
-        }
-        
-        await load();
-        setIsPersonModalOpen(false);
-    };
-
-    const handleDeletePerson = (id: string, mode: 'WORKER' | 'SUPPLIER') => {
-        setZeModal({
-            isOpen: true,
-            title: mode === 'WORKER' ? 'Excluir Profissional' : 'Excluir Fornecedor',
-            message: 'Tem certeza? Essa ação não pode ser desfeita.',
-            onConfirm: async () => {
-                if (mode === 'WORKER') await dbService.deleteWorker(id);
-                else await dbService.deleteSupplier(id);
-                await load();
-                setZeModal(prev => ({ ...prev, isOpen: false }));
-            }
-        });
-    };
-
-    // CALCULATORS
-    useEffect(() => {
-        if (!calcArea) { setCalcResult([]); return; }
-        const area = Number(calcArea);
-        if (calcType === 'PISO') {
-            const piso = Math.ceil(area * 1.15); 
-            const argamassa = Math.ceil(area * 4); 
-            const rejunte = Math.ceil(area * 0.3); 
-            setCalcResult([`${piso} m² de Piso (com quebra)`, `${argamassa} kg de Argamassa AC-II/III`, `${rejunte} kg de Rejunte`]);
-        } else if (calcType === 'PAREDE') {
-            const tijolos = Math.ceil(area * 30); 
-            const cimento = Math.ceil(area * 5); 
-            setCalcResult([`${tijolos} Blocos/Tijolos`, `~${Math.ceil(cimento/50)} Sacos de Cimento`]);
-        } else if (calcType === 'PINTURA') {
-            const litros = Math.ceil(area / 10);
-            setCalcResult([`${litros * 2} Litros de Tinta (2 demãos)`, `${Math.ceil(area/30)} L de Selador`]);
-        }
-    }, [calcArea, calcType]);
-
-    // EXPORT
-    const handleExportExcel = () => {
-        const wb = XLSX.utils.book_new();
-        const wsCrono = XLSX.utils.json_to_sheet(steps.map(s => ({ Etapa: s.name, Inicio: parseDateNoTimezone(s.startDate), Fim: parseDateNoTimezone(s.endDate), Status: s.status })));
-        XLSX.utils.book_append_sheet(wb, wsCrono, "Cronograma");
-        const wsMat = XLSX.utils.json_to_sheet(materials.map(m => ({ Material: m.name, Qtd: m.plannedQty, Comprado: m.purchasedQty })));
-        XLSX.utils.book_append_sheet(wb, wsMat, "Materiais");
-        XLSX.writeFile(wb, `Obra_${work?.name}.xlsx`);
-    };
-
-    const handleAiAsk = async () => {
-        if (!aiMessage.trim()) return;
-        setAiLoading(true);
-        const response = await aiService.sendMessage(aiMessage);
-        setAiResponse(response);
-        setAiLoading(false);
-        setAiMessage('');
-    };
-
-    if (loading) return <div className="h-screen flex items-center justify-center"><i className="fa-solid fa-circle-notch fa-spin text-3xl text-primary"></i></div>;
-    if (!work) return null;
-
-    // --- RENDER CONTENT ---
-
-    const renderMainTab = () => {
-        if (activeTab === 'SCHEDULE') {
-            return (
-                <div className="space-y-4 animate-in fade-in">
-                    <div className="flex justify-between items-end mb-2 px-2">
-                        <div>
-                            <h2 className="text-2xl font-black text-primary dark:text-white">Cronograma</h2>
-                            <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Etapas da Obra</p>
-                        </div>
-                        <button onClick={() => { setStepModalMode('ADD'); setStepName(''); setStepStart(new Date().toISOString().split('T')[0]); setStepEnd(new Date().toISOString().split('T')[0]); setIsStepModalOpen(true); }} className="bg-primary text-white w-10 h-10 rounded-xl shadow-lg flex items-center justify-center hover:scale-105 transition-transform"><i className="fa-solid fa-plus"></i></button>
-                    </div>
-                    {steps.map((step, idx) => {
-                         const stepNum = String(idx + 1).padStart(2, '0');
-                         const isDone = step.status === StepStatus.COMPLETED;
-                         const isInProgress = step.status === StepStatus.IN_PROGRESS;
-                         
-                         // Determine Delay (Late) status
-                         const today = new Date().toISOString().split('T')[0];
-                         const isDelayed = step.endDate < today && !isDone;
-
-                         let statusBadgeClass = 'bg-slate-100 text-slate-500';
-                         let statusText = 'Pendente';
-                         let cardBorderClass = 'border-slate-100 dark:border-slate-800';
-                         let iconColor = 'border-slate-200 text-slate-300';
-                         let iconClass = 'fa-play';
-
-                         if (isDone) {
-                             statusBadgeClass = 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400';
-                             statusText = 'Concluído';
-                             cardBorderClass = 'border-green-200 dark:border-green-900/30';
-                             iconColor = 'bg-green-500 border-green-500 text-white';
-                             iconClass = 'fa-check';
-                         } else if (isDelayed) {
-                             // Red style for delayed items
-                             statusBadgeClass = 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400';
-                             statusText = 'Atrasado';
-                             cardBorderClass = 'border-red-200 dark:border-red-900/30';
-                             iconColor = 'bg-red-500 border-red-500 text-white animate-pulse';
-                             iconClass = 'fa-triangle-exclamation';
-                         } else if (isInProgress) {
-                             statusBadgeClass = 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400';
-                             statusText = 'Em Andamento';
-                             iconColor = 'bg-secondary border-secondary text-white';
-                             iconClass = 'fa-hammer';
-                         }
-
-                         return (
-                            <div key={step.id} className={`group bg-white dark:bg-slate-900 p-5 rounded-2xl border shadow-sm transition-all hover:shadow-md relative overflow-hidden ${cardBorderClass}`}>
-                                <div className="flex items-center gap-4">
-                                    <button onClick={() => handleStepStatusClick(step)} className={`w-10 h-10 rounded-xl border-2 flex items-center justify-center shrink-0 transition-all ${iconColor}`}>
-                                        <i className={`fa-solid ${iconClass}`}></i>
-                                    </button>
-                                    <div className="flex-1 cursor-pointer" onClick={() => { setStepModalMode('EDIT'); setCurrentStepId(step.id); setStepName(step.name); setStepStart(step.startDate.split('T')[0]); setStepEnd(step.endDate.split('T')[0]); setIsStepModalOpen(true); }}>
-                                        <div className="flex justify-between items-start mb-2">
-                                            <div>
-                                                <div className="flex items-center gap-2 mb-1">
-                                                    <span className="text-[10px] font-bold text-slate-400">ETAPA {stepNum}</span>
-                                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${statusBadgeClass}`}>{statusText}</span>
-                                                </div>
-                                                <h3 className={`font-bold text-lg leading-tight ${isDone ? 'text-slate-400 line-through' : 'text-primary dark:text-white'}`}>{step.name}</h3>
-                                            </div>
-                                            <div className="text-slate-300 hover:text-secondary p-1"><i className="fa-solid fa-pen-to-square"></i></div>
-                                        </div>
-                                        <div className="flex gap-4">
-                                            <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium bg-slate-50 dark:bg-slate-800 px-2 py-1 rounded-md">
-                                                <i className="fa-regular fa-calendar"></i> {parseDateNoTimezone(step.startDate)}
-                                            </div>
-                                            <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium bg-slate-50 dark:bg-slate-800 px-2 py-1 rounded-md">
-                                                <i className="fa-solid fa-flag-checkered"></i> {parseDateNoTimezone(step.endDate)}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                         );
-                    })}
-                </div>
-            );
-        }
-
-        if (activeTab === 'MATERIALS') {
-             return (
-                <div className="space-y-6 animate-in fade-in">
-                    <div className="flex justify-between items-end mb-2 px-2 sticky top-0 z-10 bg-slate-50 dark:bg-slate-950 py-2">
-                        <div>
-                            <h2 className="text-2xl font-black text-primary dark:text-white">Materiais</h2>
-                            <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Controle de Compras</p>
-                        </div>
-                        <button onClick={() => setAddMatModal(true)} className="bg-primary text-white w-12 h-12 rounded-xl flex items-center justify-center hover:bg-primary-light transition-all shadow-lg shadow-primary/30"><i className="fa-solid fa-plus text-lg"></i></button>
-                    </div>
-                    {steps.map((step, idx) => {
-                        const stepMaterials = materials ? materials.filter(m => m.stepId === step.id) : [];
-                        if (stepMaterials.length === 0) return null;
-                        
-                        return (
-                            <div key={step.id} className="mb-8">
-                                <div className="flex items-center gap-3 mb-4 pl-2 border-b border-slate-200 dark:border-slate-800 pb-2">
-                                    <div className="w-8 h-8 rounded-lg bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 flex items-center justify-center font-black text-sm">{String(idx+1).padStart(2,'0')}</div>
-                                    <h3 className="font-bold text-lg text-primary dark:text-white">{step.name}</h3>
-                                </div>
-                                <div className="space-y-3">
-                                    {stepMaterials.map(mat => {
-                                        const hasPlanned = mat.plannedQty > 0;
-                                        const purchased = mat.purchasedQty;
-                                        const progress = hasPlanned ? Math.min(100, (purchased / mat.plannedQty) * 100) : 0;
-                                        
-                                        // Logic for Partial/Complete/Pending
-                                        let statusText = 'Pendente';
-                                        let statusColor = 'bg-slate-100 text-slate-500';
-                                        let barColor = 'bg-slate-200';
-
-                                        if (purchased >= mat.plannedQty) {
-                                            statusText = 'Concluído';
-                                            statusColor = 'bg-green-100 text-green-700';
-                                            barColor = 'bg-green-500';
-                                        } else if (purchased > 0) {
-                                            statusText = 'Parcial';
-                                            statusColor = 'bg-orange-100 text-orange-600';
-                                            barColor = 'bg-secondary'; // Orange/Amber
-                                        }
-
-                                        return (
-                                            <div key={mat.id} onClick={() => { setMaterialModal({isOpen: true, material: mat}); setMatName(mat.name); setMatBrand(mat.brand||''); setMatPlannedQty(String(mat.plannedQty)); setMatUnit(mat.unit); setMatBuyQty(''); setMatBuyCost(''); }} className={`bg-white dark:bg-slate-900 p-4 rounded-2xl border shadow-sm cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md ${statusText === 'Concluído' ? 'border-green-200 dark:border-green-900/30' : 'border-slate-100 dark:border-slate-800'}`}>
-                                                <div className="flex justify-between items-start mb-2">
-                                                    <div><div className="font-bold text-primary dark:text-white text-base leading-tight">{mat.name}</div>{mat.brand && <div className="text-xs text-slate-400 font-bold uppercase mt-0.5">{mat.brand}</div>}</div>
-                                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${statusColor}`}>{statusText}</span>
-                                                </div>
-                                                <div className="mt-3 flex items-center gap-3">
-                                                    <div className="flex-1 h-2.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden"><div className={`h-full transition-all duration-500 ${barColor}`} style={{ width: `${progress}%` }}></div></div>
-                                                    <div className="text-xs font-mono font-bold text-slate-500 whitespace-nowrap bg-slate-50 dark:bg-slate-800 px-2 py-1 rounded">{mat.purchasedQty}/{mat.plannedQty} {mat.unit}</div>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
-             );
-        }
-
-        if (activeTab === 'FINANCIAL') {
-            return (
-                <div className="space-y-6 animate-in fade-in">
-                    <div className="flex justify-between items-end mb-2 px-2 sticky top-0 z-10 bg-slate-50 dark:bg-slate-950 py-2">
-                        <div>
-                            <h2 className="text-2xl font-black text-primary dark:text-white">Financeiro</h2>
-                            <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Fluxo de Caixa</p>
-                        </div>
-                        <button onClick={() => setAddExpenseModal(true)} className="bg-green-600 text-white w-12 h-12 rounded-xl flex items-center justify-center hover:bg-green-700 transition-all shadow-lg shadow-green-600/30"><i className="fa-solid fa-plus text-lg"></i></button>
-                    </div>
-                    
-                    <div className="bg-gradient-premium p-6 rounded-3xl text-white shadow-xl relative overflow-hidden mb-8">
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2"></div>
-                        <p className="text-sm opacity-80 font-medium mb-1">Total Gasto na Obra</p>
-                        <h3 className="text-4xl font-black mb-4 tracking-tight">R$ {expenses.reduce((sum, e) => sum + Number(e.amount), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h3>
-                        <div className="flex items-center gap-2 text-xs opacity-70 bg-white/10 w-fit px-3 py-1 rounded-full"><i className="fa-solid fa-wallet"></i> Orçamento: R$ {work.budgetPlanned.toLocaleString('pt-BR')}</div>
-                    </div>
-
-                    {/* Grouped Financial Expenses by Step */}
-                    {[...steps, { id: 'general', name: 'Despesas Gerais / Sem Etapa', startDate: '', endDate: '', status: StepStatus.NOT_STARTED, workId: '', isDelayed: false }].map((step, idx) => {
-                        const stepExpenses = expenses.filter(e => {
-                            if (step.id === 'general') return !e.stepId; // Expenses without stepId
-                            return e.stepId === step.id;
-                        });
-
-                        if (stepExpenses.length === 0) return null;
-
-                        const isGeneral = step.id === 'general';
-                        const stepLabel = isGeneral ? step.name : `${String(idx + 1).padStart(2, '0')} Etapa: ${step.name}`;
-
-                        return (
-                            <div key={step.id} className="mb-6">
-                                <div className="mb-3 pl-2 flex items-center gap-2">
-                                    {!isGeneral && <div className="w-2 h-2 rounded-full bg-secondary"></div>}
-                                    <h3 className={`font-bold uppercase tracking-wide ${isGeneral ? 'text-slate-400 text-xs' : 'text-primary dark:text-white text-sm'}`}>{stepLabel}</h3>
-                                </div>
-                                <div className="space-y-3">
-                                    {stepExpenses.map(exp => (
-                                        <div key={exp.id} className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm flex items-center justify-between">
-                                            <div className="flex items-center gap-4">
-                                                <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${exp.category === 'Material' ? 'bg-amber-100 text-amber-600' : 'bg-blue-100 text-blue-600'}`}>
-                                                    <i className={`fa-solid ${exp.category === 'Material' ? 'fa-box' : 'fa-helmet-safety'}`}></i>
-                                                </div>
-                                                <div>
-                                                    <p className="font-bold text-primary dark:text-white text-base leading-tight">{exp.description}</p>
-                                                    <p className="text-xs text-slate-500 mt-0.5">
-                                                        {exp.category} • {parseDateNoTimezone(exp.date.split('T')[0])}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                            <span className="font-bold text-primary dark:text-white text-lg whitespace-nowrap">R$ {Number(exp.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
-            );
-        }
-
-        if (activeTab === 'MORE') {
-            return (
-                <div className="space-y-8 animate-in fade-in">
-                    <div className="px-2">
-                        <h2 className="text-3xl font-black text-primary dark:text-white">Mais Opções</h2>
-                        <p className="text-sm text-slate-500 font-bold uppercase tracking-wider">Central de Controle</p>
-                    </div>
-
-                    <div className="space-y-8">
-                        <div>
-                            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 pl-2">Gestão Operacional</h3>
-                            <div className="grid grid-cols-2 gap-4">
-                                <button onClick={() => setSubView('TEAM')} className="group p-6 bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm hover:border-secondary transition-all flex flex-col items-center gap-3 relative overflow-hidden">
-                                    <div className="absolute inset-0 bg-secondary/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                                    <div className="w-14 h-14 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center text-2xl group-hover:scale-110 transition-transform shadow-sm"><i className="fa-solid fa-helmet-safety"></i></div>
-                                    <span className="font-bold text-base text-primary dark:text-white relative z-10">Equipe</span>
-                                </button>
-                                <button onClick={() => setSubView('SUPPLIERS')} className="group p-6 bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm hover:border-secondary transition-all flex flex-col items-center gap-3 relative overflow-hidden">
-                                    <div className="absolute inset-0 bg-secondary/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                                    <div className="w-14 h-14 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center text-2xl group-hover:scale-110 transition-transform shadow-sm"><i className="fa-solid fa-truck-fast"></i></div>
-                                    <span className="font-bold text-base text-primary dark:text-white relative z-10">Fornecedores</span>
-                                </button>
-                            </div>
-                        </div>
-
-                        <div>
-                            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4 pl-2">Documentação e Mídia</h3>
-                            <div className="grid grid-cols-3 gap-3">
-                                <button onClick={() => setSubView('REPORTS')} className="group p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm hover:border-secondary transition-all flex flex-col items-center gap-2">
-                                    <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center text-xl group-hover:bg-indigo-100 transition-colors"><i className="fa-solid fa-file-lines"></i></div>
-                                    <span className="font-bold text-xs text-primary dark:text-white">Relatórios</span>
-                                </button>
-                                <button onClick={() => setSubView('PHOTOS')} className="group p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm hover:border-secondary transition-all flex flex-col items-center gap-2">
-                                    <div className="w-12 h-12 bg-pink-50 text-pink-600 rounded-xl flex items-center justify-center text-xl group-hover:bg-pink-100 transition-colors"><i className="fa-solid fa-camera-retro"></i></div>
-                                    <span className="font-bold text-xs text-primary dark:text-white">Fotos</span>
-                                </button>
-                                <button onClick={() => setSubView('PROJECTS')} className="group p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm hover:border-secondary transition-all flex flex-col items-center gap-2">
-                                    <div className="w-12 h-12 bg-teal-50 text-teal-600 rounded-xl flex items-center justify-center text-xl group-hover:bg-teal-100 transition-colors"><i className="fa-solid fa-folder-open"></i></div>
-                                    <span className="font-bold text-xs text-primary dark:text-white">Projetos</span>
-                                </button>
-                            </div>
-                        </div>
-
-                        <div className="relative overflow-hidden rounded-[2rem] shadow-xl">
-                            <div className="absolute inset-0 bg-gradient-premium"></div>
-                            <div className="relative z-10 p-6">
-                                <div className="flex items-center gap-3 mb-6">
-                                    <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center text-white shadow-lg shadow-secondary/30"><i className="fa-solid fa-crown"></i></div>
-                                    <div><h3 className="text-lg font-black text-white uppercase tracking-tight">Área Premium</h3><p className="text-xs text-slate-400 font-medium">Ferramentas Exclusivas</p></div>
-                                </div>
-
-                                <div onClick={() => setSubView('BONUS_IA')} className="bg-white/10 hover:bg-white/15 p-4 rounded-2xl border border-white/10 mb-4 cursor-pointer flex items-center gap-4 transition-all backdrop-blur-sm group">
-                                    <div className="relative">
-                                        <img src={ZE_AVATAR} className={`w-14 h-14 rounded-full border-2 border-secondary bg-slate-800 object-cover ${!isPremium ? 'grayscale opacity-70' : ''}`} onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK}/>
-                                        <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 border-2 border-slate-800 rounded-full"></div>
-                                    </div>
-                                    <div><h4 className="font-bold text-white text-base group-hover:text-secondary transition-colors">Zé da Obra AI</h4><p className="text-xs text-slate-300">Tire dúvidas técnicas 24h</p></div>
-                                    <div className="ml-auto w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-white/50 group-hover:bg-secondary group-hover:text-white transition-all"><i className="fa-solid fa-chevron-right"></i></div>
-                                </div>
-
-                                <div className="grid grid-cols-3 gap-3">
-                                    {['CALCULATORS', 'CONTRACTS', 'CHECKLIST'].map(item => (
-                                        <button key={item} onClick={() => setSubView(item as SubView)} className={`p-3 bg-white/5 hover:bg-white/10 rounded-xl border border-white/5 flex flex-col items-center gap-2 text-center transition-colors group ${!isPremium ? 'opacity-70' : ''}`}>
-                                            <i className={`fa-solid ${item === 'CALCULATORS' ? 'fa-calculator' : item === 'CONTRACTS' ? 'fa-file-signature' : 'fa-clipboard-check'} text-slate-300 group-hover:text-secondary text-2xl mb-1 transition-colors`}></i>
-                                            <span className="text-[10px] font-bold text-white uppercase tracking-wide">{item === 'CALCULATORS' ? 'Calculadoras' : item === 'CONTRACTS' ? 'Contratos' : 'Checklist'}</span>
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            );
-        }
-        return null;
-    };
-
-    // --- RENDER SUBVIEW ---
-    const renderSubViewContent = () => {
-        switch(subView) {
-            case 'TEAM': return (
-                <div className="space-y-6">
-                    <div className="bg-blue-50 dark:bg-blue-900/20 p-6 rounded-3xl border border-blue-100 dark:border-blue-900 mb-2">
-                        <h3 className="text-xl font-bold text-primary dark:text-white mb-1">Minha Equipe</h3>
-                        <button onClick={() => openPersonModal('WORKER')} className="w-full mt-4 py-4 rounded-2xl bg-blue-600 text-white font-bold hover:bg-blue-700 transition-colors shadow-lg shadow-blue-600/20 flex items-center justify-center gap-2">
-                            <i className="fa-solid fa-plus"></i> Adicionar Profissional
-                        </button>
-                    </div>
-                    <div className="space-y-3">
-                        {workers.length === 0 && <p className="text-center text-slate-400 py-10">Nenhum profissional cadastrado.</p>}
-                        {workers.map(w => (
-                            <div key={w.id} className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm flex items-center justify-between">
-                                <div className="flex items-center gap-4 cursor-pointer flex-1" onClick={() => openPersonModal('WORKER', w)}>
-                                    {/* FIXED ICON: HELMET */}
-                                    <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 text-xl"><i className="fa-solid fa-helmet-safety"></i></div>
-                                    <div><h4 className="font-bold text-primary dark:text-white">{w.name}</h4><p className="text-xs text-slate-500 font-bold">{w.role}</p></div>
-                                </div>
-                                <div className="flex gap-2">
-                                    {w.phone && (
-                                        <a 
-                                            href={`https://wa.me/55${w.phone.replace(/\D/g, '')}`} 
-                                            target="_blank" 
-                                            rel="noopener noreferrer"
-                                            className="w-10 h-10 rounded-xl bg-green-100 text-green-600 hover:bg-green-200 transition-colors flex items-center justify-center"
-                                        >
-                                            <i className="fa-brands fa-whatsapp text-lg"></i>
-                                        </a>
-                                    )}
-                                    <button onClick={() => handleDeletePerson(w.id, 'WORKER')} className="w-10 h-10 rounded-xl text-red-500 hover:bg-red-50 transition-colors"><i className="fa-solid fa-trash"></i></button>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            );
-
-            case 'SUPPLIERS': return (
-                <div className="space-y-6">
-                    <div className="bg-amber-50 dark:bg-amber-900/20 p-6 rounded-3xl border border-amber-100 dark:border-amber-900 mb-2">
-                        <h3 className="text-xl font-bold text-primary dark:text-white mb-1">Fornecedores</h3>
-                        <button onClick={() => openPersonModal('SUPPLIER')} className="w-full mt-4 py-4 rounded-2xl bg-amber-600 text-white font-bold hover:bg-amber-700 transition-colors shadow-lg shadow-amber-600/20 flex items-center justify-center gap-2">
-                            <i className="fa-solid fa-plus"></i> Adicionar Fornecedor
-                        </button>
-                    </div>
-                    <div className="space-y-3">
-                        {suppliers.length === 0 && <p className="text-center text-slate-400 py-10">Nenhum fornecedor cadastrado.</p>}
-                        {suppliers.map(s => (
-                            <div key={s.id} className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm flex items-center justify-between">
-                                <div className="flex items-center gap-4 cursor-pointer flex-1" onClick={() => openPersonModal('SUPPLIER', s)}>
-                                    <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 text-xl"><i className="fa-solid fa-store"></i></div>
-                                    <div><h4 className="font-bold text-primary dark:text-white">{s.name}</h4><p className="text-xs text-slate-500 font-bold">{s.category}</p></div>
-                                </div>
-                                <div className="flex gap-2">
-                                    {s.phone && (
-                                        <a 
-                                            href={`https://wa.me/55${s.phone.replace(/\D/g, '')}`} 
-                                            target="_blank" 
-                                            rel="noopener noreferrer"
-                                            className="w-10 h-10 rounded-xl bg-green-100 text-green-600 hover:bg-green-200 transition-colors flex items-center justify-center"
-                                        >
-                                            <i className="fa-brands fa-whatsapp text-lg"></i>
-                                        </a>
-                                    )}
-                                    <button onClick={() => handleDeletePerson(s.id, 'SUPPLIER')} className="w-10 h-10 rounded-xl text-red-500 hover:bg-red-50 transition-colors"><i className="fa-solid fa-trash"></i></button>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            );
-
-            case 'REPORTS': return (
-                <div className="space-y-6">
-                    <div className="flex gap-2 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
-                        {['CRONO', 'MAT', 'FIN'].map((rt) => (
-                            <button key={rt} onClick={() => setReportTab(rt as any)} className={`flex-1 py-2 rounded-lg text-xs font-bold ${reportTab === rt ? 'bg-white shadow text-primary' : 'text-slate-500'}`}>
-                                {rt === 'CRONO' ? 'Cronograma' : rt === 'MAT' ? 'Materiais' : 'Financeiro'}
-                            </button>
-                        ))}
-                    </div>
-                    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
-                        <table className="w-full text-left text-sm">
-                            <thead className="bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
-                                <tr>
-                                    <th className="px-4 py-3 font-bold text-slate-500 uppercase text-xs">Item</th>
-                                    <th className="px-4 py-3 font-bold text-slate-500 uppercase text-xs text-right">Status/Valor</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                                {reportTab === 'CRONO' && steps.map((s) => (
-                                    <tr key={s.id}>
-                                        <td className="px-4 py-3 font-bold text-primary dark:text-white">{s.name}<br/><span className="text-[10px] font-normal text-slate-400">{parseDateNoTimezone(s.endDate)}</span></td>
-                                        <td className="px-4 py-3 text-right"><span className={`text-[10px] font-bold px-2 py-1 rounded ${s.status === 'CONCLUIDO' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}`}>{s.status === 'CONCLUIDO' ? 'OK' : 'PEND'}</span></td>
-                                    </tr>
-                                ))}
-                                {reportTab === 'MAT' && materials.map((m) => (
-                                    <tr key={m.id}>
-                                        <td className="px-4 py-3 text-primary dark:text-white">{m.name}</td>
-                                        <td className="px-4 py-3 text-right font-mono text-xs">{m.purchasedQty}/{m.plannedQty}</td>
-                                    </tr>
-                                ))}
-                                {reportTab === 'FIN' && expenses.map((e) => (
-                                    <tr key={e.id}>
-                                        <td className="px-4 py-3 text-primary dark:text-white">{e.description}<br/><span className="text-[10px] text-slate-400">{parseDateNoTimezone(e.date)}</span></td>
-                                        <td className="px-4 py-3 text-right font-bold text-primary dark:text-white">R$ {e.amount}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                    <button onClick={handleExportExcel} className="w-full py-3 bg-green-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-green-700 shadow-lg"><i className="fa-solid fa-file-excel"></i> Baixar Excel</button>
-                </div>
-            );
-
-            case 'PHOTOS': return (
-                <div className="space-y-6">
-                    <label className="block w-full py-8 border-2 border-dashed border-pink-300 bg-pink-50 rounded-2xl cursor-pointer hover:bg-pink-100 transition-all text-center">
-                        <i className="fa-solid fa-camera text-2xl text-pink-400 mb-2"></i>
-                        <span className="block text-sm font-bold text-pink-600">{uploading ? 'Enviando...' : 'Adicionar Foto'}</span>
-                        <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, 'PHOTO')} disabled={uploading} />
-                    </label>
-                    <div className="grid grid-cols-2 gap-4">
-                        {photos.map(p => (
-                            <div key={p.id} className="relative group rounded-xl overflow-hidden shadow-sm">
-                                <img src={p.url} className="w-full aspect-square object-cover" alt="Obra" />
-                                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                    <span className="text-white text-xs font-bold">{parseDateNoTimezone(p.date)}</span>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            );
-
-            case 'CALCULATORS': return (
-                <div className="space-y-6">
-                    <div className="grid grid-cols-3 gap-2">
-                        {['PISO', 'PAREDE', 'PINTURA'].map(t => (
-                            <button key={t} onClick={() => {setCalcType(t as any); setCalcResult([])}} className={`flex flex-col items-center justify-center py-4 rounded-xl border-2 font-bold text-xs transition-all gap-2 ${calcType === t ? 'border-secondary bg-secondary/10 text-secondary' : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-400'}`}>
-                                <i className={`fa-solid ${t === 'PISO' ? 'fa-layer-group' : t === 'PAREDE' ? 'fa-building' : 'fa-paint-roller'} text-xl`}></i>
-                                {t}
-                            </button>
-                        ))}
-                    </div>
-                    <div className="bg-gradient-to-br from-slate-800 to-slate-900 text-white p-8 rounded-3xl shadow-xl relative overflow-hidden">
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-secondary/20 rounded-full blur-3xl"></div>
-                        <h3 className="text-lg font-bold mb-6 text-center uppercase tracking-widest text-secondary">Calculadora de {calcType}</h3>
-                        <div className="relative mb-8">
-                            <input type="number" value={calcArea} onChange={e => setCalcArea(e.target.value)} placeholder="0" className="w-full bg-white/10 border border-white/20 rounded-2xl p-4 text-center text-3xl font-black text-white outline-none focus:border-secondary transition-colors" />
-                            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-white/30 font-bold">m²</span>
-                        </div>
-                        <div className="space-y-3">
-                            {calcResult.length > 0 ? calcResult.map((res, i) => (
-                                <div key={i} className="bg-white/10 p-3 rounded-xl flex items-center gap-3 backdrop-blur-sm"><i className="fa-solid fa-check text-green-400"></i> <span className="font-bold text-sm">{res}</span></div>
-                            )) : <p className="text-center text-white/30 text-sm">Digite a área para calcular.</p>}
-                        </div>
-                    </div>
-                </div>
-            );
-
-            // Reusing existing components for other subviews to save space, but ensuring they are rendered
-            case 'BONUS_IA': return (
-                <div className="flex flex-col items-center justify-center min-h-[70vh] p-6 text-center animate-in fade-in">
-                    <div className="w-full max-w-sm bg-gradient-to-br from-slate-900 to-slate-950 rounded-[2.5rem] p-8 shadow-2xl relative overflow-hidden border border-slate-800 group">
-                        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20"></div>
-                        <div className="absolute -top-20 -right-20 w-40 h-40 bg-secondary/30 rounded-full blur-3xl animate-pulse"></div>
-                        <div className="relative z-10 flex flex-col items-center">
-                            <div className="w-28 h-28 rounded-full border-4 border-slate-800 p-1 bg-gradient-gold shadow-[0_0_30px_rgba(217,119,6,0.4)] mb-6 transform hover:scale-105 transition-transform duration-500">
-                                <img src={ZE_AVATAR} className="w-full h-full object-cover rounded-full bg-white" onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK}/>
-                            </div>
-                            <h2 className="text-3xl font-black text-white mb-2 tracking-tight">Zé da Obra <span className="text-secondary">AI</span></h2>
-                            <div className="h-1 w-12 bg-secondary rounded-full mb-6"></div>
-                            <p className="text-slate-400 text-sm mb-8 leading-relaxed font-medium">Seu engenheiro virtual particular.</p>
-                            {isPremium ? (
-                                <button onClick={() => setSubView('BONUS_IA_CHAT')} className="w-full py-4 bg-gradient-gold text-white font-black rounded-2xl shadow-lg hover:shadow-orange-500/20 hover:scale-105 transition-all flex items-center justify-center gap-3 group-hover:animate-pulse"><span>INICIAR CONVERSA</span><i className="fa-solid fa-comments"></i></button>
-                            ) : (
-                                <button onClick={() => navigate('/settings')} className="w-full py-4 bg-slate-800 text-slate-500 font-bold rounded-2xl border border-slate-700 flex items-center justify-center gap-2 hover:bg-slate-700 transition-colors"><i className="fa-solid fa-lock"></i> BLOQUEADO (PREMIUM)</button>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            );
-
-            case 'BONUS_IA_CHAT': 
-                if (!isPremium) return null;
-                return (
-                <div className="flex flex-col h-[80vh]">
-                    <div className="flex-1 bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-inner overflow-y-auto mb-4 border border-slate-200 dark:border-slate-800">
-                            <div className="flex gap-4 mb-6">
-                            <img src={ZE_AVATAR} className="w-10 h-10 rounded-full border border-slate-200" onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK}/>
-                            <div className="bg-slate-100 dark:bg-slate-800 p-3 rounded-tr-xl rounded-b-xl text-sm shadow-sm"><p className="font-bold text-secondary mb-1">Zé da Obra</p><p>Opa! Mestre de obras na área.</p></div>
-                        </div>
-                        {aiResponse && (
-                            <div className="flex gap-4 mb-6 animate-in fade-in">
-                                <img src={ZE_AVATAR} className="w-10 h-10 rounded-full border border-slate-200" onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK}/>
-                                <div className="bg-slate-100 dark:bg-slate-800 p-3 rounded-tr-xl rounded-b-xl text-sm shadow-sm"><p className="font-bold text-secondary mb-1">Zé da Obra</p><p className="whitespace-pre-wrap">{aiResponse}</p></div>
-                            </div>
-                        )}
-                    </div>
-                    <div className="flex gap-2">
-                        <input value={aiMessage} onChange={e => setAiMessage(e.target.value)} placeholder="Pergunte ao Zé..." className="flex-1 p-4 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-secondary transition-colors"/>
-                        <button onClick={handleAiAsk} disabled={aiLoading} className="w-14 bg-secondary text-white rounded-xl flex items-center justify-center shadow-lg hover:bg-orange-600 transition-colors">{aiLoading ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-paper-plane"></i>}</button>
-                    </div>
-                </div>
-            );
-
-            case 'CONTRACTS': return (
-                <div className="space-y-4">
-                    {CONTRACT_TEMPLATES.map(ct => (
-                        <div key={ct.id} onClick={() => setViewContract({ title: ct.title, content: ct.contentTemplate })} className="group bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-secondary/50 cursor-pointer shadow-sm transition-all hover:translate-x-1">
-                            <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center text-xl group-hover:bg-indigo-600 group-hover:text-white transition-colors"><i className="fa-solid fa-file-contract"></i></div>
-                                <div><h4 className="font-bold text-primary dark:text-white">{ct.title}</h4><p className="text-xs text-slate-500">Toque para abrir modelo</p></div>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            );
-
-            case 'CHECKLIST': return (
-                <div className="space-y-4">
-                    {STANDARD_CHECKLISTS.map((cl, idx) => (
-                        <div key={idx} className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
-                            <button onClick={() => setActiveChecklist(activeChecklist === cl.category ? null : cl.category)} className="w-full p-5 flex justify-between items-center text-left hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
-                                <span className="font-bold text-sm flex items-center gap-3 text-primary dark:text-white"><div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${activeChecklist === cl.category ? 'bg-green-500 text-white' : 'bg-green-100 text-green-600'}`}><i className="fa-solid fa-list-check"></i></div>{cl.category}</span>
-                                <i className={`fa-solid fa-chevron-down transition-transform text-slate-400 ${activeChecklist === cl.category ? 'rotate-180' : ''}`}></i>
-                            </button>
-                            {activeChecklist === cl.category && (
-                                <div className="p-5 pt-0 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/30 animate-in slide-in-from-top-2">
-                                    {cl.items.map((item, i) => (
-                                        <label key={i} className="flex items-start gap-3 py-3 cursor-pointer border-b border-dashed border-slate-200 dark:border-slate-700 last:border-0 hover:bg-white/50 rounded-lg px-2 transition-colors">
-                                            <input type="checkbox" className="mt-1 rounded border-slate-300 text-secondary focus:ring-secondary w-5 h-5" />
-                                            <span className="text-sm text-slate-600 dark:text-slate-300 leading-tight">{item}</span>
-                                        </label>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    ))}
-                </div>
-            );
-
-            // PROJECTS reuse
-            case 'PROJECTS': return (
-                <div className="space-y-6">
-                    <label className="block w-full py-8 border-2 border-dashed border-teal-300 bg-teal-50 rounded-2xl cursor-pointer hover:bg-teal-100 transition-all text-center">
-                        <i className="fa-solid fa-file-pdf text-2xl text-teal-400 mb-2"></i>
-                        <span className="block text-sm font-bold text-teal-600">{uploading ? 'Enviando...' : 'Adicionar PDF/Projeto'}</span>
-                        <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'FILE')} disabled={uploading} />
-                    </label>
-                    <div className="space-y-2">{files.map(f => <div key={f.id} className="p-4 bg-white rounded-xl border flex items-center gap-3"><i className="fa-solid fa-file text-slate-400"></i> <span className="text-sm font-bold truncate flex-1">{f.name}</span><a href={f.url} download={f.name}><i className="fa-solid fa-download text-primary"></i></a></div>)}</div>
-                </div>
-            );
-
-            default: return null;
-        }
-    };
-
-    return (
-        <div className="max-w-4xl mx-auto min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col font-sans relative">
-            <div className="bg-white dark:bg-slate-900 px-6 pt-6 pb-2 sticky top-0 z-20 shadow-sm border-b border-slate-100 dark:border-slate-800">
-                <div className="flex justify-between items-center mb-1">
-                    <button onClick={() => subView !== 'NONE' ? setSubView('NONE') : navigate('/')} className="text-slate-400 hover:text-primary dark:hover:text-white"><i className="fa-solid fa-arrow-left text-xl"></i></button>
-                    <h1 className="text-lg font-black text-primary dark:text-white uppercase tracking-tight truncate max-w-[200px]">
-                        {subView !== 'NONE' 
-                            ? (subView === 'TEAM' ? 'Minha Equipe' : subView === 'SUPPLIERS' ? 'Fornecedores' : subView === 'REPORTS' ? 'Relatórios' : 'Detalhes')
-                            : work.name
-                        }
-                    </h1>
-                    <div className="w-6"></div> 
-                </div>
-            </div>
-
-            <div className="flex-1 p-4 pb-32 overflow-y-auto">
-                {subView !== 'NONE' ? renderSubViewContent() : renderMainTab()}
-            </div>
-
-            {/* MAIN NAVIGATION BOTTOM BAR (Only visible on main tabs) */}
-            {subView === 'NONE' && (
-                <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 pb-safe z-40 shadow-[0_-5px_20px_rgba(0,0,0,0.05)]">
-                    <div className="flex justify-around items-center max-w-4xl mx-auto h-16">
-                        <button onClick={() => setActiveTab('SCHEDULE')} className={`flex flex-col items-center justify-center w-full h-full gap-1 transition-all ${activeTab === 'SCHEDULE' ? 'text-secondary' : 'text-slate-400'}`}><i className={`fa-solid fa-calendar-days text-xl ${activeTab === 'SCHEDULE' ? 'scale-110' : ''}`}></i><span className="text-[10px] font-bold uppercase">Cronograma</span></button>
-                        <button onClick={() => setActiveTab('MATERIALS')} className={`flex flex-col items-center justify-center w-full h-full gap-1 transition-all ${activeTab === 'MATERIALS' ? 'text-secondary' : 'text-slate-400'}`}><i className={`fa-solid fa-layer-group text-xl ${activeTab === 'MATERIALS' ? 'scale-110' : ''}`}></i><span className="text-[10px] font-bold uppercase">Materiais</span></button>
-                        <button onClick={() => setActiveTab('FINANCIAL')} className={`flex flex-col items-center justify-center w-full h-full gap-1 transition-all ${activeTab === 'FINANCIAL' ? 'text-secondary' : 'text-slate-400'}`}><i className={`fa-solid fa-chart-pie text-xl ${activeTab === 'FINANCIAL' ? 'scale-110' : ''}`}></i><span className="text-[10px] font-bold uppercase">Financeiro</span></button>
-                        <button onClick={() => setActiveTab('MORE')} className={`flex flex-col items-center justify-center w-full h-full gap-1 transition-all ${activeTab === 'MORE' ? 'text-secondary' : 'text-slate-400'}`}><i className={`fa-solid fa-bars text-xl ${activeTab === 'MORE' ? 'scale-110' : ''}`}></i><span className="text-[10px] font-bold uppercase">Mais</span></button>
-                    </div>
-                </div>
-            )}
-
-            {/* --- ALL MODALS (RENDERED AT ROOT LEVEL) --- */}
-            
-            {/* ADD/EDIT STEP MODAL */}
-            {isStepModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
-                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-6 shadow-2xl">
-                        <h3 className="text-xl font-bold mb-4 text-primary dark:text-white">{stepModalMode === 'ADD' ? 'Nova Etapa' : 'Editar Etapa'}</h3>
-                        <form onSubmit={handleSaveStep} className="space-y-4">
-                            <input placeholder="Nome da Etapa" value={stepName} onChange={e => setStepName(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required />
-                            <div className="grid grid-cols-2 gap-2">
-                                <div><label className="text-[10px] uppercase font-bold text-slate-400 ml-1">Início</label><input type="date" value={stepStart} onChange={e => setStepStart(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required /></div>
-                                <div><label className="text-[10px] uppercase font-bold text-slate-400 ml-1">Fim</label><input type="date" value={stepEnd} onChange={e => setStepEnd(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required /></div>
-                            </div>
-                            <div className="flex gap-2 pt-2">
-                                <button type="button" onClick={() => setIsStepModalOpen(false)} className="flex-1 bg-slate-100 dark:bg-slate-800 text-slate-500 py-3 rounded-xl font-bold">Cancelar</button>
-                                <button type="submit" className="flex-1 bg-primary text-white py-3 rounded-xl font-bold">Salvar</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
-
-            {/* ADD MATERIAL MODAL */}
-            {addMatModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
-                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-6 shadow-2xl overflow-y-auto max-h-[90vh]">
-                        <h3 className="text-xl font-bold mb-4 text-primary dark:text-white">Novo Material</h3>
-                        <form onSubmit={handleAddMaterial} className="space-y-4">
-                            <input placeholder="Nome do Material" value={newMatName} onChange={e => setNewMatName(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required />
-                            <div className="grid grid-cols-2 gap-2">
-                                <input type="number" placeholder="Qtd" value={newMatQty} onChange={e => setNewMatQty(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required />
-                                <input placeholder="Unidade (un, m2)" value={newMatUnit} onChange={e => setNewMatUnit(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required />
-                            </div>
-                            <select value={newMatStepId} onChange={e => setNewMatStepId(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
-                                <option value="">Sem etapa definida</option>
-                                {steps.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                            </select>
-                            
-                            <div className="border-t pt-4 mt-2">
-                                <label className="flex items-center gap-2 mb-2 font-bold text-sm"><input type="checkbox" checked={newMatBuyNow} onChange={e => setNewMatBuyNow(e.target.checked)} className="w-4 h-4" /> Já comprei este material</label>
-                                {newMatBuyNow && (
-                                    <div className="grid grid-cols-2 gap-2 animate-in slide-in-from-top-2">
-                                        <input type="number" placeholder="Qtd Comprada" value={newMatBuyQty} onChange={e => setNewMatBuyQty(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" />
-                                        <input type="number" placeholder="Valor Total (R$)" value={newMatBuyCost} onChange={e => setNewMatBuyCost(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" />
-                                    </div>
-                                )}
-                            </div>
-
-                            <div className="flex gap-2">
-                                <button type="button" onClick={() => setAddMatModal(false)} className="flex-1 bg-slate-100 py-3 rounded-xl font-bold">Cancelar</button>
-                                <button type="submit" className="flex-1 bg-primary text-white py-3 rounded-xl font-bold">Salvar</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
-
-            {/* EDIT MATERIAL MODAL */}
-            {materialModal.isOpen && materialModal.material && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
-                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-6 shadow-2xl">
-                        <h3 className="text-xl font-bold mb-1 text-primary dark:text-white">{materialModal.material.name}</h3>
-                        <p className="text-xs text-slate-500 mb-4 uppercase font-bold">Atualizar Estoque</p>
-                        <form onSubmit={handleUpdateMaterial} className="space-y-4">
-                            <div className="bg-slate-50 dark:bg-slate-800 p-3 rounded-xl border border-slate-200 dark:border-slate-700 flex justify-between items-center"><span className="text-sm font-bold">Planejado:</span><span className="font-mono font-bold">{materialModal.material.plannedQty} {materialModal.material.unit}</span></div>
-                            <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded-xl border border-green-200 dark:border-green-900 flex justify-between items-center"><span className="text-sm font-bold text-green-700 dark:text-green-400">Já Comprado:</span><span className="font-mono font-bold text-green-700 dark:text-green-400">{materialModal.material.purchasedQty} {materialModal.material.unit}</span></div>
-                            <div className="pt-2"><label className="block text-xs font-bold text-slate-400 uppercase mb-1">Nova Compra</label><div className="grid grid-cols-2 gap-2"><input type="number" placeholder="Qtd" value={matBuyQty} onChange={e => setMatBuyQty(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" /><input type="number" placeholder="Valor (R$)" value={matBuyCost} onChange={e => setMatBuyCost(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" /></div></div>
-                            <div className="flex gap-2"><button type="button" onClick={() => setMaterialModal({isOpen: false, material: null})} className="flex-1 bg-slate-100 py-3 rounded-xl font-bold">Cancelar</button><button type="submit" className="flex-1 bg-primary text-white py-3 rounded-xl font-bold">Registrar</button></div>
-                        </form>
-                    </div>
-                </div>
-            )}
-
-            {/* ADD EXPENSE MODAL */}
-            {addExpenseModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
-                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-6 shadow-2xl">
-                        <h3 className="text-xl font-bold mb-4 text-primary dark:text-white">Novo Gasto</h3>
-                        <form onSubmit={handleAddExpense} className="space-y-4">
-                            <input placeholder="Descrição (ex: Pagamento Pedreiro)" value={expDesc} onChange={e => setExpDesc(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required />
-                            <div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">R$</span><input type="number" placeholder="Valor Pago" value={expAmount} onChange={e => setExpAmount(e.target.value)} className="w-full pl-10 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required /></div>
-                            <div className="grid grid-cols-2 gap-2"><select value={expCategory} onChange={e => setExpCategory(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700"><option value={ExpenseCategory.LABOR}>Mão de Obra</option><option value={ExpenseCategory.MATERIAL}>Material</option><option value={ExpenseCategory.PERMITS}>Taxas</option><option value={ExpenseCategory.OTHER}>Outros</option></select>
-                            
-                            {/* STEP SELECTION - ENSURING VISIBILITY */}
-                            <select value={expStepId} onChange={e => setExpStepId(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold text-sm">
-                                <option value="">Sem Etapa (Geral)</option>
-                                {steps.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                            </select></div>
-                            <div className="flex gap-2"><button type="button" onClick={() => setAddExpenseModal(false)} className="flex-1 bg-slate-100 py-3 rounded-xl font-bold">Cancelar</button><button type="submit" className="flex-1 bg-primary text-white py-3 rounded-xl font-bold">Salvar</button></div>
-                        </form>
-                    </div>
-                </div>
-            )}
-            
-            {/* TEAM & SUPPLIER FORM MODAL */}
-            {isPersonModalOpen && (
-                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
-                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-6 shadow-2xl overflow-y-auto max-h-[90vh]">
-                        <div className="flex items-center gap-3 mb-4">
-                             <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl ${personMode === 'WORKER' ? 'bg-blue-100 text-blue-600' : 'bg-amber-100 text-amber-600'}`}><i className={`fa-solid ${personMode === 'WORKER' ? 'fa-helmet-safety' : 'fa-truck'}`}></i></div>
-                             <div><h3 className="text-lg font-bold text-primary dark:text-white leading-tight">{personId ? 'Editar' : 'Adicionar'} {personMode === 'WORKER' ? 'Profissional' : 'Fornecedor'}</h3></div>
-                        </div>
-                        <form onSubmit={handleSavePerson} className="space-y-4">
-                            <div><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Nome</label><input required className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold" value={personName} onChange={e => setPersonName(e.target.value)} /></div>
-                            <div><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{personMode === 'WORKER' ? 'Função' : 'Categoria'}</label><select required className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold text-sm" value={personRole} onChange={e => setPersonRole(e.target.value)}>{(personMode === 'WORKER' ? STANDARD_JOB_ROLES : STANDARD_SUPPLIER_CATEGORIES).map(r => <option key={r} value={r}>{r}</option>)}</select></div>
-                            <div><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Telefone / WhatsApp</label><input className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold" placeholder="51 99999-9999" value={personPhone} onChange={e => setPersonPhone(e.target.value)} /></div>
-                            <div><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Observações</label><textarea className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold h-20 resize-none" placeholder="Detalhes opcionais..." value={personNotes} onChange={e => setPersonNotes(e.target.value)}></textarea></div>
-                            <div className="flex gap-2 pt-2"><button type="button" onClick={() => setIsPersonModalOpen(false)} className="flex-1 py-3 font-bold text-slate-500 hover:bg-slate-100 rounded-xl">Cancelar</button><button type="submit" className="flex-1 py-3 font-bold bg-primary text-white rounded-xl shadow-lg">Salvar</button></div>
-                        </form>
-                    </div>
-                </div>
-            )}
-
-            {/* CONTRACT VIEWER MODAL */}
-            {viewContract && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
-                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-lg p-6 shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
-                        <div className="flex justify-between items-center mb-4 pb-4 border-b border-slate-100 dark:border-slate-800">
-                            <h3 className="text-xl font-bold text-primary dark:text-white">{viewContract.title}</h3>
-                            <button onClick={() => setViewContract(null)} className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500"><i className="fa-solid fa-xmark"></i></button>
-                        </div>
-                        <div className="flex-1 overflow-y-auto p-4 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 mb-4">
-                            <pre className="whitespace-pre-wrap font-mono text-xs text-slate-600 dark:text-slate-300 leading-relaxed">{viewContract.content}</pre>
-                        </div>
-                        <div className="flex gap-3">
-                            <button onClick={() => {navigator.clipboard.writeText(viewContract.content); alert("Copiado!"); setViewContract(null);}} className="flex-1 py-3 bg-slate-100 dark:bg-slate-800 text-primary dark:text-white font-bold rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"><i className="fa-regular fa-copy mr-2"></i> Copiar</button>
-                            <button onClick={() => {const blob = new Blob([viewContract.content], {type: "application/msword"}); const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = `${viewContract.title}.doc`; link.click();}} className="flex-1 py-3 bg-primary text-white font-bold rounded-xl hover:bg-primary-light transition-colors"><i className="fa-solid fa-download mr-2"></i> Baixar Word</button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            <ZeModal isOpen={zeModal.isOpen} title={zeModal.title} message={zeModal.message} onConfirm={zeModal.onConfirm} onCancel={() => setZeModal(prev => ({ ...prev, isOpen: false }))} />
-        </div>
-    );
+  // --- FOTOS E ARQUIVOS (LOCAL STORAGE MVP) ---
+  getPhotos: async (workId: string): Promise<WorkPhoto[]> => {
+      const db = getLocalDb();
+      return db.photos ? db.photos.filter((p: WorkPhoto) => p.workId === workId) : [];
+  },
+  addPhoto: async (photo: WorkPhoto) => {
+      const db = getLocalDb();
+      db.photos.push(photo);
+      saveLocalDb(db);
+  },
+  deletePhoto: async (id: string) => {
+      const db = getLocalDb();
+      db.photos = db.photos.filter((p: WorkPhoto) => p.id !== id);
+      saveLocalDb(db);
+  },
+  getFiles: async (workId: string): Promise<WorkFile[]> => {
+      const db = getLocalDb();
+      return db.files ? db.files.filter((f: WorkFile) => f.workId === workId) : [];
+  },
+  addFile: async (file: WorkFile) => {
+      const db = getLocalDb();
+      db.files.push(file);
+      saveLocalDb(db);
+  },
+  deleteFile: async (id: string) => {
+      const db = getLocalDb();
+      db.files = db.files.filter((f: WorkFile) => f.id !== id);
+      saveLocalDb(db);
+  }
 };
-
-export default WorkDetail;
