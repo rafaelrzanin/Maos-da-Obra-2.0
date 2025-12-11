@@ -101,12 +101,6 @@ const Login: React.FC = () => {
     }
   };
 
-  const handleDemoLogin = async () => {
-      setLoading(true);
-      await login('teste@maosdaobra.app', '123456');
-      // No need to navigate manually, useEffect handles it
-  };
-
   const handleSocialLogin = async (provider: 'google') => {
     setLoading(true);
     const { user: socialUser, error } = await dbService.loginSocial(provider);
@@ -205,12 +199,6 @@ const Login: React.FC = () => {
                   </button>
                   
                   <div className="mt-4 flex flex-col gap-3">
-                      {/* --- TEST LOGIN SHORTCUT --- */}
-                      <button type="button" disabled={loading} onClick={handleDemoLogin} 
-                          className="w-full h-12 rounded-xl bg-purple-600/80 border border-purple-500 text-white flex items-center justify-center gap-2 hover:bg-purple-600 transition-colors animate-pulse">
-                          <i className="fa-solid fa-rocket"></i>
-                          <span className="text-sm font-bold">Acesso Demo (Vitalício)</span>
-                      </button>
                       
                       <button type="button" disabled={loading} onClick={() => handleSocialLogin('google')} 
                           className="w-full h-12 rounded-xl bg-white/5 border border-white/10 text-white flex items-center justify-center gap-2 hover:bg-white/10 transition-colors">
