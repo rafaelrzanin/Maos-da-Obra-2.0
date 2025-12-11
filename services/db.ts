@@ -7,7 +7,27 @@ const STORAGE_KEY = 'maos_db_v1';
 
 const getLocalDb = () => {
     const s = localStorage.getItem(STORAGE_KEY);
-    return s ? JSON.parse(s) : { users: [], works: [], steps: [], materials: [], expenses: [], workers: [], suppliers: [], notifications: [], photos: [], files: [] };
+    const db = s ? JSON.parse(s) : { users: [], works: [], steps: [], materials: [], expenses: [], workers: [], suppliers: [], notifications: [], photos: [], files: [] };
+
+    // --- AUTO-SEED TEST USER (VITALICIO) ---
+    // Cria automaticamente um usuário de teste se não existir
+    const testEmail = 'teste@maosdaobra.app';
+    if (!db.users.find((u: User) => u.email === testEmail)) {
+        const testUser: User = {
+            id: 'user_test_vitalicio',
+            name: 'Usuário Teste (Vitalício)',
+            email: testEmail,
+            whatsapp: '11999999999',
+            cpf: '000.000.000-00',
+            plan: PlanType.VITALICIO,
+            subscriptionExpiresAt: '2099-12-31T23:59:59.000Z'
+        };
+        db.users.push(testUser);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(db));
+    }
+    // ---------------------------------------
+
+    return db;
 };
 
 const saveLocalDb = (data: any) => localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
