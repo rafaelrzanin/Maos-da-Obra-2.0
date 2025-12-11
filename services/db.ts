@@ -1,591 +1,230 @@
+// NO TOPO de /api/create-card.ts
+// 1. IMPORTAÇÃO E INICIALIZAÇÃO DO SUPABASE
+import { createClient } from '@supabase/supabase-js'; 
 
-import { 
-  User, Work, Step, Material, Expense, Worker, Supplier, 
-  WorkPhoto, WorkFile, Notification, PlanType, StepStatus
-} from '../types';
-import { WORK_TEMPLATES, FULL_MATERIAL_PACKAGES } from './standards';
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY; // Chave de serviço Admin
+const supabase = SUPABASE_URL && SUPABASE_SERVICE_KEY 
+    ? createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+    : null;
 
-const DB_KEY = 'maos_da_obra_db';
 
-const getLocalDb = () => {
-  const emptyDb = {
-    users: [],
-    works: [],
-    steps: [],
-    materials: [],
-    expenses: [],
-    workers: [],
-    suppliers: [],
-    photos: [],
-    files: [],
-    notifications: []
-  };
-  try {
-    const data = localStorage.getItem(DB_KEY);
-    if (!data) return emptyDb;
-    
-    const parsed = JSON.parse(data);
-    return { ...emptyDb, ...parsed };
-  } catch {
-    return emptyDb;
-  }
-};
+export default async function handler(req, res) {
+  // 1. Configuração de Segurança (CORS) - MANTIDA
+  res.setHeader('Access-Control-Allow-Credentials', true);
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,POST');
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization, x-public-key, x-secret-key'
+  );
 
-const saveLocalDb = (data: any) => {
-  localStorage.setItem(DB_KEY, JSON.stringify(data));
-};
+  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method !== 'POST') {
+    return res.status(405).json({ erro: "METHOD_NOT_ALLOWED", mensagem: "Apenas requisições POST são permitidas para esta API." });
+  }
 
-// Helper to normalize strings for comparison (remove accents, lowercase)
-const normalizeStr = (str: string) => {
-    return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-};
+  try {
+    console.log("--> [CARTÃO] Iniciando processamento...");
 
-export const dbService = {
-  // Auth
-  getCurrentUser: (): User | null => {
-    const json = localStorage.getItem('maos_user');
-    try {
-        return json ? JSON.parse(json) : null;
-    } catch {
-        return null;
+    // 2. Carrega as chaves da Vercel
+    const publicKey = process.env.NEON_PUBLIC_KEY;
+    const secretKey = process.env.NEON_SECRET_KEY;
+
+    // Garante que o Supabase e as chaves Neon estejam configuradas
+    if (!supabase) {
+        return res.status(500).json({ erro: "DB_CONFIG_ERROR", mensagem: "Chaves do Supabase (URL/KEY) não configuradas no servidor." });
     }
-  },
-  
-  syncSession: async (): Promise<User | null> => {
-    return dbService.getCurrentUser();
-  },
+    if (!publicKey || !secretKey) {
+        return res.status(500).json({ erro: "CONFIG_ERROR", mensagem: "Chaves de API (NEON_PUBLIC_KEY ou NEON_SECRET_KEY) não configuradas." });
+    }
+    
+    const API_BASE_URL = process.env.NEON_API_BASE_URL || 'https://app.neonpay.com.br/api/v1';
 
-  onAuthChange: (_callback: (user: User | null) => void) => {
-     return () => {};
-  },
+    const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
+    const { amount, card, client, installments, planType } = body;
 
-  isSubscriptionActive: (user: User) => {
-    if (!user.subscriptionExpiresAt) return false;
-    return new Date(user.subscriptionExpiresAt) > new Date();
-  },
+    // Validação de segurança
+    if (!client.document || client.document.length < 11) {
+        return res.status(400).json({ erro: "MISSING_CLIENT_DOCUMENT", mensagem: "Documento (CPF/CNPJ) do cliente é obrigatório." });
+    }
 
-  login: async (email: string, _password?: string): Promise<User | null> => {
-     const db = getLocalDb();
-     const cleanEmail = email.trim().toLowerCase();
-     
-     let user = db.users.find((u: User) => u.email === cleanEmail);
-     
-     // --- FALLBACK: CREATE TEST USER IF NOT EXISTS (Safety net) ---
-     if (cleanEmail === 'teste@maosdaobra.com' && !user) {
-         user = {
-             id: 'user-teste-id',
-             name: 'Usuário Teste',
-             email: 'teste@maosdaobra.com',
-             whatsapp: '11999999999',
-             plan: PlanType.VITALICIO,
-             subscriptionExpiresAt: new Date(Date.now() + 36500 * 24 * 60 * 60 * 1000).toISOString() // 100 years
-         };
-         if (!Array.isArray(db.users)) db.users = [];
-         db.users.push(user);
-         saveLocalDb(db);
-     }
+    // Garante que amount seja number e válido
+    const numericAmount = parseFloat(amount);
+    if (isNaN(numericAmount) || numericAmount <= 0) {
+        return res.status(400).json({ erro: "INVALID_AMOUNT", mensagem: "O valor do pagamento é inválido." });
+    }
 
-     if (user) {
-         // RECUPERAÇÃO DE DADOS ÓRFÃOS (Safety for lost IDs)
-         if (db.works.length > 0) {
-             const worksNotOwned = db.works.filter((w: Work) => w.userId !== user!.id && w.userId === 'demo-user-id');
-             if (worksNotOwned.length > 0) {
-                 db.works.forEach((w: Work) => { if(w.userId === 'demo-user-id') w.userId = user!.id; });
-                 db.steps.forEach(() => { /* steps linked via workId */ });
-                 saveLocalDb(db);
+    // 3. Define se é Assinatura ou Pagamento Único
+    const isSubscription = planType.toUpperCase() !== 'VITALICIO';
+    
+    const subEndpoint = isSubscription ? '/gateway/card/subscription' : '/gateway/card/receive';
+    
+    console.log(`--> [CARTÃO] Modo: ${isSubscription ? 'ASSINATURA' : 'PAGAMENTO ÚNICO'}`);
+
+    // CORREÇÃO DE FORMATO: Expiração (MM/AA -> YYYY-MM)
+    const [mes, anoCurto] = card.expiry.split('/');
+    const anoCompleto = `20${anoCurto}`;
+    const expiresAtFormatado = `${anoCompleto}-${mes}`;
+
+    // CORREÇÃO DE FORMATO DO NOME DO TITULAR
+    const cleanOwnerName = card.name
+        .toUpperCase()
+        .replace(/[^A-Z\s]/g, '')
+        .substring(0, 60);
+
+    // 4. Monta o Payload (Dados)
+    let payload: any = { 
+        identifier: body.identifier || `txn_${Date.now()}`,
+        amount: numericAmount, 
+        clientIp: req.headers['x-forwarded-for'] || "127.0.0.1",
+        client: {
+            name: client.name,
+            email: client.email,
+            phone: client.phone,
+            document: client.document, 
+            address: { 
+                country: "BR",
+                state: "SP", 
+                city: "São Paulo", 
+                neighborhood: "Centro", 
+                zipCode: "01001-000",
+                street: "Rua Digital",
+                number: "100"
+            }
+        },
+        paymentMethod: { 
+            type: "card", 
+            card: {
+                number: card.number.replace(/\s/g, ''),
+                owner: cleanOwnerName, 
+                expiresAt: expiresAtFormatado, 
+                cvv: card.cvv
+            }
+        }
+    };
+
+    // Ajustes de Assinatura/Produto
+    if (isSubscription) {
+        payload.subscription = {
+            periodicityType: "MONTHS",
+            periodicity: planType.toUpperCase() === 'SEMESTRAL' ? 6 : 1, 
+            firstChargeIn: 0 
+        };
+        payload.products = [{
+            id: planType.toLowerCase(),
+            name: `Plano ${planType}`,
+            quantity: 1,
+            price: numericAmount
+        }];
+    } else {
+        // Pagamento Único (Vitalício)
+        payload.installments = parseInt(installments || 1);
+        payload.products = [
+            {
+                id: "vitalicio",
+                name: "Acesso Vitalício",
+                quantity: 1,
+                price: numericAmount
+            }
+        ];
+    }
+
+    const logPayload = { ...payload, paymentMethod: { type: 'card', card: { number: card.number.substring(0, 4) + '****', cvv: '***' } } };
+    console.log("--> [CARTÃO] Payload sendo enviado (Debug):", JSON.stringify(logPayload, null, 2));
+
+    const finalUrl = `${API_BASE_URL}${subEndpoint}`;
+
+    let response;
+    let rawResponseText = '';
+    let data;
+
+    try {
+        // 5. Envia para a Neon
+        response = await fetch(finalUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-public-key': publicKey,
+                'x-secret-key': secretKey
+            },
+            body: JSON.stringify(payload)
+        });
+        
+        rawResponseText = await response.text();
+        data = JSON.parse(rawResponseText);
+
+    } catch (fetchError) {
+        // Tratamento de erro de comunicação
+        console.error("--> [CARTÃO] Erro de rede/JSON:", fetchError);
+        return res.status(500).json({ erro: "API_COMM_ERROR", mensagem: "Falha na comunicação com o servidor Neon Pay." });
+    }
+
+
+    if (!response.ok) {
+        console.error("--> [CARTÃO] Erro Neon:", JSON.stringify(data, null, 2));
+        const neonMessage = data.message || (data.details && data.details.description) || "Pagamento não autorizado. Verifique os dados do cartão.";
+
+        return res.status(response.status).json({
+            erro: "TRANSACAO_NEGADA",
+            mensagem: neonMessage,
+            detalhes: data
+        });
+    }
+
+    // -----------------------------------------------------------
+    // NOVO BLOCO CRÍTICO: SINCRONIZAÇÃO COM SUPABASE (Após Sucesso)
+    // -----------------------------------------------------------
+    try {
+        const clientEmail = client.email; 
+        const neonTxnId = data.transactionId; // ID da transação Neon Pay
+
+        // Payload de atualização do perfil
+        const updateData = {
+            plan_status: 'ACTIVE', 
+            plan_type: planType.toUpperCase(), 
+            neon_txn_id: neonTxnId,
+            updated_at: new Date().toISOString()
+        };
+
+        // 1. Tenta atualizar o perfil existente (Se o usuário já estiver na tabela profiles)
+        const { error: updateError, data: updatedProfile } = await supabase
+            .from('profiles')
+            .update(updateData)
+            .eq('email', clientEmail)
+            .select();
+
+        if (updateError || !updatedProfile || updatedProfile.length === 0) {
+             // 2. Se a atualização falhar ou não encontrar, tenta criar um novo perfil (Fallback)
+             console.log(`[SUPABASE] Perfil não encontrado. Tentando criar para ${clientEmail}.`);
+             const { error: insertError } = await supabase.from('profiles').insert([
+                 { 
+                     email: clientEmail, 
+                     name: client.name,
+                     cpf: client.document,
+                     ...updateData // Inclui os dados do plano
+                 }
+             ]);
+
+             if (insertError) {
+                 console.error("--> [SUPABASE] ERRO CRÍTICO ao INSERIR perfil:", insertError);
+                 // Não lançamos erro aqui, pois o cliente já pagou.
              }
-         }
+        }
+        
+        console.log(`--> [SUPABASE] Perfil de ${clientEmail} sincronizado com ACTIVE.`);
+        
+    } catch (dbError) {
+        console.error("--> [CARTÃO] ERRO: Falha catastrófica ao sincronizar perfil Supabase:", dbError);
+    }
+    // -----------------------------------------------------------
 
-         localStorage.setItem('maos_user', JSON.stringify(user));
-         return user;
-     }
-     return null;
-  },
 
-  signup: async (name: string, email: string, whatsapp: string, _password?: string, cpf?: string, planType?: string | null): Promise<User | null> => {
-      const db = getLocalDb();
-      const cleanEmail = email.trim().toLowerCase();
+    console.log("--> [CARTÃO] Sucesso! ID:", data.transactionId);
+    return res.status(200).json(data);
 
-      if (db.users.find((u: User) => u.email === cleanEmail)) return null;
-      
-      const newUser: User = {
-          id: Math.random().toString(36).substr(2, 9),
-          name,
-          email: cleanEmail,
-          whatsapp,
-          cpf,
-          plan: (planType as PlanType) || null,
-          subscriptionExpiresAt: planType ? new Date(Date.now() + 30*24*60*60*1000).toISOString() : undefined
-      };
-      
-      db.users.push(newUser);
-      saveLocalDb(db);
-      localStorage.setItem('maos_user', JSON.stringify(newUser));
-      return newUser;
-  },
-
-  logout: () => {
-      localStorage.removeItem('maos_user');
-  },
-
-  updatePlan: async (userId: string, plan: PlanType) => {
-      const db = getLocalDb();
-      const userIdx = db.users.findIndex((u: User) => u.id === userId);
-      if (userIdx >= 0) {
-          db.users[userIdx].plan = plan;
-          let days = 30;
-          if (plan === PlanType.SEMESTRAL) days = 180;
-          if (plan === PlanType.VITALICIO) days = 36500;
-          
-          db.users[userIdx].subscriptionExpiresAt = new Date(Date.now() + days*24*60*60*1000).toISOString();
-          saveLocalDb(db);
-          
-          const currentUser = dbService.getCurrentUser();
-          if (currentUser && currentUser.id === userId) {
-              localStorage.setItem('maos_user', JSON.stringify(db.users[userIdx]));
-          }
-      }
-  },
-  
-  updateUser: async (id: string, data: Partial<User>, _password?: string) => {
-      const db = getLocalDb();
-      const idx = db.users.findIndex((u: User) => u.id === id);
-      if (idx >= 0) {
-          db.users[idx] = { ...db.users[idx], ...data };
-          saveLocalDb(db);
-           const currentUser = dbService.getCurrentUser();
-          if (currentUser && currentUser.id === id) {
-              localStorage.setItem('maos_user', JSON.stringify(db.users[idx]));
-          }
-      }
-  },
-  
-  getUserProfile: async (id: string) => {
-      const db = getLocalDb();
-      return db.users.find((u: User) => u.id === id) || null;
-  },
-
-  loginSocial: async (_provider: string) => {
-      return { user: null, error: 'Not implemented' };
-  },
-  
-  resetPassword: async (_email: string) => {
-      return true;
-  },
-
-  // Works
-  getWorks: async (userId: string): Promise<Work[]> => {
-      const db = getLocalDb();
-      return db.works.filter((w: Work) => w.userId === userId);
-  },
-
-  getWorkById: async (id: string): Promise<Work | undefined> => {
-      const db = getLocalDb();
-      return db.works.find((w: Work) => w.id === id);
-  },
-
-  createWork: async (data: Partial<Work>, templateId?: string): Promise<Work> => {
-      const db = getLocalDb();
-      const newWork: Work = {
-          id: Math.random().toString(36).substr(2, 9),
-          status: StepStatus.NOT_STARTED,
-          ...data
-      } as Work;
-      
-      // 1. Save Work
-      db.works.push(newWork);
-
-      // 2. Generate Steps from Template (WITH ROBUST MATERIAL MAPPING)
-      if (templateId) {
-          const template = WORK_TEMPLATES.find(t => t.id === templateId);
-          if (template) {
-              const startDate = new Date(newWork.startDate);
-              const stepDuration = Math.floor(template.defaultDurationDays / template.includedSteps.length);
-              
-              template.includedSteps.forEach((stepName, index) => {
-                  const stepStart = new Date(startDate);
-                  stepStart.setDate(startDate.getDate() + (index * stepDuration));
-                  
-                  const stepEnd = new Date(stepStart);
-                  stepEnd.setDate(stepStart.getDate() + stepDuration);
-
-                  const newStep: Step = {
-                      id: Math.random().toString(36).substr(2, 9),
-                      workId: newWork.id,
-                      name: stepName,
-                      startDate: stepStart.toISOString(),
-                      endDate: stepEnd.toISOString(),
-                      status: StepStatus.NOT_STARTED,
-                      isDelayed: false
-                  };
-                  db.steps.push(newStep);
-
-                  // 3. ROBUST MATERIAL MAPPING LOGIC
-                  // Instead of weak 'includes', we map keywords to explicit categories in standards.ts
-                  
-                  const nStep = normalizeStr(stepName);
-                  let targetCategory = '';
-
-                  // --- RULES ENGINE ---
-                  if (nStep.includes('limpeza') || nStep.includes('canteiro') || nStep.includes('demolicao') || nStep.includes('retirada')) {
-                      targetCategory = 'Limpeza e Canteiro';
-                  }
-                  else if (nStep.includes('fundac') || nStep.includes('sapata') || nStep.includes('baldrame') || nStep.includes('estaca')) {
-                      targetCategory = 'Fundação e Estrutura';
-                  }
-                  else if (nStep.includes('laje') || nStep.includes('viga') || nStep.includes('pilar') || nStep.includes('concreto') || nStep.includes('estrutura')) {
-                      // Slab & Beams also use Foundation materials (Cement, Sand, Stone, Steel)
-                      targetCategory = 'Fundação e Estrutura';
-                  }
-                  else if (nStep.includes('parede') || nStep.includes('alvenaria') || nStep.includes('tijolo') || nStep.includes('levantamento')) {
-                      targetCategory = 'Alvenaria (Paredes)';
-                  }
-                  else if (nStep.includes('impermeabiliz')) {
-                      targetCategory = 'Impermeabilização';
-                  }
-                  else if (nStep.includes('chapisco') || nStep.includes('reboco') || nStep.includes('emboço')) {
-                      targetCategory = 'Chapisco e Reboco';
-                  }
-                  else if (nStep.includes('contrapiso')) {
-                      targetCategory = 'Contrapiso';
-                  }
-                  else if (nStep.includes('telhado') || nStep.includes('cobertura') || nStep.includes('calha')) {
-                      targetCategory = 'Telhado e Cobertura';
-                  }
-                  // INSTALLATIONS (INFRA)
-                  else if ((nStep.includes('eletrica') || nStep.includes('fiacao')) && !nStep.includes('luminaria')) {
-                      targetCategory = 'Instalações Elétricas (Infra)';
-                  }
-                  else if (nStep.includes('tubulacao') || nStep.includes('agua') || nStep.includes('esgoto') || nStep.includes('hidraulica')) {
-                      targetCategory = 'Instalações Hidráulicas (Tubulação)';
-                  }
-                  else if (nStep.includes('rasgo')) { 
-                      targetCategory = 'Instalações Hidráulicas (Tubulação)'; // Usually plumbing/electric chase
-                  }
-                  // FINISHES
-                  else if (nStep.includes('gesso') || nStep.includes('forro') || nStep.includes('drywall')) {
-                      targetCategory = 'Gesso e Drywall';
-                  }
-                  else if (nStep.includes('piso') || nStep.includes('revestimento') || nStep.includes('azulejo') || nStep.includes('porcelanato')) {
-                      targetCategory = 'Pisos e Revestimentos Cerâmicos';
-                  }
-                  else if (nStep.includes('marmore') || nStep.includes('granito') || nStep.includes('bancada')) {
-                      targetCategory = 'Marmoraria e Granitos';
-                  }
-                  else if (nStep.includes('janela') || nStep.includes('porta') || nStep.includes('esquadria') || nStep.includes('vidro')) {
-                      targetCategory = 'Esquadrias e Vidros';
-                  }
-                  // FINAL INSTALLATIONS
-                  else if (nStep.includes('louca') || nStep.includes('metais') || nStep.includes('torneira') || nStep.includes('vaso') || nStep.includes('cubas')) {
-                      targetCategory = 'Louças e Metais (Acabamento Hidro)';
-                  }
-                  else if (nStep.includes('luminaria') || nStep.includes('lampada') || nStep.includes('tomada') || nStep.includes('interruptor')) {
-                      targetCategory = 'Elétrica (Acabamento)';
-                  }
-                  else if (nStep.includes('pintura') || nStep.includes('tinta') || nStep.includes('massa corrida')) {
-                      targetCategory = 'Pintura';
-                  }
-                  else if (nStep.includes('limpeza final') || nStep.includes('entrega')) {
-                      targetCategory = 'Limpeza Final';
-                  }
-
-                  // 4. FIND AND ADD MATERIALS
-                  if (targetCategory) {
-                      const catalog = FULL_MATERIAL_PACKAGES.find(c => c.category === targetCategory);
-                      
-                      if (catalog) {
-                          catalog.items.forEach(item => {
-                              let qty = 1;
-                              if (item.multiplier) {
-                                  // Base qty on Area, ensuring minimum of 1
-                                  const baseQty = Math.ceil(item.multiplier * (newWork.area || 50));
-                                  qty = Math.max(1, baseQty);
-                              }
-                              
-                              db.materials.push({
-                                  id: Math.random().toString(36).substr(2, 9),
-                                  workId: newWork.id,
-                                  stepId: newStep.id,
-                                  name: item.name,
-                                  unit: item.unit,
-                                  plannedQty: qty,
-                                  purchasedQty: 0,
-                                  category: targetCategory // Storing category for easier debug/grouping
-                              });
-                          });
-                      }
-                  }
-              });
-          }
-      }
-
-      saveLocalDb(db);
-      return newWork;
-  },
-  
-  deleteWork: async (id: string) => {
-      const db = getLocalDb();
-      db.works = db.works.filter((w: Work) => w.id !== id);
-      db.steps = db.steps.filter((s: Step) => s.workId !== id);
-      db.materials = db.materials.filter((m: Material) => m.workId !== id);
-      db.expenses = db.expenses.filter((e: Expense) => e.workId !== id);
-      saveLocalDb(db);
-  },
-
-  // Stats & Summary
-  calculateWorkStats: async (workId: string) => {
-      const db = getLocalDb();
-      const workExpenses = db.expenses.filter((e: Expense) => e.workId === workId);
-      const totalSpent = workExpenses.reduce((acc: number, cur: Expense) => acc + (Number(cur.amount)||0), 0);
-      
-      const workSteps = db.steps.filter((s: Step) => s.workId === workId);
-      const completed = workSteps.filter((s: Step) => s.status === StepStatus.COMPLETED).length;
-      const progress = workSteps.length > 0 ? Math.round((completed / workSteps.length) * 100) : 0;
-      
-      return { totalSpent, progress, delayedSteps: 0 };
-  },
-
-  getDailySummary: async (workId: string) => {
-      const db = getLocalDb();
-      const steps = db.steps.filter((s: Step) => s.workId === workId);
-      const delayedSteps = steps.filter((s: Step) => {
-          if (s.status === StepStatus.COMPLETED) return false;
-          return new Date(s.endDate) < new Date();
-      }).length;
-      
-      const completedSteps = steps.filter((s: Step) => s.status === StepStatus.COMPLETED).length;
-      
-      const materials = db.materials.filter((m: Material) => m.workId === workId);
-      const pendingMaterials = materials.filter((m: Material) => m.purchasedQty < m.plannedQty).length;
-      
-      return { completedSteps, delayedSteps, pendingMaterials, totalSteps: steps.length };
-  },
-
-  // Steps
-  getSteps: async (workId: string): Promise<Step[]> => {
-      const db = getLocalDb();
-      return db.steps.filter((s: Step) => s.workId === workId);
-  },
-  
-  addStep: async (step: Step) => {
-      const db = getLocalDb();
-      db.steps.push(step);
-      saveLocalDb(db);
-  },
-  
-  updateStep: async (step: Step) => {
-      const db = getLocalDb();
-      const idx = db.steps.findIndex((s: Step) => s.id === step.id);
-      if (idx >= 0) {
-          db.steps[idx] = step;
-          saveLocalDb(db);
-      }
-  },
-
-  // Materials
-  getMaterials: async (workId: string): Promise<Material[]> => {
-      const db = getLocalDb();
-      return db.materials.filter((m: Material) => m.workId === workId);
-  },
-
-  addMaterial: async (material: Material, purchase?: any) => {
-      const db = getLocalDb();
-      if (purchase) {
-          material.purchasedQty = purchase.qty;
-          db.expenses.push({
-              id: Math.random().toString(36).substr(2, 9),
-              workId: material.workId,
-              description: `Compra: ${material.name}`,
-              amount: purchase.cost,
-              date: purchase.date,
-              category: 'Material',
-              relatedMaterialId: material.id
-          });
-      }
-      db.materials.push(material);
-      saveLocalDb(db);
-  },
-
-  updateMaterial: async (material: Material) => {
-      const db = getLocalDb();
-      const idx = db.materials.findIndex((m: Material) => m.id === material.id);
-      if (idx >= 0) {
-          db.materials[idx] = material;
-          saveLocalDb(db);
-      }
-  },
-
-  registerMaterialPurchase: async (id: string, name: string, _brand: string, _planned: number, _unit: string, qty: number, cost: number) => {
-      const db = getLocalDb();
-      const idx = db.materials.findIndex((m: Material) => m.id === id);
-      if (idx >= 0) {
-          db.materials[idx].purchasedQty = (db.materials[idx].purchasedQty || 0) + qty;
-          
-          db.expenses.push({
-              id: Math.random().toString(36).substr(2, 9),
-              workId: db.materials[idx].workId,
-              description: `Compra: ${name}`,
-              amount: cost,
-              date: new Date().toISOString(),
-              category: 'Material',
-              relatedMaterialId: id
-          });
-          
-          saveLocalDb(db);
-      }
-  },
-
-  // Expenses
-  getExpenses: async (workId: string): Promise<Expense[]> => {
-      const db = getLocalDb();
-      return db.expenses.filter((e: Expense) => e.workId === workId);
-  },
-
-  addExpense: async (expense: Expense) => {
-      const db = getLocalDb();
-      db.expenses.push(expense);
-      saveLocalDb(db);
-  },
-
-  updateExpense: async (expense: Expense) => {
-      const db = getLocalDb();
-      const idx = db.expenses.findIndex((e: Expense) => e.id === expense.id);
-      if (idx >= 0) {
-          db.expenses[idx] = expense;
-          saveLocalDb(db);
-      }
-  },
-
-  deleteExpense: async (id: string) => {
-      const db = getLocalDb();
-      db.expenses = db.expenses.filter((e: Expense) => e.id !== id);
-      saveLocalDb(db);
-  },
-
-  // CUMULATIVE FINANCIAL LOGIC (Corrected)
-  getPaymentHistory: async (workId: string, description: string, excludeId?: string): Promise<{ totalPaid: number, lastTotalAgreed: number }> => {
-      const db = getLocalDb();
-      if (!description) return { totalPaid: 0, lastTotalAgreed: 0 };
-
-      const normalize = (str: string) => str.toLowerCase().trim();
-      const targetDesc = normalize(description);
-
-      // Sum everything already paid with this description, excluding current if editing
-      const relevant = db.expenses.filter((e: Expense) => 
-          e.workId === workId && 
-          normalize(e.description) === targetDesc &&
-          e.id !== excludeId
-      );
-      
-      const totalPaid = relevant.reduce((acc: number, curr: Expense) => acc + (Number(curr.amount) || 0), 0);
-      
-      // Get the most recent "total agreed" from history
-      const lastAgreedItem = relevant
-        .sort((a: Expense, b: Expense) => new Date(b.date).getTime() - new Date(a.date).getTime())
-        .find((e: Expense) => e.totalAgreed && Number(e.totalAgreed) > 0);
-      
-      return { 
-          totalPaid, 
-          lastTotalAgreed: lastAgreedItem ? Number(lastAgreedItem.totalAgreed) : 0 
-      };
-  },
-
-  // Workers & Suppliers
-  getWorkers: async (userId: string): Promise<Worker[]> => {
-      const db = getLocalDb();
-      return db.workers.filter((w: Worker) => w.userId === userId);
-  },
-
-  addWorker: async (worker: Worker) => {
-      const db = getLocalDb();
-      db.workers.push({ ...worker, id: Math.random().toString(36).substr(2, 9) });
-      saveLocalDb(db);
-  },
-
-  updateWorker: async (worker: Worker) => {
-      const db = getLocalDb();
-      const idx = db.workers.findIndex((w: Worker) => w.id === worker.id);
-      if (idx >= 0) { db.workers[idx] = worker; saveLocalDb(db); }
-  },
-
-  deleteWorker: async (id: string) => {
-      const db = getLocalDb();
-      db.workers = db.workers.filter((w: Worker) => w.id !== id);
-      saveLocalDb(db);
-  },
-
-  getSuppliers: async (userId: string): Promise<Supplier[]> => {
-      const db = getLocalDb();
-      return db.suppliers.filter((s: Supplier) => s.userId === userId);
-  },
-
-  addSupplier: async (supplier: Supplier) => {
-      const db = getLocalDb();
-      db.suppliers.push({ ...supplier, id: Math.random().toString(36).substr(2, 9) });
-      saveLocalDb(db);
-  },
-
-  updateSupplier: async (supplier: Supplier) => {
-      const db = getLocalDb();
-      const idx = db.suppliers.findIndex((s: Supplier) => s.id === supplier.id);
-      if (idx >= 0) { db.suppliers[idx] = supplier; saveLocalDb(db); }
-  },
-
-  deleteSupplier: async (id: string) => {
-      const db = getLocalDb();
-      db.suppliers = db.suppliers.filter((s: Supplier) => s.id !== id);
-      saveLocalDb(db);
-  },
-
-  // Photos & Files
-  getPhotos: async (workId: string): Promise<WorkPhoto[]> => {
-      const db = getLocalDb();
-      return db.photos.filter((p: WorkPhoto) => p.workId === workId);
-  },
-
-  addPhoto: async (photo: WorkPhoto) => {
-      const db = getLocalDb();
-      db.photos.push(photo);
-      saveLocalDb(db);
-  },
-
-  getFiles: async (workId: string): Promise<WorkFile[]> => {
-      const db = getLocalDb();
-      return db.files.filter((f: WorkFile) => f.workId === workId);
-  },
-
-  addFile: async (file: WorkFile) => {
-      const db = getLocalDb();
-      db.files.push(file);
-      saveLocalDb(db);
-  },
-
-  // Notifications
-  getNotifications: async (userId: string): Promise<Notification[]> => {
-      const db = getLocalDb();
-      return db.notifications.filter((n: Notification) => n.userId === userId);
-  },
-
-  dismissNotification: async (id: string) => {
-      const db = getLocalDb();
-      db.notifications = db.notifications.filter((n: Notification) => n.id !== id);
-      saveLocalDb(db);
-  },
-
-  clearAllNotifications: async (userId: string) => {
-      const db = getLocalDb();
-      db.notifications = db.notifications.filter((n: Notification) => n.userId !== userId);
-      saveLocalDb(db);
-  },
-
-  generateSmartNotifications: async (_userId: string, _workId: string) => {
-      // Mock implementation
-  },
-
-  generatePix: async (amount: number, _user: any) => {
-      return { 
-          qr_code_base64: '', 
-          copy_paste_code: '00020126580014BR.GOV.BCB.PIX0136123e4567-e89b-12d3-a456-426614174000520400005303986540' + amount.toFixed(2) + '5802BR5913Maos Da Obra6008BRASILIA62070503***6304ABCD'
-      };
-  },
-};
+  } catch (error) {
+    console.error("--> [CARTÃO] Erro Crítico:", error);
+    return res.status(500).json({ erro: "INTERNAL_ERROR", mensagem: error.message });
+  }
+}
