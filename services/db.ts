@@ -1,6 +1,6 @@
 import { 
   User, Work, Step, Material, Expense, Worker, Supplier, 
-  WorkPhoto, WorkFile, Notification, PlanType, StepStatus, ExpenseCategory, FileCategory
+  WorkPhoto, WorkFile, Notification, PlanType, StepStatus
 } from '../types';
 
 const DB_KEY = 'maos_da_obra_db';
@@ -41,7 +41,7 @@ export const dbService = {
     return dbService.getCurrentUser();
   },
 
-  onAuthChange: (callback: (user: User | null) => void) => {
+  onAuthChange: (_callback: (user: User | null) => void) => {
      return () => {};
   },
 
@@ -50,7 +50,7 @@ export const dbService = {
     return new Date(user.subscriptionExpiresAt) > new Date();
   },
 
-  login: async (email: string, password?: string): Promise<User | null> => {
+  login: async (email: string, _password?: string): Promise<User | null> => {
      const db = getLocalDb();
      const user = db.users.find((u: User) => u.email === email);
      if (user) { 
@@ -60,7 +60,7 @@ export const dbService = {
      return null;
   },
 
-  signup: async (name: string, email: string, whatsapp: string, password?: string, cpf?: string, planType?: string | null): Promise<User | null> => {
+  signup: async (name: string, email: string, whatsapp: string, _password?: string, cpf?: string, planType?: string | null): Promise<User | null> => {
       const db = getLocalDb();
       if (db.users.find((u: User) => u.email === email)) return null;
       
@@ -103,7 +103,7 @@ export const dbService = {
       }
   },
   
-  updateUser: async (id: string, data: Partial<User>, password?: string) => {
+  updateUser: async (id: string, data: Partial<User>, _password?: string) => {
       const db = getLocalDb();
       const idx = db.users.findIndex((u: User) => u.id === id);
       if (idx >= 0) {
@@ -121,11 +121,11 @@ export const dbService = {
       return db.users.find((u: User) => u.id === id) || null;
   },
 
-  loginSocial: async (provider: string) => {
+  loginSocial: async (_provider: string) => {
       return { user: null, error: 'Not implemented' };
   },
   
-  resetPassword: async (email: string) => {
+  resetPassword: async (_email: string) => {
       return true;
   },
 
@@ -140,7 +140,7 @@ export const dbService = {
       return db.works.find((w: Work) => w.id === id);
   },
 
-  createWork: async (data: Partial<Work>, templateId?: string): Promise<Work> => {
+  createWork: async (data: Partial<Work>, _templateId?: string): Promise<Work> => {
       const db = getLocalDb();
       const newWork: Work = {
           id: Math.random().toString(36).substr(2, 9),
@@ -244,7 +244,7 @@ export const dbService = {
       }
   },
 
-  registerMaterialPurchase: async (id: string, name: string, brand: string, planned: number, unit: string, qty: number, cost: number) => {
+  registerMaterialPurchase: async (id: string, name: string, _brand: string, _planned: number, _unit: string, qty: number, cost: number) => {
       const db = getLocalDb();
       const idx = db.materials.findIndex((m: Material) => m.id === id);
       if (idx >= 0) {
@@ -298,14 +298,17 @@ export const dbService = {
       const normalize = (str: string) => str.toLowerCase().trim();
       const targetDesc = normalize(description);
 
+      // Filter expenses with same description, excluding current edit
       const relevant = db.expenses.filter((e: Expense) => 
           e.workId === workId && 
           normalize(e.description) === targetDesc &&
           e.id !== excludeId
       );
       
+      // Strict number conversion for safety
       const totalPaid = relevant.reduce((acc: number, curr: Expense) => acc + (Number(curr.amount) || 0), 0);
       
+      // Find most recent Agreed Amount
       const lastAgreedItem = relevant
         .sort((a: Expense, b: Expense) => new Date(b.date).getTime() - new Date(a.date).getTime())
         .find((e: Expense) => e.totalAgreed && Number(e.totalAgreed) > 0);
@@ -404,11 +407,11 @@ export const dbService = {
       saveLocalDb(db);
   },
 
-  generateSmartNotifications: async (userId: string, workId: string) => {
-      // Mock implementation
+  generateSmartNotifications: async (_userId: string, _workId: string) => {
+      // Mock implementation - Prefix arguments to ignore unused
   },
 
-  generatePix: async (amount: number, user: any) => {
+  generatePix: async (amount: number, _user: any) => {
       return { 
           qr_code_base64: '', 
           copy_paste_code: '00020126580014BR.GOV.BCB.PIX0136123e4567-e89b-12d3-a456-426614174000520400005303986540' + amount.toFixed(2) + '5802BR5913Maos Da Obra6008BRASILIA62070503***6304ABCD'
