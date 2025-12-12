@@ -26,7 +26,8 @@ const Settings: React.FC = () => {
       period: '/mês',
       color: 'bg-primary',
       highlight: false,
-      savings: null
+      savings: null,
+      trial: true
     },
     {
       id: PlanType.SEMESTRAL,
@@ -35,7 +36,8 @@ const Settings: React.FC = () => {
       period: '/semestre',
       color: 'bg-primary-light',
       highlight: true,
-      savings: 'Economia de 46%'
+      savings: 'Economia de 46%',
+      trial: true
     },
     {
       id: PlanType.VITALICIO,
@@ -44,7 +46,8 @@ const Settings: React.FC = () => {
       period: 'pague uma vez só',
       color: 'bg-premium',
       highlight: true,
-      savings: 'O mais vantajoso'
+      savings: 'O mais vantajoso',
+      trial: false
     }
   ];
 
@@ -77,11 +80,7 @@ const Settings: React.FC = () => {
           const isVitalicio = plan.id === PlanType.VITALICIO;
           
           // Lógica de Estado do Plano:
-          // 1. isNewAccount: Usuário acabou de criar conta. NENHUM plano é "Atual" ou "Expirado". Todos são selecionáveis.
-          // 2. !isNewAccount e mesmo ID: É o plano que o usuário tinha.
-          
           const isMyOldPlan = !isNewAccount && user.plan === plan.id;
-          
           const isActiveCurrent = isMyOldPlan && isSubscriptionValid;
           const isExpiredCurrent = isMyOldPlan && !isSubscriptionValid;
 
@@ -94,7 +93,7 @@ const Settings: React.FC = () => {
             >
               {isActiveCurrent && (
                 <div className="absolute top-0 right-0 bg-primary text-white text-[10px] font-bold px-3 py-1.5 rounded-bl-xl rounded-tr-2xl tracking-wider uppercase">
-                  Ativo
+                  Ativo {user.isTrial ? '(Em Teste)' : ''}
                 </div>
               )}
               
@@ -104,10 +103,10 @@ const Settings: React.FC = () => {
                 </div>
               )}
 
-              {/* Badges de Economia (Mostra se não for o plano atual ativo) */}
-              {plan.savings && !isActiveCurrent && (
-                 <div className={`absolute -top-3 left-1/2 transform -translate-x-1/2 ${isVitalicio ? 'bg-premium' : 'bg-success'} text-white text-[10px] font-bold px-4 py-1 rounded-full uppercase tracking-wider shadow-sm`}>
-                   {plan.savings}
+              {/* Badges de Economia ou Trial */}
+              {!isActiveCurrent && (
+                 <div className={`absolute -top-3 left-1/2 transform -translate-x-1/2 ${plan.trial ? 'bg-green-600' : (isVitalicio ? 'bg-premium' : 'bg-success')} text-white text-[10px] font-bold px-4 py-1 rounded-full uppercase tracking-wider shadow-sm w-max`}>
+                   {plan.trial ? '7 Dias Grátis' : (plan.savings || 'Melhor Opção')}
                  </div>
               )}
 
@@ -121,7 +120,7 @@ const Settings: React.FC = () => {
                  <span className="text-sm text-text-muted dark:text-slate-400">{plan.period.replace('/', '')}</span>
               </div>
               <p className="text-text-muted dark:text-slate-500 text-xs mb-8">
-                  Sem taxas extras. Acesso imediato.
+                  {plan.trial ? 'Comece a usar hoje, cancele quando quiser.' : 'Pagamento único. Acesso imediato.'}
               </p>
               
               <div className="flex-1 mb-8">
@@ -159,7 +158,7 @@ const Settings: React.FC = () => {
                 ) : isExpiredCurrent ? (
                   'Renovar Agora'
                 ) : (
-                  'Assinar Agora'
+                  plan.trial ? 'Testar Grátis' : 'Assinar Agora'
                 )}
               </button>
             </div>
