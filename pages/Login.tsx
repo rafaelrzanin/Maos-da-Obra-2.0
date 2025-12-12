@@ -99,9 +99,13 @@ const Login: React.FC = () => {
         console.error(error);
         
         let msg = "Erro no sistema. Verifique sua conexão.";
-        if (error.message?.includes("Invalid login")) msg = "Senha ou e-mail incorretos.";
-        else if (error.message?.includes("User already registered")) msg = "E-mail já cadastrado.";
-        else if (error.message?.includes("security purposes")) msg = "Muitas tentativas. Aguarde alguns minutos.";
+        if (error.message?.includes("Invalid login")) {
+            msg = "Conta não encontrada ou senha incorreta. Se você ainda não tem cadastro, clique em 'Criar conta' abaixo.";
+        } else if (error.message?.includes("User already registered")) {
+            msg = "E-mail já cadastrado.";
+        } else if (error.message?.includes("security purposes")) {
+            msg = "Muitas tentativas. Aguarde alguns minutos.";
+        }
         
         alert(msg);
         setLoading(false);
@@ -115,7 +119,7 @@ const Login: React.FC = () => {
 
     if (error) {
         console.error(error);
-        alert("Erro no login Google.");
+        alert("Erro no login Google. Verifique se o domínio da Vercel está autorizado no Supabase.");
         setLoading(false);
     } 
     // If successful, Supabase handles the redirect automatically.
