@@ -1,12 +1,15 @@
 
-import React, { useState, useEffect, createContext, useContext, useMemo, Suspense, lazy, useRef } from 'react';
+import React, { useState, useEffect, createContext, useContext, useMemo, Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { User, PlanType } from './types';
 import { dbService } from './services/db';
 
-// --- Lazy Loading (Melhora a velocidade inicial) ---
-const Login = lazy(() => import('./pages/Login'));
-const Dashboard = lazy(() => import('./pages/Dashboard'));
+// --- IMPORTAÇÕES ESTÁTICAS (Críticas para velocidade inicial) ---
+// Carregar Login e Dashboard imediatamente evita o "flash" de carregamento e delay de rede
+import Login from './pages/Login';
+import Dashboard from './pages/Dashboard';
+
+// --- Lazy Loading (Apenas para páginas secundárias) ---
 const CreateWork = lazy(() => import('./pages/CreateWork'));
 const WorkDetail = lazy(() => import('./pages/WorkDetail'));
 const Settings = lazy(() => import('./pages/Settings'));
@@ -14,7 +17,7 @@ const Profile = lazy(() => import('./pages/Profile'));
 const VideoTutorials = lazy(() => import('./pages/VideoTutorials'));
 const Checkout = lazy(() => import('./pages/Checkout'));
 
-// --- Componente de Carregamento (Evita tela branca) ---
+// --- Componente de Carregamento ---
 const LoadingScreen = () => (
   <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-950 transition-colors">
     <div className="relative">
@@ -23,7 +26,6 @@ const LoadingScreen = () => (
             <i className="fa-solid fa-helmet-safety"></i>
         </div>
     </div>
-    <p className="mt-4 text-sm font-bold text-slate-400 animate-pulse">Carregando...</p>
   </div>
 );
 
@@ -65,18 +67,42 @@ const AuthContext = createContext<AuthContextType>(null!);
 export const useAuth = () => useContext(AuthContext);
 
 const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUserState] = useState<User | null>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  
-  const userRef = useRef<string>(JSON.stringify(user));
 
-  const setUser = (newUser: User | null) => {
-      const newStr = JSON.stringify(newUser);
-      if (newStr !== userRef.current) {
-          userRef.current = newStr;
-          setUserState(newUser);
+  // Lógica simplificada e direta para evitar loops
+  useEffect(() => {
+    let mounted = true;
+
+    const initAuth = async () => {
+      try {
+        // Verifica sessão atual
+        const currentUser = await dbService.getCurrentUser();
+        if (mounted) {
+          setUser(currentUser);
+        }
+      } catch (error) {
+        console.error("Erro auth inicial:", error);
+      } finally {
+        if (mounted) setLoading(false);
       }
-  };
+    };
+
+    initAuth();
+
+    // Escuta mudanças (Login/Logout)
+    const unsubscribe = dbService.onAuthChange((u) => {
+      if (mounted) {
+        setUser(u);
+        setLoading(false);
+      }
+    });
+
+    return () => {
+      mounted = false;
+      unsubscribe();
+    };
+  }, []);
 
   const isSubscriptionValid = useMemo(() => user ? dbService.isSubscriptionActive(user) : false, [user]);
   const isNewAccount = useMemo(() => user ? !user.subscriptionExpiresAt : true, [user]);
@@ -91,23 +117,8 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
       return null;
   }, [user]);
 
-  useEffect(() => {
-    const unsubscribe = dbService.onAuthChange((u: User | null) => {
-        setUser(u);
-        setLoading(false);
-    });
-
-    const safetyTimer = setTimeout(() => {
-        if (loading) setLoading(false);
-    }, 4000);
-
-    return () => { 
-        unsubscribe(); 
-        clearTimeout(safetyTimer); 
-    };
-  }, []); 
-
   const refreshUser = async () => {
+      // Force refresh ignorando cache
       const currentUser = await dbService.syncSession();
       if (currentUser) setUser(currentUser);
   };
@@ -120,6 +131,9 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
             setUser(u);
             return true;
         }
+        return false;
+    } catch (e) {
+        console.error(e);
         return false;
     } finally {
         setLoading(false);
