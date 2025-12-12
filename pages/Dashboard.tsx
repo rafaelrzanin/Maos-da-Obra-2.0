@@ -47,34 +47,51 @@ const Dashboard: React.FC = () => {
   const [zeModal, setZeModal] = useState<{isOpen: boolean, title: string, message: string, workId?: string}>({isOpen: false, title: '', message: ''});
 
   useEffect(() => {
+    let isMounted = true;
+
     const loadDashboard = async () => {
-        // Prevent reloading if user ID hasn't changed
-        if (user && user.id !== loadedUserIdRef.current) {
+        // Prevent reloading if user ID hasn't changed, unless it's the first load
+        if (user && (user.id !== loadedUserIdRef.current || works.length === 0)) {
             loadedUserIdRef.current = user.id;
             setLoading(true);
             
+            // Safety timeout: Se o banco demorar mais de 8s, libera a tela
+            const timeoutId = setTimeout(() => {
+                if (isMounted && loading) {
+                    console.warn("Dashboard timeout: Banco demorou muito.");
+                    setLoading(false);
+                }
+            }, 8000);
+
             try {
                 const data = await dbService.getWorks(user.id);
+                if (!isMounted) return;
+                
                 setWorks(data);
 
                 if (data.length > 0) {
                     // Default to first work
-                    await handleSwitchWork(data[0]);
+                    await handleSwitchWork(data[0], isMounted);
                 } else {
-                    setLoading(false);
+                    setFocusWork(null);
                 }
             } catch (e) {
                 console.error("Dashboard Load Error", e);
-                setLoading(false);
+            } finally {
+                clearTimeout(timeoutId);
+                if (isMounted) setLoading(false);
             }
         } else if (!user) {
             setLoading(false);
         }
     };
+    
     loadDashboard();
-  }, [user?.id]); // Only re-run if user ID changes, NOT the entire user object
+    
+    return () => { isMounted = false; };
+  }, [user?.id]); 
 
-  const handleSwitchWork = async (work: Work) => {
+  const handleSwitchWork = async (work: Work, isMounted: boolean = true) => {
       setFocusWork(work);
       setShowWorkSelector(false);
       setLoading(true);
@@ -89,6 +106,8 @@ const Dashboard: React.FC = () => {
             dbService.getNotifications(user.id),
             dbService.getSteps(work.id)
         ]);
+
+        if (!isMounted) return;
 
         setStats(workStats);
         setDailySummary(summary);
@@ -106,7 +125,7 @@ const Dashboard: React.FC = () => {
       } catch (e) {
           console.error(e);
       } finally {
-          setLoading(false);
+          if (isMounted) setLoading(false);
       }
   };
 
@@ -170,16 +189,18 @@ const Dashboard: React.FC = () => {
       setNotifications([]);
   };
 
+  // Se estiver carregando E não tiver nenhuma obra carregada
   if (loading && !focusWork && works.length === 0) return (
-      <div className="flex items-center justify-center h-screen text-secondary">
-          <i className="fa-solid fa-circle-notch fa-spin text-3xl"></i>
+      <div className="flex flex-col items-center justify-center h-screen text-secondary">
+          <i className="fa-solid fa-circle-notch fa-spin text-3xl mb-4"></i>
+          <p className="text-slate-400 font-bold animate-pulse">Carregando dados...</p>
       </div>
   );
 
-  // EMPTY STATE
-  if (!focusWork && !loading) {
+  // EMPTY STATE - SE NÃO TIVER OBRAS
+  if ((!focusWork && !loading) || (works.length === 0 && !loading)) {
       return (
-        <div className="flex flex-col items-center justify-center min-h-[80vh] px-4 text-center">
+        <div className="flex flex-col items-center justify-center min-h-[80vh] px-4 text-center animate-in fade-in">
             <div className="w-24 h-24 bg-gradient-gold rounded-[2rem] flex items-center justify-center text-white mb-8 shadow-glow transform rotate-3">
                 <i className="fa-solid fa-helmet-safety text-5xl"></i>
             </div>
@@ -197,6 +218,7 @@ const Dashboard: React.FC = () => {
       );
   }
 
+  // Se tiver obras, mas focusWork ainda for null (raro, mas possível durante transição)
   if (!focusWork) return null;
 
   // CALCULATIONS FOR UI
