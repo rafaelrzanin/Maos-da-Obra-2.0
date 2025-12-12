@@ -2,9 +2,7 @@
 import { 
   User, Work, Step, Material, Expense, Worker, Supplier, 
   WorkPhoto, WorkFile, Notification, PlanType,
-  ExpenseCategory,
-  WorkStatus,
-  StepStatus
+  ExpenseCategory
 } from '../types';
 import { WORK_TEMPLATES, FULL_MATERIAL_PACKAGES } from './standards';
 import { supabase } from './supabase';
@@ -245,7 +243,7 @@ export const dbService = {
 
   onAuthChange(callback: (user: User | null) => void) {
       if (!supabase) return () => {};
-      const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
+      const { data } = supabase.auth.onAuthStateChange(async (_event, session) => {
           if (session?.user) {
               const profile = await this.getUserProfile(session.user.id);
               callback(profile);
@@ -519,7 +517,7 @@ export const dbService = {
       }).eq('id', mat.id);
   },
 
-  async registerMaterialPurchase(matId: string, name: string, brand: string, plannedQty: number, unit: string, buyQty: number, cost: number) {
+  async registerMaterialPurchase(matId: string, name: string, brand: string, _plannedQty: number, _unit: string, buyQty: number, cost: number) {
       if (!supabase) return;
       
       // Get current qty
