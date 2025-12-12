@@ -7,7 +7,8 @@ import {
 import { WORK_TEMPLATES } from './standards';
 import { supabase } from './supabase';
 
-// --- HELPER: Mapeamento de Snake_case (Banco) para CamelCase (App) ---
+// --- HELPERS: Mapeamento de Snake_case (Banco) para CamelCase (App) ---
+
 const mapProfileFromSupabase = (data: any): User => ({
     id: data.id,
     name: data.name || 'Usuário',
@@ -18,29 +19,94 @@ const mapProfileFromSupabase = (data: any): User => ({
     subscriptionExpiresAt: data.subscription_expires_at
 });
 
-// --- HELPER: Parse Work Data (DB snake_case -> App camelCase) ---
-const parseWorkFromDB = (data: any): Work => {
-    return {
-        id: data.id,
-        userId: data.user_id || data.userId, // Fallback legacy
-        name: data.name,
-        address: data.address,
-        budgetPlanned: Number(data.budget_planned || data.budgetPlanned || 0),
-        startDate: data.start_date || data.startDate,
-        endDate: data.end_date || data.endDate,
-        area: Number(data.area),
-        status: data.status,
-        notes: data.notes || '',
-        
-        // Mapeamento das colunas reais
-        floors: data.floors ? Number(data.floors) : 1,
-        bedrooms: data.bedrooms ? Number(data.bedrooms) : 0,
-        bathrooms: data.bathrooms ? Number(data.bathrooms) : 0,
-        kitchens: data.kitchens ? Number(data.kitchens) : 0,
-        livingRooms: data.living_rooms ? Number(data.living_rooms) : 0,
-        hasLeisureArea: data.has_leisure_area || false
-    } as Work;
-};
+const parseWorkFromDB = (data: any): Work => ({
+    id: data.id,
+    userId: data.user_id,
+    name: data.name,
+    address: data.address,
+    budgetPlanned: Number(data.budget_planned || 0),
+    startDate: data.start_date,
+    endDate: data.end_date,
+    area: Number(data.area),
+    status: data.status,
+    notes: data.notes || '',
+    floors: Number(data.floors || 1),
+    bedrooms: Number(data.bedrooms || 0),
+    bathrooms: Number(data.bathrooms || 0),
+    kitchens: Number(data.kitchens || 0),
+    livingRooms: Number(data.living_rooms || 0),
+    hasLeisureArea: data.has_leisure_area || false
+});
+
+const parseStepFromDB = (data: any): Step => ({
+    id: data.id,
+    workId: data.work_id,
+    name: data.name,
+    startDate: data.start_date,
+    endDate: data.end_date,
+    status: data.status,
+    isDelayed: data.is_delayed
+});
+
+const parseMaterialFromDB = (data: any): Material => ({
+    id: data.id,
+    workId: data.work_id,
+    name: data.name,
+    brand: data.brand,
+    plannedQty: Number(data.planned_qty || 0),
+    purchasedQty: Number(data.purchased_qty || 0),
+    unit: data.unit,
+    stepId: data.step_id
+});
+
+const parseExpenseFromDB = (data: any): Expense => ({
+    id: data.id,
+    workId: data.work_id,
+    description: data.description,
+    amount: Number(data.amount || 0),
+    date: data.date,
+    category: data.category,
+    stepId: data.step_id,
+    relatedMaterialId: data.related_material_id,
+    totalAgreed: data.total_agreed ? Number(data.total_agreed) : undefined
+});
+
+const parseWorkerFromDB = (data: any): Worker => ({
+    id: data.id,
+    userId: data.user_id,
+    name: data.name,
+    role: data.role,
+    phone: data.phone,
+    notes: data.notes
+});
+
+const parseSupplierFromDB = (data: any): Supplier => ({
+    id: data.id,
+    userId: data.user_id,
+    name: data.name,
+    category: data.category,
+    phone: data.phone,
+    notes: data.notes
+});
+
+const parsePhotoFromDB = (data: any): WorkPhoto => ({
+    id: data.id,
+    workId: data.work_id,
+    url: data.url,
+    description: data.description,
+    date: data.date,
+    type: data.type
+});
+
+const parseFileFromDB = (data: any): WorkFile => ({
+    id: data.id,
+    workId: data.work_id,
+    name: data.name,
+    category: data.category,
+    url: data.url,
+    type: data.type,
+    date: data.date
+});
 
 export const dbService = {
   
@@ -54,21 +120,18 @@ export const dbService = {
   syncSession: async (): Promise<User | null> => {
     if (!supabase) return dbService.getCurrentUser();
     
-    // 1. Verificar sessão ativa
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.user) {
         localStorage.removeItem('maos_user');
         return null;
     }
 
-    // 2. Buscar perfil atualizado
     const profile = await dbService.getUserProfile(session.user.id);
     if (profile) {
         localStorage.setItem('maos_user', JSON.stringify(profile));
         return profile;
     }
     
-    // 3. Auto-correção: Se tem sessão mas não tem perfil, cria agora
     return await dbService.createProfileFromAuth(session.user);
   },
 
@@ -95,7 +158,6 @@ export const dbService = {
     return new Date(user.subscriptionExpiresAt) > new Date();
   },
 
-  // Busca perfil na tabela 'profiles'
   getUserProfile: async (userId: string): Promise<User | null> => {
       if (!supabase) return null;
       try {
@@ -113,7 +175,6 @@ export const dbService = {
       }
   },
 
-  // Cria perfil na tabela 'profiles' baseado no usuário Auth (Self-healing)
   createProfileFromAuth: async (authUser: any, metadata: any = {}): Promise<User | null> => {
       if (!supabase) return null;
       
@@ -128,7 +189,6 @@ export const dbService = {
       };
 
       const { error } = await supabase.from('profiles').upsert([newProfile]);
-      
       if (error) {
           console.error("Erro ao criar perfil:", error);
           return null;
@@ -140,17 +200,12 @@ export const dbService = {
      if (!supabase) throw new Error("Erro de conexão: Supabase não configurado.");
      if (!password) throw new Error("Senha obrigatória.");
 
-     // 1. Auth com Supabase
      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
      if (error) throw error;
      if (!data.user) return null;
 
-     // 2. Busca Perfil
      let profile = await dbService.getUserProfile(data.user.id);
-     
-     // 3. Fallback Crítico: Se o Auth existe mas o Profile não, cria agora.
      if (!profile) {
-         console.warn("Perfil ausente para usuário autenticado. Criando...");
          profile = await dbService.createProfileFromAuth(data.user);
      }
 
@@ -162,7 +217,6 @@ export const dbService = {
       if (!supabase) throw new Error("Supabase não configurado.");
       if (!password) throw new Error("Senha obrigatória.");
 
-      // 1. Criar Usuário no Auth
       const { data: authData, error: authError } = await supabase.auth.signUp({
           email,
           password,
@@ -172,7 +226,6 @@ export const dbService = {
       if (authError) throw authError;
       if (!authData.user) return null;
 
-      // 2. Inserir na tabela 'profiles'
       const initialPlan = (planType as PlanType) || null;
       const profile = await dbService.createProfileFromAuth(authData.user, { name, whatsapp, cpf, plan: initialPlan });
 
@@ -189,8 +242,6 @@ export const dbService = {
 
   updateUser: async (userId: string, data: Partial<User>, newPassword?: string) => {
       if (!supabase) return;
-      
-      // Atualiza tabela profiles
       const updates: any = {};
       if (data.name) updates.name = data.name;
       if (data.whatsapp) updates.whatsapp = data.whatsapp;
@@ -198,8 +249,6 @@ export const dbService = {
       if (Object.keys(updates).length > 0) {
           await supabase.from('profiles').update(updates).eq('id', userId);
       }
-
-      // Atualiza senha se fornecida
       if (newPassword) {
           await supabase.auth.updateUser({ password: newPassword });
       }
@@ -207,7 +256,6 @@ export const dbService = {
 
   updatePlan: async (userId: string, plan: PlanType) => {
       if (!supabase) return;
-      // Define expiração baseada no plano
       let expires = new Date();
       if (plan === PlanType.MENSAL) expires.setDate(expires.getDate() + 30);
       else if (plan === PlanType.SEMESTRAL) expires.setDate(expires.getDate() + 180);
@@ -236,18 +284,15 @@ export const dbService = {
       return { user: data, error };
   },
 
-  // --- DATA METHODS (CRUD) ---
-
-  // 1. WORKS (OBRAS)
+  // --- WORKS (OBRAS) ---
+  
   getWorks: async (userId: string): Promise<Work[]> => {
       if (!supabase) return [];
-      // Usar 'user_id' se existir no banco, senão fallback (mas o banco deve estar snake_case)
+      // Usa user_id (snake_case)
       const { data, error } = await supabase.from('works').select('*').eq('user_id', userId);
-      
       if (error) {
-          // Fallback tentativo para 'userId' caso a migração não tenha rodado ou seja legado
-          const { data: dataLegacy } = await supabase.from('works').select('*').eq('userId', userId);
-          return (dataLegacy || []).map(parseWorkFromDB);
+          console.error("Erro ao buscar obras:", error);
+          return [];
       }
       return (data || []).map(parseWorkFromDB);
   },
@@ -262,19 +307,16 @@ export const dbService = {
   createWork: async (work: Omit<Work, 'id'>, templateId?: string): Promise<Work> => {
       if (!supabase) throw new Error("Offline");
       
-      // 1. Insert Work - Mapping CamelCase to DB Snake_case EXPLICITAMENTE
       const payload = {
           user_id: work.userId,
           name: work.name,
           address: work.address,
-          budget_planned: work.budgetPlanned, // Correção crucial
+          budget_planned: work.budgetPlanned,
           start_date: work.startDate,
           end_date: work.endDate,
           area: work.area,
           status: work.status || 'Planejamento',
           notes: work.notes,
-          
-          // Mapeamento para Colunas Reais
           floors: work.floors,
           bedrooms: work.bedrooms,
           bathrooms: work.bathrooms,
@@ -286,23 +328,23 @@ export const dbService = {
       const { data, error } = await supabase.from('works').insert([payload]).select().single();
 
       if (error || !data) {
-          console.error("Supabase Error:", error);
-          throw new Error(error?.message || "Erro ao criar obra no banco de dados.");
+          console.error("Supabase Create Work Error:", error);
+          throw new Error(error?.message || "Erro ao criar obra.");
       }
       
       const newWork = parseWorkFromDB(data);
 
-      // 2. Apply Template (Steps) if selected
+      // Create steps from template
       if (templateId) {
           const template = WORK_TEMPLATES.find(t => t.id === templateId);
           if (template) {
               const stepsPayload = template.includedSteps.map(stepName => ({
-                  workId: newWork.id,
+                  work_id: newWork.id, // snake_case
                   name: stepName,
-                  startDate: newWork.startDate,
-                  endDate: newWork.endDate,
+                  start_date: newWork.startDate,
+                  end_date: newWork.endDate,
                   status: 'NAO_INICIADO',
-                  isDelayed: false
+                  is_delayed: false
               }));
               await supabase.from('steps').insert(stepsPayload);
           }
@@ -315,20 +357,20 @@ export const dbService = {
       await supabase.from('works').delete().eq('id', workId);
   },
 
-  // 2. STEPS (ETAPAS)
+  // --- STEPS ---
   getSteps: async (workId: string): Promise<Step[]> => {
       if (!supabase) return [];
-      const { data } = await supabase.from('steps').select('*').eq('workId', workId);
-      return (data || []) as Step[];
+      const { data } = await supabase.from('steps').select('*').eq('work_id', workId);
+      return (data || []).map(parseStepFromDB);
   },
 
   addStep: async (step: Step) => {
       if (!supabase) return;
       await supabase.from('steps').insert([{
-          workId: step.workId,
+          work_id: step.workId,
           name: step.name,
-          startDate: step.startDate,
-          endDate: step.endDate,
+          start_date: step.startDate,
+          end_date: step.endDate,
           status: step.status
       }]);
   },
@@ -337,35 +379,35 @@ export const dbService = {
       if (!supabase) return;
       await supabase.from('steps').update({
           name: step.name,
-          startDate: step.startDate,
-          endDate: step.endDate,
+          start_date: step.startDate,
+          end_date: step.endDate,
           status: step.status
       }).eq('id', step.id);
   },
 
-  // 3. MATERIALS
+  // --- MATERIALS ---
   getMaterials: async (workId: string): Promise<Material[]> => {
       if (!supabase) return [];
-      const { data } = await supabase.from('materials').select('*').eq('workId', workId);
-      return (data || []) as Material[];
+      const { data } = await supabase.from('materials').select('*').eq('work_id', workId);
+      return (data || []).map(parseMaterialFromDB);
   },
 
   addMaterial: async (material: Material, purchaseData?: { qty: number, cost: number, date: string }) => {
       if (!supabase) return;
       
       const { data: matData } = await supabase.from('materials').insert([{
-          workId: material.workId,
+          work_id: material.workId,
           name: material.name,
           brand: material.brand,
-          plannedQty: material.plannedQty,
-          purchasedQty: purchaseData ? purchaseData.qty : 0,
+          planned_qty: material.plannedQty,
+          purchased_qty: purchaseData ? purchaseData.qty : 0,
           unit: material.unit,
-          stepId: material.stepId
+          step_id: material.stepId
       }]).select().single();
 
       if (purchaseData && matData) {
           await dbService.addExpense({
-              id: '', // DB generates
+              id: '', 
               workId: material.workId,
               description: `Compra: ${material.name}`,
               amount: purchaseData.cost,
@@ -382,7 +424,7 @@ export const dbService = {
       await supabase.from('materials').update({
           name: material.name,
           brand: material.brand,
-          plannedQty: material.plannedQty,
+          planned_qty: material.plannedQty,
           unit: material.unit
       }).eq('id', material.id);
   },
@@ -390,52 +432,49 @@ export const dbService = {
   registerMaterialPurchase: async (matId: string, name: string, brand: string, plannedQty: number, unit: string, buyQty: number, cost: number) => {
       if (!supabase) return;
       
-      // 1. Get current
-      const { data: current } = await supabase.from('materials').select('purchasedQty, workId, stepId').eq('id', matId).single();
+      const { data: current } = await supabase.from('materials').select('purchased_qty, work_id, step_id').eq('id', matId).single();
       if (!current) return;
 
-      // 2. Update Material
-      const newPurchasedQty = (current.purchasedQty || 0) + buyQty;
+      const newPurchasedQty = (Number(current.purchased_qty) || 0) + buyQty;
       
       await supabase.from('materials').update({ 
-          purchasedQty: newPurchasedQty,
+          purchased_qty: newPurchasedQty,
           name: name,
           brand: brand,
-          plannedQty: plannedQty,
+          planned_qty: plannedQty,
           unit: unit
       }).eq('id', matId);
 
-      // 3. Add Expense
       await dbService.addExpense({
           id: '',
-          workId: current.workId,
+          workId: current.work_id,
           description: `Compra: ${name}`,
           amount: cost,
           date: new Date().toISOString(),
           category: ExpenseCategory.MATERIAL,
           relatedMaterialId: matId,
-          stepId: current.stepId
+          stepId: current.step_id
       });
   },
 
-  // 4. EXPENSES (FINANCEIRO)
+  // --- EXPENSES ---
   getExpenses: async (workId: string): Promise<Expense[]> => {
       if (!supabase) return [];
-      const { data } = await supabase.from('expenses').select('*').eq('workId', workId);
-      return (data || []) as Expense[];
+      const { data } = await supabase.from('expenses').select('*').eq('work_id', workId);
+      return (data || []).map(parseExpenseFromDB);
   },
 
   addExpense: async (expense: Expense) => {
       if (!supabase) return;
       await supabase.from('expenses').insert([{
-          workId: expense.workId,
+          work_id: expense.workId,
           description: expense.description,
           amount: expense.amount,
           date: expense.date,
           category: expense.category,
-          stepId: expense.stepId,
-          relatedMaterialId: expense.relatedMaterialId,
-          totalAgreed: expense.totalAgreed
+          step_id: expense.stepId,
+          related_material_id: expense.relatedMaterialId,
+          total_agreed: expense.totalAgreed
       }]);
   },
 
@@ -446,8 +485,8 @@ export const dbService = {
           amount: expense.amount,
           date: expense.date,
           category: expense.category,
-          stepId: expense.stepId,
-          totalAgreed: expense.totalAgreed
+          step_id: expense.stepId,
+          total_agreed: expense.totalAgreed
       }).eq('id', expense.id);
   },
 
@@ -456,16 +495,16 @@ export const dbService = {
       await supabase.from('expenses').delete().eq('id', id);
   },
 
-  // 5. TEAMS & SUPPLIERS
+  // --- WORKERS & SUPPLIERS ---
   getWorkers: async (userId: string): Promise<Worker[]> => {
       if (!supabase) return [];
-      const { data } = await supabase.from('workers').select('*').eq('userId', userId);
-      return (data || []) as Worker[];
+      const { data } = await supabase.from('workers').select('*').eq('user_id', userId);
+      return (data || []).map(parseWorkerFromDB);
   },
   addWorker: async (worker: Omit<Worker, 'id'>) => {
       if (!supabase) return;
       await supabase.from('workers').insert([{
-          userId: worker.userId,
+          user_id: worker.userId,
           name: worker.name,
           role: worker.role,
           phone: worker.phone,
@@ -474,7 +513,12 @@ export const dbService = {
   },
   updateWorker: async (worker: Worker) => {
       if (!supabase) return;
-      await supabase.from('workers').update(worker).eq('id', worker.id);
+      await supabase.from('workers').update({
+          name: worker.name, 
+          role: worker.role, 
+          phone: worker.phone, 
+          notes: worker.notes
+      }).eq('id', worker.id);
   },
   deleteWorker: async (id: string) => {
       if (supabase) await supabase.from('workers').delete().eq('id', id);
@@ -482,13 +526,13 @@ export const dbService = {
 
   getSuppliers: async (userId: string): Promise<Supplier[]> => {
       if (!supabase) return [];
-      const { data } = await supabase.from('suppliers').select('*').eq('userId', userId);
-      return (data || []) as Supplier[];
+      const { data } = await supabase.from('suppliers').select('*').eq('user_id', userId);
+      return (data || []).map(parseSupplierFromDB);
   },
   addSupplier: async (supplier: Omit<Supplier, 'id'>) => {
       if (!supabase) return;
       await supabase.from('suppliers').insert([{
-          userId: supplier.userId,
+          user_id: supplier.userId,
           name: supplier.name,
           category: supplier.category,
           phone: supplier.phone,
@@ -497,22 +541,27 @@ export const dbService = {
   },
   updateSupplier: async (supplier: Supplier) => {
       if (!supabase) return;
-      await supabase.from('suppliers').update(supplier).eq('id', supplier.id);
+      await supabase.from('suppliers').update({
+          name: supplier.name, 
+          category: supplier.category, 
+          phone: supplier.phone, 
+          notes: supplier.notes
+      }).eq('id', supplier.id);
   },
   deleteSupplier: async (id: string) => {
       if (supabase) await supabase.from('suppliers').delete().eq('id', id);
   },
 
-  // 6. PHOTOS & FILES
+  // --- PHOTOS & FILES ---
   getPhotos: async (workId: string): Promise<WorkPhoto[]> => {
       if (!supabase) return [];
-      const { data } = await supabase.from('photos').select('*').eq('workId', workId);
-      return (data || []) as WorkPhoto[];
+      const { data } = await supabase.from('photos').select('*').eq('work_id', workId);
+      return (data || []).map(parsePhotoFromDB);
   },
   addPhoto: async (photo: WorkPhoto) => {
       if (!supabase) return;
       await supabase.from('photos').insert([{
-          workId: photo.workId,
+          work_id: photo.workId,
           url: photo.url,
           description: photo.description,
           date: photo.date,
@@ -522,13 +571,13 @@ export const dbService = {
 
   getFiles: async (workId: string): Promise<WorkFile[]> => {
       if (!supabase) return [];
-      const { data } = await supabase.from('files').select('*').eq('workId', workId);
-      return (data || []) as WorkFile[];
+      const { data } = await supabase.from('files').select('*').eq('work_id', workId);
+      return (data || []).map(parseFileFromDB);
   },
   addFile: async (file: WorkFile) => {
       if (!supabase) return;
       await supabase.from('files').insert([{
-          workId: file.workId,
+          work_id: file.workId,
           name: file.name,
           category: file.category,
           url: file.url,
@@ -537,7 +586,7 @@ export const dbService = {
       }]);
   },
 
-  // 7. STATS & NOTIFICATIONS
+  // --- STATS ---
   getNotifications: async (_userId: string): Promise<Notification[]> => { return []; },
   dismissNotification: async (_id: string) => {},
   clearAllNotifications: async (_userId: string) => {},
@@ -546,12 +595,12 @@ export const dbService = {
   calculateWorkStats: async (workId: string) => {
       if (!supabase) return { totalSpent: 0, progress: 0, delayedSteps: 0 };
       
-      const { data: expenses } = await supabase.from('expenses').select('amount').eq('workId', workId);
+      const { data: expenses } = await supabase.from('expenses').select('amount').eq('work_id', workId);
       const totalSpent = (expenses || []).reduce((acc, curr) => acc + Number(curr.amount), 0);
 
-      const { data: steps } = await supabase.from('steps').select('status').eq('workId', workId);
+      const { data: steps } = await supabase.from('steps').select('status').eq('work_id', workId);
       const totalSteps = steps?.length || 0;
-      const completed = steps?.filter(s => s.status === 'CONCLUIDO').length || 0;
+      const completed = steps?.filter((s: any) => s.status === 'CONCLUIDO').length || 0;
       const progress = totalSteps > 0 ? Math.round((completed / totalSteps) * 100) : 0;
 
       return { totalSpent, progress, delayedSteps: 0 };
