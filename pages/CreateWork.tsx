@@ -143,10 +143,11 @@ const CreateWork: React.FC = () => {
         }, selectedTemplateId);
 
         navigate(`/work/${newWork.id}`);
-    } catch (error) {
+    } catch (error: any) {
         console.error(error);
         setAiProcessingStage(null); 
-        alert("Ops! Ocorreu um erro técnico ao salvar. Tente novamente em instantes.");
+        // Mostra o erro real do banco de dados para facilitar a correção
+        alert(`Erro ao salvar obra: ${error.message || "Tente novamente."}`);
     } finally {
         setLoading(false);
     }
