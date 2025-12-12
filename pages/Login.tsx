@@ -111,7 +111,6 @@ const Login: React.FC = () => {
   const handleSocialLogin = async (provider: 'google') => {
     setLoading(true);
     // loginSocial returns the result of supabase.auth.signInWithOAuth
-    // It returns { data, error }. It does NOT return the user directly because it redirects.
     const { error } = await dbService.loginSocial(provider);
 
     if (error) {
@@ -176,89 +175,56 @@ const Login: React.FC = () => {
                   )}
                   <input type="email" placeholder="E-mail" value={email} onChange={e => setEmail(e.target.value)}
                       className="w-full px-4 py-3 bg-white/10 border border-white/10 rounded-xl text-white outline-none focus:border-amber-500/50" />
-                  {!isLogin && (
-                    <input type="tel" placeholder="WhatsApp" value={whatsapp} onChange={e => setWhatsapp(e.target.value)}
-                        className="w-full px-4 py-3 bg-white/10 border border-white/10 rounded-xl text-white outline-none focus:border-amber-500/50" />
-                  )}
-                  <div className="relative">
-                    <input type="password" placeholder="Senha" value={password} onChange={e => setPassword(e.target.value)}
-                        className="w-full px-4 py-3 bg-white/10 border border-white/10 rounded-xl text-white outline-none focus:border-amber-500/50" />
-                    {isLogin && (
-                        <div className="flex justify-end mt-2">
-                            <button 
-                                type="button" 
-                                onClick={() => { setShowForgotModal(true); setForgotStatus('IDLE'); setForgotEmail(email); }}
-                                className="text-xs text-slate-300 hover:text-white underline"
-                            >
-                                Esqueci minha senha
-                            </button>
-                        </div>
-                    )}
-                  </div>
+                  
+                  <input type="password" placeholder="Senha" value={password} onChange={e => setPassword(e.target.value)}
+                      className="w-full px-4 py-3 bg-white/10 border border-white/10 rounded-xl text-white outline-none focus:border-amber-500/50" />
 
                   <button type="submit" disabled={loading}
-                    className="w-full py-4 bg-amber-500 text-white font-bold rounded-xl shadow-lg hover:bg-amber-400 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-wait">
-                      {loading ? (
-                        <>
-                            <i className="fa-solid fa-circle-notch fa-spin"></i>
-                            <span>Acessando...</span>
-                        </>
-                      ) : (isLogin ? 'Entrar' : 'Cadastrar')}
+                      className="w-full py-4 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl transition-all shadow-lg shadow-amber-500/20 disabled:opacity-50 flex items-center justify-center gap-2">
+                      {loading && <i className="fa-solid fa-circle-notch fa-spin"></i>}
+                      {isLogin ? 'Entrar' : 'Começar Grátis'}
                   </button>
-                  
-                  <div className="mt-4 flex flex-col gap-3">
-                      
-                      <button type="button" disabled={loading} onClick={() => handleSocialLogin('google')} 
-                          className="w-full h-12 rounded-xl bg-white/5 border border-white/10 text-white flex items-center justify-center gap-2 hover:bg-white/10 transition-colors">
-                          <img src="https://www.svgrepo.com/show/475656/google-color.svg" className="w-5 h-5" alt="Google" />
-                          <span className="text-sm font-bold">Entrar com Google</span>
-                      </button>
-                      
-                      <button type="button" onClick={() => setIsLogin(!isLogin)} className="text-amber-400 text-sm font-bold underline">
-                        {isLogin ? 'Criar uma conta' : 'Já tenho conta'}
-                      </button>
-                  </div>
               </form>
+
+              <div className="mt-6 flex flex-col gap-4">
+                  <button onClick={() => handleSocialLogin('google')} type="button" className="w-full py-3 bg-white text-slate-900 font-bold rounded-xl flex items-center justify-center gap-3 hover:bg-slate-100 transition-colors">
+                      <img src="https://www.svgrepo.com/show/475656/google-color.svg" className="w-5 h-5" alt="Google" />
+                      Entrar com Google
+                  </button>
+
+                  <div className="flex justify-between items-center text-sm">
+                      <button onClick={() => setIsLogin(!isLogin)} className="text-white/70 hover:text-white font-medium">
+                          {isLogin ? 'Criar conta' : 'Já tenho conta'}
+                      </button>
+                      {isLogin && (
+                          <button onClick={() => setShowForgotModal(true)} className="text-amber-400 hover:text-amber-300 font-medium">
+                              Esqueci a senha
+                          </button>
+                      )}
+                  </div>
+              </div>
           </div>
       </div>
 
       {/* Forgot Password Modal */}
       {showForgotModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
-              <div className="bg-slate-900 border border-slate-700 rounded-3xl w-full max-w-sm p-6 shadow-2xl relative">
+              <div className="bg-slate-900 border border-slate-700 p-6 rounded-3xl w-full max-w-sm relative">
                   <button onClick={() => setShowForgotModal(false)} className="absolute top-4 right-4 text-slate-400 hover:text-white"><i className="fa-solid fa-xmark text-xl"></i></button>
+                  <h3 className="text-xl font-bold text-white mb-2">Recuperar Senha</h3>
+                  <p className="text-slate-400 text-sm mb-4">Digite seu e-mail para receber o link de redefinição.</p>
                   
-                  <div className="text-center mb-6">
-                      <div className="w-12 h-12 rounded-full bg-slate-800 flex items-center justify-center text-amber-500 mx-auto mb-3">
-                          <i className="fa-solid fa-key"></i>
-                      </div>
-                      <h3 className="text-lg font-bold text-white">Recuperar Senha</h3>
-                      <p className="text-sm text-slate-400">Digite seu e-mail para receber as instruções.</p>
-                  </div>
-
                   {forgotStatus === 'SENT' ? (
-                      <div className="text-center py-4">
-                          <div className="text-green-500 text-4xl mb-2"><i className="fa-solid fa-envelope-circle-check"></i></div>
-                          <p className="text-white font-bold">E-mail enviado!</p>
-                          <p className="text-xs text-slate-400 mt-2">Verifique sua caixa de entrada (e spam).</p>
-                          <button onClick={() => setShowForgotModal(false)} className="mt-4 w-full py-3 bg-slate-800 text-white rounded-xl font-bold">Fechar</button>
+                      <div className="bg-green-500/20 border border-green-500/50 text-green-200 p-4 rounded-xl text-center">
+                          <i className="fa-solid fa-check-circle text-2xl mb-2 block"></i>
+                          E-mail enviado! Verifique sua caixa de entrada.
                       </div>
                   ) : (
                       <form onSubmit={handleForgotPassword} className="space-y-4">
-                          <input 
-                              type="email" 
-                              required
-                              placeholder="seu@email.com" 
-                              value={forgotEmail} 
-                              onChange={e => setForgotEmail(e.target.value)}
-                              className="w-full px-4 py-3 bg-black/30 border border-slate-700 rounded-xl text-white outline-none focus:border-amber-500" 
-                          />
-                          <button 
-                              type="submit" 
-                              disabled={forgotStatus === 'SENDING'}
-                              className="w-full py-3 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-xl flex items-center justify-center gap-2"
-                          >
-                              {forgotStatus === 'SENDING' ? <i className="fa-solid fa-circle-notch fa-spin"></i> : 'Enviar Recuperação'}
+                          <input type="email" placeholder="Seu e-mail cadastrado" value={forgotEmail} onChange={e => setForgotEmail(e.target.value)}
+                              className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white outline-none focus:border-amber-500" required />
+                          <button type="submit" disabled={forgotStatus === 'SENDING'} className="w-full py-3 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl transition-all">
+                              {forgotStatus === 'SENDING' ? 'Enviando...' : 'Enviar Link'}
                           </button>
                       </form>
                   )}
@@ -268,4 +234,5 @@ const Login: React.FC = () => {
     </div>
   );
 };
+
 export default Login;
