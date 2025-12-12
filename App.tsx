@@ -1,16 +1,31 @@
 
-import React, { useState, useEffect, createContext, useContext, useMemo } from 'react';
+import React, { useState, useEffect, createContext, useContext, useMemo, Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { User, PlanType } from './types';
 import { dbService } from './services/db';
-import Login from './pages/Login';
-import Dashboard from './pages/Dashboard';
-import CreateWork from './pages/CreateWork';
-import WorkDetail from './pages/WorkDetail';
-import Settings from './pages/Settings';
-import Profile from './pages/Profile';
-import VideoTutorials from './pages/VideoTutorials';
-import Checkout from './pages/Checkout';
+
+// --- Lazy Loading (Melhora a velocidade inicial) ---
+const Login = lazy(() => import('./pages/Login'));
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const CreateWork = lazy(() => import('./pages/CreateWork'));
+const WorkDetail = lazy(() => import('./pages/WorkDetail'));
+const Settings = lazy(() => import('./pages/Settings'));
+const Profile = lazy(() => import('./pages/Profile'));
+const VideoTutorials = lazy(() => import('./pages/VideoTutorials'));
+const Checkout = lazy(() => import('./pages/Checkout'));
+
+// --- Componente de Carregamento (Evita tela branca) ---
+const LoadingScreen = () => (
+  <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-950 transition-colors">
+    <div className="relative">
+        <div className="w-16 h-16 border-4 border-slate-200 dark:border-slate-800 border-t-secondary rounded-full animate-spin"></div>
+        <div className="absolute inset-0 flex items-center justify-center text-xs font-bold text-secondary">
+            <i className="fa-solid fa-helmet-safety"></i>
+        </div>
+    </div>
+    <p className="mt-4 text-sm font-bold text-slate-400 animate-pulse">Carregando...</p>
+  </div>
+);
 
 // --- Theme Context ---
 type Theme = 'light' | 'dark';
@@ -49,24 +64,39 @@ const AuthContext = createContext<AuthContextType>(null!);
 export const useAuth = () => useContext(AuthContext);
 
 const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  // Otimização: Se já temos user no localStorage, NÃO começamos com loading true.
+  // Isso permite que a UI carregue instantaneamente enquanto validamos o token em background.
   const [user, setUser] = useState<User | null>(() => dbService.getCurrentUser());
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => !dbService.getCurrentUser());
 
   const isSubscriptionValid = useMemo(() => user ? dbService.isSubscriptionActive(user) : false, [user]);
-  
-  // Define se é uma conta nova (nunca teve assinatura válida ou data de expiração nunca foi setada)
   const isNewAccount = useMemo(() => user ? !user.subscriptionExpiresAt : true, [user]);
 
   useEffect(() => {
     const sync = async () => {
-        const sbUser = await dbService.syncSession();
-        if (sbUser) setUser(sbUser);
-        setLoading(false);
+        // Se já temos usuário local, não bloqueamos a UI (loading continua false ou o que foi setado)
+        // Se não temos, loading é true (setado no useState inicial)
+        
+        try {
+            const sbUser = await dbService.syncSession();
+            // Se o sync retornar null (sessão inválida) e tínhamos usuário, o setUser(null) fará o logout
+            // Se retornar user atualizado, atualizamos o estado
+            if (sbUser) setUser(sbUser);
+            else if (user) setUser(null); // Logout se sessão expirou no servidor
+        } catch (e) {
+            console.error("Auth Sync Error", e);
+        } finally {
+            setLoading(false);
+        }
     };
     sync();
-    const unsubscribe = dbService.onAuthChange((u: User | null) => setUser(u));
+
+    const unsubscribe = dbService.onAuthChange((u: User | null) => {
+        setUser(u);
+        setLoading(false);
+    });
     return () => { unsubscribe(); };
-  }, []);
+  }, []); // Dependência vazia para rodar apenas no mount
 
   const refreshUser = async () => {
       const currentUser = dbService.getCurrentUser();
@@ -74,21 +104,31 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
   };
 
   const login = async (email: string, password?: string) => {
-    const u = await dbService.login(email, password);
-    if (u) {
-        setUser(u);
-        return true;
+    setLoading(true);
+    try {
+        const u = await dbService.login(email, password);
+        if (u) {
+            setUser(u);
+            return true;
+        }
+        return false;
+    } finally {
+        setLoading(false);
     }
-    return false;
   };
 
   const signup = async (name: string, email: string, whatsapp: string, password?: string, cpf?: string, planType?: string | null) => {
-    const u = await dbService.signup(name, email, whatsapp, password, cpf, planType);
-    if (u) {
-        setUser(u);
-        return true;
+    setLoading(true);
+    try {
+        const u = await dbService.signup(name, email, whatsapp, password, cpf, planType);
+        if (u) {
+            setUser(u);
+            return true;
+        }
+        return false;
+    } finally {
+        setLoading(false);
     }
-    return false;
   };
 
   const logout = () => {
@@ -124,20 +164,18 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       const planParam = params.get('plan') as PlanType | null;
 
       if (status === 'success' && user) {
-          // CORREÇÃO: Prioriza o plano vindo da URL para evitar que o estado antigo (MENSAL) sobrescreva o novo (VITALÍCIO)
           if (planParam) {
               updatePlan(planParam).then(() => {
                   alert("Pagamento confirmado! Plano atualizado com sucesso.");
                   navigate(location.pathname, { replace: true });
               });
           } else {
-              // Se não vier plano na URL, apenas limpa a query string (Checkout já fez o update)
               navigate(location.pathname, { replace: true });
           }
       }
   }, [location.search, user, updatePlan, navigate, location.pathname]);
 
-  if (loading) return null;
+  if (loading) return <LoadingScreen />;
   if (!user) return <Navigate to="/login" replace />;
 
   const isSettingsPage = location.pathname === '/settings';
@@ -254,29 +292,31 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       )}
 
       <main className="flex-1 p-4 md:p-8 overflow-y-auto h-screen">
-        {!isSubscriptionValid && isSettingsPage && (
-            <div className={`p-4 rounded-xl mb-6 flex items-center justify-between shadow-lg ${
-                isNewAccount 
-                    ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white' 
-                    : 'bg-danger text-white'
-            }`}>
-                <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-xl">
-                        <i className={`fa-solid ${isNewAccount ? 'fa-rocket' : 'fa-lock'}`}></i>
+        <React.Suspense fallback={<div className="h-full w-full flex items-center justify-center"><div className="w-10 h-10 border-4 border-secondary border-t-transparent rounded-full animate-spin"></div></div>}>
+            {!isSubscriptionValid && isSettingsPage && (
+                <div className={`p-4 rounded-xl mb-6 flex items-center justify-between shadow-lg ${
+                    isNewAccount 
+                        ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white' 
+                        : 'bg-danger text-white'
+                }`}>
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-xl">
+                            <i className={`fa-solid ${isNewAccount ? 'fa-rocket' : 'fa-lock'}`}></i>
+                        </div>
+                        <div>
+                            <p className="text-sm font-bold uppercase tracking-wide opacity-90">
+                                {isNewAccount ? 'Falta pouco!' : 'Acesso Bloqueado'}
+                            </p>
+                            <p className="text-sm font-bold">
+                                {isNewAccount ? 'Escolha um plano para começar a usar.' : 'Sua assinatura expirou. Renove para continuar.'}
+                            </p>
+                        </div>
                     </div>
-                    <div>
-                        <p className="text-sm font-bold uppercase tracking-wide opacity-90">
-                            {isNewAccount ? 'Falta pouco!' : 'Acesso Bloqueado'}
-                        </p>
-                        <p className="text-sm font-bold">
-                            {isNewAccount ? 'Escolha um plano para começar a usar.' : 'Sua assinatura expirou. Renove para continuar.'}
-                        </p>
-                    </div>
+                    <button onClick={logout} className="text-xs bg-white/20 px-3 py-2 rounded-lg font-bold hover:bg-white/30 transition-colors">Sair</button>
                 </div>
-                <button onClick={logout} className="text-xs bg-white/20 px-3 py-2 rounded-lg font-bold hover:bg-white/30 transition-colors">Sair</button>
-            </div>
-        )}
-        {children}
+            )}
+            {children}
+        </React.Suspense>
       </main>
     </div>
   );
@@ -287,16 +327,18 @@ const App: React.FC = () => {
     <BrowserRouter>
       <ThemeProvider>
         <AuthProvider>
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route path="/" element={<Layout><Dashboard /></Layout>} />
-            <Route path="/create" element={<Layout><CreateWork /></Layout>} />
-            <Route path="/work/:id" element={<Layout><WorkDetail /></Layout>} />
-            <Route path="/settings" element={<Layout><Settings /></Layout>} />
-            <Route path="/checkout" element={<Layout><Checkout /></Layout>} />
-            <Route path="/profile" element={<Layout><Profile /></Layout>} />
-            <Route path="/tutorials" element={<Layout><VideoTutorials /></Layout>} />
-          </Routes>
+          <Suspense fallback={<LoadingScreen />}>
+            <Routes>
+                <Route path="/login" element={<Login />} />
+                <Route path="/" element={<Layout><Dashboard /></Layout>} />
+                <Route path="/create" element={<Layout><CreateWork /></Layout>} />
+                <Route path="/work/:id" element={<Layout><WorkDetail /></Layout>} />
+                <Route path="/settings" element={<Layout><Settings /></Layout>} />
+                <Route path="/checkout" element={<Layout><Checkout /></Layout>} />
+                <Route path="/profile" element={<Layout><Profile /></Layout>} />
+                <Route path="/tutorials" element={<Layout><VideoTutorials /></Layout>} />
+            </Routes>
+          </Suspense>
         </AuthProvider>
       </ThemeProvider>
     </BrowserRouter>
