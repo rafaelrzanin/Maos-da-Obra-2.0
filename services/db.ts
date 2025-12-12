@@ -407,51 +407,55 @@ export const dbService = {
         });
         await supabase.from('steps').insert(stepsToInsert);
 
-        // 3. GENERATE MATERIALS FROM TEMPLATE (The Missing Link)
-        // This ensures the material list is populated automatically
-        const area = work.area || 50; // Fallback area if 0
-        let materialsToInsert: any[] = [];
-
-        // Determine which packages to include based on template
-        let packagesToInclude = [];
-        if (templateId === 'CONSTRUCAO') {
-            packagesToInclude = FULL_MATERIAL_PACKAGES;
-        } else if (templateId === 'REFORMA_APTO') {
-            packagesToInclude = FULL_MATERIAL_PACKAGES.filter(p => 
-                !['Fundação e Estrutura', 'Telhado e Cobertura', 'Limpeza e Canteiro'].includes(p.category)
-            );
-        } else if (templateId === 'BANHEIRO') {
-            packagesToInclude = FULL_MATERIAL_PACKAGES.filter(p => 
-                ['Instalações Hidráulicas (Tubulação)', 'Pisos e Revestimentos Cerâmicos', 'Louças e Metais (Acabamento Hidro)', 'Marmoraria e Granitos', 'Impermeabilização'].includes(p.category)
-            );
-        } else if (templateId === 'PINTURA') {
-            packagesToInclude = FULL_MATERIAL_PACKAGES.filter(p => p.category === 'Pintura');
-        } else {
-            // Default: include basics
-            packagesToInclude = FULL_MATERIAL_PACKAGES.filter(p => ['Pintura', 'Limpeza Final'].includes(p.category));
-        }
-
-        // Create the inserts
-        packagesToInclude.forEach(pkg => {
-            pkg.items.forEach(item => {
-                const qty = Math.ceil(area * (item.multiplier || 1));
-                materialsToInsert.push({
-                    work_id: parsedWork.id,
-                    name: item.name,
-                    brand: '',
-                    planned_qty: qty,
-                    purchased_qty: 0,
-                    unit: item.unit
-                });
-            });
-        });
-
-        if (materialsToInsert.length > 0) {
-            await supabase.from('materials').insert(materialsToInsert);
-        }
+        // 3. GENERATE MATERIALS
+        await this.regenerateMaterials(parsedWork.id, parsedWork.area, templateId);
     }
 
     return parsedWork;
+  },
+
+  // Function to regenerate materials manually if missing
+  async regenerateMaterials(workId: string, area: number, templateId: string = 'CONSTRUCAO') {
+      if (!supabase) return;
+      
+      const safeArea = area || 50;
+      let materialsToInsert: any[] = [];
+
+      let packagesToInclude = [];
+      if (templateId === 'CONSTRUCAO') {
+          packagesToInclude = FULL_MATERIAL_PACKAGES;
+      } else if (templateId === 'REFORMA_APTO') {
+          packagesToInclude = FULL_MATERIAL_PACKAGES.filter(p => 
+              !['Fundação e Estrutura', 'Telhado e Cobertura', 'Limpeza e Canteiro'].includes(p.category)
+          );
+      } else if (templateId === 'BANHEIRO') {
+          packagesToInclude = FULL_MATERIAL_PACKAGES.filter(p => 
+              ['Instalações Hidráulicas (Tubulação)', 'Pisos e Revestimentos Cerâmicos', 'Louças e Metais (Acabamento Hidro)', 'Marmoraria e Granitos', 'Impermeabilização'].includes(p.category)
+          );
+      } else if (templateId === 'PINTURA') {
+          packagesToInclude = FULL_MATERIAL_PACKAGES.filter(p => p.category === 'Pintura');
+      } else {
+          // Default fallback
+          packagesToInclude = FULL_MATERIAL_PACKAGES;
+      }
+
+      packagesToInclude.forEach(pkg => {
+          pkg.items.forEach(item => {
+              const qty = Math.ceil(safeArea * (item.multiplier || 1));
+              materialsToInsert.push({
+                  work_id: workId,
+                  name: item.name,
+                  brand: '',
+                  planned_qty: qty,
+                  purchased_qty: 0,
+                  unit: item.unit
+              });
+          });
+      });
+
+      if (materialsToInsert.length > 0) {
+          await supabase.from('materials').insert(materialsToInsert);
+      }
   },
 
   async deleteWork(workId: string) {
