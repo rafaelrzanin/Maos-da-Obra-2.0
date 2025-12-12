@@ -660,13 +660,13 @@ export const dbService = {
   // --- PHOTOS & FILES ---
   getPhotos: async (workId: string): Promise<WorkPhoto[]> => {
       if (!supabase) return [];
-      const { data } = await supabase.from('photos').select('*').eq('work_id', workId);
+      const { data } = await supabase.from('photos').select('*').eq('obra_id', workId);
       return (data || []).map(parsePhotoFromDB);
   },
   addPhoto: async (photo: WorkPhoto) => {
       if (!supabase) return;
       await supabase.from('photos').insert([{
-          work_id: photo.workId,
+          obra_id: photo.workId,
           url: photo.url,
           description: photo.description,
           date: photo.date,
@@ -676,13 +676,13 @@ export const dbService = {
 
   getFiles: async (workId: string): Promise<WorkFile[]> => {
       if (!supabase) return [];
-      const { data } = await supabase.from('files').select('*').eq('work_id', workId);
+      const { data } = await supabase.from('files').select('*').eq('obra_id', workId);
       return (data || []).map(parseFileFromDB);
   },
   addFile: async (file: WorkFile) => {
       if (!supabase) return;
       await supabase.from('files').insert([{
-          work_id: file.workId,
+          obra_id: file.workId,
           name: file.name,
           category: file.category,
           url: file.url,
@@ -700,10 +700,10 @@ export const dbService = {
   calculateWorkStats: async (workId: string) => {
       if (!supabase) return { totalSpent: 0, progress: 0, delayedSteps: 0 };
       
-      const { data: expenses } = await supabase.from('expenses').select('amount').eq('work_id', workId);
+      const { data: expenses } = await supabase.from('expenses').select('amount').eq('obra_id', workId);
       const totalSpent = (expenses || []).reduce((acc, curr) => acc + Number(curr.amount), 0);
 
-      const { data: steps } = await supabase.from('steps').select('status').eq('work_id', workId);
+      const { data: steps } = await supabase.from('steps').select('status').eq('obra_id', workId);
       const totalSteps = steps?.length || 0;
       const completed = steps?.filter((s: any) => s.status === 'CONCLUIDO').length || 0;
       const progress = totalSteps > 0 ? Math.round((completed / totalSteps) * 100) : 0;
