@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+
+import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../App';
 import { dbService } from '../services/db';
@@ -33,7 +34,10 @@ const Dashboard: React.FC = () => {
   const [upcomingSteps, setUpcomingSteps] = useState<Step[]>([]);
   const [loading, setLoading] = useState(true);
   
-  // Dica Dinâmica - Corrigido erro TS removendo o setter não utilizado
+  // UseRef to track if we've already loaded for this user ID to prevent loops
+  const loadedUserIdRef = useRef<string | null>(null);
+  
+  // Dica Dinâmica
   const [currentTip] = useState<ZeTip>(() => getRandomZeTip());
   
   // Dropdown State
@@ -44,21 +48,31 @@ const Dashboard: React.FC = () => {
 
   useEffect(() => {
     const loadDashboard = async () => {
-        if (user) {
+        // Prevent reloading if user ID hasn't changed
+        if (user && user.id !== loadedUserIdRef.current) {
+            loadedUserIdRef.current = user.id;
             setLoading(true);
-            const data = await dbService.getWorks(user.id);
-            setWorks(data);
+            
+            try {
+                const data = await dbService.getWorks(user.id);
+                setWorks(data);
 
-            if (data.length > 0) {
-                // Default to first work
-                handleSwitchWork(data[0]);
-            } else {
+                if (data.length > 0) {
+                    // Default to first work
+                    await handleSwitchWork(data[0]);
+                } else {
+                    setLoading(false);
+                }
+            } catch (e) {
+                console.error("Dashboard Load Error", e);
                 setLoading(false);
             }
+        } else if (!user) {
+            setLoading(false);
         }
     };
     loadDashboard();
-  }, [user]);
+  }, [user?.id]); // Only re-run if user ID changes, NOT the entire user object
 
   const handleSwitchWork = async (work: Work) => {
       setFocusWork(work);
@@ -66,10 +80,13 @@ const Dashboard: React.FC = () => {
       setLoading(true);
       
       try {
+        if (!user) return;
+        
+        // Fetch all work-related data in parallel for speed
         const [workStats, summary, notifs, steps] = await Promise.all([
             dbService.calculateWorkStats(work.id),
             dbService.getDailySummary(work.id),
-            dbService.getNotifications(user!.id),
+            dbService.getNotifications(user.id),
             dbService.getSteps(work.id)
         ]);
 
@@ -85,7 +102,7 @@ const Dashboard: React.FC = () => {
         setUpcomingSteps(nextSteps);
 
         // Run smart check (fire and forget)
-        dbService.generateSmartNotifications(user!.id, work.id);
+        dbService.generateSmartNotifications(user.id, work.id);
       } catch (e) {
           console.error(e);
       } finally {
@@ -120,9 +137,9 @@ const Dashboard: React.FC = () => {
                 // If another work was focused, keep it, unless it's gone
                 const stillExists = updatedWorks.find(w => w.id === focusWork?.id);
                 if (stillExists) {
-                    handleSwitchWork(stillExists);
+                    await handleSwitchWork(stillExists);
                 } else {
-                    handleSwitchWork(updatedWorks[0]);
+                    await handleSwitchWork(updatedWorks[0]);
                 }
             } else {
                 setFocusWork(null);
