@@ -91,7 +91,7 @@ const parseSupplierFromDB = (data: any): Supplier => ({
 
 const parsePhotoFromDB = (data: any): WorkPhoto => ({
     id: data.id,
-    workId: data.work_id,
+    workId: data.obra_id,
     url: data.url,
     description: data.description,
     date: data.date,
@@ -100,7 +100,7 @@ const parsePhotoFromDB = (data: any): WorkPhoto => ({
 
 const parseFileFromDB = (data: any): WorkFile => ({
     id: data.id,
-    workId: data.work_id,
+    workId: data.obra_id,
     name: data.name,
     category: data.category,
     url: data.url,
