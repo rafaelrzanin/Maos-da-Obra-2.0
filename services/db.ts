@@ -248,11 +248,18 @@ export const dbService = {
           startDate: work.startDate,
           endDate: work.endDate,
           area: work.area,
+          // Detailed fields
+          floors: work.floors,
+          bedrooms: work.bedrooms,
+          bathrooms: work.bathrooms,
+          kitchens: work.kitchens,
+          livingRooms: work.livingRooms,
+          hasLeisureArea: work.hasLeisureArea,
           status: work.status || 'Planejamento',
           notes: work.notes
       }]).select().single();
 
-      if (error || !data) throw error || new Error("Erro ao criar obra");
+      if (error || !data) throw error || new Error("Erro ao criar obra no banco de dados.");
       const newWork = data as Work;
 
       // 2. Apply Template (Steps) if selected
