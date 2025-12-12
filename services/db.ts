@@ -361,7 +361,7 @@ export const dbService = {
                   eDate.setDate(sDate.getDate() + stepDuration);
                   
                   return {
-                      work_id: newWork.id,
+                      obra_id: newWork.id,
                       name: stepName,
                       start_date: sDate.toISOString().split('T')[0],
                       end_date: eDate.toISOString().split('T')[0],
