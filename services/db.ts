@@ -18,6 +18,30 @@ const mapProfileFromSupabase = (data: any): User => ({
     subscriptionExpiresAt: data.subscription_expires_at
 });
 
+// --- HELPER: Parse Work Data (DB snake_case -> App camelCase) ---
+const parseWorkFromDB = (data: any): Work => {
+    return {
+        id: data.id,
+        userId: data.user_id || data.userId, // Fallback for legacy
+        name: data.name,
+        address: data.address,
+        budgetPlanned: Number(data.budget_planned || data.budgetPlanned),
+        startDate: data.start_date || data.startDate,
+        endDate: data.end_date || data.endDate,
+        area: Number(data.area),
+        status: data.status,
+        notes: data.notes || '',
+        
+        // Mapeamento das colunas reais
+        floors: data.floors ? Number(data.floors) : 1,
+        bedrooms: data.bedrooms ? Number(data.bedrooms) : 0,
+        bathrooms: data.bathrooms ? Number(data.bathrooms) : 0,
+        kitchens: data.kitchens ? Number(data.kitchens) : 0,
+        livingRooms: data.living_rooms ? Number(data.living_rooms) : 0,
+        hasLeisureArea: data.has_leisure_area || false
+    } as Work;
+};
+
 export const dbService = {
   
   // --- AUTHENTICATION & PROFILE ---
@@ -217,29 +241,22 @@ export const dbService = {
   // 1. WORKS (OBRAS)
   getWorks: async (userId: string): Promise<Work[]> => {
       if (!supabase) return [];
+      // Select all columns explicitly to ensure we get snake_case fields
       const { data } = await supabase.from('works').select('*').eq('userId', userId);
-      return (data || []).map(w => ({
-          ...w,
-          budgetPlanned: Number(w.budgetPlanned), // Ensure number
-          area: Number(w.area)
-      }));
+      return (data || []).map(parseWorkFromDB);
   },
 
   getWorkById: async (workId: string): Promise<Work | null> => {
       if (!supabase) return null;
       const { data, error } = await supabase.from('works').select('*').eq('id', workId).single();
       if (error || !data) return null;
-      return {
-          ...data,
-          budgetPlanned: Number(data.budgetPlanned),
-          area: Number(data.area)
-      } as Work;
+      return parseWorkFromDB(data);
   },
 
   createWork: async (work: Omit<Work, 'id'>, templateId?: string): Promise<Work> => {
       if (!supabase) throw new Error("Offline");
       
-      // 1. Insert Work
+      // 1. Insert Work - Mapping CamelCase to DB Snake_case
       const { data, error } = await supabase.from('works').insert([{
           userId: work.userId,
           name: work.name,
@@ -248,19 +265,24 @@ export const dbService = {
           startDate: work.startDate,
           endDate: work.endDate,
           area: work.area,
-          // Detailed fields
+          status: work.status || 'Planejamento',
+          notes: work.notes,
+          
+          // Mapeamento para Colunas Reais
           floors: work.floors,
           bedrooms: work.bedrooms,
           bathrooms: work.bathrooms,
           kitchens: work.kitchens,
-          livingRooms: work.livingRooms,
-          hasLeisureArea: work.hasLeisureArea,
-          status: work.status || 'Planejamento',
-          notes: work.notes
+          living_rooms: work.livingRooms, // Note snake_case for DB
+          has_leisure_area: work.hasLeisureArea // Note snake_case for DB
       }]).select().single();
 
-      if (error || !data) throw error || new Error("Erro ao criar obra no banco de dados.");
-      const newWork = data as Work;
+      if (error || !data) {
+          console.error("Supabase Error:", error);
+          throw new Error(error?.message || "Erro ao criar obra no banco de dados.");
+      }
+      
+      const newWork = parseWorkFromDB(data);
 
       // 2. Apply Template (Steps) if selected
       if (templateId) {
