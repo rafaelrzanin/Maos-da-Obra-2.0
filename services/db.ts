@@ -119,6 +119,11 @@ const parseNotificationFromDB = (data: any): Notification => ({
     type: data.type
 });
 
+// --- CACHE SIMPLES PARA EVITAR LOOPS ---
+let cachedUserPromise: Promise<User | null> | null = null;
+let lastCacheTime = 0;
+const CACHE_DURATION = 5000; // 5 segundos de cache
+
 // --- CRITICAL FIX: Ensure Profile Exists (Unbreakable Version) ---
 const ensureUserProfile = async (authUser: any): Promise<User | null> => {
     if (!authUser || !supabase) return null;
@@ -182,18 +187,35 @@ export const dbService = {
   // --- AUTH ---
   async getCurrentUser() {
     if (!supabase) return null;
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.user) return null;
-    return await ensureUserProfile(session.user);
+    
+    const now = Date.now();
+    // Retorna cache se for recente (Evita spam no banco)
+    if (cachedUserPromise && (now - lastCacheTime < CACHE_DURATION)) {
+        return cachedUserPromise;
+    }
+
+    cachedUserPromise = (async () => {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user) return null;
+        return await ensureUserProfile(session.user);
+    })();
+    
+    lastCacheTime = now;
+    return cachedUserPromise;
   },
 
   async syncSession() {
+    // Força limpeza do cache para buscar dados frescos
+    cachedUserPromise = null;
     return this.getCurrentUser();
   },
 
   onAuthChange(callback: (user: User | null) => void) {
     if (!supabase) return () => {};
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+        // Limpa cache ao mudar estado de auth
+        cachedUserPromise = null;
+        
         if (session?.user) {
             const user = await ensureUserProfile(session.user);
             callback(user);
@@ -209,6 +231,7 @@ export const dbService = {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password: password || '' });
     if (error) throw error;
     if (data.user) {
+        cachedUserPromise = null; // Limpa cache
         return await ensureUserProfile(data.user);
     }
     return null;
@@ -254,11 +277,13 @@ export const dbService = {
         subscription_expires_at: trialExpires.toISOString()
     });
 
+    cachedUserPromise = null;
     return await ensureUserProfile(authData.user);
   },
 
   async logout() {
     if (supabase) await supabase.auth.signOut();
+    cachedUserPromise = null;
   },
 
   async getUserProfile(userId: string): Promise<User | null> {
@@ -281,6 +306,7 @@ export const dbService = {
       if (newPassword) {
           await supabase.auth.updateUser({ password: newPassword });
       }
+      cachedUserPromise = null; // Força recarga no próximo uso
   },
 
   async resetPassword(email: string) {
@@ -311,6 +337,8 @@ export const dbService = {
           subscription_expires_at: expires.toISOString(),
           is_trial: false
       }).eq('id', userId);
+      
+      cachedUserPromise = null;
   },
 
   async generatePix(_amount: number, _payer: any) {
