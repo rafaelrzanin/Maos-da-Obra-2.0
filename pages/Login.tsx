@@ -110,15 +110,19 @@ const Login: React.FC = () => {
 
   const handleSocialLogin = async (provider: 'google') => {
     setLoading(true);
-    const { user: socialUser, error } = await dbService.loginSocial(provider);
+    // loginSocial returns the result of supabase.auth.signInWithOAuth
+    // It returns { data, error }, NO user object directly.
+    const result = await dbService.loginSocial(provider);
     
+    // Check if error exists on the result object
+    // Casting to any to safely access error if strictly typed differently in versions
+    const error = (result as any).error;
+
     if (error) {
         alert("Erro no login Google.");
         setLoading(false);
-    } else if (socialUser) {
-        // Force auth refresh in App context
-        window.location.reload(); 
-    }
+    } 
+    // If successful, Supabase handles the redirect automatically.
   };
 
   const handleForgotPassword = async (e: React.FormEvent) => {
