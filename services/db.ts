@@ -465,13 +465,13 @@ export const dbService = {
   // --- STEPS ---
   getSteps: async (workId: string): Promise<Step[]> => {
       if (!supabase) return [];
-      const { data } = await supabase.from('steps').select('*').eq('work_id', workId);
+      const { data } = await supabase.from('etapas').select('*').eq('work_id', workId);
       return (data || []).map(parseStepFromDB);
   },
 
   addStep: async (step: Step) => {
       if (!supabase) return;
-      await supabase.from('steps').insert([{
+      await supabase.from('etapas').insert([{
           work_id: step.workId,
           name: step.name,
           start_date: step.startDate,
@@ -482,7 +482,7 @@ export const dbService = {
 
   updateStep: async (step: Step) => {
       if (!supabase) return;
-      await supabase.from('steps').update({
+      await supabase.from('etapas').update({
           name: step.name,
           start_date: step.startDate,
           end_date: step.endDate,
@@ -493,14 +493,14 @@ export const dbService = {
   // --- MATERIALS ---
   getMaterials: async (workId: string): Promise<Material[]> => {
       if (!supabase) return [];
-      const { data } = await supabase.from('materials').select('*').eq('work_id', workId);
+      const { data } = await supabase.from('materiais').select('*').eq('work_id', workId);
       return (data || []).map(parseMaterialFromDB);
   },
 
   addMaterial: async (material: Material, purchaseData?: { qty: number, cost: number, date: string }) => {
       if (!supabase) return;
       
-      const { data: matData } = await supabase.from('materials').insert([{
+      const { data: matData } = await supabase.from('materiais').insert([{
           work_id: material.workId,
           name: material.name,
           brand: material.brand,
@@ -526,7 +526,7 @@ export const dbService = {
 
   updateMaterial: async (material: Material) => {
       if (!supabase) return;
-      await supabase.from('materials').update({
+      await supabase.from('materiais').update({
           name: material.name,
           brand: material.brand,
           planned_qty: material.plannedQty,
@@ -537,12 +537,12 @@ export const dbService = {
   registerMaterialPurchase: async (matId: string, name: string, brand: string, plannedQty: number, unit: string, buyQty: number, cost: number) => {
       if (!supabase) return;
       
-      const { data: current } = await supabase.from('materials').select('purchased_qty, work_id, step_id').eq('id', matId).single();
+      const { data: current } = await supabase.from('materiais').select('purchased_qty, work_id, step_id').eq('id', matId).single();
       if (!current) return;
 
       const newPurchasedQty = (Number(current.purchased_qty) || 0) + buyQty;
       
-      await supabase.from('materials').update({ 
+      await supabase.from('materiais').update({ 
           purchased_qty: newPurchasedQty,
           name: name,
           brand: brand,
