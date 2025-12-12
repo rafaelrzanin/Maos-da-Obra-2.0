@@ -7,6 +7,36 @@ import { Work, Notification, Step, StepStatus, PlanType } from '../types';
 import { ZE_AVATAR, ZE_AVATAR_FALLBACK, getRandomZeTip, ZeTip } from '../services/standards';
 import { ZeModal } from '../components/ZeModal';
 
+// --- COMPONENTE SKELETON (Carregamento Visual) ---
+const DashboardSkeleton = () => (
+  <div className="max-w-4xl mx-auto pb-28 pt-6 px-4 md:px-0 animate-pulse">
+      {/* Header Skeleton */}
+      <div className="flex justify-between items-end mb-8">
+          <div className="space-y-2">
+              <div className="h-3 w-32 bg-slate-200 dark:bg-slate-800 rounded-full"></div>
+              <div className="h-8 w-64 bg-slate-200 dark:bg-slate-800 rounded-xl"></div>
+          </div>
+          <div className="h-10 w-40 bg-slate-200 dark:bg-slate-800 rounded-xl"></div>
+      </div>
+      
+      {/* Zé Tip Skeleton */}
+      <div className="h-24 w-full bg-slate-200 dark:bg-slate-800 rounded-2xl mb-8"></div>
+      
+      {/* Main HUD Skeleton */}
+      <div className="h-64 w-full bg-slate-200 dark:bg-slate-800 rounded-[1.4rem] mb-8"></div>
+      
+      {/* List Skeleton */}
+      <div className="space-y-4">
+          <div className="h-4 w-32 bg-slate-200 dark:bg-slate-800 rounded-full mb-2"></div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="h-20 bg-slate-200 dark:bg-slate-800 rounded-2xl"></div>
+              <div className="h-20 bg-slate-200 dark:bg-slate-800 rounded-2xl"></div>
+              <div className="h-20 bg-slate-200 dark:bg-slate-800 rounded-2xl"></div>
+          </div>
+      </div>
+  </div>
+);
+
 // Helper para formatar data
 const formatDateDisplay = (dateStr: string) => {
     if (!dateStr) return '--/--';
@@ -25,118 +55,110 @@ const Dashboard: React.FC = () => {
   const { user, trialDaysRemaining } = useAuth();
   const navigate = useNavigate();
   
-  // State
+  // Data State
   const [works, setWorks] = useState<Work[]>([]);
   const [focusWork, setFocusWork] = useState<Work | null>(null);
+  
+  // Dashboard Metrics State
   const [stats, setStats] = useState({ totalSpent: 0, progress: 0, delayedSteps: 0 });
   const [dailySummary, setDailySummary] = useState({ completedSteps: 0, delayedSteps: 0, pendingMaterials: 0, totalSteps: 0 });
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [upcomingSteps, setUpcomingSteps] = useState<Step[]>([]);
-  const [loading, setLoading] = useState(true);
   
-  // UseRef to track if we've already loaded for this user ID to prevent loops
-  const loadedUserIdRef = useRef<string | null>(null);
+  // Loading States (Granular)
+  const [isLoadingWorks, setIsLoadingWorks] = useState(true);
+  const [isLoadingDetails, setIsLoadingDetails] = useState(false);
   
-  // Dica Dinâmica
+  // UI States
   const [currentTip] = useState<ZeTip>(() => getRandomZeTip());
-  
-  // Dropdown State
   const [showWorkSelector, setShowWorkSelector] = useState(false);
-  
-  // Delete Modal State
   const [zeModal, setZeModal] = useState<{isOpen: boolean, title: string, message: string, workId?: string}>({isOpen: false, title: '', message: ''});
-
-  // Trial Upsell Modal
   const [showTrialUpsell, setShowTrialUpsell] = useState(false);
 
+  // 1. Initial Load: Apenas busca a lista de obras (Rápido)
   useEffect(() => {
-    // Show Trial Warning only if trial active AND 1 day remaining (Last day)
+    let isMounted = true;
+
+    const fetchWorks = async () => {
+        if (!user) return;
+        
+        try {
+            const data = await dbService.getWorks(user.id);
+            if (isMounted) {
+                setWorks(data);
+                if (data.length > 0) {
+                    setFocusWork(data[0]); // Seleciona a primeira, mas não busca detalhes ainda
+                }
+            }
+        } catch (e) {
+            console.error("Erro ao buscar obras:", e);
+        } finally {
+            if (isMounted) setIsLoadingWorks(false);
+        }
+    };
+
+    fetchWorks();
+    return () => { isMounted = false; };
+  }, [user]);
+
+  // 2. Details Load: Busca os dados pesados quando a obra em foco muda
+  useEffect(() => {
+      let isMounted = true;
+
+      const fetchDetails = async () => {
+          if (!focusWork || !user) return;
+
+          setIsLoadingDetails(true);
+          try {
+            // Executa em paralelo para velocidade
+            const [workStats, summary, notifs, steps] = await Promise.all([
+                dbService.calculateWorkStats(focusWork.id),
+                dbService.getDailySummary(focusWork.id),
+                dbService.getNotifications(user.id),
+                dbService.getSteps(focusWork.id)
+            ]);
+
+            if (isMounted) {
+                setStats(workStats);
+                setDailySummary(summary);
+                setNotifications(notifs);
+
+                // Filter Next Steps
+                const nextSteps = steps
+                    .filter(s => s.status !== StepStatus.COMPLETED)
+                    .sort((a: Step, b: Step) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
+                    .slice(0, 3);
+                setUpcomingSteps(nextSteps);
+            }
+            
+            // Background check (não bloqueia UI)
+            dbService.generateSmartNotifications(user.id, focusWork.id);
+
+          } catch (e) {
+              console.error("Erro nos detalhes:", e);
+          } finally {
+              if (isMounted) setIsLoadingDetails(false);
+          }
+      };
+
+      if (focusWork) {
+          fetchDetails();
+      }
+      
+      return () => { isMounted = false; };
+  }, [focusWork, user]);
+
+  // Trial Check
+  useEffect(() => {
     if (user?.isTrial && trialDaysRemaining !== null && trialDaysRemaining <= 1) {
         setShowTrialUpsell(true);
     }
   }, [user, trialDaysRemaining]);
 
-  useEffect(() => {
-    let isMounted = true;
-
-    const loadDashboard = async () => {
-        // Prevent reloading if user ID hasn't changed, unless it's the first load
-        if (user && (user.id !== loadedUserIdRef.current || works.length === 0)) {
-            loadedUserIdRef.current = user.id;
-            setLoading(true);
-            
-            // Safety timeout: Se o banco demorar mais de 8s, libera a tela
-            const timeoutId = setTimeout(() => {
-                if (isMounted && loading) {
-                    console.warn("Dashboard timeout: Banco demorou muito.");
-                    setLoading(false);
-                }
-            }, 8000);
-
-            try {
-                const data = await dbService.getWorks(user.id);
-                if (!isMounted) return;
-                
-                setWorks(data);
-
-                if (data.length > 0) {
-                    // Default to first work
-                    await handleSwitchWork(data[0], isMounted);
-                } else {
-                    setFocusWork(null);
-                }
-            } catch (e) {
-                console.error("Dashboard Load Error", e);
-            } finally {
-                clearTimeout(timeoutId);
-                if (isMounted) setLoading(false);
-            }
-        } else if (!user) {
-            setLoading(false);
-        }
-    };
-    
-    loadDashboard();
-    
-    return () => { isMounted = false; };
-  }, [user?.id]); 
-
-  const handleSwitchWork = async (work: Work, isMounted: boolean = true) => {
+  const handleSwitchWork = (work: Work) => {
       setFocusWork(work);
       setShowWorkSelector(false);
-      setLoading(true);
-      
-      try {
-        if (!user) return;
-        
-        // Fetch all work-related data in parallel for speed
-        const [workStats, summary, notifs, steps] = await Promise.all([
-            dbService.calculateWorkStats(work.id),
-            dbService.getDailySummary(work.id),
-            dbService.getNotifications(user.id),
-            dbService.getSteps(work.id)
-        ]);
-
-        if (!isMounted) return;
-
-        setStats(workStats);
-        setDailySummary(summary);
-        setNotifications(notifs);
-
-        // Filter Next Steps (Top 3 Pending)
-        const nextSteps = steps
-            .filter(s => s.status !== StepStatus.COMPLETED)
-            .sort((a: Step, b: Step) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
-            .slice(0, 3);
-        setUpcomingSteps(nextSteps);
-
-        // Run smart check (fire and forget)
-        dbService.generateSmartNotifications(user.id, work.id);
-      } catch (e) {
-          console.error(e);
-      } finally {
-          if (isMounted) setLoading(false);
-      }
+      // O useEffect[focusWork] vai disparar e carregar os detalhes automaticamente
   };
 
   const handleAccessWork = () => {
@@ -146,7 +168,7 @@ const Dashboard: React.FC = () => {
   };
 
   const handleDeleteClick = (e: React.MouseEvent, workId: string, workName: string) => {
-      e.stopPropagation(); // Prevent switching work when clicking delete
+      e.stopPropagation();
       setZeModal({
           isOpen: true,
           title: "Apagar Obra",
@@ -158,32 +180,25 @@ const Dashboard: React.FC = () => {
   const confirmDelete = async () => {
       if (zeModal.workId && user) {
           try {
-            setLoading(true);
+            setIsLoadingWorks(true); // Bloqueia brevemente para reload
             await dbService.deleteWork(zeModal.workId);
             
-            // Reload works from source to be safe
             const updatedWorks = await dbService.getWorks(user.id);
             setWorks(updatedWorks);
             setZeModal({isOpen: false, title: '', message: ''});
   
-            // Handle Focus
             if (updatedWorks.length > 0) {
-                // If the deleted work was the focused one, switch to the first available
-                // If another work was focused, keep it, unless it's gone
+                // Tenta manter o foco ou vai para a primeira
                 const stillExists = updatedWorks.find(w => w.id === focusWork?.id);
-                if (stillExists) {
-                    await handleSwitchWork(stillExists);
-                } else {
-                    await handleSwitchWork(updatedWorks[0]);
-                }
+                setFocusWork(stillExists || updatedWorks[0]);
             } else {
                 setFocusWork(null);
-                setLoading(false);
             }
           } catch (e) {
               console.error("Erro ao apagar", e);
-              alert("Erro ao excluir obra. Tente novamente.");
-              setLoading(false);
+              alert("Erro ao excluir obra.");
+          } finally {
+              setIsLoadingWorks(false);
           }
       }
   };
@@ -199,18 +214,15 @@ const Dashboard: React.FC = () => {
       setNotifications([]);
   };
 
-  // Se estiver carregando E não tiver nenhuma obra carregada
-  if (loading && !focusWork && works.length === 0) return (
-      <div className="flex flex-col items-center justify-center h-screen text-secondary">
-          <i className="fa-solid fa-circle-notch fa-spin text-3xl mb-4"></i>
-          <p className="text-slate-400 font-bold animate-pulse">Carregando dados...</p>
-      </div>
-  );
+  // --- RENDERIZADORES ---
 
-  // EMPTY STATE - SE NÃO TIVER OBRAS
-  if ((!focusWork && !loading) || (works.length === 0 && !loading)) {
+  // 1. Carregando lista de obras (Estado inicial)
+  if (isLoadingWorks) return <DashboardSkeleton />;
+
+  // 2. Não tem obras (Empty State) - Renderiza instantâneo se works = []
+  if (!focusWork || works.length === 0) {
       return (
-        <div className="flex flex-col items-center justify-center min-h-[80vh] px-4 text-center animate-in fade-in">
+        <div className="flex flex-col items-center justify-center min-h-[80vh] px-4 text-center animate-in fade-in duration-500">
             <div className="w-24 h-24 bg-gradient-gold rounded-[2rem] flex items-center justify-center text-white mb-8 shadow-glow transform rotate-3">
                 <i className="fa-solid fa-helmet-safety text-5xl"></i>
             </div>
@@ -228,20 +240,16 @@ const Dashboard: React.FC = () => {
       );
   }
 
-  // Se tiver obras, mas focusWork ainda for null (raro, mas possível durante transição)
-  if (!focusWork) return null;
-
-  // CALCULATIONS FOR UI
+  // 3. Tem obra selecionada -> Renderiza Dashboard
+  // Cálculos visuais
   const budgetUsage = focusWork.budgetPlanned > 0 ? (stats.totalSpent / focusWork.budgetPlanned) * 100 : 0;
   const budgetPercentage = Math.round(budgetUsage);
   
-  // UX Logic
   const hasDelay = dailySummary.delayedSteps > 0;
   const isOverBudget = budgetPercentage > 100;
   const isNearBudget = budgetPercentage > 85;
   
-  // Dynamic Styles
-  let statusGradient = 'from-secondary to-yellow-500'; // Default Gold
+  let statusGradient = 'from-secondary to-yellow-500';
   let statusIcon = 'fa-thumbs-up';
   let statusMessage = 'Tudo sob controle';
   
@@ -256,7 +264,7 @@ const Dashboard: React.FC = () => {
   }
 
   return (
-    <div className="max-w-4xl mx-auto pb-28 pt-6 px-4 md:px-0 font-sans">
+    <div className="max-w-4xl mx-auto pb-28 pt-6 px-4 md:px-0 font-sans animate-in fade-in">
       
       {/* Header Area */}
       <div className="mb-8 flex items-end justify-between relative z-20">
@@ -277,7 +285,6 @@ const Dashboard: React.FC = () => {
                      <i className={`fa-solid fa-chevron-down text-xs transition-transform ${showWorkSelector ? 'rotate-180' : ''}`}></i>
                  </button>
                  
-                 {/* Explicit Delete Button for Current Work */}
                  <button 
                     onClick={(e) => handleDeleteClick(e, focusWork.id, focusWork.name)}
                     className="w-11 h-11 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-400 hover:text-red-500 hover:border-red-200 dark:hover:border-red-900 dark:hover:text-red-400 flex items-center justify-center shadow-sm transition-all"
@@ -300,12 +307,6 @@ const Dashboard: React.FC = () => {
                                 <span className={`flex-1 truncate ${focusWork.id === w.id ? 'text-secondary font-bold' : 'text-slate-600 dark:text-slate-300'}`}>{w.name}</span>
                                 <div className="flex items-center gap-3">
                                     {focusWork.id === w.id && <i className="fa-solid fa-check text-secondary"></i>}
-                                    <button 
-                                        onClick={(e) => handleDeleteClick(e, w.id, w.name)}
-                                        className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-400 hover:bg-red-100 hover:text-red-500 flex items-center justify-center transition-colors"
-                                    >
-                                        <i className="fa-solid fa-trash text-xs"></i>
-                                    </button>
                                 </div>
                              </div>
                          ))}
@@ -373,209 +374,195 @@ const Dashboard: React.FC = () => {
         </div>
       </button>
 
-      {/* MAIN HUD (Heads Up Display) */}
-      <div className="glass-panel rounded-3xl p-1 shadow-2xl mb-8 relative z-0">
-          <div className="bg-white/50 dark:bg-slate-800/60 rounded-[1.4rem] p-6 lg:p-8 backdrop-blur-xl">
-              
-              {/* Status Header */}
-              <div className="flex items-center gap-4 mb-8">
-                  <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${statusGradient} flex items-center justify-center text-white text-3xl shadow-lg transform -rotate-3`}>
-                      <i className={`fa-solid ${statusIcon}`}></i>
-                  </div>
-                  <div>
-                      <h2 className="text-2xl font-bold text-primary dark:text-white leading-tight">{statusMessage}</h2>
-                      <p className="text-slate-500 dark:text-slate-400 font-medium">Resumo de hoje</p>
-                  </div>
-              </div>
-
-              {/* Metrics Grid */}
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
-                  {/* Card 1: Tarefas */}
-                  <div 
-                    onClick={handleAccessWork}
-                    className={`p-5 rounded-2xl border transition-all cursor-pointer hover:-translate-y-1 hover:shadow-lg bg-white dark:bg-slate-800/80 ${hasDelay ? 'border-red-500/30' : 'border-slate-100 dark:border-slate-700'}`}
-                  >
-                      <div className="flex justify-between items-start mb-3">
-                          <div className={`w-10 h-10 rounded-full flex items-center justify-center ${hasDelay ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400' : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400'}`}>
-                               <i className="fa-solid fa-list-check"></i>
-                          </div>
-                          {hasDelay && <span className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></span>}
+      {/* MAIN HUD (SKELETON IF LOADING) */}
+      {isLoadingDetails ? (
+          <div className="glass-panel rounded-3xl p-1 shadow-2xl mb-8 relative z-0 animate-pulse">
+              <div className="bg-white/50 dark:bg-slate-800/60 rounded-[1.4rem] p-6 h-64"></div>
+          </div>
+      ) : (
+          <div className="glass-panel rounded-3xl p-1 shadow-2xl mb-8 relative z-0">
+              <div className="bg-white/50 dark:bg-slate-800/60 rounded-[1.4rem] p-6 lg:p-8 backdrop-blur-xl">
+                  {/* Status Header */}
+                  <div className="flex items-center gap-4 mb-8">
+                      <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${statusGradient} flex items-center justify-center text-white text-3xl shadow-lg transform -rotate-3`}>
+                          <i className={`fa-solid ${statusIcon}`}></i>
                       </div>
-                      <p className="text-3xl font-extrabold text-primary dark:text-white mb-1">
-                          {hasDelay ? dailySummary.delayedSteps : dailySummary.completedSteps}
-                      </p>
-                      <p className={`text-xs font-bold uppercase tracking-wider ${hasDelay ? 'text-red-500 dark:text-red-400' : 'text-slate-500 dark:text-slate-400'}`}>
-                          {hasDelay ? 'Atrasadas' : 'Concluídas'}
-                      </p>
-                  </div>
-
-                  {/* Card 2: Compras */}
-                  <div 
-                    onClick={handleAccessWork}
-                    className="p-5 rounded-2xl bg-white dark:bg-slate-800/80 border border-slate-100 dark:border-slate-700 transition-all cursor-pointer hover:-translate-y-1 hover:shadow-lg"
-                  >
-                      <div className="flex justify-between items-start mb-3">
-                          <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-700 text-secondary flex items-center justify-center">
-                               <i className="fa-solid fa-cart-shopping"></i>
-                          </div>
-                      </div>
-                      <p className="text-3xl font-extrabold text-primary dark:text-white mb-1">
-                          {dailySummary.pendingMaterials}
-                      </p>
-                      <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                          Pendentes
-                      </p>
-                  </div>
-
-                  {/* Card 3: Progresso (Full width on mobile) */}
-                  <div className="col-span-2 md:col-span-1 p-5 rounded-2xl bg-gradient-to-br from-primary to-slate-800 text-white shadow-xl relative overflow-hidden">
-                      <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2"></div>
-                      <div className="relative z-10">
-                        <div className="flex justify-between items-start mb-3">
-                             <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center backdrop-blur-sm">
-                                <i className="fa-solid fa-chart-pie"></i>
-                             </div>
-                             <span className="font-bold text-lg">{stats.progress}%</span>
-                        </div>
-                        <div className="h-2 bg-black/20 rounded-full overflow-hidden mb-2">
-                             <div className="h-full bg-secondary shadow-[0_0_10px_rgba(217,119,6,0.5)]" style={{ width: `${stats.progress}%` }}></div>
-                        </div>
-                        <p className="text-[10px] uppercase tracking-wider opacity-70 font-bold">Progresso Geral</p>
-                      </div>
-                  </div>
-              </div>
-
-              {/* Financial Strip */}
-              <div className="bg-slate-50 dark:bg-slate-800/80 rounded-2xl p-6 border border-slate-200 dark:border-slate-700 relative overflow-hidden">
-                  {/* Background Bar */}
-                  <div className="absolute bottom-0 left-0 h-1 bg-slate-200 dark:bg-slate-700 w-full"></div>
-                  <div className={`absolute bottom-0 left-0 h-1 transition-all duration-1000 ${isOverBudget ? 'bg-danger shadow-[0_0_15px_red]' : 'bg-success shadow-[0_0_15px_lime]'}`} style={{ width: `${Math.min(budgetPercentage, 100)}%` }}></div>
-
-                  <div className="flex justify-between items-end mb-2 relative z-10">
                       <div>
-                          <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1">Orçamento Utilizado</p>
-                          <p className="text-xl font-bold text-primary dark:text-white">
-                              R$ {stats.totalSpent.toLocaleString('pt-BR')} 
-                              <span className="text-sm font-normal text-slate-400 dark:text-slate-500 mx-2">/</span>
-                              <span className="text-sm text-slate-400 dark:text-slate-500">R$ {focusWork.budgetPlanned.toLocaleString('pt-BR')}</span>
+                          <h2 className="text-2xl font-bold text-primary dark:text-white leading-tight">{statusMessage}</h2>
+                          <p className="text-slate-500 dark:text-slate-400 font-medium">Resumo de hoje</p>
+                      </div>
+                  </div>
+
+                  {/* Metrics Grid */}
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
+                      {/* Card 1: Tarefas */}
+                      <div 
+                        onClick={handleAccessWork}
+                        className={`p-5 rounded-2xl border transition-all cursor-pointer hover:-translate-y-1 hover:shadow-lg bg-white dark:bg-slate-800/80 ${hasDelay ? 'border-red-500/30' : 'border-slate-100 dark:border-slate-700'}`}
+                      >
+                          <div className="flex justify-between items-start mb-3">
+                              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${hasDelay ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400' : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400'}`}>
+                                  <i className="fa-solid fa-list-check"></i>
+                              </div>
+                              {hasDelay && <span className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></span>}
+                          </div>
+                          <p className="text-3xl font-extrabold text-primary dark:text-white mb-1">
+                              {hasDelay ? dailySummary.delayedSteps : dailySummary.completedSteps}
+                          </p>
+                          <p className={`text-xs font-bold uppercase tracking-wider ${hasDelay ? 'text-red-500 dark:text-red-400' : 'text-slate-500 dark:text-slate-400'}`}>
+                              {hasDelay ? 'Atrasadas' : 'Concluídas'}
                           </p>
                       </div>
-                      <div className={`px-3 py-1 rounded-lg text-sm font-bold ${isOverBudget ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400' : 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'}`}>
-                          {budgetPercentage}%
+
+                      {/* Card 2: Compras */}
+                      <div 
+                        onClick={handleAccessWork}
+                        className="p-5 rounded-2xl bg-white dark:bg-slate-800/80 border border-slate-100 dark:border-slate-700 transition-all cursor-pointer hover:-translate-y-1 hover:shadow-lg"
+                      >
+                          <div className="flex justify-between items-start mb-3">
+                              <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-700 text-secondary flex items-center justify-center">
+                                  <i className="fa-solid fa-cart-shopping"></i>
+                              </div>
+                          </div>
+                          <p className="text-3xl font-extrabold text-primary dark:text-white mb-1">
+                              {dailySummary.pendingMaterials}
+                          </p>
+                          <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                              Pendentes
+                          </p>
+                      </div>
+
+                      {/* Card 3: Progresso (Full width on mobile) */}
+                      <div className="col-span-2 md:col-span-1 p-5 rounded-2xl bg-gradient-to-br from-primary to-slate-800 text-white shadow-xl relative overflow-hidden">
+                          <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2"></div>
+                          <div className="relative z-10">
+                            <div className="flex justify-between items-start mb-3">
+                                <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center backdrop-blur-sm">
+                                    <i className="fa-solid fa-chart-pie"></i>
+                                </div>
+                                <span className="font-bold text-lg">{stats.progress}%</span>
+                            </div>
+                            <div className="h-2 bg-black/20 rounded-full overflow-hidden mb-2">
+                                <div className="h-full bg-secondary shadow-[0_0_10px_rgba(217,119,6,0.5)]" style={{ width: `${stats.progress}%` }}></div>
+                            </div>
+                            <p className="text-[10px] uppercase tracking-wider opacity-70 font-bold">Progresso Geral</p>
+                          </div>
+                      </div>
+                  </div>
+
+                  {/* Financial Strip */}
+                  <div className="bg-slate-50 dark:bg-slate-800/80 rounded-2xl p-6 border border-slate-200 dark:border-slate-700 relative overflow-hidden">
+                      <div className="absolute bottom-0 left-0 h-1 bg-slate-200 dark:bg-slate-700 w-full"></div>
+                      <div className={`absolute bottom-0 left-0 h-1 transition-all duration-1000 ${isOverBudget ? 'bg-danger shadow-[0_0_15px_red]' : 'bg-success shadow-[0_0_15px_lime]'}`} style={{ width: `${Math.min(budgetPercentage, 100)}%` }}></div>
+
+                      <div className="flex justify-between items-end mb-2 relative z-10">
+                          <div>
+                              <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1">Orçamento Utilizado</p>
+                              <p className="text-xl font-bold text-primary dark:text-white">
+                                  R$ {stats.totalSpent.toLocaleString('pt-BR')} 
+                                  <span className="text-sm font-normal text-slate-400 dark:text-slate-500 mx-2">/</span>
+                                  <span className="text-sm text-slate-400 dark:text-slate-500">R$ {focusWork.budgetPlanned.toLocaleString('pt-BR')}</span>
+                              </p>
+                          </div>
+                          <div className={`px-3 py-1 rounded-lg text-sm font-bold ${isOverBudget ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400' : 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'}`}>
+                              {budgetPercentage}%
+                          </div>
                       </div>
                   </div>
               </div>
           </div>
-      </div>
-
-      {/* UPCOMING STEPS SECTION */}
-      {upcomingSteps.length > 0 && (
-        <div className="mb-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 mb-4 px-1">
-                <i className="fa-solid fa-calendar-day"></i> Próximas Etapas
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                {upcomingSteps.map((step) => {
-                    // Normalize dates to LOCAL time boundaries to avoid timezone issues
-                    const today = new Date();
-                    today.setHours(0,0,0,0);
-                    
-                    const [y, m, d] = step.startDate.split('-').map(Number);
-                    const startDate = new Date(y, m - 1, d); // Construct Local Date
-                    
-                    const diffTime = startDate.getTime() - today.getTime();
-                    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                    
-                    let statusLabel = '';
-                    let statusColor = 'text-slate-400 bg-slate-100 dark:bg-slate-800';
-                    
-                    if (diffDays < 0) {
-                        statusLabel = 'Atrasado';
-                        statusColor = 'text-red-600 bg-red-100 dark:bg-red-900/30';
-                    } else if (diffDays === 0) {
-                        statusLabel = 'Começa Hoje';
-                        statusColor = 'text-green-600 bg-green-100 dark:bg-green-900/30';
-                    } else {
-                        statusLabel = `Em ${diffDays} dias`;
-                        statusColor = 'text-secondary bg-orange-100 dark:bg-orange-900/20';
-                    }
-
-                    return (
-                        <div key={step.id} onClick={handleAccessWork} className="cursor-pointer bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 flex items-center gap-4 shadow-sm hover:shadow-md hover:border-secondary/30 transition-all">
-                            <div className="w-10 h-10 rounded-xl bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-500 dark:text-slate-400">
-                                <i className="fa-regular fa-calendar"></i>
-                            </div>
-                            <div className="flex-1 min-w-0">
-                                <h4 className="font-bold text-primary dark:text-white text-sm truncate">{step.name}</h4>
-                                <p className="text-xs text-slate-500 dark:text-slate-400">{formatDateDisplay(step.startDate)}</p>
-                            </div>
-                            <div className={`text-[10px] font-bold px-2 py-1 rounded-md uppercase whitespace-nowrap ${statusColor}`}>
-                                {statusLabel}
-                            </div>
-                        </div>
-                    );
-                })}
-            </div>
-        </div>
       )}
 
-      {/* Notifications Section */}
-      <div>
-          <div className="flex justify-between items-center mb-4">
-              <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                  <i className="fa-regular fa-bell"></i> Avisos Recentes
-              </h3>
-              {notifications.length > 0 && (
-                  <button 
-                      onClick={handleClearAll}
-                      className="text-xs font-bold text-slate-400 hover:text-primary dark:hover:text-white transition-colors flex items-center gap-1"
-                  >
-                      Limpar tudo
-                  </button>
-              )}
+      {/* UPCOMING STEPS & NOTIFICATIONS */}
+      {isLoadingDetails ? (
+          <div className="space-y-4 animate-pulse">
+              <div className="h-20 bg-slate-100 dark:bg-slate-800 rounded-2xl"></div>
+              <div className="h-20 bg-slate-100 dark:bg-slate-800 rounded-2xl"></div>
           </div>
-          
-          <div className="space-y-3">
-              {notifications.length > 0 ? (
-                  notifications.map(notif => (
-                      <div key={notif.id} className={`group relative p-4 rounded-2xl border flex items-start gap-4 transition-all ${
-                          notif.type === 'WARNING' ? 'bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-900/30' :
-                          'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800'
-                      }`}>
-                          <div className={`mt-1 w-8 h-8 rounded-lg flex items-center justify-center shrink-0 shadow-sm ${
-                              notif.type === 'WARNING' ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400' :
-                              'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'
-                          }`}>
-                              <i className={`fa-solid ${
-                                  notif.type === 'WARNING' ? 'fa-bolt' : 'fa-info'
-                              } text-sm`}></i>
-                          </div>
-                          <div className="flex-1 pr-6">
-                              <h4 className="text-sm font-bold text-primary dark:text-white mb-0.5">{notif.title}</h4>
-                              <p className="text-sm text-slate-600 dark:text-slate-400 leading-snug">
-                                  {notif.message}
-                              </p>
-                          </div>
-                          
-                          {/* Dismiss Button */}
-                          <button 
-                              onClick={() => handleDismiss(notif.id)}
-                              className="absolute top-2 right-2 text-slate-300 hover:text-slate-500 dark:hover:text-slate-200 p-2 opacity-0 group-hover:opacity-100 transition-opacity"
-                              title="Remover aviso"
-                          >
-                              <i className="fa-solid fa-xmark"></i>
-                          </button>
-                      </div>
-                  ))
-              ) : (
-                  <div className="text-center py-8 rounded-2xl border border-dashed border-slate-300 dark:border-slate-700">
-                      <p className="text-slate-400 text-sm font-medium">
-                          Nenhum aviso urgente. Tudo em paz! 🍃
-                      </p>
-                  </div>
-              )}
-          </div>
-      </div>
+      ) : (
+          <>
+            {upcomingSteps.length > 0 && (
+                <div className="mb-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 mb-4 px-1">
+                        <i className="fa-solid fa-calendar-day"></i> Próximas Etapas
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                        {upcomingSteps.map((step) => {
+                            const today = new Date();
+                            today.setHours(0,0,0,0);
+                            
+                            const [y, m, d] = step.startDate.split('-').map(Number);
+                            const startDate = new Date(y, m - 1, d); 
+                            
+                            const diffTime = startDate.getTime() - today.getTime();
+                            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                            
+                            let statusLabel = '';
+                            let statusColor = 'text-slate-400 bg-slate-100 dark:bg-slate-800';
+                            
+                            if (diffDays < 0) {
+                                statusLabel = 'Atrasado';
+                                statusColor = 'text-red-600 bg-red-100 dark:bg-red-900/30';
+                            } else if (diffDays === 0) {
+                                statusLabel = 'Começa Hoje';
+                                statusColor = 'text-green-600 bg-green-100 dark:bg-green-900/30';
+                            } else {
+                                statusLabel = `Em ${diffDays} dias`;
+                                statusColor = 'text-secondary bg-orange-100 dark:bg-orange-900/20';
+                            }
+
+                            return (
+                                <div key={step.id} onClick={handleAccessWork} className="cursor-pointer bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 flex items-center gap-4 shadow-sm hover:shadow-md hover:border-secondary/30 transition-all">
+                                    <div className="w-10 h-10 rounded-xl bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-500 dark:text-slate-400">
+                                        <i className="fa-regular fa-calendar"></i>
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <h4 className="font-bold text-primary dark:text-white text-sm truncate">{step.name}</h4>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400">{formatDateDisplay(step.startDate)}</p>
+                                    </div>
+                                    <div className={`text-[10px] font-bold px-2 py-1 rounded-md uppercase whitespace-nowrap ${statusColor}`}>
+                                        {statusLabel}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
+
+            <div>
+                <div className="flex justify-between items-center mb-4">
+                    <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                        <i className="fa-regular fa-bell"></i> Avisos Recentes
+                    </h3>
+                    {notifications.length > 0 && (
+                        <button onClick={handleClearAll} className="text-xs font-bold text-slate-400 hover:text-primary transition-colors">Limpar tudo</button>
+                    )}
+                </div>
+                
+                <div className="space-y-3">
+                    {notifications.length > 0 ? (
+                        notifications.map(notif => (
+                            <div key={notif.id} className={`group relative p-4 rounded-2xl border flex items-start gap-4 transition-all ${notif.type === 'WARNING' ? 'bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-900/30' : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800'}`}>
+                                <div className={`mt-1 w-8 h-8 rounded-lg flex items-center justify-center shrink-0 shadow-sm ${notif.type === 'WARNING' ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400' : 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'}`}>
+                                    <i className={`fa-solid ${notif.type === 'WARNING' ? 'fa-bolt' : 'fa-info'} text-sm`}></i>
+                                </div>
+                                <div className="flex-1 pr-6">
+                                    <h4 className="text-sm font-bold text-primary dark:text-white mb-0.5">{notif.title}</h4>
+                                    <p className="text-sm text-slate-600 dark:text-slate-400 leading-snug">{notif.message}</p>
+                                </div>
+                                <button onClick={() => handleDismiss(notif.id)} className="absolute top-2 right-2 text-slate-300 hover:text-slate-500 p-2 opacity-0 group-hover:opacity-100 transition-opacity"><i className="fa-solid fa-xmark"></i></button>
+                            </div>
+                        ))
+                    ) : (
+                        <div className="text-center py-8 rounded-2xl border border-dashed border-slate-300 dark:border-slate-700">
+                            <p className="text-slate-400 text-sm font-medium">Nenhum aviso urgente. Tudo em paz! 🍃</p>
+                        </div>
+                    )}
+                </div>
+            </div>
+          </>
+      )}
 
       <button 
         onClick={() => navigate('/create')}
@@ -584,7 +571,6 @@ const Dashboard: React.FC = () => {
         <i className="fa-solid fa-plus text-2xl"></i>
       </button>
 
-      {/* ZÉ DA OBRA MODAL (DELETE) */}
       <ZeModal 
         isOpen={zeModal.isOpen}
         title={zeModal.title}
@@ -594,49 +580,25 @@ const Dashboard: React.FC = () => {
         onCancel={() => setZeModal({isOpen: false, title: '', message: ''})}
       />
 
-      {/* TRIAL EXPIRATION UPSELL MODAL */}
       {showTrialUpsell && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-500">
             <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] w-full max-w-sm p-0 shadow-2xl border border-slate-800 relative overflow-hidden transform scale-100 animate-in zoom-in-95">
-                {/* Header Impactante */}
                 <div className="bg-gradient-premium p-8 relative overflow-hidden text-center">
                     <div className="absolute top-0 right-0 w-40 h-40 bg-secondary/20 rounded-full blur-3xl translate-x-10 -translate-y-10"></div>
-                    
-                    <div className="w-20 h-20 mx-auto rounded-full bg-red-600 border-4 border-slate-900 flex items-center justify-center text-3xl text-white shadow-xl mb-4 animate-pulse">
-                        <i className="fa-solid fa-hourglass-end"></i>
-                    </div>
-                    
+                    <div className="w-20 h-20 mx-auto rounded-full bg-red-600 border-4 border-slate-900 flex items-center justify-center text-3xl text-white shadow-xl mb-4 animate-pulse"><i className="fa-solid fa-hourglass-end"></i></div>
                     <h2 className="text-2xl font-black text-white mb-1 tracking-tight">ÚLTIMO DIA!</h2>
                     <p className="text-slate-300 text-sm font-medium">Seu teste grátis acaba hoje.</p>
                 </div>
-
                 <div className="p-8">
-                    <p className="text-center text-slate-600 dark:text-slate-300 text-sm mb-6 leading-relaxed">
-                        Não perca o acesso às suas obras. Garanta o plano <strong>Vitalício</strong> agora e nunca mais se preocupe com mensalidades.
-                    </p>
-
+                    <p className="text-center text-slate-600 dark:text-slate-300 text-sm mb-6 leading-relaxed">Não perca o acesso às suas obras. Garanta o plano <strong>Vitalício</strong> agora e nunca mais se preocupe com mensalidades.</p>
                     <div className="space-y-3">
-                        <button 
-                            onClick={() => navigate(`/checkout?plan=${PlanType.VITALICIO}`)}
-                            className="w-full py-4 bg-gradient-gold text-white font-black rounded-2xl shadow-lg hover:shadow-orange-500/30 hover:scale-105 transition-all flex items-center justify-center gap-2 group"
-                        >
-                            <i className="fa-solid fa-crown text-yellow-200"></i>
-                            Quero Vitalício
-                            <i className="fa-solid fa-arrow-right group-hover:translate-x-1 transition-transform"></i>
-                        </button>
-                        
-                        <button 
-                            onClick={() => setShowTrialUpsell(false)}
-                            className="w-full py-3 bg-slate-100 dark:bg-slate-800 text-slate-500 font-bold rounded-2xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors text-xs uppercase tracking-wide"
-                        >
-                            Manter plano atual
-                        </button>
+                        <button onClick={() => navigate(`/checkout?plan=${PlanType.VITALICIO}`)} className="w-full py-4 bg-gradient-gold text-white font-black rounded-2xl shadow-lg hover:shadow-orange-500/30 hover:scale-105 transition-all flex items-center justify-center gap-2 group"><i className="fa-solid fa-crown text-yellow-200"></i> Quero Vitalício <i className="fa-solid fa-arrow-right group-hover:translate-x-1 transition-transform"></i></button>
+                        <button onClick={() => setShowTrialUpsell(false)} className="w-full py-3 bg-slate-100 dark:bg-slate-800 text-slate-500 font-bold rounded-2xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors text-xs uppercase tracking-wide">Manter plano atual</button>
                     </div>
                 </div>
             </div>
         </div>
       )}
-
     </div>
   );
 };
