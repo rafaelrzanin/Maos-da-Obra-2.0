@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, createContext, useContext, useMemo, Suspense, lazy } from 'react';
+import React, { useState, useEffect, createContext, useContext, useMemo, Suspense, lazy, useRef } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { User, PlanType } from './types';
 import { dbService } from './services/db';
@@ -66,21 +66,27 @@ export const useAuth = () => useContext(AuthContext);
 const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // Otimização: Se já temos user no localStorage, NÃO começamos com loading true.
   // Isso permite que a UI carregue instantaneamente enquanto validamos o token em background.
-  const [user, setUser] = useState<User | null>(() => dbService.getCurrentUser());
+  const [user, setUserState] = useState<User | null>(() => dbService.getCurrentUser());
   const [loading, setLoading] = useState(() => !dbService.getCurrentUser());
+  
+  // Ref para evitar loops de atualizações com o mesmo objeto
+  const userRef = useRef<string>(JSON.stringify(user));
+
+  const setUser = (newUser: User | null) => {
+      const newStr = JSON.stringify(newUser);
+      if (newStr !== userRef.current) {
+          userRef.current = newStr;
+          setUserState(newUser);
+      }
+  };
 
   const isSubscriptionValid = useMemo(() => user ? dbService.isSubscriptionActive(user) : false, [user]);
   const isNewAccount = useMemo(() => user ? !user.subscriptionExpiresAt : true, [user]);
 
   useEffect(() => {
     const sync = async () => {
-        // Se já temos usuário local, não bloqueamos a UI (loading continua false ou o que foi setado)
-        // Se não temos, loading é true (setado no useState inicial)
-        
         try {
             const sbUser = await dbService.syncSession();
-            // Se o sync retornar null (sessão inválida) e tínhamos usuário, o setUser(null) fará o logout
-            // Se retornar user atualizado, atualizamos o estado
             if (sbUser) setUser(sbUser);
             else if (user) setUser(null); // Logout se sessão expirou no servidor
         } catch (e) {
@@ -99,7 +105,7 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
   }, []); // Dependência vazia para rodar apenas no mount
 
   const refreshUser = async () => {
-      const currentUser = dbService.getCurrentUser();
+      const currentUser = await dbService.syncSession(); // Força busca no servidor
       if (currentUser) setUser(currentUser);
   };
 
