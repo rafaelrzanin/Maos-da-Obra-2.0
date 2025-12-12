@@ -22,10 +22,10 @@ const mapProfileFromSupabase = (data: any): User => ({
 const parseWorkFromDB = (data: any): Work => {
     return {
         id: data.id,
-        userId: data.user_id || data.userId, // Fallback for legacy
+        userId: data.user_id || data.userId, // Fallback legacy
         name: data.name,
         address: data.address,
-        budgetPlanned: Number(data.budget_planned || data.budgetPlanned),
+        budgetPlanned: Number(data.budget_planned || data.budgetPlanned || 0),
         startDate: data.start_date || data.startDate,
         endDate: data.end_date || data.endDate,
         area: Number(data.area),
@@ -241,8 +241,14 @@ export const dbService = {
   // 1. WORKS (OBRAS)
   getWorks: async (userId: string): Promise<Work[]> => {
       if (!supabase) return [];
-      // Select all columns explicitly to ensure we get snake_case fields
-      const { data } = await supabase.from('works').select('*').eq('userId', userId);
+      // Usar 'user_id' se existir no banco, senão fallback (mas o banco deve estar snake_case)
+      const { data, error } = await supabase.from('works').select('*').eq('user_id', userId);
+      
+      if (error) {
+          // Fallback tentativo para 'userId' caso a migração não tenha rodado ou seja legado
+          const { data: dataLegacy } = await supabase.from('works').select('*').eq('userId', userId);
+          return (dataLegacy || []).map(parseWorkFromDB);
+      }
       return (data || []).map(parseWorkFromDB);
   },
 
@@ -256,14 +262,14 @@ export const dbService = {
   createWork: async (work: Omit<Work, 'id'>, templateId?: string): Promise<Work> => {
       if (!supabase) throw new Error("Offline");
       
-      // 1. Insert Work - Mapping CamelCase to DB Snake_case
-      const { data, error } = await supabase.from('works').insert([{
-          userId: work.userId,
+      // 1. Insert Work - Mapping CamelCase to DB Snake_case EXPLICITAMENTE
+      const payload = {
+          user_id: work.userId,
           name: work.name,
           address: work.address,
-          budgetPlanned: work.budgetPlanned,
-          startDate: work.startDate,
-          endDate: work.endDate,
+          budget_planned: work.budgetPlanned, // Correção crucial
+          start_date: work.startDate,
+          end_date: work.endDate,
           area: work.area,
           status: work.status || 'Planejamento',
           notes: work.notes,
@@ -273,9 +279,11 @@ export const dbService = {
           bedrooms: work.bedrooms,
           bathrooms: work.bathrooms,
           kitchens: work.kitchens,
-          living_rooms: work.livingRooms, // Note snake_case for DB
-          has_leisure_area: work.hasLeisureArea // Note snake_case for DB
-      }]).select().single();
+          living_rooms: work.livingRooms,
+          has_leisure_area: work.hasLeisureArea
+      };
+
+      const { data, error } = await supabase.from('works').insert([payload]).select().single();
 
       if (error || !data) {
           console.error("Supabase Error:", error);
@@ -386,7 +394,7 @@ export const dbService = {
       const { data: current } = await supabase.from('materials').select('purchasedQty, workId, stepId').eq('id', matId).single();
       if (!current) return;
 
-      // 2. Update Material (Qty, Brand, Name, PlannedQty if changed)
+      // 2. Update Material
       const newPurchasedQty = (current.purchasedQty || 0) + buyQty;
       
       await supabase.from('materials').update({ 
@@ -529,10 +537,8 @@ export const dbService = {
       }]);
   },
 
-  // 7. NOTIFICATIONS & DASHBOARD
-  getNotifications: async (_userId: string): Promise<Notification[]> => {
-      return []; 
-  },
+  // 7. STATS & NOTIFICATIONS
+  getNotifications: async (_userId: string): Promise<Notification[]> => { return []; },
   dismissNotification: async (_id: string) => {},
   clearAllNotifications: async (_userId: string) => {},
   generateSmartNotifications: async (_userId: string, _workId: string) => {},
