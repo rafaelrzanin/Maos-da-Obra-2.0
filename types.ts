@@ -11,8 +11,9 @@ export interface User {
   email: string;
   whatsapp?: string;
   cpf?: string; 
-  plan?: PlanType | null; // Changed to optional/null
+  plan?: PlanType | null; 
   subscriptionExpiresAt?: string;
+  isTrial?: boolean; // New field for trial status
 }
 
 export enum WorkStatus {
@@ -83,7 +84,7 @@ export interface Expense {
   relatedMaterialId?: string; 
   stepId?: string; 
   workerId?: string;
-  totalAgreed?: number; // New field: Valor Combinado (ex: 30k)
+  totalAgreed?: number; 
 }
 
 export enum MaterialStatus {
@@ -96,7 +97,7 @@ export interface Material {
   id: string;
   workId: string;
   name: string;
-  brand?: string; // New field for brand/specification
+  brand?: string; 
   plannedQty: number;
   purchasedQty: number;
   unit: string;
