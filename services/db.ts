@@ -432,7 +432,7 @@ export const dbService = {
                               
                               if (qty > 0) {
                                   materialsPayload.push({
-                                      work_id: newWork.id,
+                                      obra_id: newWork.id,
                                       name: item.name,
                                       brand: '',
                                       planned_qty: qty,
