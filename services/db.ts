@@ -379,7 +379,7 @@ export const dbService = {
           if (templateId) {
              const template = WORK_TEMPLATES.find(t => t.id === templateId);
              if (template) {
-                 const steps = template.includedSteps.map((name, i) => ({
+                 const steps = template.includedSteps.map((name) => ({
                      id: Math.random().toString(36).substr(2, 9),
                      workId: newWork.id,
                      name,
