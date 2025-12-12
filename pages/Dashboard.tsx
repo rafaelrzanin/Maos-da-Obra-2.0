@@ -110,6 +110,12 @@ const Dashboard: React.FC = () => {
       }
   };
 
+  const handleAccessWork = () => {
+      if (focusWork && focusWork.id) {
+          navigate(`/work/${focusWork.id}`);
+      }
+  };
+
   const handleDeleteClick = (e: React.MouseEvent, workId: string, workName: string) => {
       e.stopPropagation(); // Prevent switching work when clicking delete
       setZeModal({
@@ -286,7 +292,7 @@ const Dashboard: React.FC = () => {
           )}
       </div>
       
-      {/* ZÉ DA OBRA TIP (Glassmorphism) - DYNAMIC */}
+      {/* ZÉ DA OBRA TIP */}
       <div className="mb-8 relative overflow-hidden rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm group hover:shadow-md transition-all">
            <div className="absolute top-0 right-0 w-32 h-32 bg-secondary/10 rounded-full blur-3xl translate-x-10 -translate-y-10 group-hover:bg-secondary/20 transition-all"></div>
            <div className="flex items-center gap-5 p-5 relative z-10">
@@ -316,8 +322,9 @@ const Dashboard: React.FC = () => {
 
       {/* Access Button (Floating CTA) */}
       <button 
-        onClick={() => navigate(`/work/${focusWork.id}`)}
-        className="group w-full mb-8 relative overflow-hidden rounded-2xl bg-primary dark:bg-white text-white dark:text-primary shadow-2xl hover:shadow-glow transition-all active:scale-[0.98]"
+        type="button"
+        onClick={handleAccessWork}
+        className="group w-full mb-8 relative overflow-hidden rounded-2xl bg-primary dark:bg-white text-white dark:text-primary shadow-2xl hover:shadow-glow transition-all active:scale-[0.98] cursor-pointer"
       >
         <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
         <div className="flex items-center justify-between p-6">
@@ -353,7 +360,7 @@ const Dashboard: React.FC = () => {
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
                   {/* Card 1: Tarefas */}
                   <div 
-                    onClick={() => navigate(`/work/${focusWork.id}`)}
+                    onClick={handleAccessWork}
                     className={`p-5 rounded-2xl border transition-all cursor-pointer hover:-translate-y-1 hover:shadow-lg bg-white dark:bg-slate-800/80 ${hasDelay ? 'border-red-500/30' : 'border-slate-100 dark:border-slate-700'}`}
                   >
                       <div className="flex justify-between items-start mb-3">
@@ -372,7 +379,7 @@ const Dashboard: React.FC = () => {
 
                   {/* Card 2: Compras */}
                   <div 
-                    onClick={() => navigate(`/work/${focusWork.id}`)}
+                    onClick={handleAccessWork}
                     className="p-5 rounded-2xl bg-white dark:bg-slate-800/80 border border-slate-100 dark:border-slate-700 transition-all cursor-pointer hover:-translate-y-1 hover:shadow-lg"
                   >
                       <div className="flex justify-between items-start mb-3">
@@ -462,7 +469,7 @@ const Dashboard: React.FC = () => {
                     }
 
                     return (
-                        <div key={step.id} onClick={() => navigate(`/work/${focusWork.id}`)} className="cursor-pointer bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 flex items-center gap-4 shadow-sm hover:shadow-md hover:border-secondary/30 transition-all">
+                        <div key={step.id} onClick={handleAccessWork} className="cursor-pointer bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 flex items-center gap-4 shadow-sm hover:shadow-md hover:border-secondary/30 transition-all">
                             <div className="w-10 h-10 rounded-xl bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-500 dark:text-slate-400">
                                 <i className="fa-regular fa-calendar"></i>
                             </div>
