@@ -32,7 +32,6 @@ const WorkDetail: React.FC = () => {
     // --- CORE DATA STATE ---
     const [work, setWork] = useState<Work | null>(null);
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(''); // NEW: Error state
     const [steps, setSteps] = useState<Step[]>([]);
     const [materials, setMaterials] = useState<Material[]>([]);
     const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -111,51 +110,36 @@ const WorkDetail: React.FC = () => {
 
     // --- LOAD DATA ---
     const load = async () => {
-        if (!id) {
-            setError("ID da obra não encontrado.");
-            setLoading(false);
-            return;
-        }
+        if (!id) return;
+        const w = await dbService.getWorkById(id);
+        setWork(w || null);
         
-        try {
-            const w = await dbService.getWorkById(id);
-            setWork(w || null);
+        if (w) {
+            const [s, m, e, wk, sp, ph, fl] = await Promise.all([
+                dbService.getSteps(w.id),
+                dbService.getMaterials(w.id),
+                dbService.getExpenses(w.id),
+                dbService.getWorkers(w.userId),
+                dbService.getSuppliers(w.userId),
+                dbService.getPhotos(w.id),
+                dbService.getFiles(w.id)
+            ]);
             
-            if (w) {
-                const [s, m, e, wk, sp, ph, fl] = await Promise.all([
-                    dbService.getSteps(w.id),
-                    dbService.getMaterials(w.id),
-                    dbService.getExpenses(w.id),
-                    dbService.getWorkers(w.userId),
-                    dbService.getSuppliers(w.userId),
-                    dbService.getPhotos(w.id),
-                    dbService.getFiles(w.id)
-                ]);
-                
-                setSteps(s ? s.sort((a,b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()) : []);
-                setMaterials(m || []);
-                setExpenses(e ? e.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()) : []);
-                setWorkers(wk || []);
-                setSuppliers(sp || []);
-                setPhotos(ph || []);
-                setFiles(fl || []);
-            } else {
-                setError("Obra não encontrada.");
-            }
-        } catch (e) {
-            console.error(e);
-            setError("Erro ao carregar obra.");
-        } finally {
-            setLoading(false);
+            setSteps(s ? s.sort((a,b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()) : []);
+            setMaterials(m || []);
+            setExpenses(e ? e.sort((a,b) => new Date(b.date).getTime() - new Date(a.date).getTime()) : []);
+            setWorkers(wk || []);
+            setSuppliers(sp || []);
+            setPhotos(ph || []);
+            setFiles(fl || []);
         }
+        setLoading(false);
     };
 
     useEffect(() => { load(); }, [id]);
 
-    // --- HANDLERS (Same as before) ---
-    // ... [Handlers omitted for brevity, keeping existing logic] ...
-    
-    // REDEFINING HANDLERS TO ENSURE FULL FILE CONTENT IS CORRECT
+    // --- HANDLERS ---
+
     const handleSaveStep = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!work || !stepName) return;
@@ -453,20 +437,7 @@ const WorkDetail: React.FC = () => {
     };
 
     if (loading) return <div className="h-screen flex items-center justify-center"><i className="fa-solid fa-circle-notch fa-spin text-3xl text-primary"></i></div>;
-    
-    // ERROR STATE
-    if (error || !work) return (
-        <div className="h-screen flex flex-col items-center justify-center p-4 text-center">
-            <div className="w-20 h-20 bg-red-100 text-red-500 rounded-full flex items-center justify-center text-3xl mb-4">
-                <i className="fa-solid fa-triangle-exclamation"></i>
-            </div>
-            <h2 className="text-xl font-bold text-primary dark:text-white mb-2">Ops! Obra não encontrada</h2>
-            <p className="text-slate-500 mb-6">{error || 'Não foi possível carregar os detalhes desta obra.'}</p>
-            <button onClick={() => navigate('/')} className="bg-primary text-white px-6 py-3 rounded-xl font-bold hover:bg-primary-dark transition-colors">
-                Voltar para o Painel
-            </button>
-        </div>
-    );
+    if (!work) return null;
 
     // --- RENDER CONTENT ---
 
@@ -549,7 +520,6 @@ const WorkDetail: React.FC = () => {
         }
 
         if (activeTab === 'MATERIALS') {
-             // Filter Logic
              const filteredSteps = materialFilterStepId === 'ALL' 
                 ? steps 
                 : steps.filter(s => s.id === materialFilterStepId);
@@ -565,7 +535,6 @@ const WorkDetail: React.FC = () => {
                             <button onClick={() => setAddMatModal(true)} className="bg-primary text-white w-12 h-12 rounded-xl flex items-center justify-center hover:bg-primary-light transition-all shadow-lg shadow-primary/30"><i className="fa-solid fa-plus text-lg"></i></button>
                         </div>
                         
-                        {/* STEP FILTER DROPDOWN */}
                         <div className="px-2">
                             <select 
                                 value={materialFilterStepId}
@@ -581,7 +550,7 @@ const WorkDetail: React.FC = () => {
                     </div>
 
                     {filteredSteps.map((step) => {
-                        const originalIdx = steps.findIndex(s => s.id === step.id); // For correct numbering
+                        const originalIdx = steps.findIndex(s => s.id === step.id);
                         const stepMaterials = materials ? materials.filter(m => m.stepId === step.id) : [];
                         
                         if (stepMaterials.length === 0 && materialFilterStepId !== 'ALL') {
@@ -591,7 +560,6 @@ const WorkDetail: React.FC = () => {
                         
                         return (
                             <div key={step.id} className="mb-8 bg-white/50 dark:bg-slate-900/50 rounded-2xl p-2">
-                                {/* Stronger Visual Separation for Step Header */}
                                 <div className="flex items-center gap-3 mb-4 p-3 bg-white dark:bg-slate-900 rounded-xl shadow-sm border-l-4 border-secondary">
                                     <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 text-secondary font-black text-sm flex items-center justify-center">
                                         {String(originalIdx+1).padStart(2,'0')}
@@ -605,7 +573,6 @@ const WorkDetail: React.FC = () => {
                                         const purchased = mat.purchasedQty;
                                         const progress = hasPlanned ? Math.min(100, (purchased / mat.plannedQty) * 100) : 0;
                                         
-                                        // Logic for Partial/Complete/Pending
                                         let statusText = 'Pendente';
                                         let statusColor = 'bg-slate-100 text-slate-500';
                                         let barColor = 'bg-slate-200';
@@ -617,7 +584,7 @@ const WorkDetail: React.FC = () => {
                                         } else if (purchased > 0) {
                                             statusText = 'Parcial';
                                             statusColor = 'bg-orange-100 text-orange-600';
-                                            barColor = 'bg-secondary'; // Orange/Amber
+                                            barColor = 'bg-secondary';
                                         }
 
                                         return (
@@ -680,7 +647,7 @@ const WorkDetail: React.FC = () => {
 
                     {filteredFinancialSteps.map((step, idx) => {
                         const stepExpenses = expenses.filter(e => {
-                            if (step.id === 'general') return !e.stepId; // Expenses without stepId
+                            if (step.id === 'general') return !e.stepId;
                             return e.stepId === step.id;
                         });
 
@@ -719,8 +686,11 @@ const WorkDetail: React.FC = () => {
                                                             </p>
                                                         </div>
                                                     </div>
-                                                    <div className="text-right">
+                                                    <div className="flex items-center gap-3">
                                                         <span className="font-bold text-primary dark:text-white text-lg whitespace-nowrap">R$ {Number(exp.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                                        <div className="text-slate-300 group-hover:text-secondary transition-colors">
+                                                            <i className="fa-solid fa-pen-to-square"></i>
+                                                        </div>
                                                     </div>
                                                 </div>
                                                 
@@ -823,7 +793,7 @@ const WorkDetail: React.FC = () => {
         return null;
     };
 
-    // --- RENDER SUBVIEW (Same as previous, just wrapping render) ---
+    // --- RENDER SUBVIEW ---
     const renderSubViewContent = () => {
         switch(subView) {
             case 'TEAM': return (
@@ -1069,6 +1039,7 @@ const WorkDetail: React.FC = () => {
                 </div>
             );
 
+            // Reusing existing components for other subviews to save space, but ensuring they are rendered
             case 'BONUS_IA': return (
                 <div className="flex flex-col items-center justify-center min-h-[70vh] p-6 text-center animate-in fade-in">
                     <div className="w-full max-w-sm bg-gradient-to-br from-slate-900 to-slate-950 rounded-[2.5rem] p-8 shadow-2xl relative overflow-hidden border border-slate-800 group">
@@ -1449,3 +1420,4 @@ const WorkDetail: React.FC = () => {
 };
 
 export default WorkDetail;
+
