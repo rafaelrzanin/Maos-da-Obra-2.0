@@ -1,8 +1,10 @@
+
 import { 
   User, Work, Step, Material, Expense, Worker, Supplier, 
   WorkPhoto, WorkFile, Notification, PlanType,
   ExpenseCategory,
-  WorkStatus
+  WorkStatus,
+  StepStatus
 } from '../types';
 import { WORK_TEMPLATES, FULL_MATERIAL_PACKAGES } from './standards';
 import { supabase } from './supabase';
@@ -109,188 +111,131 @@ const parseFileFromDB = (data: any): WorkFile => ({
     date: data.date
 });
 
+const parseNotificationFromDB = (data: any): Notification => ({
+    id: data.id,
+    userId: data.user_id,
+    title: data.title,
+    message: data.message,
+    date: data.date,
+    read: data.read,
+    type: data.type
+});
+
+// Helper para converter CamelCase para Snake_case para inserção
+const mapWorkToDB = (work: Partial<Work>) => ({
+    user_id: work.userId,
+    name: work.name,
+    address: work.address,
+    budget_planned: work.budgetPlanned,
+    start_date: work.startDate,
+    end_date: work.endDate,
+    area: work.area,
+    status: work.status,
+    notes: work.notes,
+    floors: work.floors,
+    bedrooms: work.bedrooms,
+    bathrooms: work.bathrooms,
+    kitchens: work.kitchens,
+    living_rooms: work.livingRooms,
+    has_leisure_area: work.hasLeisureArea
+});
+
 export const dbService = {
-  
-  // --- AUTHENTICATION & PROFILE ---
-
-  getCurrentUser: (): User | null => {
-    const json = localStorage.getItem('maos_user');
-    try { return json ? JSON.parse(json) : null; } catch { return null; }
-  },
-  
-  syncSession: async (): Promise<User | null> => {
+  // --- AUTH ---
+  async getCurrentUser() {
     if (!supabase) return null;
-    
     const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.user) {
-        localStorage.removeItem('maos_user');
-        return null;
-    }
+    if (!session?.user) return null;
+    return await this.getUserProfile(session.user.id);
+  },
 
-    // Tenta buscar o perfil. Se não existir (foi apagado no banco), recria automaticamente.
-    let profile = await dbService.getUserProfile(session.user.id);
-    
-    if (!profile) {
-        console.log("Detectado usuário sem perfil (tabelas apagadas). Recriando perfil...");
-        profile = await dbService.createProfileFromAuth(session.user);
-    }
+  async syncSession() {
+    return this.getCurrentUser();
+  },
 
-    if (profile) {
-        localStorage.setItem('maos_user', JSON.stringify(profile));
-        return profile;
+  async login(email: string, password?: string) {
+    if (!supabase) throw new Error("Supabase não configurado");
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password: password || '' });
+    if (error) throw error;
+    if (data.user) {
+        return await this.getUserProfile(data.user.id);
     }
-    
     return null;
   },
 
-  onAuthChange: (callback: (user: User | null) => void) => {
-     if (!supabase) return () => {};
-     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-        if (event === 'SIGNED_IN' && session?.user) {
-            let user = await dbService.getUserProfile(session.user.id);
-            // Auto-heal se o usuário logar e não tiver perfil
-            if (!user) user = await dbService.createProfileFromAuth(session.user);
-            
-            if (user) {
-                localStorage.setItem('maos_user', JSON.stringify(user));
-                callback(user);
-            }
-        } else if (event === 'SIGNED_OUT') {
-            localStorage.removeItem('maos_user');
-            callback(null);
-        }
-     });
-     return () => subscription.unsubscribe();
+  async loginSocial(provider: 'google') {
+    if (!supabase) return { error: 'Supabase not configured' };
+    return await supabase.auth.signInWithOAuth({ provider });
   },
 
-  isSubscriptionActive: (user: User) => {
-    if (user.plan === PlanType.VITALICIO) return true;
-    if (!user.subscriptionExpiresAt) return false;
-    return new Date(user.subscriptionExpiresAt) > new Date();
+  async signup(name: string, email: string, whatsapp: string, password?: string, cpf?: string, planType?: string | null) {
+    if (!supabase) throw new Error("Supabase não configurado");
+    
+    // 1. Criar Auth User
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+        email,
+        password: password || '123456', // Password mandatory for email signup
+    });
+
+    if (authError) throw authError;
+    if (!authData.user) throw new Error("Erro ao criar usuário");
+
+    // 2. Criar Perfil na tabela pública 'profiles'
+    // Define trial expiration (7 days from now) if no plan selected
+    const trialExpires = new Date();
+    trialExpires.setDate(trialExpires.getDate() + 7);
+
+    const { error: profileError } = await supabase.from('profiles').insert({
+        id: authData.user.id,
+        name,
+        email,
+        whatsapp,
+        cpf,
+        plan: planType || PlanType.MENSAL, // Default plan
+        is_trial: true,
+        subscription_expires_at: trialExpires.toISOString()
+    });
+
+    if (profileError) {
+        // Rollback is tricky on client side, but usually this works fine
+        console.error("Erro ao criar perfil:", profileError);
+        throw new Error("Erro ao salvar dados do perfil.");
+    }
+
+    return await this.getUserProfile(authData.user.id);
   },
 
-  getUserProfile: async (userId: string): Promise<User | null> => {
-      if (!supabase) return null;
-      try {
-          const { data, error } = await supabase
-              .from('profiles')
-              .select('*')
-              .eq('id', userId)
-              .single();
-          
-          if (error || !data) return null;
-          return mapProfileFromSupabase(data);
-      } catch (e) {
-          console.error("Erro ao buscar perfil:", e);
-          return null;
-      }
+  async logout() {
+    if (supabase) await supabase.auth.signOut();
   },
 
-  createProfileFromAuth: async (authUser: any, metadata: any = {}): Promise<User | null> => {
-      if (!supabase) return null;
-      
-      const initialPlan = metadata.plan || null;
-      const isTrial = !!initialPlan; 
-      const expirationDate = isTrial 
-          ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
-          : null;
-
-      const newProfile = {
-          id: authUser.id,
-          email: authUser.email,
-          name: metadata.name || authUser.user_metadata?.name || 'Usuário Recuprado',
-          whatsapp: metadata.whatsapp || authUser.user_metadata?.whatsapp || '',
-          cpf: metadata.cpf || authUser.user_metadata?.cpf || '',
-          plan: initialPlan,
-          subscription_expires_at: expirationDate,
-          is_trial: isTrial
-      };
-
-      const { error } = await supabase.from('profiles').upsert([newProfile]);
-      if (error) {
-          console.error("Erro ao recriar perfil:", error);
-          return null;
-      }
-      return mapProfileFromSupabase(newProfile);
+  async getUserProfile(userId: string): Promise<User | null> {
+    if (!supabase) return null;
+    const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+    
+    if (error) return null;
+    return mapProfileFromSupabase(data);
   },
 
-  login: async (email: string, password?: string): Promise<User | null> => {
-     if (!supabase) throw new Error("Erro de conexão: Supabase não configurado.");
-     if (!password) throw new Error("Senha obrigatória.");
-
-     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-     if (error) throw error;
-     if (!data.user) return null;
-
-     let profile = await dbService.getUserProfile(data.user.id);
-     
-     // AUTO-HEAL: Se o login no Auth funcionou, mas não tem perfil na tabela, cria agora.
-     if (!profile) {
-         console.log("Login efetuado, mas perfil não encontrado. Recriando...");
-         profile = await dbService.createProfileFromAuth(data.user);
-     }
-
-     if (profile) localStorage.setItem('maos_user', JSON.stringify(profile));
-     return profile;
-  },
-
-  signup: async (name: string, email: string, whatsapp: string, password?: string, cpf?: string, planType?: string | null): Promise<User | null> => {
-      if (!supabase) throw new Error("Supabase não configurado.");
-      if (!password) throw new Error("Senha obrigatória.");
-
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-          email,
-          password,
-          options: { data: { name, whatsapp, cpf } }
-      });
-
-      if (authError) throw authError;
-      if (!authData.user) return null;
-
-      const initialPlan = (planType as PlanType) || null;
-      const profile = await dbService.createProfileFromAuth(authData.user, { name, whatsapp, cpf, plan: initialPlan });
-
-      if (!profile) throw new Error("Conta criada, mas houve erro ao salvar o perfil. Tente fazer login.");
-
-      localStorage.setItem('maos_user', JSON.stringify(profile));
-      return profile;
-  },
-
-  logout: async () => {
-      if (supabase) await supabase.auth.signOut();
-      localStorage.removeItem('maos_user');
-  },
-
-  updateUser: async (userId: string, data: Partial<User>, newPassword?: string) => {
+  async updateUser(userId: string, data: Partial<User>, newPassword?: string) {
       if (!supabase) return;
+      
       const updates: any = {};
       if (data.name) updates.name = data.name;
       if (data.whatsapp) updates.whatsapp = data.whatsapp;
       
-      if (Object.keys(updates).length > 0) {
-          await supabase.from('profiles').update(updates).eq('id', userId);
-      }
+      await supabase.from('profiles').update(updates).eq('id', userId);
+
       if (newPassword) {
           await supabase.auth.updateUser({ password: newPassword });
       }
   },
 
-  updatePlan: async (userId: string, plan: PlanType) => {
-      if (!supabase) return;
-      let expires = new Date();
-      
-      if (plan === PlanType.MENSAL) expires.setDate(expires.getDate() + 30);
-      else if (plan === PlanType.SEMESTRAL) expires.setDate(expires.getDate() + 180);
-      else if (plan === PlanType.VITALICIO) expires.setFullYear(expires.getFullYear() + 100);
-
-      await supabase.from('profiles').update({
-          plan: plan,
-          subscription_expires_at: expires.toISOString(),
-          is_trial: false 
-      }).eq('id', userId);
-  },
-
-  resetPassword: async (email: string) => {
+  async resetPassword(email: string) {
       if (!supabase) return false;
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
           redirectTo: window.location.origin + '/settings',
@@ -298,219 +243,231 @@ export const dbService = {
       return !error;
   },
 
-  loginSocial: async (provider: 'google') => {
-      if (!supabase) return { user: null, error: 'No Supabase' };
-      const { data, error } = await supabase.auth.signInWithOAuth({
-          provider: provider,
-          options: { redirectTo: window.location.origin }
+  onAuthChange(callback: (user: User | null) => void) {
+      if (!supabase) return () => {};
+      const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
+          if (session?.user) {
+              const profile = await this.getUserProfile(session.user.id);
+              callback(profile);
+          } else {
+              callback(null);
+          }
       });
-      return { user: data, error };
+      return () => data.subscription.unsubscribe();
   },
 
-  // --- WORKS (OBRAS) ---
-  
-  getWorks: async (userId: string): Promise<Work[]> => {
-      if (!supabase) return [];
-      const { data, error } = await supabase.from('works').select('*').eq('user_id', userId);
-      if (error) {
-          console.error("Erro ao buscar obras:", error);
-          return [];
-      }
-      return (data || []).map(parseWorkFromDB);
+  isSubscriptionActive(user: User) {
+      if (user.plan === PlanType.VITALICIO) return true;
+      if (!user.subscriptionExpiresAt) return true; // New accounts might have undefined
+      return new Date(user.subscriptionExpiresAt) > new Date();
   },
 
-  getWorkById: async (workId: string): Promise<Work | null> => {
+  async updatePlan(userId: string, plan: PlanType) {
+      if (!supabase) return;
+      
+      let expiresAt = new Date();
+      if (plan === PlanType.MENSAL) expiresAt.setMonth(expiresAt.getMonth() + 1);
+      if (plan === PlanType.SEMESTRAL) expiresAt.setMonth(expiresAt.getMonth() + 6);
+      if (plan === PlanType.VITALICIO) expiresAt.setFullYear(expiresAt.getFullYear() + 100);
+
+      await supabase.from('profiles').update({
+          plan: plan,
+          subscription_expires_at: expiresAt.toISOString(),
+          is_trial: false
+      }).eq('id', userId);
+  },
+
+  // --- WORKS (OTIMIZADO) ---
+
+  async getWorks(userId: string) {
+    if (!supabase) return [];
+    // Otimização: Select apenas campos necessários para a lista se possível, mas * é ok para poucas obras
+    const { data, error } = await supabase
+        .from('works')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+    
+    if (error) {
+        console.error("Error fetching works:", error);
+        return [];
+    }
+    return data.map(parseWorkFromDB);
+  },
+
+  async getWorkById(workId: string) {
       if (!supabase) return null;
       const { data, error } = await supabase.from('works').select('*').eq('id', workId).single();
-      if (error || !data) return null;
+      if (error) return null;
       return parseWorkFromDB(data);
   },
 
-  createWork: async (work: Omit<Work, 'id'>, templateId?: string): Promise<Work> => {
+  // --- CRIAÇÃO DE OBRA OTIMIZADA (BULK INSERT) ---
+  async createWork(workData: Omit<Work, 'id'>, templateId?: string) {
       if (!supabase) throw new Error("Offline");
+
+      // 1. Create Work
+      const { data: work, error } = await supabase
+          .from('works')
+          .insert(mapWorkToDB(workData))
+          .select()
+          .single();
       
-      console.log("Iniciando criação da obra...", work.name);
+      if (error) throw error;
+      if (!work) throw new Error("Falha ao criar obra");
 
-      const payload = {
-          user_id: work.userId,
-          name: work.name,
-          address: work.address,
-          budget_planned: Number(work.budgetPlanned) || 0,
-          start_date: work.startDate,
-          end_date: work.endDate,
-          area: Number(work.area) || 0,
-          status: work.status || WorkStatus.PLANNING,
-          notes: work.notes,
-          floors: Number(work.floors) || 1,
-          bedrooms: Number(work.bedrooms) || 0,
-          bathrooms: Number(work.bathrooms) || 0,
-          kitchens: Number(work.kitchens) || 0,
-          living_rooms: Number(work.livingRooms) || 0,
-          has_leisure_area: work.hasLeisureArea
-      };
-
-      // 1. Criar Obra
-      const { data, error } = await supabase.from('works').insert([payload]).select().single();
-
-      if (error || !data) {
-          console.error("Erro ao inserir Obra no Supabase:", error);
-          throw new Error(error?.message || "Erro ao criar obra no banco de dados.");
-      }
-      
-      const newWork = parseWorkFromDB(data);
-      console.log("Obra criada ID:", newWork.id);
-
-      // 2. Gerar Itens Automáticos (Template)
+      // 2. Generate Steps & Materials (In Memory for Bulk Insert)
       if (templateId) {
-          try {
-              const template = WORK_TEMPLATES.find(t => t.id === templateId);
+          const template = WORK_TEMPLATES.find(t => t.id === templateId);
+          if (template) {
+              const stepsPayload = [];
+              const materialsPayload = [];
               
-              if (template && template.includedSteps.length > 0) {
+              const startDate = new Date(workData.startDate);
+              let currentDate = new Date(startDate);
+              const daysPerStep = Math.ceil(template.defaultDurationDays / template.includedSteps.length);
+
+              // Prepare Steps Payload
+              for (const stepName of template.includedSteps) {
+                  const endDate = new Date(currentDate);
+                  endDate.setDate(endDate.getDate() + daysPerStep);
                   
-                  // Gerar Cronograma (Steps)
-                  const start = new Date(newWork.startDate);
-                  const safeStart = isNaN(start.getTime()) ? new Date() : start;
-                  const durationDays = template.defaultDurationDays || 90;
-                  const stepDuration = Math.ceil(durationDays / template.includedSteps.length);
-                  
-                  const stepsPayload = template.includedSteps.map((stepName, index) => {
-                      const sDate = new Date(safeStart);
-                      sDate.setDate(safeStart.getDate() + (index * stepDuration));
-                      
-                      const eDate = new Date(sDate);
-                      eDate.setDate(sDate.getDate() + stepDuration);
-                      
-                      return {
-                          work_id: newWork.id,
-                          name: stepName,
-                          start_date: sDate.toISOString().split('T')[0],
-                          end_date: eDate.toISOString().split('T')[0],
-                          status: 'NAO_INICIADO',
-                          is_delayed: false
-                      };
+                  stepsPayload.push({
+                      work_id: work.id,
+                      name: stepName,
+                      start_date: currentDate.toISOString().split('T')[0],
+                      end_date: endDate.toISOString().split('T')[0],
+                      status: 'NAO_INICIADO', // StepStatus.NOT_STARTED
+                      is_delayed: false
                   });
+                  currentDate = new Date(endDate);
+              }
 
-                  // IMPORTANTE: .select() retorna os registros criados com seus IDs para vincular materiais depois
-                  const { data: createdSteps, error: stepsError } = await supabase.from('steps').insert(stepsPayload).select();
+              // BULK INSERT STEPS
+              // Usamos select() para receber os IDs gerados se precisássemos vincular materiais
+              const { error: stepError } = await supabase
+                  .from('steps')
+                  .insert(stepsPayload);
+              
+              if (stepError) console.error("Erro ao inserir etapas:", stepError);
 
-                  if (stepsError) {
-                      console.error("ERRO ao gerar etapas:", stepsError);
-                  } else if (createdSteps && createdSteps.length > 0) {
-                      console.log(`Geradas ${createdSteps.length} etapas com sucesso.`);
-
-                      // 3. Gerar Lista de Materiais (Vinculando às etapas criadas)
-                      let categoriesToInclude: string[] = [];
-
-                      // Definir quais categorias de material incluir baseado no template
-                      if (templateId === 'CONSTRUCAO') categoriesToInclude = FULL_MATERIAL_PACKAGES.map(c => c.category);
-                      else if (templateId === 'REFORMA_APTO') categoriesToInclude = FULL_MATERIAL_PACKAGES.map(c => c.category).filter(c => !c.includes('Fundação') && !c.includes('Telhado'));
-                      else if (templateId === 'BANHEIRO') categoriesToInclude = ['Instalações Hidráulicas (Tubulação)', 'Pisos e Revestimentos Cerâmicos', 'Louças e Metais (Acabamento Hidro)', 'Marmoraria e Granitos', 'Limpeza Final', 'Gesso e Drywall'];
-                      else if (templateId === 'COZINHA') categoriesToInclude = ['Instalações Hidráulicas (Tubulação)', 'Instalações Elétricas (Infra)', 'Pisos e Revestimentos Cerâmicos', 'Marmoraria e Granitos', 'Louças e Metais (Acabamento Hidro)', 'Limpeza Final', 'Gesso e Drywall'];
-                      else if (templateId === 'PINTURA') categoriesToInclude = ['Pintura', 'Limpeza Final'];
-
-                      const materialsPayload: any[] = [];
-                      const area = newWork.area > 0 ? newWork.area : 20;
-
-                      // Função para encontrar o ID da etapa correta para o material
-                      const findStepId = (catName: string) => {
-                          const cat = catName.toLowerCase();
-                          // Tenta achar uma etapa que tenha palavras chave da categoria
-                          const match = createdSteps.find((s: any) => {
-                              const stepName = s.name.toLowerCase();
-                              // Lógica de correspondência de strings (Material -> Etapa)
-                              if (cat.includes('fundação') && stepName.includes('fundações')) return true;
-                              if (cat.includes('alvenaria') && (stepName.includes('paredes') || stepName.includes('levantamento'))) return true;
-                              if (cat.includes('elétrica') && (stepName.includes('elétrica') || stepName.includes('fiação'))) return true;
-                              if (cat.includes('hidráulica') && (stepName.includes('tubulação') || stepName.includes('água'))) return true;
-                              if (cat.includes('pintura') && stepName.includes('pintura')) return true;
-                              if (cat.includes('piso') && (stepName.includes('pisos') || stepName.includes('revestimentos'))) return true;
-                              if (cat.includes('limpeza') && stepName.includes('limpeza')) return true;
-                              if (cat.includes('telhado') && stepName.includes('telhado')) return true;
-                              if (cat.includes('acabamento') && (stepName.includes('acabamento') || stepName.includes('louças'))) return true;
-                              if (cat.includes('gesso') && stepName.includes('gesso')) return true;
-                              return false;
-                          });
-                          return match ? match.id : null; 
-                      };
-
-                      for (const pkg of FULL_MATERIAL_PACKAGES) {
-                          if (categoriesToInclude.includes(pkg.category)) {
-                              const stepId = findStepId(pkg.category);
-                              
-                              for (const item of pkg.items) {
-                                  let qty = 0;
-                                  const n = item.name.toLowerCase();
-                                  
-                                  // Quantitativo Inteligente Baseado nos Cômodos
-                                  const bth = newWork.bathrooms || 1;
-                                  const kit = newWork.kitchens || 1;
-                                  const bed = newWork.bedrooms || 2;
-                                  const liv = newWork.livingRooms || 1;
-
-                                  if (n.includes('vaso') || n.includes('chuveiro') || n.includes('assento')) qty = bth;
-                                  else if (n.includes('torneira')) qty = bth + kit;
-                                  else if (n.includes('porta') && !n.includes('entrada')) qty = bed + bth;
-                                  else if (n.includes('tomada')) qty = (bed + liv + kit) * 4;
-                                  else if (n.includes('janela')) qty = bed + liv;
-                                  else {
-                                      // Multiplicador por área
-                                      qty = Math.ceil((item.multiplier || 1) * area);
-                                  }
-                                  
-                                  if (qty > 0) {
-                                      materialsPayload.push({
-                                          work_id: newWork.id,
-                                          name: item.name,
-                                          brand: '',
-                                          planned_qty: qty,
-                                          purchased_qty: 0,
-                                          unit: item.unit,
-                                          step_id: stepId
-                                      });
-                                  }
-                              }
-                          }
-                      }
-
-                      if (materialsPayload.length > 0) {
-                          console.log(`Gerando ${materialsPayload.length} materiais...`);
-                          const { error: matError } = await supabase.from('materials').insert(materialsPayload);
-                          if (matError) console.error("Erro ao inserir materiais:", matError);
-                      }
+              // Prepare Materials Payload (Vinculados à obra, sem vínculo rígido de etapa por enquanto para performance)
+              for (const cat of FULL_MATERIAL_PACKAGES) {
+                  const area = workData.area || 50; 
+                  for (const item of cat.items) {
+                      const qty = Math.ceil((item.multiplier || 1) * area);
+                      materialsPayload.push({
+                          work_id: work.id,
+                          name: item.name,
+                          planned_qty: qty,
+                          purchased_qty: 0,
+                          unit: item.unit,
+                          brand: 'Genérico',
+                          // step_id: null (opcional: implementar lógica de match de nome depois)
+                      });
                   }
               }
-          } catch (genError) {
-              console.error("Erro na geração automática:", genError);
-              // Não lança erro para não impedir a criação da obra, apenas loga
+
+              // BULK INSERT MATERIALS
+              // Dividir em chunks se for muito grande (opcional, mas Supabase aguenta bem ~500 rows)
+              if (materialsPayload.length > 0) {
+                  const { error: matError } = await supabase
+                      .from('materials')
+                      .insert(materialsPayload);
+                  if (matError) console.error("Erro ao inserir materiais:", matError);
+              }
           }
       }
-      return newWork;
+
+      return parseWorkFromDB(work);
   },
 
-  deleteWork: async (workId: string) => {
+  async deleteWork(workId: string) {
       if (!supabase) return;
+      // Cascade delete should handle related tables ideally, but strictly:
       await supabase.from('works').delete().eq('id', workId);
   },
 
-  // --- STEPS ---
-  getSteps: async (workId: string): Promise<Step[]> => {
+  // --- DASHBOARD STATS (OTIMIZADO) ---
+  
+  async calculateWorkStats(workId: string) {
+    if (!supabase) return { totalSpent: 0, progress: 0, delayedSteps: 0 };
+
+    // Executar queries em paralelo e buscando APENAS colunas necessárias
+    const [expensesRes, stepsRes] = await Promise.all([
+        supabase.from('expenses').select('amount').eq('work_id', workId),
+        supabase.from('steps').select('status').eq('work_id', workId)
+    ]);
+
+    const totalSpent = expensesRes.data?.reduce((sum, e) => sum + (Number(e.amount) || 0), 0) || 0;
+    
+    const steps = stepsRes.data || [];
+    const totalSteps = steps.length;
+    const completed = steps.filter(s => s.status === 'CONCLUIDO').length;
+    const progress = totalSteps > 0 ? Math.round((completed / totalSteps) * 100) : 0;
+
+    return { totalSpent, progress, delayedSteps: 0 };
+  },
+
+  async getDailySummary(workId: string) {
+    if (!supabase) return { completedSteps: 0, delayedSteps: 0, pendingMaterials: 0, totalSteps: 0 };
+
+    const today = new Date().toISOString().split('T')[0];
+    
+    // Otimização: Query específica para contagem
+    const { count: completedCount } = await supabase
+        .from('steps')
+        .select('*', { count: 'exact', head: true })
+        .eq('work_id', workId)
+        .eq('status', 'CONCLUIDO');
+
+    // Buscar etapas não concluídas para verificar atraso
+    const { data: activeSteps } = await supabase
+        .from('steps')
+        .select('end_date')
+        .eq('work_id', workId)
+        .neq('status', 'CONCLUIDO');
+    
+    const delayedSteps = activeSteps?.filter(s => s.end_date < today).length || 0;
+
+    // Buscar materiais pendentes (Isso precisa de dados, não só count, pois é computado)
+    // Limitando colunas para leveza
+    const { data: materials } = await supabase
+        .from('materials')
+        .select('planned_qty, purchased_qty')
+        .eq('work_id', workId);
+    
+    const pendingMaterials = materials?.filter(m => (Number(m.purchased_qty) || 0) < (Number(m.planned_qty) || 0)).length || 0;
+
+    return {
+        completedSteps: completedCount || 0,
+        delayedSteps,
+        pendingMaterials,
+        totalSteps: 0 // não usado
+    };
+  },
+
+  // --- GENERIC GETTERS ---
+
+  async getSteps(workId: string) {
       if (!supabase) return [];
       const { data } = await supabase.from('steps').select('*').eq('work_id', workId);
       return (data || []).map(parseStepFromDB);
   },
 
-  addStep: async (step: Step) => {
+  async addStep(step: Step) {
       if (!supabase) return;
-      await supabase.from('steps').insert([{
+      await supabase.from('steps').insert({
           work_id: step.workId,
           name: step.name,
           start_date: step.startDate,
           end_date: step.endDate,
-          status: step.status
-      }]);
+          status: step.status,
+          is_delayed: step.isDelayed
+      });
   },
 
-  updateStep: async (step: Step) => {
+  async updateStep(step: Step) {
       if (!supabase) return;
       await supabase.from('steps').update({
           name: step.name,
@@ -520,247 +477,262 @@ export const dbService = {
       }).eq('id', step.id);
   },
 
-  // --- MATERIALS ---
-  getMaterials: async (workId: string): Promise<Material[]> => {
+  async getMaterials(workId: string) {
       if (!supabase) return [];
       const { data } = await supabase.from('materials').select('*').eq('work_id', workId);
       return (data || []).map(parseMaterialFromDB);
   },
 
-  addMaterial: async (material: Material, purchaseData?: { qty: number, cost: number, date: string }) => {
+  async addMaterial(mat: Material, purchaseInfo?: { qty: number, cost: number, date: string }) {
       if (!supabase) return;
-      
-      const { data: matData } = await supabase.from('materials').insert([{
-          work_id: material.workId,
-          name: material.name,
-          brand: material.brand,
-          planned_qty: material.plannedQty,
-          purchased_qty: purchaseData ? purchaseData.qty : 0,
-          unit: material.unit,
-          step_id: material.stepId
-      }]).select().single();
+      const { data } = await supabase.from('materials').insert({
+          work_id: mat.workId,
+          name: mat.name,
+          brand: mat.brand,
+          planned_qty: mat.plannedQty,
+          purchased_qty: purchaseInfo ? purchaseInfo.qty : 0,
+          unit: mat.unit,
+          step_id: mat.stepId
+      }).select().single();
 
-      if (purchaseData && matData) {
-          await dbService.addExpense({
-              id: '', 
-              workId: material.workId,
-              description: `Compra: ${material.name}`,
-              amount: purchaseData.cost,
-              date: purchaseData.date,
+      if (purchaseInfo && data) {
+          await this.addExpense({
+              id: '', // DB generates
+              workId: mat.workId,
+              description: `Compra: ${mat.name}`,
+              amount: purchaseInfo.cost,
+              date: purchaseInfo.date,
               category: ExpenseCategory.MATERIAL,
-              relatedMaterialId: matData.id,
-              stepId: material.stepId
+              relatedMaterialId: data.id
           });
       }
   },
 
-  updateMaterial: async (material: Material) => {
+  async updateMaterial(mat: Material) {
       if (!supabase) return;
       await supabase.from('materials').update({
-          name: material.name,
-          brand: material.brand,
-          planned_qty: material.plannedQty,
-          unit: material.unit
-      }).eq('id', material.id);
+          name: mat.name,
+          brand: mat.brand,
+          planned_qty: mat.plannedQty,
+          purchased_qty: mat.purchasedQty,
+          unit: mat.unit
+      }).eq('id', mat.id);
   },
 
-  registerMaterialPurchase: async (matId: string, name: string, brand: string, plannedQty: number, unit: string, buyQty: number, cost: number) => {
+  async registerMaterialPurchase(matId: string, name: string, brand: string, plannedQty: number, unit: string, buyQty: number, cost: number) {
       if (!supabase) return;
       
-      const { data: current } = await supabase.from('materials').select('purchased_qty, work_id, step_id').eq('id', matId).single();
+      // Get current qty
+      const { data: current } = await supabase.from('materials').select('purchased_qty, work_id').eq('id', matId).single();
       if (!current) return;
 
-      const newPurchasedQty = (Number(current.purchased_qty) || 0) + buyQty;
-      
-      await supabase.from('materials').update({ 
-          purchased_qty: newPurchasedQty,
-          name: name,
-          brand: brand,
-          planned_qty: plannedQty,
-          unit: unit
+      const newQty = (Number(current.purchased_qty) || 0) + buyQty;
+
+      await supabase.from('materials').update({
+          purchased_qty: newQty,
+          brand: brand || undefined // Update brand if provided
       }).eq('id', matId);
 
-      await dbService.addExpense({
+      // Add expense automatically
+      await this.addExpense({
           id: '',
           workId: current.work_id,
           description: `Compra: ${name}`,
           amount: cost,
           date: new Date().toISOString(),
           category: ExpenseCategory.MATERIAL,
-          relatedMaterialId: matId,
-          stepId: current.step_id
+          relatedMaterialId: matId
       });
   },
 
-  // --- EXPENSES ---
-  getExpenses: async (workId: string): Promise<Expense[]> => {
+  async getExpenses(workId: string) {
       if (!supabase) return [];
       const { data } = await supabase.from('expenses').select('*').eq('work_id', workId);
       return (data || []).map(parseExpenseFromDB);
   },
 
-  addExpense: async (expense: Expense) => {
+  async addExpense(exp: Expense) {
       if (!supabase) return;
-      await supabase.from('expenses').insert([{
-          work_id: expense.workId,
-          description: expense.description,
-          amount: expense.amount,
-          date: expense.date,
-          category: expense.category,
-          step_id: expense.stepId,
-          related_material_id: expense.relatedMaterialId,
-          total_agreed: expense.totalAgreed
-      }]);
+      await supabase.from('expenses').insert({
+          work_id: exp.workId,
+          description: exp.description,
+          amount: exp.amount,
+          date: exp.date,
+          category: exp.category,
+          step_id: exp.stepId,
+          related_material_id: exp.relatedMaterialId,
+          total_agreed: exp.totalAgreed
+      });
   },
 
-  updateExpense: async (expense: Expense) => {
+  async updateExpense(exp: Expense) {
       if (!supabase) return;
       await supabase.from('expenses').update({
-          description: expense.description,
-          amount: expense.amount,
-          date: expense.date,
-          category: expense.category,
-          step_id: expense.stepId,
-          total_agreed: expense.totalAgreed
-      }).eq('id', expense.id);
+          description: exp.description,
+          amount: exp.amount,
+          date: exp.date,
+          category: exp.category,
+          step_id: exp.stepId,
+          total_agreed: exp.totalAgreed
+      }).eq('id', exp.id);
   },
 
-  deleteExpense: async (id: string) => {
+  async deleteExpense(id: string) {
       if (!supabase) return;
       await supabase.from('expenses').delete().eq('id', id);
   },
 
   // --- WORKERS & SUPPLIERS ---
-  getWorkers: async (userId: string): Promise<Worker[]> => {
+
+  async getWorkers(userId: string) {
       if (!supabase) return [];
       const { data } = await supabase.from('workers').select('*').eq('user_id', userId);
       return (data || []).map(parseWorkerFromDB);
   },
-  addWorker: async (worker: Omit<Worker, 'id'>) => {
+
+  async addWorker(worker: Partial<Worker>) {
       if (!supabase) return;
-      await supabase.from('workers').insert([{
+      await supabase.from('workers').insert({
           user_id: worker.userId,
           name: worker.name,
           role: worker.role,
           phone: worker.phone,
           notes: worker.notes
-      }]);
+      });
   },
-  updateWorker: async (worker: Worker) => {
-      if (!supabase) return;
+
+  async updateWorker(worker: Partial<Worker>) {
+      if (!supabase || !worker.id) return;
       await supabase.from('workers').update({
-          name: worker.name, 
-          role: worker.role, 
-          phone: worker.phone, 
+          name: worker.name,
+          role: worker.role,
+          phone: worker.phone,
           notes: worker.notes
       }).eq('id', worker.id);
   },
-  deleteWorker: async (id: string) => {
-      if (supabase) await supabase.from('workers').delete().eq('id', id);
+
+  async deleteWorker(id: string) {
+      if (!supabase) return;
+      await supabase.from('workers').delete().eq('id', id);
   },
 
-  getSuppliers: async (userId: string): Promise<Supplier[]> => {
+  async getSuppliers(userId: string) {
       if (!supabase) return [];
       const { data } = await supabase.from('suppliers').select('*').eq('user_id', userId);
       return (data || []).map(parseSupplierFromDB);
   },
-  addSupplier: async (supplier: Omit<Supplier, 'id'>) => {
+
+  async addSupplier(supplier: Partial<Supplier>) {
       if (!supabase) return;
-      await supabase.from('suppliers').insert([{
+      await supabase.from('suppliers').insert({
           user_id: supplier.userId,
           name: supplier.name,
           category: supplier.category,
           phone: supplier.phone,
           notes: supplier.notes
-      }]);
+      });
   },
-  updateSupplier: async (supplier: Supplier) => {
-      if (!supabase) return;
+
+  async updateSupplier(supplier: Partial<Supplier>) {
+      if (!supabase || !supplier.id) return;
       await supabase.from('suppliers').update({
-          name: supplier.name, 
-          category: supplier.category, 
-          phone: supplier.phone, 
+          name: supplier.name,
+          category: supplier.category,
+          phone: supplier.phone,
           notes: supplier.notes
       }).eq('id', supplier.id);
   },
-  deleteSupplier: async (id: string) => {
-      if (supabase) await supabase.from('suppliers').delete().eq('id', id);
+
+  async deleteSupplier(id: string) {
+      if (!supabase) return;
+      await supabase.from('suppliers').delete().eq('id', id);
   },
 
   // --- PHOTOS & FILES ---
-  getPhotos: async (workId: string): Promise<WorkPhoto[]> => {
+
+  async getPhotos(workId: string) {
       if (!supabase) return [];
-      const { data } = await supabase.from('photos').select('*').eq('work_id', workId);
+      const { data } = await supabase.from('work_photos').select('*').eq('work_id', workId).order('date', {ascending: false});
       return (data || []).map(parsePhotoFromDB);
   },
-  addPhoto: async (photo: WorkPhoto) => {
+
+  async addPhoto(photo: WorkPhoto) {
       if (!supabase) return;
-      await supabase.from('photos').insert([{
+      await supabase.from('work_photos').insert({
           work_id: photo.workId,
-          url: photo.url,
+          url: photo.url, // In real app, upload to storage and save URL
           description: photo.description,
           date: photo.date,
           type: photo.type
-      }]);
+      });
   },
 
-  getFiles: async (workId: string): Promise<WorkFile[]> => {
+  async getFiles(workId: string) {
       if (!supabase) return [];
-      const { data } = await supabase.from('files').select('*').eq('work_id', workId);
+      const { data } = await supabase.from('work_files').select('*').eq('work_id', workId).order('date', {ascending: false});
       return (data || []).map(parseFileFromDB);
   },
-  addFile: async (file: WorkFile) => {
+
+  async addFile(file: WorkFile) {
       if (!supabase) return;
-      await supabase.from('files').insert([{
+      await supabase.from('work_files').insert({
           work_id: file.workId,
           name: file.name,
           category: file.category,
           url: file.url,
           type: file.type,
           date: file.date
-      }]);
+      });
   },
 
-  // --- STATS ---
-  getNotifications: async (_userId: string): Promise<Notification[]> => { return []; },
-  dismissNotification: async (_id: string) => {},
-  clearAllNotifications: async (_userId: string) => {},
-  generateSmartNotifications: async (_userId: string, _workId: string) => {},
+  // --- NOTIFICATIONS ---
 
-  calculateWorkStats: async (workId: string) => {
-      if (!supabase) return { totalSpent: 0, progress: 0, delayedSteps: 0 };
-      
-      const { data: expenses } = await supabase.from('expenses').select('amount').eq('work_id', workId);
-      const totalSpent = (expenses || []).reduce((acc, curr) => acc + Number(curr.amount), 0);
-
-      const { data: steps } = await supabase.from('steps').select('status').eq('work_id', workId);
-      const totalSteps = steps?.length || 0;
-      const completed = steps?.filter((s: any) => s.status === 'CONCLUIDO').length || 0;
-      const progress = totalSteps > 0 ? Math.round((completed / totalSteps) * 100) : 0;
-
-      return { totalSpent, progress, delayedSteps: 0 };
+  async getNotifications(userId: string) {
+      if (!supabase) return [];
+      const { data } = await supabase.from('notifications').select('*').eq('user_id', userId).order('date', {ascending: false}).limit(10);
+      return (data || []).map(parseNotificationFromDB);
   },
 
-  getDailySummary: async (workId: string) => {
-      if (!supabase) return { completedSteps: 0, delayedSteps: 0, pendingMaterials: 0, totalSteps: 0 };
-      
+  async generateSmartNotifications(userId: string, workId: string) {
+      // Logic to generate notifications based on delays, budget, etc.
+      // For MVP, simplistic check:
+      if (!supabase) return;
+      const { data: steps } = await supabase.from('steps').select('name, end_date').eq('work_id', workId).neq('status', 'CONCLUIDO');
       const today = new Date().toISOString().split('T')[0];
-      const { data: steps } = await supabase.from('steps').select('*').eq('work_id', workId);
-      const { data: materials } = await supabase.from('materials').select('*').eq('work_id', workId);
-
-      const delayed = steps?.filter((s: any) => s.status !== 'CONCLUIDO' && s.end_date < today).length || 0;
-      const completed = steps?.filter((s: any) => s.status === 'CONCLUIDO').length || 0;
-      const pendingMats = materials?.filter((m: any) => (Number(m.purchased_qty) < Number(m.planned_qty))).length || 0;
-
-      return {
-          completedSteps: completed,
-          delayedSteps: delayed,
-          pendingMaterials: pendingMats,
-          totalSteps: steps?.length || 0
-      };
+      
+      const delayed = steps?.filter(s => s.end_date < today) || [];
+      if (delayed.length > 0) {
+          // Check if notification already exists today to avoid spam
+          const { count } = await supabase.from('notifications').select('*', { count: 'exact', head: true }).eq('user_id', userId).like('title', 'Atraso%').gte('date', today);
+          
+          if (!count || count === 0) {
+              await supabase.from('notifications').insert({
+                  user_id: userId,
+                  title: 'Atraso Identificado',
+                  message: `Você tem ${delayed.length} etapas atrasadas na obra. Verifique o cronograma.`,
+                  date: new Date().toISOString(),
+                  read: false,
+                  type: 'WARNING'
+              });
+          }
+      }
   },
 
-  generatePix: async (_amount: number, _user: any) => {
-      return { qr_code_base64: '', copy_paste_code: '' };
+  async dismissNotification(id: string) {
+      if (!supabase) return;
+      await supabase.from('notifications').delete().eq('id', id);
+  },
+
+  async clearAllNotifications(userId: string) {
+      if (!supabase) return;
+      await supabase.from('notifications').delete().eq('user_id', userId);
+  },
+
+  // --- PIX MOCK ---
+  async generatePix(amount: number, user: { name: string, email: string, cpf?: string }) {
+      return {
+          qr_code_base64: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==', // Mock pixel
+          copy_paste_code: `00020126580014BR.GOV.BCB.PIX0136123e4567-e89b-12d3-a456-426614174000520400005303986540${amount.toFixed(2).replace('.','')}5802BR5913${user.name.substring(0,13)}6008BRASILIA62070503***6304`
+      };
   }
 };
