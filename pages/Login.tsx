@@ -169,6 +169,8 @@ const Login: React.FC = () => {
                     <>
                         <input type="text" placeholder="Nome Completo" value={name} onChange={e => setName(e.target.value)}
                             className="w-full px-4 py-3 bg-white/10 border border-white/10 rounded-xl text-white outline-none focus:border-amber-500/50" />
+                        <input type="text" placeholder="WhatsApp (DDD + Número)" value={whatsapp} onChange={e => setWhatsapp(e.target.value)}
+                            className="w-full px-4 py-3 bg-white/10 border border-white/10 rounded-xl text-white outline-none focus:border-amber-500/50" />
                         <input type="text" placeholder="CPF" value={cpf} onChange={handleCpfChange}
                             className="w-full px-4 py-3 bg-white/10 border border-white/10 rounded-xl text-white outline-none focus:border-amber-500/50" />
                     </>
