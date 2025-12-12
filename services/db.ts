@@ -447,7 +447,7 @@ export const dbService = {
 
                   if (materialsPayload.length > 0) {
                       console.log(`Tentando inserir ${materialsPayload.length} materiais...`);
-                      const { error: matError } = await supabase.from('materials').insert(materialsPayload);
+                      const { error: matError } = await supabase.from('materiais').insert(materialsPayload);
                       if (matError) console.error("Erro ao inserir materiais:", matError);
                       else console.log("Materiais inseridos com sucesso.");
                   }
