@@ -438,7 +438,7 @@ export const dbService = {
                                       planned_qty: qty,
                                       purchased_qty: 0,
                                       unit: item.unit,
-                                      step_id: stepId // Pode ser null, o banco aceita
+                                      etapa_id: stepId // Pode ser null, o banco aceita
                                   });
                               }
                           }
@@ -507,7 +507,7 @@ export const dbService = {
           planned_qty: material.plannedQty,
           purchased_qty: purchaseData ? purchaseData.qty : 0,
           unit: material.unit,
-          step_id: material.stepId
+          etapa_id: material.stepId
       }]).select().single();
 
       if (purchaseData && matData) {
@@ -537,7 +537,7 @@ export const dbService = {
   registerMaterialPurchase: async (matId: string, name: string, brand: string, plannedQty: number, unit: string, buyQty: number, cost: number) => {
       if (!supabase) return;
       
-      const { data: current } = await supabase.from('materiais').select('purchased_qty, obra_id, step_id').eq('id', matId).single();
+      const { data: current } = await supabase.from('materiais').select('purchased_qty, obra_id, etapa_id').eq('id', matId).single();
       if (!current) return;
 
       const newPurchasedQty = (Number(current.purchased_qty) || 0) + buyQty;
