@@ -127,11 +127,11 @@ export const dbService = {
         return null;
     }
 
-    // Tenta buscar o perfil. Se não existir (foi apagado no banco), recria.
+    // Tenta buscar o perfil. Se não existir (foi apagado no banco), recria automaticamente.
     let profile = await dbService.getUserProfile(session.user.id);
     
     if (!profile) {
-        console.log("Perfil não encontrado no banco, recriando...");
+        console.log("Detectado usuário sem perfil (tabelas apagadas). Recriando perfil...");
         profile = await dbService.createProfileFromAuth(session.user);
     }
 
@@ -198,7 +198,7 @@ export const dbService = {
       const newProfile = {
           id: authUser.id,
           email: authUser.email,
-          name: metadata.name || authUser.user_metadata?.name || 'Usuário',
+          name: metadata.name || authUser.user_metadata?.name || 'Usuário Recuprado',
           whatsapp: metadata.whatsapp || authUser.user_metadata?.whatsapp || '',
           cpf: metadata.cpf || authUser.user_metadata?.cpf || '',
           plan: initialPlan,
@@ -208,7 +208,7 @@ export const dbService = {
 
       const { error } = await supabase.from('profiles').upsert([newProfile]);
       if (error) {
-          console.error("Erro ao criar perfil:", error);
+          console.error("Erro ao recriar perfil:", error);
           return null;
       }
       return mapProfileFromSupabase(newProfile);
@@ -223,8 +223,10 @@ export const dbService = {
      if (!data.user) return null;
 
      let profile = await dbService.getUserProfile(data.user.id);
-     // Auto-heal se perfil deletado
+     
+     // AUTO-HEAL: Se o login no Auth funcionou, mas não tem perfil na tabela, cria agora.
      if (!profile) {
+         console.log("Login efetuado, mas perfil não encontrado. Recriando...");
          profile = await dbService.createProfileFromAuth(data.user);
      }
 
@@ -388,7 +390,7 @@ export const dbService = {
                       };
                   });
 
-                  // IMPORTANTE: .select() retorna os registros criados com seus IDs
+                  // IMPORTANTE: .select() retorna os registros criados com seus IDs para vincular materiais depois
                   const { data: createdSteps, error: stepsError } = await supabase.from('steps').insert(stepsPayload).select();
 
                   if (stepsError) {
@@ -415,18 +417,20 @@ export const dbService = {
                           // Tenta achar uma etapa que tenha palavras chave da categoria
                           const match = createdSteps.find((s: any) => {
                               const stepName = s.name.toLowerCase();
+                              // Lógica de correspondência de strings (Material -> Etapa)
                               if (cat.includes('fundação') && stepName.includes('fundações')) return true;
-                              if (cat.includes('alvenaria') && stepName.includes('paredes')) return true;
-                              if (cat.includes('elétrica') && stepName.includes('elétrica')) return true;
+                              if (cat.includes('alvenaria') && (stepName.includes('paredes') || stepName.includes('levantamento'))) return true;
+                              if (cat.includes('elétrica') && (stepName.includes('elétrica') || stepName.includes('fiação'))) return true;
                               if (cat.includes('hidráulica') && (stepName.includes('tubulação') || stepName.includes('água'))) return true;
                               if (cat.includes('pintura') && stepName.includes('pintura')) return true;
-                              if (cat.includes('piso') && stepName.includes('piso')) return true;
+                              if (cat.includes('piso') && (stepName.includes('pisos') || stepName.includes('revestimentos'))) return true;
                               if (cat.includes('limpeza') && stepName.includes('limpeza')) return true;
                               if (cat.includes('telhado') && stepName.includes('telhado')) return true;
-                              if (cat.includes('acabamento') && stepName.includes('acabamento')) return true;
+                              if (cat.includes('acabamento') && (stepName.includes('acabamento') || stepName.includes('louças'))) return true;
+                              if (cat.includes('gesso') && stepName.includes('gesso')) return true;
                               return false;
                           });
-                          return match ? match.id : null; // Se não achar, fica null (sem etapa vinculada, mas aparece na lista geral)
+                          return match ? match.id : null; 
                       };
 
                       for (const pkg of FULL_MATERIAL_PACKAGES) {
