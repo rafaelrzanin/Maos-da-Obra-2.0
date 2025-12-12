@@ -65,10 +65,9 @@ const AuthContext = createContext<AuthContextType>(null!);
 export const useAuth = () => useContext(AuthContext);
 
 const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  // Otimização: Se já temos user no localStorage, NÃO começamos com loading true.
-  // Isso permite que a UI carregue instantaneamente enquanto validamos o token em background.
-  const [user, setUserState] = useState<User | null>(() => dbService.getCurrentUser());
-  const [loading, setLoading] = useState(() => !dbService.getCurrentUser());
+  // Correctly handle async user fetching: start with null and loading true
+  const [user, setUserState] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
   
   // Ref para evitar loops de atualizações com o mesmo objeto
   const userRef = useRef<string>(JSON.stringify(user));
@@ -211,161 +210,95 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const navItems = [
     { label: 'Painel Geral', path: '/', icon: 'fa-house' },
     { label: 'Nova Obra', path: '/create', icon: 'fa-plus' },
-    { label: 'Configurações', path: '/profile', icon: 'fa-gear' },
-    { label: 'Assinatura', path: '/settings', icon: 'fa-id-card' },
+    { label: 'Configurações', path: '/settings', icon: 'fa-gear' },
+    { label: 'Tutoriais', path: '/tutorials', icon: 'fa-circle-play' },
   ];
 
   return (
-    <div className="min-h-screen bg-surface dark:bg-slate-950 flex flex-col md:flex-row font-sans text-text-body dark:text-slate-300 overflow-hidden">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors">
       {/* Mobile Header */}
-      <div className="md:hidden bg-primary dark:bg-slate-900 text-white p-4 flex justify-between items-center shadow-md sticky top-0 z-50 shrink-0">
-        <h1 className="font-bold text-lg tracking-tight flex items-center gap-2">
-            <span className="bg-secondary text-white w-8 h-8 rounded-lg flex items-center justify-center">
-                <i className="fa-solid fa-helmet-safety text-sm"></i>
-            </span>
-            <span>MÃOS DA OBRA</span>
-        </h1>
-        {isSubscriptionValid && (
-            <button 
-                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} 
-                className="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center active:scale-95 transition-transform"
-            >
-                <i className={`fa-solid ${isMobileMenuOpen ? 'fa-xmark' : 'fa-bars'} text-lg`}></i>
-            </button>
-        )}
-      </div>
+      <nav className="fixed top-0 w-full z-50 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-100 dark:border-slate-800">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between h-16 items-center">
+            <div className="flex-shrink-0 flex items-center gap-3 cursor-pointer" onClick={() => navigate('/')}>
+              <div className="w-10 h-10 bg-gradient-to-br from-secondary to-orange-600 rounded-xl flex items-center justify-center text-white text-lg shadow-lg">
+                <i className="fa-solid fa-helmet-safety"></i>
+              </div>
+              <span className="font-black text-xl tracking-tight text-primary dark:text-white">MÃOS DA <span className="text-secondary">OBRA</span></span>
+            </div>
+            
+            <div className="hidden md:flex items-center gap-6">
+                {navItems.map(item => (
+                    <button key={item.path} onClick={() => navigate(item.path)} className={`text-sm font-bold transition-colors flex items-center gap-2 ${location.pathname === item.path ? 'text-secondary' : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'}`}>
+                        <i className={`fa-solid ${item.icon}`}></i> {item.label}
+                    </button>
+                ))}
+                <button onClick={() => navigate('/profile')} className="flex items-center gap-3 pl-6 border-l border-slate-200 dark:border-slate-700">
+                    <div className="text-right">
+                        <p className="text-xs font-bold text-primary dark:text-white">{user.name.split(' ')[0]}</p>
+                        <p className="text-[10px] text-slate-400 uppercase">{user.plan || 'Free'}</p>
+                    </div>
+                    <div className="w-9 h-9 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-secondary border border-slate-200 dark:border-slate-700">
+                        <i className="fa-solid fa-user"></i>
+                    </div>
+                </button>
+                <button onClick={toggleTheme} className="w-9 h-9 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 flex items-center justify-center hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+                    {theme === 'dark' ? <i className="fa-solid fa-sun"></i> : <i className="fa-solid fa-moon"></i>}
+                </button>
+                <button onClick={logout} className="text-slate-400 hover:text-red-500 transition-colors"><i className="fa-solid fa-right-from-bracket"></i></button>
+            </div>
 
-      {/* Mobile Menu Dropdown */}
-      {isMobileMenuOpen && isSubscriptionValid && (
-        <div className="md:hidden fixed inset-0 z-40 bg-black/60 backdrop-blur-sm pt-[72px]" onClick={() => setIsMobileMenuOpen(false)}>
-            <div className="bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 shadow-2xl p-4 animate-in slide-in-from-top-5 rounded-b-2xl" onClick={e => e.stopPropagation()}>
-                <nav className="flex flex-col gap-2">
+            <div className="md:hidden flex items-center gap-4">
+               <button onClick={toggleTheme} className="text-slate-500 dark:text-slate-400">
+                    {theme === 'dark' ? <i className="fa-solid fa-sun"></i> : <i className="fa-solid fa-moon"></i>}
+               </button>
+               <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="text-primary dark:text-white p-2">
+                  <i className={`fa-solid ${isMobileMenuOpen ? 'fa-xmark' : 'fa-bars'} text-xl`}></i>
+               </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Mobile Menu */}
+        {isMobileMenuOpen && (
+            <div className="md:hidden absolute top-16 left-0 w-full bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 shadow-xl animate-in slide-in-from-top-2">
+                <div className="px-4 pt-4 pb-6 space-y-2">
+                    <div className="flex items-center gap-3 p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl mb-4" onClick={() => { navigate('/profile'); setIsMobileMenuOpen(false); }}>
+                        <div className="w-12 h-12 rounded-full bg-white dark:bg-slate-700 flex items-center justify-center text-secondary text-xl shadow-sm">
+                            <i className="fa-solid fa-user"></i>
+                        </div>
+                        <div>
+                            <p className="font-bold text-primary dark:text-white">{user.name}</p>
+                            <p className="text-xs text-slate-500">{user.email}</p>
+                        </div>
+                    </div>
                     {navItems.map(item => (
-                        <button 
-                            key={item.path} 
-                            onClick={() => { navigate(item.path); setIsMobileMenuOpen(false); }} 
-                            className={`flex items-center gap-4 p-4 rounded-xl font-bold transition-colors ${location.pathname === item.path ? 'bg-primary text-white' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}`}
-                        >
-                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${location.pathname === item.path ? 'bg-white/20' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}>
-                                <i className={`fa-solid ${item.icon}`}></i>
-                            </div>
-                            {item.label}
+                        <button key={item.path} onClick={() => { navigate(item.path); setIsMobileMenuOpen(false); }} className={`w-full p-4 rounded-xl flex items-center gap-4 font-bold transition-colors ${location.pathname === item.path ? 'bg-secondary/10 text-secondary' : 'hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300'}`}>
+                            <i className={`fa-solid ${item.icon} w-6 text-center`}></i> {item.label}
                         </button>
                     ))}
-                    
-                    <div className="h-px bg-slate-100 dark:bg-slate-800 my-2"></div>
-                    
-                    <div className="flex items-center justify-between p-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-800">
-                        <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-slate-800 text-white flex items-center justify-center font-bold shadow-sm">
-                                {user.name.charAt(0)}
-                            </div>
-                            <div>
-                                <p className="text-sm font-bold text-primary dark:text-white truncate max-w-[120px]">{user.name.split(' ')[0]}</p>
-                                <p className="text-[10px] text-secondary font-bold uppercase tracking-wider">{user.plan}</p>
-                            </div>
-                        </div>
-                        <button onClick={toggleTheme} className="w-10 h-10 rounded-full bg-white dark:bg-slate-700 flex items-center justify-center text-slate-500 dark:text-white shadow-sm border border-slate-200 dark:border-slate-600">
-                            <i className={`fa-solid ${theme === 'dark' ? 'fa-sun' : 'fa-moon'}`}></i>
-                        </button>
-                    </div>
-
-                    <button onClick={logout} className="w-full py-4 mt-2 rounded-xl bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 font-bold flex items-center justify-center gap-2 hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors">
-                        <i className="fa-solid fa-arrow-right-from-bracket"></i> Sair do App
+                    <button onClick={logout} className="w-full p-4 rounded-xl flex items-center gap-4 font-bold text-red-500 hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors">
+                        <i className="fa-solid fa-right-from-bracket w-6 text-center"></i> Sair
                     </button>
-                </nav>
+                </div>
             </div>
-        </div>
-      )}
+        )}
+      </nav>
 
-      {/* Sidebar Desktop - FIXED LAYOUT */}
-      {isSubscriptionValid && (
-      <aside className="hidden md:flex flex-col w-72 bg-gradient-premium text-white h-screen sticky top-0 border-r border-white/5 overflow-hidden">
-        {/* Header Logo */}
-        <div className="p-8 pb-4 flex items-center gap-4 shrink-0">
-          <div className="w-12 h-12 bg-gradient-gold rounded-xl flex items-center justify-center transform rotate-3 shrink-0"><i className="fa-solid fa-helmet-safety text-2xl"></i></div>
-          <h1 className="font-extrabold tracking-tight leading-none text-xl">MÃOS DA<br/>OBRA</h1>
-        </div>
-        
-        {/* Scrollable Navigation */}
-        <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto custom-scrollbar">
-          {navItems.map(item => (
-              <button key={item.path} onClick={() => navigate(item.path)} className={`w-full flex items-center p-3.5 rounded-xl text-sm font-semibold transition-all ${location.pathname === item.path ? 'bg-white/10 shadow-lg border border-white/5 relative' : 'text-slate-400 hover:text-white'}`}>
-                {location.pathname === item.path && <div className="absolute left-0 top-0 bottom-0 w-1 bg-secondary"></div>}
-                <div className={`w-8 h-8 rounded-lg flex items-center justify-center mr-3 ${location.pathname === item.path ? 'bg-secondary text-white' : 'bg-white/5'}`}><i className={`fa-solid ${item.icon}`}></i></div>{item.label}
-              </button>
-          ))}
-        </nav>
-        
-        {/* Fixed Footer Card */}
-        <div className="p-4 shrink-0">
-            <div className="rounded-2xl bg-black/20 border border-white/5 p-4">
-                <div className="flex items-center gap-3 mb-4">
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-slate-700 border border-white/10 flex items-center justify-center font-bold shrink-0">{user.name.charAt(0)}</div>
-                    <div className="min-w-0 flex-1 overflow-hidden">
-                        <p className="text-sm font-bold truncate">{user.name}</p>
-                        <p className="text-[10px] text-secondary font-bold">
-                            {user.isTrial ? 'Trial Ativo' : user.plan || 'Bloqueado'}
-                        </p>
+      {/* Main Content */}
+      <main className="pt-20 min-h-screen">
+        {user.isTrial && trialDaysRemaining !== null && trialDaysRemaining <= 5 && isSubscriptionValid && (
+            <div className="max-w-4xl mx-auto px-4 mb-4">
+                <div className="bg-gradient-to-r from-orange-500 to-red-500 text-white px-4 py-3 rounded-xl shadow-lg flex items-center justify-between text-sm font-bold animate-in fade-in slide-in-from-top-2 cursor-pointer hover:brightness-110 transition-all" onClick={() => navigate('/settings')}>
+                    <div className="flex items-center gap-2">
+                        <i className="fa-solid fa-stopwatch animate-pulse"></i>
+                        <span>Teste Grátis: Restam {trialDaysRemaining} dias. Assine agora para não perder o acesso.</span>
                     </div>
-                    <button onClick={toggleTheme} className="text-slate-400 hover:text-white shrink-0"><i className={`fa-solid ${theme === 'dark' ? 'fa-sun' : 'fa-moon'}`}></i></button>
+                    <i className="fa-solid fa-chevron-right"></i>
                 </div>
-                {trialDaysRemaining !== null && trialDaysRemaining <= 7 && (
-                    <div className="mb-3 text-center">
-                        <p className="text-[10px] text-amber-400 font-bold mb-1">
-                            {trialDaysRemaining <= 0 ? 'Expira hoje!' : `Expira em ${trialDaysRemaining} dia(s)`}
-                        </p>
-                        <div className="w-full bg-white/10 h-1 rounded-full overflow-hidden">
-                            <div className="bg-amber-500 h-full transition-all" style={{ width: `${(1 - (trialDaysRemaining/7)) * 100}%` }}></div>
-                        </div>
-                    </div>
-                )}
-                <button onClick={logout} className="w-full py-2 rounded-lg bg-white/5 hover:bg-red-500/20 hover:text-red-400 text-xs font-bold transition-colors">Sair</button>
             </div>
-        </div>
-      </aside>
-      )}
-
-      <main className="flex-1 p-4 md:p-8 overflow-y-auto h-screen">
-        <React.Suspense fallback={<div className="h-full w-full flex items-center justify-center"><div className="w-10 h-10 border-4 border-secondary border-t-transparent rounded-full animate-spin"></div></div>}>
-            {/* Trial Banner on Mobile */}
-            {isSubscriptionValid && trialDaysRemaining !== null && trialDaysRemaining <= 3 && (
-                <div className="md:hidden mb-4 p-3 bg-gradient-to-r from-amber-600 to-orange-600 rounded-xl text-white flex items-center justify-between shadow-lg">
-                    <div className="flex items-center gap-3">
-                        <i className="fa-solid fa-clock text-xl"></i>
-                        <div>
-                            <p className="text-xs font-bold uppercase opacity-90">Período de Teste</p>
-                            <p className="text-sm font-black">Resta {trialDaysRemaining} dia(s)</p>
-                        </div>
-                    </div>
-                    <button onClick={() => navigate('/settings')} className="bg-white text-orange-600 px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm">Assinar</button>
-                </div>
-            )}
-
-            {!isSubscriptionValid && isSettingsPage && (
-                <div className={`p-4 rounded-xl mb-6 flex items-center justify-between shadow-lg ${
-                    isNewAccount 
-                        ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white' 
-                        : 'bg-danger text-white'
-                }`}>
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-xl">
-                            <i className={`fa-solid ${isNewAccount ? 'fa-rocket' : 'fa-lock'}`}></i>
-                        </div>
-                        <div>
-                            <p className="text-sm font-bold uppercase tracking-wide opacity-90">
-                                {isNewAccount ? 'Falta pouco!' : user?.isTrial ? 'Trial Expirado' : 'Acesso Bloqueado'}
-                            </p>
-                            <p className="text-sm font-bold">
-                                {isNewAccount ? 'Escolha um plano para começar a usar.' : 'Sua assinatura expirou. Renove para continuar.'}
-                            </p>
-                        </div>
-                    </div>
-                    <button onClick={logout} className="text-xs bg-white/20 px-3 py-2 rounded-lg font-bold hover:bg-white/30 transition-colors">Sair</button>
-                </div>
-            )}
-            {children}
-        </React.Suspense>
+        )}
+        {children}
       </main>
     </div>
   );
@@ -378,14 +311,15 @@ const App: React.FC = () => {
         <AuthProvider>
           <Suspense fallback={<LoadingScreen />}>
             <Routes>
-                <Route path="/login" element={<Login />} />
-                <Route path="/" element={<Layout><Dashboard /></Layout>} />
-                <Route path="/create" element={<Layout><CreateWork /></Layout>} />
-                <Route path="/work/:id" element={<Layout><WorkDetail /></Layout>} />
-                <Route path="/settings" element={<Layout><Settings /></Layout>} />
-                <Route path="/checkout" element={<Layout><Checkout /></Layout>} />
-                <Route path="/profile" element={<Layout><Profile /></Layout>} />
-                <Route path="/tutorials" element={<Layout><VideoTutorials /></Layout>} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/checkout" element={<Layout><Checkout /></Layout>} />
+              <Route path="/" element={<Layout><Dashboard /></Layout>} />
+              <Route path="/create" element={<Layout><CreateWork /></Layout>} />
+              <Route path="/work/:id" element={<Layout><WorkDetail /></Layout>} />
+              <Route path="/settings" element={<Layout><Settings /></Layout>} />
+              <Route path="/profile" element={<Layout><Profile /></Layout>} />
+              <Route path="/tutorials" element={<Layout><VideoTutorials /></Layout>} />
+              <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </Suspense>
         </AuthProvider>
@@ -393,4 +327,5 @@ const App: React.FC = () => {
     </BrowserRouter>
   );
 };
+
 export default App;
