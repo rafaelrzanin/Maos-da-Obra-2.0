@@ -1,156 +1,162 @@
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../App';
 import { dbService } from '../services/db';
+import { PlanType } from '../types';
 
 const Profile: React.FC = () => {
   const { user, refreshUser } = useAuth();
+  const [name, setName] = useState('');
+  const [whatsapp, setWhatsapp] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
-  
-  // Form State
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [whatsapp, setWhatsapp] = useState('');
-  
-  // Password State
-  const [newPass, setNewPass] = useState('');
-  const [confirmPass, setConfirmPass] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
     if (user) {
       setName(user.name);
-      setEmail(user.email);
       setWhatsapp(user.whatsapp || '');
     }
   }, [user]);
 
-  const handleSave = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLoading(true);
+    setErrorMsg('');
     setSuccessMsg('');
-    if (!user) return;
 
-    // Validate Password
-    if (newPass) {
-      if (newPass !== confirmPass) {
-        alert("As senhas não coincidem.");
+    if (password && password !== confirmPassword) {
+        setErrorMsg("Senhas não conferem.");
+        setLoading(false);
         return;
-      }
-      if (newPass.length < 6) {
-        alert("A senha deve ter pelo menos 6 caracteres.");
-        return;
-      }
     }
 
-    setLoading(true);
     try {
-      await dbService.updateUser(user.id, { name, whatsapp }, newPass || undefined);
-      await refreshUser();
-      setSuccessMsg("Perfil atualizado com sucesso!");
-      setNewPass('');
-      setConfirmPass('');
+        if (!user) return;
+        
+        await dbService.updateUser(user.id, {
+            name,
+            whatsapp
+        }, password || undefined);
+
+        await refreshUser();
+        setSuccessMsg("Perfil atualizado com sucesso!");
+        setPassword('');
+        setConfirmPassword('');
     } catch (error) {
-      console.error(error);
-      alert("Erro ao atualizar perfil.");
+        console.error(error);
+        setErrorMsg("Erro ao atualizar perfil.");
     } finally {
-      setLoading(false);
+        setLoading(false);
     }
   };
 
+  if (!user) return null;
+
   return (
     <div className="max-w-2xl mx-auto pb-12 pt-4 px-4 font-sans">
-      <h1 className="text-2xl font-bold text-text-main dark:text-white mb-2">Configurações</h1>
-      <p className="text-text-muted dark:text-slate-400 mb-8">Gerencie seus dados e segurança.</p>
+      <div className="flex items-center gap-3 mb-6">
+        <div className="w-12 h-12 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-xl text-slate-500 dark:text-slate-300">
+            <i className="fa-solid fa-user"></i>
+        </div>
+        <div>
+            <h1 className="text-2xl font-bold text-primary dark:text-white">Meu Perfil</h1>
+            <p className="text-sm text-slate-500 dark:text-slate-400">Gerencie seus dados pessoais e assinatura.</p>
+        </div>
+      </div>
 
-      <form onSubmit={handleSave} className="space-y-8">
-        
-        {/* PERSONAL DATA */}
-        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
-          <h2 className="text-lg font-bold text-primary dark:text-white mb-4 flex items-center gap-2">
-            <i className="fa-solid fa-user text-secondary"></i> Meus Dados
-          </h2>
-          
-          <div className="space-y-4">
+      <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 md:p-8 shadow-sm border border-slate-200 dark:border-slate-800 mb-8">
+        <div className="flex items-center gap-4 mb-6 pb-6 border-b border-slate-100 dark:border-slate-800">
+            <div className="w-16 h-16 rounded-full bg-primary text-white flex items-center justify-center text-2xl font-bold">
+                {user.name.charAt(0)}
+            </div>
             <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nome Completo</label>
-              <input 
-                type="text" 
-                value={name} 
-                onChange={e => setName(e.target.value)}
-                className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-text-main dark:text-white outline-none focus:ring-2 focus:ring-primary/20 transition-all"
-              />
+                <h2 className="text-xl font-bold text-primary dark:text-white">{user.name}</h2>
+                <p className="text-sm text-slate-500 dark:text-slate-400">{user.email}</p>
+                <div className="flex items-center gap-2 mt-2">
+                    <span className="bg-secondary/10 text-secondary text-xs font-bold px-2 py-0.5 rounded-md uppercase tracking-wide border border-secondary/20">
+                        {user.plan || 'Gratuito'}
+                    </span>
+                    {user.subscriptionExpiresAt && (
+                        <span className="text-xs text-slate-400">
+                            Vence em: {new Date(user.subscriptionExpiresAt).toLocaleDateString()}
+                        </span>
+                    )}
+                </div>
+            </div>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-6">
+            <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nome Completo</label>
+                <input 
+                    type="text" 
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                />
             </div>
             
             <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">E-mail (Login)</label>
-              <input 
-                type="email" 
-                value={email} 
-                disabled
-                className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800/50 text-slate-500 dark:text-slate-400 cursor-not-allowed"
-              />
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">WhatsApp</label>
+                <input 
+                    type="text" 
+                    value={whatsapp}
+                    onChange={(e) => setWhatsapp(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                />
             </div>
 
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">WhatsApp</label>
-              <input 
-                type="tel" 
-                value={whatsapp} 
-                onChange={e => setWhatsapp(e.target.value)}
-                placeholder="(00) 00000-0000"
-                className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-text-main dark:text-white outline-none focus:ring-2 focus:ring-primary/20 transition-all"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* SECURITY */}
-        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
-          <h2 className="text-lg font-bold text-primary dark:text-white mb-4 flex items-center gap-2">
-            <i className="fa-solid fa-lock text-secondary"></i> Segurança
-          </h2>
-          <p className="text-xs text-slate-500 mb-4">Preencha apenas se quiser alterar sua senha.</p>
-          
-          <div className="space-y-4">
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nova Senha</label>
-              <input 
-                type="password" 
-                value={newPass} 
-                onChange={e => setNewPass(e.target.value)}
-                placeholder="Mínimo 6 caracteres"
-                className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-text-main dark:text-white outline-none focus:ring-2 focus:ring-primary/20 transition-all"
-              />
+            <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
+                <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">Alterar Senha</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nova Senha</label>
+                        <input 
+                            type="password" 
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            placeholder="Deixe em branco para manter"
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Confirmar Senha</label>
+                        <input 
+                            type="password" 
+                            value={confirmPassword}
+                            onChange={(e) => setConfirmPassword(e.target.value)}
+                            placeholder="Repita a nova senha"
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                        />
+                    </div>
+                </div>
             </div>
 
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Confirmar Nova Senha</label>
-              <input 
-                type="password" 
-                value={confirmPass} 
-                onChange={e => setConfirmPass(e.target.value)}
-                placeholder="Repita a senha"
-                className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-text-main dark:text-white outline-none focus:ring-2 focus:ring-primary/20 transition-all"
-              />
+            {errorMsg && (
+                <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900 text-red-600 dark:text-red-400 rounded-xl text-sm font-bold flex items-center gap-2 animate-in fade-in">
+                    <i className="fa-solid fa-triangle-exclamation"></i> {errorMsg}
+                </div>
+            )}
+            
+            {successMsg && (
+            <div className="p-4 bg-green-100 dark:bg-green-900/30 border border-green-200 dark:border-green-900 text-green-700 dark:text-green-300 rounded-xl flex items-center gap-2 animate-in fade-in">
+                <i className="fa-solid fa-check-circle"></i> {successMsg}
             </div>
-          </div>
-        </div>
+            )}
 
-        {successMsg && (
-          <div className="p-4 bg-green-100 dark:bg-green-900/30 border border-green-200 dark:border-green-900 text-green-700 dark:text-green-300 rounded-xl flex items-center gap-2 animate-in fade-in">
-            <i className="fa-solid fa-check-circle"></i> {successMsg}
-          </div>
-        )}
-
-        <button 
-          type="submit" 
-          disabled={loading}
-          className="w-full py-4 bg-primary hover:bg-primary-dark text-white font-bold rounded-xl shadow-lg shadow-primary/20 transition-all disabled:opacity-70 flex items-center justify-center gap-2"
-        >
-          {loading ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-save"></i>}
-          Salvar Alterações
-        </button>
-
-      </form>
+            <button 
+            type="submit" 
+            disabled={loading}
+            className="w-full py-4 bg-primary hover:bg-primary-dark text-white font-bold rounded-xl shadow-lg shadow-primary/20 transition-all disabled:opacity-70 flex items-center justify-center gap-2"
+            >
+            {loading ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-save"></i>}
+            Salvar Alterações
+            </button>
+        </form>
+      </div>
     </div>
   );
 };
