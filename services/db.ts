@@ -22,7 +22,8 @@ const parseWorkFromDB = (data: any): Work => ({
     id: data.id,
     userId: data.user_id,
     name: data.name,
-    address: data.address,
+    // CORRIGIDO: Lê 'endereco' do banco
+    address: data.endereco, 
     budgetPlanned: Number(data.budget_planned || 0),
     startDate: data.start_date,
     endDate: data.end_date,
@@ -110,7 +111,6 @@ const parseFileFromDB = (data: any): WorkFile => ({
 export const dbService = {
   
   // --- AUTHENTICATION & PROFILE ---
-  // ... (Funções de Autenticação - Sem Alteração) ...
 
   getCurrentUser: (): User | null => {
     const json = localStorage.getItem('maos_user');
@@ -288,7 +288,6 @@ export const dbService = {
   
   getWorks: async (userId: string): Promise<Work[]> => {
       if (!supabase) return [];
-      // CORRIGIDO: Usando 'obras'
       const { data, error } = await supabase.from('obras').select('*').eq('user_id', userId); 
       if (error) {
           console.error("Erro ao buscar obras:", error);
@@ -299,7 +298,6 @@ export const dbService = {
 
   getWorkById: async (workId: string): Promise<Work | null> => {
       if (!supabase) return null;
-      // CORRIGIDO: Usando 'obras'
       const { data, error } = await supabase.from('obras').select('*').eq('id', workId).single(); 
       if (error || !data) return null;
       return parseWorkFromDB(data);
@@ -313,7 +311,8 @@ export const dbService = {
       const payload = {
           user_id: work.userId,
           name: work.name,
-          address: work.address,
+          // CORRIGIDO: Usa 'endereco' para o Supabase
+          endereco: work.address, 
           budget_planned: Number(work.budgetPlanned) || 0,
           start_date: work.startDate,
           end_date: work.endDate,
@@ -329,7 +328,6 @@ export const dbService = {
       };
 
       // 1. Criar Obra (Tabela 'obras')
-      // CORRIGIDO: Usando 'obras'
       const { data, error } = await supabase.from('obras').insert([payload]).select().single(); 
 
       if (error || !data) {
@@ -363,17 +361,16 @@ export const dbService = {
                   eDate.setDate(sDate.getDate() + stepDuration);
                   
                   return {
-                      obra_id: newWork.id, // CORRETO: Usa obra_id
+                      obra_id: newWork.id, 
                       name: stepName,
                       start_date: sDate.toISOString().split('T')[0],
                       end_date: eDate.toISOString().split('T')[0],
                       status: 'NAO_INICIADO',
-                      // REMOVIDO: is_delayed para evitar 400 Bad Request se a coluna não existir
+                      // is_delayed REMOVIDO
                   };
               });
 
               console.log("Tentando inserir etapas:", stepsPayload.length);
-              // CORRIGIDO: Usando 'etapas'
               const { data: createdSteps, error: stepsError } = await supabase.from('etapas').insert(stepsPayload).select(); 
 
               if (stepsError) {
@@ -383,8 +380,6 @@ export const dbService = {
 
                   // 3. Gerar Lista de Materiais
                   let categoriesToInclude: string[] = [];
-                  // ... (Lógica para definir categoriesToInclude) ...
-
                   if (templateId === 'CONSTRUCAO') categoriesToInclude = FULL_MATERIAL_PACKAGES.map(c => c.category);
                   else if (templateId === 'REFORMA_APTO') categoriesToInclude = FULL_MATERIAL_PACKAGES.map(c => c.category).filter(c => !c.includes('Fundação') && !c.includes('Telhado'));
                   else if (templateId === 'BANHEIRO') categoriesToInclude = ['Instalações Hidráulicas (Tubulação)', 'Pisos e Revestimentos Cerâmicos', 'Louças e Metais (Acabamento Hidro)', 'Marmoraria e Granitos', 'Limpeza Final', 'Gesso e Drywall'];
@@ -442,7 +437,7 @@ export const dbService = {
                                       planned_qty: qty,
                                       purchased_qty: 0,
                                       unit: item.unit,
-                                      etapa_id: stepId // CORRIGIDO: Usa etapa_id (que no app é stepId)
+                                      etapa_id: stepId 
                                   });
                               }
                           }
@@ -451,7 +446,6 @@ export const dbService = {
 
                   if (materialsPayload.length > 0) {
                       console.log(`Tentando inserir ${materialsPayload.length} materiais...`);
-                      // CORRIGIDO: Usando 'materiais'
                       const { error: matError } = await supabase.from('materiais').insert(materialsPayload); 
                       if (matError) console.error("Erro ao inserir materiais:", matError);
                       else console.log("Materiais inseridos com sucesso.");
@@ -464,34 +458,29 @@ export const dbService = {
 
   deleteWork: async (workId: string) => {
       if (!supabase) return;
-      // CORRIGIDO: Usando 'obras'
       await supabase.from('obras').delete().eq('id', workId); 
   },
 
   // --- ETAPAS (STEPS) ---
   getSteps: async (workId: string): Promise<Step[]> => {
       if (!supabase) return [];
-      // CORRIGIDO: Usando 'etapas' e 'obra_id'
       const { data } = await supabase.from('etapas').select('*').eq('obra_id', workId); 
       return (data || []).map(parseStepFromDB);
   },
 
   addStep: async (step: Step) => {
       if (!supabase) return;
-      // CORRIGIDO: Usando 'etapas'
       await supabase.from('etapas').insert([{ 
           obra_id: step.workId,
           name: step.name,
           start_date: step.startDate,
           end_date: step.endDate,
           status: step.status
-          // REMOVIDO: is_delayed
       }]);
   },
 
   updateStep: async (step: Step) => {
       if (!supabase) return;
-      // CORRIGIDO: Usando 'etapas'
       await supabase.from('etapas').update({ 
           name: step.name,
           start_date: step.startDate,
@@ -503,7 +492,6 @@ export const dbService = {
   // --- MATERIAIS (MATERIALS) ---
   getMaterials: async (workId: string): Promise<Material[]> => {
       if (!supabase) return [];
-      // CORRIGIDO: Usando 'materiais' e 'obra_id'
       const { data } = await supabase.from('materiais').select('*').eq('obra_id', workId); 
       return (data || []).map(parseMaterialFromDB);
   },
@@ -511,7 +499,6 @@ export const dbService = {
   addMaterial: async (material: Material, purchaseData?: { qty: number, cost: number, date: string }) => {
       if (!supabase) return;
       
-      // CORRIGIDO: Usando 'materiais' e 'etapa_id'
       const { data: matData } = await supabase.from('materiais').insert([{ 
           obra_id: material.workId,
           name: material.name,
@@ -538,7 +525,6 @@ export const dbService = {
 
   updateMaterial: async (material: Material) => {
       if (!supabase) return;
-      // CORRIGIDO: Usando 'materiais'
       await supabase.from('materiais').update({ 
           name: material.name,
           brand: material.brand,
@@ -550,13 +536,11 @@ export const dbService = {
   registerMaterialPurchase: async (matId: string, name: string, brand: string, plannedQty: number, unit: string, buyQty: number, cost: number) => {
       if (!supabase) return;
       
-      // CORRIGIDO: Usando 'materiais' e 'obra_id' e 'etapa_id'
       const { data: current } = await supabase.from('materiais').select('purchased_qty, obra_id, etapa_id').eq('id', matId).single(); 
       if (!current) return;
 
       const newPurchasedQty = (Number(current.purchased_qty) || 0) + buyQty;
       
-      // CORRIGIDO: Usando 'materiais'
       await supabase.from('materiais').update({ 
           purchased_qty: newPurchasedQty,
           name: name,
@@ -580,14 +564,12 @@ export const dbService = {
   // --- DESPESAS (EXPENSES) ---
   getExpenses: async (workId: string): Promise<Expense[]> => {
       if (!supabase) return [];
-      // CORRIGIDO: Usando 'despesas' e 'obra_id'
       const { data } = await supabase.from('despesas').select('*').eq('obra_id', workId); 
       return (data || []).map(parseExpenseFromDB);
   },
 
   addExpense: async (expense: Expense) => {
       if (!supabase) return;
-      // CORRIGIDO: Usando 'despesas' e 'obra_id' e 'etapa_id'
       await supabase.from('despesas').insert([{ 
           obra_id: expense.workId,
           description: expense.description,
@@ -602,7 +584,6 @@ export const dbService = {
 
   updateExpense: async (expense: Expense) => {
       if (!supabase) return;
-      // CORRIGIDO: Usando 'despesas' e 'etapa_id'
       await supabase.from('despesas').update({ 
           description: expense.description,
           amount: expense.amount,
@@ -615,12 +596,10 @@ export const dbService = {
 
   deleteExpense: async (id: string) => {
       if (!supabase) return;
-      // CORRIGIDO: Usando 'despesas'
       await supabase.from('despesas').delete().eq('id', id); 
   },
 
-  // --- WORKERS & SUPPLIERS ---
-  // ... (Funções de Workers e Suppliers - Assumindo que as tabelas estão em inglês) ...
+  // --- WORKERS & SUPPLIERS (Assumindo que estas tabelas estão em inglês) ---
   getWorkers: async (userId: string): Promise<Worker[]> => {
       if (!supabase) return [];
       const { data } = await supabase.from('workers').select('*').eq('user_id', userId);
@@ -680,13 +659,11 @@ export const dbService = {
   // --- FOTOS & ARQUIVOS (PHOTOS & FILES) ---
   getPhotos: async (workId: string): Promise<WorkPhoto[]> => {
       if (!supabase) return [];
-      // CORRIGIDO: Usando 'fotos' e 'obra_id'
       const { data } = await supabase.from('fotos').select('*').eq('obra_id', workId); 
       return (data || []).map(parsePhotoFromDB);
   },
   addPhoto: async (photo: WorkPhoto) => {
       if (!supabase) return;
-      // CORRIGIDO: Usando 'fotos'
       await supabase.from('fotos').insert([{ 
           obra_id: photo.workId,
           url: photo.url,
@@ -698,13 +675,11 @@ export const dbService = {
 
   getFiles: async (workId: string): Promise<WorkFile[]> => {
       if (!supabase) return [];
-      // CORRIGIDO: Usando 'arquivos' e 'obra_id'
       const { data } = await supabase.from('arquivos').select('*').eq('obra_id', workId); 
       return (data || []).map(parseFileFromDB);
   },
   addFile: async (file: WorkFile) => {
       if (!supabase) return;
-      // CORRIGIDO: Usando 'arquivos'
       await supabase.from('arquivos').insert([{ 
           obra_id: file.workId,
           name: file.name,
@@ -724,11 +699,9 @@ export const dbService = {
   calculateWorkStats: async (workId: string) => {
       if (!supabase) return { totalSpent: 0, progress: 0, delayedSteps: 0 };
       
-      // CORRIGIDO: Usando 'despesas' e 'obra_id'
       const { data: expenses } = await supabase.from('despesas').select('amount').eq('obra_id', workId); 
       const totalSpent = (expenses || []).reduce((acc, curr) => acc + Number(curr.amount), 0);
 
-      // CORRIGIDO: Usando 'etapas' e 'obra_id'
       const { data: steps } = await supabase.from('etapas').select('status').eq('obra_id', workId); 
       const totalSteps = steps?.length || 0;
       const completed = steps?.filter((s: any) => s.status === 'CONCLUIDO').length || 0;
