@@ -17,7 +17,7 @@ const mapProfileFromSupabase = (data: any): User => ({
     cpf: data.cpf,
     plan: data.plan as PlanType,
     subscriptionExpiresAt: data.subscription_expires_at,
-    isTrial: data.is_trial || false // Mapeia o campo de trial
+    isTrial: data.is_trial || false
 });
 
 const parseWorkFromDB = (data: any): Work => ({
@@ -127,13 +127,20 @@ export const dbService = {
         return null;
     }
 
-    const profile = await dbService.getUserProfile(session.user.id);
+    // Tenta buscar o perfil. Se não existir (foi apagado no banco), recria.
+    let profile = await dbService.getUserProfile(session.user.id);
+    
+    if (!profile) {
+        console.log("Perfil não encontrado no banco, recriando...");
+        profile = await dbService.createProfileFromAuth(session.user);
+    }
+
     if (profile) {
         localStorage.setItem('maos_user', JSON.stringify(profile));
         return profile;
     }
     
-    return await dbService.createProfileFromAuth(session.user);
+    return null;
   },
 
   onAuthChange: (callback: (user: User | null) => void) => {
@@ -141,10 +148,13 @@ export const dbService = {
      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
         if (event === 'SIGNED_IN' && session?.user) {
             let user = await dbService.getUserProfile(session.user.id);
+            // Auto-heal se o usuário logar e não tiver perfil
             if (!user) user = await dbService.createProfileFromAuth(session.user);
             
-            localStorage.setItem('maos_user', JSON.stringify(user));
-            callback(user);
+            if (user) {
+                localStorage.setItem('maos_user', JSON.stringify(user));
+                callback(user);
+            }
         } else if (event === 'SIGNED_OUT') {
             localStorage.removeItem('maos_user');
             callback(null);
@@ -156,7 +166,6 @@ export const dbService = {
   isSubscriptionActive: (user: User) => {
     if (user.plan === PlanType.VITALICIO) return true;
     if (!user.subscriptionExpiresAt) return false;
-    // Verifica se a data de expiração (seja trial ou pago) ainda é válida
     return new Date(user.subscriptionExpiresAt) > new Date();
   },
 
@@ -180,11 +189,10 @@ export const dbService = {
   createProfileFromAuth: async (authUser: any, metadata: any = {}): Promise<User | null> => {
       if (!supabase) return null;
       
-      // Lógica de Trial: Se tem plano definido, começa com 7 dias de trial
       const initialPlan = metadata.plan || null;
       const isTrial = !!initialPlan; 
       const expirationDate = isTrial 
-          ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 Dias de Trial
+          ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
           : null;
 
       const newProfile = {
@@ -215,6 +223,7 @@ export const dbService = {
      if (!data.user) return null;
 
      let profile = await dbService.getUserProfile(data.user.id);
+     // Auto-heal se perfil deletado
      if (!profile) {
          profile = await dbService.createProfileFromAuth(data.user);
      }
@@ -237,7 +246,6 @@ export const dbService = {
       if (!authData.user) return null;
 
       const initialPlan = (planType as PlanType) || null;
-      // Ao criar, passamos o plano. O createProfileFromAuth aplica a regra dos 7 dias.
       const profile = await dbService.createProfileFromAuth(authData.user, { name, whatsapp, cpf, plan: initialPlan });
 
       if (!profile) throw new Error("Conta criada, mas houve erro ao salvar o perfil. Tente fazer login.");
@@ -269,12 +277,10 @@ export const dbService = {
       if (!supabase) return;
       let expires = new Date();
       
-      // Calcula nova data baseado no pagamento (Fim do Trial)
       if (plan === PlanType.MENSAL) expires.setDate(expires.getDate() + 30);
       else if (plan === PlanType.SEMESTRAL) expires.setDate(expires.getDate() + 180);
       else if (plan === PlanType.VITALICIO) expires.setFullYear(expires.getFullYear() + 100);
 
-      // Atualiza o plano, a nova data e REMOVE o status de Trial
       await supabase.from('profiles').update({
           plan: plan,
           subscription_expires_at: expires.toISOString(),
@@ -341,35 +347,29 @@ export const dbService = {
           has_leisure_area: work.hasLeisureArea
       };
 
-      // 1. Criar Obra e esperar o ID
+      // 1. Criar Obra
       const { data, error } = await supabase.from('works').insert([payload]).select().single();
 
       if (error || !data) {
-          console.error("Supabase Create Work Error:", error);
-          throw new Error(error?.message || "Erro ao criar obra.");
+          console.error("Erro ao inserir Obra no Supabase:", error);
+          throw new Error(error?.message || "Erro ao criar obra no banco de dados.");
       }
       
       const newWork = parseWorkFromDB(data);
-      console.log("Obra criada com sucesso:", newWork.id);
+      console.log("Obra criada ID:", newWork.id);
 
-      // Se tiver template, gera os passos e materiais
+      // 2. Gerar Itens Automáticos (Template)
       if (templateId) {
           try {
               const template = WORK_TEMPLATES.find(t => t.id === templateId);
               
               if (template && template.includedSteps.length > 0) {
                   
-                  // 2. Gerar Cronograma Inteligente
+                  // Gerar Cronograma (Steps)
                   const start = new Date(newWork.startDate);
-                  const end = new Date(newWork.endDate);
-                  
-                  // Fallback para datas válidas
                   const safeStart = isNaN(start.getTime()) ? new Date() : start;
-                  const safeEnd = isNaN(end.getTime()) ? new Date(safeStart.getTime() + (90 * 24 * 60 * 60 * 1000)) : end;
-
-                  const totalTime = Math.max(1, safeEnd.getTime() - safeStart.getTime());
-                  const totalDays = Math.ceil(totalTime / (1000 * 60 * 60 * 24));
-                  const stepDuration = Math.max(1, Math.floor(totalDays / template.includedSteps.length));
+                  const durationDays = template.defaultDurationDays || 90;
+                  const stepDuration = Math.ceil(durationDays / template.includedSteps.length);
                   
                   const stepsPayload = template.includedSteps.map((stepName, index) => {
                       const sDate = new Date(safeStart);
@@ -388,18 +388,18 @@ export const dbService = {
                       };
                   });
 
-                  console.log("Tentando inserir etapas:", stepsPayload.length);
-                  // IMPORTANTE: .select() para retornar os IDs criados para usar nos materiais
+                  // IMPORTANTE: .select() retorna os registros criados com seus IDs
                   const { data: createdSteps, error: stepsError } = await supabase.from('steps').insert(stepsPayload).select();
 
                   if (stepsError) {
-                      console.error("ERRO CRÍTICO ao inserir etapas:", stepsError);
-                  } else {
-                      console.log("Etapas inseridas com sucesso:", createdSteps?.length);
+                      console.error("ERRO ao gerar etapas:", stepsError);
+                  } else if (createdSteps && createdSteps.length > 0) {
+                      console.log(`Geradas ${createdSteps.length} etapas com sucesso.`);
 
-                      // 3. Gerar Lista de Materiais
+                      // 3. Gerar Lista de Materiais (Vinculando às etapas criadas)
                       let categoriesToInclude: string[] = [];
 
+                      // Definir quais categorias de material incluir baseado no template
                       if (templateId === 'CONSTRUCAO') categoriesToInclude = FULL_MATERIAL_PACKAGES.map(c => c.category);
                       else if (templateId === 'REFORMA_APTO') categoriesToInclude = FULL_MATERIAL_PACKAGES.map(c => c.category).filter(c => !c.includes('Fundação') && !c.includes('Telhado'));
                       else if (templateId === 'BANHEIRO') categoriesToInclude = ['Instalações Hidráulicas (Tubulação)', 'Pisos e Revestimentos Cerâmicos', 'Louças e Metais (Acabamento Hidro)', 'Marmoraria e Granitos', 'Limpeza Final', 'Gesso e Drywall'];
@@ -407,26 +407,26 @@ export const dbService = {
                       else if (templateId === 'PINTURA') categoriesToInclude = ['Pintura', 'Limpeza Final'];
 
                       const materialsPayload: any[] = [];
-                      const area = newWork.area > 0 ? newWork.area : 10;
+                      const area = newWork.area > 0 ? newWork.area : 20;
 
-                      // Helper function robusta para achar ID da etapa
-                      const findStepId = (cat: string) => {
-                          if (!createdSteps || createdSteps.length === 0) return null;
-                          const c = cat.toLowerCase();
+                      // Função para encontrar o ID da etapa correta para o material
+                      const findStepId = (catName: string) => {
+                          const cat = catName.toLowerCase();
+                          // Tenta achar uma etapa que tenha palavras chave da categoria
                           const match = createdSteps.find((s: any) => {
-                              const n = s.name.toLowerCase();
-                              // Lógica de matching flexível
-                              if (c.includes('fundação') && n.includes('fundações')) return true;
-                              if (c.includes('alvenaria') && n.includes('paredes')) return true;
-                              if (c.includes('elétrica') && n.includes('elétrica')) return true;
-                              if (c.includes('hidráulica') && (n.includes('tubulação') || n.includes('água'))) return true;
-                              if (c.includes('pintura') && n.includes('pintura')) return true;
-                              if (c.includes('piso') && n.includes('piso')) return true;
-                              if (c.includes('limpeza') && n.includes('limpeza')) return true;
-                              // Fallback genérico
-                              return n.includes(c.split(' ')[0]);
+                              const stepName = s.name.toLowerCase();
+                              if (cat.includes('fundação') && stepName.includes('fundações')) return true;
+                              if (cat.includes('alvenaria') && stepName.includes('paredes')) return true;
+                              if (cat.includes('elétrica') && stepName.includes('elétrica')) return true;
+                              if (cat.includes('hidráulica') && (stepName.includes('tubulação') || stepName.includes('água'))) return true;
+                              if (cat.includes('pintura') && stepName.includes('pintura')) return true;
+                              if (cat.includes('piso') && stepName.includes('piso')) return true;
+                              if (cat.includes('limpeza') && stepName.includes('limpeza')) return true;
+                              if (cat.includes('telhado') && stepName.includes('telhado')) return true;
+                              if (cat.includes('acabamento') && stepName.includes('acabamento')) return true;
+                              return false;
                           });
-                          return match ? match.id : null;
+                          return match ? match.id : null; // Se não achar, fica null (sem etapa vinculada, mas aparece na lista geral)
                       };
 
                       for (const pkg of FULL_MATERIAL_PACKAGES) {
@@ -436,7 +436,8 @@ export const dbService = {
                               for (const item of pkg.items) {
                                   let qty = 0;
                                   const n = item.name.toLowerCase();
-                                  // Lógica de quantidade baseada nos cômodos
+                                  
+                                  // Quantitativo Inteligente Baseado nos Cômodos
                                   const bth = newWork.bathrooms || 1;
                                   const kit = newWork.kitchens || 1;
                                   const bed = newWork.bedrooms || 2;
@@ -468,16 +469,15 @@ export const dbService = {
                       }
 
                       if (materialsPayload.length > 0) {
-                          console.log(`Tentando inserir ${materialsPayload.length} materiais...`);
+                          console.log(`Gerando ${materialsPayload.length} materiais...`);
                           const { error: matError } = await supabase.from('materials').insert(materialsPayload);
                           if (matError) console.error("Erro ao inserir materiais:", matError);
-                          else console.log("Materiais inseridos com sucesso.");
                       }
                   }
               }
           } catch (genError) {
-              console.error("Erro na geração automática (Work Criada, mas sem itens):", genError);
-              // Não lança erro para não bloquear a UI, pois a obra base já existe.
+              console.error("Erro na geração automática:", genError);
+              // Não lança erro para não impedir a criação da obra, apenas loga
           }
       }
       return newWork;
@@ -485,7 +485,6 @@ export const dbService = {
 
   deleteWork: async (workId: string) => {
       if (!supabase) return;
-      // Como usamos ON DELETE CASCADE no banco, deletar a work deleta tudo.
       await supabase.from('works').delete().eq('id', workId);
   },
 
@@ -738,14 +737,26 @@ export const dbService = {
       return { totalSpent, progress, delayedSteps: 0 };
   },
 
-  getDailySummary: async (_workId: string) => {
-      return { completedSteps: 0, delayedSteps: 0, pendingMaterials: 0, totalSteps: 0 };
+  getDailySummary: async (workId: string) => {
+      if (!supabase) return { completedSteps: 0, delayedSteps: 0, pendingMaterials: 0, totalSteps: 0 };
+      
+      const today = new Date().toISOString().split('T')[0];
+      const { data: steps } = await supabase.from('steps').select('*').eq('work_id', workId);
+      const { data: materials } = await supabase.from('materials').select('*').eq('work_id', workId);
+
+      const delayed = steps?.filter((s: any) => s.status !== 'CONCLUIDO' && s.end_date < today).length || 0;
+      const completed = steps?.filter((s: any) => s.status === 'CONCLUIDO').length || 0;
+      const pendingMats = materials?.filter((m: any) => (Number(m.purchased_qty) < Number(m.planned_qty))).length || 0;
+
+      return {
+          completedSteps: completed,
+          delayedSteps: delayed,
+          pendingMaterials: pendingMats,
+          totalSteps: steps?.length || 0
+      };
   },
 
-  generatePix: async (_amount: number, _user: any) => {
-      return {
-          qr_code_base64: "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
-          copy_paste_code: "00020126360014BR.GOV.BCB.PIX0114+551199999999520400005303986540410.005802BR5913Maos da Obra6008Sao Paulo62070503***6304E2CA"
-      };
+  generatePix: async (amount: number, user: any) => {
+      return { qr_code_base64: '', copy_paste_code: '' };
   }
 };
