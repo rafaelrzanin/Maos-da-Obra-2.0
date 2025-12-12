@@ -651,7 +651,7 @@ export const dbService = {
   // --- STATS ---
   getNotifications: async (_userId: string): Promise<Notification[]> => { return []; },
   dismissNotification: async (_id: string) => {},
-  clearAllNotifications: a (_userId: string) => {},
+  clearAllNotifications: async (_userId: string) => {},
   generateSmartNotifications: async (_userId: string, _workId: string) => {},
 
   calculateWorkStats: async (workId: string) => {
