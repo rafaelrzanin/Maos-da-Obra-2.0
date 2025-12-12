@@ -1,7 +1,8 @@
 import { 
-    User, Work, Step, Material, Expense, Worker, Supplier, 
-    WorkPhoto, WorkFile, Notification, PlanType,
-    ExpenseCategory
+  User, Work, Step, Material, Expense, Worker, Supplier, 
+  WorkPhoto, WorkFile, Notification, PlanType,
+  ExpenseCategory,
+  WorkStatus
 } from '../types';
 import { WORK_TEMPLATES, FULL_MATERIAL_PACKAGES } from './standards';
 import { supabase } from './supabase';
@@ -22,13 +23,11 @@ const parseWorkFromDB = (data: any): Work => ({
     id: data.id,
     userId: data.user_id,
     name: data.name,
-    // CORRIGIDO: Lê 'endereco' do banco
-    address: data.endereco, 
+    address: data.address,
     budgetPlanned: Number(data.budget_planned || 0),
     startDate: data.start_date,
     endDate: data.end_date,
-    // CORRIGIDO: Lê 'area' do banco (Assume que o campo existe para leitura)
-    area: Number(data.area), 
+    area: Number(data.area),
     status: data.status,
     notes: data.notes || '',
     floors: Number(data.floors || 1),
@@ -41,7 +40,7 @@ const parseWorkFromDB = (data: any): Work => ({
 
 const parseStepFromDB = (data: any): Step => ({
     id: data.id,
-    workId: data.obra_id,
+    workId: data.work_id,
     name: data.name,
     startDate: data.start_date,
     endDate: data.end_date,
@@ -51,23 +50,23 @@ const parseStepFromDB = (data: any): Step => ({
 
 const parseMaterialFromDB = (data: any): Material => ({
     id: data.id,
-    workId: data.obra_id,
+    workId: data.work_id,
     name: data.name,
     brand: data.brand,
     plannedQty: Number(data.planned_qty || 0),
     purchasedQty: Number(data.purchased_qty || 0),
     unit: data.unit,
-    stepId: data.etapa_id
+    stepId: data.step_id
 });
 
 const parseExpenseFromDB = (data: any): Expense => ({
     id: data.id,
-    workId: data.obra_id,
+    workId: data.work_id,
     description: data.description,
     amount: Number(data.amount || 0),
     date: data.date,
     category: data.category,
-    stepId: data.etapa_id,
+    stepId: data.step_id,
     relatedMaterialId: data.related_material_id,
     totalAgreed: data.total_agreed ? Number(data.total_agreed) : undefined
 });
@@ -92,7 +91,7 @@ const parseSupplierFromDB = (data: any): Supplier => ({
 
 const parsePhotoFromDB = (data: any): WorkPhoto => ({
     id: data.id,
-    workId: data.obra_id,
+    workId: data.work_id,
     url: data.url,
     description: data.description,
     date: data.date,
@@ -101,7 +100,7 @@ const parsePhotoFromDB = (data: any): WorkPhoto => ({
 
 const parseFileFromDB = (data: any): WorkFile => ({
     id: data.id,
-    workId: data.obra_id,
+    workId: data.work_id,
     name: data.name,
     category: data.category,
     url: data.url,
@@ -119,8 +118,16 @@ export const dbService = {
   },
   
   syncSession: async (): Promise<User | null> => {
-    if (!supabase) return dbService.getCurrentUser();
+    // 1. Check for Test/Mock User first to preserve it
+    const current = dbService.getCurrentUser();
+    if (current && current.id === 'vip-test-user') {
+        return current;
+    }
+
+    // 2. If no Supabase, rely on localStorage (which we already checked)
+    if (!supabase) return current;
     
+    // 3. If Supabase exists, validate session
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.user) {
         localStorage.removeItem('maos_user');
@@ -146,6 +153,7 @@ export const dbService = {
             localStorage.setItem('maos_user', JSON.stringify(user));
             callback(user);
         } else if (event === 'SIGNED_OUT') {
+            // Only clear if not mock user (though logout usually calls logout() explicitly)
             localStorage.removeItem('maos_user');
             callback(null);
         }
@@ -160,6 +168,11 @@ export const dbService = {
   },
 
   getUserProfile: async (userId: string): Promise<User | null> => {
+      // Mock User Bypass
+      if (userId === 'vip-test-user') {
+          return dbService.getCurrentUser();
+      }
+
       if (!supabase) return null;
       try {
           const { data, error } = await supabase
@@ -198,6 +211,20 @@ export const dbService = {
   },
 
   login: async (email: string, password?: string): Promise<User | null> => {
+     // --- TEST USER BYPASS ---
+     if (email === 'vip@maosdaobra.com' && password === '123456') {
+         const mockUser: User = {
+             id: 'vip-test-user',
+             name: 'Usuário VIP Teste',
+             email: 'vip@maosdaobra.com',
+             whatsapp: '11999999999',
+             plan: PlanType.VITALICIO,
+             subscriptionExpiresAt: new Date(Date.now() + 100 * 365 * 24 * 60 * 60 * 1000).toISOString() // 100 years
+         };
+         localStorage.setItem('maos_user', JSON.stringify(mockUser));
+         return mockUser;
+     }
+
      if (!supabase) throw new Error("Erro de conexão: Supabase não configurado.");
      if (!password) throw new Error("Senha obrigatória.");
 
@@ -242,6 +269,16 @@ export const dbService = {
   },
 
   updateUser: async (userId: string, data: Partial<User>, newPassword?: string) => {
+      if (userId === 'vip-test-user') {
+          // Mock update
+          const current = dbService.getCurrentUser();
+          if (current) {
+              const updated = { ...current, ...data };
+              localStorage.setItem('maos_user', JSON.stringify(updated));
+          }
+          return;
+      }
+
       if (!supabase) return;
       const updates: any = {};
       if (data.name) updates.name = data.name;
@@ -256,6 +293,16 @@ export const dbService = {
   },
 
   updatePlan: async (userId: string, plan: PlanType) => {
+      if (userId === 'vip-test-user') {
+          // Mock update
+          const current = dbService.getCurrentUser();
+          if (current) {
+              const updated = { ...current, plan };
+              localStorage.setItem('maos_user', JSON.stringify(updated));
+          }
+          return;
+      }
+
       if (!supabase) return;
       let expires = new Date();
       if (plan === PlanType.MENSAL) expires.setDate(expires.getDate() + 30);
@@ -285,11 +332,17 @@ export const dbService = {
       return { user: data, error };
   },
 
-  // --- OBRAS (WORKS) ---
+  // --- WORKS (OBRAS) ---
   
   getWorks: async (userId: string): Promise<Work[]> => {
+      // Mock Storage for Test User
+      if (userId === 'vip-test-user') {
+          const stored = localStorage.getItem('maos_works_test');
+          return stored ? JSON.parse(stored) : [];
+      }
+
       if (!supabase) return [];
-      const { data, error } = await supabase.from('obras').select('*').eq('user_id', userId); 
+      const { data, error } = await supabase.from('works').select('*').eq('user_id', userId);
       if (error) {
           console.error("Erro ao buscar obras:", error);
           return [];
@@ -298,13 +351,51 @@ export const dbService = {
   },
 
   getWorkById: async (workId: string): Promise<Work | null> => {
+      // Mock Storage Check
+      const stored = localStorage.getItem('maos_works_test');
+      if (stored) {
+          const works = JSON.parse(stored);
+          const found = works.find((w: Work) => w.id === workId);
+          if (found) return found;
+      }
+
       if (!supabase) return null;
-      const { data, error } = await supabase.from('obras').select('*').eq('id', workId).single(); 
+      const { data, error } = await supabase.from('works').select('*').eq('id', workId).single();
       if (error || !data) return null;
       return parseWorkFromDB(data);
   },
 
   createWork: async (work: Omit<Work, 'id'>, templateId?: string): Promise<Work> => {
+      // Mock Storage for Test User
+      if (work.userId === 'vip-test-user') {
+          const newWork: Work = { ...work, id: Math.random().toString(36).substr(2, 9), status: WorkStatus.PLANNING };
+          
+          const stored = localStorage.getItem('maos_works_test');
+          const works = stored ? JSON.parse(stored) : [];
+          works.push(newWork);
+          localStorage.setItem('maos_works_test', JSON.stringify(works));
+          
+          // Generate Mock Steps based on template
+          if (templateId) {
+             const template = WORK_TEMPLATES.find(t => t.id === templateId);
+             if (template) {
+                 const steps = template.includedSteps.map((name, i) => ({
+                     id: Math.random().toString(36).substr(2, 9),
+                     workId: newWork.id,
+                     name,
+                     startDate: new Date().toISOString().split('T')[0],
+                     endDate: new Date().toISOString().split('T')[0],
+                     status: 'NAO_INICIADO',
+                     isDelayed: false
+                 }));
+                 const storedSteps = localStorage.getItem('maos_steps_test');
+                 const allSteps = storedSteps ? JSON.parse(storedSteps) : [];
+                 localStorage.setItem('maos_steps_test', JSON.stringify([...allSteps, ...steps]));
+             }
+          }
+          return newWork;
+      }
+
       if (!supabase) throw new Error("Offline");
       
       console.log("Iniciando criação da obra...", work.name);
@@ -312,168 +403,204 @@ export const dbService = {
       const payload = {
           user_id: work.userId,
           name: work.name,
-          // CORRIGIDO: Usa 'endereco'
-          endereco: work.address, 
+          address: work.address,
           budget_planned: Number(work.budgetPlanned) || 0,
           start_date: work.startDate,
           end_date: work.endDate,
-          // CORRIGIDO: REMOVIDO CAMPO 'area' DO PAYLOAD PARA EVITAR ERRO DE SCHEMA
-          // area: Number(work.area) || 0, // <-- REMOVIDO DA INSERÇÃO
-          status: work.status || 'Planejamento',
+          area: Number(work.area) || 0,
+          status: work.status || WorkStatus.PLANNING,
           notes: work.notes,
           floors: Number(work.floors) || 1,
           bedrooms: Number(work.bedrooms) || 0,
           bathrooms: Number(work.bathrooms) || 0,
           kitchens: Number(work.kitchens) || 0,
-          livingRooms: Number(work.livingRooms) || 0,
+          living_rooms: Number(work.livingRooms) || 0,
           has_leisure_area: work.hasLeisureArea
       };
 
-      // 1. Criar Obra (Tabela 'obras')
-      const { data, error } = await supabase.from('obras').insert([payload]).select().single(); 
+      // 1. Criar Obra e esperar o ID
+      const { data, error } = await supabase.from('works').insert([payload]).select().single();
 
       if (error || !data) {
-          console.error("Supabase Create Obra Error:", error);
+          console.error("Supabase Create Work Error:", error);
           throw new Error(error?.message || "Erro ao criar obra.");
       }
       
       const newWork = parseWorkFromDB(data);
       console.log("Obra criada com sucesso:", newWork.id);
 
+      // Se tiver template, gera os passos
       if (templateId) {
-          const template = WORK_TEMPLATES.find(t => t.id === templateId);
-          
-          if (template && template.includedSteps.length > 0) {
+          try {
+              const template = WORK_TEMPLATES.find(t => t.id === templateId);
               
-              // 2. Gerar Cronograma Inteligente
-              const start = new Date(newWork.startDate);
-              const end = new Date(newWork.endDate);
-              const safeStart = isNaN(start.getTime()) ? new Date() : start;
-              const safeEnd = isNaN(end.getTime()) ? new Date(safeStart.getTime() + (90 * 24 * 60 * 60 * 1000)) : end;
-
-              const totalTime = safeEnd.getTime() - safeStart.getTime();
-              const totalDays = Math.max(1, Math.ceil(totalTime / (1000 * 60 * 60 * 24)));
-              const stepDuration = Math.max(1, Math.floor(totalDays / template.includedSteps.length));
-              
-              const stepsPayload = template.includedSteps.map((stepName, index) => {
-                  const sDate = new Date(safeStart);
-                  sDate.setDate(safeStart.getDate() + (index * stepDuration));
+              if (template && template.includedSteps.length > 0) {
                   
-                  const eDate = new Date(sDate);
-                  eDate.setDate(sDate.getDate() + stepDuration);
+                  // 2. Gerar Cronograma Inteligente
+                  const start = new Date(newWork.startDate);
+                  const end = new Date(newWork.endDate);
                   
-                  return {
-                      obra_id: newWork.id, 
-                      name: stepName,
-                      start_date: sDate.toISOString().split('T')[0],
-                      end_date: eDate.toISOString().split('T')[0],
-                      status: 'NAO_INICIADO',
-                      // is_delayed REMOVIDO
-                  };
-              });
+                  // Fallback para datas válidas
+                  const safeStart = isNaN(start.getTime()) ? new Date() : start;
+                  const safeEnd = isNaN(end.getTime()) ? new Date(safeStart.getTime() + (90 * 24 * 60 * 60 * 1000)) : end;
 
-              console.log("Tentando inserir etapas:", stepsPayload.length);
-              const { data: createdSteps, error: stepsError } = await supabase.from('etapas').insert(stepsPayload).select(); 
+                  const totalTime = Math.max(1, safeEnd.getTime() - safeStart.getTime());
+                  const totalDays = Math.ceil(totalTime / (1000 * 60 * 60 * 24));
+                  const stepDuration = Math.max(1, Math.floor(totalDays / template.includedSteps.length));
+                  
+                  const stepsPayload = template.includedSteps.map((stepName, index) => {
+                      const sDate = new Date(safeStart);
+                      sDate.setDate(safeStart.getDate() + (index * stepDuration));
+                      
+                      const eDate = new Date(sDate);
+                      eDate.setDate(sDate.getDate() + stepDuration);
+                      
+                      return {
+                          work_id: newWork.id,
+                          name: stepName,
+                          start_date: sDate.toISOString().split('T')[0],
+                          end_date: eDate.toISOString().split('T')[0],
+                          status: 'NAO_INICIADO',
+                          is_delayed: false
+                      };
+                  });
 
-              if (stepsError) {
-                  console.error("ERRO CRÍTICO ao inserir etapas:", stepsError);
-              } else {
-                  console.log("Etapas inseridas com sucesso:", createdSteps.length);
+                  console.log("Tentando inserir etapas:", stepsPayload.length);
+                  // IMPORTANTE: .select() para retornar os IDs criados para usar nos materiais
+                  const { data: createdSteps, error: stepsError } = await supabase.from('steps').insert(stepsPayload).select();
 
-                  // 3. Gerar Lista de Materiais
-                  let categoriesToInclude: string[] = [];
-                  if (templateId === 'CONSTRUCAO') categoriesToInclude = FULL_MATERIAL_PACKAGES.map(c => c.category);
-                  else if (templateId === 'REFORMA_APTO') categoriesToInclude = FULL_MATERIAL_PACKAGES.map(c => c.category).filter(c => !c.includes('Fundação') && !c.includes('Telhado'));
-                  else if (templateId === 'BANHEIRO') categoriesToInclude = ['Instalações Hidráulicas (Tubulação)', 'Pisos e Revestimentos Cerâmicos', 'Louças e Metais (Acabamento Hidro)', 'Marmoraria e Granitos', 'Limpeza Final', 'Gesso e Drywall'];
-                  else if (templateId === 'COZINHA') categoriesToInclude = ['Instalações Hidráulicas (Tubulação)', 'Instalações Elétricas (Infra)', 'Pisos e Revestimentos Cerâmicos', 'Marmoraria e Granitos', 'Louças e Metais (Acabamento Hidro)', 'Limpeza Final', 'Gesso e Drywall'];
-                  else if (templateId === 'PINTURA') categoriesToInclude = ['Pintura', 'Limpeza Final'];
+                  if (stepsError) {
+                      console.error("ERRO CRÍTICO ao inserir etapas:", stepsError);
+                  } else {
+                      console.log("Etapas inseridas com sucesso:", createdSteps?.length);
 
-                  const materialsPayload: any[] = [];
-                  const area = newWork.area > 0 ? newWork.area : 10;
+                      // 3. Gerar Lista de Materiais
+                      let categoriesToInclude: string[] = [];
 
-                  // Robust step finder - case insensitive partial matching
-                  const findStepId = (cat: string) => {
-                      if (!createdSteps || createdSteps.length === 0) return null;
-                      const c = cat.toLowerCase();
-                      const match = createdSteps.find((s: any) => {
-                          const n = s.name.toLowerCase();
-                          if (c.includes('fundação') && n.includes('fundações')) return true;
-                          if (c.includes('alvenaria') && n.includes('paredes')) return true;
-                          if (c.includes('elétrica') && n.includes('elétrica')) return true;
-                          if (c.includes('hidráulica') && (n.includes('tubulação') || n.includes('água'))) return true;
-                          if (c.includes('pintura') && n.includes('pintura')) return true;
-                          if (c.includes('piso') && n.includes('piso')) return true;
-                          if (c.includes('limpeza') && n.includes('limpeza')) return true;
-                          return n.includes(c.split(' ')[0]);
-                      });
-                      return match ? match.id : null;
-                  };
+                      if (templateId === 'CONSTRUCAO') categoriesToInclude = FULL_MATERIAL_PACKAGES.map(c => c.category);
+                      else if (templateId === 'REFORMA_APTO') categoriesToInclude = FULL_MATERIAL_PACKAGES.map(c => c.category).filter(c => !c.includes('Fundação') && !c.includes('Telhado'));
+                      else if (templateId === 'BANHEIRO') categoriesToInclude = ['Instalações Hidráulicas (Tubulação)', 'Pisos e Revestimentos Cerâmicos', 'Louças e Metais (Acabamento Hidro)', 'Marmoraria e Granitos', 'Limpeza Final', 'Gesso e Drywall'];
+                      else if (templateId === 'COZINHA') categoriesToInclude = ['Instalações Hidráulicas (Tubulação)', 'Instalações Elétricas (Infra)', 'Pisos e Revestimentos Cerâmicos', 'Marmoraria e Granitos', 'Louças e Metais (Acabamento Hidro)', 'Limpeza Final', 'Gesso e Drywall'];
+                      else if (templateId === 'PINTURA') categoriesToInclude = ['Pintura', 'Limpeza Final'];
 
-                  for (const pkg of FULL_MATERIAL_PACKAGES) {
-                      if (categoriesToInclude.includes(pkg.category)) {
-                          const stepId = findStepId(pkg.category);
-                          
-                          for (const item of pkg.items) {
-                              let qty = 0;
-                              const n = item.name.toLowerCase();
-                              // Lógica de quantidade baseada nos cômodos
-                              const bth = newWork.bathrooms || 1;
-                              const kit = newWork.kitchens || 1;
-                              const bed = newWork.bedrooms || 2;
-                              const liv = newWork.livingRooms || 1;
+                      const materialsPayload: any[] = [];
+                      const area = newWork.area > 0 ? newWork.area : 10;
 
-                              if (n.includes('vaso') || n.includes('chuveiro') || n.includes('assento')) qty = bth;
-                              else if (n.includes('torneira')) qty = bth + kit;
-                              else if (n.includes('porta de madeira')) qty = bed + bth;
-                              else if (n.includes('tomada')) qty = (bed + liv + kit) * 4;
-                              else if (n.includes('janela')) qty = bed + liv;
-                              else {
-                                  qty = Math.ceil((item.multiplier || 1) * area);
-                              }
+                      // Helper function robusta para achar ID da etapa
+                      const findStepId = (cat: string) => {
+                          if (!createdSteps || createdSteps.length === 0) return null;
+                          const c = cat.toLowerCase();
+                          const match = createdSteps.find((s: any) => {
+                              const n = s.name.toLowerCase();
+                              // Lógica de matching flexível
+                              if (c.includes('fundação') && n.includes('fundações')) return true;
+                              if (c.includes('alvenaria') && n.includes('paredes')) return true;
+                              if (c.includes('elétrica') && n.includes('elétrica')) return true;
+                              if (c.includes('hidráulica') && (n.includes('tubulação') || n.includes('água'))) return true;
+                              if (c.includes('pintura') && n.includes('pintura')) return true;
+                              if (c.includes('piso') && n.includes('piso')) return true;
+                              if (c.includes('limpeza') && n.includes('limpeza')) return true;
+                              // Fallback genérico
+                              return n.includes(c.split(' ')[0]);
+                          });
+                          return match ? match.id : null;
+                      };
+
+                      for (const pkg of FULL_MATERIAL_PACKAGES) {
+                          if (categoriesToInclude.includes(pkg.category)) {
+                              const stepId = findStepId(pkg.category);
                               
-                              if (qty > 0) {
-                                  materialsPayload.push({
-                                      obra_id: newWork.id,
-                                      name: item.name,
-                                      brand: '',
-                                      planned_qty: qty,
-                                      purchased_qty: 0,
-                                      unit: item.unit,
-                                      etapa_id: stepId 
-                                  });
+                              for (const item of pkg.items) {
+                                  let qty = 0;
+                                  const n = item.name.toLowerCase();
+                                  // Lógica de quantidade baseada nos cômodos
+                                  const bth = newWork.bathrooms || 1;
+                                  const kit = newWork.kitchens || 1;
+                                  const bed = newWork.bedrooms || 2;
+                                  const liv = newWork.livingRooms || 1;
+
+                                  if (n.includes('vaso') || n.includes('chuveiro') || n.includes('assento')) qty = bth;
+                                  else if (n.includes('torneira')) qty = bth + kit;
+                                  else if (n.includes('porta') && !n.includes('entrada')) qty = bed + bth;
+                                  else if (n.includes('tomada')) qty = (bed + liv + kit) * 4;
+                                  else if (n.includes('janela')) qty = bed + liv;
+                                  else {
+                                      // Multiplicador por área
+                                      qty = Math.ceil((item.multiplier || 1) * area);
+                                  }
+                                  
+                                  if (qty > 0) {
+                                      materialsPayload.push({
+                                          work_id: newWork.id,
+                                          name: item.name,
+                                          brand: '',
+                                          planned_qty: qty,
+                                          purchased_qty: 0,
+                                          unit: item.unit,
+                                          step_id: stepId
+                                      });
+                                  }
                               }
                           }
                       }
-                  }
 
-                  if (materialsPayload.length > 0) {
-                      console.log(`Tentando inserir ${materialsPayload.length} materiais...`);
-                      const { error: matError } = await supabase.from('materiais').insert(materialsPayload); 
-                      if (matError) console.error("Erro ao inserir materiais:", matError);
-                      else console.log("Materiais inseridos com sucesso.");
+                      if (materialsPayload.length > 0) {
+                          console.log(`Tentando inserir ${materialsPayload.length} materiais...`);
+                          const { error: matError } = await supabase.from('materials').insert(materialsPayload);
+                          if (matError) console.error("Erro ao inserir materiais:", matError);
+                          else console.log("Materiais inseridos com sucesso.");
+                      }
                   }
               }
+          } catch (genError) {
+              console.error("Erro na geração automática (Work Criada, mas sem itens):", genError);
+              // Não lança erro para não bloquear a UI, pois a obra base já existe.
           }
       }
       return newWork;
   },
 
   deleteWork: async (workId: string) => {
+      // Mock Deletion
+      const stored = localStorage.getItem('maos_works_test');
+      if (stored) {
+          const works = JSON.parse(stored);
+          const filtered = works.filter((w: Work) => w.id !== workId);
+          localStorage.setItem('maos_works_test', JSON.stringify(filtered));
+      }
+
       if (!supabase) return;
-      await supabase.from('obras').delete().eq('id', workId); 
+      // Como usamos ON DELETE CASCADE no banco, deletar a work deleta tudo.
+      await supabase.from('works').delete().eq('id', workId);
   },
 
-  // --- ETAPAS (STEPS) ---
+  // --- STEPS ---
   getSteps: async (workId: string): Promise<Step[]> => {
+      // Mock Steps
+      const stored = localStorage.getItem('maos_steps_test');
+      if (stored) {
+          const allSteps = JSON.parse(stored);
+          return allSteps.filter((s: Step) => s.workId === workId);
+      }
+
       if (!supabase) return [];
-      const { data } = await supabase.from('etapas').select('*').eq('obra_id', workId); 
+      const { data } = await supabase.from('steps').select('*').eq('work_id', workId);
       return (data || []).map(parseStepFromDB);
   },
 
   addStep: async (step: Step) => {
+      // Mock Add
+      if (dbService.getCurrentUser()?.id === 'vip-test-user') {
+          const stored = localStorage.getItem('maos_steps_test');
+          const allSteps = stored ? JSON.parse(stored) : [];
+          allSteps.push(step);
+          localStorage.setItem('maos_steps_test', JSON.stringify(allSteps));
+          return;
+      }
+
       if (!supabase) return;
-      await supabase.from('etapas').insert([{ 
-          obra_id: step.workId,
+      await supabase.from('steps').insert([{
+          work_id: step.workId,
           name: step.name,
           start_date: step.startDate,
           end_date: step.endDate,
@@ -482,8 +609,20 @@ export const dbService = {
   },
 
   updateStep: async (step: Step) => {
+      // Mock Update
+      if (dbService.getCurrentUser()?.id === 'vip-test-user') {
+          const stored = localStorage.getItem('maos_steps_test');
+          const allSteps = stored ? JSON.parse(stored) : [];
+          const idx = allSteps.findIndex((s: Step) => s.id === step.id);
+          if (idx !== -1) {
+              allSteps[idx] = step;
+              localStorage.setItem('maos_steps_test', JSON.stringify(allSteps));
+          }
+          return;
+      }
+
       if (!supabase) return;
-      await supabase.from('etapas').update({ 
+      await supabase.from('steps').update({
           name: step.name,
           start_date: step.startDate,
           end_date: step.endDate,
@@ -491,24 +630,54 @@ export const dbService = {
       }).eq('id', step.id);
   },
 
-  // --- MATERIAIS (MATERIALS) ---
+  // --- MATERIALS ---
   getMaterials: async (workId: string): Promise<Material[]> => {
+      // Mock Materials
+      const stored = localStorage.getItem('maos_materials_test');
+      if (stored) {
+          const all = JSON.parse(stored);
+          return all.filter((m: Material) => m.workId === workId);
+      }
+
       if (!supabase) return [];
-      const { data } = await supabase.from('materiais').select('*').eq('obra_id', workId); 
+      const { data } = await supabase.from('materials').select('*').eq('work_id', workId);
       return (data || []).map(parseMaterialFromDB);
   },
 
   addMaterial: async (material: Material, purchaseData?: { qty: number, cost: number, date: string }) => {
+      // Mock Add
+      if (dbService.getCurrentUser()?.id === 'vip-test-user') {
+          const stored = localStorage.getItem('maos_materials_test');
+          const all = stored ? JSON.parse(stored) : [];
+          const newMat = { ...material, purchasedQty: purchaseData ? purchaseData.qty : 0 };
+          all.push(newMat);
+          localStorage.setItem('maos_materials_test', JSON.stringify(all));
+
+          if (purchaseData) {
+              await dbService.addExpense({
+                  id: Math.random().toString(36).substr(2, 9), 
+                  workId: material.workId,
+                  description: `Compra: ${material.name}`,
+                  amount: purchaseData.cost,
+                  date: purchaseData.date,
+                  category: ExpenseCategory.MATERIAL,
+                  relatedMaterialId: material.id,
+                  stepId: material.stepId
+              });
+          }
+          return;
+      }
+
       if (!supabase) return;
       
-      const { data: matData } = await supabase.from('materiais').insert([{ 
-          obra_id: material.workId,
+      const { data: matData } = await supabase.from('materials').insert([{
+          work_id: material.workId,
           name: material.name,
           brand: material.brand,
           planned_qty: material.plannedQty,
           purchased_qty: purchaseData ? purchaseData.qty : 0,
           unit: material.unit,
-          etapa_id: material.stepId
+          step_id: material.stepId
       }]).select().single();
 
       if (purchaseData && matData) {
@@ -526,8 +695,20 @@ export const dbService = {
   },
 
   updateMaterial: async (material: Material) => {
+      // Mock Update
+      if (dbService.getCurrentUser()?.id === 'vip-test-user') {
+          const stored = localStorage.getItem('maos_materials_test');
+          const all = stored ? JSON.parse(stored) : [];
+          const idx = all.findIndex((m: Material) => m.id === material.id);
+          if (idx !== -1) {
+              all[idx] = material;
+              localStorage.setItem('maos_materials_test', JSON.stringify(all));
+          }
+          return;
+      }
+
       if (!supabase) return;
-      await supabase.from('materiais').update({ 
+      await supabase.from('materials').update({
           name: material.name,
           brand: material.brand,
           planned_qty: material.plannedQty,
@@ -536,14 +717,39 @@ export const dbService = {
   },
 
   registerMaterialPurchase: async (matId: string, name: string, brand: string, plannedQty: number, unit: string, buyQty: number, cost: number) => {
+      // Mock Purchase
+      if (dbService.getCurrentUser()?.id === 'vip-test-user') {
+          const stored = localStorage.getItem('maos_materials_test');
+          const all = stored ? JSON.parse(stored) : [];
+          const idx = all.findIndex((m: Material) => m.id === matId);
+          if (idx !== -1) {
+              const current = all[idx];
+              const newPurchasedQty = (Number(current.purchasedQty) || 0) + buyQty;
+              all[idx] = { ...current, purchasedQty: newPurchasedQty, name, brand, plannedQty, unit };
+              localStorage.setItem('maos_materials_test', JSON.stringify(all));
+
+              await dbService.addExpense({
+                  id: Math.random().toString(36).substr(2, 9),
+                  workId: current.workId,
+                  description: `Compra: ${name}`,
+                  amount: cost,
+                  date: new Date().toISOString(),
+                  category: ExpenseCategory.MATERIAL,
+                  relatedMaterialId: matId,
+                  stepId: current.stepId
+              });
+          }
+          return;
+      }
+
       if (!supabase) return;
       
-      const { data: current } = await supabase.from('materiais').select('purchased_qty, obra_id, etapa_id').eq('id', matId).single(); 
+      const { data: current } = await supabase.from('materials').select('purchased_qty, work_id, step_id').eq('id', matId).single();
       if (!current) return;
 
       const newPurchasedQty = (Number(current.purchased_qty) || 0) + buyQty;
       
-      await supabase.from('materiais').update({ 
+      await supabase.from('materials').update({ 
           purchased_qty: newPurchasedQty,
           name: name,
           brand: brand,
@@ -553,61 +759,100 @@ export const dbService = {
 
       await dbService.addExpense({
           id: '',
-          workId: current.obra_id,
+          workId: current.work_id,
           description: `Compra: ${name}`,
           amount: cost,
           date: new Date().toISOString(),
           category: ExpenseCategory.MATERIAL,
           relatedMaterialId: matId,
-          stepId: current.etapa_id
+          stepId: current.step_id
       });
   },
 
-  // --- DESPESAS (EXPENSES) ---
+  // --- EXPENSES ---
   getExpenses: async (workId: string): Promise<Expense[]> => {
+      // Mock Expenses
+      const stored = localStorage.getItem('maos_expenses_test');
+      if (stored) {
+          const all = JSON.parse(stored);
+          return all.filter((e: Expense) => e.workId === workId);
+      }
+
       if (!supabase) return [];
-      const { data } = await supabase.from('despesas').select('*').eq('obra_id', workId); 
+      const { data } = await supabase.from('expenses').select('*').eq('work_id', workId);
       return (data || []).map(parseExpenseFromDB);
   },
 
   addExpense: async (expense: Expense) => {
+      // Mock Add
+      if (dbService.getCurrentUser()?.id === 'vip-test-user') {
+          const stored = localStorage.getItem('maos_expenses_test');
+          const all = stored ? JSON.parse(stored) : [];
+          all.push(expense);
+          localStorage.setItem('maos_expenses_test', JSON.stringify(all));
+          return;
+      }
+
       if (!supabase) return;
-      await supabase.from('despesas').insert([{ 
-          obra_id: expense.workId,
+      await supabase.from('expenses').insert([{
+          work_id: expense.workId,
           description: expense.description,
           amount: expense.amount,
           date: expense.date,
           category: expense.category,
-          etapa_id: expense.stepId,
+          step_id: expense.stepId,
           related_material_id: expense.relatedMaterialId,
           total_agreed: expense.totalAgreed
       }]);
   },
 
   updateExpense: async (expense: Expense) => {
+      // Mock Update
+      if (dbService.getCurrentUser()?.id === 'vip-test-user') {
+          const stored = localStorage.getItem('maos_expenses_test');
+          const all = stored ? JSON.parse(stored) : [];
+          const idx = all.findIndex((e: Expense) => e.id === expense.id);
+          if (idx !== -1) {
+              all[idx] = expense;
+              localStorage.setItem('maos_expenses_test', JSON.stringify(all));
+          }
+          return;
+      }
+
       if (!supabase) return;
-      await supabase.from('despesas').update({ 
+      await supabase.from('expenses').update({
           description: expense.description,
           amount: expense.amount,
           date: expense.date,
           category: expense.category,
-          etapa_id: expense.stepId,
+          step_id: expense.stepId,
           total_agreed: expense.totalAgreed
       }).eq('id', expense.id);
   },
 
   deleteExpense: async (id: string) => {
+      // Mock Delete
+      if (dbService.getCurrentUser()?.id === 'vip-test-user') {
+          const stored = localStorage.getItem('maos_expenses_test');
+          const all = stored ? JSON.parse(stored) : [];
+          const filtered = all.filter((e: Expense) => e.id !== id);
+          localStorage.setItem('maos_expenses_test', JSON.stringify(filtered));
+          return;
+      }
+
       if (!supabase) return;
-      await supabase.from('despesas').delete().eq('id', id); 
+      await supabase.from('expenses').delete().eq('id', id);
   },
 
-  // --- WORKERS & SUPPLIERS (Assumindo que estas tabelas estão em inglês) ---
+  // --- WORKERS & SUPPLIERS ---
   getWorkers: async (userId: string): Promise<Worker[]> => {
+      if (userId === 'vip-test-user') return [];
       if (!supabase) return [];
       const { data } = await supabase.from('workers').select('*').eq('user_id', userId);
       return (data || []).map(parseWorkerFromDB);
   },
   addWorker: async (worker: Omit<Worker, 'id'>) => {
+      if (worker.userId === 'vip-test-user') return;
       if (!supabase) return;
       await supabase.from('workers').insert([{
           user_id: worker.userId,
@@ -631,11 +876,13 @@ export const dbService = {
   },
 
   getSuppliers: async (userId: string): Promise<Supplier[]> => {
+      if (userId === 'vip-test-user') return [];
       if (!supabase) return [];
       const { data } = await supabase.from('suppliers').select('*').eq('user_id', userId);
       return (data || []).map(parseSupplierFromDB);
   },
   addSupplier: async (supplier: Omit<Supplier, 'id'>) => {
+      if (supplier.userId === 'vip-test-user') return;
       if (!supabase) return;
       await supabase.from('suppliers').insert([{
           user_id: supplier.userId,
@@ -658,16 +905,16 @@ export const dbService = {
       if (supabase) await supabase.from('suppliers').delete().eq('id', id);
   },
 
-  // --- FOTOS & ARQUIVOS (PHOTOS & FILES) ---
+  // --- PHOTOS & FILES ---
   getPhotos: async (workId: string): Promise<WorkPhoto[]> => {
       if (!supabase) return [];
-      const { data } = await supabase.from('fotos').select('*').eq('obra_id', workId); 
+      const { data } = await supabase.from('photos').select('*').eq('work_id', workId);
       return (data || []).map(parsePhotoFromDB);
   },
   addPhoto: async (photo: WorkPhoto) => {
       if (!supabase) return;
-      await supabase.from('fotos').insert([{ 
-          obra_id: photo.workId,
+      await supabase.from('photos').insert([{
+          work_id: photo.workId,
           url: photo.url,
           description: photo.description,
           date: photo.date,
@@ -677,13 +924,13 @@ export const dbService = {
 
   getFiles: async (workId: string): Promise<WorkFile[]> => {
       if (!supabase) return [];
-      const { data } = await supabase.from('arquivos').select('*').eq('obra_id', workId); 
+      const { data } = await supabase.from('files').select('*').eq('work_id', workId);
       return (data || []).map(parseFileFromDB);
   },
   addFile: async (file: WorkFile) => {
       if (!supabase) return;
-      await supabase.from('arquivos').insert([{ 
-          obra_id: file.workId,
+      await supabase.from('files').insert([{
+          work_id: file.workId,
           name: file.name,
           category: file.category,
           url: file.url,
@@ -699,12 +946,29 @@ export const dbService = {
   generateSmartNotifications: async (_userId: string, _workId: string) => {},
 
   calculateWorkStats: async (workId: string) => {
+      // Mock Stats
+      if (dbService.getCurrentUser()?.id === 'vip-test-user') {
+         const expStored = localStorage.getItem('maos_expenses_test');
+         const expenses = expStored ? JSON.parse(expStored) : [];
+         const workExpenses = expenses.filter((e: Expense) => e.workId === workId);
+         const totalSpent = workExpenses.reduce((acc: number, curr: Expense) => acc + Number(curr.amount), 0);
+
+         const stepStored = localStorage.getItem('maos_steps_test');
+         const steps = stepStored ? JSON.parse(stepStored) : [];
+         const workSteps = steps.filter((s: Step) => s.workId === workId);
+         const totalSteps = workSteps.length || 0;
+         const completed = workSteps.filter((s: Step) => s.status === 'CONCLUIDO').length || 0;
+         const progress = totalSteps > 0 ? Math.round((completed / totalSteps) * 100) : 0;
+         
+         return { totalSpent, progress, delayedSteps: 0 };
+      }
+
       if (!supabase) return { totalSpent: 0, progress: 0, delayedSteps: 0 };
       
-      const { data: expenses } = await supabase.from('despesas').select('amount').eq('obra_id', workId); 
+      const { data: expenses } = await supabase.from('expenses').select('amount').eq('work_id', workId);
       const totalSpent = (expenses || []).reduce((acc, curr) => acc + Number(curr.amount), 0);
 
-      const { data: steps } = await supabase.from('etapas').select('status').eq('obra_id', workId); 
+      const { data: steps } = await supabase.from('steps').select('status').eq('work_id', workId);
       const totalSteps = steps?.length || 0;
       const completed = steps?.filter((s: any) => s.status === 'CONCLUIDO').length || 0;
       const progress = totalSteps > 0 ? Math.round((completed / totalSteps) * 100) : 0;
