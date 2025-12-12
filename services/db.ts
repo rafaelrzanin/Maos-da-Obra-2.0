@@ -4,7 +4,7 @@ import {
   WorkPhoto, WorkFile, Notification, PlanType,
   ExpenseCategory
 } from '../types';
-import { WORK_TEMPLATES } from './standards';
+import { WORK_TEMPLATES, FULL_MATERIAL_PACKAGES } from './standards';
 import { supabase } from './supabase';
 
 // --- HELPERS: Mapeamento de Snake_case (Banco) para CamelCase (App) ---
@@ -325,6 +325,7 @@ export const dbService = {
           has_leisure_area: work.hasLeisureArea
       };
 
+      // 1. Criar Obra
       const { data, error } = await supabase.from('works').insert([payload]).select().single();
 
       if (error || !data) {
@@ -334,19 +335,80 @@ export const dbService = {
       
       const newWork = parseWorkFromDB(data);
 
-      // Create steps from template
       if (templateId) {
           const template = WORK_TEMPLATES.find(t => t.id === templateId);
+          
           if (template) {
+              // 2. Gerar Cronograma (Etapas)
               const stepsPayload = template.includedSteps.map(stepName => ({
-                  work_id: newWork.id, // snake_case
+                  work_id: newWork.id,
                   name: stepName,
                   start_date: newWork.startDate,
                   end_date: newWork.endDate,
                   status: 'NAO_INICIADO',
                   is_delayed: false
               }));
-              await supabase.from('steps').insert(stepsPayload);
+              const { data: createdSteps } = await supabase.from('steps').insert(stepsPayload).select();
+
+              // 3. Gerar Lista de Materiais Inteligente
+              // Filtra quais categorias de materiais adicionar baseado no template
+              let categoriesToInclude: string[] = [];
+
+              if (templateId === 'CONSTRUCAO') {
+                  // Inclui TUDO
+                  categoriesToInclude = FULL_MATERIAL_PACKAGES.map(c => c.category);
+              } else if (templateId === 'REFORMA_APTO') {
+                  // Remove fundação e telhado
+                  categoriesToInclude = FULL_MATERIAL_PACKAGES
+                      .map(c => c.category)
+                      .filter(c => !c.includes('Fundação') && !c.includes('Telhado'));
+              } else if (templateId === 'BANHEIRO') {
+                  categoriesToInclude = ['Instalações Hidráulicas (Tubulação)', 'Pisos e Revestimentos Cerâmicos', 'Louças e Metais (Acabamento Hidro)', 'Marmoraria e Granitos', 'Limpeza Final'];
+              } else if (templateId === 'COZINHA') {
+                  categoriesToInclude = ['Instalações Hidráulicas (Tubulação)', 'Instalações Elétricas (Infra)', 'Pisos e Revestimentos Cerâmicos', 'Marmoraria e Granitos', 'Louças e Metais (Acabamento Hidro)', 'Limpeza Final'];
+              } else if (templateId === 'PINTURA') {
+                  categoriesToInclude = ['Pintura', 'Limpeza Final'];
+              }
+
+              const materialsPayload: any[] = [];
+              const area = work.area || 10; // Fallback seguro se area for 0
+
+              // Mapeia steps criados para tentar vincular materiais (heurística simples)
+              // Ex: Material 'Cimento' -> Tenta achar etapa 'Estrutura' ou 'Alvenaria'
+              const findStepId = (categoryName: string) => {
+                  if (!createdSteps) return null;
+                  // Tenta achar uma etapa que contenha parte do nome da categoria
+                  const match = createdSteps.find((s: any) => 
+                      categoryName.toLowerCase().includes(s.name.toLowerCase().split(' ')[0]) ||
+                      s.name.toLowerCase().includes(categoryName.toLowerCase().split(' ')[0])
+                  );
+                  return match ? match.id : null;
+              };
+
+              for (const pkg of FULL_MATERIAL_PACKAGES) {
+                  if (categoriesToInclude.includes(pkg.category)) {
+                      const stepId = findStepId(pkg.category);
+                      
+                      for (const item of pkg.items) {
+                          // Calcula quantidade: Multiplicador * Área da Obra
+                          const qty = Math.ceil((item.multiplier || 1) * area);
+                          
+                          materialsPayload.push({
+                              work_id: newWork.id,
+                              name: item.name,
+                              brand: '', // Marca em branco para preencher depois
+                              planned_qty: qty,
+                              purchased_qty: 0,
+                              unit: item.unit,
+                              step_id: stepId // Vincula à etapa se possível
+                          });
+                      }
+                  }
+              }
+
+              if (materialsPayload.length > 0) {
+                  await supabase.from('materials').insert(materialsPayload);
+              }
           }
       }
       return newWork;
@@ -589,7 +651,7 @@ export const dbService = {
   // --- STATS ---
   getNotifications: async (_userId: string): Promise<Notification[]> => { return []; },
   dismissNotification: async (_id: string) => {},
-  clearAllNotifications: async (_userId: string) => {},
+  clearAllNotifications: a (_userId: string) => {},
   generateSmartNotifications: async (_userId: string, _workId: string) => {},
 
   calculateWorkStats: async (workId: string) => {
