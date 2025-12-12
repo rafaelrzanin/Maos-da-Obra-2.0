@@ -27,7 +27,7 @@ const parseWorkFromDB = (data: any): Work => ({
     budgetPlanned: Number(data.budget_planned || 0),
     startDate: data.start_date,
     endDate: data.end_date,
-    // CORRIGIDO: Lê 'area' do banco
+    // CORRIGIDO: Lê 'area' do banco (Assume que o campo existe para leitura)
     area: Number(data.area), 
     status: data.status,
     notes: data.notes || '',
@@ -317,15 +317,15 @@ export const dbService = {
           budget_planned: Number(work.budgetPlanned) || 0,
           start_date: work.startDate,
           end_date: work.endDate,
-          // CORRIGIDO: Usa 'area'
-          area: Number(work.area) || 0, 
+          // CORRIGIDO: REMOVIDO CAMPO 'area' DO PAYLOAD PARA EVITAR ERRO DE SCHEMA
+          // area: Number(work.area) || 0, // <-- REMOVIDO DA INSERÇÃO
           status: work.status || 'Planejamento',
           notes: work.notes,
           floors: Number(work.floors) || 1,
           bedrooms: Number(work.bedrooms) || 0,
           bathrooms: Number(work.bathrooms) || 0,
           kitchens: Number(work.kitchens) || 0,
-          living_rooms: Number(work.livingRooms) || 0,
+          livingRooms: Number(work.livingRooms) || 0,
           has_leisure_area: work.hasLeisureArea
       };
 
