@@ -95,14 +95,20 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
             setLoading(false);
         }
     };
-    sync();
+    
+    // Safety timeout para loading infinito no login
+    const safetyTimer = setTimeout(() => {
+        setLoading(false);
+    }, 5000);
+
+    sync().then(() => clearTimeout(safetyTimer));
 
     const unsubscribe = dbService.onAuthChange((u: User | null) => {
         setUser(u);
         setLoading(false);
     });
-    return () => { unsubscribe(); };
-  }, []); // Dependência vazia para rodar apenas no mount
+    return () => { unsubscribe(); clearTimeout(safetyTimer); };
+  }, []); 
 
   const refreshUser = async () => {
       const currentUser = await dbService.syncSession(); // Força busca no servidor
