@@ -56,7 +56,7 @@ const parseMaterialFromDB = (data: any): Material => ({
     plannedQty: Number(data.planned_qty || 0),
     purchasedQty: Number(data.purchased_qty || 0),
     unit: data.unit,
-    stepId: data.step_id
+    stepId: data.etapa_id
 });
 
 const parseExpenseFromDB = (data: any): Expense => ({
@@ -66,7 +66,7 @@ const parseExpenseFromDB = (data: any): Expense => ({
     amount: Number(data.amount || 0),
     date: data.date,
     category: data.category,
-    stepId: data.step_id,
+    stepId: data.etapa_id,
     relatedMaterialId: data.related_material_id,
     totalAgreed: data.total_agreed ? Number(data.total_agreed) : undefined
 });
