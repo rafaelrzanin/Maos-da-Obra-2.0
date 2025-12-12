@@ -119,25 +119,26 @@ const parseNotificationFromDB = (data: any): Notification => ({
     type: data.type
 });
 
-// --- CRITICAL FIX: Ensure Profile Exists ---
-// Handles the "Clean DB" scenario. If Auth User exists but Profile Table is empty, creates it.
+// --- CRITICAL FIX: Ensure Profile Exists (Unbreakable Version) ---
+// If Supabase DB fails, we MUST return a valid User object based on Auth data
+// to prevent the "Auth Loop" where the app keeps reloading trying to fetch the profile.
 const ensureUserProfile = async (authUser: any): Promise<User | null> => {
     if (!authUser || !supabase) return null;
 
     try {
         // 1. Try to fetch existing profile
-        const { data: existingProfile } = await supabase
+        const { data: existingProfile, error: fetchError } = await supabase
             .from('profiles')
             .select('*')
             .eq('id', authUser.id)
-            .single();
+            .maybeSingle(); // Use maybeSingle to avoid 406 errors
 
         if (existingProfile) {
             return mapProfileFromSupabase(existingProfile);
         }
 
         // 2. If not found, create it automatically
-        console.log("Perfil não encontrado (DB Limpo?). Criando automaticamente...");
+        console.log("Perfil não encontrado. Tentando criar...");
 
         const trialExpires = new Date();
         trialExpires.setDate(trialExpires.getDate() + 7);
@@ -158,15 +159,30 @@ const ensureUserProfile = async (authUser: any): Promise<User | null> => {
             .single();
 
         if (createError) {
-            console.error("ERRO CRÍTICO: Não foi possível criar o perfil.", createError);
-            return null;
+            console.error("ERRO CRÍTICO DB: Não foi possível gravar o perfil.", createError);
+            // FALLBACK DE EMERGÊNCIA: Retorna um perfil em memória para não bloquear o acesso
+            return {
+                id: authUser.id,
+                name: newProfileData.name,
+                email: authUser.email,
+                plan: PlanType.MENSAL,
+                isTrial: true,
+                subscriptionExpiresAt: trialExpires.toISOString()
+            };
         }
 
         return mapProfileFromSupabase(createdProfile);
 
     } catch (e) {
-        console.error("Erro inesperado no ensureUserProfile", e);
-        return null;
+        console.error("Erro fatal no ensureUserProfile", e);
+        // Retorna fallback mesmo em caso de exceção
+        return {
+            id: authUser.id,
+            name: authUser.email || 'Usuário',
+            email: authUser.email,
+            plan: PlanType.MENSAL,
+            isTrial: true
+        };
     }
 };
 
@@ -187,6 +203,7 @@ export const dbService = {
     if (!supabase) return () => {};
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
         if (session?.user) {
+            // Pass the user to ensureUserProfile immediately
             const user = await ensureUserProfile(session.user);
             callback(user);
         } else {
@@ -229,7 +246,11 @@ export const dbService = {
     });
 
     if (authError) throw authError;
-    if (!authData.user) throw new Error("Erro ao criar usuário");
+    // Se o usuário já existe mas não confirmou e-mail ou algo assim, authData.user pode vir nulo dependendo da config
+    if (!authData.user) {
+        // Tenta logar se o cadastro diz que já existe
+        return this.login(email, password);
+    }
 
     // 2. Tenta criar o perfil explicitamente
     const trialExpires = new Date();
