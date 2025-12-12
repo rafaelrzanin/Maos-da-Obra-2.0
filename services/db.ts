@@ -371,7 +371,7 @@ export const dbService = {
               });
 
               console.log("Tentando inserir etapas:", stepsPayload.length);
-              const { data: createdSteps, error: stepsError } = await supabase.from('steps').insert(stepsPayload).select();
+              const { data: createdSteps, error: stepsError } = await supabase.from('etapas').insert(stepsPayload).select();
 
               if (stepsError) {
                   console.error("ERRO CRÍTICO ao inserir etapas:", stepsError);
