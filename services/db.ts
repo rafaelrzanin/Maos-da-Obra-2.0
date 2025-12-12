@@ -465,14 +465,14 @@ export const dbService = {
   // --- STEPS ---
   getSteps: async (workId: string): Promise<Step[]> => {
       if (!supabase) return [];
-      const { data } = await supabase.from('etapas').select('*').eq('work_id', workId);
+      const { data } = await supabase.from('etapas').select('*').eq('obra_id', workId);
       return (data || []).map(parseStepFromDB);
   },
 
   addStep: async (step: Step) => {
       if (!supabase) return;
       await supabase.from('etapas').insert([{
-          work_id: step.workId,
+          obra_id: step.workId,
           name: step.name,
           start_date: step.startDate,
           end_date: step.endDate,
@@ -493,7 +493,7 @@ export const dbService = {
   // --- MATERIALS ---
   getMaterials: async (workId: string): Promise<Material[]> => {
       if (!supabase) return [];
-      const { data } = await supabase.from('materiais').select('*').eq('work_id', workId);
+      const { data } = await supabase.from('materiais').select('*').eq('obra_id', workId);
       return (data || []).map(parseMaterialFromDB);
   },
 
@@ -501,7 +501,7 @@ export const dbService = {
       if (!supabase) return;
       
       const { data: matData } = await supabase.from('materiais').insert([{
-          work_id: material.workId,
+          obra_id: material.workId,
           name: material.name,
           brand: material.brand,
           planned_qty: material.plannedQty,
@@ -537,7 +537,7 @@ export const dbService = {
   registerMaterialPurchase: async (matId: string, name: string, brand: string, plannedQty: number, unit: string, buyQty: number, cost: number) => {
       if (!supabase) return;
       
-      const { data: current } = await supabase.from('materiais').select('purchased_qty, work_id, step_id').eq('id', matId).single();
+      const { data: current } = await supabase.from('materiais').select('purchased_qty, obra_id, step_id').eq('id', matId).single();
       if (!current) return;
 
       const newPurchasedQty = (Number(current.purchased_qty) || 0) + buyQty;
@@ -552,7 +552,7 @@ export const dbService = {
 
       await dbService.addExpense({
           id: '',
-          workId: current.work_id,
+          workId: current.obra_id,
           description: `Compra: ${name}`,
           amount: cost,
           date: new Date().toISOString(),
@@ -565,14 +565,14 @@ export const dbService = {
   // --- EXPENSES ---
   getExpenses: async (workId: string): Promise<Expense[]> => {
       if (!supabase) return [];
-      const { data } = await supabase.from('expenses').select('*').eq('work_id', workId);
+      const { data } = await supabase.from('expenses').select('*').eq('obra_id', workId);
       return (data || []).map(parseExpenseFromDB);
   },
 
   addExpense: async (expense: Expense) => {
       if (!supabase) return;
       await supabase.from('expenses').insert([{
-          work_id: expense.workId,
+          obra_id: expense.workId,
           description: expense.description,
           amount: expense.amount,
           date: expense.date,
