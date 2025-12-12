@@ -118,16 +118,8 @@ export const dbService = {
   },
   
   syncSession: async (): Promise<User | null> => {
-    // 1. Check for Test/Mock User first to preserve it
-    const current = dbService.getCurrentUser();
-    if (current && current.id === 'vip-test-user') {
-        return current;
-    }
-
-    // 2. If no Supabase, rely on localStorage (which we already checked)
-    if (!supabase) return current;
+    if (!supabase) return null;
     
-    // 3. If Supabase exists, validate session
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.user) {
         localStorage.removeItem('maos_user');
@@ -153,7 +145,6 @@ export const dbService = {
             localStorage.setItem('maos_user', JSON.stringify(user));
             callback(user);
         } else if (event === 'SIGNED_OUT') {
-            // Only clear if not mock user (though logout usually calls logout() explicitly)
             localStorage.removeItem('maos_user');
             callback(null);
         }
@@ -168,11 +159,6 @@ export const dbService = {
   },
 
   getUserProfile: async (userId: string): Promise<User | null> => {
-      // Mock User Bypass
-      if (userId === 'vip-test-user') {
-          return dbService.getCurrentUser();
-      }
-
       if (!supabase) return null;
       try {
           const { data, error } = await supabase
@@ -211,20 +197,6 @@ export const dbService = {
   },
 
   login: async (email: string, password?: string): Promise<User | null> => {
-     // --- TEST USER BYPASS ---
-     if (email === 'vip@maosdaobra.com' && password === '123456') {
-         const mockUser: User = {
-             id: 'vip-test-user',
-             name: 'Usuário VIP Teste',
-             email: 'vip@maosdaobra.com',
-             whatsapp: '11999999999',
-             plan: PlanType.VITALICIO,
-             subscriptionExpiresAt: new Date(Date.now() + 100 * 365 * 24 * 60 * 60 * 1000).toISOString() // 100 years
-         };
-         localStorage.setItem('maos_user', JSON.stringify(mockUser));
-         return mockUser;
-     }
-
      if (!supabase) throw new Error("Erro de conexão: Supabase não configurado.");
      if (!password) throw new Error("Senha obrigatória.");
 
@@ -269,16 +241,6 @@ export const dbService = {
   },
 
   updateUser: async (userId: string, data: Partial<User>, newPassword?: string) => {
-      if (userId === 'vip-test-user') {
-          // Mock update
-          const current = dbService.getCurrentUser();
-          if (current) {
-              const updated = { ...current, ...data };
-              localStorage.setItem('maos_user', JSON.stringify(updated));
-          }
-          return;
-      }
-
       if (!supabase) return;
       const updates: any = {};
       if (data.name) updates.name = data.name;
@@ -293,16 +255,6 @@ export const dbService = {
   },
 
   updatePlan: async (userId: string, plan: PlanType) => {
-      if (userId === 'vip-test-user') {
-          // Mock update
-          const current = dbService.getCurrentUser();
-          if (current) {
-              const updated = { ...current, plan };
-              localStorage.setItem('maos_user', JSON.stringify(updated));
-          }
-          return;
-      }
-
       if (!supabase) return;
       let expires = new Date();
       if (plan === PlanType.MENSAL) expires.setDate(expires.getDate() + 30);
@@ -335,12 +287,6 @@ export const dbService = {
   // --- WORKS (OBRAS) ---
   
   getWorks: async (userId: string): Promise<Work[]> => {
-      // Mock Storage for Test User
-      if (userId === 'vip-test-user') {
-          const stored = localStorage.getItem('maos_works_test');
-          return stored ? JSON.parse(stored) : [];
-      }
-
       if (!supabase) return [];
       const { data, error } = await supabase.from('works').select('*').eq('user_id', userId);
       if (error) {
@@ -351,14 +297,6 @@ export const dbService = {
   },
 
   getWorkById: async (workId: string): Promise<Work | null> => {
-      // Mock Storage Check
-      const stored = localStorage.getItem('maos_works_test');
-      if (stored) {
-          const works = JSON.parse(stored);
-          const found = works.find((w: Work) => w.id === workId);
-          if (found) return found;
-      }
-
       if (!supabase) return null;
       const { data, error } = await supabase.from('works').select('*').eq('id', workId).single();
       if (error || !data) return null;
@@ -366,36 +304,6 @@ export const dbService = {
   },
 
   createWork: async (work: Omit<Work, 'id'>, templateId?: string): Promise<Work> => {
-      // Mock Storage for Test User
-      if (work.userId === 'vip-test-user') {
-          const newWork: Work = { ...work, id: Math.random().toString(36).substr(2, 9), status: WorkStatus.PLANNING };
-          
-          const stored = localStorage.getItem('maos_works_test');
-          const works = stored ? JSON.parse(stored) : [];
-          works.push(newWork);
-          localStorage.setItem('maos_works_test', JSON.stringify(works));
-          
-          // Generate Mock Steps based on template
-          if (templateId) {
-             const template = WORK_TEMPLATES.find(t => t.id === templateId);
-             if (template) {
-                 const steps = template.includedSteps.map((name) => ({
-                     id: Math.random().toString(36).substr(2, 9),
-                     workId: newWork.id,
-                     name,
-                     startDate: new Date().toISOString().split('T')[0],
-                     endDate: new Date().toISOString().split('T')[0],
-                     status: 'NAO_INICIADO',
-                     isDelayed: false
-                 }));
-                 const storedSteps = localStorage.getItem('maos_steps_test');
-                 const allSteps = storedSteps ? JSON.parse(storedSteps) : [];
-                 localStorage.setItem('maos_steps_test', JSON.stringify([...allSteps, ...steps]));
-             }
-          }
-          return newWork;
-      }
-
       if (!supabase) throw new Error("Offline");
       
       console.log("Iniciando criação da obra...", work.name);
@@ -429,7 +337,7 @@ export const dbService = {
       const newWork = parseWorkFromDB(data);
       console.log("Obra criada com sucesso:", newWork.id);
 
-      // Se tiver template, gera os passos
+      // Se tiver template, gera os passos e materiais
       if (templateId) {
           try {
               const template = WORK_TEMPLATES.find(t => t.id === templateId);
@@ -561,14 +469,6 @@ export const dbService = {
   },
 
   deleteWork: async (workId: string) => {
-      // Mock Deletion
-      const stored = localStorage.getItem('maos_works_test');
-      if (stored) {
-          const works = JSON.parse(stored);
-          const filtered = works.filter((w: Work) => w.id !== workId);
-          localStorage.setItem('maos_works_test', JSON.stringify(filtered));
-      }
-
       if (!supabase) return;
       // Como usamos ON DELETE CASCADE no banco, deletar a work deleta tudo.
       await supabase.from('works').delete().eq('id', workId);
@@ -576,28 +476,12 @@ export const dbService = {
 
   // --- STEPS ---
   getSteps: async (workId: string): Promise<Step[]> => {
-      // Mock Steps
-      const stored = localStorage.getItem('maos_steps_test');
-      if (stored) {
-          const allSteps = JSON.parse(stored);
-          return allSteps.filter((s: Step) => s.workId === workId);
-      }
-
       if (!supabase) return [];
       const { data } = await supabase.from('steps').select('*').eq('work_id', workId);
       return (data || []).map(parseStepFromDB);
   },
 
   addStep: async (step: Step) => {
-      // Mock Add
-      if (dbService.getCurrentUser()?.id === 'vip-test-user') {
-          const stored = localStorage.getItem('maos_steps_test');
-          const allSteps = stored ? JSON.parse(stored) : [];
-          allSteps.push(step);
-          localStorage.setItem('maos_steps_test', JSON.stringify(allSteps));
-          return;
-      }
-
       if (!supabase) return;
       await supabase.from('steps').insert([{
           work_id: step.workId,
@@ -609,18 +493,6 @@ export const dbService = {
   },
 
   updateStep: async (step: Step) => {
-      // Mock Update
-      if (dbService.getCurrentUser()?.id === 'vip-test-user') {
-          const stored = localStorage.getItem('maos_steps_test');
-          const allSteps = stored ? JSON.parse(stored) : [];
-          const idx = allSteps.findIndex((s: Step) => s.id === step.id);
-          if (idx !== -1) {
-              allSteps[idx] = step;
-              localStorage.setItem('maos_steps_test', JSON.stringify(allSteps));
-          }
-          return;
-      }
-
       if (!supabase) return;
       await supabase.from('steps').update({
           name: step.name,
@@ -632,42 +504,12 @@ export const dbService = {
 
   // --- MATERIALS ---
   getMaterials: async (workId: string): Promise<Material[]> => {
-      // Mock Materials
-      const stored = localStorage.getItem('maos_materials_test');
-      if (stored) {
-          const all = JSON.parse(stored);
-          return all.filter((m: Material) => m.workId === workId);
-      }
-
       if (!supabase) return [];
       const { data } = await supabase.from('materials').select('*').eq('work_id', workId);
       return (data || []).map(parseMaterialFromDB);
   },
 
   addMaterial: async (material: Material, purchaseData?: { qty: number, cost: number, date: string }) => {
-      // Mock Add
-      if (dbService.getCurrentUser()?.id === 'vip-test-user') {
-          const stored = localStorage.getItem('maos_materials_test');
-          const all = stored ? JSON.parse(stored) : [];
-          const newMat = { ...material, purchasedQty: purchaseData ? purchaseData.qty : 0 };
-          all.push(newMat);
-          localStorage.setItem('maos_materials_test', JSON.stringify(all));
-
-          if (purchaseData) {
-              await dbService.addExpense({
-                  id: Math.random().toString(36).substr(2, 9), 
-                  workId: material.workId,
-                  description: `Compra: ${material.name}`,
-                  amount: purchaseData.cost,
-                  date: purchaseData.date,
-                  category: ExpenseCategory.MATERIAL,
-                  relatedMaterialId: material.id,
-                  stepId: material.stepId
-              });
-          }
-          return;
-      }
-
       if (!supabase) return;
       
       const { data: matData } = await supabase.from('materials').insert([{
@@ -695,18 +537,6 @@ export const dbService = {
   },
 
   updateMaterial: async (material: Material) => {
-      // Mock Update
-      if (dbService.getCurrentUser()?.id === 'vip-test-user') {
-          const stored = localStorage.getItem('maos_materials_test');
-          const all = stored ? JSON.parse(stored) : [];
-          const idx = all.findIndex((m: Material) => m.id === material.id);
-          if (idx !== -1) {
-              all[idx] = material;
-              localStorage.setItem('maos_materials_test', JSON.stringify(all));
-          }
-          return;
-      }
-
       if (!supabase) return;
       await supabase.from('materials').update({
           name: material.name,
@@ -717,31 +547,6 @@ export const dbService = {
   },
 
   registerMaterialPurchase: async (matId: string, name: string, brand: string, plannedQty: number, unit: string, buyQty: number, cost: number) => {
-      // Mock Purchase
-      if (dbService.getCurrentUser()?.id === 'vip-test-user') {
-          const stored = localStorage.getItem('maos_materials_test');
-          const all = stored ? JSON.parse(stored) : [];
-          const idx = all.findIndex((m: Material) => m.id === matId);
-          if (idx !== -1) {
-              const current = all[idx];
-              const newPurchasedQty = (Number(current.purchasedQty) || 0) + buyQty;
-              all[idx] = { ...current, purchasedQty: newPurchasedQty, name, brand, plannedQty, unit };
-              localStorage.setItem('maos_materials_test', JSON.stringify(all));
-
-              await dbService.addExpense({
-                  id: Math.random().toString(36).substr(2, 9),
-                  workId: current.workId,
-                  description: `Compra: ${name}`,
-                  amount: cost,
-                  date: new Date().toISOString(),
-                  category: ExpenseCategory.MATERIAL,
-                  relatedMaterialId: matId,
-                  stepId: current.stepId
-              });
-          }
-          return;
-      }
-
       if (!supabase) return;
       
       const { data: current } = await supabase.from('materials').select('purchased_qty, work_id, step_id').eq('id', matId).single();
@@ -771,28 +576,12 @@ export const dbService = {
 
   // --- EXPENSES ---
   getExpenses: async (workId: string): Promise<Expense[]> => {
-      // Mock Expenses
-      const stored = localStorage.getItem('maos_expenses_test');
-      if (stored) {
-          const all = JSON.parse(stored);
-          return all.filter((e: Expense) => e.workId === workId);
-      }
-
       if (!supabase) return [];
       const { data } = await supabase.from('expenses').select('*').eq('work_id', workId);
       return (data || []).map(parseExpenseFromDB);
   },
 
   addExpense: async (expense: Expense) => {
-      // Mock Add
-      if (dbService.getCurrentUser()?.id === 'vip-test-user') {
-          const stored = localStorage.getItem('maos_expenses_test');
-          const all = stored ? JSON.parse(stored) : [];
-          all.push(expense);
-          localStorage.setItem('maos_expenses_test', JSON.stringify(all));
-          return;
-      }
-
       if (!supabase) return;
       await supabase.from('expenses').insert([{
           work_id: expense.workId,
@@ -807,18 +596,6 @@ export const dbService = {
   },
 
   updateExpense: async (expense: Expense) => {
-      // Mock Update
-      if (dbService.getCurrentUser()?.id === 'vip-test-user') {
-          const stored = localStorage.getItem('maos_expenses_test');
-          const all = stored ? JSON.parse(stored) : [];
-          const idx = all.findIndex((e: Expense) => e.id === expense.id);
-          if (idx !== -1) {
-              all[idx] = expense;
-              localStorage.setItem('maos_expenses_test', JSON.stringify(all));
-          }
-          return;
-      }
-
       if (!supabase) return;
       await supabase.from('expenses').update({
           description: expense.description,
@@ -831,28 +608,17 @@ export const dbService = {
   },
 
   deleteExpense: async (id: string) => {
-      // Mock Delete
-      if (dbService.getCurrentUser()?.id === 'vip-test-user') {
-          const stored = localStorage.getItem('maos_expenses_test');
-          const all = stored ? JSON.parse(stored) : [];
-          const filtered = all.filter((e: Expense) => e.id !== id);
-          localStorage.setItem('maos_expenses_test', JSON.stringify(filtered));
-          return;
-      }
-
       if (!supabase) return;
       await supabase.from('expenses').delete().eq('id', id);
   },
 
   // --- WORKERS & SUPPLIERS ---
   getWorkers: async (userId: string): Promise<Worker[]> => {
-      if (userId === 'vip-test-user') return [];
       if (!supabase) return [];
       const { data } = await supabase.from('workers').select('*').eq('user_id', userId);
       return (data || []).map(parseWorkerFromDB);
   },
   addWorker: async (worker: Omit<Worker, 'id'>) => {
-      if (worker.userId === 'vip-test-user') return;
       if (!supabase) return;
       await supabase.from('workers').insert([{
           user_id: worker.userId,
@@ -876,13 +642,11 @@ export const dbService = {
   },
 
   getSuppliers: async (userId: string): Promise<Supplier[]> => {
-      if (userId === 'vip-test-user') return [];
       if (!supabase) return [];
       const { data } = await supabase.from('suppliers').select('*').eq('user_id', userId);
       return (data || []).map(parseSupplierFromDB);
   },
   addSupplier: async (supplier: Omit<Supplier, 'id'>) => {
-      if (supplier.userId === 'vip-test-user') return;
       if (!supabase) return;
       await supabase.from('suppliers').insert([{
           user_id: supplier.userId,
@@ -946,23 +710,6 @@ export const dbService = {
   generateSmartNotifications: async (_userId: string, _workId: string) => {},
 
   calculateWorkStats: async (workId: string) => {
-      // Mock Stats
-      if (dbService.getCurrentUser()?.id === 'vip-test-user') {
-         const expStored = localStorage.getItem('maos_expenses_test');
-         const expenses = expStored ? JSON.parse(expStored) : [];
-         const workExpenses = expenses.filter((e: Expense) => e.workId === workId);
-         const totalSpent = workExpenses.reduce((acc: number, curr: Expense) => acc + Number(curr.amount), 0);
-
-         const stepStored = localStorage.getItem('maos_steps_test');
-         const steps = stepStored ? JSON.parse(stepStored) : [];
-         const workSteps = steps.filter((s: Step) => s.workId === workId);
-         const totalSteps = workSteps.length || 0;
-         const completed = workSteps.filter((s: Step) => s.status === 'CONCLUIDO').length || 0;
-         const progress = totalSteps > 0 ? Math.round((completed / totalSteps) * 100) : 0;
-         
-         return { totalSpent, progress, delayedSteps: 0 };
-      }
-
       if (!supabase) return { totalSpent: 0, progress: 0, delayedSteps: 0 };
       
       const { data: expenses } = await supabase.from('expenses').select('amount').eq('work_id', workId);
