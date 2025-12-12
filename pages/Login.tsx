@@ -111,14 +111,11 @@ const Login: React.FC = () => {
   const handleSocialLogin = async (provider: 'google') => {
     setLoading(true);
     // loginSocial returns the result of supabase.auth.signInWithOAuth
-    // It returns { data, error }, NO user object directly.
-    const result = await dbService.loginSocial(provider);
-    
-    // Check if error exists on the result object
-    // Casting to any to safely access error if strictly typed differently in versions
-    const error = (result as any).error;
+    // It returns { data, error }. It does NOT return the user directly because it redirects.
+    const { error } = await dbService.loginSocial(provider);
 
     if (error) {
+        console.error(error);
         alert("Erro no login Google.");
         setLoading(false);
     } 
