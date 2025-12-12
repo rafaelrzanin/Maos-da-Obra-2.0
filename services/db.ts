@@ -2,7 +2,7 @@
 import { 
   User, Work, Step, Material, Expense, Worker, Supplier, 
   WorkPhoto, WorkFile, Notification, PlanType,
-  ExpenseCategory, WorkStatus, StepStatus
+  ExpenseCategory, StepStatus
 } from '../types';
 import { WORK_TEMPLATES } from './standards';
 import { supabase } from './supabase';
@@ -316,7 +316,7 @@ export const dbService = {
       }).eq('id', userId);
   },
 
-  async generatePix(amount: number, payer: any) {
+  async generatePix(_amount: number, _payer: any) {
       // Mock implementation as real gateway is server-side
       return {
           qr_code_base64: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
@@ -455,7 +455,7 @@ export const dbService = {
       }).eq('id', mat.id);
   },
 
-  async registerMaterialPurchase(materialId: string, name: string, brand: string, planned: number, unit: string, qty: number, cost: number) {
+  async registerMaterialPurchase(materialId: string, name: string, _brand: string, _planned: number, _unit: string, qty: number, cost: number) {
       if (!supabase) return;
       
       // Update material qty
