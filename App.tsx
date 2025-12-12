@@ -58,6 +58,7 @@ interface AuthContextType {
   refreshUser: () => Promise<void>;
   isSubscriptionValid: boolean;
   isNewAccount: boolean;
+  trialDaysRemaining: number | null; // Novo campo
 }
 
 const AuthContext = createContext<AuthContextType>(null!);
@@ -82,6 +83,16 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
 
   const isSubscriptionValid = useMemo(() => user ? dbService.isSubscriptionActive(user) : false, [user]);
   const isNewAccount = useMemo(() => user ? !user.subscriptionExpiresAt : true, [user]);
+  
+  const trialDaysRemaining = useMemo(() => {
+      if (user?.isTrial && user.subscriptionExpiresAt) {
+          const now = new Date();
+          const expires = new Date(user.subscriptionExpiresAt);
+          const diffTime = expires.getTime() - now.getTime();
+          return Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+      }
+      return null;
+  }, [user]);
 
   useEffect(() => {
     const sync = async () => {
@@ -156,7 +167,7 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, signup, logout, updatePlan, refreshUser, isSubscriptionValid, isNewAccount }}>
+    <AuthContext.Provider value={{ user, loading, login, signup, logout, updatePlan, refreshUser, isSubscriptionValid, isNewAccount, trialDaysRemaining }}>
       {children}
     </AuthContext.Provider>
   );
@@ -164,7 +175,7 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
 
 // Layout Component
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, loading, logout, isSubscriptionValid, isNewAccount, updatePlan } = useAuth();
+  const { user, loading, logout, isSubscriptionValid, isNewAccount, updatePlan, trialDaysRemaining } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
@@ -293,10 +304,22 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                     <div className="w-10 h-10 rounded-full bg-gradient-to-br from-slate-700 border border-white/10 flex items-center justify-center font-bold shrink-0">{user.name.charAt(0)}</div>
                     <div className="min-w-0 flex-1 overflow-hidden">
                         <p className="text-sm font-bold truncate">{user.name}</p>
-                        <p className="text-[10px] text-secondary font-bold">{user.plan || 'Bloqueado'}</p>
+                        <p className="text-[10px] text-secondary font-bold">
+                            {user.isTrial ? 'Trial Ativo' : user.plan || 'Bloqueado'}
+                        </p>
                     </div>
                     <button onClick={toggleTheme} className="text-slate-400 hover:text-white shrink-0"><i className={`fa-solid ${theme === 'dark' ? 'fa-sun' : 'fa-moon'}`}></i></button>
                 </div>
+                {trialDaysRemaining !== null && trialDaysRemaining <= 7 && (
+                    <div className="mb-3 text-center">
+                        <p className="text-[10px] text-amber-400 font-bold mb-1">
+                            {trialDaysRemaining <= 0 ? 'Expira hoje!' : `Expira em ${trialDaysRemaining} dia(s)`}
+                        </p>
+                        <div className="w-full bg-white/10 h-1 rounded-full overflow-hidden">
+                            <div className="bg-amber-500 h-full transition-all" style={{ width: `${(1 - (trialDaysRemaining/7)) * 100}%` }}></div>
+                        </div>
+                    </div>
+                )}
                 <button onClick={logout} className="w-full py-2 rounded-lg bg-white/5 hover:bg-red-500/20 hover:text-red-400 text-xs font-bold transition-colors">Sair</button>
             </div>
         </div>
@@ -305,6 +328,20 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
       <main className="flex-1 p-4 md:p-8 overflow-y-auto h-screen">
         <React.Suspense fallback={<div className="h-full w-full flex items-center justify-center"><div className="w-10 h-10 border-4 border-secondary border-t-transparent rounded-full animate-spin"></div></div>}>
+            {/* Trial Banner on Mobile */}
+            {isSubscriptionValid && trialDaysRemaining !== null && trialDaysRemaining <= 3 && (
+                <div className="md:hidden mb-4 p-3 bg-gradient-to-r from-amber-600 to-orange-600 rounded-xl text-white flex items-center justify-between shadow-lg">
+                    <div className="flex items-center gap-3">
+                        <i className="fa-solid fa-clock text-xl"></i>
+                        <div>
+                            <p className="text-xs font-bold uppercase opacity-90">Período de Teste</p>
+                            <p className="text-sm font-black">Resta {trialDaysRemaining} dia(s)</p>
+                        </div>
+                    </div>
+                    <button onClick={() => navigate('/settings')} className="bg-white text-orange-600 px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm">Assinar</button>
+                </div>
+            )}
+
             {!isSubscriptionValid && isSettingsPage && (
                 <div className={`p-4 rounded-xl mb-6 flex items-center justify-between shadow-lg ${
                     isNewAccount 
@@ -317,7 +354,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                         </div>
                         <div>
                             <p className="text-sm font-bold uppercase tracking-wide opacity-90">
-                                {isNewAccount ? 'Falta pouco!' : 'Acesso Bloqueado'}
+                                {isNewAccount ? 'Falta pouco!' : user?.isTrial ? 'Trial Expirado' : 'Acesso Bloqueado'}
                             </p>
                             <p className="text-sm font-bold">
                                 {isNewAccount ? 'Escolha um plano para começar a usar.' : 'Sua assinatura expirou. Renove para continuar.'}
