@@ -40,7 +40,7 @@ const parseWorkFromDB = (data: any): Work => ({
 
 const parseStepFromDB = (data: any): Step => ({
     id: data.id,
-    workId: data.work_id,
+    workId: data.obra_id,
     name: data.name,
     startDate: data.start_date,
     endDate: data.end_date,
@@ -50,7 +50,7 @@ const parseStepFromDB = (data: any): Step => ({
 
 const parseMaterialFromDB = (data: any): Material => ({
     id: data.id,
-    workId: data.work_id,
+    workId: data.obra_id,
     name: data.name,
     brand: data.brand,
     plannedQty: Number(data.planned_qty || 0),
@@ -61,7 +61,7 @@ const parseMaterialFromDB = (data: any): Material => ({
 
 const parseExpenseFromDB = (data: any): Expense => ({
     id: data.id,
-    workId: data.work_id,
+    workId: data.obra_id,
     description: data.description,
     amount: Number(data.amount || 0),
     date: data.date,
