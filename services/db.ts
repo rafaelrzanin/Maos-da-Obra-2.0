@@ -4,7 +4,7 @@ import {
   WorkPhoto, WorkFile, Notification, PlanType,
   ExpenseCategory, StepStatus
 } from '../types';
-import { WORK_TEMPLATES } from './standards';
+import { WORK_TEMPLATES, FULL_MATERIAL_PACKAGES } from './standards';
 import { supabase } from './supabase';
 
 // --- HELPERS: Mapeamento de Snake_case (Banco) para CamelCase (App) ---
@@ -120,25 +120,19 @@ const parseNotificationFromDB = (data: any): Notification => ({
 });
 
 // --- CRITICAL FIX: Ensure Profile Exists (Unbreakable Version) ---
-// If Supabase DB fails, we MUST return a valid User object based on Auth data
-// to prevent the "Auth Loop" where the app keeps reloading trying to fetch the profile.
 const ensureUserProfile = async (authUser: any): Promise<User | null> => {
     if (!authUser || !supabase) return null;
 
     try {
-        // 1. Try to fetch existing profile
-        const { data: existingProfile, error: fetchError } = await supabase
+        const { data: existingProfile } = await supabase
             .from('profiles')
             .select('*')
             .eq('id', authUser.id)
-            .maybeSingle(); // Use maybeSingle to avoid 406 errors
+            .maybeSingle();
 
         if (existingProfile) {
             return mapProfileFromSupabase(existingProfile);
         }
-
-        // 2. If not found, create it automatically
-        console.log("Perfil não encontrado. Tentando criar...");
 
         const trialExpires = new Date();
         trialExpires.setDate(trialExpires.getDate() + 7);
@@ -160,7 +154,6 @@ const ensureUserProfile = async (authUser: any): Promise<User | null> => {
 
         if (createError) {
             console.error("ERRO CRÍTICO DB: Não foi possível gravar o perfil.", createError);
-            // FALLBACK DE EMERGÊNCIA: Retorna um perfil em memória para não bloquear o acesso
             return {
                 id: authUser.id,
                 name: newProfileData.name,
@@ -175,7 +168,6 @@ const ensureUserProfile = async (authUser: any): Promise<User | null> => {
 
     } catch (e) {
         console.error("Erro fatal no ensureUserProfile", e);
-        // Retorna fallback mesmo em caso de exceção
         return {
             id: authUser.id,
             name: authUser.email || 'Usuário',
@@ -203,7 +195,6 @@ export const dbService = {
     if (!supabase) return () => {};
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
         if (session?.user) {
-            // Pass the user to ensureUserProfile immediately
             const user = await ensureUserProfile(session.user);
             callback(user);
         } else {
@@ -236,7 +227,6 @@ export const dbService = {
   async signup(name: string, email: string, whatsapp: string, password?: string, cpf?: string, planType?: string | null) {
     if (!supabase) throw new Error("Supabase não configurado");
     
-    // 1. Criar Auth User
     const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password: password || '123456',
@@ -246,17 +236,14 @@ export const dbService = {
     });
 
     if (authError) throw authError;
-    // Se o usuário já existe mas não confirmou e-mail ou algo assim, authData.user pode vir nulo dependendo da config
     if (!authData.user) {
-        // Tenta logar se o cadastro diz que já existe
         return this.login(email, password);
     }
 
-    // 2. Tenta criar o perfil explicitamente
     const trialExpires = new Date();
     trialExpires.setDate(trialExpires.getDate() + 7);
 
-    const { error: profileError } = await supabase.from('profiles').insert({
+    await supabase.from('profiles').insert({
         id: authData.user.id,
         name,
         email,
@@ -267,10 +254,6 @@ export const dbService = {
         subscription_expires_at: trialExpires.toISOString()
     });
 
-    if (profileError) {
-        console.error("Aviso: Erro ao criar perfil no cadastro (será tentado novamente no login):", profileError);
-    }
-
     return await ensureUserProfile(authData.user);
   },
 
@@ -280,19 +263,13 @@ export const dbService = {
 
   async getUserProfile(userId: string): Promise<User | null> {
     if (!supabase) return null;
-    const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
-    
+    const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
     if (error) return null;
     return mapProfileFromSupabase(data);
   },
 
   async updateUser(userId: string, data: Partial<User>, newPassword?: string) {
       if (!supabase) return;
-      
       const updates: any = {};
       if (data.name) updates.name = data.name;
       if (data.whatsapp) updates.whatsapp = data.whatsapp;
@@ -301,7 +278,6 @@ export const dbService = {
       if (Object.keys(updates).length > 0) {
         await supabase.from('profiles').update(updates).eq('id', userId);
       }
-
       if (newPassword) {
           await supabase.auth.updateUser({ password: newPassword });
       }
@@ -338,7 +314,6 @@ export const dbService = {
   },
 
   async generatePix(_amount: number, _payer: any) {
-      // Mock implementation as real gateway is server-side
       return {
           qr_code_base64: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
           copy_paste_code: "00020126330014BR.GOV.BCB.PIX011155555555555520400005303986540510.005802BR5913Mãos da Obra6008Brasilia62070503***63041234"
@@ -388,7 +363,6 @@ export const dbService = {
     const template = WORK_TEMPLATES.find(t => t.id === templateId);
     if (template) {
         const stepsToInsert = template.includedSteps.map((stepName, idx) => {
-            // Simple logic to stagger dates
             const start = new Date(work.startDate!);
             start.setDate(start.getDate() + (idx * 5)); 
             const end = new Date(start);
@@ -404,6 +378,49 @@ export const dbService = {
             };
         });
         await supabase.from('steps').insert(stepsToInsert);
+
+        // 3. GENERATE MATERIALS FROM TEMPLATE (The Missing Link)
+        // This ensures the material list is populated automatically
+        const area = work.area || 50; // Fallback area if 0
+        let materialsToInsert: any[] = [];
+
+        // Determine which packages to include based on template
+        let packagesToInclude = [];
+        if (templateId === 'CONSTRUCAO') {
+            packagesToInclude = FULL_MATERIAL_PACKAGES;
+        } else if (templateId === 'REFORMA_APTO') {
+            packagesToInclude = FULL_MATERIAL_PACKAGES.filter(p => 
+                !['Fundação e Estrutura', 'Telhado e Cobertura', 'Limpeza e Canteiro'].includes(p.category)
+            );
+        } else if (templateId === 'BANHEIRO') {
+            packagesToInclude = FULL_MATERIAL_PACKAGES.filter(p => 
+                ['Instalações Hidráulicas (Tubulação)', 'Pisos e Revestimentos Cerâmicos', 'Louças e Metais (Acabamento Hidro)', 'Marmoraria e Granitos', 'Impermeabilização'].includes(p.category)
+            );
+        } else if (templateId === 'PINTURA') {
+            packagesToInclude = FULL_MATERIAL_PACKAGES.filter(p => p.category === 'Pintura');
+        } else {
+            // Default: include basics
+            packagesToInclude = FULL_MATERIAL_PACKAGES.filter(p => ['Pintura', 'Limpeza Final'].includes(p.category));
+        }
+
+        // Create the inserts
+        packagesToInclude.forEach(pkg => {
+            pkg.items.forEach(item => {
+                const qty = Math.ceil(area * (item.multiplier || 1));
+                materialsToInsert.push({
+                    work_id: parsedWork.id,
+                    name: item.name,
+                    brand: '',
+                    planned_qty: qty,
+                    purchased_qty: 0,
+                    unit: item.unit
+                });
+            });
+        });
+
+        if (materialsToInsert.length > 0) {
+            await supabase.from('materials').insert(materialsToInsert);
+        }
     }
 
     return parsedWork;
@@ -479,14 +496,12 @@ export const dbService = {
   async registerMaterialPurchase(materialId: string, name: string, _brand: string, _planned: number, _unit: string, qty: number, cost: number) {
       if (!supabase) return;
       
-      // Update material qty
       const { data: mat } = await supabase.from('materials').select('purchased_qty, work_id').eq('id', materialId).single();
       if (mat) {
           await supabase.from('materials').update({
               purchased_qty: (mat.purchased_qty || 0) + qty
           }).eq('id', materialId);
 
-          // Add Expense
           await supabase.from('expenses').insert({
               work_id: mat.work_id,
               description: `Compra: ${name}`,
@@ -609,7 +624,6 @@ export const dbService = {
 
   async addPhoto(photo: WorkPhoto) {
       if (!supabase) return;
-      // In a real app, upload to storage bucket first. Here we assume base64 or url is passed.
       await supabase.from('work_photos').insert({
           work_id: photo.workId,
           url: photo.url,
@@ -690,14 +704,12 @@ export const dbService = {
 
   async generateSmartNotifications(userId: string, workId: string) {
       if (!supabase) return;
-      // Simple logic to generate notifications based on delays
       const { data: steps } = await supabase.from('steps').select('*').eq('work_id', workId);
       const today = new Date().toISOString().split('T')[0];
       
       const delays = steps?.filter((s: any) => s.end_date < today && s.status !== StepStatus.COMPLETED) || [];
       
       for (const step of delays) {
-          // Check if notification already exists
           const { data: exists } = await supabase.from('notifications')
             .select('*')
             .eq('user_id', userId)
