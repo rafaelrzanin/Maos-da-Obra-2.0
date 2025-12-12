@@ -284,11 +284,11 @@ export const dbService = {
       return { user: data, error };
   },
 
-  // --- WORKS (OBRAS) ---
+  // --- obras (OBRAS) ---
   
   getWorks: async (userId: string): Promise<Work[]> => {
       if (!supabase) return [];
-      const { data, error } = await supabase.from('works').select('*').eq('user_id', userId);
+      const { data, error } = await supabase.from('obras').select('*').eq('user_id', userId);
       if (error) {
           console.error("Erro ao buscar obras:", error);
           return [];
