@@ -16,7 +16,8 @@ const mapProfileFromSupabase = (data: any): User => ({
     whatsapp: data.whatsapp,
     cpf: data.cpf,
     plan: data.plan as PlanType,
-    subscriptionExpiresAt: data.subscription_expires_at
+    subscriptionExpiresAt: data.subscription_expires_at,
+    isTrial: data.is_trial || false // Mapeia o campo de trial
 });
 
 const parseWorkFromDB = (data: any): Work => ({
@@ -155,6 +156,7 @@ export const dbService = {
   isSubscriptionActive: (user: User) => {
     if (user.plan === PlanType.VITALICIO) return true;
     if (!user.subscriptionExpiresAt) return false;
+    // Verifica se a data de expiração (seja trial ou pago) ainda é válida
     return new Date(user.subscriptionExpiresAt) > new Date();
   },
 
@@ -178,14 +180,22 @@ export const dbService = {
   createProfileFromAuth: async (authUser: any, metadata: any = {}): Promise<User | null> => {
       if (!supabase) return null;
       
+      // Lógica de Trial: Se tem plano definido, começa com 7 dias de trial
+      const initialPlan = metadata.plan || null;
+      const isTrial = !!initialPlan; 
+      const expirationDate = isTrial 
+          ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 Dias de Trial
+          : null;
+
       const newProfile = {
           id: authUser.id,
           email: authUser.email,
           name: metadata.name || authUser.user_metadata?.name || 'Usuário',
           whatsapp: metadata.whatsapp || authUser.user_metadata?.whatsapp || '',
           cpf: metadata.cpf || authUser.user_metadata?.cpf || '',
-          plan: metadata.plan || null,
-          subscription_expires_at: metadata.plan ? new Date(Date.now() + 30*24*60*60*1000).toISOString() : null
+          plan: initialPlan,
+          subscription_expires_at: expirationDate,
+          is_trial: isTrial
       };
 
       const { error } = await supabase.from('profiles').upsert([newProfile]);
@@ -227,6 +237,7 @@ export const dbService = {
       if (!authData.user) return null;
 
       const initialPlan = (planType as PlanType) || null;
+      // Ao criar, passamos o plano. O createProfileFromAuth aplica a regra dos 7 dias.
       const profile = await dbService.createProfileFromAuth(authData.user, { name, whatsapp, cpf, plan: initialPlan });
 
       if (!profile) throw new Error("Conta criada, mas houve erro ao salvar o perfil. Tente fazer login.");
@@ -257,13 +268,17 @@ export const dbService = {
   updatePlan: async (userId: string, plan: PlanType) => {
       if (!supabase) return;
       let expires = new Date();
+      
+      // Calcula nova data baseado no pagamento (Fim do Trial)
       if (plan === PlanType.MENSAL) expires.setDate(expires.getDate() + 30);
       else if (plan === PlanType.SEMESTRAL) expires.setDate(expires.getDate() + 180);
       else if (plan === PlanType.VITALICIO) expires.setFullYear(expires.getFullYear() + 100);
 
+      // Atualiza o plano, a nova data e REMOVE o status de Trial
       await supabase.from('profiles').update({
           plan: plan,
-          subscription_expires_at: expires.toISOString()
+          subscription_expires_at: expires.toISOString(),
+          is_trial: false 
       }).eq('id', userId);
   },
 
