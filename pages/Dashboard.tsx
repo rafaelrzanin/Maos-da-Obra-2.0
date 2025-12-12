@@ -3,7 +3,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../App';
 import { dbService } from '../services/db';
-import { Work, Notification, Step, StepStatus } from '../types';
+import { Work, Notification, Step, StepStatus, PlanType } from '../types';
 import { ZE_AVATAR, ZE_AVATAR_FALLBACK, getRandomZeTip, ZeTip } from '../services/standards';
 import { ZeModal } from '../components/ZeModal';
 
@@ -22,7 +22,7 @@ const formatDateDisplay = (dateStr: string) => {
 };
 
 const Dashboard: React.FC = () => {
-  const { user } = useAuth();
+  const { user, trialDaysRemaining } = useAuth();
   const navigate = useNavigate();
   
   // State
@@ -45,6 +45,16 @@ const Dashboard: React.FC = () => {
   
   // Delete Modal State
   const [zeModal, setZeModal] = useState<{isOpen: boolean, title: string, message: string, workId?: string}>({isOpen: false, title: '', message: ''});
+
+  // Trial Upsell Modal
+  const [showTrialUpsell, setShowTrialUpsell] = useState(false);
+
+  useEffect(() => {
+    // Show Trial Warning only if trial active AND 1 day remaining (Last day)
+    if (user?.isTrial && trialDaysRemaining !== null && trialDaysRemaining <= 1) {
+        setShowTrialUpsell(true);
+    }
+  }, [user, trialDaysRemaining]);
 
   useEffect(() => {
     let isMounted = true;
@@ -583,6 +593,49 @@ const Dashboard: React.FC = () => {
         onConfirm={confirmDelete}
         onCancel={() => setZeModal({isOpen: false, title: '', message: ''})}
       />
+
+      {/* TRIAL EXPIRATION UPSELL MODAL */}
+      {showTrialUpsell && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-500">
+            <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] w-full max-w-sm p-0 shadow-2xl border border-slate-800 relative overflow-hidden transform scale-100 animate-in zoom-in-95">
+                {/* Header Impactante */}
+                <div className="bg-gradient-premium p-8 relative overflow-hidden text-center">
+                    <div className="absolute top-0 right-0 w-40 h-40 bg-secondary/20 rounded-full blur-3xl translate-x-10 -translate-y-10"></div>
+                    
+                    <div className="w-20 h-20 mx-auto rounded-full bg-red-600 border-4 border-slate-900 flex items-center justify-center text-3xl text-white shadow-xl mb-4 animate-pulse">
+                        <i className="fa-solid fa-hourglass-end"></i>
+                    </div>
+                    
+                    <h2 className="text-2xl font-black text-white mb-1 tracking-tight">ÚLTIMO DIA!</h2>
+                    <p className="text-slate-300 text-sm font-medium">Seu teste grátis acaba hoje.</p>
+                </div>
+
+                <div className="p-8">
+                    <p className="text-center text-slate-600 dark:text-slate-300 text-sm mb-6 leading-relaxed">
+                        Não perca o acesso às suas obras. Garanta o plano <strong>Vitalício</strong> agora e nunca mais se preocupe com mensalidades.
+                    </p>
+
+                    <div className="space-y-3">
+                        <button 
+                            onClick={() => navigate(`/checkout?plan=${PlanType.VITALICIO}`)}
+                            className="w-full py-4 bg-gradient-gold text-white font-black rounded-2xl shadow-lg hover:shadow-orange-500/30 hover:scale-105 transition-all flex items-center justify-center gap-2 group"
+                        >
+                            <i className="fa-solid fa-crown text-yellow-200"></i>
+                            Quero Vitalício
+                            <i className="fa-solid fa-arrow-right group-hover:translate-x-1 transition-transform"></i>
+                        </button>
+                        
+                        <button 
+                            onClick={() => setShowTrialUpsell(false)}
+                            className="w-full py-3 bg-slate-100 dark:bg-slate-800 text-slate-500 font-bold rounded-2xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors text-xs uppercase tracking-wide"
+                        >
+                            Manter plano atual
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+      )}
 
     </div>
   );
