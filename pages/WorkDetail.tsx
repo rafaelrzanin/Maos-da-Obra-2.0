@@ -236,6 +236,19 @@ const WorkDetail: React.FC = () => {
         await load();
     };
 
+    const handleRegenerateMaterials = async () => {
+        if (!work) return;
+        setLoading(true);
+        try {
+            await dbService.regenerateMaterials(work.id, work.area);
+            await load();
+        } catch (e) {
+            alert("Erro ao gerar lista.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const openAddExpense = () => {
         setExpenseModal({ isOpen: true, mode: 'ADD' });
         setExpDesc('');
@@ -523,6 +536,27 @@ const WorkDetail: React.FC = () => {
              const filteredSteps = materialFilterStepId === 'ALL' 
                 ? steps 
                 : steps.filter(s => s.id === materialFilterStepId);
+
+             // EMPTY STATE RECOVERY BUTTON
+             if (materials.length === 0) {
+                 return (
+                    <div className="flex flex-col items-center justify-center h-[50vh] text-center px-4 animate-in fade-in">
+                        <div className="w-20 h-20 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mb-6 text-slate-400">
+                            <i className="fa-solid fa-box-open text-4xl"></i>
+                        </div>
+                        <h3 className="text-xl font-bold text-primary dark:text-white mb-2">Lista de Materiais Vazia</h3>
+                        <p className="text-slate-500 text-sm mb-8 max-w-xs">Parece que os materiais não foram gerados automaticamente.</p>
+                        <button 
+                            onClick={handleRegenerateMaterials} 
+                            disabled={loading}
+                            className="bg-secondary text-white font-bold py-3 px-8 rounded-xl shadow-lg hover:bg-orange-600 transition-all flex items-center gap-2"
+                        >
+                            {loading ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-wand-magic-sparkles"></i>}
+                            Gerar Lista Padrão Agora
+                        </button>
+                    </div>
+                 );
+             }
 
              return (
                 <div className="space-y-6 animate-in fade-in">
