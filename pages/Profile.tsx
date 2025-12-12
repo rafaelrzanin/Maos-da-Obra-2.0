@@ -2,7 +2,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../App';
 import { dbService } from '../services/db';
-import { PlanType } from '../types';
 
 const Profile: React.FC = () => {
   const { user, refreshUser } = useAuth();
