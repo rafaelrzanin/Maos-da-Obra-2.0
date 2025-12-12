@@ -1,8 +1,7 @@
-
 import { 
-  User, Work, Step, Material, Expense, Worker, Supplier, 
-  WorkPhoto, WorkFile, Notification, PlanType,
-  ExpenseCategory
+    User, Work, Step, Material, Expense, Worker, Supplier, 
+    WorkPhoto, WorkFile, Notification, PlanType,
+    ExpenseCategory
 } from '../types';
 import { WORK_TEMPLATES, FULL_MATERIAL_PACKAGES } from './standards';
 import { supabase } from './supabase';
@@ -111,6 +110,7 @@ const parseFileFromDB = (data: any): WorkFile => ({
 export const dbService = {
   
   // --- AUTHENTICATION & PROFILE ---
+  // ... (Funções de Autenticação - Sem Alteração) ...
 
   getCurrentUser: (): User | null => {
     const json = localStorage.getItem('maos_user');
@@ -284,11 +284,12 @@ export const dbService = {
       return { user: data, error };
   },
 
-  // --- obras (OBRAS) ---
+  // --- OBRAS (WORKS) ---
   
   getWorks: async (userId: string): Promise<Work[]> => {
       if (!supabase) return [];
-      const { data, error } = await supabase.from('obras').select('*').eq('user_id', userId);
+      // CORRIGIDO: Usando 'obras'
+      const { data, error } = await supabase.from('obras').select('*').eq('user_id', userId); 
       if (error) {
           console.error("Erro ao buscar obras:", error);
           return [];
@@ -298,7 +299,8 @@ export const dbService = {
 
   getWorkById: async (workId: string): Promise<Work | null> => {
       if (!supabase) return null;
-      const { data, error } = await supabase.from('works').select('*').eq('id', workId).single();
+      // CORRIGIDO: Usando 'obras'
+      const { data, error } = await supabase.from('obras').select('*').eq('id', workId).single(); 
       if (error || !data) return null;
       return parseWorkFromDB(data);
   },
@@ -326,11 +328,12 @@ export const dbService = {
           has_leisure_area: work.hasLeisureArea
       };
 
-      // 1. Criar Obra
-      const { data, error } = await supabase.from('works').insert([payload]).select().single();
+      // 1. Criar Obra (Tabela 'obras')
+      // CORRIGIDO: Usando 'obras'
+      const { data, error } = await supabase.from('obras').insert([payload]).select().single(); 
 
       if (error || !data) {
-          console.error("Supabase Create Work Error:", error);
+          console.error("Supabase Create Obra Error:", error);
           throw new Error(error?.message || "Erro ao criar obra.");
       }
       
@@ -345,7 +348,6 @@ export const dbService = {
               // 2. Gerar Cronograma Inteligente
               const start = new Date(newWork.startDate);
               const end = new Date(newWork.endDate);
-              // Fallback para datas válidas se algo vier errado
               const safeStart = isNaN(start.getTime()) ? new Date() : start;
               const safeEnd = isNaN(end.getTime()) ? new Date(safeStart.getTime() + (90 * 24 * 60 * 60 * 1000)) : end;
 
@@ -361,17 +363,18 @@ export const dbService = {
                   eDate.setDate(sDate.getDate() + stepDuration);
                   
                   return {
-                      obra_id: newWork.id,
+                      obra_id: newWork.id, // CORRETO: Usa obra_id
                       name: stepName,
                       start_date: sDate.toISOString().split('T')[0],
                       end_date: eDate.toISOString().split('T')[0],
                       status: 'NAO_INICIADO',
-                      is_delayed: false
+                      // REMOVIDO: is_delayed para evitar 400 Bad Request se a coluna não existir
                   };
               });
 
               console.log("Tentando inserir etapas:", stepsPayload.length);
-              const { data: createdSteps, error: stepsError } = await supabase.from('etapas').insert(stepsPayload).select();
+              // CORRIGIDO: Usando 'etapas'
+              const { data: createdSteps, error: stepsError } = await supabase.from('etapas').insert(stepsPayload).select(); 
 
               if (stepsError) {
                   console.error("ERRO CRÍTICO ao inserir etapas:", stepsError);
@@ -380,6 +383,7 @@ export const dbService = {
 
                   // 3. Gerar Lista de Materiais
                   let categoriesToInclude: string[] = [];
+                  // ... (Lógica para definir categoriesToInclude) ...
 
                   if (templateId === 'CONSTRUCAO') categoriesToInclude = FULL_MATERIAL_PACKAGES.map(c => c.category);
                   else if (templateId === 'REFORMA_APTO') categoriesToInclude = FULL_MATERIAL_PACKAGES.map(c => c.category).filter(c => !c.includes('Fundação') && !c.includes('Telhado'));
@@ -438,7 +442,7 @@ export const dbService = {
                                       planned_qty: qty,
                                       purchased_qty: 0,
                                       unit: item.unit,
-                                      etapa_id: stepId // Pode ser null, o banco aceita
+                                      etapa_id: stepId // CORRIGIDO: Usa etapa_id (que no app é stepId)
                                   });
                               }
                           }
@@ -447,7 +451,8 @@ export const dbService = {
 
                   if (materialsPayload.length > 0) {
                       console.log(`Tentando inserir ${materialsPayload.length} materiais...`);
-                      const { error: matError } = await supabase.from('materiais').insert(materialsPayload);
+                      // CORRIGIDO: Usando 'materiais'
+                      const { error: matError } = await supabase.from('materiais').insert(materialsPayload); 
                       if (matError) console.error("Erro ao inserir materiais:", matError);
                       else console.log("Materiais inseridos com sucesso.");
                   }
@@ -459,30 +464,35 @@ export const dbService = {
 
   deleteWork: async (workId: string) => {
       if (!supabase) return;
-      await supabase.from('works').delete().eq('id', workId);
+      // CORRIGIDO: Usando 'obras'
+      await supabase.from('obras').delete().eq('id', workId); 
   },
 
-  // --- STEPS ---
+  // --- ETAPAS (STEPS) ---
   getSteps: async (workId: string): Promise<Step[]> => {
       if (!supabase) return [];
-      const { data } = await supabase.from('etapas').select('*').eq('obra_id', workId);
+      // CORRIGIDO: Usando 'etapas' e 'obra_id'
+      const { data } = await supabase.from('etapas').select('*').eq('obra_id', workId); 
       return (data || []).map(parseStepFromDB);
   },
 
   addStep: async (step: Step) => {
       if (!supabase) return;
-      await supabase.from('etapas').insert([{
+      // CORRIGIDO: Usando 'etapas'
+      await supabase.from('etapas').insert([{ 
           obra_id: step.workId,
           name: step.name,
           start_date: step.startDate,
           end_date: step.endDate,
           status: step.status
+          // REMOVIDO: is_delayed
       }]);
   },
 
   updateStep: async (step: Step) => {
       if (!supabase) return;
-      await supabase.from('etapas').update({
+      // CORRIGIDO: Usando 'etapas'
+      await supabase.from('etapas').update({ 
           name: step.name,
           start_date: step.startDate,
           end_date: step.endDate,
@@ -490,17 +500,19 @@ export const dbService = {
       }).eq('id', step.id);
   },
 
-  // --- MATERIALS ---
+  // --- MATERIAIS (MATERIALS) ---
   getMaterials: async (workId: string): Promise<Material[]> => {
       if (!supabase) return [];
-      const { data } = await supabase.from('materiais').select('*').eq('obra_id', workId);
+      // CORRIGIDO: Usando 'materiais' e 'obra_id'
+      const { data } = await supabase.from('materiais').select('*').eq('obra_id', workId); 
       return (data || []).map(parseMaterialFromDB);
   },
 
   addMaterial: async (material: Material, purchaseData?: { qty: number, cost: number, date: string }) => {
       if (!supabase) return;
       
-      const { data: matData } = await supabase.from('materiais').insert([{
+      // CORRIGIDO: Usando 'materiais' e 'etapa_id'
+      const { data: matData } = await supabase.from('materiais').insert([{ 
           obra_id: material.workId,
           name: material.name,
           brand: material.brand,
@@ -526,7 +538,8 @@ export const dbService = {
 
   updateMaterial: async (material: Material) => {
       if (!supabase) return;
-      await supabase.from('materiais').update({
+      // CORRIGIDO: Usando 'materiais'
+      await supabase.from('materiais').update({ 
           name: material.name,
           brand: material.brand,
           planned_qty: material.plannedQty,
@@ -537,11 +550,13 @@ export const dbService = {
   registerMaterialPurchase: async (matId: string, name: string, brand: string, plannedQty: number, unit: string, buyQty: number, cost: number) => {
       if (!supabase) return;
       
-      const { data: current } = await supabase.from('materiais').select('purchased_qty, obra_id, etapa_id').eq('id', matId).single();
+      // CORRIGIDO: Usando 'materiais' e 'obra_id' e 'etapa_id'
+      const { data: current } = await supabase.from('materiais').select('purchased_qty, obra_id, etapa_id').eq('id', matId).single(); 
       if (!current) return;
 
       const newPurchasedQty = (Number(current.purchased_qty) || 0) + buyQty;
       
+      // CORRIGIDO: Usando 'materiais'
       await supabase.from('materiais').update({ 
           purchased_qty: newPurchasedQty,
           name: name,
@@ -562,16 +577,18 @@ export const dbService = {
       });
   },
 
-  // --- EXPENSES ---
+  // --- DESPESAS (EXPENSES) ---
   getExpenses: async (workId: string): Promise<Expense[]> => {
       if (!supabase) return [];
-      const { data } = await supabase.from('expenses').select('*').eq('obra_id', workId);
+      // CORRIGIDO: Usando 'despesas' e 'obra_id'
+      const { data } = await supabase.from('despesas').select('*').eq('obra_id', workId); 
       return (data || []).map(parseExpenseFromDB);
   },
 
   addExpense: async (expense: Expense) => {
       if (!supabase) return;
-      await supabase.from('expenses').insert([{
+      // CORRIGIDO: Usando 'despesas' e 'obra_id' e 'etapa_id'
+      await supabase.from('despesas').insert([{ 
           obra_id: expense.workId,
           description: expense.description,
           amount: expense.amount,
@@ -585,7 +602,8 @@ export const dbService = {
 
   updateExpense: async (expense: Expense) => {
       if (!supabase) return;
-      await supabase.from('expenses').update({
+      // CORRIGIDO: Usando 'despesas' e 'etapa_id'
+      await supabase.from('despesas').update({ 
           description: expense.description,
           amount: expense.amount,
           date: expense.date,
@@ -597,10 +615,12 @@ export const dbService = {
 
   deleteExpense: async (id: string) => {
       if (!supabase) return;
-      await supabase.from('expenses').delete().eq('id', id);
+      // CORRIGIDO: Usando 'despesas'
+      await supabase.from('despesas').delete().eq('id', id); 
   },
 
   // --- WORKERS & SUPPLIERS ---
+  // ... (Funções de Workers e Suppliers - Assumindo que as tabelas estão em inglês) ...
   getWorkers: async (userId: string): Promise<Worker[]> => {
       if (!supabase) return [];
       const { data } = await supabase.from('workers').select('*').eq('user_id', userId);
@@ -657,15 +677,17 @@ export const dbService = {
       if (supabase) await supabase.from('suppliers').delete().eq('id', id);
   },
 
-  // --- PHOTOS & FILES ---
+  // --- FOTOS & ARQUIVOS (PHOTOS & FILES) ---
   getPhotos: async (workId: string): Promise<WorkPhoto[]> => {
       if (!supabase) return [];
-      const { data } = await supabase.from('photos').select('*').eq('obra_id', workId);
+      // CORRIGIDO: Usando 'fotos' e 'obra_id'
+      const { data } = await supabase.from('fotos').select('*').eq('obra_id', workId); 
       return (data || []).map(parsePhotoFromDB);
   },
   addPhoto: async (photo: WorkPhoto) => {
       if (!supabase) return;
-      await supabase.from('photos').insert([{
+      // CORRIGIDO: Usando 'fotos'
+      await supabase.from('fotos').insert([{ 
           obra_id: photo.workId,
           url: photo.url,
           description: photo.description,
@@ -676,12 +698,14 @@ export const dbService = {
 
   getFiles: async (workId: string): Promise<WorkFile[]> => {
       if (!supabase) return [];
-      const { data } = await supabase.from('files').select('*').eq('obra_id', workId);
+      // CORRIGIDO: Usando 'arquivos' e 'obra_id'
+      const { data } = await supabase.from('arquivos').select('*').eq('obra_id', workId); 
       return (data || []).map(parseFileFromDB);
   },
   addFile: async (file: WorkFile) => {
       if (!supabase) return;
-      await supabase.from('files').insert([{
+      // CORRIGIDO: Usando 'arquivos'
+      await supabase.from('arquivos').insert([{ 
           obra_id: file.workId,
           name: file.name,
           category: file.category,
@@ -700,10 +724,12 @@ export const dbService = {
   calculateWorkStats: async (workId: string) => {
       if (!supabase) return { totalSpent: 0, progress: 0, delayedSteps: 0 };
       
-      const { data: expenses } = await supabase.from('expenses').select('amount').eq('obra_id', workId);
+      // CORRIGIDO: Usando 'despesas' e 'obra_id'
+      const { data: expenses } = await supabase.from('despesas').select('amount').eq('obra_id', workId); 
       const totalSpent = (expenses || []).reduce((acc, curr) => acc + Number(curr.amount), 0);
 
-      const { data: steps } = await supabase.from('steps').select('status').eq('obra_id', workId);
+      // CORRIGIDO: Usando 'etapas' e 'obra_id'
+      const { data: steps } = await supabase.from('etapas').select('status').eq('obra_id', workId); 
       const totalSteps = steps?.length || 0;
       const completed = steps?.filter((s: any) => s.status === 'CONCLUIDO').length || 0;
       const progress = totalSteps > 0 ? Math.round((completed / totalSteps) * 100) : 0;
