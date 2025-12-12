@@ -174,7 +174,7 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
 
 // Layout Component
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, loading, logout, isSubscriptionValid, isNewAccount, updatePlan, trialDaysRemaining } = useAuth();
+  const { user, loading, logout, isSubscriptionValid, updatePlan, trialDaysRemaining } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
