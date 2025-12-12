@@ -558,7 +558,7 @@ export const dbService = {
           date: new Date().toISOString(),
           category: ExpenseCategory.MATERIAL,
           relatedMaterialId: matId,
-          stepId: current.step_id
+          stepId: current.etapa_id
       });
   },
 
@@ -577,7 +577,7 @@ export const dbService = {
           amount: expense.amount,
           date: expense.date,
           category: expense.category,
-          step_id: expense.stepId,
+          etapa_id: expense.stepId,
           related_material_id: expense.relatedMaterialId,
           total_agreed: expense.totalAgreed
       }]);
@@ -590,7 +590,7 @@ export const dbService = {
           amount: expense.amount,
           date: expense.date,
           category: expense.category,
-          step_id: expense.stepId,
+          etapa_id: expense.stepId,
           total_agreed: expense.totalAgreed
       }).eq('id', expense.id);
   },
