@@ -338,51 +338,71 @@ export const dbService = {
       if (templateId) {
           const template = WORK_TEMPLATES.find(t => t.id === templateId);
           
-          if (template) {
-              // 2. Gerar Cronograma (Etapas)
-              const stepsPayload = template.includedSteps.map(stepName => ({
-                  work_id: newWork.id,
-                  name: stepName,
-                  start_date: newWork.startDate,
-                  end_date: newWork.endDate,
-                  status: 'NAO_INICIADO',
-                  is_delayed: false
-              }));
+          if (template && template.includedSteps.length > 0) {
+              
+              // 2. Gerar Cronograma Inteligente (Distribuir datas)
+              const start = new Date(newWork.startDate);
+              const end = new Date(newWork.endDate);
+              const totalDuration = (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24);
+              const totalSteps = template.includedSteps.length;
+              const stepDuration = Math.max(1, Math.floor(totalDuration / totalSteps));
+              
+              const stepsPayload = template.includedSteps.map((stepName, index) => {
+                  const sDate = new Date(start);
+                  sDate.setDate(start.getDate() + (index * stepDuration));
+                  
+                  const eDate = new Date(sDate);
+                  eDate.setDate(sDate.getDate() + stepDuration);
+                  
+                  return {
+                      work_id: newWork.id,
+                      name: stepName,
+                      start_date: sDate.toISOString().split('T')[0],
+                      end_date: eDate.toISOString().split('T')[0],
+                      status: 'NAO_INICIADO',
+                      is_delayed: false
+                  };
+              });
+
+              // Insere e retorna para pegar os IDs
               const { data: createdSteps } = await supabase.from('steps').insert(stepsPayload).select();
 
-              // 3. Gerar Lista de Materiais Inteligente
-              // Filtra quais categorias de materiais adicionar baseado no template
+              // 3. Gerar Lista de Materiais
               let categoriesToInclude: string[] = [];
 
               if (templateId === 'CONSTRUCAO') {
-                  // Inclui TUDO
                   categoriesToInclude = FULL_MATERIAL_PACKAGES.map(c => c.category);
               } else if (templateId === 'REFORMA_APTO') {
-                  // Remove fundação e telhado
                   categoriesToInclude = FULL_MATERIAL_PACKAGES
                       .map(c => c.category)
                       .filter(c => !c.includes('Fundação') && !c.includes('Telhado'));
               } else if (templateId === 'BANHEIRO') {
-                  categoriesToInclude = ['Instalações Hidráulicas (Tubulação)', 'Pisos e Revestimentos Cerâmicos', 'Louças e Metais (Acabamento Hidro)', 'Marmoraria e Granitos', 'Limpeza Final'];
+                  categoriesToInclude = ['Instalações Hidráulicas (Tubulação)', 'Pisos e Revestimentos Cerâmicos', 'Louças e Metais (Acabamento Hidro)', 'Marmoraria e Granitos', 'Limpeza Final', 'Gesso e Drywall'];
               } else if (templateId === 'COZINHA') {
-                  categoriesToInclude = ['Instalações Hidráulicas (Tubulação)', 'Instalações Elétricas (Infra)', 'Pisos e Revestimentos Cerâmicos', 'Marmoraria e Granitos', 'Louças e Metais (Acabamento Hidro)', 'Limpeza Final'];
+                  categoriesToInclude = ['Instalações Hidráulicas (Tubulação)', 'Instalações Elétricas (Infra)', 'Pisos e Revestimentos Cerâmicos', 'Marmoraria e Granitos', 'Louças e Metais (Acabamento Hidro)', 'Limpeza Final', 'Gesso e Drywall'];
               } else if (templateId === 'PINTURA') {
                   categoriesToInclude = ['Pintura', 'Limpeza Final'];
               }
 
               const materialsPayload: any[] = [];
-              const area = work.area || 10; // Fallback seguro se area for 0
+              const area = work.area > 0 ? work.area : 10; // Fallback area segura
 
-              // Mapeia steps criados para tentar vincular materiais (heurística simples)
-              // Ex: Material 'Cimento' -> Tenta achar etapa 'Estrutura' ou 'Alvenaria'
+              // Helper para achar o ID da etapa correta baseado no nome da categoria
               const findStepId = (categoryName: string) => {
                   if (!createdSteps) return null;
-                  // Tenta achar uma etapa que contenha parte do nome da categoria
-                  const match = createdSteps.find((s: any) => 
-                      categoryName.toLowerCase().includes(s.name.toLowerCase().split(' ')[0]) ||
-                      s.name.toLowerCase().includes(categoryName.toLowerCase().split(' ')[0])
-                  );
-                  return match ? match.id : null;
+                  const cat = categoryName.toLowerCase();
+                  
+                  // Palavras-chave de mapeamento
+                  if (cat.includes('fundação')) return createdSteps.find((s: any) => s.name.toLowerCase().includes('fundações'))?.id;
+                  if (cat.includes('alvenaria')) return createdSteps.find((s: any) => s.name.toLowerCase().includes('paredes') || s.name.toLowerCase().includes('alvenaria'))?.id;
+                  if (cat.includes('elétrica')) return createdSteps.find((s: any) => s.name.toLowerCase().includes('elétrica'))?.id;
+                  if (cat.includes('hidráulica')) return createdSteps.find((s: any) => s.name.toLowerCase().includes('tubulação') || s.name.toLowerCase().includes('água'))?.id;
+                  if (cat.includes('pintura')) return createdSteps.find((s: any) => s.name.toLowerCase().includes('pintura'))?.id;
+                  if (cat.includes('piso')) return createdSteps.find((s: any) => s.name.toLowerCase().includes('pisos'))?.id;
+                  if (cat.includes('limpeza')) return createdSteps.find((s: any) => s.name.toLowerCase().includes('limpeza'))?.id;
+                  
+                  // Fallback genérico
+                  return createdSteps.find((s: any) => s.name.toLowerCase().includes(cat.split(' ')[0]))?.id;
               };
 
               for (const pkg of FULL_MATERIAL_PACKAGES) {
@@ -390,18 +410,30 @@ export const dbService = {
                       const stepId = findStepId(pkg.category);
                       
                       for (const item of pkg.items) {
-                          // Calcula quantidade: Multiplicador * Área da Obra
-                          const qty = Math.ceil((item.multiplier || 1) * area);
+                          // Lógica de Quantidade Inteligente
+                          let qty = 0;
+                          const nameLower = item.name.toLowerCase();
                           
-                          materialsPayload.push({
-                              work_id: newWork.id,
-                              name: item.name,
-                              brand: '', // Marca em branco para preencher depois
-                              planned_qty: qty,
-                              purchased_qty: 0,
-                              unit: item.unit,
-                              step_id: stepId // Vincula à etapa se possível
-                          });
+                          if (nameLower.includes('vaso') || nameLower.includes('chuveiro')) qty = work.bathrooms || 1;
+                          else if (nameLower.includes('torneira')) qty = (work.bathrooms || 1) + (work.kitchens || 1);
+                          else if (nameLower.includes('porta')) qty = (work.bedrooms || 2) + (work.bathrooms || 1);
+                          else if (nameLower.includes('tomada')) qty = ((work.bedrooms || 2) + 1) * 4;
+                          else {
+                              // Multiplicador por área
+                              qty = Math.ceil((item.multiplier || 1) * area);
+                          }
+                          
+                          if (qty > 0) {
+                              materialsPayload.push({
+                                  work_id: newWork.id,
+                                  name: item.name,
+                                  brand: '',
+                                  planned_qty: qty,
+                                  purchased_qty: 0,
+                                  unit: item.unit,
+                                  step_id: stepId
+                              });
+                          }
                       }
                   }
               }
