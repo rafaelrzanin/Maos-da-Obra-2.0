@@ -756,7 +756,7 @@ export const dbService = {
       };
   },
 
-  generatePix: async (amount: number, user: any) => {
+  generatePix: async (_amount: number, _user: any) => {
       return { qr_code_base64: '', copy_paste_code: '' };
   }
 };
