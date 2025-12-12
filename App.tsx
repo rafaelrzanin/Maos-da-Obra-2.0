@@ -94,30 +94,21 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
   }, [user]);
 
   useEffect(() => {
-    const sync = async () => {
-        try {
-            const sbUser = await dbService.syncSession();
-            if (sbUser) setUser(sbUser);
-            else if (user) setUser(null); // Logout se sessão expirou no servidor
-        } catch (e) {
-            console.error("Auth Sync Error", e);
-        } finally {
-            setLoading(false);
-        }
-    };
-    
-    // Safety timeout para loading infinito no login
-    const safetyTimer = setTimeout(() => {
-        setLoading(false);
-    }, 5000);
-
-    sync().then(() => clearTimeout(safetyTimer));
-
+    // Escuta mudanças de auth do Supabase (Login/Logout/OAuth)
     const unsubscribe = dbService.onAuthChange((u: User | null) => {
         setUser(u);
         setLoading(false);
     });
-    return () => { unsubscribe(); clearTimeout(safetyTimer); };
+
+    // Timeout de segurança caso a conexão falhe
+    const safetyTimer = setTimeout(() => {
+        if (loading) setLoading(false);
+    }, 4000);
+
+    return () => { 
+        unsubscribe(); 
+        clearTimeout(safetyTimer); 
+    };
   }, []); 
 
   const refreshUser = async () => {
@@ -329,3 +320,4 @@ const App: React.FC = () => {
 };
 
 export default App;
+
