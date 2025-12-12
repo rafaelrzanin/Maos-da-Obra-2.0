@@ -27,7 +27,8 @@ const parseWorkFromDB = (data: any): Work => ({
     budgetPlanned: Number(data.budget_planned || 0),
     startDate: data.start_date,
     endDate: data.end_date,
-    area: Number(data.area),
+    // CORRIGIDO: Lê 'area_construida' do banco (ou apenas 'area' se for o caso)
+    area: Number(data.area_construida || data.area), 
     status: data.status,
     notes: data.notes || '',
     floors: Number(data.floors || 1),
@@ -311,12 +312,13 @@ export const dbService = {
       const payload = {
           user_id: work.userId,
           name: work.name,
-          // CORRIGIDO: Usa 'endereco' para o Supabase
+          // CORRIGIDO: Envia 'endereco' para o Supabase
           endereco: work.address, 
           budget_planned: Number(work.budgetPlanned) || 0,
           start_date: work.startDate,
           end_date: work.endDate,
-          area: Number(work.area) || 0,
+          // CORRIGIDO: Assume 'area_construida' para evitar erro. Se for apenas 'area', o Supabase deve aceitar.
+          area_construida: Number(work.area) || 0, 
           status: work.status || 'Planejamento',
           notes: work.notes,
           floors: Number(work.floors) || 1,
