@@ -58,7 +58,6 @@ const WorkDetail: React.FC = () => {
     
     // Material Filter
     const [materialFilterStepId, setMaterialFilterStepId] = useState<string>('ALL');
-    const [financialFilterStepId, setFinancialFilterStepId] = useState<string>('ALL');
 
     const [materialModal, setMaterialModal] = useState<{ isOpen: boolean, material: Material | null }>({ isOpen: false, material: null });
     const [matName, setMatName] = useState('');
@@ -211,6 +210,7 @@ const WorkDetail: React.FC = () => {
         
         const hasPurchase = matBuyQty && Number(matBuyQty) > 0;
 
+        // 1. Update Definition
         const updatedMaterial = {
             ...materialModal.material,
             name: matName,
@@ -220,6 +220,7 @@ const WorkDetail: React.FC = () => {
         };
         await dbService.updateMaterial(updatedMaterial);
 
+        // 2. Register Purchase (if applicable)
         if (hasPurchase) {
             await dbService.registerMaterialPurchase(
                 materialModal.material.id,
@@ -234,19 +235,6 @@ const WorkDetail: React.FC = () => {
 
         setMaterialModal({ isOpen: false, material: null });
         await load();
-    };
-
-    const handleRegenerateMaterials = async () => {
-        if (!work) return;
-        setLoading(true);
-        try {
-            await dbService.regenerateMaterials(work.id, work.area);
-            await load();
-        } catch (e) {
-            alert("Erro ao gerar lista.");
-        } finally {
-            setLoading(false);
-        }
     };
 
     const openAddExpense = () => {
@@ -470,6 +458,7 @@ const WorkDetail: React.FC = () => {
                          const isDone = step.status === StepStatus.COMPLETED;
                          const isInProgress = step.status === StepStatus.IN_PROGRESS;
                          
+                         // Determine Delay (Late) status
                          const today = new Date().toISOString().split('T')[0];
                          const isDelayed = step.endDate < today && !isDone;
 
@@ -486,6 +475,7 @@ const WorkDetail: React.FC = () => {
                              iconColor = 'bg-green-500 border-green-500 text-white';
                              iconClass = 'fa-check';
                          } else if (isDelayed) {
+                             // Red style for delayed items
                              statusBadgeClass = 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400';
                              statusText = 'Atrasado';
                              cardBorderClass = 'border-red-200 dark:border-red-900/30';
@@ -533,30 +523,10 @@ const WorkDetail: React.FC = () => {
         }
 
         if (activeTab === 'MATERIALS') {
+             // Filter Logic
              const filteredSteps = materialFilterStepId === 'ALL' 
                 ? steps 
                 : steps.filter(s => s.id === materialFilterStepId);
-
-             // EMPTY STATE RECOVERY BUTTON
-             if (materials.length === 0) {
-                 return (
-                    <div className="flex flex-col items-center justify-center h-[50vh] text-center px-4 animate-in fade-in">
-                        <div className="w-20 h-20 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mb-6 text-slate-400">
-                            <i className="fa-solid fa-box-open text-4xl"></i>
-                        </div>
-                        <h3 className="text-xl font-bold text-primary dark:text-white mb-2">Lista de Materiais Vazia</h3>
-                        <p className="text-slate-500 text-sm mb-8 max-w-xs">Parece que os materiais não foram gerados automaticamente.</p>
-                        <button 
-                            onClick={handleRegenerateMaterials} 
-                            disabled={loading}
-                            className="bg-secondary text-white font-bold py-3 px-8 rounded-xl shadow-lg hover:bg-orange-600 transition-all flex items-center gap-2"
-                        >
-                            {loading ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-wand-magic-sparkles"></i>}
-                            Gerar Lista Padrão Agora
-                        </button>
-                    </div>
-                 );
-             }
 
              return (
                 <div className="space-y-6 animate-in fade-in">
@@ -569,6 +539,7 @@ const WorkDetail: React.FC = () => {
                             <button onClick={() => setAddMatModal(true)} className="bg-primary text-white w-12 h-12 rounded-xl flex items-center justify-center hover:bg-primary-light transition-all shadow-lg shadow-primary/30"><i className="fa-solid fa-plus text-lg"></i></button>
                         </div>
                         
+                        {/* STEP FILTER DROPDOWN */}
                         <div className="px-2">
                             <select 
                                 value={materialFilterStepId}
@@ -584,7 +555,7 @@ const WorkDetail: React.FC = () => {
                     </div>
 
                     {filteredSteps.map((step) => {
-                        const originalIdx = steps.findIndex(s => s.id === step.id);
+                        const originalIdx = steps.findIndex(s => s.id === step.id); // For correct numbering
                         const stepMaterials = materials ? materials.filter(m => m.stepId === step.id) : [];
                         
                         if (stepMaterials.length === 0 && materialFilterStepId !== 'ALL') {
@@ -594,6 +565,7 @@ const WorkDetail: React.FC = () => {
                         
                         return (
                             <div key={step.id} className="mb-8 bg-white/50 dark:bg-slate-900/50 rounded-2xl p-2">
+                                {/* Stronger Visual Separation for Step Header */}
                                 <div className="flex items-center gap-3 mb-4 p-3 bg-white dark:bg-slate-900 rounded-xl shadow-sm border-l-4 border-secondary">
                                     <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 text-secondary font-black text-sm flex items-center justify-center">
                                         {String(originalIdx+1).padStart(2,'0')}
@@ -607,6 +579,7 @@ const WorkDetail: React.FC = () => {
                                         const purchased = mat.purchasedQty;
                                         const progress = hasPlanned ? Math.min(100, (purchased / mat.plannedQty) * 100) : 0;
                                         
+                                        // Logic for Partial/Complete/Pending
                                         let statusText = 'Pendente';
                                         let statusColor = 'bg-slate-100 text-slate-500';
                                         let barColor = 'bg-slate-200';
@@ -618,7 +591,7 @@ const WorkDetail: React.FC = () => {
                                         } else if (purchased > 0) {
                                             statusText = 'Parcial';
                                             statusColor = 'bg-orange-100 text-orange-600';
-                                            barColor = 'bg-secondary';
+                                            barColor = 'bg-secondary'; // Orange/Amber
                                         }
 
                                         return (
@@ -643,53 +616,34 @@ const WorkDetail: React.FC = () => {
         }
 
         if (activeTab === 'FINANCIAL') {
-            const filteredFinancialSteps = financialFilterStepId === 'ALL' 
-                ? [...steps, { id: 'general', name: 'Despesas Gerais / Sem Etapa', startDate: '', endDate: '', status: StepStatus.NOT_STARTED, workId: '', isDelayed: false }] 
-                : steps.filter(s => s.id === financialFilterStepId);
-
             return (
                 <div className="space-y-6 animate-in fade-in">
-                    <div className="flex flex-col gap-2 mb-2 px-2 sticky top-0 z-10 bg-slate-50 dark:bg-slate-950 py-2">
-                        <div className="flex justify-between items-end">
-                            <div>
-                                <h2 className="text-2xl font-black text-primary dark:text-white">Financeiro</h2>
-                                <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Fluxo de Caixa</p>
-                            </div>
-                            <button onClick={openAddExpense} className="bg-green-600 text-white w-12 h-12 rounded-xl flex items-center justify-center hover:bg-green-700 transition-all shadow-lg shadow-green-600/30"><i className="fa-solid fa-plus text-lg"></i></button>
+                    <div className="flex justify-between items-end mb-2 px-2 sticky top-0 z-10 bg-slate-50 dark:bg-slate-950 py-2">
+                        <div>
+                            <h2 className="text-2xl font-black text-primary dark:text-white">Financeiro</h2>
+                            <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Fluxo de Caixa</p>
                         </div>
-                        
-                        <select 
-                            value={financialFilterStepId}
-                            onChange={(e) => setFinancialFilterStepId(e.target.value)}
-                            className="w-full p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 font-bold text-sm text-slate-600 dark:text-slate-300 shadow-sm focus:border-green-500 focus:ring-1 focus:ring-green-500 outline-none transition-all"
-                        >
-                            <option value="ALL">Todas as Etapas</option>
-                            {steps.map((s, idx) => (
-                                <option key={s.id} value={s.id}>{String(idx+1).padStart(2, '0')}. {s.name}</option>
-                            ))}
-                        </select>
+                        <button onClick={openAddExpense} className="bg-green-600 text-white w-12 h-12 rounded-xl flex items-center justify-center hover:bg-green-700 transition-all shadow-lg shadow-green-600/30"><i className="fa-solid fa-plus text-lg"></i></button>
                     </div>
                     
-                    {financialFilterStepId === 'ALL' && (
-                        <div className="bg-gradient-premium p-6 rounded-3xl text-white shadow-xl relative overflow-hidden mb-8">
-                            <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2"></div>
-                            <p className="text-sm opacity-80 font-medium mb-1">Total Gasto na Obra</p>
-                            <h3 className="text-4xl font-black mb-4 tracking-tight">R$ {expenses.reduce((sum, e) => sum + Number(e.amount), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h3>
-                            <div className="flex items-center gap-2 text-xs opacity-70 bg-white/10 w-fit px-3 py-1 rounded-full"><i className="fa-solid fa-wallet"></i> Orçamento: R$ {work.budgetPlanned.toLocaleString('pt-BR')}</div>
-                        </div>
-                    )}
+                    <div className="bg-gradient-premium p-6 rounded-3xl text-white shadow-xl relative overflow-hidden mb-8">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2"></div>
+                        <p className="text-sm opacity-80 font-medium mb-1">Total Gasto na Obra</p>
+                        <h3 className="text-4xl font-black mb-4 tracking-tight">R$ {expenses.reduce((sum, e) => sum + Number(e.amount), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h3>
+                        <div className="flex items-center gap-2 text-xs opacity-70 bg-white/10 w-fit px-3 py-1 rounded-full"><i className="fa-solid fa-wallet"></i> Orçamento: R$ {work.budgetPlanned.toLocaleString('pt-BR')}</div>
+                    </div>
 
-                    {filteredFinancialSteps.map((step, idx) => {
+                    {/* Grouped Financial Expenses by Step */}
+                    {[...steps, { id: 'general', name: 'Despesas Gerais / Sem Etapa', startDate: '', endDate: '', status: StepStatus.NOT_STARTED, workId: '', isDelayed: false }].map((step, idx) => {
                         const stepExpenses = expenses.filter(e => {
-                            if (step.id === 'general') return !e.stepId;
+                            if (step.id === 'general') return !e.stepId; // Expenses without stepId
                             return e.stepId === step.id;
                         });
 
                         if (stepExpenses.length === 0) return null;
 
                         const isGeneral = step.id === 'general';
-                        const stepNumber = financialFilterStepId === 'ALL' && !isGeneral ? String(idx + 1).padStart(2, '0') : ''; 
-                        const stepLabel = isGeneral ? step.name : (financialFilterStepId !== 'ALL' ? step.name : `${stepNumber} Etapa: ${step.name}`);
+                        const stepLabel = isGeneral ? step.name : `${String(idx + 1).padStart(2, '0')} Etapa: ${step.name}`;
 
                         return (
                             <div key={step.id} className="mb-6">
@@ -699,6 +653,7 @@ const WorkDetail: React.FC = () => {
                                 </div>
                                 <div className="space-y-3">
                                     {stepExpenses.map(exp => {
+                                        // PARTIAL PAYMENT LOGIC
                                         const isPartial = exp.totalAgreed && exp.totalAgreed > exp.amount;
                                         const progress = isPartial ? (exp.amount / exp.totalAgreed!) * 100 : 100;
 
@@ -720,14 +675,13 @@ const WorkDetail: React.FC = () => {
                                                             </p>
                                                         </div>
                                                     </div>
-                                                    <div className="flex items-center gap-3">
+                                                    <div className="text-right">
+                                                        {/* MAIN VALUE IS ALWAYS PAID AMOUNT */}
                                                         <span className="font-bold text-primary dark:text-white text-lg whitespace-nowrap">R$ {Number(exp.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                                                        <div className="text-slate-300 group-hover:text-secondary transition-colors">
-                                                            <i className="fa-solid fa-pen-to-square"></i>
-                                                        </div>
                                                     </div>
                                                 </div>
                                                 
+                                                {/* VISUAL FOR PARTIAL PAYMENTS */}
                                                 {isPartial && (
                                                     <div className="mt-2 pt-2 border-t border-dashed border-slate-100 dark:border-slate-800">
                                                         <div className="flex justify-between text-[10px] uppercase font-bold text-slate-400 mb-1">
@@ -843,6 +797,7 @@ const WorkDetail: React.FC = () => {
                         {workers.map(w => (
                             <div key={w.id} className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm flex items-center justify-between">
                                 <div className="flex items-center gap-4 cursor-pointer flex-1" onClick={() => openPersonModal('WORKER', w)}>
+                                    {/* FIXED ICON: HELMET */}
                                     <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 text-xl"><i className="fa-solid fa-helmet-safety"></i></div>
                                     <div><h4 className="font-bold text-primary dark:text-white">{w.name}</h4><p className="text-xs text-slate-500 font-bold">{w.role}</p></div>
                                 </div>
