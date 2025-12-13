@@ -57,7 +57,8 @@ const parseMaterialFromDB = (data: any): Material => ({
     plannedQty: Number(data.planned_qty || 0),
     purchasedQty: Number(data.purchased_qty || 0),
     unit: data.unit,
-    stepId: data.step_id
+    stepId: data.step_id,
+    category: data.category // Added category parsing
 });
 
 const parseExpenseFromDB = (data: any): Expense => ({
@@ -422,17 +423,20 @@ export const dbService = {
       let materialsToInsert: any[] = [];
 
       let packagesToInclude = [];
-      if (templateId === 'CONSTRUCAO') {
+      // Safe fallback for template ID
+      const safeTemplateId = templateId || 'CONSTRUCAO';
+
+      if (safeTemplateId === 'CONSTRUCAO') {
           packagesToInclude = FULL_MATERIAL_PACKAGES;
-      } else if (templateId === 'REFORMA_APTO') {
+      } else if (safeTemplateId === 'REFORMA_APTO') {
           packagesToInclude = FULL_MATERIAL_PACKAGES.filter(p => 
               !['Fundação e Estrutura', 'Telhado e Cobertura', 'Limpeza e Canteiro'].includes(p.category)
           );
-      } else if (templateId === 'BANHEIRO') {
+      } else if (safeTemplateId === 'BANHEIRO') {
           packagesToInclude = FULL_MATERIAL_PACKAGES.filter(p => 
               ['Instalações Hidráulicas (Tubulação)', 'Pisos e Revestimentos Cerâmicos', 'Louças e Metais (Acabamento Hidro)', 'Marmoraria e Granitos', 'Impermeabilização'].includes(p.category)
           );
-      } else if (templateId === 'PINTURA') {
+      } else if (safeTemplateId === 'PINTURA') {
           packagesToInclude = FULL_MATERIAL_PACKAGES.filter(p => p.category === 'Pintura');
       } else {
           // Default fallback
@@ -448,12 +452,15 @@ export const dbService = {
                   brand: '',
                   planned_qty: qty,
                   purchased_qty: 0,
-                  unit: item.unit
+                  unit: item.unit,
+                  category: pkg.category // CRITICAL: Save the category so we can group them later
               });
           });
       });
 
       if (materialsToInsert.length > 0) {
+          // Optional: Clear existing AUTO generated materials to avoid duplicates? 
+          // For now, let's just insert. If the user clicked "Regenerate", they want items.
           await supabase.from('materials').insert(materialsToInsert);
       }
   },
@@ -507,7 +514,8 @@ export const dbService = {
           brand: mat.brand,
           planned_qty: mat.plannedQty,
           unit: mat.unit,
-          step_id: mat.stepId
+          step_id: mat.stepId,
+          category: mat.category
       }).select().single();
 
       if (purchaseInfo && savedMat) {
@@ -521,7 +529,8 @@ export const dbService = {
           name: mat.name,
           brand: mat.brand,
           planned_qty: mat.plannedQty,
-          unit: mat.unit
+          unit: mat.unit,
+          category: mat.category
       }).eq('id', mat.id);
   },
 
