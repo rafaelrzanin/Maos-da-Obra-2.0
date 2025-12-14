@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import { useAuth } from '../App';
@@ -45,6 +45,9 @@ const WorkDetail: React.FC = () => {
     const [subView, setSubView] = useState<SubView>('NONE');
     const [uploading, setUploading] = useState(false);
     
+    // --- AUTO-GENERATION SAFETY ---
+    const hasTriedAutoGenerate = useRef(false);
+
     // --- PREMIUM CHECK ---
     const isPremium = user?.plan === PlanType.VITALICIO;
 
@@ -136,6 +139,18 @@ const WorkDetail: React.FC = () => {
     };
 
     useEffect(() => { load(); }, [id]);
+
+    // --- AUTO-GENERATE MATERIALS FIX ---
+    useEffect(() => {
+        // If loaded, work exists, NO materials exist, and we haven't tried yet:
+        if (!loading && work && materials.length === 0 && !hasTriedAutoGenerate.current) {
+            hasTriedAutoGenerate.current = true; // Prevent loops
+            console.log("Auto-generating materials for empty work...");
+            dbService.regenerateMaterials(work.id, work.area).then(() => {
+                load(); // Reload to see new materials
+            });
+        }
+    }, [loading, work, materials]);
 
     // --- HANDLERS ---
 
@@ -235,21 +250,6 @@ const WorkDetail: React.FC = () => {
 
         setMaterialModal({ isOpen: false, material: null });
         await load();
-    };
-
-    const handleRegenerateMaterials = async () => {
-        if (!work) return;
-        setLoading(true);
-        try {
-            await dbService.regenerateMaterials(work.id, work.area);
-            await new Promise(r => setTimeout(r, 1000)); // Small delay for DB consistency
-            await load(); 
-        } catch (e) {
-            console.error(e);
-            alert("Erro ao gerar lista.");
-        } finally {
-            setLoading(false);
-        }
     };
 
     const openAddExpense = () => {
@@ -574,32 +574,27 @@ const WorkDetail: React.FC = () => {
                 ? steps 
                 : steps.filter(s => s.id === materialFilterStepId);
 
-             // EMPTY STATE RECOVERY BUTTON
+             // EMPTY STATE + AUTO-GENERATE FEEDBACK
              if (materials.length === 0) {
                  return (
-                    <div className="flex flex-col items-center justify-center h-[50vh] text-center px-4 animate-in fade-in">
-                        <div className="w-20 h-20 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mb-6 text-slate-400">
-                            <i className="fa-solid fa-box-open text-4xl"></i>
+                    <div className="space-y-6 animate-in fade-in">
+                        {/* Always show header with ADD button */}
+                        <div className="sticky top-0 z-20 bg-slate-50 dark:bg-slate-950 pb-2">
+                            <div className="flex justify-between items-end mb-2 px-2">
+                                <div>
+                                    <h2 className="text-2xl font-black text-primary dark:text-white">Materiais</h2>
+                                    <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Controle de Compras</p>
+                                </div>
+                                <button onClick={() => setAddMatModal(true)} className="bg-primary text-white w-12 h-12 rounded-xl flex items-center justify-center hover:bg-primary-light transition-all shadow-lg shadow-primary/30"><i className="fa-solid fa-plus text-lg"></i></button>
+                            </div>
                         </div>
-                        <h3 className="text-xl font-bold text-primary dark:text-white mb-2">Lista de Materiais Vazia</h3>
-                        <p className="text-slate-500 text-sm mb-8 max-w-xs">Parece que os materiais não foram gerados automaticamente.</p>
-                        
-                        <div className="flex flex-col gap-3 w-full max-w-xs">
-                            <button 
-                                onClick={handleRegenerateMaterials} 
-                                disabled={loading}
-                                className="w-full bg-secondary text-white font-bold py-3 px-8 rounded-xl shadow-lg hover:bg-orange-600 transition-all flex items-center justify-center gap-2"
-                            >
-                                {loading ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-wand-magic-sparkles"></i>}
-                                Gerar Lista Padrão
-                            </button>
-                            <button 
-                                onClick={() => setAddMatModal(true)}
-                                className="w-full bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-300 font-bold py-3 px-8 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all flex items-center justify-center gap-2"
-                            >
-                                <i className="fa-solid fa-plus"></i>
-                                Adicionar Manualmente
-                            </button>
+
+                        <div className="flex flex-col items-center justify-center h-[40vh] text-center px-4">
+                            <div className="w-16 h-16 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mb-4 text-slate-400">
+                                <i className="fa-solid fa-wand-magic-sparkles text-2xl animate-pulse"></i>
+                            </div>
+                            <h3 className="text-lg font-bold text-primary dark:text-white mb-2">Gerando Lista...</h3>
+                            <p className="text-slate-500 text-sm max-w-xs">O Zé da Obra está calculando os materiais automaticamente. Se demorar, você pode adicionar manualmente.</p>
                         </div>
                     </div>
                  );
@@ -613,6 +608,7 @@ const WorkDetail: React.FC = () => {
                                 <h2 className="text-2xl font-black text-primary dark:text-white">Materiais</h2>
                                 <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Controle de Compras</p>
                             </div>
+                            {/* RESTORED ADD BUTTON VISIBILITY */}
                             <button onClick={() => setAddMatModal(true)} className="bg-primary text-white w-12 h-12 rounded-xl flex items-center justify-center hover:bg-primary-light transition-all shadow-lg shadow-primary/30"><i className="fa-solid fa-plus text-lg"></i></button>
                         </div>
                         
@@ -655,11 +651,9 @@ const WorkDetail: React.FC = () => {
                     {/* RENDER UNLINKED MATERIALS (Without Step ID) - Grouped by Category */}
                     {materialFilterStepId === 'ALL' && (
                         (() => {
-                            // Find materials with NO stepId
                             const generalMaterials = materials.filter(m => !m.stepId);
                             if (generalMaterials.length === 0) return null;
 
-                            // Group by category if available
                             const grouped = generalMaterials.reduce((acc, mat) => {
                                 const cat = mat.category || 'Materiais Gerais';
                                 if (!acc[cat]) acc[cat] = [];
