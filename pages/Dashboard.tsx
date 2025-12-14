@@ -80,19 +80,23 @@ const Dashboard: React.FC = () => {
     let isMounted = true;
 
     const fetchWorks = async () => {
-        if (!user) return;
+        if (!user) {
+            setIsLoadingWorks(false);
+            return;
+        }
         
         try {
             const data = await dbService.getWorks(user.id);
             if (isMounted) {
                 setWorks(data);
                 if (data.length > 0) {
-                    // Only update focusWork if not already set or invalid
                     setFocusWork(prev => {
                         if (!prev) return data[0];
                         const exists = data.find(w => w.id === prev.id);
                         return exists || data[0];
                     });
+                } else {
+                    setFocusWork(null);
                 }
             }
         } catch (e) {
@@ -107,12 +111,14 @@ const Dashboard: React.FC = () => {
   }, [user]);
 
   // 2. Details Load: Busca os dados pesados quando a obra em foco muda
-  // CRITICAL FIX: DEPENDENCY ON ID, NOT OBJECT
   useEffect(() => {
       let isMounted = true;
 
       const fetchDetails = async () => {
-          if (!focusWork || !user) return;
+          if (!focusWork || !user) {
+              setIsLoadingDetails(false);
+              return;
+          }
 
           setIsLoadingDetails(true);
           try {
@@ -149,10 +155,16 @@ const Dashboard: React.FC = () => {
 
       if (focusWork?.id) {
           fetchDetails();
+      } else if (works.length > 0 && !focusWork) {
+          // Fallback: se tem obras mas focusWork está null, seta a primeira
+          setFocusWork(works[0]);
+      } else {
+          // Se não tem obras ou focusWork, para o loading
+          setIsLoadingDetails(false);
       }
       
       return () => { isMounted = false; };
-  }, [focusWork?.id, user]); 
+  }, [focusWork?.id, user, works]); // Added works to dependencies to catch initial load race condition
 
   // Trial Check
   useEffect(() => {
@@ -226,7 +238,9 @@ const Dashboard: React.FC = () => {
   if (isLoadingWorks) return <DashboardSkeleton />;
 
   // 2. Não tem obras (Empty State) - Renderiza instantâneo se works = []
-  if (!focusWork || works.length === 0) {
+  // Garante que se focusWork não existe mas works existe, a lógica do useEffect corrigirá, 
+  // mas enquanto isso não mostramos o "Bem-vindo" erroneamente se works.length > 0.
+  if (works.length === 0) {
       return (
         <div className="flex flex-col items-center justify-center min-h-[80vh] px-4 text-center animate-in fade-in duration-500">
             <div className="w-24 h-24 bg-gradient-gold rounded-[2rem] flex items-center justify-center text-white mb-8 shadow-glow transform rotate-3">
@@ -246,7 +260,10 @@ const Dashboard: React.FC = () => {
       );
   }
 
-  // 3. Tem obra selecionada -> Renderiza Dashboard
+  // 3. Se tem obras mas focusWork ainda é null (transição), mostra loading
+  if (!focusWork) return <DashboardSkeleton />;
+
+  // 4. Tem obra selecionada -> Renderiza Dashboard
   const budgetUsage = focusWork.budgetPlanned > 0 ? (stats.totalSpent / focusWork.budgetPlanned) * 100 : 0;
   const budgetPercentage = Math.round(budgetUsage);
   
