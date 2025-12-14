@@ -242,8 +242,10 @@ const WorkDetail: React.FC = () => {
         setLoading(true);
         try {
             await dbService.regenerateMaterials(work.id, work.area);
-            await load(); // Reload to see the new materials
+            await new Promise(r => setTimeout(r, 1000)); // Small delay for DB consistency
+            await load(); 
         } catch (e) {
+            console.error(e);
             alert("Erro ao gerar lista.");
         } finally {
             setLoading(false);
@@ -593,7 +595,7 @@ const WorkDetail: React.FC = () => {
                             </button>
                             <button 
                                 onClick={() => setAddMatModal(true)}
-                                className="w-full bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-300 font-bold py-3 px-8 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 transition-all flex items-center justify-center gap-2"
+                                className="w-full bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-300 font-bold py-3 px-8 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all flex items-center justify-center gap-2"
                             >
                                 <i className="fa-solid fa-plus"></i>
                                 Adicionar Manualmente
