@@ -408,7 +408,7 @@ export const dbService = {
         });
         await supabase.from('steps').insert(stepsToInsert);
 
-        // 3. GENERATE MATERIALS
+        // 3. GENERATE MATERIALS (Trigger regeneration)
         await this.regenerateMaterials(parsedWork.id, parsedWork.area, templateId);
     }
 
@@ -423,7 +423,6 @@ export const dbService = {
       let materialsToInsert: any[] = [];
 
       let packagesToInclude = [];
-      // Safe fallback for template ID
       const safeTemplateId = templateId || 'CONSTRUCAO';
 
       if (safeTemplateId === 'CONSTRUCAO') {
@@ -439,7 +438,6 @@ export const dbService = {
       } else if (safeTemplateId === 'PINTURA') {
           packagesToInclude = FULL_MATERIAL_PACKAGES.filter(p => p.category === 'Pintura');
       } else {
-          // Default fallback
           packagesToInclude = FULL_MATERIAL_PACKAGES;
       }
 
@@ -453,15 +451,18 @@ export const dbService = {
                   planned_qty: qty,
                   purchased_qty: 0,
                   unit: item.unit,
-                  category: pkg.category // CRITICAL: Save the category so we can group them later
+                  category: pkg.category
               });
           });
       });
 
       if (materialsToInsert.length > 0) {
-          // Optional: Clear existing AUTO generated materials to avoid duplicates? 
-          // For now, let's just insert. If the user clicked "Regenerate", they want items.
-          await supabase.from('materials').insert(materialsToInsert);
+          // BATCH INSERT TO PREVENT TIMEOUTS
+          const chunkSize = 25; // Safe batch size
+          for (let i = 0; i < materialsToInsert.length; i += chunkSize) {
+              const chunk = materialsToInsert.slice(i, i + chunkSize);
+              await supabase.from('materials').insert(chunk);
+          }
       }
   },
 
@@ -713,7 +714,7 @@ export const dbService = {
       if (!supabase) return { totalSpent: 0, progress: 0, delayedSteps: 0 };
       
       const { data: expenses } = await supabase.from('expenses').select('amount').eq('work_id', workId);
-      const totalSpent = (expenses || []).reduce((sum, e) => sum + Number(e.amount), 0);
+      const totalSpent = (expenses || []).reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
 
       const { data: steps } = await supabase.from('steps').select('status, end_date').eq('work_id', workId);
       const totalSteps = steps?.length || 0;
