@@ -6,7 +6,7 @@ import { useAuth } from '../App';
 import { dbService } from '../services/db';
 import { Work, Worker, Supplier, Material, Step, Expense, StepStatus, WorkPhoto, WorkFile, FileCategory, ExpenseCategory, PlanType } from '../types';
 import { ZeModal } from '../components/ZeModal';
-import { STANDARD_CHECKLISTS, CONTRACT_TEMPLATES, STANDARD_JOB_ROLES, STANDARD_SUPPLIER_CATEGORIES, ZE_AVATAR, ZE_AVATAR_FALLBACK } from '../services/standards';
+import { STANDARD_CHECKLISTS, CONTRACT_TEMPLATES, STANDARD_JOB_ROLES, STANDARD_SUPPLIER_CATEGORIES, ZE_AVATAR, ZE_AVATAR_FALLBACK, FULL_MATERIAL_PACKAGES } from '../services/standards';
 import { aiService } from '../services/ai';
 
 // --- TYPES FOR VIEW STATE ---
@@ -45,7 +45,9 @@ const WorkDetail: React.FC = () => {
     const [subView, setSubView] = useState<SubView>('NONE');
     const [uploading, setUploading] = useState(false);
     
-    // --- AUTO-GENERATION SAFETY ---
+    // --- GENERATION STATE (FORÇA BRUTA) ---
+    const [isGenerating, setIsGenerating] = useState(false);
+    const [genProgress, setGenProgress] = useState(0);
     const hasTriedAutoGenerate = useRef(false);
 
     // --- PREMIUM CHECK ---
@@ -140,17 +142,62 @@ const WorkDetail: React.FC = () => {
 
     useEffect(() => { load(); }, [id]);
 
-    // --- AUTO-GENERATE MATERIALS FIX ---
-    useEffect(() => {
-        // If loaded, work exists, NO materials exist, and we haven't tried yet:
-        if (!loading && work && materials.length === 0 && !hasTriedAutoGenerate.current) {
-            hasTriedAutoGenerate.current = true; // Prevent loops
-            console.log("Auto-generating materials for empty work...");
-            dbService.regenerateMaterials(work.id, work.area).then(() => {
-                load(); // Reload to see new materials
+    // --- CLIENT-SIDE BRUTE FORCE GENERATOR ---
+    const forceGenerateMaterials = async () => {
+        if (!work || isGenerating) return;
+        
+        // Safety check to prevent accidental double clicks
+        setIsGenerating(true);
+        setGenProgress(0);
+
+        try {
+            // 1. Prepare items based on Work Area
+            const area = work.area || 50;
+            const allItems: any[] = [];
+            
+            // Filter packages based on work type logic (simplified here to include all standard for construction)
+            // You could add logic to filter packages if work.notes includes 'REFORMA' etc.
+            const packagesToUse = FULL_MATERIAL_PACKAGES; 
+
+            packagesToUse.forEach(pkg => {
+                pkg.items.forEach(item => {
+                    const qty = Math.ceil(area * (item.multiplier || 1));
+                    allItems.push({
+                        workId: work.id,
+                        name: item.name,
+                        brand: '',
+                        plannedQty: qty,
+                        purchasedQty: 0,
+                        unit: item.unit,
+                        category: pkg.category
+                    });
+                });
             });
+
+            const total = allItems.length;
+            
+            // 2. Insert ONE BY ONE to ensure it works even if slow
+            for (let i = 0; i < total; i++) {
+                await dbService.addMaterial({
+                    ...allItems[i],
+                    id: Math.random().toString(36).substr(2, 9)
+                });
+                // Update progress bar
+                setGenProgress(Math.round(((i + 1) / total) * 100));
+                // Tiny delay to breathe
+                await new Promise(r => setTimeout(r, 20));
+            }
+
+            await load(); // Reload data to show list
+            
+        } catch (e) {
+            console.error("Force generation error:", e);
+            alert("Houve um erro na geração, mas os itens salvos permanecerão.");
+        } finally {
+            setIsGenerating(false);
+            setGenProgress(0);
         }
-    }, [loading, work, materials]);
+    };
 
     // --- HANDLERS ---
 
@@ -589,12 +636,41 @@ const WorkDetail: React.FC = () => {
                             </div>
                         </div>
 
-                        <div className="flex flex-col items-center justify-center h-[40vh] text-center px-4">
+                        <div className="flex flex-col items-center justify-center h-[50vh] text-center px-4">
                             <div className="w-16 h-16 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mb-4 text-slate-400">
-                                <i className="fa-solid fa-wand-magic-sparkles text-2xl animate-pulse"></i>
+                                <i className="fa-solid fa-box-open text-4xl"></i>
                             </div>
-                            <h3 className="text-lg font-bold text-primary dark:text-white mb-2">Gerando Lista...</h3>
-                            <p className="text-slate-500 text-sm max-w-xs">O Zé da Obra está calculando os materiais automaticamente. Se demorar, você pode adicionar manualmente.</p>
+                            <h3 className="text-lg font-bold text-primary dark:text-white mb-2">Lista Vazia</h3>
+                            <p className="text-slate-500 text-sm max-w-xs mb-6">A geração automática falhou? Use o botão abaixo para criar a lista agora.</p>
+                            
+                            {isGenerating ? (
+                                <div className="w-full max-w-xs">
+                                    <div className="flex justify-between text-xs font-bold text-slate-500 mb-1">
+                                        <span>Criando itens...</span>
+                                        <span>{genProgress}%</span>
+                                    </div>
+                                    <div className="h-4 bg-slate-200 rounded-full overflow-hidden">
+                                        <div className="h-full bg-secondary transition-all duration-75" style={{ width: `${genProgress}%` }}></div>
+                                    </div>
+                                    <p className="text-xs text-slate-400 mt-2">Não feche o app.</p>
+                                </div>
+                            ) : (
+                                <div className="flex flex-col gap-3 w-full max-w-xs">
+                                    <button 
+                                        onClick={forceGenerateMaterials}
+                                        className="w-full bg-secondary hover:bg-orange-600 text-white font-black py-4 px-6 rounded-2xl shadow-lg transition-all flex items-center justify-center gap-2 active:scale-95 animate-pulse"
+                                    >
+                                        <i className="fa-solid fa-bolt"></i>
+                                        REPARAR LISTA AGORA
+                                    </button>
+                                    <button 
+                                        onClick={() => setAddMatModal(true)}
+                                        className="w-full bg-white dark:bg-slate-800 text-slate-500 font-bold py-3 px-6 rounded-2xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 transition-all"
+                                    >
+                                        Adicionar Manualmente
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     </div>
                  );
