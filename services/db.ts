@@ -403,10 +403,9 @@ export const dbService = {
         });
         await supabase.from('steps').insert(stepsToInsert);
 
-        // 3. GENERATE MATERIALS (Fire and forget from create, but robust inside)
-        // We do NOT await here to let the UI respond faster, 
-        // the list will populate in background or on first load.
-        this.regenerateMaterials(parsedWork.id, parsedWork.area, templateId).catch(console.error);
+        // 3. GENERATE MATERIALS (AWAITING HERE TO ENSURE COMPLETION)
+        // With the SQL fix applied, this should execute successfully.
+        await this.regenerateMaterials(parsedWork.id, parsedWork.area, templateId);
     }
 
     return parsedWork;
@@ -449,30 +448,17 @@ export const dbService = {
                   planned_qty: qty,
                   purchased_qty: 0,
                   unit: item.unit,
-                  category: pkg.category // Assuming DB has this column, if not it will ignore or error per chunk
+                  category: pkg.category
               });
           });
       });
 
       if (materialsToInsert.length > 0) {
-          // ULTRA SAFE BATCH INSERT
-          // Small chunks + Error Ignoring to guarantee partial success at least
-          const chunkSize = 10; 
-          for (let i = 0; i < materialsToInsert.length; i += chunkSize) {
-              const chunk = materialsToInsert.slice(i, i + chunkSize);
-              // We use try-catch inside loop to ensure one bad chunk doesn't kill everything
-              try {
-                  const { error } = await supabase.from('materials').insert(chunk);
-                  if (error) {
-                      console.warn("Retrying chunk one-by-one due to error:", error.message);
-                      // If batch fails, try one by one to save what we can
-                      for (const item of chunk) {
-                          await supabase.from('materials').insert(item); 
-                      }
-                  }
-              } catch (e) {
-                  console.error("Critical insertion error, skipping chunk", e);
-              }
+          // BATCH INSERT (Should work with correct SQL Schema)
+          const { error } = await supabase.from('materials').insert(materialsToInsert);
+          if (error) {
+              console.error("FATAL: Failed to insert materials.", error);
+              throw new Error(`Erro ao gerar lista automática: ${error.message}. Verifique o SQL do Supabase.`);
           }
       }
   },
@@ -518,9 +504,9 @@ export const dbService = {
   },
 
   async addMaterial(mat: Material, purchaseInfo?: { qty: number, cost: number, date: string }) {
-      if (!supabase) return;
+      if (!supabase) return { error: "Sem conexão" };
       
-      const { data: savedMat } = await supabase.from('materials').insert({
+      const { data: savedMat, error } = await supabase.from('materials').insert({
           work_id: mat.workId,
           name: mat.name,
           brand: mat.brand,
@@ -530,9 +516,12 @@ export const dbService = {
           category: mat.category
       }).select().single();
 
+      if (error) return { error };
+
       if (purchaseInfo && savedMat) {
           await this.registerMaterialPurchase(savedMat.id, mat.name, mat.brand||'', mat.plannedQty, mat.unit, purchaseInfo.qty, purchaseInfo.cost);
       }
+      return { data: savedMat };
   },
 
   async updateMaterial(mat: Material) {
