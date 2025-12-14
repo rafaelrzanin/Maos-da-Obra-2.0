@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../App';
 import { dbService } from '../services/db';
@@ -14,6 +14,10 @@ const CreateWork: React.FC = () => {
   const [currentStep, setCurrentStep] = useState(1);
   const totalSteps = 3;
   const [loading, setLoading] = useState(false);
+  
+  // Generation Animation State
+  const [generationMode, setGenerationMode] = useState(false);
+  const [genStep, setGenStep] = useState(0);
 
   // Form Data
   const [formData, setFormData] = useState({
@@ -77,12 +81,15 @@ const CreateWork: React.FC = () => {
       else setSelectedTemplateId('');
   };
 
+  const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
     if (!validateStep(currentStep)) return;
 
     setLoading(true);
+    setGenerationMode(true); // Activate overlay
 
     try {
         const duration = selectedTemplate?.defaultDurationDays || 90;
@@ -90,7 +97,8 @@ const CreateWork: React.FC = () => {
         const end = new Date(start);
         end.setDate(end.getDate() + duration);
 
-        const newWork = await dbService.createWork({
+        // Start Creation Process
+        const createPromise = dbService.createWork({
           userId: user.id,
           name: formData.name,
           address: formData.address || 'Endereço não informado',
@@ -108,17 +116,33 @@ const CreateWork: React.FC = () => {
           notes: selectedTemplate?.label || ''
         }, selectedTemplateId);
 
+        // Simulated steps for UX
+        setGenStep(1); // Analyzing
+        await wait(1500); 
+        
+        setGenStep(2); // Creating Schedule
+        await wait(1500);
+        
+        setGenStep(3); // Calculating Materials
+        await wait(1500);
+
+        setGenStep(4); // Finishing
+        
+        const newWork = await createPromise;
+        await wait(800); // Small pause at 100%
+
         navigate(`/work/${newWork.id}`);
     } catch (error: any) {
         console.error("Erro CREATE:", error);
-        // Exibe mensagem amigável para o erro de permissão caso o script SQL ainda não tenha sido rodado
+        setGenerationMode(false);
+        setLoading(false);
+        setGenStep(0);
+        
         if (error.message?.includes('permission denied')) {
-            alert("Erro de Permissão: O banco de dados foi reiniciado. Por favor, execute o script SQL de correção no painel do Supabase para restaurar o acesso.");
+            alert("Erro de Permissão: O banco de dados foi reiniciado. Por favor, execute o script SQL de correção.");
         } else {
             alert(`Erro ao salvar: ${error.message}`);
         }
-    } finally {
-        setLoading(false);
     }
   };
 
@@ -133,6 +157,38 @@ const CreateWork: React.FC = () => {
           </div>
       </div>
   );
+
+  // GENERATION OVERLAY
+  if (generationMode) {
+      return (
+          <div className="fixed inset-0 z-50 bg-slate-900 flex flex-col items-center justify-center p-6 text-center animate-in fade-in duration-700">
+              <div className="relative mb-8">
+                  <div className="w-32 h-32 rounded-full border-4 border-slate-800 flex items-center justify-center relative z-10 bg-slate-900">
+                      <img src={ZE_AVATAR} className="w-24 h-24 rounded-full border-2 border-slate-700 object-cover" onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK}/>
+                  </div>
+                  <div className="absolute inset-0 rounded-full border-4 border-t-secondary border-r-secondary border-b-transparent border-l-transparent animate-spin"></div>
+              </div>
+              
+              <h2 className="text-2xl font-black text-white mb-2 animate-pulse">
+                  {genStep === 1 && "Analisando seus dados..."}
+                  {genStep === 2 && "Criando cronograma..."}
+                  {genStep === 3 && "Calculando materiais..."}
+                  {genStep === 4 && "Finalizando projeto!"}
+              </h2>
+              
+              <p className="text-slate-400 text-sm max-w-xs mx-auto mb-8">
+                  O Zé da Obra está organizando tudo para você não ter dor de cabeça.
+              </p>
+
+              <div className="w-64 h-2 bg-slate-800 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-secondary transition-all duration-1000 ease-out" 
+                    style={{ width: `${genStep * 25}%` }}
+                  ></div>
+              </div>
+          </div>
+      );
+  }
 
   const renderStepContent = () => {
     switch(currentStep) {
