@@ -107,14 +107,13 @@ const Dashboard: React.FC = () => {
   }, [user]);
 
   // 2. Details Load: Busca os dados pesados quando a obra em foco muda
+  // CRITICAL FIX: DEPENDENCY ON ID, NOT OBJECT
   useEffect(() => {
       let isMounted = true;
 
       const fetchDetails = async () => {
           if (!focusWork || !user) return;
 
-          // Only show skeleton if we don't have cached data for this work? 
-          // For now, always show skeleton to indicate refresh, but make sure it resolves properly.
           setIsLoadingDetails(true);
           try {
             // Executa em paralelo para velocidade
@@ -153,7 +152,7 @@ const Dashboard: React.FC = () => {
       }
       
       return () => { isMounted = false; };
-  }, [focusWork?.id, user]); // Changed dependency to ID to prevent reference loops
+  }, [focusWork?.id, user]); 
 
   // Trial Check
   useEffect(() => {
