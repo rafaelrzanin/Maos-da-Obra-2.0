@@ -1,629 +1,839 @@
 
-import React, { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../App';
-import { dbService } from '../services/db';
-import { Work, Notification, Step, StepStatus, PlanType } from '../types';
-import { ZE_AVATAR, ZE_AVATAR_FALLBACK, getRandomZeTip, ZeTip } from '../services/standards';
-import { ZeModal } from '../components/ZeModal';
+import { 
+  User, Work, Step, Material, Expense, Worker, Supplier, 
+  WorkPhoto, WorkFile, Notification, PlanType,
+  ExpenseCategory, StepStatus
+} from '../types';
+import { WORK_TEMPLATES, FULL_MATERIAL_PACKAGES } from './standards';
+import { supabase } from './supabase';
 
-// --- COMPONENTE SKELETON (Carregamento Visual) ---
-const DashboardSkeleton = () => (
-  <div className="max-w-4xl mx-auto pb-28 pt-6 px-4 md:px-0 animate-pulse">
-      {/* Header Skeleton */}
-      <div className="flex justify-between items-end mb-8">
-          <div className="space-y-2">
-              <div className="h-3 w-32 bg-slate-200 dark:bg-slate-800 rounded-full"></div>
-              <div className="h-8 w-64 bg-slate-200 dark:bg-slate-800 rounded-xl"></div>
-          </div>
-          <div className="h-10 w-40 bg-slate-200 dark:bg-slate-800 rounded-xl"></div>
-      </div>
-      
-      {/* Zé Tip Skeleton */}
-      <div className="h-24 w-full bg-slate-200 dark:bg-slate-800 rounded-2xl mb-8"></div>
-      
-      {/* Main HUD Skeleton */}
-      <div className="h-64 w-full bg-slate-200 dark:bg-slate-800 rounded-[1.4rem] mb-8"></div>
-      
-      {/* List Skeleton */}
-      <div className="space-y-4">
-          <div className="h-4 w-32 bg-slate-200 dark:bg-slate-800 rounded-full mb-2"></div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <div className="h-20 bg-slate-200 dark:bg-slate-800 rounded-2xl"></div>
-              <div className="h-20 bg-slate-200 dark:bg-slate-800 rounded-2xl"></div>
-              <div className="h-20 bg-slate-200 dark:bg-slate-800 rounded-2xl"></div>
-          </div>
-      </div>
-  </div>
-);
+// --- HELPERS ---
 
-// Helper para formatar data
-const formatDateDisplay = (dateStr: string) => {
-    if (!dateStr) return '--/--';
-    if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
-        const [, month, day] = dateStr.split('-');
-        return `${day}/${month}`;
+const mapProfileFromSupabase = (data: any): User => ({
+    id: data.id,
+    name: data.name || 'Usuário',
+    email: data.email || '',
+    whatsapp: data.whatsapp,
+    cpf: data.cpf,
+    plan: data.plan as PlanType,
+    subscriptionExpiresAt: data.subscription_expires_at,
+    isTrial: data.is_trial || false
+});
+
+const parseWorkFromDB = (data: any): Work => ({
+    id: data.id,
+    userId: data.user_id,
+    name: data.name,
+    address: data.address,
+    budgetPlanned: Number(data.budget_planned || 0),
+    startDate: data.start_date,
+    endDate: data.end_date,
+    area: Number(data.area),
+    status: data.status,
+    notes: data.notes || '',
+    floors: Number(data.floors || 1),
+    bedrooms: Number(data.bedrooms || 0),
+    bathrooms: Number(data.bathrooms || 0),
+    kitchens: Number(data.kitchens || 0),
+    livingRooms: Number(data.living_rooms || 0),
+    hasLeisureArea: data.has_leisure_area || false
+});
+
+const parseStepFromDB = (data: any): Step => ({
+    id: data.id,
+    workId: data.work_id,
+    name: data.name,
+    startDate: data.start_date,
+    endDate: data.end_date,
+    status: data.status,
+    isDelayed: data.is_delayed
+});
+
+const parseMaterialFromDB = (data: any): Material => ({
+    id: data.id,
+    workId: data.work_id,
+    name: data.name,
+    brand: data.brand,
+    plannedQty: Number(data.planned_qty || 0),
+    purchasedQty: Number(data.purchased_qty || 0),
+    unit: data.unit,
+    stepId: data.step_id,
+    category: data.category
+});
+
+const parseExpenseFromDB = (data: any): Expense => ({
+    id: data.id,
+    workId: data.work_id,
+    description: data.description,
+    amount: Number(data.amount || 0),
+    date: data.date,
+    category: data.category,
+    stepId: data.step_id,
+    relatedMaterialId: data.related_material_id,
+    totalAgreed: data.total_agreed ? Number(data.total_agreed) : undefined
+});
+
+const parseWorkerFromDB = (data: any): Worker => ({
+    id: data.id,
+    userId: data.user_id,
+    name: data.name,
+    role: data.role,
+    phone: data.phone,
+    notes: data.notes
+});
+
+const parseSupplierFromDB = (data: any): Supplier => ({
+    id: data.id,
+    userId: data.user_id,
+    name: data.name,
+    category: data.category,
+    phone: data.phone,
+    notes: data.notes
+});
+
+const parsePhotoFromDB = (data: any): WorkPhoto => ({
+    id: data.id,
+    workId: data.work_id,
+    url: data.url,
+    description: data.description,
+    date: data.date,
+    type: data.type
+});
+
+const parseFileFromDB = (data: any): WorkFile => ({
+    id: data.id,
+    workId: data.work_id,
+    name: data.name,
+    category: data.category,
+    url: data.url,
+    type: data.type,
+    date: data.date
+});
+
+const parseNotificationFromDB = (data: any): Notification => ({
+    id: data.id,
+    userId: data.user_id,
+    title: data.title,
+    message: data.message,
+    date: data.date,
+    read: data.read,
+    type: data.type
+});
+
+// --- CACHE & DEDUPLICATION ---
+let cachedUserPromise: Promise<User | null> | null = null;
+let lastCacheTime = 0;
+const CACHE_DURATION = 5000;
+
+// Track active profile requests by User ID to prevent race conditions during login
+const pendingProfileRequests: Record<string, Promise<User | null>> = {};
+
+// Função crítica: Garante que o perfil existe. Se falhar com 403, o app trava.
+// Optimized with Deduplication to prevent double-requests on login
+const ensureUserProfile = async (authUser: any): Promise<User | null> => {
+    if (!authUser || !supabase) return null;
+
+    // Deduplication: If a request for this user is already in flight, return it.
+    if (pendingProfileRequests[authUser.id]) {
+        return pendingProfileRequests[authUser.id];
     }
-    try {
-        return new Date(dateStr).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
-    } catch (e) {
-        return dateStr;
-    }
-};
 
-const Dashboard: React.FC = () => {
-  const { user, trialDaysRemaining } = useAuth();
-  const navigate = useNavigate();
-  
-  // Data State
-  const [works, setWorks] = useState<Work[]>([]);
-  const [focusWork, setFocusWork] = useState<Work | null>(null);
-  
-  // Dashboard Metrics State
-  const [stats, setStats] = useState({ totalSpent: 0, progress: 0, delayedSteps: 0 });
-  const [dailySummary, setDailySummary] = useState({ completedSteps: 0, delayedSteps: 0, pendingMaterials: 0, totalSteps: 0 });
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [upcomingSteps, setUpcomingSteps] = useState<Step[]>([]);
-  
-  // Loading States (Granular)
-  const [isLoadingWorks, setIsLoadingWorks] = useState(true);
-  const [isLoadingDetails, setIsLoadingDetails] = useState(false);
-  
-  // UI States
-  const [currentTip] = useState<ZeTip>(() => getRandomZeTip());
-  const [showWorkSelector, setShowWorkSelector] = useState(false);
-  const [zeModal, setZeModal] = useState<{isOpen: boolean, title: string, message: string, workId?: string}>({isOpen: false, title: '', message: ''});
-  const [showTrialUpsell, setShowTrialUpsell] = useState(false);
-
-  // 1. Initial Load: Apenas busca a lista de obras (Rápido)
-  useEffect(() => {
-    let isMounted = true;
-
-    const fetchWorks = async () => {
-        if (!user) {
-            setIsLoadingWorks(false);
-            return;
-        }
-        
+    const fetchProfileProcess = async (): Promise<User | null> => {
         try {
-            const data = await dbService.getWorks(user.id);
-            if (isMounted) {
-                setWorks(data);
-                if (data.length > 0) {
-                    setFocusWork(prev => {
-                        if (!prev) return data[0];
-                        const exists = data.find(w => w.id === prev.id);
-                        return exists || data[0];
-                    });
-                } else {
-                    setFocusWork(null);
-                }
+            // 1. Tenta ler o perfil existente
+            const { data: existingProfile, error: readError } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', authUser.id)
+                .maybeSingle();
+
+            if (existingProfile) {
+                return mapProfileFromSupabase(existingProfile);
             }
+
+            // Se deu erro de permissão (403), não adianta tentar inserir, vai falhar também.
+            if (readError && readError.code === '42501') { // 42501 = Permission denied
+                 console.error("ERRO CRÍTICO 403: Permissão negada ao ler perfil.");
+                 return {
+                    id: authUser.id,
+                    name: authUser.user_metadata?.name || 'Erro de Permissão',
+                    email: authUser.email || '',
+                    plan: PlanType.MENSAL,
+                    isTrial: true
+                 };
+            }
+
+            // 2. Se não existe, cria
+            const trialExpires = new Date();
+            trialExpires.setDate(trialExpires.getDate() + 7);
+
+            const newProfileData = {
+                id: authUser.id,
+                name: authUser.user_metadata?.name || authUser.email?.split('@')[0] || 'Novo Usuário',
+                email: authUser.email,
+                plan: PlanType.MENSAL,
+                is_trial: true,
+                subscription_expires_at: trialExpires.toISOString()
+            };
+
+            const { data: createdProfile, error: createError } = await supabase
+                .from('profiles')
+                .insert(newProfileData)
+                .select()
+                .single();
+
+            if (createError) {
+                console.error("Erro ao criar perfil:", createError);
+                return {
+                    id: authUser.id,
+                    name: newProfileData.name,
+                    email: authUser.email || '',
+                    plan: PlanType.MENSAL,
+                    isTrial: true,
+                    subscriptionExpiresAt: trialExpires.toISOString()
+                };
+            }
+
+            return mapProfileFromSupabase(createdProfile);
+
         } catch (e) {
-            console.error("Erro ao buscar obras:", e);
-        } finally {
-            if (isMounted) setIsLoadingWorks(false);
+            console.error("Exceção no ensureUserProfile", e);
+            return {
+                id: authUser.id,
+                name: authUser.email || 'Usuário',
+                email: authUser.email,
+                plan: PlanType.MENSAL,
+                isTrial: true
+            };
         }
     };
 
-    fetchWorks();
-    return () => { isMounted = false; };
-  }, [user]);
+    const promise = fetchProfileProcess();
+    pendingProfileRequests[authUser.id] = promise;
 
-  // 2. Details Load: Busca os dados pesados quando a obra em foco muda
-  useEffect(() => {
-      let isMounted = true;
+    // Clean up pending request map after completion
+    promise.finally(() => {
+        delete pendingProfileRequests[authUser.id];
+    });
 
-      const fetchDetails = async () => {
-          if (!focusWork || !user) {
-              setIsLoadingDetails(false);
-              return;
-          }
-
-          setIsLoadingDetails(true);
-          try {
-            // Executa em paralelo para velocidade
-            const [workStats, summary, notifs, steps] = await Promise.all([
-                dbService.calculateWorkStats(focusWork.id),
-                dbService.getDailySummary(focusWork.id),
-                dbService.getNotifications(user.id),
-                dbService.getSteps(focusWork.id)
-            ]);
-
-            if (isMounted) {
-                setStats(workStats);
-                setDailySummary(summary);
-                setNotifications(notifs);
-
-                // Filter Next Steps
-                const nextSteps = steps
-                    .filter(s => s.status !== StepStatus.COMPLETED)
-                    .sort((a: Step, b: Step) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
-                    .slice(0, 3);
-                setUpcomingSteps(nextSteps);
-            }
-            
-            // Background check (não bloqueia UI)
-            dbService.generateSmartNotifications(user.id, focusWork.id);
-
-          } catch (e) {
-              console.error("Erro nos detalhes:", e);
-          } finally {
-              if (isMounted) setIsLoadingDetails(false);
-          }
-      };
-
-      if (focusWork?.id) {
-          fetchDetails();
-      } else if (works.length > 0 && !focusWork) {
-          // Fallback: se tem obras mas focusWork está null, seta a primeira
-          setFocusWork(works[0]);
-      } else {
-          // Se não tem obras ou focusWork, para o loading
-          setIsLoadingDetails(false);
-      }
-      
-      return () => { isMounted = false; };
-  }, [focusWork?.id, user, works]); // Added works to dependencies to catch initial load race condition
-
-  // Trial Check
-  useEffect(() => {
-    if (user?.isTrial && trialDaysRemaining !== null && trialDaysRemaining <= 1) {
-        setShowTrialUpsell(true);
-    }
-  }, [user, trialDaysRemaining]);
-
-  const handleSwitchWork = (work: Work) => {
-      if (focusWork?.id !== work.id) {
-          setFocusWork(work);
-          setShowWorkSelector(false);
-      }
-  };
-
-  const handleAccessWork = () => {
-      if (focusWork && focusWork.id) {
-          navigate(`/work/${focusWork.id}`);
-      }
-  };
-
-  const handleDeleteClick = (e: React.MouseEvent, workId: string, workName: string) => {
-      e.stopPropagation();
-      setZeModal({
-          isOpen: true,
-          title: "Apagar Obra",
-          message: `Tem certeza? Ao apagar a obra "${workName}", todo o histórico de gastos, compras e cronograma será perdido permanentemente.`,
-          workId: workId
-      });
-  };
-
-  const confirmDelete = async () => {
-      if (zeModal.workId && user) {
-          try {
-            setIsLoadingWorks(true); // Bloqueia brevemente para reload
-            await dbService.deleteWork(zeModal.workId);
-            
-            const updatedWorks = await dbService.getWorks(user.id);
-            setWorks(updatedWorks);
-            setZeModal({isOpen: false, title: '', message: ''});
-  
-            if (updatedWorks.length > 0) {
-                const stillExists = updatedWorks.find(w => w.id === focusWork?.id);
-                setFocusWork(stillExists || updatedWorks[0]);
-            } else {
-                setFocusWork(null);
-            }
-          } catch (e) {
-              console.error("Erro ao apagar", e);
-              alert("Erro ao excluir obra.");
-          } finally {
-              setIsLoadingWorks(false);
-          }
-      }
-  };
-
-  const handleDismiss = async (id: string) => {
-      await dbService.dismissNotification(id);
-      setNotifications(prev => prev.filter(n => n.id !== id));
-  };
-
-  const handleClearAll = async () => {
-      if (!user) return;
-      await dbService.clearAllNotifications(user.id);
-      setNotifications([]);
-  };
-
-  // --- RENDERIZADORES ---
-
-  // 1. Carregando lista de obras (Estado inicial)
-  if (isLoadingWorks) return <DashboardSkeleton />;
-
-  // 2. Não tem obras (Empty State) - Renderiza instantâneo se works = []
-  // Garante que se focusWork não existe mas works existe, a lógica do useEffect corrigirá, 
-  // mas enquanto isso não mostramos o "Bem-vindo" erroneamente se works.length > 0.
-  if (works.length === 0) {
-      return (
-        <div className="flex flex-col items-center justify-center min-h-[80vh] px-4 text-center animate-in fade-in duration-500">
-            <div className="w-24 h-24 bg-gradient-gold rounded-[2rem] flex items-center justify-center text-white mb-8 shadow-glow transform rotate-3">
-                <i className="fa-solid fa-helmet-safety text-5xl"></i>
-            </div>
-            <h2 className="text-3xl font-bold text-primary dark:text-white mb-4 tracking-tight">Bem-vindo ao Mãos da Obra</h2>
-            <p className="text-slate-600 dark:text-slate-300 max-w-md mb-10 leading-relaxed">
-                Gestão profissional para sua construção. Simples, visual e direto ao ponto. Vamos começar sua primeira obra?
-            </p>
-            <button 
-                onClick={() => navigate('/create')}
-                className="bg-primary hover:bg-primary-dark dark:bg-white dark:hover:bg-slate-200 text-white dark:text-primary font-bold py-4 px-10 rounded-2xl shadow-xl transition-all flex items-center gap-3 text-lg"
-            >
-                <i className="fa-solid fa-plus"></i> Iniciar Projeto
-            </button>
-        </div>
-      );
-  }
-
-  // 3. Se tem obras mas focusWork ainda é null (transição), mostra loading
-  if (!focusWork) return <DashboardSkeleton />;
-
-  // 4. Tem obra selecionada -> Renderiza Dashboard
-  const budgetUsage = focusWork.budgetPlanned > 0 ? (stats.totalSpent / focusWork.budgetPlanned) * 100 : 0;
-  const budgetPercentage = Math.round(budgetUsage);
-  
-  const hasDelay = dailySummary.delayedSteps > 0;
-  const isOverBudget = budgetPercentage > 100;
-  const isNearBudget = budgetPercentage > 85;
-  
-  let statusGradient = 'from-secondary to-yellow-500';
-  let statusIcon = 'fa-thumbs-up';
-  let statusMessage = 'Tudo sob controle';
-  
-  if (hasDelay || isOverBudget) {
-      statusGradient = 'from-red-600 to-red-400';
-      statusIcon = 'fa-triangle-exclamation';
-      statusMessage = 'Atenção necessária';
-  } else if (isNearBudget || dailySummary.pendingMaterials > 2) {
-      statusGradient = 'from-orange-500 to-amber-400';
-      statusIcon = 'fa-circle-exclamation';
-      statusMessage = 'Pontos de atenção';
-  }
-
-  return (
-    <div className="max-w-4xl mx-auto pb-28 pt-6 px-4 md:px-0 font-sans animate-in fade-in">
-      
-      {/* Header Area */}
-      <div className="mb-8 flex items-end justify-between relative z-20">
-          <div>
-            <p className="text-xs text-secondary font-bold uppercase tracking-widest mb-1">Painel de Controle</p>
-            <h1 className="text-3xl md:text-4xl font-extrabold text-primary dark:text-white leading-tight tracking-tight">
-                Olá, {user?.name.split(' ')[0]}
-            </h1>
-          </div>
-          {works.length > 0 && (
-             <div className="relative flex items-center gap-2">
-                 <button 
-                    onClick={() => setShowWorkSelector(!showWorkSelector)}
-                    className="text-sm text-primary dark:text-white font-bold bg-white dark:bg-slate-800 px-4 py-3 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 hover:border-secondary transition-all flex items-center gap-2"
-                 >
-                     <i className="fa-solid fa-building text-secondary"></i>
-                     <span className="max-w-[120px] truncate">{focusWork.name}</span> 
-                     <i className={`fa-solid fa-chevron-down text-xs transition-transform ${showWorkSelector ? 'rotate-180' : ''}`}></i>
-                 </button>
-                 
-                 <button 
-                    onClick={(e) => handleDeleteClick(e, focusWork.id, focusWork.name)}
-                    className="w-11 h-11 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-400 hover:text-red-500 hover:border-red-200 dark:hover:border-red-900 dark:hover:text-red-400 flex items-center justify-center shadow-sm transition-all"
-                    title="Excluir Obra Atual"
-                 >
-                     <i className="fa-solid fa-trash"></i>
-                 </button>
-                 
-                 {showWorkSelector && (
-                     <div className="absolute right-0 top-full mt-2 w-72 bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-100 dark:border-slate-700 overflow-hidden animate-in fade-in slide-in-from-top-2 z-50">
-                         <div className="p-3 bg-slate-50 dark:bg-slate-800 border-b border-slate-100 dark:border-slate-700">
-                             <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase">Minhas Obras</p>
-                         </div>
-                         {works.map((w: Work) => (
-                             <div
-                                key={w.id}
-                                className={`w-full px-5 py-4 text-sm font-medium border-b last:border-0 border-slate-50 dark:border-slate-800 flex items-center justify-between group hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer ${focusWork.id === w.id ? 'bg-slate-50 dark:bg-slate-800/50' : ''}`}
-                                onClick={() => handleSwitchWork(w)}
-                             >
-                                <span className={`flex-1 truncate ${focusWork.id === w.id ? 'text-secondary font-bold' : 'text-slate-600 dark:text-slate-300'}`}>{w.name}</span>
-                                <div className="flex items-center gap-3">
-                                    {focusWork.id === w.id && <i className="fa-solid fa-check text-secondary"></i>}
-                                </div>
-                             </div>
-                         ))}
-                         <button
-                            onClick={() => navigate('/create')}
-                            className="w-full text-left px-5 py-4 text-sm font-bold text-secondary hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors flex items-center gap-3"
-                         >
-                            <div className="w-6 h-6 rounded-full bg-secondary/10 flex items-center justify-center">
-                                <i className="fa-solid fa-plus text-xs"></i>
-                            </div>
-                            Nova Obra
-                         </button>
-                     </div>
-                 )}
-             </div>
-          )}
-      </div>
-      
-      {/* ZÉ DA OBRA TIP */}
-      <div className="mb-8 relative overflow-hidden rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm group hover:shadow-md transition-all">
-           <div className="absolute top-0 right-0 w-32 h-32 bg-secondary/10 rounded-full blur-3xl translate-x-10 -translate-y-10 group-hover:bg-secondary/20 transition-all"></div>
-           <div className="flex items-center gap-5 p-5 relative z-10">
-                <div className="w-16 h-16 rounded-full p-1 bg-gradient-to-br from-slate-100 to-slate-300 dark:from-slate-700 dark:to-slate-800 shrink-0 shadow-inner">
-                        <img 
-                        src={ZE_AVATAR} 
-                        alt="Zeca da Obra" 
-                        className="w-full h-full object-cover rounded-full border-2 border-white dark:border-slate-800 bg-white"
-                        onError={(e) => { 
-                            const target = e.currentTarget;
-                            if (target.src !== ZE_AVATAR_FALLBACK) {
-                                target.src = ZE_AVATAR_FALLBACK;
-                            }
-                        }}
-                        />
-                </div>
-                <div>
-                    <div className="flex items-center gap-2 mb-1">
-                        <span className="bg-secondary text-white text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">Dica do Zé: {currentTip.tag}</span>
-                    </div>
-                    <p className="text-sm text-slate-600 dark:text-slate-300 italic font-medium">
-                        "{currentTip.text}"
-                    </p>
-                </div>
-           </div>
-      </div>
-
-      {/* Access Button (Floating CTA) */}
-      <button 
-        type="button"
-        onClick={handleAccessWork}
-        className="group w-full mb-8 relative overflow-hidden rounded-2xl bg-primary dark:bg-white text-white dark:text-primary shadow-2xl hover:shadow-glow transition-all active:scale-[0.98] cursor-pointer"
-      >
-        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
-        <div className="flex items-center justify-between p-6">
-            <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-full bg-white/20 dark:bg-primary/10 flex items-center justify-center">
-                    <i className="fa-solid fa-arrow-right-to-bracket text-xl"></i>
-                </div>
-                <div className="text-left">
-                    <h3 className="text-lg font-bold">Acessar Minha Obra</h3>
-                    <p className="text-xs opacity-80 font-medium">Gerenciar etapas, compras e gastos</p>
-                </div>
-            </div>
-            <i className="fa-solid fa-chevron-right text-xl opacity-50 group-hover:translate-x-1 transition-transform"></i>
-        </div>
-      </button>
-
-      {/* MAIN HUD (SKELETON IF LOADING) */}
-      {isLoadingDetails ? (
-          <div className="glass-panel rounded-3xl p-1 shadow-2xl mb-8 relative z-0 animate-pulse">
-              <div className="bg-white/50 dark:bg-slate-800/60 rounded-[1.4rem] p-6 h-64"></div>
-          </div>
-      ) : (
-          <div className="glass-panel rounded-3xl p-1 shadow-2xl mb-8 relative z-0">
-              <div className="bg-white/50 dark:bg-slate-800/60 rounded-[1.4rem] p-6 lg:p-8 backdrop-blur-xl">
-                  {/* Status Header */}
-                  <div className="flex items-center gap-4 mb-8">
-                      <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${statusGradient} flex items-center justify-center text-white text-3xl shadow-lg transform -rotate-3`}>
-                          <i className={`fa-solid ${statusIcon}`}></i>
-                      </div>
-                      <div>
-                          <h2 className="text-2xl font-bold text-primary dark:text-white leading-tight">{statusMessage}</h2>
-                          <p className="text-slate-500 dark:text-slate-400 font-medium">Resumo de hoje</p>
-                      </div>
-                  </div>
-
-                  {/* Metrics Grid */}
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
-                      {/* Card 1: Tarefas */}
-                      <div 
-                        onClick={handleAccessWork}
-                        className={`p-5 rounded-2xl border transition-all cursor-pointer hover:-translate-y-1 hover:shadow-lg bg-white dark:bg-slate-800/80 ${hasDelay ? 'border-red-500/30' : 'border-slate-100 dark:border-slate-700'}`}
-                      >
-                          <div className="flex justify-between items-start mb-3">
-                              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${hasDelay ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400' : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400'}`}>
-                                  <i className="fa-solid fa-list-check"></i>
-                              </div>
-                              {hasDelay && <span className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></span>}
-                          </div>
-                          <p className="text-3xl font-extrabold text-primary dark:text-white mb-1">
-                              {hasDelay ? dailySummary.delayedSteps : dailySummary.completedSteps}
-                          </p>
-                          <p className={`text-xs font-bold uppercase tracking-wider ${hasDelay ? 'text-red-500 dark:text-red-400' : 'text-slate-500 dark:text-slate-400'}`}>
-                              {hasDelay ? 'Atrasadas' : 'Concluídas'}
-                          </p>
-                      </div>
-
-                      {/* Card 2: Compras */}
-                      <div 
-                        onClick={handleAccessWork}
-                        className="p-5 rounded-2xl bg-white dark:bg-slate-800/80 border border-slate-100 dark:border-slate-700 transition-all cursor-pointer hover:-translate-y-1 hover:shadow-lg"
-                      >
-                          <div className="flex justify-between items-start mb-3">
-                              <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-700 text-secondary flex items-center justify-center">
-                                  <i className="fa-solid fa-cart-shopping"></i>
-                              </div>
-                          </div>
-                          <p className="text-3xl font-extrabold text-primary dark:text-white mb-1">
-                              {dailySummary.pendingMaterials}
-                          </p>
-                          <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                              Pendentes
-                          </p>
-                      </div>
-
-                      {/* Card 3: Progresso (Full width on mobile) */}
-                      <div className="col-span-2 md:col-span-1 p-5 rounded-2xl bg-gradient-to-br from-primary to-slate-800 text-white shadow-xl relative overflow-hidden">
-                          <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2"></div>
-                          <div className="relative z-10">
-                            <div className="flex justify-between items-start mb-3">
-                                <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center backdrop-blur-sm">
-                                    <i className="fa-solid fa-chart-pie"></i>
-                                </div>
-                                <span className="font-bold text-lg">{stats.progress}%</span>
-                            </div>
-                            <div className="h-2 bg-black/20 rounded-full overflow-hidden mb-2">
-                                <div className="h-full bg-secondary shadow-[0_0_10px_rgba(217,119,6,0.5)]" style={{ width: `${stats.progress}%` }}></div>
-                            </div>
-                            <p className="text-[10px] uppercase tracking-wider opacity-70 font-bold">Progresso Geral</p>
-                          </div>
-                      </div>
-                  </div>
-
-                  {/* Financial Strip */}
-                  <div className="bg-slate-50 dark:bg-slate-800/80 rounded-2xl p-6 border border-slate-200 dark:border-slate-700 relative overflow-hidden">
-                      <div className="absolute bottom-0 left-0 h-1 bg-slate-200 dark:bg-slate-700 w-full"></div>
-                      <div className={`absolute bottom-0 left-0 h-1 transition-all duration-1000 ${isOverBudget ? 'bg-danger shadow-[0_0_15px_red]' : 'bg-success shadow-[0_0_15px_lime]'}`} style={{ width: `${Math.min(budgetPercentage, 100)}%` }}></div>
-
-                      <div className="flex justify-between items-end mb-2 relative z-10">
-                          <div>
-                              <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1">Orçamento Utilizado</p>
-                              <p className="text-xl font-bold text-primary dark:text-white">
-                                  R$ {stats.totalSpent.toLocaleString('pt-BR')} 
-                                  <span className="text-sm font-normal text-slate-400 dark:text-slate-500 mx-2">/</span>
-                                  <span className="text-sm text-slate-400 dark:text-slate-500">R$ {focusWork.budgetPlanned.toLocaleString('pt-BR')}</span>
-                              </p>
-                          </div>
-                          <div className={`px-3 py-1 rounded-lg text-sm font-bold ${isOverBudget ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400' : 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'}`}>
-                              {budgetPercentage}%
-                          </div>
-                      </div>
-                  </div>
-              </div>
-          </div>
-      )}
-
-      {/* UPCOMING STEPS & NOTIFICATIONS */}
-      {isLoadingDetails ? (
-          <div className="space-y-4 animate-pulse">
-              <div className="h-20 bg-slate-100 dark:bg-slate-800 rounded-2xl"></div>
-              <div className="h-20 bg-slate-100 dark:bg-slate-800 rounded-2xl"></div>
-          </div>
-      ) : (
-          <>
-            {upcomingSteps.length > 0 && (
-                <div className="mb-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                    <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 mb-4 px-1">
-                        <i className="fa-solid fa-calendar-day"></i> Próximas Etapas
-                    </h3>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                        {upcomingSteps.map((step) => {
-                            const today = new Date();
-                            today.setHours(0,0,0,0);
-                            
-                            const [y, m, d] = step.startDate.split('-').map(Number);
-                            const startDate = new Date(y, m - 1, d); 
-                            
-                            const diffTime = startDate.getTime() - today.getTime();
-                            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                            
-                            let statusLabel = '';
-                            let statusColor = 'text-slate-400 bg-slate-100 dark:bg-slate-800';
-                            
-                            if (diffDays < 0) {
-                                statusLabel = 'Atrasado';
-                                statusColor = 'text-red-600 bg-red-100 dark:bg-red-900/30';
-                            } else if (diffDays === 0) {
-                                statusLabel = 'Começa Hoje';
-                                statusColor = 'text-green-600 bg-green-100 dark:bg-green-900/30';
-                            } else {
-                                statusLabel = `Em ${diffDays} dias`;
-                                statusColor = 'text-secondary bg-orange-100 dark:bg-orange-900/20';
-                            }
-
-                            return (
-                                <div key={step.id} onClick={handleAccessWork} className="cursor-pointer bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-100 dark:border-slate-800 flex items-center gap-4 shadow-sm hover:shadow-md hover:border-secondary/30 transition-all">
-                                    <div className="w-10 h-10 rounded-xl bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-slate-500 dark:text-slate-400">
-                                        <i className="fa-regular fa-calendar"></i>
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <h4 className="font-bold text-primary dark:text-white text-sm truncate">{step.name}</h4>
-                                        <p className="text-xs text-slate-500 dark:text-slate-400">{formatDateDisplay(step.startDate)}</p>
-                                    </div>
-                                    <div className={`text-[10px] font-bold px-2 py-1 rounded-md uppercase whitespace-nowrap ${statusColor}`}>
-                                        {statusLabel}
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-                </div>
-            )}
-
-            <div>
-                <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                        <i className="fa-regular fa-bell"></i> Avisos Recentes
-                    </h3>
-                    {notifications.length > 0 && (
-                        <button onClick={handleClearAll} className="text-xs font-bold text-slate-400 hover:text-primary transition-colors">Limpar tudo</button>
-                    )}
-                </div>
-                
-                <div className="space-y-3">
-                    {notifications.length > 0 ? (
-                        notifications.map(notif => (
-                            <div key={notif.id} className={`group relative p-4 rounded-2xl border flex items-start gap-4 transition-all ${notif.type === 'WARNING' ? 'bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-900/30' : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800'}`}>
-                                <div className={`mt-1 w-8 h-8 rounded-lg flex items-center justify-center shrink-0 shadow-sm ${notif.type === 'WARNING' ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400' : 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400'}`}>
-                                    <i className={`fa-solid ${notif.type === 'WARNING' ? 'fa-bolt' : 'fa-info'} text-sm`}></i>
-                                </div>
-                                <div className="flex-1 pr-6">
-                                    <h4 className="text-sm font-bold text-primary dark:text-white mb-0.5">{notif.title}</h4>
-                                    <p className="text-sm text-slate-600 dark:text-slate-400 leading-snug">{notif.message}</p>
-                                </div>
-                                <button onClick={() => handleDismiss(notif.id)} className="absolute top-2 right-2 text-slate-300 hover:text-slate-500 p-2 opacity-0 group-hover:opacity-100 transition-opacity"><i className="fa-solid fa-xmark"></i></button>
-                            </div>
-                        ))
-                    ) : (
-                        <div className="text-center py-8 rounded-2xl border border-dashed border-slate-300 dark:border-slate-700">
-                            <p className="text-slate-400 text-sm font-medium">Nenhum aviso urgente. Tudo em paz! 🍃</p>
-                        </div>
-                    )}
-                </div>
-            </div>
-          </>
-      )}
-
-      <button 
-        onClick={() => navigate('/create')}
-        className="fixed bottom-6 right-6 md:hidden w-16 h-16 rounded-full bg-gradient-gold text-white shadow-2xl flex items-center justify-center z-50 hover:scale-110 transition-transform active:scale-90"
-      >
-        <i className="fa-solid fa-plus text-2xl"></i>
-      </button>
-
-      <ZeModal 
-        isOpen={zeModal.isOpen}
-        title={zeModal.title}
-        message={zeModal.message}
-        confirmText="Sim, apagar obra"
-        onConfirm={confirmDelete}
-        onCancel={() => setZeModal({isOpen: false, title: '', message: ''})}
-      />
-
-      {showTrialUpsell && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-500">
-            <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] w-full max-w-sm p-0 shadow-2xl border border-slate-800 relative overflow-hidden transform scale-100 animate-in zoom-in-95">
-                <div className="bg-gradient-premium p-8 relative overflow-hidden text-center">
-                    <div className="absolute top-0 right-0 w-40 h-40 bg-secondary/20 rounded-full blur-3xl translate-x-10 -translate-y-10"></div>
-                    <div className="w-20 h-20 mx-auto rounded-full bg-red-600 border-4 border-slate-900 flex items-center justify-center text-3xl text-white shadow-xl mb-4 animate-pulse"><i className="fa-solid fa-hourglass-end"></i></div>
-                    <h2 className="text-2xl font-black text-white mb-1 tracking-tight">ÚLTIMO DIA!</h2>
-                    <p className="text-slate-300 text-sm font-medium">Seu teste grátis acaba hoje.</p>
-                </div>
-                <div className="p-8">
-                    <p className="text-center text-slate-600 dark:text-slate-300 text-sm mb-6 leading-relaxed">Não perca o acesso às suas obras. Garanta o plano <strong>Vitalício</strong> agora e nunca mais se preocupe com mensalidades.</p>
-                    <div className="space-y-3">
-                        <button onClick={() => navigate(`/checkout?plan=${PlanType.VITALICIO}`)} className="w-full py-4 bg-gradient-gold text-white font-black rounded-2xl shadow-lg hover:shadow-orange-500/30 hover:scale-105 transition-all flex items-center justify-center gap-2 group"><i className="fa-solid fa-crown text-yellow-200"></i> Quero Vitalício <i className="fa-solid fa-arrow-right group-hover:translate-x-1 transition-transform"></i></button>
-                        <button onClick={() => setShowTrialUpsell(false)} className="w-full py-3 bg-slate-100 dark:bg-slate-800 text-slate-500 font-bold rounded-2xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors text-xs uppercase tracking-wide">Manter plano atual</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-      )}
-    </div>
-  );
+    return promise;
 };
 
-export default Dashboard;
+export const dbService = {
+  // --- AUTH ---
+  async getCurrentUser() {
+    if (!supabase) return null;
+    
+    const now = Date.now();
+    if (cachedUserPromise && (now - lastCacheTime < CACHE_DURATION)) {
+        return cachedUserPromise;
+    }
+
+    cachedUserPromise = (async () => {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user) return null;
+        return await ensureUserProfile(session.user);
+    })();
+    
+    lastCacheTime = now;
+    return cachedUserPromise;
+  },
+
+  async syncSession() {
+    cachedUserPromise = null;
+    return this.getCurrentUser();
+  },
+
+  onAuthChange(callback: (user: User | null) => void) {
+    if (!supabase) return () => {};
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+        cachedUserPromise = null;
+        
+        if (session?.user) {
+            const user = await ensureUserProfile(session.user);
+            callback(user);
+        } else {
+            callback(null);
+        }
+    });
+    return () => subscription.unsubscribe();
+  },
+
+  async login(email: string, password?: string) {
+    if (!supabase) throw new Error("Supabase não configurado");
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password: password || '' });
+    if (error) throw error;
+    if (data.user) {
+        cachedUserPromise = null;
+        // Reuse logic via ensureUserProfile
+        return await ensureUserProfile(data.user);
+    }
+    return null;
+  },
+
+  async loginSocial(provider: 'google') {
+    if (!supabase) return { error: 'Supabase not configured', data: null };
+    return await supabase.auth.signInWithOAuth({ 
+        provider,
+        options: {
+            redirectTo: window.location.origin 
+        }
+    });
+  },
+
+  async signup(name: string, email: string, whatsapp: string, password?: string, cpf?: string, planType?: string | null) {
+    if (!supabase) throw new Error("Supabase não configurado");
+    
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+        email,
+        password: password || '123456',
+        options: {
+            data: { name }
+        }
+    });
+
+    if (authError) throw authError;
+    if (!authData.user) {
+        return this.login(email, password);
+    }
+
+    const trialExpires = new Date();
+    trialExpires.setDate(trialExpires.getDate() + 7);
+
+    // Tenta inserir direto. O RLS deve permitir 'INSERT' para 'auth.uid() = id'
+    const { error: profileError } = await supabase.from('profiles').insert({
+        id: authData.user.id,
+        name,
+        email,
+        whatsapp,
+        cpf,
+        plan: planType || PlanType.MENSAL, 
+        is_trial: true,
+        subscription_expires_at: trialExpires.toISOString()
+    });
+
+    if (profileError) {
+        console.error("Erro ao criar perfil no signup:", profileError);
+        // Não lançamos erro aqui para não bloquear o signup do Auth,
+        // o ensureUserProfile vai tentar corrigir no próximo load.
+    }
+
+    cachedUserPromise = null;
+    return await ensureUserProfile(authData.user);
+  },
+
+  async logout() {
+    if (supabase) await supabase.auth.signOut();
+    cachedUserPromise = null;
+  },
+
+  async getUserProfile(userId: string): Promise<User | null> {
+    if (!supabase) return null;
+    const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
+    if (error) return null;
+    return mapProfileFromSupabase(data);
+  },
+
+  async updateUser(userId: string, data: Partial<User>, newPassword?: string) {
+      if (!supabase) return;
+      const updates: any = {};
+      if (data.name) updates.name = data.name;
+      if (data.whatsapp) updates.whatsapp = data.whatsapp;
+      if (data.plan) updates.plan = data.plan;
+
+      if (Object.keys(updates).length > 0) {
+        await supabase.from('profiles').update(updates).eq('id', userId);
+      }
+      if (newPassword) {
+          await supabase.auth.updateUser({ password: newPassword });
+      }
+      cachedUserPromise = null;
+  },
+
+  async resetPassword(email: string) {
+      if(!supabase) return false;
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: window.location.origin + '/settings'
+      });
+      return !error;
+  },
+
+  // --- SUBSCRIPTION ---
+  isSubscriptionActive(user: User): boolean {
+    if (user.plan === PlanType.VITALICIO) return true;
+    if (!user.subscriptionExpiresAt) return false;
+    return new Date(user.subscriptionExpiresAt) > new Date();
+  },
+
+  async updatePlan(userId: string, plan: PlanType) {
+      if (!supabase) return;
+      
+      let expires = new Date();
+      if (plan === PlanType.MENSAL) expires.setDate(expires.getDate() + 30);
+      if (plan === PlanType.SEMESTRAL) expires.setDate(expires.getDate() + 180);
+      if (plan === PlanType.VITALICIO) expires.setFullYear(expires.getFullYear() + 100);
+
+      await supabase.from('profiles').update({
+          plan,
+          subscription_expires_at: expires.toISOString(),
+          is_trial: false
+      }).eq('id', userId);
+      
+      cachedUserPromise = null;
+  },
+
+  async generatePix(_amount: number, _payer: any) {
+      return {
+          qr_code_base64: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+          copy_paste_code: "00020126330014BR.GOV.BCB.PIX011155555555555520400005303986540510.005802BR5913Mãos da Obra6008Brasilia62070503***63041234"
+      };
+  },
+
+  // --- WORKS ---
+  async getWorks(userId: string): Promise<Work[]> {
+    if (!supabase) return [];
+    
+    const { data, error } = await supabase
+        .from('works')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+        
+    if (error) {
+        console.error("Erro ao buscar obras (getWorks):", error);
+        return [];
+    }
+    
+    return (data || []).map(parseWorkFromDB);
+  },
+
+  async getWorkById(workId: string): Promise<Work | null> {
+    if (!supabase) return null;
+    const { data, error } = await supabase.from('works').select('*').eq('id', workId).single();
+    if (error) {
+        console.error("Erro ao buscar obra por ID:", error);
+        return null;
+    }
+    return data ? parseWorkFromDB(data) : null;
+  },
+
+  async createWork(work: Partial<Work>, templateId: string): Promise<Work> {
+    if (!supabase) throw new Error("Supabase off");
+    
+    // 1. Create Work
+    const dbWork = {
+        user_id: work.userId,
+        name: work.name,
+        address: work.address,
+        budget_planned: work.budgetPlanned,
+        start_date: work.startDate,
+        end_date: work.endDate,
+        area: work.area,
+        status: work.status,
+        notes: work.notes,
+        floors: work.floors,
+        bedrooms: work.bedrooms,
+        bathrooms: work.bathrooms,
+        kitchens: work.kitchens,
+        living_rooms: work.livingRooms,
+        has_leisure_area: work.hasLeisureArea
+    };
+
+    // Insert da Obra - Ponto crítico de RLS
+    const { data: savedWork, error } = await supabase.from('works').insert(dbWork).select().single();
+    
+    if (error) {
+        console.error("Erro SQL ao criar obra:", error);
+        throw new Error(`Erro ao criar obra no banco: ${error.message} (${error.code})`);
+    }
+    
+    const parsedWork = parseWorkFromDB(savedWork);
+
+    // 2. Generate Steps
+    const template = WORK_TEMPLATES.find(t => t.id === templateId);
+    if (template) {
+        const stepsToInsert = template.includedSteps.map((stepName, idx) => {
+            const start = new Date(work.startDate!);
+            start.setDate(start.getDate() + (idx * 5)); 
+            const end = new Date(start);
+            end.setDate(end.getDate() + 5);
+
+            return {
+                work_id: parsedWork.id,
+                name: stepName,
+                start_date: start.toISOString().split('T')[0],
+                end_date: end.toISOString().split('T')[0],
+                status: StepStatus.NOT_STARTED,
+                is_delayed: false
+            };
+        });
+        
+        const { error: stepsError } = await supabase.from('steps').insert(stepsToInsert);
+        if (stepsError) console.error("Erro ao gerar etapas:", stepsError);
+
+        // 3. GENERATE MATERIALS - NOW USING STEPS FOR LOGICAL LINKING
+        await this.regenerateMaterials(parsedWork.id, parsedWork.area, templateId);
+    }
+
+    return parsedWork;
+  },
+
+  // --- ROBUST MATERIAL GENERATION (LOGICALLY LINKED TO STEPS) ---
+  async regenerateMaterials(workId: string, area: number, templateId: string = 'CONSTRUCAO') {
+      if (!supabase) return;
+      if (!workId) return;
+      
+      const safeArea = area && area > 0 ? area : 100;
+      let materialsToInsert: any[] = [];
+
+      // 1. Fetch created steps for this work to map Names -> IDs
+      const { data: dbSteps } = await supabase.from('steps').select('*').eq('work_id', workId);
+      
+      if (!dbSteps || dbSteps.length === 0) {
+          console.warn("No steps found, skipping material generation linked to steps.");
+          return;
+      }
+
+      // 2. Iterate through each step created in the schedule
+      dbSteps.forEach((step: any) => {
+          // Find if there is a material package with the exact same name as the step
+          const packageForStep = FULL_MATERIAL_PACKAGES.find(p => p.category === step.name);
+          
+          if (packageForStep) {
+              // Create material items linked to this specific step_id
+              packageForStep.items.forEach(item => {
+                  const qty = Math.ceil(safeArea * (item.multiplier || 1));
+                  materialsToInsert.push({
+                      work_id: workId,
+                      name: item.name,
+                      brand: '',
+                      planned_qty: qty,
+                      purchased_qty: 0,
+                      unit: item.unit,
+                      step_id: step.id, // CRITICAL: Link directly to the schedule step ID
+                      category: step.name // Use step name as category
+                  });
+              });
+          }
+      });
+
+      if (materialsToInsert.length > 0) {
+          const { error } = await supabase.from('materials').insert(materialsToInsert);
+          if (error) {
+              console.error("FATAL: Failed to insert materials.", error);
+          }
+      }
+  },
+
+  async deleteWork(workId: string) {
+      if(!supabase) return;
+      await supabase.from('works').delete().eq('id', workId);
+  },
+
+  // --- STEPS ---
+  async getSteps(workId: string): Promise<Step[]> {
+      if (!supabase) return [];
+      const { data } = await supabase.from('steps').select('*').eq('work_id', workId);
+      return (data || []).map(parseStepFromDB);
+  },
+
+  async addStep(step: Step) {
+      if (!supabase) return;
+      await supabase.from('steps').insert({
+          work_id: step.workId,
+          name: step.name,
+          start_date: step.startDate,
+          end_date: step.endDate,
+          status: step.status
+      });
+  },
+
+  async updateStep(step: Step) {
+      if (!supabase) return;
+      await supabase.from('steps').update({
+          name: step.name,
+          start_date: step.startDate,
+          end_date: step.endDate,
+          status: step.status
+      }).eq('id', step.id);
+  },
+
+  // --- MATERIALS ---
+  async getMaterials(workId: string): Promise<Material[]> {
+      if (!supabase) return [];
+      const { data } = await supabase.from('materials').select('*').eq('work_id', workId);
+      return (data || []).map(parseMaterialFromDB);
+  },
+
+  async addMaterial(mat: Material, purchaseInfo?: { qty: number, cost: number, date: string }) {
+      if (!supabase) return { error: "Sem conexão" };
+      
+      const { data: savedMat, error } = await supabase.from('materials').insert({
+          work_id: mat.workId,
+          name: mat.name,
+          brand: mat.brand,
+          planned_qty: mat.plannedQty,
+          unit: mat.unit,
+          step_id: mat.stepId,
+          category: mat.category
+      }).select().single();
+
+      if (error) return { error };
+
+      if (purchaseInfo && savedMat) {
+          await this.registerMaterialPurchase(savedMat.id, mat.name, mat.brand||'', mat.plannedQty, mat.unit, purchaseInfo.qty, purchaseInfo.cost);
+      }
+      return { data: savedMat };
+  },
+
+  async updateMaterial(mat: Material) {
+      if (!supabase) return;
+      await supabase.from('materials').update({
+          name: mat.name,
+          brand: mat.brand,
+          planned_qty: mat.plannedQty,
+          unit: mat.unit,
+          category: mat.category
+      }).eq('id', mat.id);
+  },
+
+  async registerMaterialPurchase(materialId: string, name: string, _brand: string, _planned: number, _unit: string, qty: number, cost: number) {
+      if (!supabase) return;
+      
+      // FIX: Fetch step_id from the material record to link the expense
+      const { data: mat } = await supabase.from('materials').select('purchased_qty, work_id, step_id').eq('id', materialId).single();
+      
+      if (mat) {
+          await supabase.from('materials').update({
+              purchased_qty: (mat.purchased_qty || 0) + qty
+          }).eq('id', materialId);
+
+          await supabase.from('expenses').insert({
+              work_id: mat.work_id,
+              description: `Compra: ${name}`,
+              amount: cost,
+              date: new Date().toISOString(),
+              category: ExpenseCategory.MATERIAL,
+              related_material_id: materialId,
+              step_id: mat.step_id // Ensures the expense is linked to the construction step
+          });
+      }
+  },
+
+  // --- EXPENSES ---
+  async getExpenses(workId: string): Promise<Expense[]> {
+      if (!supabase) return [];
+      const { data } = await supabase.from('expenses').select('*').eq('work_id', workId);
+      return (data || []).map(parseExpenseFromDB);
+  },
+
+  async addExpense(exp: Expense) {
+      if (!supabase) return;
+      await supabase.from('expenses').insert({
+          work_id: exp.workId,
+          description: exp.description,
+          amount: exp.amount,
+          date: exp.date,
+          category: exp.category,
+          step_id: exp.stepId,
+          total_agreed: exp.totalAgreed
+      });
+  },
+
+  async updateExpense(exp: Expense) {
+      if (!supabase) return;
+      await supabase.from('expenses').update({
+          description: exp.description,
+          amount: exp.amount,
+          date: exp.date,
+          category: exp.category,
+          step_id: exp.stepId,
+          total_agreed: exp.totalAgreed
+      }).eq('id', exp.id);
+  },
+
+  async deleteExpense(id: string) {
+      if (!supabase) return;
+      await supabase.from('expenses').delete().eq('id', id);
+  },
+
+  // --- TEAM & SUPPLIERS ---
+  async getWorkers(userId: string): Promise<Worker[]> {
+      if (!supabase) return [];
+      const { data } = await supabase.from('workers').select('*').eq('user_id', userId);
+      return (data || []).map(parseWorkerFromDB);
+  },
+
+  async addWorker(worker: Partial<Worker>) {
+      if (!supabase) return;
+      await supabase.from('workers').insert({
+          user_id: worker.userId,
+          name: worker.name,
+          role: worker.role,
+          phone: worker.phone,
+          notes: worker.notes
+      });
+  },
+
+  async updateWorker(worker: Partial<Worker>) {
+      if (!supabase) return;
+      await supabase.from('workers').update({
+          name: worker.name,
+          role: worker.role,
+          phone: worker.phone,
+          notes: worker.notes
+      }).eq('id', worker.id);
+  },
+
+  async deleteWorker(id: string) {
+      if (!supabase) return;
+      await supabase.from('workers').delete().eq('id', id);
+  },
+
+  async getSuppliers(userId: string): Promise<Supplier[]> {
+      if (!supabase) return [];
+      const { data } = await supabase.from('suppliers').select('*').eq('user_id', userId);
+      return (data || []).map(parseSupplierFromDB);
+  },
+
+  async addSupplier(supplier: Partial<Supplier>) {
+      if (!supabase) return;
+      await supabase.from('suppliers').insert({
+          user_id: supplier.userId,
+          name: supplier.name,
+          category: supplier.category,
+          phone: supplier.phone,
+          notes: supplier.notes
+      });
+  },
+
+  async updateSupplier(supplier: Partial<Supplier>) {
+      if (!supabase) return;
+      await supabase.from('suppliers').update({
+          name: supplier.name,
+          category: supplier.category,
+          phone: supplier.phone,
+          notes: supplier.notes
+      }).eq('id', supplier.id);
+  },
+
+  async deleteSupplier(id: string) {
+      if (!supabase) return;
+      await supabase.from('suppliers').delete().eq('id', id);
+  },
+
+  // --- PHOTOS & FILES ---
+  async getPhotos(workId: string): Promise<WorkPhoto[]> {
+      if (!supabase) return [];
+      const { data } = await supabase.from('work_photos').select('*').eq('work_id', workId).order('date', {ascending: false});
+      return (data || []).map(parsePhotoFromDB);
+  },
+
+  async addPhoto(photo: WorkPhoto) {
+      if (!supabase) return;
+      await supabase.from('work_photos').insert({
+          work_id: photo.workId,
+          url: photo.url,
+          description: photo.description,
+          date: photo.date,
+          type: photo.type
+      });
+  },
+
+  async getFiles(workId: string): Promise<WorkFile[]> {
+      if (!supabase) return [];
+      const { data } = await supabase.from('work_files').select('*').eq('work_id', workId);
+      return (data || []).map(parseFileFromDB);
+  },
+
+  async addFile(file: WorkFile) {
+      if (!supabase) return;
+      await supabase.from('work_files').insert({
+          work_id: file.workId,
+          name: file.name,
+          category: file.category,
+          url: file.url,
+          type: file.type,
+          date: file.date
+      });
+  },
+
+  // --- NOTIFICATIONS & DASHBOARD ---
+  async getNotifications(userId: string): Promise<Notification[]> {
+      if (!supabase) return [];
+      const { data } = await supabase.from('notifications').select('*').eq('user_id', userId).eq('read', false);
+      return (data || []).map(parseNotificationFromDB);
+  },
+
+  async dismissNotification(id: string) {
+      if (!supabase) return;
+      await supabase.from('notifications').update({ read: true }).eq('id', id);
+  },
+
+  async clearAllNotifications(userId: string) {
+      if (!supabase) return;
+      await supabase.from('notifications').update({ read: true }).eq('user_id', userId);
+  },
+
+  async calculateWorkStats(workId: string) {
+      if (!supabase) return { totalSpent: 0, progress: 0, delayedSteps: 0 };
+      
+      const { data: expenses } = await supabase.from('expenses').select('amount').eq('work_id', workId);
+      const totalSpent = (expenses || []).reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+
+      const { data: steps } = await supabase.from('steps').select('status, end_date').eq('work_id', workId);
+      const totalSteps = steps?.length || 0;
+      const completed = steps?.filter((s: any) => s.status === StepStatus.COMPLETED).length || 0;
+      const progress = totalSteps > 0 ? Math.round((completed / totalSteps) * 100) : 0;
+      
+      const today = new Date().toISOString().split('T')[0];
+      const delayedSteps = steps?.filter((s: any) => s.end_date < today && s.status !== StepStatus.COMPLETED).length || 0;
+
+      return { totalSpent, progress, delayedSteps };
+  },
+
+  async getDailySummary(workId: string) {
+      if (!supabase) return { completedSteps: 0, delayedSteps: 0, pendingMaterials: 0, totalSteps: 0 };
+      
+      const { data: steps } = await supabase.from('steps').select('*').eq('work_id', workId);
+      const { data: materials } = await supabase.from('materials').select('*').eq('work_id', workId);
+
+      const totalSteps = steps?.length || 0;
+      const completedSteps = steps?.filter((s: any) => s.status === StepStatus.COMPLETED).length || 0;
+      
+      const today = new Date().toISOString().split('T')[0];
+      const delayedSteps = steps?.filter((s: any) => s.end_date < today && s.status !== StepStatus.COMPLETED).length || 0;
+
+      const pendingMaterials = materials?.filter((m: any) => (m.purchased_qty || 0) < (m.planned_qty || 0)).length || 0;
+
+      return { completedSteps, delayedSteps, pendingMaterials, totalSteps };
+  },
+
+  async generateSmartNotifications(userId: string, workId: string) {
+      if (!supabase) return;
+      const { data: steps } = await supabase.from('steps').select('*').eq('work_id', workId);
+      const today = new Date().toISOString().split('T')[0];
+      
+      const delays = steps?.filter((s: any) => s.end_date < today && s.status !== StepStatus.COMPLETED) || [];
+      
+      for (const step of delays) {
+          const { data: exists } = await supabase.from('notifications')
+            .select('*')
+            .eq('user_id', userId)
+            .ilike('message', `%${step.name}%`)
+            .eq('read', false);
+          
+          if (!exists || exists.length === 0) {
+              await supabase.from('notifications').insert({
+                  user_id: userId,
+                  title: 'Atraso Detectado',
+                  message: `A etapa "${step.name}" deveria ter acabado em ${step.end_date}.`,
+                  type: 'WARNING',
+                  date: new Date().toISOString(),
+                  read: false
+              });
+          }
+      }
+  }
+};
 
