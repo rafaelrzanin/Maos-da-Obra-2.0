@@ -210,6 +210,7 @@ const WorkDetail: React.FC = () => {
         
         const hasPurchase = matBuyQty && Number(matBuyQty) > 0;
 
+        // 1. Update Definition
         const updatedMaterial = {
             ...materialModal.material,
             name: matName,
@@ -219,6 +220,7 @@ const WorkDetail: React.FC = () => {
         };
         await dbService.updateMaterial(updatedMaterial);
 
+        // 2. Register Purchase (if applicable)
         if (hasPurchase) {
             await dbService.registerMaterialPurchase(
                 materialModal.material.id,
@@ -579,14 +581,24 @@ const WorkDetail: React.FC = () => {
                         </div>
                         <h3 className="text-xl font-bold text-primary dark:text-white mb-2">Lista de Materiais Vazia</h3>
                         <p className="text-slate-500 text-sm mb-8 max-w-xs">Parece que os materiais não foram gerados automaticamente.</p>
-                        <button 
-                            onClick={handleRegenerateMaterials} 
-                            disabled={loading}
-                            className="bg-secondary text-white font-bold py-3 px-8 rounded-xl shadow-lg hover:bg-orange-600 transition-all flex items-center gap-2"
-                        >
-                            {loading ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-wand-magic-sparkles"></i>}
-                            Gerar Lista Padrão Agora
-                        </button>
+                        
+                        <div className="flex flex-col gap-3 w-full max-w-xs">
+                            <button 
+                                onClick={handleRegenerateMaterials} 
+                                disabled={loading}
+                                className="w-full bg-secondary text-white font-bold py-3 px-8 rounded-xl shadow-lg hover:bg-orange-600 transition-all flex items-center justify-center gap-2"
+                            >
+                                {loading ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-wand-magic-sparkles"></i>}
+                                Gerar Lista Padrão
+                            </button>
+                            <button 
+                                onClick={() => setAddMatModal(true)}
+                                className="w-full bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-300 font-bold py-3 px-8 rounded-xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 transition-all flex items-center justify-center gap-2"
+                            >
+                                <i className="fa-solid fa-plus"></i>
+                                Adicionar Manualmente
+                            </button>
+                        </div>
                     </div>
                  );
              }
@@ -1181,7 +1193,7 @@ const WorkDetail: React.FC = () => {
 
     return (
         <div className="max-w-4xl mx-auto min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col font-sans relative">
-            <div className="bg-white dark:bg-slate-900 px-6 pt-6 pb-2 sticky top-0 z-50 shadow-sm border-b border-slate-100 dark:border-slate-800 no-print">
+            <div className="bg-white dark:bg-slate-900 px-6 pt-6 pb-2 sticky top-0 z-20 shadow-sm border-b border-slate-100 dark:border-slate-800 no-print">
                 <div className="flex justify-between items-center mb-1">
                     <button onClick={() => subView !== 'NONE' ? setSubView('NONE') : navigate('/')} className="text-slate-400 hover:text-primary dark:hover:text-white"><i className="fa-solid fa-arrow-left text-xl"></i></button>
                     <h1 className="text-lg font-black text-primary dark:text-white uppercase tracking-tight truncate max-w-[200px]">
@@ -1190,38 +1202,17 @@ const WorkDetail: React.FC = () => {
                             : work.name
                         }
                     </h1>
-                    
-                    {/* DESKTOP TABS (Shown only on MD+, when in main view) */}
-                    {subView === 'NONE' && (
-                        <div className="hidden md:flex bg-slate-100 dark:bg-slate-800 p-1.5 rounded-xl shrink-0 gap-1 absolute right-6 top-1/2 -translate-y-1/2">
-                            {[
-                                { id: 'SCHEDULE', label: 'Cronograma', icon: 'fa-calendar-days' },
-                                { id: 'MATERIALS', label: 'Materiais', icon: 'fa-layer-group' },
-                                { id: 'FINANCIAL', label: 'Financeiro', icon: 'fa-chart-pie' },
-                                { id: 'MORE', label: 'Mais', icon: 'fa-bars' }
-                            ].map(tab => (
-                                <button 
-                                    key={tab.id} 
-                                    onClick={() => setActiveTab(tab.id as MainTab)}
-                                    className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${activeTab === tab.id ? 'bg-white dark:bg-slate-700 text-secondary shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
-                                >
-                                    <i className={`fa-solid ${tab.icon}`}></i> {tab.label}
-                                </button>
-                            ))}
-                        </div>
-                    )}
-                    
-                    <div className="w-6 md:hidden"></div> 
+                    <div className="w-6"></div> 
                 </div>
             </div>
 
-            <div className="flex-1 p-4 pb-32 md:pb-8 overflow-y-auto">
+            <div className="flex-1 p-4 pb-32 overflow-y-auto">
                 {subView !== 'NONE' ? renderSubViewContent() : renderMainTab()}
             </div>
 
-            {/* MAIN NAVIGATION BOTTOM BAR (Only visible on main tabs, mobile) - Increased Z-Index */}
+            {/* MAIN NAVIGATION BOTTOM BAR (Only visible on main tabs) */}
             {subView === 'NONE' && (
-                <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 pb-safe z-[60] shadow-[0_-5px_20px_rgba(0,0,0,0.05)] no-print">
+                <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 pb-safe z-40 shadow-[0_-5px_20px_rgba(0,0,0,0.05)] no-print">
                     <div className="flex justify-around items-center max-w-4xl mx-auto h-16">
                         <button onClick={() => setActiveTab('SCHEDULE')} className={`flex flex-col items-center justify-center w-full h-full gap-1 transition-all ${activeTab === 'SCHEDULE' ? 'text-secondary' : 'text-slate-400'}`}><i className={`fa-solid fa-calendar-days text-xl ${activeTab === 'SCHEDULE' ? 'scale-110' : ''}`}></i><span className="text-[10px] font-bold uppercase">Cronograma</span></button>
                         <button onClick={() => setActiveTab('MATERIALS')} className={`flex flex-col items-center justify-center w-full h-full gap-1 transition-all ${activeTab === 'MATERIALS' ? 'text-secondary' : 'text-slate-400'}`}><i className={`fa-solid fa-layer-group text-xl ${activeTab === 'MATERIALS' ? 'scale-110' : ''}`}></i><span className="text-[10px] font-bold uppercase">Materiais</span></button>
@@ -1235,7 +1226,7 @@ const WorkDetail: React.FC = () => {
             
             {/* ADD/EDIT STEP MODAL */}
             {isStepModalOpen && (
-                <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
                     <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-6 shadow-2xl">
                         <h3 className="text-xl font-bold mb-4 text-primary dark:text-white">{stepModalMode === 'ADD' ? 'Nova Etapa' : 'Editar Etapa'}</h3>
                         <form onSubmit={handleSaveStep} className="space-y-4">
@@ -1255,7 +1246,7 @@ const WorkDetail: React.FC = () => {
 
             {/* ADD MATERIAL MODAL */}
             {addMatModal && (
-                <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
                     <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-6 shadow-2xl overflow-y-auto max-h-[90vh]">
                         <h3 className="text-xl font-bold mb-4 text-primary dark:text-white">Novo Material</h3>
                         <form onSubmit={handleAddMaterial} className="space-y-4">
@@ -1290,7 +1281,7 @@ const WorkDetail: React.FC = () => {
 
             {/* EDIT MATERIAL MODAL */}
             {materialModal.isOpen && materialModal.material && (
-                <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
                     <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-6 shadow-2xl overflow-y-auto max-h-[90vh]">
                         <h3 className="text-xl font-bold mb-4 text-primary dark:text-white">Editar Material</h3>
                         
@@ -1353,7 +1344,7 @@ const WorkDetail: React.FC = () => {
 
             {/* EXPENSE MODAL (ADD / EDIT) */}
             {expenseModal.isOpen && (
-                <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
                     <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-6 shadow-2xl">
                         <div className="flex justify-between items-center mb-4">
                             <h3 className="text-xl font-bold text-primary dark:text-white">
@@ -1421,7 +1412,7 @@ const WorkDetail: React.FC = () => {
             
             {/* TEAM & SUPPLIER FORM MODAL */}
             {isPersonModalOpen && (
-                 <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
                     <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-6 shadow-2xl overflow-y-auto max-h-[90vh]">
                         <div className="flex items-center gap-3 mb-4">
                              <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl ${personMode === 'WORKER' ? 'bg-blue-100 text-blue-600' : 'bg-amber-100 text-amber-600'}`}><i className={`fa-solid ${personMode === 'WORKER' ? 'fa-helmet-safety' : 'fa-truck'}`}></i></div>
@@ -1440,7 +1431,7 @@ const WorkDetail: React.FC = () => {
 
             {/* CONTRACT VIEWER MODAL */}
             {viewContract && (
-                <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
                     <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-lg p-6 shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
                         <div className="flex justify-between items-center mb-4 pb-4 border-b border-slate-100 dark:border-slate-800">
                             <h3 className="text-xl font-bold text-primary dark:text-white">{viewContract.title}</h3>
@@ -1463,3 +1454,4 @@ const WorkDetail: React.FC = () => {
 };
 
 export default WorkDetail;
+
