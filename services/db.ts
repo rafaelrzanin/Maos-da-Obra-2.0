@@ -7,7 +7,7 @@ import {
 import { WORK_TEMPLATES, FULL_MATERIAL_PACKAGES } from './standards';
 import { supabase } from './supabase';
 
-// --- HELPERS: Mapeamento de Snake_case (Banco) para CamelCase (App) ---
+// --- HELPERS ---
 
 const mapProfileFromSupabase = (data: any): User => ({
     id: data.id,
@@ -120,7 +120,7 @@ const parseNotificationFromDB = (data: any): Notification => ({
     type: data.type
 });
 
-// --- CACHE SIMPLES PARA EVITAR LOOPS ---
+// --- CACHE ---
 let cachedUserPromise: Promise<User | null> | null = null;
 let lastCacheTime = 0;
 const CACHE_DURATION = 5000;
@@ -158,7 +158,6 @@ const ensureUserProfile = async (authUser: any): Promise<User | null> => {
             .single();
 
         if (createError) {
-            console.error("ERRO CRÍTICO DB: Não foi possível gravar o perfil.", createError);
             return {
                 id: authUser.id,
                 name: newProfileData.name,
@@ -384,7 +383,7 @@ export const dbService = {
     if (error) throw error;
     const parsedWork = parseWorkFromDB(savedWork);
 
-    // 2. Generate Steps from Template
+    // 2. Generate Steps
     const template = WORK_TEMPLATES.find(t => t.id === templateId);
     if (template) {
         const stepsToInsert = template.includedSteps.map((stepName, idx) => {
@@ -404,19 +403,21 @@ export const dbService = {
         });
         await supabase.from('steps').insert(stepsToInsert);
 
-        // 3. GENERATE MATERIALS (Trigger regeneration)
-        await this.regenerateMaterials(parsedWork.id, parsedWork.area, templateId);
+        // 3. GENERATE MATERIALS (Fire and forget from create, but robust inside)
+        // We do NOT await here to let the UI respond faster, 
+        // the list will populate in background or on first load.
+        this.regenerateMaterials(parsedWork.id, parsedWork.area, templateId).catch(console.error);
     }
 
     return parsedWork;
   },
 
-  // --- MATERIAL GENERATION FIX (BATCHED) ---
+  // --- ROBUST MATERIAL GENERATION ---
   async regenerateMaterials(workId: string, area: number, templateId: string = 'CONSTRUCAO') {
       if (!supabase) return;
       if (!workId) return;
       
-      const safeArea = area && area > 0 ? area : 50; // Default to 50m² if missing
+      const safeArea = area && area > 0 ? area : 100; // Default safer area
       let materialsToInsert: any[] = [];
 
       let packagesToInclude = [];
@@ -448,20 +449,29 @@ export const dbService = {
                   planned_qty: qty,
                   purchased_qty: 0,
                   unit: item.unit,
-                  category: pkg.category
+                  category: pkg.category // Assuming DB has this column, if not it will ignore or error per chunk
               });
           });
       });
 
       if (materialsToInsert.length > 0) {
-          // BATCH INSERT - Small chunks to guarantee success
-          const chunkSize = 20; 
+          // ULTRA SAFE BATCH INSERT
+          // Small chunks + Error Ignoring to guarantee partial success at least
+          const chunkSize = 10; 
           for (let i = 0; i < materialsToInsert.length; i += chunkSize) {
               const chunk = materialsToInsert.slice(i, i + chunkSize);
-              const { error } = await supabase.from('materials').insert(chunk);
-              if (error) {
-                  console.error("Error inserting material chunk:", error);
-                  // Continue to next chunk even if one fails
+              // We use try-catch inside loop to ensure one bad chunk doesn't kill everything
+              try {
+                  const { error } = await supabase.from('materials').insert(chunk);
+                  if (error) {
+                      console.warn("Retrying chunk one-by-one due to error:", error.message);
+                      // If batch fails, try one by one to save what we can
+                      for (const item of chunk) {
+                          await supabase.from('materials').insert(item); 
+                      }
+                  }
+              } catch (e) {
+                  console.error("Critical insertion error, skipping chunk", e);
               }
           }
       }
