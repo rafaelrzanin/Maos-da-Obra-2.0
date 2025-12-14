@@ -31,38 +31,6 @@ export const getRandomZeTip = (): ZeTip => {
   return ZE_TIPS[randomIndex];
 };
 
-export interface PhaseCategory {
-  category: string;
-  steps: string[];
-}
-
-export const STANDARD_PHASES: PhaseCategory[] = [
-  {
-    category: 'Preparação',
-    steps: ['Limpeza do terreno', 'Preparação de Canteiro', 'Demolição', 'Retirada de entulho']
-  },
-  {
-    category: 'Estrutura e Alvenaria',
-    steps: ['Fundações', 'Levantamento de paredes', 'Lajes e Vigas', 'Telhado']
-  },
-  {
-    category: 'Instalações',
-    steps: ['Rasgo de paredes', 'Tubulação de Água/Esgoto', 'Fiação Elétrica', 'Pontos de Ar Condicionado']
-  },
-  {
-    category: 'Acabamento Grosso',
-    steps: ['Chapisco e Reboco', 'Contrapiso', 'Gesso / Forro', 'Impermeabilização']
-  },
-  {
-    category: 'Acabamento Fino',
-    steps: ['Pisos e Revestimentos', 'Azulejos', 'Marmoraria (Bancadas)', 'Instalação de Louças e Metais', 'Esquadrias (Janelas/Portas)']
-  },
-  {
-    category: 'Pintura e Finalização',
-    steps: ['Massa Corrida e Lixamento', 'Pintura Paredes/Tetos', 'Instalação de Luminárias', 'Limpeza Final e Entrega']
-  }
-];
-
 export interface WorkTemplate {
   id: string;
   label: string;
@@ -72,6 +40,7 @@ export interface WorkTemplate {
   includedSteps: string[];
 }
 
+// NOTE: The steps here must MATCH the category names in FULL_MATERIAL_PACKAGES exactly for linking to work.
 export const WORK_TEMPLATES: WorkTemplate[] = [
   {
     id: 'CONSTRUCAO',
@@ -80,10 +49,23 @@ export const WORK_TEMPLATES: WorkTemplate[] = [
     description: 'Começar do terreno vazio até a mudança.',
     defaultDurationDays: 180,
     includedSteps: [
-      'Limpeza do terreno', 'Fundações', 'Levantamento de paredes', 'Lajes e Vigas', 'Telhado',
-      'Tubulação de Água/Esgoto', 'Fiação Elétrica', 'Chapisco e Reboco', 'Contrapiso',
-      'Impermeabilização', 'Gesso / Forro', 'Pisos e Revestimentos', 'Esquadrias (Janelas/Portas)',
-      'Marmoraria (Bancadas)', 'Pintura Paredes/Tetos', 'Instalação de Louças e Metais', 'Instalação de Luminárias',
+      'Limpeza do terreno', 
+      'Fundações', 
+      'Levantamento de paredes', 
+      'Lajes e Vigas', 
+      'Telhado',
+      'Tubulação de Água/Esgoto', 
+      'Fiação Elétrica', 
+      'Chapisco e Reboco', 
+      'Contrapiso',
+      'Impermeabilização', 
+      'Gesso / Forro', 
+      'Pisos e Revestimentos', 
+      'Esquadrias (Janelas/Portas)',
+      'Marmoraria (Bancadas)', 
+      'Pintura Paredes/Tetos', 
+      'Instalação de Louças e Metais', 
+      'Instalação de Luminárias',
       'Limpeza Final e Entrega'
     ]
   },
@@ -94,9 +76,17 @@ export const WORK_TEMPLATES: WorkTemplate[] = [
     description: 'Geral: pisos, pintura, gesso e elétrica.',
     defaultDurationDays: 60,
     includedSteps: [
-      'Demolição', 'Retirada de entulho', 'Tubulação de Água/Esgoto', 'Fiação Elétrica',
-      'Gesso / Forro', 'Pisos e Revestimentos', 'Azulejos', 'Marmoraria (Bancadas)',
-      'Pintura Paredes/Tetos', 'Instalação de Louças e Metais', 'Instalação de Luminárias', 'Limpeza Final e Entrega'
+      'Demolição', 
+      'Retirada de entulho', 
+      'Tubulação de Água/Esgoto', 
+      'Fiação Elétrica',
+      'Gesso / Forro', 
+      'Pisos e Revestimentos', 
+      'Marmoraria (Bancadas)',
+      'Pintura Paredes/Tetos', 
+      'Instalação de Louças e Metais', 
+      'Instalação de Luminárias', 
+      'Limpeza Final e Entrega'
     ]
   },
   {
@@ -106,9 +96,15 @@ export const WORK_TEMPLATES: WorkTemplate[] = [
     description: 'Troca de piso, louças e impermeabilização.',
     defaultDurationDays: 15,
     includedSteps: [
-      'Demolição', 'Tubulação de Água/Esgoto', 'Impermeabilização', 'Contrapiso', 
-      'Azulejos', 'Pisos e Revestimentos', 'Gesso / Forro', 'Marmoraria (Bancadas)',
-      'Instalação de Louças e Metais', 'Limpeza Final e Entrega'
+      'Demolição', 
+      'Tubulação de Água/Esgoto', 
+      'Impermeabilização', 
+      'Contrapiso', 
+      'Pisos e Revestimentos', 
+      'Gesso / Forro', 
+      'Marmoraria (Bancadas)',
+      'Instalação de Louças e Metais', 
+      'Limpeza Final e Entrega'
     ]
   },
   {
@@ -118,8 +114,13 @@ export const WORK_TEMPLATES: WorkTemplate[] = [
     description: 'Azulejos, bancadas e instalações.',
     defaultDurationDays: 20,
     includedSteps: [
-      'Demolição', 'Rasgo de paredes', 'Tubulação de Água/Esgoto', 'Fiação Elétrica',
-      'Azulejos', 'Pisos e Revestimentos', 'Marmoraria (Bancadas)', 'Instalação de Louças e Metais', 'Limpeza Final e Entrega'
+      'Demolição', 
+      'Tubulação de Água/Esgoto', 
+      'Fiação Elétrica',
+      'Pisos e Revestimentos', 
+      'Marmoraria (Bancadas)', 
+      'Instalação de Louças e Metais', 
+      'Limpeza Final e Entrega'
     ]
   },
   {
@@ -129,7 +130,9 @@ export const WORK_TEMPLATES: WorkTemplate[] = [
     description: 'Renovar as paredes e tetos.',
     defaultDurationDays: 10,
     includedSteps: [
-      'Proteção do piso', 'Massa Corrida e Lixamento', 'Pintura Paredes/Tetos', 'Limpeza Final e Entrega'
+      'Proteção do piso', 
+      'Pintura Paredes/Tetos', 
+      'Limpeza Final e Entrega'
     ]
   }
 ];
@@ -139,9 +142,10 @@ export interface MaterialCatalog {
   items: {name: string, unit: string, multiplier?: number}[];
 }
 
+// CRITICAL: The 'category' key here MUST match the step names in WORK_TEMPLATES above.
 export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
   {
-    category: 'Limpeza e Canteiro',
+    category: 'Limpeza do terreno',
     items: [
       { name: 'Sacos de Ráfia (Entulho)', unit: 'un', multiplier: 0.8 },
       { name: 'Caçamba Estacionária', unit: 'un', multiplier: 0.05 },
@@ -153,7 +157,7 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
     ]
   },
   {
-    category: 'Fundação e Estrutura',
+    category: 'Fundações',
     items: [
       { name: 'Cimento CP-II (Estrutural)', unit: 'sacos', multiplier: 0.4 },
       { name: 'Areia Média (Lavada)', unit: 'm³', multiplier: 0.06 },
@@ -168,7 +172,7 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
     ]
   },
   {
-    category: 'Alvenaria (Paredes)',
+    category: 'Levantamento de paredes',
     items: [
       { name: 'Tijolo Cerâmico 8 furos', unit: 'milheiro', multiplier: 0.085 },
       { name: 'Cimento CP-II (Assentamento)', unit: 'sacos', multiplier: 0.25 },
@@ -176,6 +180,16 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
       { name: 'Areia Média', unit: 'm³', multiplier: 0.05 },
       { name: 'Ferro para Vergas (Treliça/Cabelo)', unit: 'barras', multiplier: 0.15 },
       { name: 'Aditivo Plastificante (Vedalit)', unit: 'litros', multiplier: 0.05 }
+    ]
+  },
+  {
+    category: 'Lajes e Vigas',
+    items: [
+      { name: 'Laje Pré-moldada (Vigota+Isopor)', unit: 'm²', multiplier: 1.05 },
+      { name: 'Concreto Usinado (Caminhão)', unit: 'm³', multiplier: 0.12 },
+      { name: 'Malha de Ferro (Pop)', unit: 'un', multiplier: 0.15 },
+      { name: 'Caixa de Luz de Laje', unit: 'un', multiplier: 0.1 },
+      { name: 'Eletroduto Laranja (Laje)', unit: 'rolos', multiplier: 0.05 }
     ]
   },
   {
@@ -207,7 +221,7 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
     ]
   },
   {
-    category: 'Telhado e Cobertura',
+    category: 'Telhado',
     items: [
       { name: 'Telha (Cerâmica/Concreto)', unit: 'un', multiplier: 17 }, 
       { name: 'Viga de Madeira (Peroba/Garapeira) 6x12', unit: 'm', multiplier: 0.6 },
@@ -220,25 +234,22 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
     ]
   },
   {
-    category: 'Instalações Elétricas (Infra)',
+    category: 'Fiação Elétrica',
     items: [
       { name: 'Eletroduto Corrugado 3/4 (Amarelo)', unit: 'rolos', multiplier: 0.15 },
-      { name: 'Eletroduto Corrugado 1" (Laranja - Laje)', unit: 'rolos', multiplier: 0.05 },
       { name: 'Caixa de Luz 4x2 (Parede)', unit: 'un', multiplier: 0.5 },
-      { name: 'Caixa de Luz 4x4 (Teto/Parede)', unit: 'un', multiplier: 0.15 },
       { name: 'Quadro de Distribuição (12/24 din)', unit: 'un', multiplier: 0.01 },
       { name: 'Cabo Flexível 2.5mm (Tomadas)', unit: 'rolos 100m', multiplier: 0.06 },
       { name: 'Cabo Flexível 1.5mm (Iluminação)', unit: 'rolos 100m', multiplier: 0.04 },
       { name: 'Cabo Flexível 6.0mm (Chuveiro)', unit: 'm', multiplier: 0.6 },
-      { name: 'Cabo Flexível 10.0mm (Entrada)', unit: 'm', multiplier: 0.2 },
       { name: 'Disjuntor Unipolar (10A/16A/20A)', unit: 'un', multiplier: 0.2 },
       { name: 'Disjuntor Bipolar (40A/50A)', unit: 'un', multiplier: 0.03 },
-      { name: 'Disjuntor DR (Segurança)', unit: 'un', multiplier: 0.01 },
-      { name: 'Haste de Aterramento (Cobre)', unit: 'un', multiplier: 0.02 }
+      { name: 'Haste de Aterramento (Cobre)', unit: 'un', multiplier: 0.02 },
+      { name: 'Fita Isolante', unit: 'un', multiplier: 0.05 }
     ]
   },
   {
-    category: 'Instalações Hidráulicas (Tubulação)',
+    category: 'Tubulação de Água/Esgoto',
     items: [
       { name: 'Tubo Soldável 25mm (Água Fria)', unit: 'barras 6m', multiplier: 0.3 },
       { name: 'Tubo Soldável 50mm (Alimentação)', unit: 'barras 6m', multiplier: 0.05 },
@@ -246,16 +257,14 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
       { name: 'Tubo Esgoto 40mm/50mm (Secundário)', unit: 'barras 6m', multiplier: 0.2 },
       { name: 'Joelho 90 graus 25mm', unit: 'un', multiplier: 0.8 },
       { name: 'Tê Soldável 25mm', unit: 'un', multiplier: 0.3 },
-      { name: 'Luva de Correr (Reparo)', unit: 'un', multiplier: 0.05 },
       { name: 'Cola PVC (Adesivo Plástico)', unit: 'frasco', multiplier: 0.05 },
       { name: 'Registro de Gaveta 3/4 (Geral)', unit: 'un', multiplier: 0.03 },
       { name: 'Registro de Pressão 3/4 (Chuveiro)', unit: 'un', multiplier: 0.03 },
-      { name: 'Caixa Sifonada 150x150', unit: 'un', multiplier: 0.04 },
-      { name: 'Ralo Seco', unit: 'un', multiplier: 0.03 }
+      { name: 'Caixa Sifonada 150x150', unit: 'un', multiplier: 0.04 }
     ]
   },
   {
-    category: 'Gesso e Drywall',
+    category: 'Gesso / Forro',
     items: [
       { name: 'Placa de Gesso 60x60 (Plaquinha)', unit: 'un', multiplier: 3.0 },
       { name: 'Chapa Drywall ST (Standard)', unit: 'chapa', multiplier: 0.4 },
@@ -266,7 +275,7 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
     ]
   },
   {
-    category: 'Pisos e Revestimentos Cerâmicos',
+    category: 'Pisos e Revestimentos',
     items: [
       { name: 'Piso / Porcelanato (Chão)', unit: 'm²', multiplier: 1.15 },
       { name: 'Revestimento (Parede)', unit: 'm²', multiplier: 0.8 },
@@ -278,7 +287,7 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
     ]
   },
   {
-    category: 'Marmoraria e Granitos',
+    category: 'Marmoraria (Bancadas)',
     items: [
       { name: 'Bancada Cozinha (Granito/Mármore)', unit: 'm²', multiplier: 0.02 },
       { name: 'Bancada Banheiro', unit: 'un', multiplier: 0.025 },
@@ -290,7 +299,7 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
     ]
   },
   {
-    category: 'Esquadrias e Vidros',
+    category: 'Esquadrias (Janelas/Portas)',
     items: [
       { name: 'Porta de Madeira Completa (Interna)', unit: 'un', multiplier: 0.08 },
       { name: 'Fechadura Interna', unit: 'un', multiplier: 0.08 },
@@ -301,7 +310,7 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
     ]
   },
   {
-    category: 'Louças e Metais (Acabamento Hidro)',
+    category: 'Instalação de Louças e Metais',
     items: [
       { name: 'Vaso Sanitário com Caixa Acoplada', unit: 'un', multiplier: 0.025 },
       { name: 'Assento Sanitário', unit: 'un', multiplier: 0.025 },
@@ -310,23 +319,21 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
       { name: 'Chuveiro / Ducha', unit: 'un', multiplier: 0.025 },
       { name: 'Kit Acessórios (Toalheiro/Papeleira)', unit: 'kit', multiplier: 0.025 },
       { name: 'Sifão Universal', unit: 'un', multiplier: 0.05 },
-      { name: 'Engate Flexível', unit: 'un', multiplier: 0.05 },
-      { name: 'Válvula de Escoamento (Ralo pia)', unit: 'un', multiplier: 0.05 }
+      { name: 'Engate Flexível', unit: 'un', multiplier: 0.05 }
     ]
   },
   {
-    category: 'Elétrica (Acabamento)',
+    category: 'Instalação de Luminárias',
     items: [
       { name: 'Conjunto Tomada 10A (Placa+Módulo)', unit: 'un', multiplier: 0.3 },
       { name: 'Conjunto Tomada 20A', unit: 'un', multiplier: 0.1 },
       { name: 'Conjunto Interruptor Simples', unit: 'un', multiplier: 0.1 },
-      { name: 'Conjunto Interruptor Paralelo (Three-way)', unit: 'un', multiplier: 0.05 },
       { name: 'Plafon / Luminária LED', unit: 'un', multiplier: 0.15 },
-      { name: 'Fita Isolante', unit: 'un', multiplier: 0.05 }
+      { name: 'Lâmpadas', unit: 'un', multiplier: 0.2 }
     ]
   },
   {
-    category: 'Pintura',
+    category: 'Pintura Paredes/Tetos',
     items: [
       { name: 'Lixa de Parede (100/150/220)', unit: 'folhas', multiplier: 0.8 },
       { name: 'Selador Acrílico (Fundo)', unit: 'latas 18L', multiplier: 0.03 },
@@ -342,7 +349,7 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
     ]
   },
   {
-    category: 'Limpeza Final',
+    category: 'Limpeza Final e Entrega',
     items: [
       { name: 'Ácido para Limpeza de Pedras', unit: 'galão', multiplier: 0.02 },
       { name: 'Detergente Pós-Obra', unit: 'galão', multiplier: 0.02 },
@@ -553,3 +560,4 @@ export const LIFETIME_BONUSES = [
     desc: 'Acesso prioritário e sem limites ao nosso engenheiro virtual via IA.'
   }
 ];
+
