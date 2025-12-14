@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
@@ -210,6 +209,7 @@ const WorkDetail: React.FC = () => {
         
         const hasPurchase = matBuyQty && Number(matBuyQty) > 0;
 
+        // 1. Update Definition
         const updatedMaterial = {
             ...materialModal.material,
             name: matName,
@@ -219,6 +219,7 @@ const WorkDetail: React.FC = () => {
         };
         await dbService.updateMaterial(updatedMaterial);
 
+        // 2. Register Purchase (if applicable)
         if (hasPurchase) {
             await dbService.registerMaterialPurchase(
                 materialModal.material.id,
@@ -233,19 +234,6 @@ const WorkDetail: React.FC = () => {
 
         setMaterialModal({ isOpen: false, material: null });
         await load();
-    };
-
-    const handleRegenerateMaterials = async () => {
-        if (!work) return;
-        setLoading(true);
-        try {
-            await dbService.regenerateMaterials(work.id, work.area);
-            await load(); // Reload to see the new materials
-        } catch (e) {
-            alert("Erro ao gerar lista.");
-        } finally {
-            setLoading(false);
-        }
     };
 
     const openAddExpense = () => {
@@ -451,40 +439,6 @@ const WorkDetail: React.FC = () => {
     if (loading) return <div className="h-screen flex items-center justify-center"><i className="fa-solid fa-circle-notch fa-spin text-3xl text-primary"></i></div>;
     if (!work) return null;
 
-    // Helper Function for Rendering Material Cards
-    const renderMaterialCard = (mat: Material) => {
-        const hasPlanned = mat.plannedQty > 0;
-        const purchased = mat.purchasedQty;
-        const progress = hasPlanned ? Math.min(100, (purchased / mat.plannedQty) * 100) : 0;
-        
-        let statusText = 'Pendente';
-        let statusColor = 'bg-slate-100 text-slate-500';
-        let barColor = 'bg-slate-200';
-
-        if (purchased >= mat.plannedQty) {
-            statusText = 'Concluído';
-            statusColor = 'bg-green-100 text-green-700';
-            barColor = 'bg-green-500';
-        } else if (purchased > 0) {
-            statusText = 'Parcial';
-            statusColor = 'bg-orange-100 text-orange-600';
-            barColor = 'bg-secondary';
-        }
-
-        return (
-            <div key={mat.id} onClick={() => { setMaterialModal({isOpen: true, material: mat}); setMatName(mat.name); setMatBrand(mat.brand||''); setMatPlannedQty(String(mat.plannedQty)); setMatUnit(mat.unit); setMatBuyQty(''); setMatBuyCost(''); }} className={`bg-white dark:bg-slate-900 p-4 rounded-2xl border shadow-sm cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md ${statusText === 'Concluído' ? 'border-green-200 dark:border-green-900/30' : 'border-slate-100 dark:border-slate-800'}`}>
-                <div className="flex justify-between items-start mb-2">
-                    <div><div className="font-bold text-primary dark:text-white text-base leading-tight">{mat.name}</div>{mat.brand && <div className="text-xs text-slate-400 font-bold uppercase mt-0.5">{mat.brand}</div>}</div>
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${statusColor}`}>{statusText}</span>
-                </div>
-                <div className="mt-3 flex items-center gap-3">
-                    <div className="flex-1 h-2.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden"><div className={`h-full transition-all duration-500 ${barColor}`} style={{ width: `${progress}%` }}></div></div>
-                    <div className="text-xs font-mono font-bold text-slate-500 whitespace-nowrap bg-slate-50 dark:bg-slate-800 px-2 py-1 rounded">{mat.purchasedQty}/{mat.plannedQty} {mat.unit}</div>
-                </div>
-            </div>
-        );
-    };
-
     // --- RENDER CONTENT ---
 
     const renderMainTab = () => {
@@ -503,6 +457,7 @@ const WorkDetail: React.FC = () => {
                          const isDone = step.status === StepStatus.COMPLETED;
                          const isInProgress = step.status === StepStatus.IN_PROGRESS;
                          
+                         // Determine Delay (Late) status
                          const today = new Date().toISOString().split('T')[0];
                          const isDelayed = step.endDate < today && !isDone;
 
@@ -519,6 +474,7 @@ const WorkDetail: React.FC = () => {
                              iconColor = 'bg-green-500 border-green-500 text-white';
                              iconClass = 'fa-check';
                          } else if (isDelayed) {
+                             // Red style for delayed items
                              statusBadgeClass = 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400';
                              statusText = 'Atrasado';
                              cardBorderClass = 'border-red-200 dark:border-red-900/30';
@@ -566,30 +522,10 @@ const WorkDetail: React.FC = () => {
         }
 
         if (activeTab === 'MATERIALS') {
+             // Filter Logic
              const filteredSteps = materialFilterStepId === 'ALL' 
                 ? steps 
                 : steps.filter(s => s.id === materialFilterStepId);
-
-             // EMPTY STATE RECOVERY BUTTON
-             if (materials.length === 0) {
-                 return (
-                    <div className="flex flex-col items-center justify-center h-[50vh] text-center px-4 animate-in fade-in">
-                        <div className="w-20 h-20 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mb-6 text-slate-400">
-                            <i className="fa-solid fa-box-open text-4xl"></i>
-                        </div>
-                        <h3 className="text-xl font-bold text-primary dark:text-white mb-2">Lista de Materiais Vazia</h3>
-                        <p className="text-slate-500 text-sm mb-8 max-w-xs">Parece que os materiais não foram gerados automaticamente.</p>
-                        <button 
-                            onClick={handleRegenerateMaterials} 
-                            disabled={loading}
-                            className="bg-secondary text-white font-bold py-3 px-8 rounded-xl shadow-lg hover:bg-orange-600 transition-all flex items-center gap-2"
-                        >
-                            {loading ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-wand-magic-sparkles"></i>}
-                            Gerar Lista Padrão Agora
-                        </button>
-                    </div>
-                 );
-             }
 
              return (
                 <div className="space-y-6 animate-in fade-in">
@@ -602,6 +538,7 @@ const WorkDetail: React.FC = () => {
                             <button onClick={() => setAddMatModal(true)} className="bg-primary text-white w-12 h-12 rounded-xl flex items-center justify-center hover:bg-primary-light transition-all shadow-lg shadow-primary/30"><i className="fa-solid fa-plus text-lg"></i></button>
                         </div>
                         
+                        {/* STEP FILTER DROPDOWN */}
                         <div className="px-2">
                             <select 
                                 value={materialFilterStepId}
@@ -616,53 +553,67 @@ const WorkDetail: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* RENDER STEP GROUPS */}
                     {filteredSteps.map((step) => {
-                        const originalIdx = steps.findIndex(s => s.id === step.id);
+                        const originalIdx = steps.findIndex(s => s.id === step.id); // For correct numbering
                         const stepMaterials = materials ? materials.filter(m => m.stepId === step.id) : [];
                         
+                        if (stepMaterials.length === 0 && materialFilterStepId !== 'ALL') {
+                            return <div key={step.id} className="text-center text-slate-400 py-8 italic text-sm">Sem materiais cadastrados nesta etapa.</div>;
+                        }
                         if (stepMaterials.length === 0) return null;
                         
                         return (
                             <div key={step.id} className="mb-8 bg-white/50 dark:bg-slate-900/50 rounded-2xl p-2">
+                                {/* Stronger Visual Separation for Step Header */}
                                 <div className="flex items-center gap-3 mb-4 p-3 bg-white dark:bg-slate-900 rounded-xl shadow-sm border-l-4 border-secondary">
                                     <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 text-secondary font-black text-sm flex items-center justify-center">
                                         {String(originalIdx+1).padStart(2,'0')}
                                     </div>
                                     <h3 className="font-bold text-lg text-primary dark:text-white uppercase tracking-tight">{step.name}</h3>
                                 </div>
+
                                 <div className="space-y-3 px-1">
-                                    {stepMaterials.map(mat => renderMaterialCard(mat))}
+                                    {stepMaterials.map(mat => {
+                                        const hasPlanned = mat.plannedQty > 0;
+                                        const purchased = mat.purchasedQty;
+                                        const progress = hasPlanned ? Math.min(100, (purchased / mat.plannedQty) * 100) : 0;
+                                        
+                                        // Logic for Partial/Complete/Pending
+                                        let statusText = 'Pendente';
+                                        let statusColor = 'bg-slate-100 text-slate-500';
+                                        let barColor = 'bg-slate-200';
+
+                                        if (purchased >= mat.plannedQty) {
+                                            statusText = 'Concluído';
+                                            statusColor = 'bg-green-100 text-green-700';
+                                            barColor = 'bg-green-500';
+                                        } else if (purchased > 0) {
+                                            statusText = 'Parcial';
+                                            statusColor = 'bg-orange-100 text-orange-600';
+                                            barColor = 'bg-secondary'; // Orange/Amber
+                                        }
+
+                                        return (
+                                            <div key={mat.id} onClick={() => { setMaterialModal({isOpen: true, material: mat}); setMatName(mat.name); setMatBrand(mat.brand||''); setMatPlannedQty(String(mat.plannedQty)); setMatUnit(mat.unit); setMatBuyQty(''); setMatBuyCost(''); }} className={`bg-white dark:bg-slate-900 p-4 rounded-2xl border shadow-sm cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md ${statusText === 'Concluído' ? 'border-green-200 dark:border-green-900/30' : 'border-slate-100 dark:border-slate-800'}`}>
+                                                <div className="flex justify-between items-start mb-2">
+                                                    <div><div className="font-bold text-primary dark:text-white text-base leading-tight">{mat.name}</div>{mat.brand && <div className="text-xs text-slate-400 font-bold uppercase mt-0.5">{mat.brand}</div>}</div>
+                                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${statusColor}`}>{statusText}</span>
+                                                </div>
+                                                <div className="mt-3 flex items-center gap-3">
+                                                    <div className="flex-1 h-2.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden"><div className={`h-full transition-all duration-500 ${barColor}`} style={{ width: `${progress}%` }}></div></div>
+                                                    <div className="text-xs font-mono font-bold text-slate-500 whitespace-nowrap bg-slate-50 dark:bg-slate-800 px-2 py-1 rounded">{mat.purchasedQty}/{mat.plannedQty} {mat.unit}</div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
                                 </div>
                             </div>
                         );
                     })}
-
-                    {/* RENDER UNLINKED MATERIALS (Without Step ID) - Grouped by Category */}
-                    {materialFilterStepId === 'ALL' && (
-                        Object.entries(materials.filter(m => !m.stepId).reduce((acc, m) => {
-                            const cat = m.category || 'Geral';
-                            if (!acc[cat]) acc[cat] = [];
-                            acc[cat].push(m);
-                            return acc;
-                        }, {} as Record<string, Material[]>)).map(([category, items]) => (
-                            <div key={category} className="mb-8 bg-white/50 dark:bg-slate-900/50 rounded-2xl p-2">
-                                <div className="flex items-center gap-3 mb-4 p-3 bg-white dark:bg-slate-900 rounded-xl shadow-sm border-l-4 border-slate-400">
-                                    <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 font-black text-sm flex items-center justify-center">
-                                        <i className="fa-solid fa-layer-group"></i>
-                                    </div>
-                                    <h3 className="font-bold text-lg text-primary dark:text-white uppercase tracking-tight">{category}</h3>
-                                </div>
-                                <div className="space-y-3 px-1">
-                                    {items.map(mat => renderMaterialCard(mat))}
-                                </div>
-                            </div>
-                        ))
-                    )}
                 </div>
              );
         }
-        
+
         if (activeTab === 'FINANCIAL') {
             return (
                 <div className="space-y-6 animate-in fade-in">
@@ -681,9 +632,10 @@ const WorkDetail: React.FC = () => {
                         <div className="flex items-center gap-2 text-xs opacity-70 bg-white/10 w-fit px-3 py-1 rounded-full"><i className="fa-solid fa-wallet"></i> Orçamento: R$ {work.budgetPlanned.toLocaleString('pt-BR')}</div>
                     </div>
 
+                    {/* Grouped Financial Expenses by Step */}
                     {[...steps, { id: 'general', name: 'Despesas Gerais / Sem Etapa', startDate: '', endDate: '', status: StepStatus.NOT_STARTED, workId: '', isDelayed: false }].map((step, idx) => {
                         const stepExpenses = expenses.filter(e => {
-                            if (step.id === 'general') return !e.stepId;
+                            if (step.id === 'general') return !e.stepId; // Expenses without stepId
                             return e.stepId === step.id;
                         });
 
@@ -700,6 +652,7 @@ const WorkDetail: React.FC = () => {
                                 </div>
                                 <div className="space-y-3">
                                     {stepExpenses.map(exp => {
+                                        // PARTIAL PAYMENT LOGIC
                                         const isPartial = exp.totalAgreed && exp.totalAgreed > exp.amount;
                                         const progress = isPartial ? (exp.amount / exp.totalAgreed!) * 100 : 100;
 
@@ -722,10 +675,12 @@ const WorkDetail: React.FC = () => {
                                                         </div>
                                                     </div>
                                                     <div className="text-right">
+                                                        {/* MAIN VALUE IS ALWAYS PAID AMOUNT */}
                                                         <span className="font-bold text-primary dark:text-white text-lg whitespace-nowrap">R$ {Number(exp.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                                                     </div>
                                                 </div>
                                                 
+                                                {/* VISUAL FOR PARTIAL PAYMENTS */}
                                                 {isPartial && (
                                                     <div className="mt-2 pt-2 border-t border-dashed border-slate-100 dark:border-slate-800">
                                                         <div className="flex justify-between text-[10px] uppercase font-bold text-slate-400 mb-1">
@@ -825,7 +780,7 @@ const WorkDetail: React.FC = () => {
         return null;
     };
 
-    // --- RENDER SUBVIEW CONTENT ---
+    // --- RENDER SUBVIEW ---
     const renderSubViewContent = () => {
         switch(subView) {
             case 'TEAM': return (
@@ -841,7 +796,6 @@ const WorkDetail: React.FC = () => {
                         {workers.map(w => (
                             <div key={w.id} className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm flex items-center justify-between">
                                 <div className="flex items-center gap-4 cursor-pointer flex-1" onClick={() => openPersonModal('WORKER', w)}>
-                                    {/* FIXED ICON: HELMET */}
                                     <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 text-xl"><i className="fa-solid fa-helmet-safety"></i></div>
                                     <div><h4 className="font-bold text-primary dark:text-white">{w.name}</h4><p className="text-xs text-slate-500 font-bold">{w.role}</p></div>
                                 </div>
@@ -1181,6 +1135,27 @@ const WorkDetail: React.FC = () => {
                             : work.name
                         }
                     </h1>
+                    
+                    {/* DESKTOP TABS (Shown only on MD+, when in main view) */}
+                    {subView === 'NONE' && (
+                        <div className="hidden md:flex bg-slate-100 dark:bg-slate-800 p-1.5 rounded-xl shrink-0 gap-1 absolute right-6 top-1/2 -translate-y-1/2">
+                            {[
+                                { id: 'SCHEDULE', label: 'Cronograma', icon: 'fa-calendar-days' },
+                                { id: 'MATERIALS', label: 'Materiais', icon: 'fa-layer-group' },
+                                { id: 'FINANCIAL', label: 'Financeiro', icon: 'fa-chart-pie' },
+                                { id: 'MORE', label: 'Mais', icon: 'fa-bars' }
+                            ].map(tab => (
+                                <button 
+                                    key={tab.id} 
+                                    onClick={() => setActiveTab(tab.id as MainTab)}
+                                    className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${activeTab === tab.id ? 'bg-white dark:bg-slate-700 text-secondary shadow-sm' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                                >
+                                    <i className={`fa-solid ${tab.icon}`}></i> {tab.label}
+                                </button>
+                            ))}
+                        </div>
+                    )}
+                    
                     <div className="w-6 md:hidden"></div> 
                 </div>
             </div>
@@ -1189,6 +1164,7 @@ const WorkDetail: React.FC = () => {
                 {subView !== 'NONE' ? renderSubViewContent() : renderMainTab()}
             </div>
 
+            {/* MAIN NAVIGATION BOTTOM BAR (Only visible on main tabs, mobile) */}
             {subView === 'NONE' && (
                 <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 pb-safe z-40 shadow-[0_-5px_20px_rgba(0,0,0,0.05)] no-print">
                     <div className="flex justify-around items-center max-w-4xl mx-auto h-16">
@@ -1432,4 +1408,3 @@ const WorkDetail: React.FC = () => {
 };
 
 export default WorkDetail;
-
