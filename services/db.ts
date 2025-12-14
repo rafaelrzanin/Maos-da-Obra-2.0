@@ -58,7 +58,7 @@ const parseMaterialFromDB = (data: any): Material => ({
     purchasedQty: Number(data.purchased_qty || 0),
     unit: data.unit,
     stepId: data.step_id,
-    category: data.category // Added category parsing
+    category: data.category
 });
 
 const parseExpenseFromDB = (data: any): Expense => ({
@@ -123,9 +123,8 @@ const parseNotificationFromDB = (data: any): Notification => ({
 // --- CACHE SIMPLES PARA EVITAR LOOPS ---
 let cachedUserPromise: Promise<User | null> | null = null;
 let lastCacheTime = 0;
-const CACHE_DURATION = 5000; // 5 segundos de cache
+const CACHE_DURATION = 5000;
 
-// --- CRITICAL FIX: Ensure Profile Exists (Unbreakable Version) ---
 const ensureUserProfile = async (authUser: any): Promise<User | null> => {
     if (!authUser || !supabase) return null;
 
@@ -190,7 +189,6 @@ export const dbService = {
     if (!supabase) return null;
     
     const now = Date.now();
-    // Retorna cache se for recente (Evita spam no banco)
     if (cachedUserPromise && (now - lastCacheTime < CACHE_DURATION)) {
         return cachedUserPromise;
     }
@@ -206,7 +204,6 @@ export const dbService = {
   },
 
   async syncSession() {
-    // Força limpeza do cache para buscar dados frescos
     cachedUserPromise = null;
     return this.getCurrentUser();
   },
@@ -214,7 +211,6 @@ export const dbService = {
   onAuthChange(callback: (user: User | null) => void) {
     if (!supabase) return () => {};
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-        // Limpa cache ao mudar estado de auth
         cachedUserPromise = null;
         
         if (session?.user) {
@@ -232,7 +228,7 @@ export const dbService = {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password: password || '' });
     if (error) throw error;
     if (data.user) {
-        cachedUserPromise = null; // Limpa cache
+        cachedUserPromise = null;
         return await ensureUserProfile(data.user);
     }
     return null;
@@ -307,7 +303,7 @@ export const dbService = {
       if (newPassword) {
           await supabase.auth.updateUser({ password: newPassword });
       }
-      cachedUserPromise = null; // Força recarga no próximo uso
+      cachedUserPromise = null;
   },
 
   async resetPassword(email: string) {
@@ -415,11 +411,12 @@ export const dbService = {
     return parsedWork;
   },
 
-  // Function to regenerate materials manually if missing
+  // --- MATERIAL GENERATION FIX (BATCHED) ---
   async regenerateMaterials(workId: string, area: number, templateId: string = 'CONSTRUCAO') {
       if (!supabase) return;
+      if (!workId) return;
       
-      const safeArea = area || 50;
+      const safeArea = area && area > 0 ? area : 50; // Default to 50m² if missing
       let materialsToInsert: any[] = [];
 
       let packagesToInclude = [];
@@ -457,11 +454,15 @@ export const dbService = {
       });
 
       if (materialsToInsert.length > 0) {
-          // BATCH INSERT TO PREVENT TIMEOUTS
-          const chunkSize = 25; // Safe batch size
+          // BATCH INSERT - Small chunks to guarantee success
+          const chunkSize = 20; 
           for (let i = 0; i < materialsToInsert.length; i += chunkSize) {
               const chunk = materialsToInsert.slice(i, i + chunkSize);
-              await supabase.from('materials').insert(chunk);
+              const { error } = await supabase.from('materials').insert(chunk);
+              if (error) {
+                  console.error("Error inserting material chunk:", error);
+                  // Continue to next chunk even if one fails
+              }
           }
       }
   },
