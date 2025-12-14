@@ -26,6 +26,7 @@ const LoadingScreen = () => (
             <i className="fa-solid fa-helmet-safety"></i>
         </div>
     </div>
+    <p className="mt-4 text-slate-400 text-sm font-bold animate-pulse">Carregando...</p>
   </div>
 );
 
@@ -76,8 +77,12 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
 
     const initAuth = async () => {
       try {
-        // Verifica sessão atual
-        const currentUser = await dbService.getCurrentUser();
+        // Timeout de segurança: se o DB demorar mais de 4s, libera a UI (vai pro login)
+        const timeoutPromise = new Promise(resolve => setTimeout(() => resolve(null), 4000));
+        const authPromise = dbService.getCurrentUser();
+        
+        const currentUser = await Promise.race([authPromise, timeoutPromise]) as User | null;
+        
         if (mounted) {
           setUser(currentUser);
         }
