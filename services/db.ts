@@ -125,11 +125,13 @@ let cachedUserPromise: Promise<User | null> | null = null;
 let lastCacheTime = 0;
 const CACHE_DURATION = 5000;
 
+// Função crítica: Garante que o perfil existe. Se falhar com 403, o app trava.
 const ensureUserProfile = async (authUser: any): Promise<User | null> => {
     if (!authUser || !supabase) return null;
 
     try {
-        const { data: existingProfile } = await supabase
+        // 1. Tenta ler o perfil existente
+        const { data: existingProfile, error: readError } = await supabase
             .from('profiles')
             .select('*')
             .eq('id', authUser.id)
@@ -139,6 +141,21 @@ const ensureUserProfile = async (authUser: any): Promise<User | null> => {
             return mapProfileFromSupabase(existingProfile);
         }
 
+        // Se deu erro de permissão (403), não adianta tentar inserir, vai falhar também.
+        // Mas se for null (não encontrado), tentamos inserir.
+        if (readError && readError.code === '42501') { // 42501 = Permission denied
+             console.error("ERRO CRÍTICO 403: Permissão negada ao ler perfil. Verifique as Policies no Supabase.");
+             // Tentamos retornar um objeto temporário para não crashar a UI, mas as operações de banco falharão
+             return {
+                id: authUser.id,
+                name: authUser.user_metadata?.name || 'Erro de Permissão',
+                email: authUser.email || '',
+                plan: PlanType.MENSAL,
+                isTrial: true
+             };
+        }
+
+        // 2. Se não existe, cria
         const trialExpires = new Date();
         trialExpires.setDate(trialExpires.getDate() + 7);
 
@@ -158,10 +175,12 @@ const ensureUserProfile = async (authUser: any): Promise<User | null> => {
             .single();
 
         if (createError) {
+            console.error("Erro ao criar perfil:", createError);
+            // Retorna dados da memória em caso de falha no DB
             return {
                 id: authUser.id,
                 name: newProfileData.name,
-                email: authUser.email,
+                email: authUser.email || '',
                 plan: PlanType.MENSAL,
                 isTrial: true,
                 subscriptionExpiresAt: trialExpires.toISOString()
@@ -171,7 +190,7 @@ const ensureUserProfile = async (authUser: any): Promise<User | null> => {
         return mapProfileFromSupabase(createdProfile);
 
     } catch (e) {
-        console.error("Erro fatal no ensureUserProfile", e);
+        console.error("Exceção no ensureUserProfile", e);
         return {
             id: authUser.id,
             name: authUser.email || 'Usuário',
@@ -262,7 +281,8 @@ export const dbService = {
     const trialExpires = new Date();
     trialExpires.setDate(trialExpires.getDate() + 7);
 
-    await supabase.from('profiles').insert({
+    // Tenta inserir direto. O RLS deve permitir 'INSERT' para 'auth.uid() = id'
+    const { error: profileError } = await supabase.from('profiles').insert({
         id: authData.user.id,
         name,
         email,
@@ -272,6 +292,12 @@ export const dbService = {
         is_trial: true,
         subscription_expires_at: trialExpires.toISOString()
     });
+
+    if (profileError) {
+        console.error("Erro ao criar perfil no signup:", profileError);
+        // Não lançamos erro aqui para não bloquear o signup do Auth,
+        // o ensureUserProfile vai tentar corrigir no próximo load.
+    }
 
     cachedUserPromise = null;
     return await ensureUserProfile(authData.user);
@@ -347,13 +373,28 @@ export const dbService = {
   // --- WORKS ---
   async getWorks(userId: string): Promise<Work[]> {
     if (!supabase) return [];
-    const { data } = await supabase.from('works').select('*').eq('user_id', userId).order('created_at', { ascending: false });
+    
+    const { data, error } = await supabase
+        .from('works')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+        
+    if (error) {
+        console.error("Erro ao buscar obras (getWorks):", error);
+        return [];
+    }
+    
     return (data || []).map(parseWorkFromDB);
   },
 
   async getWorkById(workId: string): Promise<Work | null> {
     if (!supabase) return null;
-    const { data } = await supabase.from('works').select('*').eq('id', workId).single();
+    const { data, error } = await supabase.from('works').select('*').eq('id', workId).single();
+    if (error) {
+        console.error("Erro ao buscar obra por ID:", error);
+        return null;
+    }
     return data ? parseWorkFromDB(data) : null;
   },
 
@@ -379,8 +420,14 @@ export const dbService = {
         has_leisure_area: work.hasLeisureArea
     };
 
+    // Insert da Obra - Ponto crítico de RLS
     const { data: savedWork, error } = await supabase.from('works').insert(dbWork).select().single();
-    if (error) throw error;
+    
+    if (error) {
+        console.error("Erro SQL ao criar obra:", error);
+        throw new Error(`Erro ao criar obra no banco: ${error.message} (${error.code})`);
+    }
+    
     const parsedWork = parseWorkFromDB(savedWork);
 
     // 2. Generate Steps
@@ -401,10 +448,11 @@ export const dbService = {
                 is_delayed: false
             };
         });
-        await supabase.from('steps').insert(stepsToInsert);
+        
+        const { error: stepsError } = await supabase.from('steps').insert(stepsToInsert);
+        if (stepsError) console.error("Erro ao gerar etapas:", stepsError);
 
         // 3. GENERATE MATERIALS (AWAITING HERE TO ENSURE COMPLETION)
-        // With the SQL fix applied, this should execute successfully.
         await this.regenerateMaterials(parsedWork.id, parsedWork.area, templateId);
     }
 
@@ -458,7 +506,7 @@ export const dbService = {
           const { error } = await supabase.from('materials').insert(materialsToInsert);
           if (error) {
               console.error("FATAL: Failed to insert materials.", error);
-              throw new Error(`Erro ao gerar lista automática: ${error.message}. Verifique o SQL do Supabase.`);
+              // Não lança erro para não quebrar a UI, mas loga.
           }
       }
   },
