@@ -91,6 +91,11 @@ const CreateWork: React.FC = () => {
     setLoading(true);
     setGenerationMode(true); // Activate overlay
 
+    // Timeout safety
+    const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error("TIMEOUT")), 15000); // 15 seconds max
+    });
+
     try {
         const duration = selectedTemplate?.defaultDurationDays || 90;
         const start = new Date(formData.startDate);
@@ -128,8 +133,9 @@ const CreateWork: React.FC = () => {
 
         setGenStep(4); // Finishing
         
-        const newWork = await createPromise;
-        await wait(800); // Small pause at 100%
+        // Race against timeout
+        const newWork: any = await Promise.race([createPromise, timeoutPromise]);
+        await wait(800); 
 
         navigate(`/work/${newWork.id}`);
     } catch (error: any) {
@@ -138,8 +144,10 @@ const CreateWork: React.FC = () => {
         setLoading(false);
         setGenStep(0);
         
-        if (error.message?.includes('permission denied')) {
-            alert("Erro de Permissão: O banco de dados foi reiniciado. Por favor, execute o script SQL de correção.");
+        if (error.message === 'TIMEOUT' || error.message?.includes('Supabase off')) {
+            alert("Erro de conexão ou Banco de Dados não configurado. Verifique se você criou as tabelas no Supabase (SQL Editor).");
+        } else if (error.message?.includes('permission denied')) {
+            alert("Erro de Permissão. Execute o script SQL para criar as tabelas ou corrigir permissões.");
         } else {
             alert(`Erro ao salvar: ${error.message}`);
         }
