@@ -586,7 +586,9 @@ export const dbService = {
   async registerMaterialPurchase(materialId: string, name: string, _brand: string, _planned: number, _unit: string, qty: number, cost: number) {
       if (!supabase) return;
       
-      const { data: mat } = await supabase.from('materials').select('purchased_qty, work_id').eq('id', materialId).single();
+      // FIX: Fetch step_id from the material record to link the expense
+      const { data: mat } = await supabase.from('materials').select('purchased_qty, work_id, step_id').eq('id', materialId).single();
+      
       if (mat) {
           await supabase.from('materials').update({
               purchased_qty: (mat.purchased_qty || 0) + qty
@@ -598,7 +600,8 @@ export const dbService = {
               amount: cost,
               date: new Date().toISOString(),
               category: ExpenseCategory.MATERIAL,
-              related_material_id: materialId
+              related_material_id: materialId,
+              step_id: mat.step_id // Ensures the expense is linked to the construction step
           });
       }
   },
