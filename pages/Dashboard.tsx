@@ -87,7 +87,12 @@ const Dashboard: React.FC = () => {
             if (isMounted) {
                 setWorks(data);
                 if (data.length > 0) {
-                    setFocusWork(data[0]); // Seleciona a primeira, mas não busca detalhes ainda
+                    // Only update focusWork if not already set or invalid
+                    setFocusWork(prev => {
+                        if (!prev) return data[0];
+                        const exists = data.find(w => w.id === prev.id);
+                        return exists || data[0];
+                    });
                 }
             }
         } catch (e) {
@@ -108,6 +113,8 @@ const Dashboard: React.FC = () => {
       const fetchDetails = async () => {
           if (!focusWork || !user) return;
 
+          // Only show skeleton if we don't have cached data for this work? 
+          // For now, always show skeleton to indicate refresh, but make sure it resolves properly.
           setIsLoadingDetails(true);
           try {
             // Executa em paralelo para velocidade
@@ -141,12 +148,12 @@ const Dashboard: React.FC = () => {
           }
       };
 
-      if (focusWork) {
+      if (focusWork?.id) {
           fetchDetails();
       }
       
       return () => { isMounted = false; };
-  }, [focusWork, user]);
+  }, [focusWork?.id, user]); // Changed dependency to ID to prevent reference loops
 
   // Trial Check
   useEffect(() => {
@@ -156,9 +163,10 @@ const Dashboard: React.FC = () => {
   }, [user, trialDaysRemaining]);
 
   const handleSwitchWork = (work: Work) => {
-      setFocusWork(work);
-      setShowWorkSelector(false);
-      // O useEffect[focusWork] vai disparar e carregar os detalhes automaticamente
+      if (focusWork?.id !== work.id) {
+          setFocusWork(work);
+          setShowWorkSelector(false);
+      }
   };
 
   const handleAccessWork = () => {
@@ -188,7 +196,6 @@ const Dashboard: React.FC = () => {
             setZeModal({isOpen: false, title: '', message: ''});
   
             if (updatedWorks.length > 0) {
-                // Tenta manter o foco ou vai para a primeira
                 const stillExists = updatedWorks.find(w => w.id === focusWork?.id);
                 setFocusWork(stillExists || updatedWorks[0]);
             } else {
@@ -241,7 +248,6 @@ const Dashboard: React.FC = () => {
   }
 
   // 3. Tem obra selecionada -> Renderiza Dashboard
-  // Cálculos visuais
   const budgetUsage = focusWork.budgetPlanned > 0 ? (stats.totalSpent / focusWork.budgetPlanned) * 100 : 0;
   const budgetPercentage = Math.round(budgetUsage);
   
@@ -604,3 +610,4 @@ const Dashboard: React.FC = () => {
 };
 
 export default Dashboard;
+
