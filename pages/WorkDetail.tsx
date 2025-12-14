@@ -1,12 +1,12 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import { useAuth } from '../App';
 import { dbService } from '../services/db';
 import { Work, Worker, Supplier, Material, Step, Expense, StepStatus, WorkPhoto, WorkFile, FileCategory, ExpenseCategory, PlanType } from '../types';
 import { ZeModal } from '../components/ZeModal';
-import { STANDARD_CHECKLISTS, CONTRACT_TEMPLATES, STANDARD_JOB_ROLES, STANDARD_SUPPLIER_CATEGORIES, ZE_AVATAR, ZE_AVATAR_FALLBACK, FULL_MATERIAL_PACKAGES } from '../services/standards';
+import { STANDARD_CHECKLISTS, CONTRACT_TEMPLATES, STANDARD_JOB_ROLES, STANDARD_SUPPLIER_CATEGORIES, ZE_AVATAR, ZE_AVATAR_FALLBACK } from '../services/standards';
 import { aiService } from '../services/ai';
 
 // --- TYPES FOR VIEW STATE ---
@@ -45,11 +45,6 @@ const WorkDetail: React.FC = () => {
     const [subView, setSubView] = useState<SubView>('NONE');
     const [uploading, setUploading] = useState(false);
     
-    // --- GENERATION STATE (FORÇA BRUTA) ---
-    const [isGenerating, setIsGenerating] = useState(false);
-    const [genProgress, setGenProgress] = useState(0);
-    const hasTriedAutoGenerate = useRef(false);
-
     // --- PREMIUM CHECK ---
     const isPremium = user?.plan === PlanType.VITALICIO;
 
@@ -141,63 +136,6 @@ const WorkDetail: React.FC = () => {
     };
 
     useEffect(() => { load(); }, [id]);
-
-    // --- CLIENT-SIDE BRUTE FORCE GENERATOR ---
-    const forceGenerateMaterials = async () => {
-        if (!work || isGenerating) return;
-        
-        // Safety check to prevent accidental double clicks
-        setIsGenerating(true);
-        setGenProgress(0);
-
-        try {
-            // 1. Prepare items based on Work Area
-            const area = work.area || 50;
-            const allItems: any[] = [];
-            
-            // Filter packages based on work type logic (simplified here to include all standard for construction)
-            // You could add logic to filter packages if work.notes includes 'REFORMA' etc.
-            const packagesToUse = FULL_MATERIAL_PACKAGES; 
-
-            packagesToUse.forEach(pkg => {
-                pkg.items.forEach(item => {
-                    const qty = Math.ceil(area * (item.multiplier || 1));
-                    allItems.push({
-                        workId: work.id,
-                        name: item.name,
-                        brand: '',
-                        plannedQty: qty,
-                        purchasedQty: 0,
-                        unit: item.unit,
-                        category: pkg.category
-                    });
-                });
-            });
-
-            const total = allItems.length;
-            
-            // 2. Insert ONE BY ONE to ensure it works even if slow
-            for (let i = 0; i < total; i++) {
-                await dbService.addMaterial({
-                    ...allItems[i],
-                    id: Math.random().toString(36).substr(2, 9)
-                });
-                // Update progress bar
-                setGenProgress(Math.round(((i + 1) / total) * 100));
-                // Tiny delay to breathe
-                await new Promise(r => setTimeout(r, 20));
-            }
-
-            await load(); // Reload data to show list
-            
-        } catch (e) {
-            console.error("Force generation error:", e);
-            alert("Houve um erro na geração, mas os itens salvos permanecerão.");
-        } finally {
-            setIsGenerating(false);
-            setGenProgress(0);
-        }
-    };
 
     // --- HANDLERS ---
 
@@ -621,11 +559,10 @@ const WorkDetail: React.FC = () => {
                 ? steps 
                 : steps.filter(s => s.id === materialFilterStepId);
 
-             // EMPTY STATE + AUTO-GENERATE FEEDBACK
+             // EMPTY STATE
              if (materials.length === 0) {
                  return (
                     <div className="space-y-6 animate-in fade-in">
-                        {/* Always show header with ADD button */}
                         <div className="sticky top-0 z-20 bg-slate-50 dark:bg-slate-950 pb-2">
                             <div className="flex justify-between items-end mb-2 px-2">
                                 <div>
@@ -641,36 +578,14 @@ const WorkDetail: React.FC = () => {
                                 <i className="fa-solid fa-box-open text-4xl"></i>
                             </div>
                             <h3 className="text-lg font-bold text-primary dark:text-white mb-2">Lista Vazia</h3>
-                            <p className="text-slate-500 text-sm max-w-xs mb-6">A geração automática falhou? Use o botão abaixo para criar a lista agora.</p>
+                            <p className="text-slate-500 text-sm max-w-xs mb-6">Nenhum material cadastrado ainda. Use o botão + para adicionar.</p>
                             
-                            {isGenerating ? (
-                                <div className="w-full max-w-xs">
-                                    <div className="flex justify-between text-xs font-bold text-slate-500 mb-1">
-                                        <span>Criando itens...</span>
-                                        <span>{genProgress}%</span>
-                                    </div>
-                                    <div className="h-4 bg-slate-200 rounded-full overflow-hidden">
-                                        <div className="h-full bg-secondary transition-all duration-75" style={{ width: `${genProgress}%` }}></div>
-                                    </div>
-                                    <p className="text-xs text-slate-400 mt-2">Não feche o app.</p>
-                                </div>
-                            ) : (
-                                <div className="flex flex-col gap-3 w-full max-w-xs">
-                                    <button 
-                                        onClick={forceGenerateMaterials}
-                                        className="w-full bg-secondary hover:bg-orange-600 text-white font-black py-4 px-6 rounded-2xl shadow-lg transition-all flex items-center justify-center gap-2 active:scale-95 animate-pulse"
-                                    >
-                                        <i className="fa-solid fa-bolt"></i>
-                                        REPARAR LISTA AGORA
-                                    </button>
-                                    <button 
-                                        onClick={() => setAddMatModal(true)}
-                                        className="w-full bg-white dark:bg-slate-800 text-slate-500 font-bold py-3 px-6 rounded-2xl border border-slate-200 dark:border-slate-700 hover:bg-slate-50 transition-all"
-                                    >
-                                        Adicionar Manualmente
-                                    </button>
-                                </div>
-                            )}
+                            <button 
+                                onClick={() => setAddMatModal(true)}
+                                className="bg-primary text-white font-bold py-3 px-6 rounded-2xl shadow-lg transition-all hover:bg-primary-light"
+                            >
+                                <i className="fa-solid fa-plus mr-2"></i> Adicionar Material
+                            </button>
                         </div>
                     </div>
                  );
@@ -684,7 +599,6 @@ const WorkDetail: React.FC = () => {
                                 <h2 className="text-2xl font-black text-primary dark:text-white">Materiais</h2>
                                 <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Controle de Compras</p>
                             </div>
-                            {/* RESTORED ADD BUTTON VISIBILITY */}
                             <button onClick={() => setAddMatModal(true)} className="bg-primary text-white w-12 h-12 rounded-xl flex items-center justify-center hover:bg-primary-light transition-all shadow-lg shadow-primary/30"><i className="fa-solid fa-plus text-lg"></i></button>
                         </div>
                         
