@@ -1000,10 +1000,10 @@ const WorkDetail: React.FC = () => {
                             </div>
 
                             <table className="w-full text-left text-sm">
-                                <thead className="bg-slate-50 dark:bg-slate-100 border-b border-slate-200">
+                                <thead className="bg-slate-100 dark:bg-slate-200 border-b border-slate-200">
                                     <tr>
-                                        <th className="px-6 py-4 font-bold text-slate-500 uppercase text-xs">Item / Descrição</th>
-                                        <th className="px-6 py-4 font-bold text-slate-500 uppercase text-xs text-right">Detalhes / Status</th>
+                                        <th className="px-6 py-4 font-bold text-slate-500 uppercase text-xs tracking-wider">Item / Descrição</th>
+                                        <th className="px-6 py-4 font-bold text-slate-500 uppercase text-xs text-right tracking-wider">Detalhes / Status</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
@@ -1017,16 +1017,16 @@ const WorkDetail: React.FC = () => {
                                         let statusText = 'Pendente';
 
                                         if (isDone) { badgeColor = 'bg-green-100 text-green-700'; statusText = 'Concluído'; }
-                                        else if (isDelayed) { badgeColor = 'bg-red-100 text-red-600'; statusText = 'Atrasado'; }
+                                        else if (isDelayed) { badgeColor = 'bg-red-500 text-white shadow-red-500/30 shadow-md'; statusText = 'Atrasado'; }
                                         else if (isInProgress) { badgeColor = 'bg-orange-100 text-orange-600'; statusText = 'Em Andamento'; }
 
                                         return (
-                                            <tr key={s.id} className="hover:bg-slate-50 transition-colors">
+                                            <tr key={s.id} className="hover:bg-slate-50 transition-colors group">
                                                 <td className="px-6 py-4">
                                                     <div className="flex items-center gap-3">
-                                                        <span className="text-xs font-bold text-slate-300 w-5">{String(idx+1).padStart(2,'0')}</span>
+                                                        <span className="text-xs font-bold text-slate-300 w-5 group-hover:text-slate-400">{String(idx+1).padStart(2,'0')}</span>
                                                         <div>
-                                                            <p className="font-bold text-slate-800">{s.name}</p>
+                                                            <p className={`font-bold ${isDelayed ? 'text-red-600' : 'text-slate-800'}`}>{s.name}</p>
                                                             <p className="text-xs text-slate-500">{parseDateNoTimezone(s.startDate)} - {parseDateNoTimezone(s.endDate)}</p>
                                                         </div>
                                                     </div>
@@ -1052,10 +1052,11 @@ const WorkDetail: React.FC = () => {
                                                 return (
                                                     <React.Fragment key={step.id}>
                                                         {/* Step Header */}
-                                                        <tr className="bg-slate-100 dark:bg-slate-800 border-y border-slate-200 dark:border-slate-700">
-                                                            <td colSpan={2} className="px-6 py-2">
-                                                                <span className="text-xs font-black text-slate-500 uppercase tracking-widest">
-                                                                    {String(idx + 1).padStart(2, '0')}. {step.name}
+                                                        <tr className="bg-slate-50/80 border-y border-slate-200">
+                                                            <td colSpan={2} className="px-6 py-3 border-l-4 border-secondary">
+                                                                <span className="text-xs font-black text-slate-600 uppercase tracking-widest flex items-center gap-2">
+                                                                    <span className="bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded text-[10px]">{String(idx + 1).padStart(2, '0')}</span> 
+                                                                    {step.name}
                                                                 </span>
                                                             </td>
                                                         </tr>
@@ -1074,7 +1075,7 @@ const WorkDetail: React.FC = () => {
                                                             }
 
                                                             return (
-                                                                <tr key={m.id} className="hover:bg-slate-50">
+                                                                <tr key={m.id} className="hover:bg-slate-50 transition-colors">
                                                                     <td className="px-6 py-4 pl-10"> {/* Indent */}
                                                                         <p className="font-bold text-slate-800">{m.name}</p>
                                                                         <p className="text-xs text-slate-500 font-bold uppercase">{m.brand || 'Marca não inf.'}</p>
@@ -1087,7 +1088,7 @@ const WorkDetail: React.FC = () => {
                                                                             <span className={`text-[9px] font-bold px-2 py-0.5 rounded uppercase ${statusClass}`}>
                                                                                 {statusText}
                                                                             </span>
-                                                                            <div className="w-20 h-1 bg-slate-200 rounded-full overflow-hidden mt-1">
+                                                                            <div className="w-20 h-1.5 bg-slate-200 rounded-full overflow-hidden mt-1 shadow-inner">
                                                                                 <div className={`h-full ${m.purchasedQty >= m.plannedQty ? 'bg-green-500' : 'bg-orange-400'}`} style={{ width: `${Math.min(progress, 100)}%` }}></div>
                                                                             </div>
                                                                         </div>
@@ -1101,8 +1102,8 @@ const WorkDetail: React.FC = () => {
                                             {/* Materials without Step */}
                                             {(reportMaterialFilterStepId === 'ALL' || reportMaterialFilterStepId === 'GENERAL') && materials.filter(m => !m.stepId).length > 0 && (
                                                  <React.Fragment key="general-mats">
-                                                    <tr className="bg-slate-100 dark:bg-slate-800 border-y border-slate-200 dark:border-slate-700">
-                                                        <td colSpan={2} className="px-6 py-2">
+                                                    <tr className="bg-slate-50/80 border-y border-slate-200">
+                                                        <td colSpan={2} className="px-6 py-3 border-l-4 border-slate-300">
                                                             <span className="text-xs font-black text-slate-500 uppercase tracking-widest">
                                                                 Materiais Gerais / Sem Etapa
                                                             </span>
@@ -1122,7 +1123,7 @@ const WorkDetail: React.FC = () => {
                                                          }
 
                                                          return (
-                                                            <tr key={m.id} className="hover:bg-slate-50">
+                                                            <tr key={m.id} className="hover:bg-slate-50 transition-colors">
                                                                 <td className="px-6 py-4 pl-10">
                                                                     <p className="font-bold text-slate-800">{m.name}</p>
                                                                     <p className="text-xs text-slate-500 font-bold uppercase">{m.brand || 'Marca não inf.'}</p>
@@ -1135,7 +1136,7 @@ const WorkDetail: React.FC = () => {
                                                                         <span className={`text-[9px] font-bold px-2 py-0.5 rounded uppercase ${statusClass}`}>
                                                                             {statusText}
                                                                         </span>
-                                                                        <div className="w-20 h-1 bg-slate-200 rounded-full overflow-hidden mt-1">
+                                                                        <div className="w-20 h-1.5 bg-slate-200 rounded-full overflow-hidden mt-1 shadow-inner">
                                                                             <div className={`h-full ${m.purchasedQty >= m.plannedQty ? 'bg-green-500' : 'bg-orange-400'}`} style={{ width: `${Math.min(progress, 100)}%` }}></div>
                                                                         </div>
                                                                     </div>
@@ -1149,11 +1150,11 @@ const WorkDetail: React.FC = () => {
                                     )}
 
                                     {reportTab === 'FIN' && expenses.map((e) => (
-                                        <tr key={e.id} className="hover:bg-slate-50">
+                                        <tr key={e.id} className="hover:bg-slate-50 transition-colors">
                                             <td className="px-6 py-4">
                                                 <div className="flex items-center gap-3">
                                                     {/* Category Icon */}
-                                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs ${e.category === ExpenseCategory.LABOR ? 'bg-blue-100 text-blue-600' : e.category === ExpenseCategory.MATERIAL ? 'bg-amber-100 text-amber-600' : 'bg-slate-100 text-slate-500'}`}>
+                                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs shadow-sm ${e.category === ExpenseCategory.LABOR ? 'bg-blue-100 text-blue-600' : e.category === ExpenseCategory.MATERIAL ? 'bg-amber-100 text-amber-600' : 'bg-slate-100 text-slate-500'}`}>
                                                         <i className={`fa-solid ${e.category === ExpenseCategory.LABOR ? 'fa-helmet-safety' : e.category === ExpenseCategory.MATERIAL ? 'fa-box' : 'fa-file-invoice'}`}></i>
                                                     </div>
                                                     <div>
