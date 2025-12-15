@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
-import { useAuth } from '../App';
+import { useAuth } from '../contexts/AuthContext';
 import { dbService } from '../services/db';
 import { Work, Worker, Supplier, Material, Step, Expense, StepStatus, WorkPhoto, WorkFile, FileCategory, ExpenseCategory, PlanType } from '../types';
 import { ZeModal } from '../components/ZeModal';
@@ -27,7 +27,7 @@ const parseDateNoTimezone = (dateStr: string) => {
 const WorkDetail: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
-    const { user } = useAuth();
+    const { user, trialDaysRemaining } = useAuth();
     
     // --- CORE DATA STATE ---
     const [work, setWork] = useState<Work | null>(null);
@@ -45,8 +45,13 @@ const WorkDetail: React.FC = () => {
     const [subView, setSubView] = useState<SubView>('NONE');
     const [uploading, setUploading] = useState(false);
     
-    // --- PREMIUM CHECK ---
-    const isPremium = user?.plan === PlanType.VITALICIO;
+    // --- AI ACCESS LOGIC ---
+    const isVitalicio = user?.plan === PlanType.VITALICIO;
+    const isAiTrialActive = user?.isTrial && trialDaysRemaining !== null && trialDaysRemaining > 0;
+    const hasAiAccess = isVitalicio || isAiTrialActive;
+
+    // --- PREMIUM TOOLS LOCK ---
+    const isPremium = isVitalicio;
 
     // --- MODALS STATE ---
     const [stepModalMode, setStepModalMode] = useState<'ADD' | 'EDIT'>('ADD');
@@ -56,8 +61,12 @@ const WorkDetail: React.FC = () => {
     const [stepStart, setStepStart] = useState('');
     const [stepEnd, setStepEnd] = useState('');
     
-    // Material Filter
+    // Material Filter (Main Tab)
     const [materialFilterStepId, setMaterialFilterStepId] = useState<string>('ALL');
+    
+    // Report Filter
+    const [reportTab, setReportTab] = useState<'CRONO'|'MAT'|'FIN'>('CRONO');
+    const [reportMaterialFilterStepId, setReportMaterialFilterStepId] = useState<string>('ALL');
 
     const [materialModal, setMaterialModal] = useState<{ isOpen: boolean, material: Material | null }>({ isOpen: false, material: null });
     const [matName, setMatName] = useState('');
@@ -77,7 +86,7 @@ const WorkDetail: React.FC = () => {
     const [newMatBuyQty, setNewMatBuyQty] = useState('');
     const [newMatBuyCost, setNewMatBuyCost] = useState('');
 
-    // EXPENSE MODAL STATE (UNIFIED ADD/EDIT)
+    // EXPENSE MODAL STATE
     const [expenseModal, setExpenseModal] = useState<{ isOpen: boolean, mode: 'ADD'|'EDIT', id?: string }>({ isOpen: false, mode: 'ADD' });
     const [expDesc, setExpDesc] = useState('');
     const [expAmount, setExpAmount] = useState('');
@@ -105,7 +114,6 @@ const WorkDetail: React.FC = () => {
     const [calcArea, setCalcArea] = useState('');
     const [calcResult, setCalcResult] = useState<string[]>([]);
     const [activeChecklist, setActiveChecklist] = useState<string | null>(null);
-    const [reportTab, setReportTab] = useState<'CRONO'|'MAT'|'FIN'>('CRONO');
 
     // --- LOAD DATA ---
     const load = async () => {
@@ -395,7 +403,6 @@ const WorkDetail: React.FC = () => {
         });
     };
 
-    // CALCULATORS
     useEffect(() => {
         if (!calcArea) { setCalcResult([]); return; }
         const area = Number(calcArea);
@@ -414,7 +421,6 @@ const WorkDetail: React.FC = () => {
         }
     }, [calcArea, calcType]);
 
-    // EXPORT EXCEL
     const handleExportExcel = () => {
         const wb = XLSX.utils.book_new();
         const wsCrono = XLSX.utils.json_to_sheet(steps.map(s => ({ Etapa: s.name, Inicio: parseDateNoTimezone(s.startDate), Fim: parseDateNoTimezone(s.endDate), Status: s.status })));
