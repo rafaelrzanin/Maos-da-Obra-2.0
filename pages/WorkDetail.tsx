@@ -659,9 +659,11 @@ const WorkDetail: React.FC = () => {
                                 </div>
                                 <div className="space-y-3">
                                     {stepExpenses.map(exp => {
-                                        // PARTIAL PAYMENT LOGIC
-                                        const isPartial = exp.totalAgreed && exp.totalAgreed > exp.amount;
-                                        const progress = isPartial ? (exp.amount / exp.totalAgreed!) * 100 : 100;
+                                        // PAYMENT PROGRESS LOGIC
+                                        // If totalAgreed exists, we show the progress bar regardless if it's partial or full.
+                                        const hasTotal = exp.totalAgreed && exp.totalAgreed > 0;
+                                        const progress = hasTotal ? (exp.amount / exp.totalAgreed!) * 100 : 100;
+                                        const isPaid = hasTotal && exp.amount >= exp.totalAgreed!;
 
                                         return (
                                             <div 
@@ -687,15 +689,15 @@ const WorkDetail: React.FC = () => {
                                                     </div>
                                                 </div>
                                                 
-                                                {/* VISUAL FOR PARTIAL PAYMENTS */}
-                                                {isPartial && (
+                                                {/* VISUAL FOR PAYMENTS (PARTIAL OR FULL IF TOTAL IS SET) */}
+                                                {hasTotal && (
                                                     <div className="mt-2 pt-2 border-t border-dashed border-slate-100 dark:border-slate-800">
                                                         <div className="flex justify-between text-[10px] uppercase font-bold text-slate-400 mb-1">
                                                             <span>Pago: R$ {exp.amount.toLocaleString('pt-BR')}</span>
                                                             <span>Total: R$ {exp.totalAgreed?.toLocaleString('pt-BR')}</span>
                                                         </div>
                                                         <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                                                            <div className="h-full bg-orange-400 rounded-full" style={{width: `${progress}%`}}></div>
+                                                            <div className={`h-full rounded-full ${isPaid ? 'bg-green-500' : 'bg-orange-400'}`} style={{width: `${Math.min(progress, 100)}%`}}></div>
                                                         </div>
                                                     </div>
                                                 )}
