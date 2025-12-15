@@ -315,18 +315,18 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       {/* Main Content Area */}
       <main className="flex-1 md:ml-64 pt-20 md:pt-0 min-h-screen transition-all">
         <div className="p-4 md:p-8 max-w-7xl mx-auto">
-            {/* Trial Banner */}
-            {user.isTrial && trialDaysRemaining !== null && trialDaysRemaining <= 5 && isSubscriptionValid && (
-                <div className="mb-6 bg-gradient-to-r from-orange-500 to-red-600 text-white px-6 py-4 rounded-2xl shadow-lg flex flex-col md:flex-row items-center justify-between gap-4 animate-in fade-in slide-in-from-top-2">
+            {/* Trial Banner - FOCUSED ON ZÉ DA OBRA ONLY */}
+            {user.plan !== PlanType.VITALICIO && user.isTrial && trialDaysRemaining !== null && trialDaysRemaining > 0 && (
+                <div className="mb-6 bg-gradient-to-r from-purple-600 to-indigo-700 text-white px-6 py-4 rounded-2xl shadow-lg flex flex-col md:flex-row items-center justify-between gap-4 animate-in fade-in slide-in-from-top-2">
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center animate-pulse"><i className="fa-solid fa-stopwatch text-xl"></i></div>
+                        <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center animate-pulse"><i className="fa-solid fa-robot text-xl"></i></div>
                         <div>
-                            <p className="font-bold text-sm md:text-base">Teste Grátis: Restam {trialDaysRemaining} dias</p>
-                            <p className="text-xs opacity-90">Não perca o acesso às suas obras e dados.</p>
+                            <p className="font-bold text-sm md:text-base">Zé da Obra Grátis: Restam {trialDaysRemaining} dias</p>
+                            <p className="text-xs opacity-90">Aproveite seu engenheiro virtual ilimitado antes que expire.</p>
                         </div>
                     </div>
-                    <button onClick={() => navigate('/settings')} className="px-6 py-2 bg-white text-red-600 font-bold rounded-xl text-sm hover:bg-slate-100 transition-colors shadow-sm whitespace-nowrap">
-                        Assinar Agora
+                    <button onClick={() => navigate('/checkout?plan=VITALICIO')} className="px-6 py-2 bg-white text-indigo-700 font-bold rounded-xl text-sm hover:bg-slate-100 transition-colors shadow-sm whitespace-nowrap">
+                        Garantir Vitalício
                     </button>
                 </div>
             )}
