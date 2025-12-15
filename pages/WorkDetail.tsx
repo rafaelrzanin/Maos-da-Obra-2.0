@@ -61,11 +61,11 @@ const WorkDetail: React.FC = () => {
     const [stepStart, setStepStart] = useState('');
     const [stepEnd, setStepEnd] = useState('');
     
-    // Material Filter
+    // Material Filter (Main Tab)
     const [materialFilterStepId, setMaterialFilterStepId] = useState<string>('ALL');
     
     // Report Filter
-    const [reportFilterStepId, setReportFilterStepId] = useState<string>('ALL');
+    const [reportTab, setReportTab] = useState<'CRONO'|'MAT'|'FIN'>('CRONO');
 
     const [materialModal, setMaterialModal] = useState<{ isOpen: boolean, material: Material | null }>({ isOpen: false, material: null });
     const [matName, setMatName] = useState('');
@@ -113,7 +113,6 @@ const WorkDetail: React.FC = () => {
     const [calcArea, setCalcArea] = useState('');
     const [calcResult, setCalcResult] = useState<string[]>([]);
     const [activeChecklist, setActiveChecklist] = useState<string | null>(null);
-    const [reportTab, setReportTab] = useState<'CRONO'|'MAT'|'FIN'>('CRONO');
 
     // --- LOAD DATA ---
     const load = async () => {
@@ -446,22 +445,7 @@ const WorkDetail: React.FC = () => {
     if (loading) return <div className="h-screen flex items-center justify-center"><i className="fa-solid fa-circle-notch fa-spin text-3xl text-primary"></i></div>;
     if (!work) return null;
 
-    // --- REUSABLE LOCKED COMPONENT ---
-    const LockedFeature = ({ featureName }: { featureName: string }) => (
-        <div className="flex flex-col items-center justify-center min-h-[50vh] p-6 text-center animate-in fade-in">
-            <div className="w-20 h-20 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-6 shadow-sm">
-                <i className="fa-solid fa-lock text-3xl text-slate-400"></i>
-            </div>
-            <h3 className="text-2xl font-bold text-primary dark:text-white mb-2">{featureName}</h3>
-            <p className="text-slate-500 dark:text-slate-400 max-w-xs mb-8">Esta ferramenta é um bônus exclusivo para membros do plano Vitalício.</p>
-            <button 
-                onClick={() => navigate('/checkout?plan=VITALICIO')} 
-                className="px-8 py-4 bg-gradient-premium text-white font-bold rounded-xl shadow-xl hover:scale-105 transition-transform flex items-center gap-2"
-            >
-                <i className="fa-solid fa-crown text-yellow-400"></i> Desbloquear Agora
-            </button>
-        </div>
-    );
+    // --- RENDER CONTENT ---
 
     const renderMainTab = () => {
         if (activeTab === 'SCHEDULE') {
@@ -875,105 +859,251 @@ const WorkDetail: React.FC = () => {
                 </div>
             );
 
-            case 'REPORTS': return (
-                <div className="space-y-6">
-                    {/* Filter Tabs */}
-                    <div className="flex gap-2 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl no-print">
-                        {['CRONO', 'MAT', 'FIN'].map((rt) => (
-                            <button key={rt} onClick={() => setReportTab(rt as any)} className={`flex-1 py-2 rounded-lg text-xs font-bold ${reportTab === rt ? 'bg-white shadow text-primary' : 'text-slate-500'}`}>
-                                {rt === 'CRONO' ? 'Cronograma' : rt === 'MAT' ? 'Materiais' : 'Financeiro'}
+            case 'REPORTS': {
+                // --- DASHBOARD CALCS ---
+                const today = new Date().toISOString().split('T')[0];
+                const statusCounts = steps.reduce((acc, s) => {
+                    if (s.status === StepStatus.COMPLETED) acc.completed++;
+                    else if (s.startDate && s.endDate < today) acc.delayed++; // Logic: Not done + End Date passed
+                    else if (s.status === StepStatus.IN_PROGRESS) acc.inProgress++;
+                    else acc.pending++;
+                    return acc;
+                }, { pending: 0, inProgress: 0, completed: 0, delayed: 0 });
+                const totalSteps = steps.length;
+                const percentComplete = totalSteps > 0 ? Math.round((statusCounts.completed / totalSteps) * 100) : 0;
+
+                const financeSums = expenses.reduce((acc, e) => {
+                    const val = Number(e.amount);
+                    acc.total += val;
+                    if (e.category === ExpenseCategory.MATERIAL) acc.material += val;
+                    else if (e.category === ExpenseCategory.LABOR) acc.labor += val;
+                    else acc.others += val;
+                    return acc;
+                }, { total: 0, material: 0, labor: 0, others: 0 });
+
+                return (
+                <div className="space-y-6 animate-in fade-in">
+                    
+                    {/* 1. HEADER (Title + Actions) */}
+                    <div className="flex justify-between items-start pt-2 no-print">
+                        <div>
+                            <h2 className="text-2xl font-black text-primary dark:text-white tracking-tight">Relatório Geral</h2>
+                            <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">{work.name}</p>
+                        </div>
+                        <div className="flex gap-2">
+                            <button onClick={handlePrintPDF} className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-lg text-xs font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors flex items-center gap-1">
+                                <i className="fa-solid fa-print"></i> PDF
                             </button>
-                        ))}
+                            <button onClick={handleExportExcel} className="px-3 py-1.5 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-lg text-xs font-bold hover:bg-green-100 dark:hover:bg-green-900/50 transition-colors flex items-center gap-1">
+                                <i className="fa-solid fa-file-excel"></i> Excel
+                            </button>
+                        </div>
                     </div>
 
-                    {/* PRINT-FRIENDLY CONTAINER */}
-                    <div className="bg-white dark:bg-white dark:text-black rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm print:shadow-none print:border-0 print:rounded-none">
-                        
-                        {/* Header for Print/PDF */}
-                        <div className="hidden print:block p-8 border-b-2 border-slate-100">
-                            <div className="flex justify-between items-start">
-                                <div>
-                                    <h1 className="text-3xl font-black text-slate-900 mb-1">MÃOS DA OBRA</h1>
-                                    <p className="text-sm font-bold text-slate-500">Relatório Geral da Obra</p>
-                                </div>
-                                <div className="text-right">
-                                    <h2 className="text-xl font-bold text-slate-800">{work.name}</h2>
-                                    <p className="text-sm text-slate-500">Data: {new Date().toLocaleDateString()}</p>
-                                </div>
+                    {/* 2. SUMMARY DASHBOARD (3 Columns) */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 no-print">
+                        {/* A. Cronograma */}
+                        <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm relative overflow-hidden">
+                            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3"><i className="fa-solid fa-calendar-check mr-1"></i> Cronograma</h3>
+                            <div className="flex items-end gap-2 mb-2">
+                                <span className="text-3xl font-black text-primary dark:text-white">{percentComplete}%</span>
+                                <span className="text-xs font-bold text-slate-500 mb-1">Concluído</span>
                             </div>
-                            
-                            {/* Summary Stats */}
-                            <div className="mt-6 p-4 bg-slate-50 rounded-xl border border-slate-200 grid grid-cols-3 gap-4">
-                                <div>
-                                    <span className="text-xs font-bold text-slate-400 uppercase">Orçamento</span>
-                                    <p className="text-lg font-black text-slate-800">R$ {work.budgetPlanned.toLocaleString('pt-BR')}</p>
+                            <div className="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden mb-4">
+                                <div className="h-full bg-blue-500 rounded-full transition-all duration-1000" style={{ width: `${percentComplete}%` }}></div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 text-[10px] font-bold uppercase text-slate-500">
+                                <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-green-500"></div> {statusCounts.completed} Finalizadas</div>
+                                <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-orange-500"></div> {statusCounts.inProgress} Em Andamento</div>
+                                <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-red-500"></div> {statusCounts.delayed} Atrasadas</div>
+                                <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-slate-300"></div> {statusCounts.pending} Pendentes</div>
+                            </div>
+                        </div>
+
+                        {/* B. Materiais */}
+                        <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm relative overflow-hidden">
+                            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3"><i className="fa-solid fa-layer-group mr-1"></i> Materiais</h3>
+                            <div className="flex justify-between items-center mb-4">
+                                <div className="text-center">
+                                    <span className="block text-2xl font-black text-primary dark:text-white">{materials.length}</span>
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase">Itens Totais</span>
                                 </div>
-                                <div>
-                                    <span className="text-xs font-bold text-slate-400 uppercase">Gasto Total</span>
-                                    <p className="text-lg font-black text-red-600">R$ {expenses.reduce((a, b) => a + Number(b.amount), 0).toLocaleString('pt-BR')}</p>
+                                <div className="text-center">
+                                    <span className="block text-2xl font-black text-green-600">{materials.filter(m => m.purchasedQty >= m.plannedQty).length}</span>
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase">Comprados</span>
                                 </div>
-                                <div>
-                                    <span className="text-xs font-bold text-slate-400 uppercase">Status</span>
-                                    <p className="text-lg font-black text-blue-600">{expenses.length} lançamentos</p>
+                                <div className="text-center">
+                                    <span className="block text-2xl font-black text-orange-500">{materials.filter(m => m.purchasedQty < m.plannedQty).length}</span>
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase">Faltam</span>
                                 </div>
                             </div>
                         </div>
 
-                        <table className="w-full text-left text-sm">
-                            <thead className="bg-slate-50 dark:bg-slate-100 border-b border-slate-200 dark:border-slate-200">
-                                <tr>
-                                    <th className="px-6 py-4 font-bold text-slate-500 uppercase text-xs">Item / Descrição</th>
-                                    <th className="px-6 py-4 font-bold text-slate-500 uppercase text-xs text-right">Detalhes / Valor</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100 dark:divide-slate-200">
-                                {reportTab === 'CRONO' && steps.map((s) => (
-                                    <tr key={s.id} className="hover:bg-slate-50">
-                                        <td className="px-6 py-4">
-                                            <p className="font-bold text-slate-800">{s.name}</p>
-                                            <p className="text-xs text-slate-500">{parseDateNoTimezone(s.startDate)} - {parseDateNoTimezone(s.endDate)}</p>
-                                        </td>
-                                        <td className="px-6 py-4 text-right">
-                                            <span className={`inline-block text-[10px] font-bold px-3 py-1 rounded-full ${s.status === 'CONCLUIDO' ? 'bg-green-100 text-green-700' : s.status === 'EM_ANDAMENTO' ? 'bg-orange-100 text-orange-700' : 'bg-slate-100 text-slate-500'}`}>
-                                                {s.status === 'CONCLUIDO' ? 'CONCLUÍDO' : s.status === 'EM_ANDAMENTO' ? 'EM ANDAMENTO' : 'PENDENTE'}
-                                            </span>
-                                        </td>
+                        {/* C. Financeiro */}
+                        <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm relative overflow-hidden">
+                            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3"><i className="fa-solid fa-chart-pie mr-1"></i> Financeiro</h3>
+                            <div className="flex justify-between items-end mb-2">
+                                <span className="text-xl font-black text-primary dark:text-white">R$ {financeSums.total.toLocaleString('pt-BR', { notation: 'compact' })}</span>
+                                <span className="text-xs text-slate-400 font-bold">/ R$ {work.budgetPlanned.toLocaleString('pt-BR', { notation: 'compact' })}</span>
+                            </div>
+                            
+                            {/* Distribution Bar */}
+                            <div className="flex h-2 w-full rounded-full overflow-hidden mb-3">
+                                <div className="bg-amber-500" style={{ width: `${(financeSums.material / (financeSums.total || 1)) * 100}%` }}></div>
+                                <div className="bg-blue-600" style={{ width: `${(financeSums.labor / (financeSums.total || 1)) * 100}%` }}></div>
+                                <div className="bg-slate-300" style={{ width: `${(financeSums.others / (financeSums.total || 1)) * 100}%` }}></div>
+                            </div>
+
+                            <div className="flex justify-between text-[10px] font-bold uppercase text-slate-500">
+                                <span className="text-amber-600"><i className="fa-solid fa-square text-[8px]"></i> Mat</span>
+                                <span className="text-blue-600"><i className="fa-solid fa-square text-[8px]"></i> Mão de Obra</span>
+                                <span className="text-slate-400"><i className="fa-solid fa-square text-[8px]"></i> Outros</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* 3. TABS & TABLE */}
+                    <div>
+                        <div className="flex gap-2 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl mb-4 no-print">
+                            {['CRONO', 'MAT', 'FIN'].map((rt) => (
+                                <button key={rt} onClick={() => setReportTab(rt as any)} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${reportTab === rt ? 'bg-white shadow text-primary' : 'text-slate-500 hover:text-slate-700'}`}>
+                                    {rt === 'CRONO' ? 'Cronograma' : rt === 'MAT' ? 'Materiais' : 'Financeiro'}
+                                </button>
+                            ))}
+                        </div>
+
+                        <div className="bg-white dark:bg-white dark:text-black rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm print:shadow-none print:border-0 print:rounded-none">
+                            
+                            {/* Printable Header (Visible only in Print) */}
+                            <div className="hidden print:block p-8 border-b-2 border-slate-100">
+                                <div className="flex justify-between items-start">
+                                    <div><h1 className="text-3xl font-black text-slate-900 mb-1">MÃOS DA OBRA</h1><p className="text-sm font-bold text-slate-500">Relatório Analítico</p></div>
+                                    <div className="text-right"><h2 className="text-xl font-bold text-slate-800">{work.name}</h2><p className="text-sm text-slate-500">{new Date().toLocaleDateString()}</p></div>
+                                </div>
+                            </div>
+
+                            <table className="w-full text-left text-sm">
+                                <thead className="bg-slate-50 dark:bg-slate-100 border-b border-slate-200">
+                                    <tr>
+                                        <th className="px-6 py-4 font-bold text-slate-500 uppercase text-xs">Item / Descrição</th>
+                                        <th className="px-6 py-4 font-bold text-slate-500 uppercase text-xs text-right">Detalhes / Status</th>
                                     </tr>
-                                ))}
-                                
-                                {reportTab === 'MAT' && (
-                                    <>
-                                        {steps.map((step, idx) => {
-                                            const stepMats = materials.filter(m => m.stepId === step.id);
-                                            if (stepMats.length === 0) return null;
-                                            
-                                            return (
-                                                <React.Fragment key={step.id}>
-                                                    {/* Step Header */}
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {reportTab === 'CRONO' && steps.map((s, idx) => {
+                                        const isDone = s.status === StepStatus.COMPLETED;
+                                        // Delayed Logic: End Date Passed AND Not Done
+                                        const isDelayed = s.endDate < today && !isDone;
+                                        const isInProgress = s.status === StepStatus.IN_PROGRESS;
+
+                                        let badgeColor = 'bg-slate-100 text-slate-500';
+                                        let statusText = 'Pendente';
+
+                                        if (isDone) { badgeColor = 'bg-green-100 text-green-700'; statusText = 'Concluído'; }
+                                        else if (isDelayed) { badgeColor = 'bg-red-100 text-red-600'; statusText = 'Atrasado'; }
+                                        else if (isInProgress) { badgeColor = 'bg-orange-100 text-orange-600'; statusText = 'Em Andamento'; }
+
+                                        return (
+                                            <tr key={s.id} className="hover:bg-slate-50 transition-colors">
+                                                <td className="px-6 py-4">
+                                                    <div className="flex items-center gap-3">
+                                                        <span className="text-xs font-bold text-slate-300 w-5">{String(idx+1).padStart(2,'0')}</span>
+                                                        <div>
+                                                            <p className="font-bold text-slate-800">{s.name}</p>
+                                                            <p className="text-xs text-slate-500">{parseDateNoTimezone(s.startDate)} - {parseDateNoTimezone(s.endDate)}</p>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4 text-right">
+                                                    <span className={`inline-block text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wider ${badgeColor}`}>
+                                                        {statusText}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+
+                                    {reportTab === 'MAT' && (
+                                        <>
+                                            {steps.map((step, idx) => {
+                                                const stepMats = materials.filter(m => m.stepId === step.id);
+                                                if (stepMats.length === 0) return null;
+                                                
+                                                return (
+                                                    <React.Fragment key={step.id}>
+                                                        {/* Step Header */}
+                                                        <tr className="bg-slate-100 dark:bg-slate-800 border-y border-slate-200 dark:border-slate-700">
+                                                            <td colSpan={2} className="px-6 py-2">
+                                                                <span className="text-xs font-black text-slate-500 uppercase tracking-widest">
+                                                                    {String(idx + 1).padStart(2, '0')}. {step.name}
+                                                                </span>
+                                                            </td>
+                                                        </tr>
+                                                        {/* Materials */}
+                                                        {stepMats.map(m => {
+                                                            const progress = m.plannedQty > 0 ? (m.purchasedQty / m.plannedQty) * 100 : 0;
+                                                            let statusText = 'Pendente';
+                                                            let statusClass = 'bg-slate-100 text-slate-500';
+                                                            
+                                                            if (m.purchasedQty >= m.plannedQty) {
+                                                                statusText = 'Concluído';
+                                                                statusClass = 'bg-green-100 text-green-700';
+                                                            } else if (m.purchasedQty > 0) {
+                                                                statusText = 'Parcial';
+                                                                statusClass = 'bg-orange-100 text-orange-700';
+                                                            }
+
+                                                            return (
+                                                                <tr key={m.id} className="hover:bg-slate-50">
+                                                                    <td className="px-6 py-4 pl-10"> {/* Indent */}
+                                                                        <p className="font-bold text-slate-800">{m.name}</p>
+                                                                        <p className="text-xs text-slate-500 font-bold uppercase">{m.brand || 'Marca não inf.'}</p>
+                                                                    </td>
+                                                                    <td className="px-6 py-4 text-right">
+                                                                        <div className="flex flex-col items-end gap-1">
+                                                                            <div className="font-mono font-bold text-slate-700 text-xs">
+                                                                                {m.purchasedQty} / {m.plannedQty} {m.unit}
+                                                                            </div>
+                                                                            <span className={`text-[9px] font-bold px-2 py-0.5 rounded uppercase ${statusClass}`}>
+                                                                                {statusText}
+                                                                            </span>
+                                                                            <div className="w-20 h-1 bg-slate-200 rounded-full overflow-hidden mt-1">
+                                                                                <div className={`h-full ${m.purchasedQty >= m.plannedQty ? 'bg-green-500' : 'bg-orange-400'}`} style={{ width: `${Math.min(progress, 100)}%` }}></div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </td>
+                                                                </tr>
+                                                            );
+                                                        })}
+                                                    </React.Fragment>
+                                                );
+                                            })}
+                                            {/* Materials without Step */}
+                                            {materials.filter(m => !m.stepId).length > 0 && (
+                                                 <React.Fragment key="general-mats">
                                                     <tr className="bg-slate-100 dark:bg-slate-800 border-y border-slate-200 dark:border-slate-700">
                                                         <td colSpan={2} className="px-6 py-2">
                                                             <span className="text-xs font-black text-slate-500 uppercase tracking-widest">
-                                                                {String(idx + 1).padStart(2, '0')}. {step.name}
+                                                                Materiais Gerais / Sem Etapa
                                                             </span>
                                                         </td>
                                                     </tr>
-                                                    {/* Materials */}
-                                                    {stepMats.map(m => {
-                                                        const progress = m.plannedQty > 0 ? (m.purchasedQty / m.plannedQty) * 100 : 0;
-                                                        let statusText = 'Pendente';
-                                                        let statusClass = 'bg-slate-100 text-slate-500';
-                                                        
-                                                        if (m.purchasedQty >= m.plannedQty) {
-                                                            statusText = 'Concluído';
-                                                            statusClass = 'bg-green-100 text-green-700';
-                                                        } else if (m.purchasedQty > 0) {
-                                                            statusText = 'Parcial';
-                                                            statusClass = 'bg-orange-100 text-orange-700';
-                                                        }
+                                                    {materials.filter(m => !m.stepId).map(m => {
+                                                         const progress = m.plannedQty > 0 ? (m.purchasedQty / m.plannedQty) * 100 : 0;
+                                                         let statusText = 'Pendente';
+                                                         let statusClass = 'bg-slate-100 text-slate-500';
+                                                         
+                                                         if (m.purchasedQty >= m.plannedQty) {
+                                                             statusText = 'Concluído';
+                                                             statusClass = 'bg-green-100 text-green-700';
+                                                         } else if (m.purchasedQty > 0) {
+                                                             statusText = 'Parcial';
+                                                             statusClass = 'bg-orange-100 text-orange-700';
+                                                         }
 
-                                                        return (
+                                                         return (
                                                             <tr key={m.id} className="hover:bg-slate-50">
-                                                                <td className="px-6 py-4 pl-10"> {/* Indent */}
+                                                                <td className="px-6 py-4 pl-10">
                                                                     <p className="font-bold text-slate-800">{m.name}</p>
                                                                     <p className="text-xs text-slate-500 font-bold uppercase">{m.brand || 'Marca não inf.'}</p>
                                                                 </td>
@@ -991,108 +1121,58 @@ const WorkDetail: React.FC = () => {
                                                                     </div>
                                                                 </td>
                                                             </tr>
-                                                        );
+                                                         );
                                                     })}
-                                                </React.Fragment>
-                                            );
-                                        })}
-                                        {/* Materials without Step */}
-                                        {materials.filter(m => !m.stepId).length > 0 && (
-                                             <React.Fragment key="general-mats">
-                                                <tr className="bg-slate-100 dark:bg-slate-800 border-y border-slate-200 dark:border-slate-700">
-                                                    <td colSpan={2} className="px-6 py-2">
-                                                        <span className="text-xs font-black text-slate-500 uppercase tracking-widest">
-                                                            Materiais Gerais / Sem Etapa
-                                                        </span>
-                                                    </td>
-                                                </tr>
-                                                {materials.filter(m => !m.stepId).map(m => {
-                                                     const progress = m.plannedQty > 0 ? (m.purchasedQty / m.plannedQty) * 100 : 0;
-                                                     let statusText = 'Pendente';
-                                                     let statusClass = 'bg-slate-100 text-slate-500';
-                                                     
-                                                     if (m.purchasedQty >= m.plannedQty) {
-                                                         statusText = 'Concluído';
-                                                         statusClass = 'bg-green-100 text-green-700';
-                                                     } else if (m.purchasedQty > 0) {
-                                                         statusText = 'Parcial';
-                                                         statusClass = 'bg-orange-100 text-orange-700';
-                                                     }
-
-                                                     return (
-                                                        <tr key={m.id} className="hover:bg-slate-50">
-                                                            <td className="px-6 py-4 pl-10">
-                                                                <p className="font-bold text-slate-800">{m.name}</p>
-                                                                <p className="text-xs text-slate-500 font-bold uppercase">{m.brand || 'Marca não inf.'}</p>
-                                                            </td>
-                                                            <td className="px-6 py-4 text-right">
-                                                                <div className="flex flex-col items-end gap-1">
-                                                                    <div className="font-mono font-bold text-slate-700 text-xs">
-                                                                        {m.purchasedQty} / {m.plannedQty} {m.unit}
-                                                                    </div>
-                                                                    <span className={`text-[9px] font-bold px-2 py-0.5 rounded uppercase ${statusClass}`}>
-                                                                        {statusText}
-                                                                    </span>
-                                                                    <div className="w-20 h-1 bg-slate-200 rounded-full overflow-hidden mt-1">
-                                                                        <div className={`h-full ${m.purchasedQty >= m.plannedQty ? 'bg-green-500' : 'bg-orange-400'}`} style={{ width: `${Math.min(progress, 100)}%` }}></div>
-                                                                    </div>
-                                                                </div>
-                                                            </td>
-                                                        </tr>
-                                                     );
-                                                })}
-                                             </React.Fragment>
-                                        )}
-                                    </>
-                                )}
-
-                                {reportTab === 'FIN' && expenses.map((e) => (
-                                    <tr key={e.id} className="hover:bg-slate-50">
-                                        <td className="px-6 py-4">
-                                            <p className="font-bold text-slate-800">{e.description}</p>
-                                            <p className="text-xs text-slate-500 flex items-center gap-2">
-                                                <span>{parseDateNoTimezone(e.date)}</span>
-                                                <span className="w-1 h-1 rounded-full bg-slate-300"></span>
-                                                <span>{e.category}</span>
-                                            </p>
-                                        </td>
-                                        <td className="px-6 py-4 text-right">
-                                            <p className="font-bold text-slate-800">R$ {e.amount.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
-                                            {e.totalAgreed && (
-                                                <p className="text-[10px] text-slate-500 font-bold mt-0.5">
-                                                    Parcial de R$ {e.totalAgreed.toLocaleString('pt-BR')}
-                                                </p>
+                                                 </React.Fragment>
                                             )}
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
+                                        </>
+                                    )}
 
-                    <div className="flex gap-3 no-print">
-                        <button onClick={handlePrintPDF} className="flex-1 py-3 bg-slate-800 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-slate-700 shadow-lg transition-all">
-                            <i className="fa-solid fa-print"></i> Imprimir / PDF
-                        </button>
-                        <button onClick={handleExportExcel} className="flex-1 py-3 bg-green-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-green-700 shadow-lg transition-all">
-                            <i className="fa-solid fa-file-excel"></i> Baixar Excel
-                        </button>
+                                    {reportTab === 'FIN' && expenses.map((e) => (
+                                        <tr key={e.id} className="hover:bg-slate-50">
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center gap-3">
+                                                    {/* Category Icon */}
+                                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs ${e.category === ExpenseCategory.LABOR ? 'bg-blue-100 text-blue-600' : e.category === ExpenseCategory.MATERIAL ? 'bg-amber-100 text-amber-600' : 'bg-slate-100 text-slate-500'}`}>
+                                                        <i className={`fa-solid ${e.category === ExpenseCategory.LABOR ? 'fa-helmet-safety' : e.category === ExpenseCategory.MATERIAL ? 'fa-box' : 'fa-file-invoice'}`}></i>
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-bold text-slate-800">{e.description}</p>
+                                                        <p className="text-xs text-slate-500">{parseDateNoTimezone(e.date)}</p>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4 text-right">
+                                                <p className="font-bold text-slate-800">R$ {e.amount.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
+                                                {e.totalAgreed && (
+                                                    <div className="text-[10px] text-slate-400 font-bold mt-1 flex items-center justify-end gap-1">
+                                                        <span>Total: R$ {e.totalAgreed.toLocaleString('pt-BR')}</span>
+                                                        {e.amount < e.totalAgreed && <i className="fa-solid fa-clock text-orange-400" title="Pagamento Parcial"></i>}
+                                                    </div>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        {/* Print Styles Injection */}
+                        <style>{`
+                            @media print {
+                                .no-print { display: none !important; }
+                                body { background: white; color: black; }
+                                nav, aside, .bottom-nav { display: none !important; }
+                                main { padding: 0 !important; margin: 0 !important; height: auto !important; overflow: visible !important; }
+                                table { width: 100% !important; page-break-inside: auto; }
+                                tr { page-break-inside: avoid; page-break-after: auto; }
+                                td, th { padding: 8px 12px !important; border-bottom: 1px solid #ddd !important; }
+                            }
+                        `}</style>
                     </div>
-
-                    {/* PRINT STYLES */}
-                    <style>{`
-                        @media print {
-                            .no-print { display: none !important; }
-                            body { background: white; color: black; }
-                            nav, aside, .bottom-nav { display: none !important; }
-                            main { padding: 0 !important; margin: 0 !important; height: auto !important; overflow: visible !important; }
-                            /* Ensure table fits */
-                            table { width: 100% !important; }
-                            td, th { padding: 8px 12px !important; border-bottom: 1px solid #ddd !important; }
-                        }
-                    `}</style>
                 </div>
             );
+            }
 
             case 'PHOTOS': return (
                 <div className="space-y-6">
@@ -1265,6 +1345,232 @@ const WorkDetail: React.FC = () => {
                         <button onClick={() => setActiveTab('MATERIALS')} className={`flex flex-col items-center justify-center w-full h-full gap-1 transition-all ${activeTab === 'MATERIALS' ? 'text-secondary' : 'text-slate-400'}`}><i className={`fa-solid fa-layer-group text-xl ${activeTab === 'MATERIALS' ? 'scale-110' : ''}`}></i><span className="text-[10px] font-bold uppercase">Materiais</span></button>
                         <button onClick={() => setActiveTab('FINANCIAL')} className={`flex flex-col items-center justify-center w-full h-full gap-1 transition-all ${activeTab === 'FINANCIAL' ? 'text-secondary' : 'text-slate-400'}`}><i className={`fa-solid fa-chart-pie text-xl ${activeTab === 'FINANCIAL' ? 'scale-110' : ''}`}></i><span className="text-[10px] font-bold uppercase">Financeiro</span></button>
                         <button onClick={() => setActiveTab('MORE')} className={`flex flex-col items-center justify-center w-full h-full gap-1 transition-all ${activeTab === 'MORE' ? 'text-secondary' : 'text-slate-400'}`}><i className={`fa-solid fa-bars text-xl ${activeTab === 'MORE' ? 'scale-110' : ''}`}></i><span className="text-[10px] font-bold uppercase">Mais</span></button>
+                    </div>
+                </div>
+            )}
+
+            {/* --- ALL MODALS (RENDERED AT ROOT LEVEL) --- */}
+            
+            {/* ADD/EDIT STEP MODAL */}
+            {isStepModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-6 shadow-2xl">
+                        <h3 className="text-xl font-bold mb-4 text-primary dark:text-white">{stepModalMode === 'ADD' ? 'Nova Etapa' : 'Editar Etapa'}</h3>
+                        <form onSubmit={handleSaveStep} className="space-y-4">
+                            <input placeholder="Nome da Etapa" value={stepName} onChange={e => setStepName(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required />
+                            <div className="grid grid-cols-2 gap-2">
+                                <div><label className="text-[10px] uppercase font-bold text-slate-400 ml-1">Início</label><input type="date" value={stepStart} onChange={e => setStepStart(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required /></div>
+                                <div><label className="text-[10px] uppercase font-bold text-slate-400 ml-1">Fim</label><input type="date" value={stepEnd} onChange={e => setStepEnd(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required /></div>
+                            </div>
+                            <div className="flex gap-2 pt-2">
+                                <button type="button" onClick={() => setIsStepModalOpen(false)} className="flex-1 bg-slate-100 dark:bg-slate-800 text-slate-500 py-3 rounded-xl font-bold">Cancelar</button>
+                                <button type="submit" className="flex-1 bg-primary text-white py-3 rounded-xl font-bold">Salvar</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* ADD MATERIAL MODAL */}
+            {addMatModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-6 shadow-2xl overflow-y-auto max-h-[90vh]">
+                        <h3 className="text-xl font-bold mb-4 text-primary dark:text-white">Novo Material</h3>
+                        <form onSubmit={handleAddMaterial} className="space-y-4">
+                            <input placeholder="Nome do Material" value={newMatName} onChange={e => setNewMatName(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required />
+                            <div className="grid grid-cols-2 gap-2">
+                                <input type="number" placeholder="Qtd" value={newMatQty} onChange={e => setNewMatQty(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required />
+                                <input placeholder="Unidade (un, m2)" value={newMatUnit} onChange={e => setNewMatUnit(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required />
+                            </div>
+                            <select value={newMatStepId} onChange={e => setNewMatStepId(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
+                                <option value="">Sem etapa definida</option>
+                                {steps.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                            </select>
+                            
+                            <div className="border-t pt-4 mt-2">
+                                <label className="flex items-center gap-2 mb-2 font-bold text-sm"><input type="checkbox" checked={newMatBuyNow} onChange={e => setNewMatBuyNow(e.target.checked)} className="w-4 h-4" /> Já comprei este material</label>
+                                {newMatBuyNow && (
+                                    <div className="grid grid-cols-2 gap-2 animate-in slide-in-from-top-2">
+                                        <input type="number" placeholder="Qtd Comprada" value={newMatBuyQty} onChange={e => setNewMatBuyQty(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" />
+                                        <input type="number" placeholder="Valor Total (R$)" value={newMatBuyCost} onChange={e => setNewMatBuyCost(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" />
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="flex gap-2">
+                                <button type="button" onClick={() => setAddMatModal(false)} className="flex-1 bg-slate-100 py-3 rounded-xl font-bold">Cancelar</button>
+                                <button type="submit" className="flex-1 bg-primary text-white py-3 rounded-xl font-bold">Salvar</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* EDIT MATERIAL MODAL */}
+            {materialModal.isOpen && materialModal.material && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-6 shadow-2xl overflow-y-auto max-h-[90vh]">
+                        <h3 className="text-xl font-bold mb-4 text-primary dark:text-white">Editar Material</h3>
+                        
+                        <form onSubmit={handleUpdateMaterial} className="space-y-6">
+                            {/* EDITABLE DEFINITION */}
+                            <div className="space-y-3">
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Nome do Produto</label>
+                                    <input 
+                                        value={matName} 
+                                        onChange={e => setMatName(e.target.value)} 
+                                        className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold"
+                                    />
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Qtd Planejada</label>
+                                        <input 
+                                            type="number"
+                                            value={matPlannedQty} 
+                                            onChange={e => setMatPlannedQty(e.target.value)} 
+                                            className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Unidade</label>
+                                        <input 
+                                            value={matUnit} 
+                                            onChange={e => setMatUnit(e.target.value)} 
+                                            className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* READ-ONLY STATUS */}
+                            <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-xl border border-green-200 dark:border-green-900 flex justify-between items-center">
+                                <span className="text-sm font-bold text-green-700 dark:text-green-400">Total Já Comprado:</span>
+                                <span className="font-mono font-black text-lg text-green-700 dark:text-green-400">{materialModal.material.purchasedQty} {materialModal.material.unit}</span>
+                            </div>
+
+                            {/* OPTIONAL NEW PURCHASE */}
+                            <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
+                                <label className="block text-xs font-black text-secondary uppercase mb-2 tracking-widest"><i className="fa-solid fa-cart-plus"></i> Registrar Nova Compra</label>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <input type="number" placeholder="Qtd" value={matBuyQty} onChange={e => setMatBuyQty(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" />
+                                    <input type="number" placeholder="Valor (R$)" value={matBuyCost} onChange={e => setMatBuyCost(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" />
+                                </div>
+                                <p className="text-[10px] text-slate-400 mt-2">*Preencha apenas se houver nova compra. Se quiser só corrigir o nome/planejado, deixe vazio.</p>
+                            </div>
+
+                            <div className="flex gap-2">
+                                <button type="button" onClick={() => setMaterialModal({isOpen: false, material: null})} className="flex-1 bg-slate-100 py-3 rounded-xl font-bold">Cancelar</button>
+                                <button type="submit" className="flex-1 bg-primary text-white py-3 rounded-xl font-bold shadow-lg">Salvar Alterações</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* EXPENSE MODAL (ADD / EDIT) */}
+            {expenseModal.isOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-6 shadow-2xl">
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="text-xl font-bold text-primary dark:text-white">
+                                {expenseModal.mode === 'ADD' ? 'Novo Gasto' : 'Editar Gasto'}
+                            </h3>
+                            {expenseModal.mode === 'EDIT' && (
+                                <button onClick={handleDeleteExpense} className="text-red-500 hover:bg-red-50 p-2 rounded-lg transition-colors">
+                                    <i className="fa-solid fa-trash"></i>
+                                </button>
+                            )}
+                        </div>
+                        <form onSubmit={handleSaveExpense} className="space-y-4">
+                            <input placeholder="Descrição (ex: Pagamento Pedreiro)" value={expDesc} onChange={e => setExpDesc(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required />
+                            
+                            <div className="grid grid-cols-2 gap-2">
+                                <div className="relative">
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Valor Pago Agora</label>
+                                    <div className="relative">
+                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">R$</span>
+                                        <input type="number" placeholder="0.00" value={expAmount} onChange={e => setExpAmount(e.target.value)} className="w-full pl-10 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required />
+                                    </div>
+                                </div>
+                                <div className="relative">
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Total Combinado</label>
+                                    <div className="relative">
+                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">R$</span>
+                                        <input type="number" placeholder="(Opcional)" value={expTotalAgreed} onChange={e => setExpTotalAgreed(e.target.value)} className="w-full pl-10 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Categoria</label>
+                                    <select value={expCategory} onChange={e => setExpCategory(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
+                                        <option value={ExpenseCategory.LABOR}>Mão de Obra</option>
+                                        <option value={ExpenseCategory.MATERIAL}>Material</option>
+                                        <option value={ExpenseCategory.PERMITS}>Taxas</option>
+                                        <option value={ExpenseCategory.OTHER}>Outros</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Data</label>
+                                    <input type="date" value={expDate} onChange={e => setExpDate(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required />
+                                </div>
+                            </div>
+                            
+                            {/* STEP SELECTION - ENSURING VISIBILITY */}
+                            <div>
+                                <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Etapa Relacionada</label>
+                                <select value={expStepId} onChange={e => setExpStepId(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold text-sm">
+                                    <option value="">Sem Etapa (Geral)</option>
+                                    {steps.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                                </select>
+                            </div>
+
+                            <div className="flex gap-2 pt-2">
+                                <button type="button" onClick={() => setExpenseModal({isOpen: false, mode: 'ADD'})} className="flex-1 bg-slate-100 py-3 rounded-xl font-bold">Cancelar</button>
+                                <button type="submit" className="flex-1 bg-primary text-white py-3 rounded-xl font-bold">Salvar</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+            
+            {/* TEAM & SUPPLIER FORM MODAL */}
+            {isPersonModalOpen && (
+                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-6 shadow-2xl overflow-y-auto max-h-[90vh]">
+                        <div className="flex items-center gap-3 mb-4">
+                             <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl ${personMode === 'WORKER' ? 'bg-blue-100 text-blue-600' : 'bg-amber-100 text-amber-600'}`}><i className={`fa-solid ${personMode === 'WORKER' ? 'fa-helmet-safety' : 'fa-truck'}`}></i></div>
+                             <div><h3 className="text-lg font-bold text-primary dark:text-white leading-tight">{personId ? 'Editar' : 'Adicionar'} {personMode === 'WORKER' ? 'Profissional' : 'Fornecedor'}</h3></div>
+                        </div>
+                        <form onSubmit={handleSavePerson} className="space-y-4">
+                            <div><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Nome</label><input required className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold" value={personName} onChange={e => setPersonName(e.target.value)} /></div>
+                            <div><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{personMode === 'WORKER' ? 'Função' : 'Categoria'}</label><select required className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold text-sm" value={personRole} onChange={e => setPersonRole(e.target.value)}>{(personMode === 'WORKER' ? STANDARD_JOB_ROLES : STANDARD_SUPPLIER_CATEGORIES).map(r => <option key={r} value={r}>{r}</option>)}</select></div>
+                            <div><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Telefone / WhatsApp</label><input className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold" placeholder="51 99999-9999" value={personPhone} onChange={e => setPersonPhone(e.target.value)} /></div>
+                            <div><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Observações</label><textarea className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold h-20 resize-none" placeholder="Detalhes opcionais..." value={personNotes} onChange={e => setPersonNotes(e.target.value)}></textarea></div>
+                            <div className="flex gap-2 pt-2"><button type="button" onClick={() => setIsPersonModalOpen(false)} className="flex-1 py-3 font-bold text-slate-500 hover:bg-slate-100 rounded-xl">Cancelar</button><button type="submit" className="flex-1 py-3 font-bold bg-primary text-white rounded-xl shadow-lg">Salvar</button></div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* CONTRACT VIEWER MODAL */}
+            {viewContract && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-lg p-6 shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+                        <div className="flex justify-between items-center mb-4 pb-4 border-b border-slate-100 dark:border-slate-800">
+                            <h3 className="text-xl font-bold text-primary dark:text-white">{viewContract.title}</h3>
+                            <button onClick={() => setViewContract(null)} className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500"><i className="fa-solid fa-xmark"></i></button>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-4 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 mb-4">
+                            <pre className="whitespace-pre-wrap font-mono text-xs text-slate-600 dark:text-slate-300 leading-relaxed">{viewContract.content}</pre>
+                        </div>
+                        <div className="flex gap-3">
+                            <button onClick={() => {navigator.clipboard.writeText(viewContract.content); alert("Copiado!"); setViewContract(null);}} className="flex-1 py-3 bg-slate-100 dark:bg-slate-800 text-primary dark:text-white font-bold rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"><i className="fa-regular fa-copy mr-2"></i> Copiar</button>
+                            <button onClick={() => {const blob = new Blob([viewContract.content], {type: "application/msword"}); const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = `${viewContract.title}.doc`; link.click();}} className="flex-1 py-3 bg-primary text-white font-bold rounded-xl hover:bg-primary-light transition-colors"><i className="fa-solid fa-download mr-2"></i> Baixar Word</button>
+                        </div>
                     </div>
                 </div>
             )}
