@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../App';
@@ -27,7 +28,7 @@ const Settings: React.FC = () => {
       color: 'bg-primary',
       highlight: false,
       savings: null,
-      trial: true
+      trial: false // Changed to false: System is paid from start
     },
     {
       id: PlanType.SEMESTRAL,
@@ -37,7 +38,7 @@ const Settings: React.FC = () => {
       color: 'bg-primary-light',
       highlight: true,
       savings: 'Economia de 46%',
-      trial: true
+      trial: false // Changed to false
     },
     {
       id: PlanType.VITALICIO,
@@ -93,7 +94,7 @@ const Settings: React.FC = () => {
             >
               {isActiveCurrent && (
                 <div className="absolute top-0 right-0 bg-primary text-white text-[10px] font-bold px-3 py-1.5 rounded-bl-xl rounded-tr-2xl tracking-wider uppercase">
-                  Ativo {user.isTrial ? '(Em Teste)' : ''}
+                  Ativo
                 </div>
               )}
               
@@ -103,10 +104,10 @@ const Settings: React.FC = () => {
                 </div>
               )}
 
-              {/* Badges de Economia ou Trial */}
-              {!isActiveCurrent && (
-                 <div className={`absolute -top-3 left-1/2 transform -translate-x-1/2 ${plan.trial ? 'bg-green-600' : (isVitalicio ? 'bg-premium' : 'bg-success')} text-white text-[10px] font-bold px-4 py-1 rounded-full uppercase tracking-wider shadow-sm w-max`}>
-                   {plan.trial ? '7 Dias Grátis' : (plan.savings || 'Melhor Opção')}
+              {/* Badges de Economia (Trial removed) */}
+              {!isActiveCurrent && plan.savings && (
+                 <div className={`absolute -top-3 left-1/2 transform -translate-x-1/2 ${isVitalicio ? 'bg-premium' : 'bg-success'} text-white text-[10px] font-bold px-4 py-1 rounded-full uppercase tracking-wider shadow-sm w-max`}>
+                   {plan.savings}
                  </div>
               )}
 
@@ -120,7 +121,7 @@ const Settings: React.FC = () => {
                  <span className="text-sm text-text-muted dark:text-slate-400">{plan.period.replace('/', '')}</span>
               </div>
               <p className="text-text-muted dark:text-slate-500 text-xs mb-8">
-                  {plan.trial ? 'Comece a usar hoje, cancele quando quiser.' : 'Pagamento único. Acesso imediato.'}
+                  {isVitalicio ? 'Acesso vitalício à IA Zé da Obra.' : 'Gestão completa da obra.'}
               </p>
               
               <div className="flex-1 mb-8">
@@ -158,7 +159,7 @@ const Settings: React.FC = () => {
                 ) : isExpiredCurrent ? (
                   'Renovar Agora'
                 ) : (
-                  plan.trial ? 'Testar Grátis' : 'Assinar Agora'
+                  'Assinar Agora'
                 )}
               </button>
             </div>
