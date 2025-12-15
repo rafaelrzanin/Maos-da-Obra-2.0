@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../App';
+import { useAuth } from '../contexts/AuthContext';
 import { dbService } from '../services/db';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { PlanType } from '../types';
@@ -436,3 +436,4 @@ const Checkout: React.FC = () => {
 };
 
 export default Checkout;
+
