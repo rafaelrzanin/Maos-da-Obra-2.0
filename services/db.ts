@@ -230,10 +230,9 @@ export const dbService = {
     
     const now = Date.now();
     
-    // Explicit null check to avoid TS2801 (TS thinks promise is always truthy in some contexts)
-    const currentPromise = cachedUserPromise;
-    if (currentPromise !== null && (now - lastCacheTime < CACHE_DURATION)) {
-        return currentPromise;
+    // Explicit casting to 'unknown' to bypass TS "always true" check on Promise if TS infers incorrectly
+    if ((cachedUserPromise as unknown) !== null && (now - lastCacheTime < CACHE_DURATION)) {
+        return cachedUserPromise;
     }
 
     cachedUserPromise = (async () => {
