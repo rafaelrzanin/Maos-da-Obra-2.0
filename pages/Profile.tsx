@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../App';
+import { useAuth } from '../contexts/AuthContext';
 import { dbService } from '../services/db';
 
 const Profile: React.FC = () => {
@@ -161,3 +161,4 @@ const Profile: React.FC = () => {
 };
 
 export default Profile;
+
