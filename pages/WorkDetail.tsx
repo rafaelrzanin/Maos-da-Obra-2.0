@@ -46,12 +46,12 @@ const WorkDetail: React.FC = () => {
     const [uploading, setUploading] = useState(false);
     
     // --- AI ACCESS LOGIC ---
-    // AI is available if: Plan is VITALICIO OR (Trial is Active AND days remaining > 0)
     const isVitalicio = user?.plan === PlanType.VITALICIO;
     const isAiTrialActive = user?.isTrial && trialDaysRemaining !== null && trialDaysRemaining > 0;
     const hasAiAccess = isVitalicio || isAiTrialActive;
 
-    // Fix: Define isPremium (used for restricting tools like Calculators/Contracts)
+    // --- PREMIUM TOOLS LOCK ---
+    // Calculators, Contracts, and Checklists are exclusive to Vitalício
     const isPremium = isVitalicio;
 
     // --- MODALS STATE ---
@@ -86,11 +86,10 @@ const WorkDetail: React.FC = () => {
     const [newMatBuyQty, setNewMatBuyQty] = useState('');
     const [newMatBuyCost, setNewMatBuyCost] = useState('');
 
-    // EXPENSE MODAL STATE (UNIFIED ADD/EDIT)
+    // EXPENSE MODAL STATE
     const [expenseModal, setExpenseModal] = useState<{ isOpen: boolean, mode: 'ADD'|'EDIT', id?: string }>({ isOpen: false, mode: 'ADD' });
     const [expDesc, setExpDesc] = useState('');
-    const [expAmount, setExpAmount] = useState(''); // "Paying Now" input
-    const [expCurrentPaid, setExpCurrentPaid] = useState(0); // "Already Paid" cumulative
+    const [expAmount, setExpAmount] = useState('');
     const [expTotalAgreed, setExpTotalAgreed] = useState('');
     const [expCategory, setExpCategory] = useState<string>(ExpenseCategory.LABOR);
     const [expStepId, setExpStepId] = useState('');
@@ -250,8 +249,7 @@ const WorkDetail: React.FC = () => {
     const openAddExpense = () => {
         setExpenseModal({ isOpen: true, mode: 'ADD' });
         setExpDesc('');
-        setExpAmount(''); // Start empty for "Paying Now"
-        setExpCurrentPaid(0); // Start with 0 paid
+        setExpAmount('');
         setExpTotalAgreed('');
         setExpCategory(ExpenseCategory.LABOR);
         setExpStepId('');
@@ -261,11 +259,7 @@ const WorkDetail: React.FC = () => {
     const openEditExpense = (expense: Expense) => {
         setExpenseModal({ isOpen: true, mode: 'EDIT', id: expense.id });
         setExpDesc(expense.description);
-        
-        // CORRECTION: Set the already paid amount from DB to the state variable
-        setExpCurrentPaid(expense.amount); 
-        
-        setExpAmount(''); // "Paying Now" starts empty to allow adding more
+        setExpAmount(String(expense.amount));
         setExpTotalAgreed(expense.totalAgreed ? String(expense.totalAgreed) : '');
         setExpCategory(expense.category);
         setExpStepId(expense.stepId || '');
@@ -278,25 +272,13 @@ const WorkDetail: React.FC = () => {
         
         const finalStepId = expStepId || undefined;
         const finalTotalAgreed = expTotalAgreed ? Number(expTotalAgreed) : undefined;
-        
-        // CUMULATIVE LOGIC:
-        let finalAmount = 0;
-        const payingNow = Number(expAmount) || 0;
-
-        if (expenseModal.mode === 'ADD') {
-            // In ADD mode, whatever is typed is the initial amount
-            finalAmount = payingNow;
-        } else {
-            // In EDIT mode: Old Amount (DB) + New Payment (Input)
-            finalAmount = expCurrentPaid + payingNow;
-        }
 
         if (expenseModal.mode === 'ADD') {
             await dbService.addExpense({
                 id: Math.random().toString(36).substr(2, 9),
                 workId: work.id,
                 description: expDesc,
-                amount: finalAmount,
+                amount: Number(expAmount),
                 date: new Date(expDate).toISOString(),
                 category: expCategory,
                 stepId: finalStepId,
@@ -308,7 +290,7 @@ const WorkDetail: React.FC = () => {
                 await dbService.updateExpense({
                     ...existing,
                     description: expDesc,
-                    amount: finalAmount,
+                    amount: Number(expAmount),
                     date: new Date(expDate).toISOString(),
                     category: expCategory,
                     stepId: finalStepId,
@@ -422,7 +404,6 @@ const WorkDetail: React.FC = () => {
         });
     };
 
-    // CALCULATORS
     useEffect(() => {
         if (!calcArea) { setCalcResult([]); return; }
         const area = Number(calcArea);
@@ -441,7 +422,6 @@ const WorkDetail: React.FC = () => {
         }
     }, [calcArea, calcType]);
 
-    // EXPORT EXCEL
     const handleExportExcel = () => {
         const wb = XLSX.utils.book_new();
         const wsCrono = XLSX.utils.json_to_sheet(steps.map(s => ({ Etapa: s.name, Inicio: parseDateNoTimezone(s.startDate), Fim: parseDateNoTimezone(s.endDate), Status: s.status })));
@@ -467,10 +447,25 @@ const WorkDetail: React.FC = () => {
     if (loading) return <div className="h-screen flex items-center justify-center"><i className="fa-solid fa-circle-notch fa-spin text-3xl text-primary"></i></div>;
     if (!work) return null;
 
-    // --- RENDER CONTENT ---
+    // --- REUSABLE LOCKED COMPONENT ---
+    const LockedFeature = ({ featureName }: { featureName: string }) => (
+        <div className="flex flex-col items-center justify-center min-h-[50vh] p-6 text-center animate-in fade-in">
+            <div className="w-20 h-20 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-6 shadow-sm">
+                <i className="fa-solid fa-lock text-3xl text-slate-400"></i>
+            </div>
+            <h3 className="text-2xl font-bold text-primary dark:text-white mb-2">{featureName}</h3>
+            <p className="text-slate-500 dark:text-slate-400 max-w-xs mb-8">Esta ferramenta é um bônus exclusivo para membros do plano Vitalício.</p>
+            <button 
+                onClick={() => navigate('/checkout?plan=VITALICIO')} 
+                className="px-8 py-4 bg-gradient-premium text-white font-bold rounded-xl shadow-xl hover:scale-105 transition-transform flex items-center gap-2"
+            >
+                <i className="fa-solid fa-crown text-yellow-400"></i> Desbloquear Agora
+            </button>
+        </div>
+    );
 
     const renderMainTab = () => {
-        // ... (Main Tab content - SCHEDULE, MATERIALS, FINANCIAL, MORE - remains same as previously optimized)
+        // ... (Existing renderMainTab code - SAME AS BEFORE)
         if (activeTab === 'SCHEDULE') {
             return (
                 <div className="space-y-4 animate-in fade-in">
@@ -479,7 +474,7 @@ const WorkDetail: React.FC = () => {
                             <h2 className="text-2xl font-black text-primary dark:text-white">Cronograma</h2>
                             <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Etapas da Obra</p>
                         </div>
-                        <button onClick={() => { setStepModalMode('ADD'); setStepName(''); setStepStart(new Date().toISOString().split('T')[0]); setStepEnd(new Date().toISOString().split('T')[0]); setIsStepModalOpen(true); }} className="bg-green-600 text-white w-12 h-12 rounded-xl flex items-center justify-center hover:bg-green-700 transition-all shadow-lg shadow-green-600/30"><i className="fa-solid fa-plus text-lg"></i></button>
+                        <button onClick={() => { setStepModalMode('ADD'); setStepName(''); setStepStart(new Date().toISOString().split('T')[0]); setStepEnd(new Date().toISOString().split('T')[0]); setIsStepModalOpen(true); }} className="bg-primary text-white w-10 h-10 rounded-xl shadow-lg flex items-center justify-center hover:scale-105 transition-transform"><i className="fa-solid fa-plus"></i></button>
                     </div>
                     {steps.map((step, idx) => {
                          const stepNum = String(idx + 1).padStart(2, '0');
@@ -562,7 +557,7 @@ const WorkDetail: React.FC = () => {
                                 <h2 className="text-2xl font-black text-primary dark:text-white">Materiais</h2>
                                 <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Controle de Compras</p>
                             </div>
-                            <button onClick={() => setAddMatModal(true)} className="bg-green-600 text-white w-12 h-12 rounded-xl flex items-center justify-center hover:bg-green-700 transition-all shadow-lg shadow-green-600/30"><i className="fa-solid fa-plus text-lg"></i></button>
+                            <button onClick={() => setAddMatModal(true)} className="bg-primary text-white w-12 h-12 rounded-xl flex items-center justify-center hover:bg-primary-light transition-all shadow-lg shadow-primary/30"><i className="fa-solid fa-plus text-lg"></i></button>
                         </div>
                         <div className="px-2">
                             <select 
@@ -807,309 +802,9 @@ const WorkDetail: React.FC = () => {
     // --- RENDER SUBVIEW ---
     const renderSubViewContent = () => {
         switch(subView) {
-            case 'TEAM': return (
-                <div className="space-y-6">
-                    <div className="bg-blue-50 dark:bg-blue-900/20 p-6 rounded-3xl border border-blue-100 dark:border-blue-900 mb-2">
-                        <h3 className="text-xl font-bold text-primary dark:text-white mb-1">Minha Equipe</h3>
-                        <button onClick={() => openPersonModal('WORKER')} className="w-full mt-4 py-4 rounded-2xl bg-blue-600 text-white font-bold hover:bg-blue-700 transition-colors shadow-lg shadow-blue-600/20 flex items-center justify-center gap-2">
-                            <i className="fa-solid fa-plus"></i> Adicionar Profissional
-                        </button>
-                    </div>
-                    <div className="space-y-3">
-                        {workers.length === 0 && <p className="text-center text-slate-400 py-10">Nenhum profissional cadastrado.</p>}
-                        {workers.map(w => (
-                            <div key={w.id} className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm flex items-center justify-between">
-                                <div className="flex items-center gap-4 cursor-pointer flex-1" onClick={() => openPersonModal('WORKER', w)}>
-                                    <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 text-xl"><i className="fa-solid fa-helmet-safety"></i></div>
-                                    <div><h4 className="font-bold text-primary dark:text-white">{w.name}</h4><p className="text-xs text-slate-500 font-bold">{w.role}</p></div>
-                                </div>
-                                <div className="flex gap-2">
-                                    {w.phone && (
-                                        <a 
-                                            href={`https://wa.me/55${w.phone.replace(/\D/g, '')}`} 
-                                            target="_blank" 
-                                            rel="noopener noreferrer"
-                                            className="w-10 h-10 rounded-xl bg-green-100 text-green-600 hover:bg-green-200 transition-colors flex items-center justify-center"
-                                        >
-                                            <i className="fa-brands fa-whatsapp text-lg"></i>
-                                        </a>
-                                    )}
-                                    <button onClick={() => handleDeletePerson(w.id, 'WORKER')} className="w-10 h-10 rounded-xl text-red-500 hover:bg-red-50 transition-colors"><i className="fa-solid fa-trash"></i></button>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            );
-
-            case 'SUPPLIERS': return (
-                <div className="space-y-6">
-                    <div className="bg-amber-50 dark:bg-amber-900/20 p-6 rounded-3xl border border-amber-100 dark:border-amber-900 mb-2">
-                        <h3 className="text-xl font-bold text-primary dark:text-white mb-1">Fornecedores</h3>
-                        <button onClick={() => openPersonModal('SUPPLIER')} className="w-full mt-4 py-4 rounded-2xl bg-amber-600 text-white font-bold hover:bg-amber-700 transition-colors shadow-lg shadow-amber-600/20 flex items-center justify-center gap-2">
-                            <i className="fa-solid fa-plus"></i> Adicionar Fornecedor
-                        </button>
-                    </div>
-                    <div className="space-y-3">
-                        {suppliers.length === 0 && <p className="text-center text-slate-400 py-10">Nenhum fornecedor cadastrado.</p>}
-                        {suppliers.map(s => (
-                            <div key={s.id} className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm flex items-center justify-between">
-                                <div className="flex items-center gap-4 cursor-pointer flex-1" onClick={() => openPersonModal('SUPPLIER', s)}>
-                                    <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 text-xl"><i className="fa-solid fa-store"></i></div>
-                                    <div><h4 className="font-bold text-primary dark:text-white">{s.name}</h4><p className="text-xs text-slate-500 font-bold">{s.category}</p></div>
-                                </div>
-                                <div className="flex gap-2">
-                                    {s.phone && (
-                                        <a 
-                                            href={`https://wa.me/55${s.phone.replace(/\D/g, '')}`} 
-                                            target="_blank" 
-                                            rel="noopener noreferrer"
-                                            className="w-10 h-10 rounded-xl bg-green-100 text-green-600 hover:bg-green-200 transition-colors flex items-center justify-center"
-                                        >
-                                            <i className="fa-brands fa-whatsapp text-lg"></i>
-                                        </a>
-                                    )}
-                                    <button onClick={() => handleDeletePerson(s.id, 'SUPPLIER')} className="w-10 h-10 rounded-xl text-red-500 hover:bg-red-50 transition-colors"><i className="fa-solid fa-trash"></i></button>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            );
-
-            case 'REPORTS': return (
-                <div className="space-y-6">
-                    {/* TOP ACTION BAR (Moved to top as requested) */}
-                    <div className="flex gap-3 no-print">
-                        <button onClick={handlePrintPDF} className="flex-1 py-3 bg-slate-800 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-slate-700 shadow-lg transition-all">
-                            <i className="fa-solid fa-print"></i> Imprimir / PDF
-                        </button>
-                        <button onClick={handleExportExcel} className="flex-1 py-3 bg-green-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-green-700 shadow-lg transition-all">
-                            <i className="fa-solid fa-file-excel"></i> Baixar Excel
-                        </button>
-                    </div>
-
-                    {/* Report Controls (Tabs + Filter) */}
-                    <div className="space-y-3 no-print">
-                        <div className="flex gap-2 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
-                            {['CRONO', 'MAT', 'FIN'].map((rt) => (
-                                <button key={rt} onClick={() => setReportTab(rt as any)} className={`flex-1 py-2 rounded-lg text-xs font-bold ${reportTab === rt ? 'bg-white shadow text-primary' : 'text-slate-500'}`}>
-                                    {rt === 'CRONO' ? 'Cronograma' : rt === 'MAT' ? 'Materiais' : 'Financeiro'}
-                                </button>
-                            ))}
-                        </div>
-                        {/* STEP FILTER FOR REPORTS */}
-                        <select 
-                            value={reportFilterStepId}
-                            onChange={(e) => setReportFilterStepId(e.target.value)}
-                            className="w-full p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 font-bold text-sm text-slate-600 dark:text-slate-300 shadow-sm focus:border-secondary focus:ring-1 focus:ring-secondary outline-none transition-all"
-                        >
-                            <option value="ALL">Todas as Etapas (Geral)</option>
-                            {steps.map((s, idx) => (
-                                <option key={s.id} value={s.id}>{String(idx+1).padStart(2, '0')}. {s.name}</option>
-                            ))}
-                        </select>
-                    </div>
-
-                    {/* PRINT-FRIENDLY CONTAINER */}
-                    <div className="bg-white dark:bg-white dark:text-black rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm print:shadow-none print:border-0 print:rounded-none">
-                        
-                        {/* Header for Print/PDF */}
-                        <div className="hidden print:block p-8 border-b-2 border-slate-100">
-                            <div className="flex justify-between items-start">
-                                <div><h1 className="text-3xl font-black text-slate-900 mb-1">MÃOS DA OBRA</h1><p className="text-sm font-bold text-slate-500">Relatório Geral da Obra</p></div>
-                                <div className="text-right"><h2 className="text-xl font-bold text-slate-800">{work.name}</h2><p className="text-sm text-slate-500">Data: {new Date().toLocaleDateString()}</p></div>
-                            </div>
-                            <div className="mt-6 p-4 bg-slate-50 rounded-xl border border-slate-200 grid grid-cols-3 gap-4">
-                                <div><span className="text-xs font-bold text-slate-400 uppercase">Orçamento</span><p className="text-lg font-black text-slate-800">R$ {work.budgetPlanned.toLocaleString('pt-BR')}</p></div>
-                                <div><span className="text-xs font-bold text-slate-400 uppercase">Gasto Total</span><p className="text-lg font-black text-red-600">R$ {expenses.reduce((a, b) => a + Number(b.amount), 0).toLocaleString('pt-BR')}</p></div>
-                                <div><span className="text-xs font-bold text-slate-400 uppercase">Status</span><p className="text-lg font-black text-blue-600">{expenses.length} lançamentos</p></div>
-                            </div>
-                        </div>
-
-                        {/* CONTENT AREA - CARD BASED */}
-                        <div className="p-4 space-y-6">
-                            {/* --- CRONOGRAMA REPORT --- */}
-                            {reportTab === 'CRONO' && (
-                                <div className="grid grid-cols-1 gap-4">
-                                    {steps
-                                        .filter(s => reportFilterStepId === 'ALL' || s.id === reportFilterStepId)
-                                        .map((s, idx) => {
-                                            const today = new Date().toISOString().split('T')[0];
-                                            const isDone = s.status === 'CONCLUIDO';
-                                            const isLate = !isDone && s.endDate < today;
-                                            const isInProgress = !isDone && s.startDate <= today && s.endDate >= today;
-                                            
-                                            let borderClass = 'border-l-slate-300';
-                                            let statusLabel = 'Pendente';
-                                            let statusBg = 'bg-slate-100 text-slate-500';
-
-                                            if (isDone) {
-                                                borderClass = 'border-l-green-500';
-                                                statusLabel = 'Concluído';
-                                                statusBg = 'bg-green-100 text-green-700';
-                                            } else if (isLate) {
-                                                borderClass = 'border-l-red-500';
-                                                statusLabel = 'Atrasado';
-                                                statusBg = 'bg-red-100 text-red-600';
-                                            } else if (isInProgress) {
-                                                borderClass = 'border-l-orange-500';
-                                                statusLabel = 'Em Andamento';
-                                                statusBg = 'bg-orange-100 text-orange-600';
-                                            }
-
-                                            return (
-                                                <div key={s.id} className={`p-4 bg-slate-50 dark:bg-white rounded-xl border border-slate-200 border-l-4 ${borderClass} flex justify-between items-center shadow-sm`}>
-                                                    <div>
-                                                        <div className="flex items-center gap-2 mb-1">
-                                                            <span className="text-[10px] font-black text-slate-400 uppercase">ETAPA {String(idx + 1).padStart(2, '0')}</span>
-                                                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${statusBg}`}>{statusLabel}</span>
-                                                        </div>
-                                                        <h4 className="font-bold text-slate-800 text-lg">{s.name}</h4>
-                                                        <p className="text-xs text-slate-500 font-medium mt-1">
-                                                            <i className="fa-regular fa-calendar mr-1"></i> {parseDateNoTimezone(s.startDate)} - {parseDateNoTimezone(s.endDate)}
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                            );
-                                    })}
-                                </div>
-                            )}
-
-                            {/* --- MATERIAIS REPORT --- */}
-                            {reportTab === 'MAT' && (
-                                <div>
-                                    {steps
-                                        .filter(s => reportFilterStepId === 'ALL' || s.id === reportFilterStepId)
-                                        .map((step) => {
-                                            const stepMaterials = materials.filter(m => m.stepId === step.id);
-                                            if (stepMaterials.length === 0) return null;
-
-                                            return (
-                                                <div key={step.id} className="mb-6 last:mb-0">
-                                                    <h3 className="font-bold text-slate-700 uppercase tracking-wide text-xs mb-3 border-b border-slate-200 pb-2">{step.name}</h3>
-                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                                        {stepMaterials.map(m => {
-                                                            const progress = m.plannedQty > 0 ? (m.purchasedQty / m.plannedQty) * 100 : 0;
-                                                            let statusColor = 'bg-slate-200'; // Gray (Not bought)
-                                                            let iconClass = 'text-slate-400';
-                                                            
-                                                            if (m.purchasedQty >= m.plannedQty) {
-                                                                statusColor = 'bg-green-500'; // Green (Done)
-                                                                iconClass = 'text-green-600';
-                                                            } else if (m.purchasedQty > 0) {
-                                                                statusColor = 'bg-orange-500'; // Orange (Partial)
-                                                                iconClass = 'text-orange-500';
-                                                            }
-
-                                                            return (
-                                                                <div key={m.id} className="bg-slate-50 dark:bg-white p-3 rounded-xl border border-slate-200 flex items-center gap-3">
-                                                                    <div className={`w-10 h-10 rounded-full bg-white flex items-center justify-center shadow-sm border border-slate-100 ${iconClass}`}>
-                                                                        <i className="fa-solid fa-box-open"></i>
-                                                                    </div>
-                                                                    <div className="flex-1">
-                                                                        <div className="flex justify-between items-center mb-1">
-                                                                            <span className="font-bold text-slate-800 text-sm truncate">{m.name}</span>
-                                                                            <span className="text-[10px] font-mono font-bold text-slate-500">{m.purchasedQty}/{m.plannedQty} {m.unit}</span>
-                                                                        </div>
-                                                                        <div className="h-1.5 w-full bg-slate-200 rounded-full overflow-hidden">
-                                                                            <div className={`h-full ${statusColor}`} style={{ width: `${Math.min(progress, 100)}%` }}></div>
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            );
-                                                        })}
-                                                    </div>
-                                                </div>
-                                            );
-                                    })}
-                                </div>
-                            )}
-
-                            {/* --- FINANCEIRO REPORT --- */}
-                            {reportTab === 'FIN' && (
-                                <div>
-                                    {[...steps, { id: 'general', name: 'Despesas Gerais / Sem Etapa' } as any]
-                                        .filter(s => reportFilterStepId === 'ALL' || (s.id === 'general' ? reportFilterStepId === 'ALL' : s.id === reportFilterStepId))
-                                        .map((step) => {
-                                            const stepExpenses = expenses.filter(e => {
-                                                if (step.id === 'general') return !e.stepId;
-                                                return e.stepId === step.id;
-                                            });
-
-                                            if (stepExpenses.length === 0) return null;
-                                            const stepTotal = stepExpenses.reduce((sum, e) => sum + e.amount, 0);
-
-                                            return (
-                                                <div key={step.id} className="mb-6 last:mb-0 bg-slate-50 dark:bg-white/50 p-4 rounded-2xl border border-slate-200">
-                                                    <div className="flex justify-between items-center mb-4 pb-2 border-b border-slate-200">
-                                                        <h3 className="font-bold text-slate-700 uppercase tracking-wide text-xs">{step.name}</h3>
-                                                        <span className="font-black text-slate-800 text-sm">Total: R$ {stepTotal.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
-                                                    </div>
-                                                    <div className="space-y-2">
-                                                        {stepExpenses.map(e => (
-                                                            <div key={e.id} className="bg-white p-3 rounded-xl border border-slate-100 flex justify-between items-center shadow-sm">
-                                                                <div className="flex items-center gap-3">
-                                                                    <div className="w-8 h-8 rounded-lg bg-slate-100 text-slate-500 flex items-center justify-center text-xs">
-                                                                        <i className={`fa-solid ${e.category === 'Material' ? 'fa-box' : 'fa-helmet-safety'}`}></i>
-                                                                    </div>
-                                                                    <div>
-                                                                        <p className="font-bold text-slate-800 text-sm leading-tight">{e.description}</p>
-                                                                        <p className="text-[10px] text-slate-400">{parseDateNoTimezone(e.date)}</p>
-                                                                    </div>
-                                                                </div>
-                                                                <div className="text-right">
-                                                                    <p className="font-bold text-slate-800 text-sm">R$ {e.amount.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
-                                                                    {e.totalAgreed && <p className="text-[10px] text-slate-400">Parcial</p>}
-                                                                </div>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            );
-                                    })}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* PRINT STYLES */}
-                    <style>{`
-                        @media print {
-                            .no-print { display: none !important; }
-                            body { background: white; color: black; }
-                            nav, aside, .bottom-nav { display: none !important; }
-                            main { padding: 0 !important; margin: 0 !important; height: auto !important; overflow: visible !important; }
-                            /* Ensure cards look good on print */
-                            .bg-slate-50 { background-color: #f8fafc !important; }
-                            .border-l-4 { border-left-width: 4px !important; }
-                            .print\\:block { display: block !important; }
-                        }
-                    `}</style>
-                </div>
-            );
-
-            case 'PHOTOS': return (
-                <div className="space-y-6">
-                    <label className="block w-full py-8 border-2 border-dashed border-pink-300 bg-pink-50 rounded-2xl cursor-pointer hover:bg-pink-100 transition-all text-center">
-                        <i className="fa-solid fa-camera text-2xl text-pink-400 mb-2"></i>
-                        <span className="block text-sm font-bold text-pink-600">{uploading ? 'Enviando...' : 'Adicionar Foto'}</span>
-                        <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, 'PHOTO')} disabled={uploading} />
-                    </label>
-                    <div className="grid grid-cols-2 gap-4">
-                        {photos.map(p => (
-                            <div key={p.id} className="relative group rounded-xl overflow-hidden shadow-sm">
-                                <img src={p.url} className="w-full aspect-square object-cover" alt="Obra" />
-                                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                    <span className="text-white text-xs font-bold">{parseDateNoTimezone(p.date)}</span>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            );
-
-            case 'CALCULATORS': return (
+            case 'CALCULATORS': 
+                if (!isPremium) return <LockedFeature featureName="Calculadoras de Material" />;
+                return (
                 <div className="space-y-6">
                     <div className="grid grid-cols-3 gap-2">
                         {['PISO', 'PAREDE', 'PINTURA'].map(t => (
@@ -1126,392 +821,3 @@ const WorkDetail: React.FC = () => {
                             <input type="number" value={calcArea} onChange={e => setCalcArea(e.target.value)} placeholder="0" className="w-full bg-white/10 border border-white/20 rounded-2xl p-4 text-center text-3xl font-black text-white outline-none focus:border-secondary transition-colors" />
                             <span className="absolute right-4 top-1/2 -translate-y-1/2 text-white/30 font-bold">m²</span>
                         </div>
-                        <div className="space-y-3">
-                            {calcResult.length > 0 ? calcResult.map((res, i) => (
-                                <div key={i} className="bg-white/10 p-3 rounded-xl flex items-center gap-3 backdrop-blur-sm"><i className="fa-solid fa-check text-green-400"></i> <span className="font-bold text-sm">{res}</span></div>
-                            )) : <p className="text-center text-white/30 text-sm">Digite a área para calcular.</p>}
-                        </div>
-                    </div>
-                </div>
-            );
-
-            // Reusing existing components for other subviews to save space, but ensuring they are rendered
-            case 'BONUS_IA': return (
-                <div className="flex flex-col items-center justify-center min-h-[70vh] p-6 text-center animate-in fade-in">
-                    <div className="w-full max-w-sm bg-gradient-to-br from-slate-900 to-slate-950 rounded-[2.5rem] p-8 shadow-2xl relative overflow-hidden border border-slate-800 group">
-                        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20"></div>
-                        <div className="absolute -top-20 -right-20 w-40 h-40 bg-secondary/30 rounded-full blur-3xl animate-pulse"></div>
-                        <div className="relative z-10 flex flex-col items-center">
-                            <div className="w-28 h-28 rounded-full border-4 border-slate-800 p-1 bg-gradient-gold shadow-[0_0_30px_rgba(217,119,6,0.4)] mb-6 transform hover:scale-105 transition-transform duration-500">
-                                <img src={ZE_AVATAR} className="w-full h-full object-cover rounded-full bg-white" onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK}/>
-                            </div>
-                            <h2 className="text-3xl font-black text-white mb-2 tracking-tight">Zé da Obra <span className="text-secondary">AI</span></h2>
-                            <div className="h-1 w-12 bg-secondary rounded-full mb-6"></div>
-                            <p className="text-slate-400 text-sm mb-8 leading-relaxed font-medium">Seu engenheiro virtual particular.</p>
-                            {hasAiAccess ? (
-                                <button onClick={() => setSubView('BONUS_IA_CHAT')} className="w-full py-4 bg-gradient-gold text-white font-black rounded-2xl shadow-lg hover:shadow-orange-500/20 hover:scale-105 transition-all flex items-center justify-center gap-3 group-hover:animate-pulse"><span>INICIAR CONVERSA</span><i className="fa-solid fa-comments"></i></button>
-                            ) : (
-                                <button onClick={() => navigate('/checkout?plan=VITALICIO')} className="w-full py-4 bg-slate-800 text-slate-500 font-bold rounded-2xl border border-slate-700 flex items-center justify-center gap-2 hover:bg-slate-700 transition-colors"><i className="fa-solid fa-lock"></i> BLOQUEADO (ASSINAR)</button>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            );
-
-            case 'BONUS_IA_CHAT': 
-                if (!hasAiAccess) return null;
-                return (
-                <div className="flex flex-col h-[80vh]">
-                    <div className="flex-1 bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-inner overflow-y-auto mb-4 border border-slate-200 dark:border-slate-800">
-                            <div className="flex gap-4 mb-6">
-                            <img src={ZE_AVATAR} className="w-10 h-10 rounded-full border border-slate-200" onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK}/>
-                            <div className="bg-slate-100 dark:bg-slate-800 p-3 rounded-tr-xl rounded-b-xl text-sm shadow-sm"><p className="font-bold text-secondary mb-1">Zé da Obra</p><p>Opa! Mestre de obras na área.</p></div>
-                        </div>
-                        {aiResponse && (
-                            <div className="flex gap-4 mb-6 animate-in fade-in">
-                                <img src={ZE_AVATAR} className="w-10 h-10 rounded-full border border-slate-200" onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK}/>
-                                <div className="bg-slate-100 dark:bg-slate-800 p-3 rounded-tr-xl rounded-b-xl text-sm shadow-sm"><p className="font-bold text-secondary mb-1">Zé da Obra</p><p className="whitespace-pre-wrap">{aiResponse}</p></div>
-                            </div>
-                        )}
-                    </div>
-                    <div className="flex gap-2">
-                        <input value={aiMessage} onChange={e => setAiMessage(e.target.value)} placeholder="Pergunte ao Zé..." className="flex-1 p-4 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-secondary transition-colors"/>
-                        <button onClick={handleAiAsk} disabled={aiLoading} className="w-14 bg-secondary text-white rounded-xl flex items-center justify-center shadow-lg hover:bg-orange-600 transition-colors">{aiLoading ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-paper-plane"></i>}</button>
-                    </div>
-                </div>
-            );
-
-            case 'CONTRACTS': return (
-                <div className="space-y-4">
-                    {CONTRACT_TEMPLATES.map(ct => (
-                        <div key={ct.id} onClick={() => setViewContract({ title: ct.title, content: ct.contentTemplate })} className="group bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-secondary/50 cursor-pointer shadow-sm transition-all hover:translate-x-1">
-                            <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center text-xl group-hover:bg-indigo-600 group-hover:text-white transition-colors"><i className="fa-solid fa-file-contract"></i></div>
-                                <div><h4 className="font-bold text-primary dark:text-white">{ct.title}</h4><p className="text-xs text-slate-500">Toque para abrir modelo</p></div>
-                            </div>
-                        </div>
-                    ))}
-                </div>
-            );
-
-            case 'CHECKLIST': return (
-                <div className="space-y-4">
-                    {STANDARD_CHECKLISTS.map((cl, idx) => (
-                        <div key={idx} className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
-                            <button onClick={() => setActiveChecklist(activeChecklist === cl.category ? null : cl.category)} className="w-full p-5 flex justify-between items-center text-left hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
-                                <span className="font-bold text-sm flex items-center gap-3 text-primary dark:text-white"><div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${activeChecklist === cl.category ? 'bg-green-500 text-white' : 'bg-green-100 text-green-600'}`}><i className="fa-solid fa-list-check"></i></div>{cl.category}</span>
-                                <i className={`fa-solid fa-chevron-down transition-transform text-slate-400 ${activeChecklist === cl.category ? 'rotate-180' : ''}`}></i>
-                            </button>
-                            {activeChecklist === cl.category && (
-                                <div className="p-5 pt-0 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/30 animate-in slide-in-from-top-2">
-                                    {cl.items.map((item, i) => (
-                                        <label key={i} className="flex items-start gap-3 py-3 cursor-pointer border-b border-dashed border-slate-200 dark:border-slate-700 last:border-0 hover:bg-white/50 rounded-lg px-2 transition-colors">
-                                            <input type="checkbox" className="mt-1 rounded border-slate-300 text-secondary focus:ring-secondary w-5 h-5" />
-                                            <span className="text-sm text-slate-600 dark:text-slate-300 leading-tight">{item}</span>
-                                        </label>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    ))}
-                </div>
-            );
-
-            // PROJECTS reuse
-            case 'PROJECTS': return (
-                <div className="space-y-6">
-                    <label className="block w-full py-8 border-2 border-dashed border-teal-300 bg-teal-50 rounded-2xl cursor-pointer hover:bg-teal-100 transition-all text-center">
-                        <i className="fa-solid fa-file-pdf text-2xl text-teal-400 mb-2"></i>
-                        <span className="block text-sm font-bold text-teal-600">{uploading ? 'Enviando...' : 'Adicionar PDF/Projeto'}</span>
-                        <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'FILE')} disabled={uploading} />
-                    </label>
-                    <div className="space-y-2">{files.map(f => <div key={f.id} className="p-4 bg-white rounded-xl border flex items-center gap-3"><i className="fa-solid fa-file text-slate-400"></i> <span className="text-sm font-bold truncate flex-1">{f.name}</span><a href={f.url} download={f.name}><i className="fa-solid fa-download text-primary"></i></a></div>)}</div>
-                </div>
-            );
-
-            default: return null;
-        }
-    };
-
-    return (
-        <div className="max-w-4xl mx-auto min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col font-sans relative">
-            <div className="bg-white dark:bg-slate-900 px-6 pt-6 pb-2 sticky top-0 z-20 shadow-sm border-b border-slate-100 dark:border-slate-800 no-print">
-                <div className="flex justify-between items-center mb-1">
-                    <button onClick={() => subView !== 'NONE' ? setSubView('NONE') : navigate('/')} className="text-slate-400 hover:text-primary dark:hover:text-white"><i className="fa-solid fa-arrow-left text-xl"></i></button>
-                    <h1 className="text-lg font-black text-primary dark:text-white uppercase tracking-tight truncate max-w-[200px]">
-                        {subView !== 'NONE' 
-                            ? (subView === 'TEAM' ? 'Minha Equipe' : subView === 'SUPPLIERS' ? 'Fornecedores' : subView === 'REPORTS' ? 'Relatórios' : 'Detalhes')
-                            : work.name
-                        }
-                    </h1>
-                    <div className="w-6"></div> 
-                </div>
-
-                {/* DESKTOP TOP NAVIGATION (Within Frame) */}
-                {subView === 'NONE' && (
-                    <div className="hidden md:flex items-center gap-2 mt-4 overflow-x-auto no-scrollbar pb-1">
-                        <button onClick={() => setActiveTab('SCHEDULE')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${activeTab === 'SCHEDULE' ? 'bg-secondary/10 text-secondary' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-primary dark:hover:text-white'}`}>
-                            <i className="fa-solid fa-calendar-days"></i> Cronograma
-                        </button>
-                        <button onClick={() => setActiveTab('MATERIALS')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${activeTab === 'MATERIALS' ? 'bg-secondary/10 text-secondary' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-primary dark:hover:text-white'}`}>
-                            <i className="fa-solid fa-layer-group"></i> Materiais
-                        </button>
-                        <button onClick={() => setActiveTab('FINANCIAL')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${activeTab === 'FINANCIAL' ? 'bg-secondary/10 text-secondary' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-primary dark:hover:text-white'}`}>
-                            <i className="fa-solid fa-chart-pie"></i> Financeiro
-                        </button>
-                        <button onClick={() => setActiveTab('MORE')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${activeTab === 'MORE' ? 'bg-secondary/10 text-secondary' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-primary dark:hover:text-white'}`}>
-                            <i className="fa-solid fa-bars"></i> Mais
-                        </button>
-                    </div>
-                )}
-            </div>
-
-            <div className="flex-1 p-4 pb-32 md:pb-8 overflow-y-auto">
-                {subView !== 'NONE' ? renderSubViewContent() : renderMainTab()}
-            </div>
-
-            {/* MAIN NAVIGATION BOTTOM BAR (MOBILE ONLY) */}
-            {subView === 'NONE' && (
-                <div className="fixed md:hidden bottom-0 left-0 right-0 bg-white dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 pb-safe z-40 shadow-[0_-5px_20px_rgba(0,0,0,0.05)] no-print">
-                    <div className="flex justify-around items-center max-w-4xl mx-auto h-16">
-                        <button onClick={() => setActiveTab('SCHEDULE')} className={`flex flex-col items-center justify-center w-full h-full gap-1 transition-all ${activeTab === 'SCHEDULE' ? 'text-secondary' : 'text-slate-400'}`}><i className={`fa-solid fa-calendar-days text-xl ${activeTab === 'SCHEDULE' ? 'scale-110' : ''}`}></i><span className="text-[10px] font-bold uppercase">Cronograma</span></button>
-                        <button onClick={() => setActiveTab('MATERIALS')} className={`flex flex-col items-center justify-center w-full h-full gap-1 transition-all ${activeTab === 'MATERIALS' ? 'text-secondary' : 'text-slate-400'}`}><i className={`fa-solid fa-layer-group text-xl ${activeTab === 'MATERIALS' ? 'scale-110' : ''}`}></i><span className="text-[10px] font-bold uppercase">Materiais</span></button>
-                        <button onClick={() => setActiveTab('FINANCIAL')} className={`flex flex-col items-center justify-center w-full h-full gap-1 transition-all ${activeTab === 'FINANCIAL' ? 'text-secondary' : 'text-slate-400'}`}><i className={`fa-solid fa-chart-pie text-xl ${activeTab === 'FINANCIAL' ? 'scale-110' : ''}`}></i><span className="text-[10px] font-bold uppercase">Financeiro</span></button>
-                        <button onClick={() => setActiveTab('MORE')} className={`flex flex-col items-center justify-center w-full h-full gap-1 transition-all ${activeTab === 'MORE' ? 'text-secondary' : 'text-slate-400'}`}><i className={`fa-solid fa-bars text-xl ${activeTab === 'MORE' ? 'scale-110' : ''}`}></i><span className="text-[10px] font-bold uppercase">Mais</span></button>
-                    </div>
-                </div>
-            )}
-
-            {/* --- ALL MODALS (RENDERED AT ROOT LEVEL) --- */}
-            
-            {/* ADD/EDIT STEP MODAL */}
-            {isStepModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
-                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-6 shadow-2xl">
-                        <h3 className="text-xl font-bold mb-4 text-primary dark:text-white">{stepModalMode === 'ADD' ? 'Nova Etapa' : 'Editar Etapa'}</h3>
-                        <form onSubmit={handleSaveStep} className="space-y-4">
-                            <input placeholder="Nome da Etapa" value={stepName} onChange={e => setStepName(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required />
-                            <div className="grid grid-cols-2 gap-2">
-                                <div><label className="text-[10px] uppercase font-bold text-slate-400 ml-1">Início</label><input type="date" value={stepStart} onChange={e => setStepStart(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required /></div>
-                                <div><label className="text-[10px] uppercase font-bold text-slate-400 ml-1">Fim</label><input type="date" value={stepEnd} onChange={e => setStepEnd(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required /></div>
-                            </div>
-                            <div className="flex gap-2 pt-2">
-                                <button type="button" onClick={() => setIsStepModalOpen(false)} className="flex-1 bg-slate-100 dark:bg-slate-800 text-slate-500 py-3 rounded-xl font-bold">Cancelar</button>
-                                <button type="submit" className="flex-1 bg-primary text-white py-3 rounded-xl font-bold">Salvar</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
-
-            {/* ADD MATERIAL MODAL */}
-            {addMatModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
-                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-6 shadow-2xl overflow-y-auto max-h-[90vh]">
-                        <h3 className="text-xl font-bold mb-4 text-primary dark:text-white">Novo Material</h3>
-                        <form onSubmit={handleAddMaterial} className="space-y-4">
-                            <input placeholder="Nome do Material" value={newMatName} onChange={e => setNewMatName(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required />
-                            <div className="grid grid-cols-2 gap-2">
-                                <input type="number" placeholder="Qtd" value={newMatQty} onChange={e => setNewMatQty(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required />
-                                <input placeholder="Unidade (un, m2)" value={newMatUnit} onChange={e => setNewMatUnit(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required />
-                            </div>
-                            <select value={newMatStepId} onChange={e => setNewMatStepId(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
-                                <option value="">Sem etapa definida</option>
-                                {steps.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                            </select>
-                            
-                            <div className="border-t pt-4 mt-2">
-                                <label className="flex items-center gap-2 mb-2 font-bold text-sm"><input type="checkbox" checked={newMatBuyNow} onChange={e => setNewMatBuyNow(e.target.checked)} className="w-4 h-4" /> Já comprei este material</label>
-                                {newMatBuyNow && (
-                                    <div className="grid grid-cols-2 gap-2 animate-in slide-in-from-top-2">
-                                        <input type="number" placeholder="Qtd Comprada" value={newMatBuyQty} onChange={e => setNewMatBuyQty(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" />
-                                        <input type="number" placeholder="Valor Total (R$)" value={newMatBuyCost} onChange={e => setNewMatBuyCost(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" />
-                                    </div>
-                                )}
-                            </div>
-
-                            <div className="flex gap-2">
-                                <button type="button" onClick={() => setAddMatModal(false)} className="flex-1 bg-slate-100 py-3 rounded-xl font-bold">Cancelar</button>
-                                <button type="submit" className="flex-1 bg-primary text-white py-3 rounded-xl font-bold">Salvar</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
-
-            {/* EDIT MATERIAL MODAL */}
-            {materialModal.isOpen && materialModal.material && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
-                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-6 shadow-2xl overflow-y-auto max-h-[90vh]">
-                        <h3 className="text-xl font-bold mb-4 text-primary dark:text-white">Editar Material</h3>
-                        
-                        <form onSubmit={handleUpdateMaterial} className="space-y-6">
-                            {/* EDITABLE DEFINITION */}
-                            <div className="space-y-3">
-                                <div>
-                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Nome do Produto</label>
-                                    <input 
-                                        value={matName} 
-                                        onChange={e => setMatName(e.target.value)} 
-                                        className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold"
-                                    />
-                                </div>
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div>
-                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Qtd Planejada</label>
-                                        <input 
-                                            type="number"
-                                            value={matPlannedQty} 
-                                            onChange={e => setMatPlannedQty(e.target.value)} 
-                                            className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Unidade</label>
-                                        <input 
-                                            value={matUnit} 
-                                            onChange={e => setMatUnit(e.target.value)} 
-                                            className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold"
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* READ-ONLY STATUS */}
-                            <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-xl border border-green-200 dark:border-green-900 flex justify-between items-center">
-                                <span className="text-sm font-bold text-green-700 dark:text-green-400">Total Já Comprado:</span>
-                                <span className="font-mono font-black text-lg text-green-700 dark:text-green-400">{materialModal.material.purchasedQty} {materialModal.material.unit}</span>
-                            </div>
-
-                            {/* OPTIONAL NEW PURCHASE */}
-                            <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
-                                <label className="block text-xs font-black text-secondary uppercase mb-2 tracking-widest"><i className="fa-solid fa-cart-plus"></i> Registrar Nova Compra</label>
-                                <div className="grid grid-cols-2 gap-3">
-                                    <input type="number" placeholder="Qtd" value={matBuyQty} onChange={e => setMatBuyQty(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" />
-                                    <input type="number" placeholder="Valor (R$)" value={matBuyCost} onChange={e => setMatBuyCost(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" />
-                                </div>
-                                <p className="text-[10px] text-slate-400 mt-2">*Preencha apenas se houver nova compra. Se quiser só corrigir o nome/planejado, deixe vazio.</p>
-                            </div>
-
-                            <div className="flex gap-2">
-                                <button type="button" onClick={() => setMaterialModal({isOpen: false, material: null})} className="flex-1 bg-slate-100 py-3 rounded-xl font-bold">Cancelar</button>
-                                <button type="submit" className="flex-1 bg-primary text-white py-3 rounded-xl font-bold shadow-lg">Salvar Alterações</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
-
-            {/* EXPENSE MODAL (ADD / EDIT) */}
-            {expenseModal.isOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
-                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-6 shadow-2xl">
-                        <div className="flex justify-between items-center mb-4">
-                            <h3 className="text-xl font-bold text-primary dark:text-white">
-                                {expenseModal.mode === 'ADD' ? 'Novo Gasto' : 'Editar Gasto'}
-                            </h3>
-                            {expenseModal.mode === 'EDIT' && (
-                                <button onClick={handleDeleteExpense} className="text-red-500 hover:bg-red-50 p-2 rounded-lg transition-colors">
-                                    <i className="fa-solid fa-trash"></i>
-                                </button>
-                            )}
-                        </div>
-                        <form onSubmit={handleSaveExpense} className="space-y-4">
-                            <input placeholder="Descrição (ex: Pagamento Pedreiro)" value={expDesc} onChange={e => setExpDesc(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required />
-                            
-                            <div className="grid grid-cols-2 gap-2">
-                                <div className="relative">
-                                    <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Valor Pago Agora</label>
-                                    <div className="relative">
-                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">R$</span>
-                                        <input type="number" placeholder="0.00" value={expAmount} onChange={e => setExpAmount(e.target.value)} className="w-full pl-10 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required />
-                                    </div>
-                                </div>
-                                <div className="relative">
-                                    <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Total Combinado</label>
-                                    <div className="relative">
-                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">R$</span>
-                                        <input type="number" placeholder="(Opcional)" value={expTotalAgreed} onChange={e => setExpTotalAgreed(e.target.value)} className="w-full pl-10 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" />
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-2">
-                                <div>
-                                    <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Categoria</label>
-                                    <select value={expCategory} onChange={e => setExpCategory(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
-                                        <option value={ExpenseCategory.LABOR}>Mão de Obra</option>
-                                        <option value={ExpenseCategory.MATERIAL}>Material</option>
-                                        <option value={ExpenseCategory.PERMITS}>Taxas</option>
-                                        <option value={ExpenseCategory.OTHER}>Outros</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Data</label>
-                                    <input type="date" value={expDate} onChange={e => setExpDate(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required />
-                                </div>
-                            </div>
-                            
-                            {/* STEP SELECTION - ENSURING VISIBILITY */}
-                            <div>
-                                <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Etapa Relacionada</label>
-                                <select value={expStepId} onChange={e => setExpStepId(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold text-sm">
-                                    <option value="">Sem Etapa (Geral)</option>
-                                    {steps.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                                </select>
-                            </div>
-
-                            <div className="flex gap-2 pt-2">
-                                <button type="button" onClick={() => setExpenseModal({isOpen: false, mode: 'ADD'})} className="flex-1 bg-slate-100 py-3 rounded-xl font-bold">Cancelar</button>
-                                <button type="submit" className="flex-1 bg-primary text-white py-3 rounded-xl font-bold">Salvar</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
-            
-            {/* TEAM & SUPPLIER FORM MODAL */}
-            {isPersonModalOpen && (
-                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
-                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-6 shadow-2xl overflow-y-auto max-h-[90vh]">
-                        <div className="flex items-center gap-3 mb-4">
-                             <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl ${personMode === 'WORKER' ? 'bg-blue-100 text-blue-600' : 'bg-amber-100 text-amber-600'}`}><i className={`fa-solid ${personMode === 'WORKER' ? 'fa-helmet-safety' : 'fa-truck'}`}></i></div>
-                             <div><h3 className="text-lg font-bold text-primary dark:text-white leading-tight">{personId ? 'Editar' : 'Adicionar'} {personMode === 'WORKER' ? 'Profissional' : 'Fornecedor'}</h3></div>
-                        </div>
-                        <form onSubmit={handleSavePerson} className="space-y-4">
-                            <div><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Nome</label><input required className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold" value={personName} onChange={e => setPersonName(e.target.value)} /></div>
-                            <div><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{personMode === 'WORKER' ? 'Função' : 'Categoria'}</label><select required className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold text-sm" value={personRole} onChange={e => setPersonRole(e.target.value)}>{(personMode === 'WORKER' ? STANDARD_JOB_ROLES : STANDARD_SUPPLIER_CATEGORIES).map(r => <option key={r} value={r}>{r}</option>)}</select></div>
-                            <div><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Telefone / WhatsApp</label><input className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold" placeholder="51 99999-9999" value={personPhone} onChange={e => setPersonPhone(e.target.value)} /></div>
-                            <div><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Observações</label><textarea className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold h-20 resize-none" placeholder="Detalhes opcionais..." value={personNotes} onChange={e => setPersonNotes(e.target.value)}></textarea></div>
-                            <div className="flex gap-2 pt-2"><button type="button" onClick={() => setIsPersonModalOpen(false)} className="flex-1 py-3 font-bold text-slate-500 hover:bg-slate-100 rounded-xl">Cancelar</button><button type="submit" className="flex-1 py-3 font-bold bg-primary text-white rounded-xl shadow-lg">Salvar</button></div>
-                        </form>
-                    </div>
-                </div>
-            )}
-
-            {/* CONTRACT VIEWER MODAL */}
-            {viewContract && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
-                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-lg p-6 shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
-                        <div className="flex justify-between items-center mb-4 pb-4 border-b border-slate-100 dark:border-slate-800">
-                            <h3 className="text-xl font-bold text-primary dark:text-white">{viewContract.title}</h3>
-                            <button onClick={() => setViewContract(null)} className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500"><i className="fa-solid fa-xmark"></i></button>
-                        </div>
-                        <div className="flex-1 overflow-y-auto p-4 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 mb-4">
-                            <pre className="whitespace-pre-wrap font-mono text-xs text-slate-600 dark:text-slate-300 leading-relaxed">{viewContract.content}</pre>
-                        </div>
-                        <div className="flex gap-3">
-                            <button onClick={() => {navigator.clipboard.writeText(viewContract.content); alert("Copiado!"); setViewContract(null);}} className="flex-1 py-3 bg-slate-100 dark:bg-slate-800 text-primary dark:text-white font-bold rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"><i className="fa-regular fa-copy mr-2"></i> Copiar</button>
-                            <button onClick={() => {const blob = new Blob([viewContract.content], {type: "application/msword"}); const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = `${viewContract.title}.doc`; link.click();}} className="flex-1 py-3 bg-primary text-white font-bold rounded-xl hover:bg-primary-light transition-colors"><i className="fa-solid fa-download mr-2"></i> Baixar Word</button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            <ZeModal isOpen={zeModal.isOpen} title={zeModal.title} message={zeModal.message} onConfirm={zeModal.onConfirm} onCancel={() => setZeModal(prev => ({ ...prev, isOpen: false }))} />
-        </div>
-    );
-};
-
-export default WorkDetail;
-
