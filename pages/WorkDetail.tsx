@@ -51,7 +51,8 @@ const WorkDetail: React.FC = () => {
     const isAiTrialActive = user?.isTrial && trialDaysRemaining !== null && trialDaysRemaining > 0;
     const hasAiAccess = isVitalicio || isAiTrialActive;
 
-    // Fix: Define isPremium (used for restricting tools like Calculators/Contracts)
+    // --- PREMIUM TOOLS LOCK ---
+    // Calculators, Contracts, and Checklists are exclusive to Vitalício
     const isPremium = isVitalicio;
 
     // --- MODALS STATE ---
@@ -86,11 +87,10 @@ const WorkDetail: React.FC = () => {
     const [newMatBuyQty, setNewMatBuyQty] = useState('');
     const [newMatBuyCost, setNewMatBuyCost] = useState('');
 
-    // EXPENSE MODAL STATE (UNIFIED ADD/EDIT)
+    // EXPENSE MODAL STATE
     const [expenseModal, setExpenseModal] = useState<{ isOpen: boolean, mode: 'ADD'|'EDIT', id?: string }>({ isOpen: false, mode: 'ADD' });
     const [expDesc, setExpDesc] = useState('');
-    const [expAmount, setExpAmount] = useState(''); // "Paying Now" input
-    const [expCurrentPaid, setExpCurrentPaid] = useState(0); // "Already Paid" cumulative
+    const [expAmount, setExpAmount] = useState('');
     const [expTotalAgreed, setExpTotalAgreed] = useState('');
     const [expCategory, setExpCategory] = useState<string>(ExpenseCategory.LABOR);
     const [expStepId, setExpStepId] = useState('');
@@ -250,8 +250,7 @@ const WorkDetail: React.FC = () => {
     const openAddExpense = () => {
         setExpenseModal({ isOpen: true, mode: 'ADD' });
         setExpDesc('');
-        setExpAmount(''); // Start empty for "Paying Now"
-        setExpCurrentPaid(0); // Start with 0 paid
+        setExpAmount('');
         setExpTotalAgreed('');
         setExpCategory(ExpenseCategory.LABOR);
         setExpStepId('');
@@ -261,11 +260,7 @@ const WorkDetail: React.FC = () => {
     const openEditExpense = (expense: Expense) => {
         setExpenseModal({ isOpen: true, mode: 'EDIT', id: expense.id });
         setExpDesc(expense.description);
-        
-        // CORRECTION: Set the already paid amount from DB to the state variable
-        setExpCurrentPaid(expense.amount); 
-        
-        setExpAmount(''); // "Paying Now" starts empty to allow adding more
+        setExpAmount(String(expense.amount));
         setExpTotalAgreed(expense.totalAgreed ? String(expense.totalAgreed) : '');
         setExpCategory(expense.category);
         setExpStepId(expense.stepId || '');
@@ -278,25 +273,13 @@ const WorkDetail: React.FC = () => {
         
         const finalStepId = expStepId || undefined;
         const finalTotalAgreed = expTotalAgreed ? Number(expTotalAgreed) : undefined;
-        
-        // CUMULATIVE LOGIC:
-        let finalAmount = 0;
-        const payingNow = Number(expAmount) || 0;
-
-        if (expenseModal.mode === 'ADD') {
-            // In ADD mode, whatever is typed is the initial amount
-            finalAmount = payingNow;
-        } else {
-            // In EDIT mode: Old Amount (DB) + New Payment (Input)
-            finalAmount = expCurrentPaid + payingNow;
-        }
 
         if (expenseModal.mode === 'ADD') {
             await dbService.addExpense({
                 id: Math.random().toString(36).substr(2, 9),
                 workId: work.id,
                 description: expDesc,
-                amount: finalAmount,
+                amount: Number(expAmount),
                 date: new Date(expDate).toISOString(),
                 category: expCategory,
                 stepId: finalStepId,
@@ -308,7 +291,7 @@ const WorkDetail: React.FC = () => {
                 await dbService.updateExpense({
                     ...existing,
                     description: expDesc,
-                    amount: finalAmount,
+                    amount: Number(expAmount),
                     date: new Date(expDate).toISOString(),
                     category: expCategory,
                     stepId: finalStepId,
@@ -422,7 +405,6 @@ const WorkDetail: React.FC = () => {
         });
     };
 
-    // CALCULATORS
     useEffect(() => {
         if (!calcArea) { setCalcResult([]); return; }
         const area = Number(calcArea);
@@ -441,7 +423,6 @@ const WorkDetail: React.FC = () => {
         }
     }, [calcArea, calcType]);
 
-    // EXPORT EXCEL
     const handleExportExcel = () => {
         const wb = XLSX.utils.book_new();
         const wsCrono = XLSX.utils.json_to_sheet(steps.map(s => ({ Etapa: s.name, Inicio: parseDateNoTimezone(s.startDate), Fim: parseDateNoTimezone(s.endDate), Status: s.status })));
@@ -467,10 +448,24 @@ const WorkDetail: React.FC = () => {
     if (loading) return <div className="h-screen flex items-center justify-center"><i className="fa-solid fa-circle-notch fa-spin text-3xl text-primary"></i></div>;
     if (!work) return null;
 
-    // --- RENDER CONTENT ---
+    // --- REUSABLE LOCKED COMPONENT ---
+    const LockedFeature = ({ featureName }: { featureName: string }) => (
+        <div className="flex flex-col items-center justify-center min-h-[50vh] p-6 text-center animate-in fade-in">
+            <div className="w-20 h-20 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-6 shadow-sm">
+                <i className="fa-solid fa-lock text-3xl text-slate-400"></i>
+            </div>
+            <h3 className="text-2xl font-bold text-primary dark:text-white mb-2">{featureName}</h3>
+            <p className="text-slate-500 dark:text-slate-400 max-w-xs mb-8">Esta ferramenta é um bônus exclusivo para membros do plano Vitalício.</p>
+            <button 
+                onClick={() => navigate('/checkout?plan=VITALICIO')} 
+                className="px-8 py-4 bg-gradient-premium text-white font-bold rounded-xl shadow-xl hover:scale-105 transition-transform flex items-center gap-2"
+            >
+                <i className="fa-solid fa-crown text-yellow-400"></i> Desbloquear Agora
+            </button>
+        </div>
+    );
 
     const renderMainTab = () => {
-        // ... (Main Tab content - SCHEDULE, MATERIALS, FINANCIAL, MORE - remains same as previously optimized)
         if (activeTab === 'SCHEDULE') {
             return (
                 <div className="space-y-4 animate-in fade-in">
@@ -479,7 +474,7 @@ const WorkDetail: React.FC = () => {
                             <h2 className="text-2xl font-black text-primary dark:text-white">Cronograma</h2>
                             <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Etapas da Obra</p>
                         </div>
-                        <button onClick={() => { setStepModalMode('ADD'); setStepName(''); setStepStart(new Date().toISOString().split('T')[0]); setStepEnd(new Date().toISOString().split('T')[0]); setIsStepModalOpen(true); }} className="bg-green-600 text-white w-12 h-12 rounded-xl flex items-center justify-center hover:bg-green-700 transition-all shadow-lg shadow-green-600/30"><i className="fa-solid fa-plus text-lg"></i></button>
+                        <button onClick={() => { setStepModalMode('ADD'); setStepName(''); setStepStart(new Date().toISOString().split('T')[0]); setStepEnd(new Date().toISOString().split('T')[0]); setIsStepModalOpen(true); }} className="bg-primary text-white w-10 h-10 rounded-xl shadow-lg flex items-center justify-center hover:scale-105 transition-transform"><i className="fa-solid fa-plus"></i></button>
                     </div>
                     {steps.map((step, idx) => {
                          const stepNum = String(idx + 1).padStart(2, '0');
@@ -503,6 +498,7 @@ const WorkDetail: React.FC = () => {
                              iconColor = 'bg-green-500 border-green-500 text-white';
                              iconClass = 'fa-check';
                          } else if (isDelayed) {
+                             // Red style for delayed items
                              statusBadgeClass = 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400';
                              statusText = 'Atrasado';
                              cardBorderClass = 'border-red-200 dark:border-red-900/30';
@@ -550,6 +546,7 @@ const WorkDetail: React.FC = () => {
         }
 
         if (activeTab === 'MATERIALS') {
+             // Filter Logic
              const filteredSteps = materialFilterStepId === 'ALL' 
                 ? steps 
                 : steps.filter(s => s.id === materialFilterStepId);
@@ -562,8 +559,10 @@ const WorkDetail: React.FC = () => {
                                 <h2 className="text-2xl font-black text-primary dark:text-white">Materiais</h2>
                                 <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Controle de Compras</p>
                             </div>
-                            <button onClick={() => setAddMatModal(true)} className="bg-green-600 text-white w-12 h-12 rounded-xl flex items-center justify-center hover:bg-green-700 transition-all shadow-lg shadow-green-600/30"><i className="fa-solid fa-plus text-lg"></i></button>
+                            <button onClick={() => setAddMatModal(true)} className="bg-primary text-white w-12 h-12 rounded-xl flex items-center justify-center hover:bg-primary-light transition-all shadow-lg shadow-primary/30"><i className="fa-solid fa-plus text-lg"></i></button>
                         </div>
+                        
+                        {/* STEP FILTER DROPDOWN */}
                         <div className="px-2">
                             <select 
                                 value={materialFilterStepId}
@@ -579,7 +578,7 @@ const WorkDetail: React.FC = () => {
                     </div>
 
                     {filteredSteps.map((step) => {
-                        const originalIdx = steps.findIndex(s => s.id === step.id);
+                        const originalIdx = steps.findIndex(s => s.id === step.id); // For correct numbering
                         const stepMaterials = materials ? materials.filter(m => m.stepId === step.id) : [];
                         
                         if (stepMaterials.length === 0 && materialFilterStepId !== 'ALL') {
@@ -589,6 +588,7 @@ const WorkDetail: React.FC = () => {
                         
                         return (
                             <div key={step.id} className="mb-8 bg-white/50 dark:bg-slate-900/50 rounded-2xl p-2">
+                                {/* Stronger Visual Separation for Step Header */}
                                 <div className="flex items-center gap-3 mb-4 p-3 bg-white dark:bg-slate-900 rounded-xl shadow-sm border-l-4 border-secondary">
                                     <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 text-secondary font-black text-sm flex items-center justify-center">
                                         {String(originalIdx+1).padStart(2,'0')}
@@ -602,6 +602,7 @@ const WorkDetail: React.FC = () => {
                                         const purchased = mat.purchasedQty;
                                         const progress = hasPlanned ? Math.min(100, (purchased / mat.plannedQty) * 100) : 0;
                                         
+                                        // Logic for Partial/Complete/Pending
                                         let statusText = 'Pendente';
                                         let statusColor = 'bg-slate-100 text-slate-500';
                                         let barColor = 'bg-slate-200';
@@ -613,7 +614,7 @@ const WorkDetail: React.FC = () => {
                                         } else if (purchased > 0) {
                                             statusText = 'Parcial';
                                             statusColor = 'bg-orange-100 text-orange-600';
-                                            barColor = 'bg-secondary';
+                                            barColor = 'bg-secondary'; // Orange/Amber
                                         }
 
                                         return (
@@ -655,9 +656,10 @@ const WorkDetail: React.FC = () => {
                         <div className="flex items-center gap-2 text-xs opacity-70 bg-white/10 w-fit px-3 py-1 rounded-full"><i className="fa-solid fa-wallet"></i> Orçamento: R$ {work.budgetPlanned.toLocaleString('pt-BR')}</div>
                     </div>
 
+                    {/* Grouped Financial Expenses by Step */}
                     {[...steps, { id: 'general', name: 'Despesas Gerais / Sem Etapa', startDate: '', endDate: '', status: StepStatus.NOT_STARTED, workId: '', isDelayed: false }].map((step, idx) => {
                         const stepExpenses = expenses.filter(e => {
-                            if (step.id === 'general') return !e.stepId; 
+                            if (step.id === 'general') return !e.stepId; // Expenses without stepId
                             return e.stepId === step.id;
                         });
 
@@ -674,6 +676,7 @@ const WorkDetail: React.FC = () => {
                                 </div>
                                 <div className="space-y-3">
                                     {stepExpenses.map(exp => {
+                                        // PARTIAL PAYMENT LOGIC
                                         const isPartial = exp.totalAgreed && exp.totalAgreed > exp.amount;
                                         const progress = isPartial ? (exp.amount / exp.totalAgreed!) * 100 : 100;
 
@@ -696,10 +699,12 @@ const WorkDetail: React.FC = () => {
                                                         </div>
                                                     </div>
                                                     <div className="text-right">
+                                                        {/* MAIN VALUE IS ALWAYS PAID AMOUNT */}
                                                         <span className="font-bold text-primary dark:text-white text-lg whitespace-nowrap">R$ {Number(exp.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                                                     </div>
                                                 </div>
                                                 
+                                                {/* VISUAL FOR PARTIAL PAYMENTS */}
                                                 {isPartial && (
                                                     <div className="mt-2 pt-2 border-t border-dashed border-slate-100 dark:border-slate-800">
                                                         <div className="flex justify-between text-[10px] uppercase font-bold text-slate-400 mb-1">
@@ -775,7 +780,7 @@ const WorkDetail: React.FC = () => {
 
                                 <div onClick={() => setSubView('BONUS_IA')} className="bg-white/10 hover:bg-white/15 p-4 rounded-2xl border border-white/10 mb-4 cursor-pointer flex items-center gap-4 transition-all backdrop-blur-sm group">
                                     <div className="relative">
-                                        <img src={ZE_AVATAR} className={`w-14 h-14 rounded-full border-2 border-secondary bg-slate-800 object-cover ${!hasAiAccess ? 'grayscale opacity-70' : ''}`} onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK}/>
+                                        <img src={ZE_AVATAR} className={`w-14 h-14 rounded-full border-2 border-secondary bg-slate-800 object-cover ${!isPremium ? 'grayscale opacity-70' : ''}`} onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK}/>
                                         <div className={`absolute -bottom-1 -right-1 w-4 h-4 border-2 border-slate-800 rounded-full ${hasAiAccess ? 'bg-green-500' : 'bg-slate-500'}`}></div>
                                     </div>
                                     <div>
@@ -807,6 +812,34 @@ const WorkDetail: React.FC = () => {
     // --- RENDER SUBVIEW ---
     const renderSubViewContent = () => {
         switch(subView) {
+            case 'CALCULATORS': 
+                if (!isPremium) return <LockedFeature featureName="Calculadoras de Material" />;
+                return (
+                <div className="space-y-6">
+                    <div className="grid grid-cols-3 gap-2">
+                        {['PISO', 'PAREDE', 'PINTURA'].map(t => (
+                            <button key={t} onClick={() => {setCalcType(t as any); setCalcResult([])}} className={`flex flex-col items-center justify-center py-4 rounded-xl border-2 font-bold text-xs transition-all gap-2 ${calcType === t ? 'border-secondary bg-secondary/10 text-secondary' : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-400'}`}>
+                                <i className={`fa-solid ${t === 'PISO' ? 'fa-layer-group' : t === 'PAREDE' ? 'fa-building' : 'fa-paint-roller'} text-xl`}></i>
+                                {t}
+                            </button>
+                        ))}
+                    </div>
+                    <div className="bg-gradient-to-br from-slate-800 to-slate-900 text-white p-8 rounded-3xl shadow-xl relative overflow-hidden">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-secondary/20 rounded-full blur-3xl"></div>
+                        <h3 className="text-lg font-bold mb-6 text-center uppercase tracking-widest text-secondary">Calculadora de {calcType}</h3>
+                        <div className="relative mb-8">
+                            <input type="number" value={calcArea} onChange={e => setCalcArea(e.target.value)} placeholder="0" className="w-full bg-white/10 border border-white/20 rounded-2xl p-4 text-center text-3xl font-black text-white outline-none focus:border-secondary transition-colors" />
+                            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-white/30 font-bold">m²</span>
+                        </div>
+                        <div className="space-y-3">
+                            {calcResult.length > 0 ? calcResult.map((res, i) => (
+                                <div key={i} className="bg-white/10 p-3 rounded-xl flex items-center gap-3 backdrop-blur-sm"><i className="fa-solid fa-check text-green-400"></i> <span className="font-bold text-sm">{res}</span></div>
+                            )) : <p className="text-center text-white/30 text-sm">Digite a área para calcular.</p>}
+                        </div>
+                    </div>
+                </div>
+            );
+
             case 'TEAM': return (
                 <div className="space-y-6">
                     <div className="bg-blue-50 dark:bg-blue-900/20 p-6 rounded-3xl border border-blue-100 dark:border-blue-900 mb-2">
@@ -879,7 +912,107 @@ const WorkDetail: React.FC = () => {
 
             case 'REPORTS': return (
                 <div className="space-y-6">
-                    {/* TOP ACTION BAR (Moved to top as requested) */}
+                    {/* Filter Tabs */}
+                    <div className="flex gap-2 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl no-print">
+                        {['CRONO', 'MAT', 'FIN'].map((rt) => (
+                            <button key={rt} onClick={() => setReportTab(rt as any)} className={`flex-1 py-2 rounded-lg text-xs font-bold ${reportTab === rt ? 'bg-white shadow text-primary' : 'text-slate-500'}`}>
+                                {rt === 'CRONO' ? 'Cronograma' : rt === 'MAT' ? 'Materiais' : 'Financeiro'}
+                            </button>
+                        ))}
+                    </div>
+
+                    {/* PRINT-FRIENDLY CONTAINER */}
+                    <div className="bg-white dark:bg-white dark:text-black rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm print:shadow-none print:border-0 print:rounded-none">
+                        
+                        {/* Header for Print/PDF */}
+                        <div className="hidden print:block p-8 border-b-2 border-slate-100">
+                            <div className="flex justify-between items-start">
+                                <div>
+                                    <h1 className="text-3xl font-black text-slate-900 mb-1">MÃOS DA OBRA</h1>
+                                    <p className="text-sm font-bold text-slate-500">Relatório Geral da Obra</p>
+                                </div>
+                                <div className="text-right">
+                                    <h2 className="text-xl font-bold text-slate-800">{work.name}</h2>
+                                    <p className="text-sm text-slate-500">Data: {new Date().toLocaleDateString()}</p>
+                                </div>
+                            </div>
+                            
+                            {/* Summary Stats */}
+                            <div className="mt-6 p-4 bg-slate-50 rounded-xl border border-slate-200 grid grid-cols-3 gap-4">
+                                <div>
+                                    <span className="text-xs font-bold text-slate-400 uppercase">Orçamento</span>
+                                    <p className="text-lg font-black text-slate-800">R$ {work.budgetPlanned.toLocaleString('pt-BR')}</p>
+                                </div>
+                                <div>
+                                    <span className="text-xs font-bold text-slate-400 uppercase">Gasto Total</span>
+                                    <p className="text-lg font-black text-red-600">R$ {expenses.reduce((a, b) => a + Number(b.amount), 0).toLocaleString('pt-BR')}</p>
+                                </div>
+                                <div>
+                                    <span className="text-xs font-bold text-slate-400 uppercase">Status</span>
+                                    <p className="text-lg font-black text-blue-600">{expenses.length} lançamentos</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <table className="w-full text-left text-sm">
+                            <thead className="bg-slate-50 dark:bg-slate-100 border-b border-slate-200 dark:border-slate-200">
+                                <tr>
+                                    <th className="px-6 py-4 font-bold text-slate-500 uppercase text-xs">Item / Descrição</th>
+                                    <th className="px-6 py-4 font-bold text-slate-500 uppercase text-xs text-right">Detalhes / Valor</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 dark:divide-slate-200">
+                                {reportTab === 'CRONO' && steps.map((s) => (
+                                    <tr key={s.id} className="hover:bg-slate-50">
+                                        <td className="px-6 py-4">
+                                            <p className="font-bold text-slate-800">{s.name}</p>
+                                            <p className="text-xs text-slate-500">{parseDateNoTimezone(s.startDate)} - {parseDateNoTimezone(s.endDate)}</p>
+                                        </td>
+                                        <td className="px-6 py-4 text-right">
+                                            <span className={`inline-block text-[10px] font-bold px-3 py-1 rounded-full ${s.status === 'CONCLUIDO' ? 'bg-green-100 text-green-700' : s.status === 'EM_ANDAMENTO' ? 'bg-orange-100 text-orange-700' : 'bg-slate-100 text-slate-500'}`}>
+                                                {s.status === 'CONCLUIDO' ? 'CONCLUÍDO' : s.status === 'EM_ANDAMENTO' ? 'EM ANDAMENTO' : 'PENDENTE'}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                ))}
+                                {reportTab === 'MAT' && materials.map((m) => (
+                                    <tr key={m.id} className="hover:bg-slate-50">
+                                        <td className="px-6 py-4">
+                                            <p className="font-bold text-slate-800">{m.name}</p>
+                                            <p className="text-xs text-slate-500">{m.brand || 'Marca não inf.'}</p>
+                                        </td>
+                                        <td className="px-6 py-4 text-right">
+                                            <div className="font-mono font-bold text-slate-700">{m.purchasedQty} / {m.plannedQty} {m.unit}</div>
+                                            <div className="w-24 h-1.5 bg-slate-200 rounded-full ml-auto mt-1 overflow-hidden">
+                                                <div className="h-full bg-blue-500" style={{width: `${Math.min((m.purchasedQty/m.plannedQty)*100, 100)}%`}}></div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                                {reportTab === 'FIN' && expenses.map((e) => (
+                                    <tr key={e.id} className="hover:bg-slate-50">
+                                        <td className="px-6 py-4">
+                                            <p className="font-bold text-slate-800">{e.description}</p>
+                                            <p className="text-xs text-slate-500 flex items-center gap-2">
+                                                <span>{parseDateNoTimezone(e.date)}</span>
+                                                <span className="w-1 h-1 rounded-full bg-slate-300"></span>
+                                                <span>{e.category}</span>
+                                            </p>
+                                        </td>
+                                        <td className="px-6 py-4 text-right">
+                                            <p className="font-bold text-slate-800">R$ {e.amount.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
+                                            {e.totalAgreed && (
+                                                <p className="text-[10px] text-slate-500 font-bold mt-0.5">
+                                                    Parcial de R$ {e.totalAgreed.toLocaleString('pt-BR')}
+                                                </p>
+                                            )}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+
                     <div className="flex gap-3 no-print">
                         <button onClick={handlePrintPDF} className="flex-1 py-3 bg-slate-800 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-slate-700 shadow-lg transition-all">
                             <i className="fa-solid fa-print"></i> Imprimir / PDF
@@ -889,190 +1022,6 @@ const WorkDetail: React.FC = () => {
                         </button>
                     </div>
 
-                    {/* Report Controls (Tabs + Filter) */}
-                    <div className="space-y-3 no-print">
-                        <div className="flex gap-2 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
-                            {['CRONO', 'MAT', 'FIN'].map((rt) => (
-                                <button key={rt} onClick={() => setReportTab(rt as any)} className={`flex-1 py-2 rounded-lg text-xs font-bold ${reportTab === rt ? 'bg-white shadow text-primary' : 'text-slate-500'}`}>
-                                    {rt === 'CRONO' ? 'Cronograma' : rt === 'MAT' ? 'Materiais' : 'Financeiro'}
-                                </button>
-                            ))}
-                        </div>
-                        {/* STEP FILTER FOR REPORTS */}
-                        <select 
-                            value={reportFilterStepId}
-                            onChange={(e) => setReportFilterStepId(e.target.value)}
-                            className="w-full p-3 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 font-bold text-sm text-slate-600 dark:text-slate-300 shadow-sm focus:border-secondary focus:ring-1 focus:ring-secondary outline-none transition-all"
-                        >
-                            <option value="ALL">Todas as Etapas (Geral)</option>
-                            {steps.map((s, idx) => (
-                                <option key={s.id} value={s.id}>{String(idx+1).padStart(2, '0')}. {s.name}</option>
-                            ))}
-                        </select>
-                    </div>
-
-                    {/* PRINT-FRIENDLY CONTAINER */}
-                    <div className="bg-white dark:bg-white dark:text-black rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm print:shadow-none print:border-0 print:rounded-none">
-                        
-                        {/* Header for Print/PDF */}
-                        <div className="hidden print:block p-8 border-b-2 border-slate-100">
-                            <div className="flex justify-between items-start">
-                                <div><h1 className="text-3xl font-black text-slate-900 mb-1">MÃOS DA OBRA</h1><p className="text-sm font-bold text-slate-500">Relatório Geral da Obra</p></div>
-                                <div className="text-right"><h2 className="text-xl font-bold text-slate-800">{work.name}</h2><p className="text-sm text-slate-500">Data: {new Date().toLocaleDateString()}</p></div>
-                            </div>
-                            <div className="mt-6 p-4 bg-slate-50 rounded-xl border border-slate-200 grid grid-cols-3 gap-4">
-                                <div><span className="text-xs font-bold text-slate-400 uppercase">Orçamento</span><p className="text-lg font-black text-slate-800">R$ {work.budgetPlanned.toLocaleString('pt-BR')}</p></div>
-                                <div><span className="text-xs font-bold text-slate-400 uppercase">Gasto Total</span><p className="text-lg font-black text-red-600">R$ {expenses.reduce((a, b) => a + Number(b.amount), 0).toLocaleString('pt-BR')}</p></div>
-                                <div><span className="text-xs font-bold text-slate-400 uppercase">Status</span><p className="text-lg font-black text-blue-600">{expenses.length} lançamentos</p></div>
-                            </div>
-                        </div>
-
-                        {/* CONTENT AREA - CARD BASED */}
-                        <div className="p-4 space-y-6">
-                            {/* --- CRONOGRAMA REPORT --- */}
-                            {reportTab === 'CRONO' && (
-                                <div className="grid grid-cols-1 gap-4">
-                                    {steps
-                                        .filter(s => reportFilterStepId === 'ALL' || s.id === reportFilterStepId)
-                                        .map((s, idx) => {
-                                            const today = new Date().toISOString().split('T')[0];
-                                            const isDone = s.status === 'CONCLUIDO';
-                                            const isLate = !isDone && s.endDate < today;
-                                            const isInProgress = !isDone && s.startDate <= today && s.endDate >= today;
-                                            
-                                            let borderClass = 'border-l-slate-300';
-                                            let statusLabel = 'Pendente';
-                                            let statusBg = 'bg-slate-100 text-slate-500';
-
-                                            if (isDone) {
-                                                borderClass = 'border-l-green-500';
-                                                statusLabel = 'Concluído';
-                                                statusBg = 'bg-green-100 text-green-700';
-                                            } else if (isLate) {
-                                                borderClass = 'border-l-red-500';
-                                                statusLabel = 'Atrasado';
-                                                statusBg = 'bg-red-100 text-red-600';
-                                            } else if (isInProgress) {
-                                                borderClass = 'border-l-orange-500';
-                                                statusLabel = 'Em Andamento';
-                                                statusBg = 'bg-orange-100 text-orange-600';
-                                            }
-
-                                            return (
-                                                <div key={s.id} className={`p-4 bg-slate-50 dark:bg-white rounded-xl border border-slate-200 border-l-4 ${borderClass} flex justify-between items-center shadow-sm`}>
-                                                    <div>
-                                                        <div className="flex items-center gap-2 mb-1">
-                                                            <span className="text-[10px] font-black text-slate-400 uppercase">ETAPA {String(idx + 1).padStart(2, '0')}</span>
-                                                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${statusBg}`}>{statusLabel}</span>
-                                                        </div>
-                                                        <h4 className="font-bold text-slate-800 text-lg">{s.name}</h4>
-                                                        <p className="text-xs text-slate-500 font-medium mt-1">
-                                                            <i className="fa-regular fa-calendar mr-1"></i> {parseDateNoTimezone(s.startDate)} - {parseDateNoTimezone(s.endDate)}
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                            );
-                                    })}
-                                </div>
-                            )}
-
-                            {/* --- MATERIAIS REPORT --- */}
-                            {reportTab === 'MAT' && (
-                                <div>
-                                    {steps
-                                        .filter(s => reportFilterStepId === 'ALL' || s.id === reportFilterStepId)
-                                        .map((step) => {
-                                            const stepMaterials = materials.filter(m => m.stepId === step.id);
-                                            if (stepMaterials.length === 0) return null;
-
-                                            return (
-                                                <div key={step.id} className="mb-6 last:mb-0">
-                                                    <h3 className="font-bold text-slate-700 uppercase tracking-wide text-xs mb-3 border-b border-slate-200 pb-2">{step.name}</h3>
-                                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                                        {stepMaterials.map(m => {
-                                                            const progress = m.plannedQty > 0 ? (m.purchasedQty / m.plannedQty) * 100 : 0;
-                                                            let statusColor = 'bg-slate-200'; // Gray (Not bought)
-                                                            let iconClass = 'text-slate-400';
-                                                            
-                                                            if (m.purchasedQty >= m.plannedQty) {
-                                                                statusColor = 'bg-green-500'; // Green (Done)
-                                                                iconClass = 'text-green-600';
-                                                            } else if (m.purchasedQty > 0) {
-                                                                statusColor = 'bg-orange-500'; // Orange (Partial)
-                                                                iconClass = 'text-orange-500';
-                                                            }
-
-                                                            return (
-                                                                <div key={m.id} className="bg-slate-50 dark:bg-white p-3 rounded-xl border border-slate-200 flex items-center gap-3">
-                                                                    <div className={`w-10 h-10 rounded-full bg-white flex items-center justify-center shadow-sm border border-slate-100 ${iconClass}`}>
-                                                                        <i className="fa-solid fa-box-open"></i>
-                                                                    </div>
-                                                                    <div className="flex-1">
-                                                                        <div className="flex justify-between items-center mb-1">
-                                                                            <span className="font-bold text-slate-800 text-sm truncate">{m.name}</span>
-                                                                            <span className="text-[10px] font-mono font-bold text-slate-500">{m.purchasedQty}/{m.plannedQty} {m.unit}</span>
-                                                                        </div>
-                                                                        <div className="h-1.5 w-full bg-slate-200 rounded-full overflow-hidden">
-                                                                            <div className={`h-full ${statusColor}`} style={{ width: `${Math.min(progress, 100)}%` }}></div>
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-                                                            );
-                                                        })}
-                                                    </div>
-                                                </div>
-                                            );
-                                    })}
-                                </div>
-                            )}
-
-                            {/* --- FINANCEIRO REPORT --- */}
-                            {reportTab === 'FIN' && (
-                                <div>
-                                    {[...steps, { id: 'general', name: 'Despesas Gerais / Sem Etapa' } as any]
-                                        .filter(s => reportFilterStepId === 'ALL' || (s.id === 'general' ? reportFilterStepId === 'ALL' : s.id === reportFilterStepId))
-                                        .map((step) => {
-                                            const stepExpenses = expenses.filter(e => {
-                                                if (step.id === 'general') return !e.stepId;
-                                                return e.stepId === step.id;
-                                            });
-
-                                            if (stepExpenses.length === 0) return null;
-                                            const stepTotal = stepExpenses.reduce((sum, e) => sum + e.amount, 0);
-
-                                            return (
-                                                <div key={step.id} className="mb-6 last:mb-0 bg-slate-50 dark:bg-white/50 p-4 rounded-2xl border border-slate-200">
-                                                    <div className="flex justify-between items-center mb-4 pb-2 border-b border-slate-200">
-                                                        <h3 className="font-bold text-slate-700 uppercase tracking-wide text-xs">{step.name}</h3>
-                                                        <span className="font-black text-slate-800 text-sm">Total: R$ {stepTotal.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
-                                                    </div>
-                                                    <div className="space-y-2">
-                                                        {stepExpenses.map(e => (
-                                                            <div key={e.id} className="bg-white p-3 rounded-xl border border-slate-100 flex justify-between items-center shadow-sm">
-                                                                <div className="flex items-center gap-3">
-                                                                    <div className="w-8 h-8 rounded-lg bg-slate-100 text-slate-500 flex items-center justify-center text-xs">
-                                                                        <i className={`fa-solid ${e.category === 'Material' ? 'fa-box' : 'fa-helmet-safety'}`}></i>
-                                                                    </div>
-                                                                    <div>
-                                                                        <p className="font-bold text-slate-800 text-sm leading-tight">{e.description}</p>
-                                                                        <p className="text-[10px] text-slate-400">{parseDateNoTimezone(e.date)}</p>
-                                                                    </div>
-                                                                </div>
-                                                                <div className="text-right">
-                                                                    <p className="font-bold text-slate-800 text-sm">R$ {e.amount.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
-                                                                    {e.totalAgreed && <p className="text-[10px] text-slate-400">Parcial</p>}
-                                                                </div>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            );
-                                    })}
-                                </div>
-                            )}
-                        </div>
-                    </div>
-
                     {/* PRINT STYLES */}
                     <style>{`
                         @media print {
@@ -1080,10 +1029,9 @@ const WorkDetail: React.FC = () => {
                             body { background: white; color: black; }
                             nav, aside, .bottom-nav { display: none !important; }
                             main { padding: 0 !important; margin: 0 !important; height: auto !important; overflow: visible !important; }
-                            /* Ensure cards look good on print */
-                            .bg-slate-50 { background-color: #f8fafc !important; }
-                            .border-l-4 { border-left-width: 4px !important; }
-                            .print\\:block { display: block !important; }
+                            /* Ensure table fits */
+                            table { width: 100% !important; }
+                            td, th { padding: 8px 12px !important; border-bottom: 1px solid #ddd !important; }
                         }
                     `}</style>
                 </div>
@@ -1109,33 +1057,6 @@ const WorkDetail: React.FC = () => {
                 </div>
             );
 
-            case 'CALCULATORS': return (
-                <div className="space-y-6">
-                    <div className="grid grid-cols-3 gap-2">
-                        {['PISO', 'PAREDE', 'PINTURA'].map(t => (
-                            <button key={t} onClick={() => {setCalcType(t as any); setCalcResult([])}} className={`flex flex-col items-center justify-center py-4 rounded-xl border-2 font-bold text-xs transition-all gap-2 ${calcType === t ? 'border-secondary bg-secondary/10 text-secondary' : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-400'}`}>
-                                <i className={`fa-solid ${t === 'PISO' ? 'fa-layer-group' : t === 'PAREDE' ? 'fa-building' : 'fa-paint-roller'} text-xl`}></i>
-                                {t}
-                            </button>
-                        ))}
-                    </div>
-                    <div className="bg-gradient-to-br from-slate-800 to-slate-900 text-white p-8 rounded-3xl shadow-xl relative overflow-hidden">
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-secondary/20 rounded-full blur-3xl"></div>
-                        <h3 className="text-lg font-bold mb-6 text-center uppercase tracking-widest text-secondary">Calculadora de {calcType}</h3>
-                        <div className="relative mb-8">
-                            <input type="number" value={calcArea} onChange={e => setCalcArea(e.target.value)} placeholder="0" className="w-full bg-white/10 border border-white/20 rounded-2xl p-4 text-center text-3xl font-black text-white outline-none focus:border-secondary transition-colors" />
-                            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-white/30 font-bold">m²</span>
-                        </div>
-                        <div className="space-y-3">
-                            {calcResult.length > 0 ? calcResult.map((res, i) => (
-                                <div key={i} className="bg-white/10 p-3 rounded-xl flex items-center gap-3 backdrop-blur-sm"><i className="fa-solid fa-check text-green-400"></i> <span className="font-bold text-sm">{res}</span></div>
-                            )) : <p className="text-center text-white/30 text-sm">Digite a área para calcular.</p>}
-                        </div>
-                    </div>
-                </div>
-            );
-
-            // Reusing existing components for other subviews to save space, but ensuring they are rendered
             case 'BONUS_IA': return (
                 <div className="flex flex-col items-center justify-center min-h-[70vh] p-6 text-center animate-in fade-in">
                     <div className="w-full max-w-sm bg-gradient-to-br from-slate-900 to-slate-950 rounded-[2.5rem] p-8 shadow-2xl relative overflow-hidden border border-slate-800 group">
@@ -1181,7 +1102,9 @@ const WorkDetail: React.FC = () => {
                 </div>
             );
 
-            case 'CONTRACTS': return (
+            case 'CONTRACTS': 
+                if (!isPremium) return <LockedFeature featureName="Gerador de Contratos" />;
+                return (
                 <div className="space-y-4">
                     {CONTRACT_TEMPLATES.map(ct => (
                         <div key={ct.id} onClick={() => setViewContract({ title: ct.title, content: ct.contentTemplate })} className="group bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-secondary/50 cursor-pointer shadow-sm transition-all hover:translate-x-1">
@@ -1194,7 +1117,9 @@ const WorkDetail: React.FC = () => {
                 </div>
             );
 
-            case 'CHECKLIST': return (
+            case 'CHECKLIST': 
+                if (!isPremium) return <LockedFeature featureName="Checklists de Qualidade" />;
+                return (
                 <div className="space-y-4">
                     {STANDARD_CHECKLISTS.map((cl, idx) => (
                         <div key={idx} className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
@@ -1514,3 +1439,4 @@ const WorkDetail: React.FC = () => {
 };
 
 export default WorkDetail;
+
