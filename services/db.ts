@@ -9,7 +9,7 @@ import { WORK_TEMPLATES, FULL_MATERIAL_PACKAGES } from './standards';
 import { supabase } from './supabase';
 
 // --- CACHE SYSTEM (IN-MEMORY) ---
-const CACHE_TTL = 30000; // 30 segundos de cache para evitar flickering
+const CACHE_TTL = 60000; // Aumentado para 60s para maior estabilidade
 const _dashboardCache: {
     works: { data: Work[], timestamp: number } | null;
     stats: Record<string, { data: any, timestamp: number }>;
@@ -353,18 +353,30 @@ export const dbService = {
 
   async updateUser(userId: string, data: Partial<User>, newPassword?: string) {
       if (!supabase) return;
-      const updates: any = {};
-      if (data.name) updates.name = data.name;
-      if (data.whatsapp) updates.whatsapp = data.whatsapp;
-      if (data.plan) updates.plan = data.plan;
+      
+      try {
+          // 1. Atualiza dados do perfil (Nome, Whatsapp, etc)
+          const updates: any = {};
+          if (data.name) updates.name = data.name;
+          if (data.whatsapp) updates.whatsapp = data.whatsapp;
+          if (data.plan) updates.plan = data.plan;
 
-      if (Object.keys(updates).length > 0) {
-        await supabase.from('profiles').update(updates).eq('id', userId);
+          if (Object.keys(updates).length > 0) {
+            const { error } = await supabase.from('profiles').update(updates).eq('id', userId);
+            if (error) throw new Error("Erro ao atualizar dados: " + error.message);
+          }
+
+          // 2. Atualiza a senha SE fornecida (AUTH separado)
+          if (newPassword && newPassword.trim() !== '') {
+              const { error: passError } = await supabase.auth.updateUser({ password: newPassword });
+              if (passError) throw new Error("Erro ao atualizar senha: " + passError.message);
+          }
+          
+          sessionCachePromise = null; // Invalida cache para forçar refresh
+      } catch (e) {
+          console.error("Erro updateUser:", e);
+          throw e; // Repassa erro para a UI tratar
       }
-      if (newPassword) {
-          await supabase.auth.updateUser({ password: newPassword });
-      }
-      sessionCachePromise = null;
   },
 
   async resetPassword(email: string) {
@@ -465,7 +477,7 @@ export const dbService = {
         bedrooms: work.bedrooms,
         bathrooms: work.bathrooms,
         kitchens: work.kitchens,
-        living_rooms: work.livingRooms,
+        living_rooms: work.living_rooms,
         has_leisure_area: work.hasLeisureArea
     };
 
@@ -854,3 +866,4 @@ export const dbService = {
       }
   }
 };
+
