@@ -222,15 +222,18 @@ const ensureUserProfile = async (authUser: any): Promise<User | null> => {
 export const dbService = {
   // --- AUTH ---
   async getCurrentUser() {
-    if (!supabase) return null;
+    // Local capture to satisfy TypeScript narrowing when used inside callbacks/async closures
+    const client = supabase;
+    if (!client) return null;
     
     const now = Date.now();
-    if (cachedUserPromise && (now - lastCacheTime < CACHE_DURATION)) {
+    // Explicit null check to avoid TS2801 (TS thinks promise is always truthy in some contexts)
+    if (cachedUserPromise !== null && (now - lastCacheTime < CACHE_DURATION)) {
         return cachedUserPromise;
     }
 
     cachedUserPromise = (async () => {
-        const { data: { session } } = await supabase.auth.getSession();
+        const { data: { session } } = await client.auth.getSession();
         if (!session?.user) return null;
         return await ensureUserProfile(session.user);
     })();
@@ -245,8 +248,10 @@ export const dbService = {
   },
 
   onAuthChange(callback: (user: User | null) => void) {
-    if (!supabase) return () => {};
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+    const client = supabase;
+    if (!client) return () => {};
+    
+    const { data: { subscription } } = client.auth.onAuthStateChange(async (_event, session) => {
         cachedUserPromise = null;
         
         if (session?.user) {
