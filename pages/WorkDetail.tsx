@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
@@ -79,8 +80,8 @@ const WorkDetail: React.FC = () => {
     // EXPENSE MODAL STATE (UNIFIED ADD/EDIT)
     const [expenseModal, setExpenseModal] = useState<{ isOpen: boolean, mode: 'ADD'|'EDIT', id?: string }>({ isOpen: false, mode: 'ADD' });
     const [expDesc, setExpDesc] = useState('');
-    const [expAmount, setExpAmount] = useState(''); // "Paying Now"
-    const [expCurrentPaid, setExpCurrentPaid] = useState(0); // "Already Paid"
+    const [expAmount, setExpAmount] = useState(''); // "Paying Now" input
+    const [expCurrentPaid, setExpCurrentPaid] = useState(0); // "Already Paid" cumulative
     const [expTotalAgreed, setExpTotalAgreed] = useState('');
     const [expCategory, setExpCategory] = useState<string>(ExpenseCategory.LABOR);
     const [expStepId, setExpStepId] = useState('');
@@ -251,8 +252,11 @@ const WorkDetail: React.FC = () => {
     const openEditExpense = (expense: Expense) => {
         setExpenseModal({ isOpen: true, mode: 'EDIT', id: expense.id });
         setExpDesc(expense.description);
-        setExpCurrentPaid(expense.amount); // Store DB Amount as "Already Paid"
-        setExpAmount(''); // "Paying Now" input starts empty
+        
+        // CORRECTION: Set the already paid amount from DB to the state variable
+        setExpCurrentPaid(expense.amount); 
+        
+        setExpAmount(''); // "Paying Now" starts empty to allow adding more
         setExpTotalAgreed(expense.totalAgreed ? String(expense.totalAgreed) : '');
         setExpCategory(expense.category);
         setExpStepId(expense.stepId || '');
@@ -268,11 +272,14 @@ const WorkDetail: React.FC = () => {
         
         // CUMULATIVE LOGIC:
         let finalAmount = 0;
+        const payingNow = Number(expAmount) || 0;
+
         if (expenseModal.mode === 'ADD') {
-            finalAmount = Number(expAmount);
+            // In ADD mode, whatever is typed is the initial amount
+            finalAmount = payingNow;
         } else {
-            // EDIT: Old Total + New Payment
-            finalAmount = expCurrentPaid + (Number(expAmount) || 0);
+            // In EDIT mode: Old Amount (DB) + New Payment (Input)
+            finalAmount = expCurrentPaid + payingNow;
         }
 
         if (expenseModal.mode === 'ADD') {
@@ -462,7 +469,8 @@ const WorkDetail: React.FC = () => {
                             <h2 className="text-2xl font-black text-primary dark:text-white">Cronograma</h2>
                             <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Etapas da Obra</p>
                         </div>
-                        <button onClick={() => { setStepModalMode('ADD'); setStepName(''); setStepStart(new Date().toISOString().split('T')[0]); setStepEnd(new Date().toISOString().split('T')[0]); setIsStepModalOpen(true); }} className="bg-primary text-white w-10 h-10 rounded-xl shadow-lg flex items-center justify-center hover:scale-105 transition-transform"><i className="fa-solid fa-plus"></i></button>
+                        {/* UPDATE: GREEN BUTTON */}
+                        <button onClick={() => { setStepModalMode('ADD'); setStepName(''); setStepStart(new Date().toISOString().split('T')[0]); setStepEnd(new Date().toISOString().split('T')[0]); setIsStepModalOpen(true); }} className="bg-green-600 text-white w-12 h-12 rounded-xl flex items-center justify-center hover:bg-green-700 transition-all shadow-lg shadow-green-600/30"><i className="fa-solid fa-plus text-lg"></i></button>
                     </div>
                     {steps.map((step, idx) => {
                          const stepNum = String(idx + 1).padStart(2, '0');
@@ -547,7 +555,8 @@ const WorkDetail: React.FC = () => {
                                 <h2 className="text-2xl font-black text-primary dark:text-white">Materiais</h2>
                                 <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Controle de Compras</p>
                             </div>
-                            <button onClick={() => setAddMatModal(true)} className="bg-primary text-white w-12 h-12 rounded-xl flex items-center justify-center hover:bg-primary-light transition-all shadow-lg shadow-primary/30"><i className="fa-solid fa-plus text-lg"></i></button>
+                            {/* UPDATE: GREEN BUTTON */}
+                            <button onClick={() => setAddMatModal(true)} className="bg-green-600 text-white w-12 h-12 rounded-xl flex items-center justify-center hover:bg-green-700 transition-all shadow-lg shadow-green-600/30"><i className="fa-solid fa-plus text-lg"></i></button>
                         </div>
                         
                         {/* STEP FILTER DROPDOWN */}
@@ -814,7 +823,14 @@ const WorkDetail: React.FC = () => {
                                 </div>
                                 <div className="flex gap-2">
                                     {w.phone && (
-                                        <a href={`https://wa.me/55${w.phone.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-xl bg-green-100 text-green-600 hover:bg-green-200 transition-colors flex items-center justify-center"><i className="fa-brands fa-whatsapp text-lg"></i></a>
+                                        <a 
+                                            href={`https://wa.me/55${w.phone.replace(/\D/g, '')}`} 
+                                            target="_blank" 
+                                            rel="noopener noreferrer"
+                                            className="w-10 h-10 rounded-xl bg-green-100 text-green-600 hover:bg-green-200 transition-colors flex items-center justify-center"
+                                        >
+                                            <i className="fa-brands fa-whatsapp text-lg"></i>
+                                        </a>
                                     )}
                                     <button onClick={() => handleDeletePerson(w.id, 'WORKER')} className="w-10 h-10 rounded-xl text-red-500 hover:bg-red-50 transition-colors"><i className="fa-solid fa-trash"></i></button>
                                 </div>
@@ -842,7 +858,14 @@ const WorkDetail: React.FC = () => {
                                 </div>
                                 <div className="flex gap-2">
                                     {s.phone && (
-                                        <a href={`https://wa.me/55${s.phone.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-xl bg-green-100 text-green-600 hover:bg-green-200 transition-colors flex items-center justify-center"><i className="fa-brands fa-whatsapp text-lg"></i></a>
+                                        <a 
+                                            href={`https://wa.me/55${s.phone.replace(/\D/g, '')}`} 
+                                            target="_blank" 
+                                            rel="noopener noreferrer"
+                                            className="w-10 h-10 rounded-xl bg-green-100 text-green-600 hover:bg-green-200 transition-colors flex items-center justify-center"
+                                        >
+                                            <i className="fa-brands fa-whatsapp text-lg"></i>
+                                        </a>
                                     )}
                                     <button onClick={() => handleDeletePerson(s.id, 'SUPPLIER')} className="w-10 h-10 rounded-xl text-red-500 hover:bg-red-50 transition-colors"><i className="fa-solid fa-trash"></i></button>
                                 </div>
@@ -1107,6 +1130,7 @@ const WorkDetail: React.FC = () => {
                 </div>
             );
 
+            // PROJECTS reuse
             case 'PROJECTS': return (
                 <div className="space-y-6">
                     <label className="block w-full py-8 border-2 border-dashed border-teal-300 bg-teal-50 rounded-2xl cursor-pointer hover:bg-teal-100 transition-all text-center">
@@ -1290,31 +1314,21 @@ const WorkDetail: React.FC = () => {
                         <form onSubmit={handleSaveExpense} className="space-y-4">
                             <input placeholder="Descrição (ex: Pagamento Pedreiro)" value={expDesc} onChange={e => setExpDesc(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required />
                             
-                            {/* TOTAL COMBINADO */}
-                            <div className="relative">
-                                <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Total Combinado (R$)</label>
-                                <input type="number" placeholder="Opcional" value={expTotalAgreed} onChange={e => setExpTotalAgreed(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" />
-                            </div>
-
-                            {/* TOTAL JÁ PAGO (READ-ONLY) */}
-                            <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-xl border border-green-200 dark:border-green-900 flex justify-between items-center">
-                                <span className="text-sm font-bold text-green-700 dark:text-green-400">Total Já Pago:</span>
-                                <span className="font-mono font-black text-lg text-green-700 dark:text-green-400">
-                                    R$ {expCurrentPaid.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                </span>
-                            </div>
-
-                            {/* VALOR PAGO AGORA */}
-                            <div className="relative">
-                                <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Valor Pago Agora (+)</label>
-                                <input 
-                                    type="number" 
-                                    placeholder="0.00" 
-                                    value={expAmount} 
-                                    onChange={e => setExpAmount(e.target.value)} 
-                                    className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-secondary dark:border-secondary border-2 font-bold text-primary dark:text-white" 
-                                />
-                                <p className="text-[10px] text-slate-400 mt-1 ml-1">*Este valor será somado ao total já pago.</p>
+                            <div className="grid grid-cols-2 gap-2">
+                                <div className="relative">
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Valor Pago Agora</label>
+                                    <div className="relative">
+                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">R$</span>
+                                        <input type="number" placeholder="0.00" value={expAmount} onChange={e => setExpAmount(e.target.value)} className="w-full pl-10 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required />
+                                    </div>
+                                </div>
+                                <div className="relative">
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Total Combinado</label>
+                                    <div className="relative">
+                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">R$</span>
+                                        <input type="number" placeholder="(Opcional)" value={expTotalAgreed} onChange={e => setExpTotalAgreed(e.target.value)} className="w-full pl-10 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" />
+                                    </div>
+                                </div>
                             </div>
 
                             <div className="grid grid-cols-2 gap-2">
@@ -1333,6 +1347,7 @@ const WorkDetail: React.FC = () => {
                                 </div>
                             </div>
                             
+                            {/* STEP SELECTION - ENSURING VISIBILITY */}
                             <div>
                                 <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Etapa Relacionada</label>
                                 <select value={expStepId} onChange={e => setExpStepId(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold text-sm">
