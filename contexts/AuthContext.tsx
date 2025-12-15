@@ -49,18 +49,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const initAuth = async () => {
       try {
-        const timeoutPromise = new Promise(resolve => setTimeout(() => resolve(null), 4000));
+        // Aumentado timeout para 10s para evitar logout indevido em conexões lentas ou cold start
+        const timeoutPromise = new Promise((resolve) => 
+            setTimeout(() => resolve('TIMEOUT'), 10000) 
+        );
         const authPromise = dbService.getCurrentUser();
         
-        const currentUser = await Promise.race([authPromise, timeoutPromise]) as User | null;
+        const result = await Promise.race([authPromise, timeoutPromise]);
         
         if (mounted) {
-          setUser(currentUser);
+            if (result === 'TIMEOUT') {
+                console.warn("Auth check timed out, waiting for listener...");
+                // Não setamos null aqui para não forçar logout, deixamos o listener do onAuthChange resolver
+            } else {
+                setUser(result as User | null);
+            }
         }
       } catch (error) {
         console.error("Erro auth inicial:", error);
       } finally {
-        if (mounted) setLoading(false);
+        // Só removemos o loading se já tivermos uma resposta definitiva ou se o listener assumir
+        if (mounted && user !== null) setLoading(false);
       }
     };
 
@@ -101,8 +110,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setLoading(true);
     try {
         const loginPromise = dbService.login(email, password);
+        // Timeout de segurança no login manual
         const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error("Login timed out (10s limit)")), 10000)
+            setTimeout(() => reject(new Error("Tempo limite excedido. Verifique sua conexão.")), 15000)
         );
         
         const u = await Promise.race([loginPromise, timeoutPromise]) as User | null;
@@ -152,3 +162,4 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     </AuthContext.Provider>
   );
 };
+
