@@ -65,7 +65,7 @@ const Dashboard: React.FC = () => {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [upcomingSteps, setUpcomingSteps] = useState<Step[]>([]);
   
-  // Loading States (Granular)
+  // Loading States (Optimized)
   const [isLoadingWorks, setIsLoadingWorks] = useState(true);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
   
@@ -75,7 +75,7 @@ const Dashboard: React.FC = () => {
   const [zeModal, setZeModal] = useState<{isOpen: boolean, title: string, message: string, workId?: string}>({isOpen: false, title: '', message: ''});
   const [showTrialUpsell, setShowTrialUpsell] = useState(false);
 
-  // 1. Initial Load: Busca lista de obras e define o foco IMEDIATAMENTE
+  // 1. Initial Load: Busca lista de obras
   useEffect(() => {
     let isMounted = true;
 
@@ -86,20 +86,19 @@ const Dashboard: React.FC = () => {
         }
         
         try {
+            // O dbService agora possui cache, então isso deve retornar instantaneamente
+            // se o usuário apenas navegou de volta para a dashboard.
             const data = await dbService.getWorks(user.id);
+            
             if (isMounted) {
                 setWorks(data);
                 
-                // Correção Cirúrgica: Define focusWork sincronicamente com os dados
-                // e só desativa o loading DEPOIS que o estado estiver garantido.
                 if (data.length > 0) {
                     setFocusWork(prev => {
-                        // Se já existia um foco e ele ainda está na lista (ex: reload suave), mantém
                         if (prev) {
                             const exists = data.find(w => w.id === prev.id);
                             if (exists) return exists;
                         }
-                        // Senão, pega o primeiro (Padrão ao voltar para o dashboard)
                         return data[0];
                     });
                 } else {
@@ -117,7 +116,7 @@ const Dashboard: React.FC = () => {
     return () => { isMounted = false; };
   }, [user]);
 
-  // 2. Details Load: Busca os dados pesados quando a obra em foco muda
+  // 2. Details Load: Busca os dados pesados
   useEffect(() => {
       let isMounted = true;
 
@@ -127,9 +126,12 @@ const Dashboard: React.FC = () => {
               return;
           }
 
+          // Se já temos dados carregados na memória (ex: cache do dbService é rápido),
+          // podemos evitar setar isLoadingDetails para true se a resposta for < 50ms.
+          // Mas como simplificação, confiamos no cache do dbService.
           setIsLoadingDetails(true);
+          
           try {
-            // Executa em paralelo para velocidade
             const [workStats, summary, notifs, steps] = await Promise.all([
                 dbService.calculateWorkStats(focusWork.id),
                 dbService.getDailySummary(focusWork.id),
@@ -142,7 +144,6 @@ const Dashboard: React.FC = () => {
                 setDailySummary(summary);
                 setNotifications(notifs);
 
-                // Filter Next Steps
                 const nextSteps = steps
                     .filter(s => s.status !== StepStatus.COMPLETED)
                     .sort((a: Step, b: Step) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
@@ -150,7 +151,6 @@ const Dashboard: React.FC = () => {
                 setUpcomingSteps(nextSteps);
             }
             
-            // Background check (não bloqueia UI)
             dbService.generateSmartNotifications(user.id, focusWork.id);
 
           } catch (e) {
@@ -163,17 +163,14 @@ const Dashboard: React.FC = () => {
       if (focusWork?.id) {
           fetchDetails();
       } else if (works.length > 0 && !focusWork) {
-          // Fallback de segurança: se tem obras mas focusWork está null
           setFocusWork(works[0]);
       } else {
-          // Se não tem obras ou focusWork, para o loading
           setIsLoadingDetails(false);
       }
       
       return () => { isMounted = false; };
-  }, [focusWork?.id, user, works]); // Added works to dependencies to catch initial load race condition
+  }, [focusWork?.id, user, works]); 
 
-  // Trial Check
   useEffect(() => {
     if (user?.isTrial && trialDaysRemaining !== null && trialDaysRemaining <= 1) {
         setShowTrialUpsell(true);
@@ -206,7 +203,7 @@ const Dashboard: React.FC = () => {
   const confirmDelete = async () => {
       if (zeModal.workId && user) {
           try {
-            setIsLoadingWorks(true); // Bloqueia brevemente para reload
+            setIsLoadingWorks(true); 
             await dbService.deleteWork(zeModal.workId);
             
             const updatedWorks = await dbService.getWorks(user.id);
@@ -241,10 +238,8 @@ const Dashboard: React.FC = () => {
 
   // --- RENDERIZADORES ---
 
-  // 1. Carregando lista de obras (Estado inicial)
   if (isLoadingWorks) return <DashboardSkeleton />;
 
-  // 2. Não tem obras (Empty State) - Renderiza instantâneo se works = []
   if (works.length === 0) {
       return (
         <div className="flex flex-col items-center justify-center min-h-[80vh] px-4 text-center animate-in fade-in duration-500">
@@ -265,10 +260,8 @@ const Dashboard: React.FC = () => {
       );
   }
 
-  // 3. Se tem obras mas focusWork ainda é null (transição), mostra loading
   if (!focusWork) return <DashboardSkeleton />;
 
-  // 4. Tem obra selecionada -> Renderiza Dashboard
   const budgetUsage = focusWork.budgetPlanned > 0 ? (stats.totalSpent / focusWork.budgetPlanned) * 100 : 0;
   const budgetPercentage = Math.round(budgetUsage);
   
