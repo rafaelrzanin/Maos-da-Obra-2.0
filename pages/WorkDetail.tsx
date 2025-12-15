@@ -94,6 +94,8 @@ const WorkDetail: React.FC = () => {
     const [expCategory, setExpCategory] = useState<string>(ExpenseCategory.LABOR);
     const [expStepId, setExpStepId] = useState('');
     const [expDate, setExpDate] = useState('');
+    // NEW STATE: Tracks the amount already in DB to support cumulative logic
+    const [expSavedAmount, setExpSavedAmount] = useState(0);
 
     const [isPersonModalOpen, setIsPersonModalOpen] = useState(false);
     const [personMode, setPersonMode] = useState<'WORKER'|'SUPPLIER'>('WORKER');
@@ -249,6 +251,7 @@ const WorkDetail: React.FC = () => {
         setExpenseModal({ isOpen: true, mode: 'ADD' });
         setExpDesc('');
         setExpAmount('');
+        setExpSavedAmount(0); // Reset saved amount for new
         setExpTotalAgreed('');
         setExpCategory(ExpenseCategory.LABOR);
         setExpStepId('');
@@ -258,7 +261,13 @@ const WorkDetail: React.FC = () => {
     const openEditExpense = (expense: Expense) => {
         setExpenseModal({ isOpen: true, mode: 'EDIT', id: expense.id });
         setExpDesc(expense.description);
-        setExpAmount(String(expense.amount));
+        
+        // CUMULATIVE LOGIC:
+        // Set input to empty so user adds NEW payment.
+        // Save current DB total to expSavedAmount.
+        setExpAmount(''); 
+        setExpSavedAmount(expense.amount); 
+        
         setExpTotalAgreed(expense.totalAgreed ? String(expense.totalAgreed) : '');
         setExpCategory(expense.category);
         setExpStepId(expense.stepId || '');
@@ -271,13 +280,14 @@ const WorkDetail: React.FC = () => {
         
         const finalStepId = expStepId || undefined;
         const finalTotalAgreed = expTotalAgreed ? Number(expTotalAgreed) : undefined;
+        const inputAmount = Number(expAmount) || 0;
 
         if (expenseModal.mode === 'ADD') {
             await dbService.addExpense({
                 id: Math.random().toString(36).substr(2, 9),
                 workId: work.id,
                 description: expDesc,
-                amount: Number(expAmount),
+                amount: inputAmount,
                 date: new Date(expDate).toISOString(),
                 category: expCategory,
                 stepId: finalStepId,
@@ -286,10 +296,13 @@ const WorkDetail: React.FC = () => {
         } else if (expenseModal.mode === 'EDIT' && expenseModal.id) {
             const existing = expenses.find(e => e.id === expenseModal.id);
             if (existing) {
+                // LOGIC: New Total = Old Saved Total + New Input
+                const newTotalAmount = expSavedAmount + inputAmount;
+
                 await dbService.updateExpense({
                     ...existing,
                     description: expDesc,
-                    amount: Number(expAmount),
+                    amount: newTotalAmount,
                     date: new Date(expDate).toISOString(),
                     category: expCategory,
                     stepId: finalStepId,
@@ -403,6 +416,7 @@ const WorkDetail: React.FC = () => {
         });
     };
 
+    // CALCULATORS
     useEffect(() => {
         if (!calcArea) { setCalcResult([]); return; }
         const area = Number(calcArea);
@@ -421,6 +435,7 @@ const WorkDetail: React.FC = () => {
         }
     }, [calcArea, calcType]);
 
+    // EXPORT EXCEL
     const handleExportExcel = () => {
         const wb = XLSX.utils.book_new();
         const wsCrono = XLSX.utils.json_to_sheet(steps.map(s => ({ Etapa: s.name, Inicio: parseDateNoTimezone(s.startDate), Fim: parseDateNoTimezone(s.endDate), Status: s.status })));
@@ -1218,12 +1233,12 @@ const WorkDetail: React.FC = () => {
                                 <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-xl border border-green-200 dark:border-green-900 mb-2">
                                     <div className="flex justify-between items-center mb-1">
                                         <span className="text-[10px] font-bold text-green-700 dark:text-green-400 uppercase">Total Já Pago</span>
-                                        <span className="text-lg font-black text-green-700 dark:text-green-400">R$ {Number(expAmount).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                                        <span className="text-lg font-black text-green-700 dark:text-green-400">R$ {Number(expSavedAmount).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
                                     </div>
-                                    {expTotalAgreed && Number(expTotalAgreed) > Number(expAmount) && (
+                                    {expTotalAgreed && Number(expTotalAgreed) > Number(expSavedAmount) && (
                                         <div className="flex justify-between items-center border-t border-green-200 dark:border-green-800 pt-2 mt-2">
                                             <span className="text-[10px] font-bold text-orange-600 dark:text-orange-400 uppercase">Restante</span>
-                                            <span className="text-sm font-bold text-orange-600 dark:text-orange-400">R$ {(Number(expTotalAgreed) - Number(expAmount)).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                                            <span className="text-sm font-bold text-orange-600 dark:text-orange-400">R$ {(Number(expTotalAgreed) - (Number(expSavedAmount) + (Number(expAmount) || 0))).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
                                         </div>
                                     )}
                                 </div>
