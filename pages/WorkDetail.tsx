@@ -46,13 +46,11 @@ const WorkDetail: React.FC = () => {
     const [uploading, setUploading] = useState(false);
     
     // --- AI ACCESS LOGIC ---
-    // AI is available if: Plan is VITALICIO OR (Trial is Active AND days remaining > 0)
     const isVitalicio = user?.plan === PlanType.VITALICIO;
     const isAiTrialActive = user?.isTrial && trialDaysRemaining !== null && trialDaysRemaining > 0;
     const hasAiAccess = isVitalicio || isAiTrialActive;
 
     // --- PREMIUM TOOLS LOCK ---
-    // Calculators, Contracts, and Checklists are exclusive to Vitalício
     const isPremium = isVitalicio;
 
     // --- MODALS STATE ---
@@ -783,12 +781,7 @@ const WorkDetail: React.FC = () => {
                                         <img src={ZE_AVATAR} className={`w-14 h-14 rounded-full border-2 border-secondary bg-slate-800 object-cover ${!isPremium ? 'grayscale opacity-70' : ''}`} onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK}/>
                                         <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 border-2 border-slate-800 rounded-full"></div>
                                     </div>
-                                    <div>
-                                        <h4 className={`font-bold text-base transition-colors ${isPremium ? 'text-white group-hover:text-secondary' : 'text-slate-400'}`}>
-                                            Zé da Obra AI
-                                        </h4>
-                                        <p className="text-xs text-slate-300">{isPremium ? 'Tire dúvidas técnicas 24h' : (isAiTrialActive ? 'Trial Ativo (7 dias)' : 'Bloqueado (Vitalício)')}</p>
-                                    </div>
+                                    <div><h4 className="font-bold text-white text-base group-hover:text-secondary transition-colors">Zé da Obra AI</h4><p className="text-xs text-slate-300">Tire dúvidas técnicas 24h</p></div>
                                     <div className="ml-auto w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-white/50 group-hover:bg-secondary group-hover:text-white transition-all"><i className="fa-solid fa-chevron-right"></i></div>
                                 </div>
 
@@ -812,34 +805,6 @@ const WorkDetail: React.FC = () => {
     // --- RENDER SUBVIEW ---
     const renderSubViewContent = () => {
         switch(subView) {
-            case 'CALCULATORS': 
-                if (!isPremium) return <LockedFeature featureName="Calculadoras de Material" />;
-                return (
-                <div className="space-y-6">
-                    <div className="grid grid-cols-3 gap-2">
-                        {['PISO', 'PAREDE', 'PINTURA'].map(t => (
-                            <button key={t} onClick={() => {setCalcType(t as any); setCalcResult([])}} className={`flex flex-col items-center justify-center py-4 rounded-xl border-2 font-bold text-xs transition-all gap-2 ${calcType === t ? 'border-secondary bg-secondary/10 text-secondary' : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-400'}`}>
-                                <i className={`fa-solid ${t === 'PISO' ? 'fa-layer-group' : t === 'PAREDE' ? 'fa-building' : 'fa-paint-roller'} text-xl`}></i>
-                                {t}
-                            </button>
-                        ))}
-                    </div>
-                    <div className="bg-gradient-to-br from-slate-800 to-slate-900 text-white p-8 rounded-3xl shadow-xl relative overflow-hidden">
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-secondary/20 rounded-full blur-3xl"></div>
-                        <h3 className="text-lg font-bold mb-6 text-center uppercase tracking-widest text-secondary">Calculadora de {calcType}</h3>
-                        <div className="relative mb-8">
-                            <input type="number" value={calcArea} onChange={e => setCalcArea(e.target.value)} placeholder="0" className="w-full bg-white/10 border border-white/20 rounded-2xl p-4 text-center text-3xl font-black text-white outline-none focus:border-secondary transition-colors" />
-                            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-white/30 font-bold">m²</span>
-                        </div>
-                        <div className="space-y-3">
-                            {calcResult.length > 0 ? calcResult.map((res, i) => (
-                                <div key={i} className="bg-white/10 p-3 rounded-xl flex items-center gap-3 backdrop-blur-sm"><i className="fa-solid fa-check text-green-400"></i> <span className="font-bold text-sm">{res}</span></div>
-                            )) : <p className="text-center text-white/30 text-sm">Digite a área para calcular.</p>}
-                        </div>
-                    </div>
-                </div>
-            );
-
             case 'TEAM': return (
                 <div className="space-y-6">
                     <div className="bg-blue-50 dark:bg-blue-900/20 p-6 rounded-3xl border border-blue-100 dark:border-blue-900 mb-2">
@@ -910,132 +875,230 @@ const WorkDetail: React.FC = () => {
                 </div>
             );
 
-            case 'REPORTS': return (
-                <div className="space-y-6">
-                    {/* Filter Tabs */}
-                    <div className="flex gap-2 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl no-print">
-                        {['CRONO', 'MAT', 'FIN'].map((rt) => (
-                            <button key={rt} onClick={() => setReportTab(rt as any)} className={`flex-1 py-2 rounded-lg text-xs font-bold ${reportTab === rt ? 'bg-white shadow text-primary' : 'text-slate-500'}`}>
-                                {rt === 'CRONO' ? 'Cronograma' : rt === 'MAT' ? 'Materiais' : 'Financeiro'}
+            case 'REPORTS': {
+                // --- DASHBOARD CALCS ---
+                const today = new Date().toISOString().split('T')[0];
+                const statusCounts = steps.reduce((acc, s) => {
+                    if (s.status === StepStatus.COMPLETED) acc.completed++;
+                    else if (s.startDate && s.endDate < today) acc.delayed++; // Logic: Not done + End Date passed
+                    else if (s.status === StepStatus.IN_PROGRESS) acc.inProgress++;
+                    else acc.pending++;
+                    return acc;
+                }, { pending: 0, inProgress: 0, completed: 0, delayed: 0 });
+                const totalSteps = steps.length;
+                const percentComplete = totalSteps > 0 ? Math.round((statusCounts.completed / totalSteps) * 100) : 0;
+
+                const financeSums = expenses.reduce((acc, e) => {
+                    const val = Number(e.amount);
+                    acc.total += val;
+                    if (e.category === ExpenseCategory.MATERIAL) acc.material += val;
+                    else if (e.category === ExpenseCategory.LABOR) acc.labor += val;
+                    else acc.others += val;
+                    return acc;
+                }, { total: 0, material: 0, labor: 0, others: 0 });
+
+                return (
+                <div className="space-y-6 animate-in fade-in">
+                    
+                    {/* 1. HEADER (Title + Actions) */}
+                    <div className="flex justify-between items-start pt-2 no-print">
+                        <div>
+                            <h2 className="text-2xl font-black text-primary dark:text-white tracking-tight">Relatório Geral</h2>
+                            <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">{work.name}</p>
+                        </div>
+                        <div className="flex gap-2">
+                            <button onClick={handlePrintPDF} className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-lg text-xs font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors flex items-center gap-1">
+                                <i className="fa-solid fa-print"></i> PDF
                             </button>
-                        ))}
+                            <button onClick={handleExportExcel} className="px-3 py-1.5 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-lg text-xs font-bold hover:bg-green-100 dark:hover:bg-green-900/50 transition-colors flex items-center gap-1">
+                                <i className="fa-solid fa-file-excel"></i> Excel
+                            </button>
+                        </div>
                     </div>
 
-                    {/* PRINT-FRIENDLY CONTAINER */}
-                    <div className="bg-white dark:bg-white dark:text-black rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm print:shadow-none print:border-0 print:rounded-none">
-                        
-                        {/* Header for Print/PDF */}
-                        <div className="hidden print:block p-8 border-b-2 border-slate-100">
-                            <div className="flex justify-between items-start">
-                                <div>
-                                    <h1 className="text-3xl font-black text-slate-900 mb-1">MÃOS DA OBRA</h1>
-                                    <p className="text-sm font-bold text-slate-500">Relatório Geral da Obra</p>
-                                </div>
-                                <div className="text-right">
-                                    <h2 className="text-xl font-bold text-slate-800">{work.name}</h2>
-                                    <p className="text-sm text-slate-500">Data: {new Date().toLocaleDateString()}</p>
-                                </div>
+                    {/* 2. SUMMARY DASHBOARD (3 Columns) */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 no-print">
+                        {/* A. Cronograma */}
+                        <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm relative overflow-hidden">
+                            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3"><i className="fa-solid fa-calendar-check mr-1"></i> Cronograma</h3>
+                            <div className="flex items-end gap-2 mb-2">
+                                <span className="text-3xl font-black text-primary dark:text-white">{percentComplete}%</span>
+                                <span className="text-xs font-bold text-slate-500 mb-1">Concluído</span>
                             </div>
-                            
-                            {/* Summary Stats */}
-                            <div className="mt-6 p-4 bg-slate-50 rounded-xl border border-slate-200 grid grid-cols-3 gap-4">
-                                <div>
-                                    <span className="text-xs font-bold text-slate-400 uppercase">Orçamento</span>
-                                    <p className="text-lg font-black text-slate-800">R$ {work.budgetPlanned.toLocaleString('pt-BR')}</p>
+                            <div className="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden mb-4">
+                                <div className="h-full bg-blue-500 rounded-full transition-all duration-1000" style={{ width: `${percentComplete}%` }}></div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 text-[10px] font-bold uppercase text-slate-500">
+                                <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-green-500"></div> {statusCounts.completed} Finalizadas</div>
+                                <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-orange-500"></div> {statusCounts.inProgress} Em Andamento</div>
+                                <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-red-500"></div> {statusCounts.delayed} Atrasadas</div>
+                                <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-slate-300"></div> {statusCounts.pending} Pendentes</div>
+                            </div>
+                        </div>
+
+                        {/* B. Materiais */}
+                        <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm relative overflow-hidden">
+                            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3"><i className="fa-solid fa-layer-group mr-1"></i> Materiais</h3>
+                            <div className="flex justify-between items-center mb-4">
+                                <div className="text-center">
+                                    <span className="block text-2xl font-black text-primary dark:text-white">{materials.length}</span>
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase">Itens Totais</span>
                                 </div>
-                                <div>
-                                    <span className="text-xs font-bold text-slate-400 uppercase">Gasto Total</span>
-                                    <p className="text-lg font-black text-red-600">R$ {expenses.reduce((a, b) => a + Number(b.amount), 0).toLocaleString('pt-BR')}</p>
+                                <div className="text-center">
+                                    <span className="block text-2xl font-black text-green-600">{materials.filter(m => m.purchasedQty >= m.plannedQty).length}</span>
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase">Comprados</span>
                                 </div>
-                                <div>
-                                    <span className="text-xs font-bold text-slate-400 uppercase">Status</span>
-                                    <p className="text-lg font-black text-blue-600">{expenses.length} lançamentos</p>
+                                <div className="text-center">
+                                    <span className="block text-2xl font-black text-orange-500">{materials.filter(m => m.purchasedQty < m.plannedQty).length}</span>
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase">Faltam</span>
                                 </div>
                             </div>
                         </div>
 
-                        <table className="w-full text-left text-sm">
-                            <thead className="bg-slate-50 dark:bg-slate-100 border-b border-slate-200 dark:border-slate-200">
-                                <tr>
-                                    <th className="px-6 py-4 font-bold text-slate-500 uppercase text-xs">Item / Descrição</th>
-                                    <th className="px-6 py-4 font-bold text-slate-500 uppercase text-xs text-right">Detalhes / Valor</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100 dark:divide-slate-200">
-                                {reportTab === 'CRONO' && steps.map((s) => (
-                                    <tr key={s.id} className="hover:bg-slate-50">
-                                        <td className="px-6 py-4">
-                                            <p className="font-bold text-slate-800">{s.name}</p>
-                                            <p className="text-xs text-slate-500">{parseDateNoTimezone(s.startDate)} - {parseDateNoTimezone(s.endDate)}</p>
-                                        </td>
-                                        <td className="px-6 py-4 text-right">
-                                            <span className={`inline-block text-[10px] font-bold px-3 py-1 rounded-full ${s.status === 'CONCLUIDO' ? 'bg-green-100 text-green-700' : s.status === 'EM_ANDAMENTO' ? 'bg-orange-100 text-orange-700' : 'bg-slate-100 text-slate-500'}`}>
-                                                {s.status === 'CONCLUIDO' ? 'CONCLUÍDO' : s.status === 'EM_ANDAMENTO' ? 'EM ANDAMENTO' : 'PENDENTE'}
-                                            </span>
-                                        </td>
-                                    </tr>
-                                ))}
-                                {reportTab === 'MAT' && materials.map((m) => (
-                                    <tr key={m.id} className="hover:bg-slate-50">
-                                        <td className="px-6 py-4">
-                                            <p className="font-bold text-slate-800">{m.name}</p>
-                                            <p className="text-xs text-slate-500">{m.brand || 'Marca não inf.'}</p>
-                                        </td>
-                                        <td className="px-6 py-4 text-right">
-                                            <div className="font-mono font-bold text-slate-700">{m.purchasedQty} / {m.plannedQty} {m.unit}</div>
-                                            <div className="w-24 h-1.5 bg-slate-200 rounded-full ml-auto mt-1 overflow-hidden">
-                                                <div className="h-full bg-blue-500" style={{width: `${Math.min((m.purchasedQty/m.plannedQty)*100, 100)}%`}}></div>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                                {reportTab === 'FIN' && expenses.map((e) => (
-                                    <tr key={e.id} className="hover:bg-slate-50">
-                                        <td className="px-6 py-4">
-                                            <p className="font-bold text-slate-800">{e.description}</p>
-                                            <p className="text-xs text-slate-500 flex items-center gap-2">
-                                                <span>{parseDateNoTimezone(e.date)}</span>
-                                                <span className="w-1 h-1 rounded-full bg-slate-300"></span>
-                                                <span>{e.category}</span>
-                                            </p>
-                                        </td>
-                                        <td className="px-6 py-4 text-right">
-                                            <p className="font-bold text-slate-800">R$ {e.amount.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
-                                            {e.totalAgreed && (
-                                                <p className="text-[10px] text-slate-500 font-bold mt-0.5">
-                                                    Parcial de R$ {e.totalAgreed.toLocaleString('pt-BR')}
-                                                </p>
-                                            )}
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                        {/* C. Financeiro */}
+                        <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm relative overflow-hidden">
+                            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3"><i className="fa-solid fa-chart-pie mr-1"></i> Financeiro</h3>
+                            <div className="flex justify-between items-end mb-2">
+                                <span className="text-xl font-black text-primary dark:text-white">R$ {financeSums.total.toLocaleString('pt-BR', { notation: 'compact' })}</span>
+                                <span className="text-xs text-slate-400 font-bold">/ R$ {work.budgetPlanned.toLocaleString('pt-BR', { notation: 'compact' })}</span>
+                            </div>
+                            
+                            {/* Distribution Bar */}
+                            <div className="flex h-2 w-full rounded-full overflow-hidden mb-3">
+                                <div className="bg-amber-500" style={{ width: `${(financeSums.material / (financeSums.total || 1)) * 100}%` }}></div>
+                                <div className="bg-blue-600" style={{ width: `${(financeSums.labor / (financeSums.total || 1)) * 100}%` }}></div>
+                                <div className="bg-slate-300" style={{ width: `${(financeSums.others / (financeSums.total || 1)) * 100}%` }}></div>
+                            </div>
+
+                            <div className="flex justify-between text-[10px] font-bold uppercase text-slate-500">
+                                <span className="text-amber-600"><i className="fa-solid fa-square text-[8px]"></i> Mat</span>
+                                <span className="text-blue-600"><i className="fa-solid fa-square text-[8px]"></i> Mão de Obra</span>
+                                <span className="text-slate-400"><i className="fa-solid fa-square text-[8px]"></i> Outros</span>
+                            </div>
+                        </div>
                     </div>
 
-                    <div className="flex gap-3 no-print">
-                        <button onClick={handlePrintPDF} className="flex-1 py-3 bg-slate-800 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-slate-700 shadow-lg transition-all">
-                            <i className="fa-solid fa-print"></i> Imprimir / PDF
-                        </button>
-                        <button onClick={handleExportExcel} className="flex-1 py-3 bg-green-600 text-white rounded-xl font-bold flex items-center justify-center gap-2 hover:bg-green-700 shadow-lg transition-all">
-                            <i className="fa-solid fa-file-excel"></i> Baixar Excel
-                        </button>
-                    </div>
+                    {/* 3. TABS & TABLE */}
+                    <div>
+                        <div className="flex gap-2 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl mb-4 no-print">
+                            {['CRONO', 'MAT', 'FIN'].map((rt) => (
+                                <button key={rt} onClick={() => setReportTab(rt as any)} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${reportTab === rt ? 'bg-white shadow text-primary' : 'text-slate-500 hover:text-slate-700'}`}>
+                                    {rt === 'CRONO' ? 'Cronograma' : rt === 'MAT' ? 'Materiais' : 'Financeiro'}
+                                </button>
+                            ))}
+                        </div>
 
-                    {/* PRINT STYLES */}
-                    <style>{`
-                        @media print {
-                            .no-print { display: none !important; }
-                            body { background: white; color: black; }
-                            nav, aside, .bottom-nav { display: none !important; }
-                            main { padding: 0 !important; margin: 0 !important; height: auto !important; overflow: visible !important; }
-                            /* Ensure table fits */
-                            table { width: 100% !important; }
-                            td, th { padding: 8px 12px !important; border-bottom: 1px solid #ddd !important; }
-                        }
-                    `}</style>
+                        <div className="bg-white dark:bg-white dark:text-black rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm print:shadow-none print:border-0 print:rounded-none">
+                            
+                            {/* Printable Header (Visible only in Print) */}
+                            <div className="hidden print:block p-8 border-b-2 border-slate-100">
+                                <div className="flex justify-between items-start">
+                                    <div><h1 className="text-3xl font-black text-slate-900 mb-1">MÃOS DA OBRA</h1><p className="text-sm font-bold text-slate-500">Relatório Analítico</p></div>
+                                    <div className="text-right"><h2 className="text-xl font-bold text-slate-800">{work.name}</h2><p className="text-sm text-slate-500">{new Date().toLocaleDateString()}</p></div>
+                                </div>
+                            </div>
+
+                            <table className="w-full text-left text-sm">
+                                <thead className="bg-slate-50 dark:bg-slate-100 border-b border-slate-200">
+                                    <tr>
+                                        <th className="px-6 py-4 font-bold text-slate-500 uppercase text-xs">Item / Descrição</th>
+                                        <th className="px-6 py-4 font-bold text-slate-500 uppercase text-xs text-right">Detalhes / Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100">
+                                    {reportTab === 'CRONO' && steps.map((s, idx) => {
+                                        const isDone = s.status === StepStatus.COMPLETED;
+                                        // Delayed Logic: End Date Passed AND Not Done
+                                        const isDelayed = s.endDate < today && !isDone;
+                                        const isInProgress = s.status === StepStatus.IN_PROGRESS;
+
+                                        let badgeColor = 'bg-slate-100 text-slate-500';
+                                        let statusText = 'Pendente';
+
+                                        if (isDone) { badgeColor = 'bg-green-100 text-green-700'; statusText = 'Concluído'; }
+                                        else if (isDelayed) { badgeColor = 'bg-red-100 text-red-600'; statusText = 'Atrasado'; }
+                                        else if (isInProgress) { badgeColor = 'bg-orange-100 text-orange-600'; statusText = 'Em Andamento'; }
+
+                                        return (
+                                            <tr key={s.id} className="hover:bg-slate-50 transition-colors">
+                                                <td className="px-6 py-4">
+                                                    <div className="flex items-center gap-3">
+                                                        <span className="text-xs font-bold text-slate-300 w-5">{String(idx+1).padStart(2,'0')}</span>
+                                                        <div>
+                                                            <p className="font-bold text-slate-800">{s.name}</p>
+                                                            <p className="text-xs text-slate-500">{parseDateNoTimezone(s.startDate)} - {parseDateNoTimezone(s.endDate)}</p>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                                <td className="px-6 py-4 text-right">
+                                                    <span className={`inline-block text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wider ${badgeColor}`}>
+                                                        {statusText}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+
+                                    {reportTab === 'MAT' && materials.map((m) => (
+                                        <tr key={m.id} className="hover:bg-slate-50">
+                                            <td className="px-6 py-4">
+                                                <p className="font-bold text-slate-800">{m.name}</p>
+                                                <p className="text-xs text-slate-500 font-bold uppercase">{m.brand || 'Marca não inf.'}</p>
+                                            </td>
+                                            <td className="px-6 py-4 text-right">
+                                                <div className="font-mono font-bold text-slate-700">{m.purchasedQty} / {m.plannedQty} {m.unit}</div>
+                                                <div className="w-24 h-1.5 bg-slate-200 rounded-full ml-auto mt-1 overflow-hidden">
+                                                    <div className={`h-full ${m.purchasedQty >= m.plannedQty ? 'bg-green-500' : 'bg-orange-400'}`} style={{width: `${Math.min((m.purchasedQty/m.plannedQty)*100, 100)}%`}}></div>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+
+                                    {reportTab === 'FIN' && expenses.map((e) => (
+                                        <tr key={e.id} className="hover:bg-slate-50">
+                                            <td className="px-6 py-4">
+                                                <div className="flex items-center gap-3">
+                                                    {/* Category Icon */}
+                                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs ${e.category === ExpenseCategory.LABOR ? 'bg-blue-100 text-blue-600' : e.category === ExpenseCategory.MATERIAL ? 'bg-amber-100 text-amber-600' : 'bg-slate-100 text-slate-500'}`}>
+                                                        <i className={`fa-solid ${e.category === ExpenseCategory.LABOR ? 'fa-helmet-safety' : e.category === ExpenseCategory.MATERIAL ? 'fa-box' : 'fa-file-invoice'}`}></i>
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-bold text-slate-800">{e.description}</p>
+                                                        <p className="text-xs text-slate-500">{parseDateNoTimezone(e.date)}</p>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4 text-right">
+                                                <p className="font-bold text-slate-800">R$ {e.amount.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
+                                                {e.totalAgreed && (
+                                                    <div className="text-[10px] text-slate-400 font-bold mt-1 flex items-center justify-end gap-1">
+                                                        <span>Total: R$ {e.totalAgreed.toLocaleString('pt-BR')}</span>
+                                                        {e.amount < e.totalAgreed && <i className="fa-solid fa-clock text-orange-400" title="Pagamento Parcial"></i>}
+                                                    </div>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        {/* Print Styles Injection */}
+                        <style>{`
+                            @media print {
+                                .no-print { display: none !important; }
+                                body { background: white; color: black; }
+                                nav, aside, .bottom-nav { display: none !important; }
+                                main { padding: 0 !important; margin: 0 !important; height: auto !important; overflow: visible !important; }
+                                table { width: 100% !important; page-break-inside: auto; }
+                                tr { page-break-inside: avoid; page-break-after: auto; }
+                                td, th { padding: 8px 12px !important; border-bottom: 1px solid #ddd !important; }
+                            }
+                        `}</style>
+                    </div>
                 </div>
             );
+            }
 
             case 'PHOTOS': return (
                 <div className="space-y-6">
@@ -1057,6 +1120,33 @@ const WorkDetail: React.FC = () => {
                 </div>
             );
 
+            case 'CALCULATORS': return (
+                <div className="space-y-6">
+                    <div className="grid grid-cols-3 gap-2">
+                        {['PISO', 'PAREDE', 'PINTURA'].map(t => (
+                            <button key={t} onClick={() => {setCalcType(t as any); setCalcResult([])}} className={`flex flex-col items-center justify-center py-4 rounded-xl border-2 font-bold text-xs transition-all gap-2 ${calcType === t ? 'border-secondary bg-secondary/10 text-secondary' : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-400'}`}>
+                                <i className={`fa-solid ${t === 'PISO' ? 'fa-layer-group' : t === 'PAREDE' ? 'fa-building' : 'fa-paint-roller'} text-xl`}></i>
+                                {t}
+                            </button>
+                        ))}
+                    </div>
+                    <div className="bg-gradient-to-br from-slate-800 to-slate-900 text-white p-8 rounded-3xl shadow-xl relative overflow-hidden">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-secondary/20 rounded-full blur-3xl"></div>
+                        <h3 className="text-lg font-bold mb-6 text-center uppercase tracking-widest text-secondary">Calculadora de {calcType}</h3>
+                        <div className="relative mb-8">
+                            <input type="number" value={calcArea} onChange={e => setCalcArea(e.target.value)} placeholder="0" className="w-full bg-white/10 border border-white/20 rounded-2xl p-4 text-center text-3xl font-black text-white outline-none focus:border-secondary transition-colors" />
+                            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-white/30 font-bold">m²</span>
+                        </div>
+                        <div className="space-y-3">
+                            {calcResult.length > 0 ? calcResult.map((res, i) => (
+                                <div key={i} className="bg-white/10 p-3 rounded-xl flex items-center gap-3 backdrop-blur-sm"><i className="fa-solid fa-check text-green-400"></i> <span className="font-bold text-sm">{res}</span></div>
+                            )) : <p className="text-center text-white/30 text-sm">Digite a área para calcular.</p>}
+                        </div>
+                    </div>
+                </div>
+            );
+
+            // Reusing existing components for other subviews to save space, but ensuring they are rendered
             case 'BONUS_IA': return (
                 <div className="flex flex-col items-center justify-center min-h-[70vh] p-6 text-center animate-in fade-in">
                     <div className="w-full max-w-sm bg-gradient-to-br from-slate-900 to-slate-950 rounded-[2.5rem] p-8 shadow-2xl relative overflow-hidden border border-slate-800 group">
@@ -1069,10 +1159,10 @@ const WorkDetail: React.FC = () => {
                             <h2 className="text-3xl font-black text-white mb-2 tracking-tight">Zé da Obra <span className="text-secondary">AI</span></h2>
                             <div className="h-1 w-12 bg-secondary rounded-full mb-6"></div>
                             <p className="text-slate-400 text-sm mb-8 leading-relaxed font-medium">Seu engenheiro virtual particular.</p>
-                            {hasAiAccess ? (
+                            {isPremium ? (
                                 <button onClick={() => setSubView('BONUS_IA_CHAT')} className="w-full py-4 bg-gradient-gold text-white font-black rounded-2xl shadow-lg hover:shadow-orange-500/20 hover:scale-105 transition-all flex items-center justify-center gap-3 group-hover:animate-pulse"><span>INICIAR CONVERSA</span><i className="fa-solid fa-comments"></i></button>
                             ) : (
-                                <button onClick={() => navigate('/checkout?plan=VITALICIO')} className="w-full py-4 bg-slate-800 text-slate-500 font-bold rounded-2xl border border-slate-700 flex items-center justify-center gap-2 hover:bg-slate-700 transition-colors"><i className="fa-solid fa-lock"></i> BLOQUEADO (ASSINAR)</button>
+                                <button onClick={() => navigate('/settings')} className="w-full py-4 bg-slate-800 text-slate-500 font-bold rounded-2xl border border-slate-700 flex items-center justify-center gap-2 hover:bg-slate-700 transition-colors"><i className="fa-solid fa-lock"></i> BLOQUEADO (PREMIUM)</button>
                             )}
                         </div>
                     </div>
@@ -1080,7 +1170,7 @@ const WorkDetail: React.FC = () => {
             );
 
             case 'BONUS_IA_CHAT': 
-                if (!hasAiAccess) return null;
+                if (!isPremium) return null;
                 return (
                 <div className="flex flex-col h-[80vh]">
                     <div className="flex-1 bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-inner overflow-y-auto mb-4 border border-slate-200 dark:border-slate-800">
@@ -1102,9 +1192,7 @@ const WorkDetail: React.FC = () => {
                 </div>
             );
 
-            case 'CONTRACTS': 
-                if (!isPremium) return <LockedFeature featureName="Gerador de Contratos" />;
-                return (
+            case 'CONTRACTS': return (
                 <div className="space-y-4">
                     {CONTRACT_TEMPLATES.map(ct => (
                         <div key={ct.id} onClick={() => setViewContract({ title: ct.title, content: ct.contentTemplate })} className="group bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-secondary/50 cursor-pointer shadow-sm transition-all hover:translate-x-1">
@@ -1117,9 +1205,7 @@ const WorkDetail: React.FC = () => {
                 </div>
             );
 
-            case 'CHECKLIST': 
-                if (!isPremium) return <LockedFeature featureName="Checklists de Qualidade" />;
-                return (
+            case 'CHECKLIST': return (
                 <div className="space-y-4">
                     {STANDARD_CHECKLISTS.map((cl, idx) => (
                         <div key={idx} className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
@@ -1171,33 +1257,15 @@ const WorkDetail: React.FC = () => {
                     </h1>
                     <div className="w-6"></div> 
                 </div>
-
-                {/* DESKTOP TOP NAVIGATION (Within Frame) */}
-                {subView === 'NONE' && (
-                    <div className="hidden md:flex items-center gap-2 mt-4 overflow-x-auto no-scrollbar pb-1">
-                        <button onClick={() => setActiveTab('SCHEDULE')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${activeTab === 'SCHEDULE' ? 'bg-secondary/10 text-secondary' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-primary dark:hover:text-white'}`}>
-                            <i className="fa-solid fa-calendar-days"></i> Cronograma
-                        </button>
-                        <button onClick={() => setActiveTab('MATERIALS')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${activeTab === 'MATERIALS' ? 'bg-secondary/10 text-secondary' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-primary dark:hover:text-white'}`}>
-                            <i className="fa-solid fa-layer-group"></i> Materiais
-                        </button>
-                        <button onClick={() => setActiveTab('FINANCIAL')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${activeTab === 'FINANCIAL' ? 'bg-secondary/10 text-secondary' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-primary dark:hover:text-white'}`}>
-                            <i className="fa-solid fa-chart-pie"></i> Financeiro
-                        </button>
-                        <button onClick={() => setActiveTab('MORE')} className={`px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2 ${activeTab === 'MORE' ? 'bg-secondary/10 text-secondary' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-primary dark:hover:text-white'}`}>
-                            <i className="fa-solid fa-bars"></i> Mais
-                        </button>
-                    </div>
-                )}
             </div>
 
-            <div className="flex-1 p-4 pb-32 md:pb-8 overflow-y-auto">
+            <div className="flex-1 p-4 pb-32 overflow-y-auto">
                 {subView !== 'NONE' ? renderSubViewContent() : renderMainTab()}
             </div>
 
-            {/* MAIN NAVIGATION BOTTOM BAR (MOBILE ONLY) */}
+            {/* MAIN NAVIGATION BOTTOM BAR (Only visible on main tabs) */}
             {subView === 'NONE' && (
-                <div className="fixed md:hidden bottom-0 left-0 right-0 bg-white dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 pb-safe z-40 shadow-[0_-5px_20px_rgba(0,0,0,0.05)] no-print">
+                <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 pb-safe z-40 shadow-[0_-5px_20px_rgba(0,0,0,0.05)] no-print">
                     <div className="flex justify-around items-center max-w-4xl mx-auto h-16">
                         <button onClick={() => setActiveTab('SCHEDULE')} className={`flex flex-col items-center justify-center w-full h-full gap-1 transition-all ${activeTab === 'SCHEDULE' ? 'text-secondary' : 'text-slate-400'}`}><i className={`fa-solid fa-calendar-days text-xl ${activeTab === 'SCHEDULE' ? 'scale-110' : ''}`}></i><span className="text-[10px] font-bold uppercase">Cronograma</span></button>
                         <button onClick={() => setActiveTab('MATERIALS')} className={`flex flex-col items-center justify-center w-full h-full gap-1 transition-all ${activeTab === 'MATERIALS' ? 'text-secondary' : 'text-slate-400'}`}><i className={`fa-solid fa-layer-group text-xl ${activeTab === 'MATERIALS' ? 'scale-110' : ''}`}></i><span className="text-[10px] font-bold uppercase">Materiais</span></button>
