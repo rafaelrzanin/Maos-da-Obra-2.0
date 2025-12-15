@@ -22,6 +22,8 @@ const Profile: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (loading) return;
+    
     setLoading(true);
     setErrorMsg('');
     setSuccessMsg('');
@@ -33,20 +35,23 @@ const Profile: React.FC = () => {
     }
 
     try {
-        if (!user) return;
+        if (!user) throw new Error("Usuário não identificado.");
         
-        await dbService.updateUser(user.id, {
-            name,
-            whatsapp
-        }, password || undefined);
+        // Timeout para evitar travamento eterno
+        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 10000));
+        
+        await Promise.race([
+            dbService.updateUser(user.id, { name, whatsapp }, password || undefined),
+            timeoutPromise
+        ]);
 
         await refreshUser();
         setSuccessMsg("Perfil atualizado com sucesso!");
         setPassword('');
         setConfirmPassword('');
-    } catch (error) {
-        console.error(error);
-        setErrorMsg("Erro ao atualizar perfil.");
+    } catch (error: any) {
+        console.error("Erro no Profile:", error);
+        setErrorMsg(error.message === "Timeout" ? "O servidor demorou para responder, mas seus dados podem ter sido salvos." : `Erro: ${error.message}`);
     } finally {
         setLoading(false);
     }
@@ -55,7 +60,7 @@ const Profile: React.FC = () => {
   if (!user) return null;
 
   return (
-    <div className="max-w-2xl mx-auto pb-12 pt-4 px-4 font-sans">
+    <div className="max-w-2xl mx-auto pb-12 pt-4 px-4 font-sans animate-in fade-in">
       <div className="flex items-center gap-3 mb-6">
         <div className="w-12 h-12 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-xl text-slate-500 dark:text-slate-300">
             <i className="fa-solid fa-user"></i>
@@ -110,6 +115,10 @@ const Profile: React.FC = () => {
 
             <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
                 <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">Alterar Senha</h3>
+                <div className="p-3 mb-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-700 text-xs text-slate-500">
+                    <i className="fa-solid fa-info-circle mr-2"></i>
+                    A senha é protegida pelo sistema de autenticação e não fica visível.
+                </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nova Senha</label>
@@ -152,7 +161,7 @@ const Profile: React.FC = () => {
             className="w-full py-4 bg-primary hover:bg-primary-dark text-white font-bold rounded-xl shadow-lg shadow-primary/20 transition-all disabled:opacity-70 flex items-center justify-center gap-2"
             >
             {loading ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-save"></i>}
-            Salvar Alterações
+            {loading ? 'Salvando...' : 'Salvar Alterações'}
             </button>
         </form>
       </div>
