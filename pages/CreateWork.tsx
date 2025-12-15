@@ -1,7 +1,7 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../App';
+import { useAuth } from '../contexts/AuthContext';
 import { dbService } from '../services/db';
 import { WORK_TEMPLATES, ZE_AVATAR, ZE_AVATAR_FALLBACK } from '../services/standards';
 import { WorkStatus } from '../types';
@@ -12,7 +12,7 @@ const CreateWork: React.FC = () => {
   
   // Wizard State
   const [currentStep, setCurrentStep] = useState(1);
-  const totalSteps = 3;
+  const totalSteps = 2; // Simplified to 2 steps for better UX
   const [loading, setLoading] = useState(false);
   
   // Generation Animation State
@@ -37,8 +37,8 @@ const CreateWork: React.FC = () => {
   const [workCategory, setWorkCategory] = useState<'CONSTRUCTION' | 'RENOVATION' | null>(null);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
   
-  const needsDetailedInputs = workCategory === 'CONSTRUCTION' || selectedTemplateId === 'REFORMA_APTO';
   const selectedTemplate = WORK_TEMPLATES.find(t => t.id === selectedTemplateId);
+  const needsDetailedInputs = workCategory === 'CONSTRUCTION' || selectedTemplateId === 'REFORMA_APTO';
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
@@ -59,21 +59,8 @@ const CreateWork: React.FC = () => {
        if (!formData.name.trim()) { alert("Por favor, dê um apelido para sua obra."); return false; }
        if (!formData.budgetPlanned) { alert("Quanto você pretende gastar (mesmo que seja um chute)?"); return false; }
     }
-    if (step === 2) {
-       if (!workCategory) { alert("Escolha entre Construção ou Reforma."); return false; }
-       if (!selectedTemplateId) { alert("Selecione o tipo específico da obra."); return false; }
-       if (!formData.startDate) { alert("Qual a data de início?"); return false; }
-    }
     return true;
   };
-
-  const nextStep = () => {
-    if (validateStep(currentStep)) {
-        setCurrentStep(prev => Math.min(prev + 1, totalSteps));
-    }
-  };
-
-  const prevStep = () => setCurrentStep(prev => Math.max(prev - 1, 1));
 
   const handleCategorySelect = (category: 'CONSTRUCTION' | 'RENOVATION') => {
       setWorkCategory(category);
@@ -87,6 +74,11 @@ const CreateWork: React.FC = () => {
     e.preventDefault();
     if (!user) return;
     if (!validateStep(currentStep)) return;
+    
+    // Validate Step 2 specific
+    if (!workCategory) { alert("Escolha entre Construção ou Reforma."); return; }
+    if (!selectedTemplateId) { alert("Selecione o tipo específico da obra."); return; }
+    if (!formData.startDate) { alert("Qual a data de início?"); return; }
 
     setLoading(true);
     setGenerationMode(true); // Activate overlay
@@ -145,9 +137,9 @@ const CreateWork: React.FC = () => {
         setGenStep(0);
         
         if (error.message === 'TIMEOUT' || error.message?.includes('Supabase off')) {
-            alert("Erro de conexão ou Banco de Dados não configurado. Verifique se você criou as tabelas no Supabase (SQL Editor).");
+            alert("Erro de conexão ou Banco de Dados não configurado. Verifique se você criou as tabelas no Supabase.");
         } else if (error.message?.includes('permission denied')) {
-            alert("Erro de Permissão. Execute o script SQL para criar as tabelas ou corrigir permissões.");
+            alert("Erro de Permissão. Verifique se você está logado corretamente.");
         } else {
             alert(`Erro ao salvar: ${error.message}`);
         }
@@ -155,13 +147,13 @@ const CreateWork: React.FC = () => {
   };
 
   const CounterInput = ({ label, field, icon }: { label: string, field: keyof typeof formData, icon: string }) => (
-      <div className="bg-white dark:bg-slate-800 rounded-2xl border-2 border-slate-200 dark:border-slate-700 p-4 flex flex-col items-center justify-center shadow-sm hover:border-secondary/50 dark:hover:border-secondary/50 transition-colors group">
-          <div className="text-slate-400 mb-2 group-hover:text-secondary transition-colors text-xl"><i className={`fa-solid ${icon}`}></i></div>
-          <label className="text-xs font-black text-slate-700 dark:text-slate-300 uppercase mb-3 text-center tracking-wider">{label}</label>
+      <div className="bg-white dark:bg-slate-800 rounded-2xl border-2 border-slate-200 dark:border-slate-700 p-3 flex flex-col items-center justify-center shadow-sm hover:border-secondary/50 dark:hover:border-secondary/50 transition-colors group">
+          <div className="text-slate-400 mb-1 group-hover:text-secondary transition-colors text-lg"><i className={`fa-solid ${icon}`}></i></div>
+          <label className="text-[10px] font-black text-slate-700 dark:text-slate-300 uppercase mb-2 text-center tracking-wider">{label}</label>
           <div className="flex items-center gap-3 w-full justify-center">
-              <button type="button" onClick={() => handleCounter(field, false)} className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-200 font-bold hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors text-xl flex items-center justify-center pb-1">-</button>
-              <span className="min-w-[2rem] text-center font-black text-primary dark:text-white text-2xl">{formData[field as keyof typeof formData]}</span>
-              <button type="button" onClick={() => handleCounter(field, true)} className="w-10 h-10 rounded-xl bg-primary text-white font-bold hover:bg-primary-light transition-colors shadow-md shadow-primary/20 text-xl flex items-center justify-center pb-1">+</button>
+              <button type="button" onClick={() => handleCounter(field, false)} className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-200 font-bold hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors flex items-center justify-center">-</button>
+              <span className="min-w-[1.5rem] text-center font-black text-primary dark:text-white text-xl">{formData[field as keyof typeof formData]}</span>
+              <button type="button" onClick={() => handleCounter(field, true)} className="w-8 h-8 rounded-lg bg-primary text-white font-bold hover:bg-primary-light transition-colors shadow-md shadow-primary/20 flex items-center justify-center">+</button>
           </div>
       </div>
   );
@@ -269,47 +261,33 @@ const CreateWork: React.FC = () => {
                             </div>
                         )}
                         {needsDetailedInputs && (
-                             <div className="mb-8 space-y-6">
+                             <div className="mb-8">
                                  {workCategory === 'CONSTRUCTION' && (
-                                     <div className="p-5 bg-slate-50 dark:bg-slate-800 rounded-2xl border-2 border-slate-200 dark:border-slate-700">
-                                         <div className="flex items-center gap-4 mb-4"><div className="w-10 h-10 rounded-lg bg-secondary/10 flex items-center justify-center text-secondary text-xl"><i className="fa-solid fa-layer-group"></i></div><div><h3 className="font-black text-slate-800 dark:text-white text-sm uppercase tracking-wide">Pavimentos</h3><p className="text-xs font-bold text-slate-400">Andares</p></div></div>
-                                         <div className="flex items-center justify-center gap-4"><button type="button" onClick={() => handleCounter('floors', false)} className="w-10 h-10 rounded-lg bg-white dark:bg-slate-700 border shadow-sm text-lg font-bold">-</button><span className="w-8 text-center font-black text-xl text-primary dark:text-white">{formData.floors}</span><button type="button" onClick={() => handleCounter('floors', true)} className="w-10 h-10 rounded-lg bg-primary text-white shadow-md text-lg font-bold">+</button></div>
+                                     <div className="mb-6">
+                                         <CounterInput label="Pavimentos" field="floors" icon="fa-layer-group" />
                                      </div>
                                  )}
                                  <div className="grid grid-cols-2 gap-4">
                                      <CounterInput label="Quartos" field="bedrooms" icon="fa-bed" />
                                      <CounterInput label="Banheiros" field="bathrooms" icon="fa-bath" />
                                      <CounterInput label="Cozinhas" field="kitchens" icon="fa-kitchen-set" />
-                                     <CounterInput label="Salas" field="livingRooms" icon="fa-couch" />
+                                     <CounterInput label="Salas" field="livingRooms" icon="fa-tv" />
+                                 </div>
+                                 <div className="mt-6 flex items-center justify-center">
+                                     <label className="flex items-center gap-3 cursor-pointer group">
+                                         <div className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-colors ${formData.hasLeisureArea ? 'bg-secondary border-secondary' : 'border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800'}`}>
+                                             {formData.hasLeisureArea && <i className="fa-solid fa-check text-white text-xs"></i>}
+                                         </div>
+                                         <input type="checkbox" name="hasLeisureArea" checked={formData.hasLeisureArea} onChange={handleChange} className="hidden" />
+                                         <span className="text-sm font-bold text-slate-600 dark:text-slate-300 group-hover:text-primary dark:group-hover:text-white transition-colors">Possui área de lazer / piscina?</span>
+                                     </label>
                                  </div>
                              </div>
                         )}
+                        
                         <div>
                             <label className="block text-xs font-black text-slate-700 dark:text-slate-300 uppercase mb-2 tracking-widest pl-1">Data de Início</label>
-                            <input name="startDate" type="date" required value={formData.startDate} className="w-full px-5 py-4 text-base font-bold border-2 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white rounded-2xl focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all" onChange={handleChange} />
-                        </div>
-                    </div>
-                </div>
-            );
-        case 3:
-            return (
-                <div className="animate-in fade-in slide-in-from-right-8 duration-500">
-                    <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 md:p-8 shadow-xl border border-slate-200 dark:border-slate-800">
-                        <div className="flex items-center gap-4 mb-6">
-                            <div className="w-16 h-16 rounded-full p-1 bg-gradient-to-br from-secondary to-orange-500 shadow-xl"><img src={ZE_AVATAR} alt="Zé" className="w-full h-full object-cover rounded-full bg-slate-800 border-2 border-white" onError={(e) => { e.currentTarget.src = ZE_AVATAR_FALLBACK; }} /></div>
-                            <div><h2 className="text-2xl font-black text-primary dark:text-white leading-tight">Engenheiro Virtual</h2><p className="text-slate-500 dark:text-slate-400 font-medium text-sm">Pronto para calcular.</p></div>
-                        </div>
-                        <div className="relative overflow-hidden bg-slate-900 rounded-3xl p-8 text-white shadow-xl group">
-                            <div className="absolute top-0 right-0 w-64 h-64 bg-secondary/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 group-hover:bg-secondary/30 transition-colors"></div>
-                            <div className="relative z-10">
-                                <h3 className="text-lg font-bold mb-4 flex items-center gap-2"><i className="fa-solid fa-list-check text-secondary"></i> Resumo</h3>
-                                <div className="space-y-3 mb-6 border-b border-white/10 pb-4">
-                                    <div className="flex justify-between items-center"><span className="text-slate-400 text-sm">Projeto</span><span className="font-bold">{formData.name}</span></div>
-                                    <div className="flex justify-between items-center"><span className="text-slate-400 text-sm">Tipo</span><span className="font-bold">{needsDetailedInputs ? 'Construção' : selectedTemplate?.label}</span></div>
-                                    <div className="flex justify-between items-center"><span className="text-slate-400 text-sm">Área Total</span><span className="font-bold">{formData.area} m²</span></div>
-                                </div>
-                                <div className="bg-white/5 p-4 rounded-xl border border-white/10 flex items-start gap-3"><i className="fa-solid fa-wand-magic-sparkles text-secondary mt-1"></i><p className="text-sm text-slate-300 leading-relaxed">Vou gerar o cronograma e a lista de materiais agora.</p></div>
-                            </div>
+                            <input type="date" name="startDate" value={formData.startDate} onChange={handleChange} className="w-full px-5 py-4 text-base font-bold border-2 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white rounded-2xl focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all" />
                         </div>
                     </div>
                 </div>
@@ -319,19 +297,31 @@ const CreateWork: React.FC = () => {
   };
 
   return (
-    <div className="max-w-2xl mx-auto pb-12 pt-6 px-4 font-sans">
-      <button onClick={() => navigate('/')} className="mb-6 text-slate-400 hover:text-primary dark:hover:text-white font-black uppercase text-xs tracking-widest flex items-center gap-2 transition-colors"><i className="fa-solid fa-arrow-left"></i> Cancelar</button>
-      <div className="mb-8">
-          <div className="flex flex-col gap-2 mb-4"><span className="w-fit px-3 py-1 rounded-full bg-secondary/10 text-secondary text-[10px] font-black uppercase tracking-widest border border-secondary/20">Passo {currentStep} de {totalSteps}</span><h1 className="text-3xl font-black text-slate-800 dark:text-white tracking-tight">{currentStep === 1 ? 'Nova Obra' : currentStep === 2 ? 'Configuração' : 'Resumo Inteligente'}</h1></div>
-          <div className="w-full bg-slate-200 dark:bg-slate-800 rounded-full h-2.5 overflow-hidden"><div className="bg-gradient-to-r from-secondary to-orange-500 h-full rounded-full transition-all duration-500 ease-out shadow-[0_0_10px_rgba(217,119,6,0.5)]" style={{ width: `${(currentStep / totalSteps) * 100}%` }}></div></div>
+    <div className="max-w-2xl mx-auto pb-12 pt-6 px-4">
+      <div className="flex items-center justify-between mb-8">
+          <button onClick={() => currentStep === 1 ? navigate('/') : setCurrentStep(prev => prev - 1)} className="text-slate-400 hover:text-primary dark:hover:text-white transition-colors"><i className="fa-solid fa-arrow-left text-xl"></i></button>
+          <div className="flex gap-2">
+              {[1, 2].map(s => (
+                  <div key={s} className={`h-2 rounded-full transition-all duration-500 ${s <= currentStep ? 'w-8 bg-secondary' : 'w-2 bg-slate-200 dark:bg-slate-700'}`}></div>
+              ))}
+          </div>
+          <div className="w-6"></div>
       </div>
-      
-      <form onSubmit={handleSubmit} className="space-y-8">
-        {renderStepContent()}
-        <div className="flex gap-4 pt-2">
-           {currentStep > 1 && (<button type="button" onClick={prevStep} disabled={loading} className="flex-1 bg-white dark:bg-slate-900 border-2 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-black text-sm uppercase tracking-wide py-5 rounded-2xl transition-all hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-slate-300 disabled:opacity-50 shadow-sm">Voltar</button>)}
-           {currentStep === 2 && !workCategory ? null : (currentStep < totalSteps ? (<button type="button" onClick={nextStep} className="flex-1 bg-primary hover:bg-primary-dark text-white font-black text-sm uppercase tracking-wide py-5 rounded-2xl transition-all shadow-xl shadow-primary/30 flex items-center justify-center gap-3 hover:-translate-y-1 active:translate-y-0">Continuar <i className="fa-solid fa-arrow-right"></i></button>) : (<button type="submit" disabled={loading} className="flex-1 bg-green-600 hover:bg-green-700 text-white font-black text-sm uppercase tracking-wide py-5 rounded-2xl transition-all shadow-xl shadow-green-600/30 flex items-center justify-center gap-3 hover:-translate-y-1 active:translate-y-0 disabled:opacity-70 disabled:cursor-wait"><i className="fa-solid fa-wand-magic-sparkles"></i> {loading ? 'Gerando...' : 'Gerar Obra com IA'}</button>))}
-        </div>
+
+      <form onSubmit={handleSubmit}>
+          {renderStepContent()}
+          
+          <div className="mt-8 flex justify-end">
+              {currentStep < totalSteps ? (
+                  <button type="button" onClick={() => { if(validateStep(currentStep)) setCurrentStep(prev => prev + 1); }} className="px-8 py-4 bg-primary text-white font-bold rounded-2xl shadow-lg hover:bg-primary-light transition-all flex items-center gap-3">
+                      Próximo <i className="fa-solid fa-arrow-right"></i>
+                  </button>
+              ) : (
+                  <button type="submit" disabled={loading} className="px-8 py-4 bg-gradient-gold text-white font-bold rounded-2xl shadow-lg hover:shadow-orange-500/30 hover:scale-105 transition-all flex items-center gap-3 disabled:opacity-70 disabled:scale-100">
+                      {loading ? 'Gerando...' : 'Criar Obra'} <i className="fa-solid fa-check"></i>
+                  </button>
+              )}
+          </div>
       </form>
     </div>
   );
