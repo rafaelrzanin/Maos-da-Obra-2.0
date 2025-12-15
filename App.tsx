@@ -11,7 +11,7 @@ import Dashboard from './pages/Dashboard';
 
 // --- Lazy Loading (Apenas para páginas secundárias) ---
 const CreateWork = lazy(() => import('./pages/CreateWork'));
-const WorkDetail = lazy(() => import('./pages/WorkDetail'));
+const WorkDetail = lazy(() => import('./pages/WorkDetail') as Promise<{ default: React.ComponentType<any> }>);
 const Settings = lazy(() => import('./pages/Settings'));
 const Profile = lazy(() => import('./pages/Profile'));
 const VideoTutorials = lazy(() => import('./pages/VideoTutorials'));
