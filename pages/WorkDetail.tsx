@@ -780,14 +780,14 @@ const WorkDetail: React.FC = () => {
 
                                 <div onClick={() => setSubView('BONUS_IA')} className="bg-white/10 hover:bg-white/15 p-4 rounded-2xl border border-white/10 mb-4 cursor-pointer flex items-center gap-4 transition-all backdrop-blur-sm group">
                                     <div className="relative">
-                                        <img src={ZE_AVATAR} className={`w-14 h-14 rounded-full border-2 border-secondary bg-slate-800 object-cover ${!hasAiAccess ? 'grayscale opacity-70' : ''}`} onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK}/>
-                                        <div className={`absolute -bottom-1 -right-1 w-4 h-4 border-2 border-slate-800 rounded-full ${hasAiAccess ? 'bg-green-500' : 'bg-slate-500'}`}></div>
+                                        <img src={ZE_AVATAR} className={`w-14 h-14 rounded-full border-2 border-secondary bg-slate-800 object-cover ${!isPremium ? 'grayscale opacity-70' : ''}`} onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK}/>
+                                        <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 border-2 border-slate-800 rounded-full"></div>
                                     </div>
                                     <div>
-                                        <h4 className={`font-bold text-base transition-colors ${hasAiAccess ? 'text-white group-hover:text-secondary' : 'text-slate-400'}`}>
+                                        <h4 className={`font-bold text-base transition-colors ${isPremium ? 'text-white group-hover:text-secondary' : 'text-slate-400'}`}>
                                             Zé da Obra AI
                                         </h4>
-                                        <p className="text-xs text-slate-300">{hasAiAccess ? 'Tire dúvidas técnicas 24h' : (isAiTrialActive ? 'Trial Ativo (7 dias)' : 'Bloqueado (Vitalício)')}</p>
+                                        <p className="text-xs text-slate-300">{isPremium ? 'Tire dúvidas técnicas 24h' : (isAiTrialActive ? 'Trial Ativo (7 dias)' : 'Bloqueado (Vitalício)')}</p>
                                     </div>
                                     <div className="ml-auto w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-white/50 group-hover:bg-secondary group-hover:text-white transition-all"><i className="fa-solid fa-chevron-right"></i></div>
                                 </div>
