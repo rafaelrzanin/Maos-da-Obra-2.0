@@ -75,7 +75,7 @@ const Dashboard: React.FC = () => {
   const [zeModal, setZeModal] = useState<{isOpen: boolean, title: string, message: string, workId?: string}>({isOpen: false, title: '', message: ''});
   const [showTrialUpsell, setShowTrialUpsell] = useState(false);
 
-  // 1. Initial Load: Apenas busca a lista de obras (Rápido)
+  // 1. Initial Load: Busca lista de obras e define o foco IMEDIATAMENTE
   useEffect(() => {
     let isMounted = true;
 
@@ -89,19 +89,26 @@ const Dashboard: React.FC = () => {
             const data = await dbService.getWorks(user.id);
             if (isMounted) {
                 setWorks(data);
+                
+                // Correção Cirúrgica: Define focusWork sincronicamente com os dados
+                // e só desativa o loading DEPOIS que o estado estiver garantido.
                 if (data.length > 0) {
                     setFocusWork(prev => {
-                        if (!prev) return data[0];
-                        const exists = data.find(w => w.id === prev.id);
-                        return exists || data[0];
+                        // Se já existia um foco e ele ainda está na lista (ex: reload suave), mantém
+                        if (prev) {
+                            const exists = data.find(w => w.id === prev.id);
+                            if (exists) return exists;
+                        }
+                        // Senão, pega o primeiro (Padrão ao voltar para o dashboard)
+                        return data[0];
                     });
                 } else {
                     setFocusWork(null);
                 }
+                setIsLoadingWorks(false);
             }
         } catch (e) {
             console.error("Erro ao buscar obras:", e);
-        } finally {
             if (isMounted) setIsLoadingWorks(false);
         }
     };
@@ -156,7 +163,7 @@ const Dashboard: React.FC = () => {
       if (focusWork?.id) {
           fetchDetails();
       } else if (works.length > 0 && !focusWork) {
-          // Fallback: se tem obras mas focusWork está null, seta a primeira
+          // Fallback de segurança: se tem obras mas focusWork está null
           setFocusWork(works[0]);
       } else {
           // Se não tem obras ou focusWork, para o loading
@@ -238,8 +245,6 @@ const Dashboard: React.FC = () => {
   if (isLoadingWorks) return <DashboardSkeleton />;
 
   // 2. Não tem obras (Empty State) - Renderiza instantâneo se works = []
-  // Garante que se focusWork não existe mas works existe, a lógica do useEffect corrigirá, 
-  // mas enquanto isso não mostramos o "Bem-vindo" erroneamente se works.length > 0.
   if (works.length === 0) {
       return (
         <div className="flex flex-col items-center justify-center min-h-[80vh] px-4 text-center animate-in fade-in duration-500">
