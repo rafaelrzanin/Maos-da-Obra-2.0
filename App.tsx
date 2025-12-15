@@ -5,17 +5,16 @@ import { User, PlanType } from './types';
 import { dbService } from './services/db';
 
 // --- IMPORTAÇÕES ESTÁTICAS (Críticas para velocidade inicial) ---
-// Carregar Login e Dashboard imediatamente evita o "flash" de carregamento e delay de rede
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 
-// --- Lazy Loading (Apenas para páginas secundárias) ---
-const CreateWork = lazy(() => import('./pages/CreateWork'));
+// --- Lazy Loading com Type Casting para evitar erro de Build (TS2322) ---
+const CreateWork = lazy(() => import('./pages/CreateWork') as Promise<{ default: React.ComponentType<any> }>);
 const WorkDetail = lazy(() => import('./pages/WorkDetail') as Promise<{ default: React.ComponentType<any> }>);
-const Settings = lazy(() => import('./pages/Settings'));
-const Profile = lazy(() => import('./pages/Profile'));
-const VideoTutorials = lazy(() => import('./pages/VideoTutorials'));
-const Checkout = lazy(() => import('./pages/Checkout'));
+const Settings = lazy(() => import('./pages/Settings') as Promise<{ default: React.ComponentType<any> }>);
+const Profile = lazy(() => import('./pages/Profile') as Promise<{ default: React.ComponentType<any> }>);
+const VideoTutorials = lazy(() => import('./pages/VideoTutorials') as Promise<{ default: React.ComponentType<any> }>);
+const Checkout = lazy(() => import('./pages/Checkout') as Promise<{ default: React.ComponentType<any> }>);
 
 // --- Componente de Carregamento ---
 const LoadingScreen = () => (
@@ -71,13 +70,11 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Lógica simplificada e direta para evitar loops
   useEffect(() => {
     let mounted = true;
 
     const initAuth = async () => {
       try {
-        // Timeout de segurança: se o DB demorar mais de 4s, libera a UI (vai pro login)
         const timeoutPromise = new Promise(resolve => setTimeout(() => resolve(null), 4000));
         const authPromise = dbService.getCurrentUser();
         
@@ -95,7 +92,6 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
 
     initAuth();
 
-    // Escuta mudanças (Login/Logout)
     const unsubscribe = dbService.onAuthChange((u) => {
       if (mounted) {
         setUser(u);
@@ -123,7 +119,6 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
   }, [user]);
 
   const refreshUser = async () => {
-      // Force refresh ignorando cache
       const currentUser = await dbService.syncSession();
       if (currentUser) setUser(currentUser);
   };
@@ -131,7 +126,6 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
   const login = async (email: string, password?: string) => {
     setLoading(true);
     try {
-        // Wrap login in a timeout to prevent infinite hanging
         const loginPromise = dbService.login(email, password);
         const timeoutPromise = new Promise((_, reject) => 
             setTimeout(() => reject(new Error("Login timed out (10s limit)")), 10000)
@@ -146,7 +140,6 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
         return false;
     } catch (e) {
         console.error("Login exception:", e);
-        // Do not throw, return false so UI can show error message
         return false;
     } finally {
         setLoading(false);
@@ -186,7 +179,7 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
   );
 };
 
-// Layout Component com Sidebar Restaurada
+// Layout Component
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, loading, logout, isSubscriptionValid, trialDaysRemaining, updatePlan } = useAuth();
   const { theme, toggleTheme } = useTheme();
@@ -232,7 +225,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   return (
     <div className="flex min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors">
       
-      {/* SIDEBAR DESKTOP (AZUL ESCURO) - Restaurado */}
+      {/* SIDEBAR DESKTOP */}
       <aside className="hidden md:flex flex-col w-64 bg-slate-900 text-white fixed h-full z-30 shadow-xl">
         <div className="p-6 border-b border-slate-800">
             <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/')}>
@@ -271,7 +264,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         </div>
       </aside>
 
-      {/* MOBILE HEADER (Apenas em telas pequenas) */}
+      {/* MOBILE HEADER */}
       <nav className="md:hidden fixed top-0 w-full z-50 bg-slate-900 text-white shadow-md">
         <div className="flex justify-between h-16 items-center px-4">
             <div className="flex items-center gap-3">
@@ -285,7 +278,6 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             </button>
         </div>
 
-        {/* Mobile Dropdown Menu */}
         {isMobileMenuOpen && (
             <div className="absolute top-16 left-0 w-full bg-slate-900 border-t border-slate-800 shadow-xl animate-in slide-in-from-top-2">
                 <div className="p-4 space-y-2">
@@ -315,7 +307,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       {/* Main Content Area */}
       <main className="flex-1 md:ml-64 pt-20 md:pt-0 min-h-screen transition-all">
         <div className="p-4 md:p-8 max-w-7xl mx-auto">
-            {/* Trial Banner - FOCUSED ON ZÉ DA OBRA ONLY */}
+            {/* Trial Banner - ZÉ DA OBRA ONLY */}
             {user.plan !== PlanType.VITALICIO && user.isTrial && trialDaysRemaining !== null && trialDaysRemaining > 0 && (
                 <div className="mb-6 bg-gradient-to-r from-purple-600 to-indigo-700 text-white px-6 py-4 rounded-2xl shadow-lg flex flex-col md:flex-row items-center justify-between gap-4 animate-in fade-in slide-in-from-top-2">
                     <div className="flex items-center gap-3">
