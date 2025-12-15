@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
-import { useAuth } from '../App';
+import { useAuth } from '../contexts/AuthContext';
 import { dbService } from '../services/db';
 import { Work, Worker, Supplier, Material, Step, Expense, StepStatus, WorkPhoto, WorkFile, FileCategory, ExpenseCategory, PlanType } from '../types';
 import { ZeModal } from '../components/ZeModal';
