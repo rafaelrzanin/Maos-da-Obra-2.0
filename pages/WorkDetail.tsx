@@ -66,6 +66,7 @@ const WorkDetail: React.FC = () => {
     
     // Report Filter
     const [reportTab, setReportTab] = useState<'CRONO'|'MAT'|'FIN'>('CRONO');
+    const [reportMaterialFilterStepId, setReportMaterialFilterStepId] = useState<string>('ALL');
 
     const [materialModal, setMaterialModal] = useState<{ isOpen: boolean, material: Material | null }>({ isOpen: false, material: null });
     const [matName, setMatName] = useState('');
@@ -972,6 +973,22 @@ const WorkDetail: React.FC = () => {
                             ))}
                         </div>
 
+                        {reportTab === 'MAT' && (
+                            <div className="mb-4 no-print">
+                                <select 
+                                    value={reportMaterialFilterStepId} 
+                                    onChange={(e) => setReportMaterialFilterStepId(e.target.value)}
+                                    className="w-full p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 font-bold text-xs text-slate-600 dark:text-slate-300 shadow-sm outline-none focus:border-secondary transition-all"
+                                >
+                                    <option value="ALL">Todos os Materiais (Geral)</option>
+                                    {steps.map((s, i) => (
+                                        <option key={s.id} value={s.id}>{String(i+1).padStart(2, '0')}. {s.name}</option>
+                                    ))}
+                                    <option value="GENERAL">Materiais sem Etapa</option>
+                                </select>
+                            </div>
+                        )}
+
                         <div className="bg-white dark:bg-white dark:text-black rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm print:shadow-none print:border-0 print:rounded-none">
                             
                             {/* Printable Header (Visible only in Print) */}
@@ -1026,6 +1043,9 @@ const WorkDetail: React.FC = () => {
                                     {reportTab === 'MAT' && (
                                         <>
                                             {steps.map((step, idx) => {
+                                                // FILTER LOGIC
+                                                if (reportMaterialFilterStepId !== 'ALL' && reportMaterialFilterStepId !== step.id) return null;
+
                                                 const stepMats = materials.filter(m => m.stepId === step.id);
                                                 if (stepMats.length === 0) return null;
                                                 
@@ -1079,7 +1099,7 @@ const WorkDetail: React.FC = () => {
                                                 );
                                             })}
                                             {/* Materials without Step */}
-                                            {materials.filter(m => !m.stepId).length > 0 && (
+                                            {(reportMaterialFilterStepId === 'ALL' || reportMaterialFilterStepId === 'GENERAL') && materials.filter(m => !m.stepId).length > 0 && (
                                                  <React.Fragment key="general-mats">
                                                     <tr className="bg-slate-100 dark:bg-slate-800 border-y border-slate-200 dark:border-slate-700">
                                                         <td colSpan={2} className="px-6 py-2">
