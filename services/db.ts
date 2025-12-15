@@ -1,3 +1,4 @@
+
 // @ts-nocheck
 import { 
   User, Work, Step, Material, Expense, Worker, Supplier, 
@@ -6,6 +7,20 @@ import {
 } from '../types';
 import { WORK_TEMPLATES, FULL_MATERIAL_PACKAGES } from './standards';
 import { supabase } from './supabase';
+
+// --- CACHE SYSTEM (IN-MEMORY) ---
+const CACHE_TTL = 30000; // 30 segundos de cache para evitar flickering
+const _dashboardCache: {
+    works: { data: Work[], timestamp: number } | null;
+    stats: Record<string, { data: any, timestamp: number }>;
+    summary: Record<string, { data: any, timestamp: number }>;
+    notifications: { data: Notification[], timestamp: number } | null;
+} = {
+    works: null,
+    stats: {},
+    summary: {},
+    notifications: null
+};
 
 // --- HELPERS ---
 
@@ -120,30 +135,22 @@ const parseNotificationFromDB = (data: any): Notification => ({
     type: data.type
 });
 
-// --- CACHE & DEDUPLICATION ---
-// Cache storage
+// --- AUTH CACHE & DEDUPLICATION ---
 let sessionCachePromise: Promise<User | null> | null = null;
 let sessionCacheTimestamp = 0;
-const CACHE_DURATION = 5000;
-
-// Track active profile requests by User ID to prevent race conditions during login
+const AUTH_CACHE_DURATION = 5000;
 const pendingProfileRequests: Record<string, Promise<User | null>> = {};
 
-// Função crítica: Garante que o perfil existe. Se falhar com 403, o app trava.
-// Optimized with Deduplication to prevent double-requests on login
 const ensureUserProfile = async (authUser: any): Promise<User | null> => {
-    // Capture local client to ensure non-null type persists in closures
     const client = supabase;
     if (!authUser || !client) return null;
 
-    // Deduplication: If a request for this user is already in flight, return it.
     if (pendingProfileRequests[authUser.id]) {
         return pendingProfileRequests[authUser.id];
     }
 
     const fetchProfileProcess = async (): Promise<User | null> => {
         try {
-            // 1. Tenta ler o perfil existente
             const { data: existingProfile, error: readError } = await client
                 .from('profiles')
                 .select('*')
@@ -154,8 +161,7 @@ const ensureUserProfile = async (authUser: any): Promise<User | null> => {
                 return mapProfileFromSupabase(existingProfile);
             }
 
-            // Se deu erro de permissão (403), não adianta tentar inserir, vai falhar também.
-            if (readError && readError.code === '42501') { // 42501 = Permission denied
+            if (readError && readError.code === '42501') { 
                  console.error("ERRO CRÍTICO 403: Permissão negada ao ler perfil.");
                  return {
                     id: authUser.id,
@@ -166,7 +172,6 @@ const ensureUserProfile = async (authUser: any): Promise<User | null> => {
                  };
             }
 
-            // 2. Se não existe, cria
             const trialExpires = new Date();
             trialExpires.setDate(trialExpires.getDate() + 7);
 
@@ -214,7 +219,6 @@ const ensureUserProfile = async (authUser: any): Promise<User | null> => {
     const promise = fetchProfileProcess();
     pendingProfileRequests[authUser.id] = promise;
 
-    // Clean up pending request map after completion
     promise.finally(() => {
         delete pendingProfileRequests[authUser.id];
     });
@@ -225,14 +229,12 @@ const ensureUserProfile = async (authUser: any): Promise<User | null> => {
 export const dbService = {
   // --- AUTH ---
   async getCurrentUser() {
-    // Local capture to satisfy TypeScript narrowing when used inside callbacks/async closures
     const client = supabase;
     if (!client) return null;
     
     const now = Date.now();
     
-    // Explicit simple variable usage to avoid TS complexity issues
-    if (sessionCachePromise && (now - sessionCacheTimestamp < CACHE_DURATION)) {
+    if (sessionCachePromise && (now - sessionCacheTimestamp < AUTH_CACHE_DURATION)) {
         return sessionCachePromise;
     }
 
@@ -262,6 +264,11 @@ export const dbService = {
             const user = await ensureUserProfile(session.user);
             callback(user);
         } else {
+            // Limpa cache ao deslogar
+            _dashboardCache.works = null;
+            _dashboardCache.stats = {};
+            _dashboardCache.summary = {};
+            _dashboardCache.notifications = null;
             callback(null);
         }
     });
@@ -274,7 +281,6 @@ export const dbService = {
     if (error) throw error;
     if (data.user) {
         sessionCachePromise = null;
-        // Reuse logic via ensureUserProfile
         return await ensureUserProfile(data.user);
     }
     return null;
@@ -309,7 +315,6 @@ export const dbService = {
     const trialExpires = new Date();
     trialExpires.setDate(trialExpires.getDate() + 7);
 
-    // Tenta inserir direto. O RLS deve permitir 'INSERT' para 'auth.uid() = id'
     const { error: profileError } = await supabase.from('profiles').insert({
         id: authData.user.id,
         name,
@@ -332,6 +337,11 @@ export const dbService = {
   async logout() {
     if (supabase) await supabase.auth.signOut();
     sessionCachePromise = null;
+    // Clear Dashboard Cache
+    _dashboardCache.works = null;
+    _dashboardCache.stats = {};
+    _dashboardCache.summary = {};
+    _dashboardCache.notifications = null;
   },
 
   async getUserProfile(userId: string): Promise<User | null> {
@@ -365,7 +375,6 @@ export const dbService = {
       return !error;
   },
 
-  // --- SUBSCRIPTION ---
   isSubscriptionActive(user: User): boolean {
     if (user.plan === PlanType.VITALICIO) return true;
     if (!user.subscriptionExpiresAt) return false;
@@ -396,10 +405,16 @@ export const dbService = {
       };
   },
 
-  // --- WORKS ---
+  // --- WORKS (WITH CACHING) ---
   async getWorks(userId: string): Promise<Work[]> {
     if (!supabase) return [];
     
+    const now = Date.now();
+    // Return cache immediately if valid
+    if (_dashboardCache.works && (now - _dashboardCache.works.timestamp < CACHE_TTL)) {
+        return _dashboardCache.works.data;
+    }
+
     const { data, error } = await supabase
         .from('works')
         .select('*')
@@ -407,15 +422,24 @@ export const dbService = {
         .order('created_at', { ascending: false });
         
     if (error) {
-        console.error("Erro ao buscar obras (getWorks):", error);
+        console.error("Erro ao buscar obras:", error);
         return [];
     }
     
-    return (data || []).map(parseWorkFromDB);
+    const parsed = (data || []).map(parseWorkFromDB);
+    _dashboardCache.works = { data: parsed, timestamp: now };
+    return parsed;
   },
 
   async getWorkById(workId: string): Promise<Work | null> {
     if (!supabase) return null;
+    
+    // Check cache first
+    if (_dashboardCache.works) {
+        const cached = _dashboardCache.works.data.find(w => w.id === workId);
+        if (cached) return cached;
+    }
+
     const { data, error } = await supabase.from('works').select('*').eq('id', workId).single();
     if (error) {
         console.error("Erro ao buscar obra por ID:", error);
@@ -427,7 +451,6 @@ export const dbService = {
   async createWork(work: Partial<Work>, templateId: string): Promise<Work> {
     if (!supabase) throw new Error("Supabase off");
     
-    // 1. Create Work
     const dbWork = {
         user_id: work.userId,
         name: work.name,
@@ -446,17 +469,19 @@ export const dbService = {
         has_leisure_area: work.hasLeisureArea
     };
 
-    // Insert da Obra - Ponto crítico de RLS
     const { data: savedWork, error } = await supabase.from('works').insert(dbWork).select().single();
     
     if (error) {
         console.error("Erro SQL ao criar obra:", error);
-        throw new Error(`Erro ao criar obra no banco: ${error.message} (${error.code})`);
+        throw new Error(`Erro ao criar obra: ${error.message}`);
     }
     
     const parsedWork = parseWorkFromDB(savedWork);
+    
+    // Invalidate Cache
+    _dashboardCache.works = null;
 
-    // 2. Generate Steps
+    // Generate Steps
     const template = WORK_TEMPLATES.find(t => t.id === templateId);
     if (template) {
         const stepsToInsert = template.includedSteps.map((stepName, idx) => {
@@ -475,39 +500,26 @@ export const dbService = {
             };
         });
         
-        const { error: stepsError } = await supabase.from('steps').insert(stepsToInsert);
-        if (stepsError) console.error("Erro ao gerar etapas:", stepsError);
-
-        // 3. GENERATE MATERIALS - NOW USING STEPS FOR LOGICAL LINKING
+        await supabase.from('steps').insert(stepsToInsert);
         await this.regenerateMaterials(parsedWork.id, parsedWork.area, templateId);
     }
 
     return parsedWork;
   },
 
-  // --- ROBUST MATERIAL GENERATION (LOGICALLY LINKED TO STEPS) ---
   async regenerateMaterials(workId: string, area: number, templateId: string = 'CONSTRUCAO') {
-      if (!supabase) return;
-      if (!workId) return;
+      if (!supabase || !workId) return;
       
       const safeArea = area && area > 0 ? area : 100;
       let materialsToInsert: any[] = [];
 
-      // 1. Fetch created steps for this work to map Names -> IDs
       const { data: dbSteps } = await supabase.from('steps').select('*').eq('work_id', workId);
       
-      if (!dbSteps || dbSteps.length === 0) {
-          console.warn("No steps found, skipping material generation linked to steps.");
-          return;
-      }
+      if (!dbSteps || dbSteps.length === 0) return;
 
-      // 2. Iterate through each step created in the schedule
       dbSteps.forEach((step: any) => {
-          // Find if there is a material package with the exact same name as the step
           const packageForStep = FULL_MATERIAL_PACKAGES.find(p => p.category === step.name);
-          
           if (packageForStep) {
-              // Create material items linked to this specific step_id
               packageForStep.items.forEach(item => {
                   const qty = Math.ceil(safeArea * (item.multiplier || 1));
                   materialsToInsert.push({
@@ -517,24 +529,24 @@ export const dbService = {
                       planned_qty: qty,
                       purchased_qty: 0,
                       unit: item.unit,
-                      step_id: step.id, // CRITICAL: Link directly to the schedule step ID
-                      category: step.name // Use step name as category
+                      step_id: step.id,
+                      category: step.name
                   });
               });
           }
       });
 
       if (materialsToInsert.length > 0) {
-          const { error } = await supabase.from('materials').insert(materialsToInsert);
-          if (error) {
-              console.error("FATAL: Failed to insert materials.", error);
-          }
+          await supabase.from('materials').insert(materialsToInsert);
       }
   },
 
   async deleteWork(workId: string) {
       if(!supabase) return;
       await supabase.from('works').delete().eq('id', workId);
+      _dashboardCache.works = null;
+      delete _dashboardCache.stats[workId];
+      delete _dashboardCache.summary[workId];
   },
 
   // --- STEPS ---
@@ -553,6 +565,9 @@ export const dbService = {
           end_date: step.endDate,
           status: step.status
       });
+      // Invalidate related caches
+      delete _dashboardCache.stats[step.workId];
+      delete _dashboardCache.summary[step.workId];
   },
 
   async updateStep(step: Step) {
@@ -563,6 +578,8 @@ export const dbService = {
           end_date: step.endDate,
           status: step.status
       }).eq('id', step.id);
+      delete _dashboardCache.stats[step.workId];
+      delete _dashboardCache.summary[step.workId];
   },
 
   // --- MATERIALS ---
@@ -589,6 +606,9 @@ export const dbService = {
 
       if (purchaseInfo && savedMat) {
           await this.registerMaterialPurchase(savedMat.id, mat.name, mat.brand||'', mat.plannedQty, mat.unit, purchaseInfo.qty, purchaseInfo.cost);
+      } else {
+          // If no purchase, still need to invalidate summary because of pending items count
+          delete _dashboardCache.summary[mat.workId];
       }
       return { data: savedMat };
   },
@@ -602,12 +622,12 @@ export const dbService = {
           unit: mat.unit,
           category: mat.category
       }).eq('id', mat.id);
+      delete _dashboardCache.summary[mat.workId];
   },
 
   async registerMaterialPurchase(materialId: string, name: string, _brand: string, _planned: number, _unit: string, qty: number, cost: number) {
       if (!supabase) return;
       
-      // FIX: Fetch step_id from the material record to link the expense
       const { data: mat } = await supabase.from('materials').select('purchased_qty, work_id, step_id').eq('id', materialId).single();
       
       if (mat) {
@@ -622,8 +642,11 @@ export const dbService = {
               date: new Date().toISOString(),
               category: ExpenseCategory.MATERIAL,
               related_material_id: materialId,
-              step_id: mat.step_id // Ensures the expense is linked to the construction step
+              step_id: mat.step_id
           });
+          
+          delete _dashboardCache.stats[mat.work_id];
+          delete _dashboardCache.summary[mat.work_id];
       }
   },
 
@@ -645,6 +668,7 @@ export const dbService = {
           step_id: exp.stepId,
           total_agreed: exp.totalAgreed
       });
+      delete _dashboardCache.stats[exp.workId];
   },
 
   async updateExpense(exp: Expense) {
@@ -657,73 +681,49 @@ export const dbService = {
           step_id: exp.stepId,
           total_agreed: exp.totalAgreed
       }).eq('id', exp.id);
+      delete _dashboardCache.stats[exp.workId];
   },
 
   async deleteExpense(id: string) {
       if (!supabase) return;
+      // Need to find work_id first to invalidate cache correctly (or just wipe strict if complex)
+      // For speed, let's assume we refresh on load. But cleaning specific cache is better.
+      const { data } = await supabase.from('expenses').select('work_id').eq('id', id).single();
       await supabase.from('expenses').delete().eq('id', id);
+      if (data) delete _dashboardCache.stats[data.work_id];
   },
 
-  // --- TEAM & SUPPLIERS ---
+  // --- WORKERS/SUPPLIERS (Standard CRUD, no heavy caching needed) ---
   async getWorkers(userId: string): Promise<Worker[]> {
       if (!supabase) return [];
       const { data } = await supabase.from('workers').select('*').eq('user_id', userId);
       return (data || []).map(parseWorkerFromDB);
   },
-
   async addWorker(worker: Partial<Worker>) {
       if (!supabase) return;
-      await supabase.from('workers').insert({
-          user_id: worker.userId,
-          name: worker.name,
-          role: worker.role,
-          phone: worker.phone,
-          notes: worker.notes
-      });
+      await supabase.from('workers').insert({ user_id: worker.userId, name: worker.name, role: worker.role, phone: worker.phone, notes: worker.notes });
   },
-
   async updateWorker(worker: Partial<Worker>) {
       if (!supabase) return;
-      await supabase.from('workers').update({
-          name: worker.name,
-          role: worker.role,
-          phone: worker.phone,
-          notes: worker.notes
-      }).eq('id', worker.id);
+      await supabase.from('workers').update({ name: worker.name, role: worker.role, phone: worker.phone, notes: worker.notes }).eq('id', worker.id);
   },
-
   async deleteWorker(id: string) {
       if (!supabase) return;
       await supabase.from('workers').delete().eq('id', id);
   },
-
   async getSuppliers(userId: string): Promise<Supplier[]> {
       if (!supabase) return [];
       const { data } = await supabase.from('suppliers').select('*').eq('user_id', userId);
       return (data || []).map(parseSupplierFromDB);
   },
-
   async addSupplier(supplier: Partial<Supplier>) {
       if (!supabase) return;
-      await supabase.from('suppliers').insert({
-          user_id: supplier.userId,
-          name: supplier.name,
-          category: supplier.category,
-          phone: supplier.phone,
-          notes: supplier.notes
-      });
+      await supabase.from('suppliers').insert({ user_id: supplier.userId, name: supplier.name, category: supplier.category, phone: supplier.phone, notes: supplier.notes });
   },
-
   async updateSupplier(supplier: Partial<Supplier>) {
       if (!supabase) return;
-      await supabase.from('suppliers').update({
-          name: supplier.name,
-          category: supplier.category,
-          phone: supplier.phone,
-          notes: supplier.notes
-      }).eq('id', supplier.id);
+      await supabase.from('suppliers').update({ name: supplier.name, category: supplier.category, phone: supplier.phone, notes: supplier.notes }).eq('id', supplier.id);
   },
-
   async deleteSupplier(id: string) {
       if (!supabase) return;
       await supabase.from('suppliers').delete().eq('id', id);
@@ -735,56 +735,56 @@ export const dbService = {
       const { data } = await supabase.from('work_photos').select('*').eq('work_id', workId).order('date', {ascending: false});
       return (data || []).map(parsePhotoFromDB);
   },
-
   async addPhoto(photo: WorkPhoto) {
       if (!supabase) return;
-      await supabase.from('work_photos').insert({
-          work_id: photo.workId,
-          url: photo.url,
-          description: photo.description,
-          date: photo.date,
-          type: photo.type
-      });
+      await supabase.from('work_photos').insert({ work_id: photo.workId, url: photo.url, description: photo.description, date: photo.date, type: photo.type });
   },
-
   async getFiles(workId: string): Promise<WorkFile[]> {
       if (!supabase) return [];
       const { data } = await supabase.from('work_files').select('*').eq('work_id', workId);
       return (data || []).map(parseFileFromDB);
   },
-
   async addFile(file: WorkFile) {
       if (!supabase) return;
-      await supabase.from('work_files').insert({
-          work_id: file.workId,
-          name: file.name,
-          category: file.category,
-          url: file.url,
-          type: file.type,
-          date: file.date
-      });
+      await supabase.from('work_files').insert({ work_id: file.workId, name: file.name, category: file.category, url: file.url, type: file.type, date: file.date });
   },
 
-  // --- NOTIFICATIONS & DASHBOARD ---
+  // --- NOTIFICATIONS (WITH CACHE) ---
   async getNotifications(userId: string): Promise<Notification[]> {
       if (!supabase) return [];
+      
+      const now = Date.now();
+      if (_dashboardCache.notifications && (now - _dashboardCache.notifications.timestamp < CACHE_TTL)) {
+          return _dashboardCache.notifications.data;
+      }
+
       const { data } = await supabase.from('notifications').select('*').eq('user_id', userId).eq('read', false);
-      return (data || []).map(parseNotificationFromDB);
+      const parsed = (data || []).map(parseNotificationFromDB);
+      _dashboardCache.notifications = { data: parsed, timestamp: now };
+      return parsed;
   },
 
   async dismissNotification(id: string) {
       if (!supabase) return;
       await supabase.from('notifications').update({ read: true }).eq('id', id);
+      _dashboardCache.notifications = null;
   },
 
   async clearAllNotifications(userId: string) {
       if (!supabase) return;
       await supabase.from('notifications').update({ read: true }).eq('user_id', userId);
+      _dashboardCache.notifications = null;
   },
 
+  // --- DASHBOARD STATS (WITH CACHE) ---
   async calculateWorkStats(workId: string) {
       if (!supabase) return { totalSpent: 0, progress: 0, delayedSteps: 0 };
       
+      const now = Date.now();
+      if (_dashboardCache.stats[workId] && (now - _dashboardCache.stats[workId].timestamp < CACHE_TTL)) {
+          return _dashboardCache.stats[workId].data;
+      }
+
       const { data: expenses } = await supabase.from('expenses').select('amount').eq('work_id', workId);
       const totalSpent = (expenses || []).reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
 
@@ -796,12 +796,19 @@ export const dbService = {
       const today = new Date().toISOString().split('T')[0];
       const delayedSteps = steps?.filter((s: any) => s.end_date < today && s.status !== StepStatus.COMPLETED).length || 0;
 
-      return { totalSpent, progress, delayedSteps };
+      const result = { totalSpent, progress, delayedSteps };
+      _dashboardCache.stats[workId] = { data: result, timestamp: now };
+      return result;
   },
 
   async getDailySummary(workId: string) {
       if (!supabase) return { completedSteps: 0, delayedSteps: 0, pendingMaterials: 0, totalSteps: 0 };
       
+      const now = Date.now();
+      if (_dashboardCache.summary[workId] && (now - _dashboardCache.summary[workId].timestamp < CACHE_TTL)) {
+          return _dashboardCache.summary[workId].data;
+      }
+
       const { data: steps } = await supabase.from('steps').select('*').eq('work_id', workId);
       const { data: materials } = await supabase.from('materials').select('*').eq('work_id', workId);
 
@@ -813,7 +820,9 @@ export const dbService = {
 
       const pendingMaterials = materials?.filter((m: any) => (m.purchased_qty || 0) < (m.planned_qty || 0)).length || 0;
 
-      return { completedSteps, delayedSteps, pendingMaterials, totalSteps };
+      const result = { completedSteps, delayedSteps, pendingMaterials, totalSteps };
+      _dashboardCache.summary[workId] = { data: result, timestamp: now };
+      return result;
   },
 
   async generateSmartNotifications(userId: string, workId: string) {
@@ -839,8 +848,9 @@ export const dbService = {
                   date: new Date().toISOString(),
                   read: false
               });
+              // Invalidate notification cache
+              _dashboardCache.notifications = null;
           }
       }
   }
 };
-
