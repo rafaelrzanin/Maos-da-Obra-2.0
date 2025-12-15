@@ -79,7 +79,8 @@ const WorkDetail: React.FC = () => {
     // EXPENSE MODAL STATE (UNIFIED ADD/EDIT)
     const [expenseModal, setExpenseModal] = useState<{ isOpen: boolean, mode: 'ADD'|'EDIT', id?: string }>({ isOpen: false, mode: 'ADD' });
     const [expDesc, setExpDesc] = useState('');
-    const [expAmount, setExpAmount] = useState(''); // Stores "Paying Now" amount
+    const [expAmount, setExpAmount] = useState(''); // "Paying Now"
+    const [expCurrentPaid, setExpCurrentPaid] = useState(0); // "Already Paid"
     const [expTotalAgreed, setExpTotalAgreed] = useState('');
     const [expCategory, setExpCategory] = useState<string>(ExpenseCategory.LABOR);
     const [expStepId, setExpStepId] = useState('');
@@ -240,6 +241,7 @@ const WorkDetail: React.FC = () => {
         setExpenseModal({ isOpen: true, mode: 'ADD' });
         setExpDesc('');
         setExpAmount(''); // Start empty for "Paying Now"
+        setExpCurrentPaid(0); // Start with 0 paid
         setExpTotalAgreed('');
         setExpCategory(ExpenseCategory.LABOR);
         setExpStepId('');
@@ -249,7 +251,8 @@ const WorkDetail: React.FC = () => {
     const openEditExpense = (expense: Expense) => {
         setExpenseModal({ isOpen: true, mode: 'EDIT', id: expense.id });
         setExpDesc(expense.description);
-        setExpAmount(String(expense.amount)); // Store DB Amount as "Already Paid"
+        setExpCurrentPaid(expense.amount); // Store DB Amount as "Already Paid"
+        setExpAmount(''); // "Paying Now" input starts empty
         setExpTotalAgreed(expense.totalAgreed ? String(expense.totalAgreed) : '');
         setExpCategory(expense.category);
         setExpStepId(expense.stepId || '');
@@ -263,12 +266,21 @@ const WorkDetail: React.FC = () => {
         const finalStepId = expStepId || undefined;
         const finalTotalAgreed = expTotalAgreed ? Number(expTotalAgreed) : undefined;
         
+        // CUMULATIVE LOGIC:
+        let finalAmount = 0;
+        if (expenseModal.mode === 'ADD') {
+            finalAmount = Number(expAmount);
+        } else {
+            // EDIT: Old Total + New Payment
+            finalAmount = expCurrentPaid + (Number(expAmount) || 0);
+        }
+
         if (expenseModal.mode === 'ADD') {
             await dbService.addExpense({
                 id: Math.random().toString(36).substr(2, 9),
                 workId: work.id,
                 description: expDesc,
-                amount: Number(expAmount),
+                amount: finalAmount,
                 date: new Date(expDate).toISOString(),
                 category: expCategory,
                 stepId: finalStepId,
@@ -280,7 +292,7 @@ const WorkDetail: React.FC = () => {
                 await dbService.updateExpense({
                     ...existing,
                     description: expDesc,
-                    amount: Number(expAmount),
+                    amount: finalAmount,
                     date: new Date(expDate).toISOString(),
                     category: expCategory,
                     stepId: finalStepId,
@@ -802,14 +814,7 @@ const WorkDetail: React.FC = () => {
                                 </div>
                                 <div className="flex gap-2">
                                     {w.phone && (
-                                        <a 
-                                            href={`https://wa.me/55${w.phone.replace(/\D/g, '')}`} 
-                                            target="_blank" 
-                                            rel="noopener noreferrer"
-                                            className="w-10 h-10 rounded-xl bg-green-100 text-green-600 hover:bg-green-200 transition-colors flex items-center justify-center"
-                                        >
-                                            <i className="fa-brands fa-whatsapp text-lg"></i>
-                                        </a>
+                                        <a href={`https://wa.me/55${w.phone.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-xl bg-green-100 text-green-600 hover:bg-green-200 transition-colors flex items-center justify-center"><i className="fa-brands fa-whatsapp text-lg"></i></a>
                                     )}
                                     <button onClick={() => handleDeletePerson(w.id, 'WORKER')} className="w-10 h-10 rounded-xl text-red-500 hover:bg-red-50 transition-colors"><i className="fa-solid fa-trash"></i></button>
                                 </div>
@@ -837,14 +842,7 @@ const WorkDetail: React.FC = () => {
                                 </div>
                                 <div className="flex gap-2">
                                     {s.phone && (
-                                        <a 
-                                            href={`https://wa.me/55${s.phone.replace(/\D/g, '')}`} 
-                                            target="_blank" 
-                                            rel="noopener noreferrer"
-                                            className="w-10 h-10 rounded-xl bg-green-100 text-green-600 hover:bg-green-200 transition-colors flex items-center justify-center"
-                                        >
-                                            <i className="fa-brands fa-whatsapp text-lg"></i>
-                                        </a>
+                                        <a href={`https://wa.me/55${s.phone.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-xl bg-green-100 text-green-600 hover:bg-green-200 transition-colors flex items-center justify-center"><i className="fa-brands fa-whatsapp text-lg"></i></a>
                                     )}
                                     <button onClick={() => handleDeletePerson(s.id, 'SUPPLIER')} className="w-10 h-10 rounded-xl text-red-500 hover:bg-red-50 transition-colors"><i className="fa-solid fa-trash"></i></button>
                                 </div>
@@ -1292,21 +1290,31 @@ const WorkDetail: React.FC = () => {
                         <form onSubmit={handleSaveExpense} className="space-y-4">
                             <input placeholder="Descrição (ex: Pagamento Pedreiro)" value={expDesc} onChange={e => setExpDesc(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required />
                             
-                            <div className="grid grid-cols-2 gap-2">
-                                <div className="relative">
-                                    <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Valor Pago Agora</label>
-                                    <div className="relative">
-                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">R$</span>
-                                        <input type="number" placeholder="0.00" value={expAmount} onChange={e => setExpAmount(e.target.value)} className="w-full pl-10 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required />
-                                    </div>
-                                </div>
-                                <div className="relative">
-                                    <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Total Combinado</label>
-                                    <div className="relative">
-                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">R$</span>
-                                        <input type="number" placeholder="(Opcional)" value={expTotalAgreed} onChange={e => setExpTotalAgreed(e.target.value)} className="w-full pl-10 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" />
-                                    </div>
-                                </div>
+                            {/* TOTAL COMBINADO */}
+                            <div className="relative">
+                                <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Total Combinado (R$)</label>
+                                <input type="number" placeholder="Opcional" value={expTotalAgreed} onChange={e => setExpTotalAgreed(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" />
+                            </div>
+
+                            {/* TOTAL JÁ PAGO (READ-ONLY) */}
+                            <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-xl border border-green-200 dark:border-green-900 flex justify-between items-center">
+                                <span className="text-sm font-bold text-green-700 dark:text-green-400">Total Já Pago:</span>
+                                <span className="font-mono font-black text-lg text-green-700 dark:text-green-400">
+                                    R$ {expCurrentPaid.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                </span>
+                            </div>
+
+                            {/* VALOR PAGO AGORA */}
+                            <div className="relative">
+                                <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Valor Pago Agora (+)</label>
+                                <input 
+                                    type="number" 
+                                    placeholder="0.00" 
+                                    value={expAmount} 
+                                    onChange={e => setExpAmount(e.target.value)} 
+                                    className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-secondary dark:border-secondary border-2 font-bold text-primary dark:text-white" 
+                                />
+                                <p className="text-[10px] text-slate-400 mt-1 ml-1">*Este valor será somado ao total já pago.</p>
                             </div>
 
                             <div className="grid grid-cols-2 gap-2">
@@ -1325,7 +1333,6 @@ const WorkDetail: React.FC = () => {
                                 </div>
                             </div>
                             
-                            {/* STEP SELECTION - ENSURING VISIBILITY */}
                             <div>
                                 <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Etapa Relacionada</label>
                                 <select value={expStepId} onChange={e => setExpStepId(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold text-sm">
