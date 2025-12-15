@@ -540,9 +540,9 @@ export const STANDARD_CHECKLISTS = [
 
 export const LIFETIME_BONUSES = [
   {
-    icon: 'fa-user-group',
-    title: 'Comunidade VIP no WhatsApp',
-    desc: 'Troque experiências com mestres de obra e engenheiros experientes.'
+    icon: 'fa-calculator',
+    title: 'Calculadoras Avançadas',
+    desc: 'Ferramentas exclusivas para cálculo de concreto, telhado e elétrica.'
   },
   {
     icon: 'fa-file-contract',
@@ -550,14 +550,9 @@ export const LIFETIME_BONUSES = [
     desc: 'Modelos prontos para evitar dores de cabeça com pedreiros e fornecedores.'
   },
   {
-    icon: 'fa-calculator',
-    title: 'Calculadoras Avançadas',
-    desc: 'Ferramentas exclusivas para cálculo de concreto, telhado e elétrica.'
-  },
-  {
-    icon: 'fa-robot',
-    title: 'Zé da Obra Ilimitado',
-    desc: 'Acesso prioritário e sem limites ao nosso engenheiro virtual via IA.'
+    icon: 'fa-list-check',
+    title: 'Checklists de Qualidade',
+    desc: 'Listas de verificação passo-a-passo para não deixar passar nada.'
   }
 ];
 
