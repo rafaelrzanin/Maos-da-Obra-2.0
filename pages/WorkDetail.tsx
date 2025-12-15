@@ -27,7 +27,7 @@ const parseDateNoTimezone = (dateStr: string) => {
 const WorkDetail: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
-    const { user } = useAuth();
+    const { user, trialDaysRemaining } = useAuth();
     
     // --- CORE DATA STATE ---
     const [work, setWork] = useState<Work | null>(null);
@@ -45,8 +45,14 @@ const WorkDetail: React.FC = () => {
     const [subView, setSubView] = useState<SubView>('NONE');
     const [uploading, setUploading] = useState(false);
     
-    // --- PREMIUM CHECK ---
-    const isPremium = user?.plan === PlanType.VITALICIO;
+    // --- AI ACCESS LOGIC ---
+    // AI is available if: Plan is VITALICIO OR (Trial is Active AND days remaining > 0)
+    const isVitalicio = user?.plan === PlanType.VITALICIO;
+    const isAiTrialActive = user?.isTrial && trialDaysRemaining !== null && trialDaysRemaining > 0;
+    const hasAiAccess = isVitalicio || isAiTrialActive;
+
+    // Fix: Define isPremium (used for restricting tools like Calculators/Contracts)
+    const isPremium = isVitalicio;
 
     // --- MODALS STATE ---
     const [stepModalMode, setStepModalMode] = useState<'ADD' | 'EDIT'>('ADD');
@@ -717,7 +723,6 @@ const WorkDetail: React.FC = () => {
         }
 
         if (activeTab === 'MORE') {
-            // ... (Same content for MORE tab)
             return (
                 <div className="space-y-8 animate-in fade-in">
                     <div className="px-2">
@@ -770,10 +775,15 @@ const WorkDetail: React.FC = () => {
 
                                 <div onClick={() => setSubView('BONUS_IA')} className="bg-white/10 hover:bg-white/15 p-4 rounded-2xl border border-white/10 mb-4 cursor-pointer flex items-center gap-4 transition-all backdrop-blur-sm group">
                                     <div className="relative">
-                                        <img src={ZE_AVATAR} className={`w-14 h-14 rounded-full border-2 border-secondary bg-slate-800 object-cover ${!isPremium ? 'grayscale opacity-70' : ''}`} onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK}/>
-                                        <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 border-2 border-slate-800 rounded-full"></div>
+                                        <img src={ZE_AVATAR} className={`w-14 h-14 rounded-full border-2 border-secondary bg-slate-800 object-cover ${!hasAiAccess ? 'grayscale opacity-70' : ''}`} onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK}/>
+                                        <div className={`absolute -bottom-1 -right-1 w-4 h-4 border-2 border-slate-800 rounded-full ${hasAiAccess ? 'bg-green-500' : 'bg-slate-500'}`}></div>
                                     </div>
-                                    <div><h4 className="font-bold text-white text-base group-hover:text-secondary transition-colors">Zé da Obra AI</h4><p className="text-xs text-slate-300">Tire dúvidas técnicas 24h</p></div>
+                                    <div>
+                                        <h4 className={`font-bold text-base transition-colors ${hasAiAccess ? 'text-white group-hover:text-secondary' : 'text-slate-400'}`}>
+                                            Zé da Obra AI
+                                        </h4>
+                                        <p className="text-xs text-slate-300">{hasAiAccess ? 'Tire dúvidas técnicas 24h' : (isAiTrialActive ? 'Trial Ativo (7 dias)' : 'Bloqueado (Vitalício)')}</p>
+                                    </div>
                                     <div className="ml-auto w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-white/50 group-hover:bg-secondary group-hover:text-white transition-all"><i className="fa-solid fa-chevron-right"></i></div>
                                 </div>
 
@@ -814,7 +824,16 @@ const WorkDetail: React.FC = () => {
                                     <div><h4 className="font-bold text-primary dark:text-white">{w.name}</h4><p className="text-xs text-slate-500 font-bold">{w.role}</p></div>
                                 </div>
                                 <div className="flex gap-2">
-                                    {w.phone && (<a href={`https://wa.me/55${w.phone.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-xl bg-green-100 text-green-600 hover:bg-green-200 transition-colors flex items-center justify-center"><i className="fa-brands fa-whatsapp text-lg"></i></a>)}
+                                    {w.phone && (
+                                        <a 
+                                            href={`https://wa.me/55${w.phone.replace(/\D/g, '')}`} 
+                                            target="_blank" 
+                                            rel="noopener noreferrer"
+                                            className="w-10 h-10 rounded-xl bg-green-100 text-green-600 hover:bg-green-200 transition-colors flex items-center justify-center"
+                                        >
+                                            <i className="fa-brands fa-whatsapp text-lg"></i>
+                                        </a>
+                                    )}
                                     <button onClick={() => handleDeletePerson(w.id, 'WORKER')} className="w-10 h-10 rounded-xl text-red-500 hover:bg-red-50 transition-colors"><i className="fa-solid fa-trash"></i></button>
                                 </div>
                             </div>
@@ -840,7 +859,16 @@ const WorkDetail: React.FC = () => {
                                     <div><h4 className="font-bold text-primary dark:text-white">{s.name}</h4><p className="text-xs text-slate-500 font-bold">{s.category}</p></div>
                                 </div>
                                 <div className="flex gap-2">
-                                    {s.phone && (<a href={`https://wa.me/55${s.phone.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-xl bg-green-100 text-green-600 hover:bg-green-200 transition-colors flex items-center justify-center"><i className="fa-brands fa-whatsapp text-lg"></i></a>)}
+                                    {s.phone && (
+                                        <a 
+                                            href={`https://wa.me/55${s.phone.replace(/\D/g, '')}`} 
+                                            target="_blank" 
+                                            rel="noopener noreferrer"
+                                            className="w-10 h-10 rounded-xl bg-green-100 text-green-600 hover:bg-green-200 transition-colors flex items-center justify-center"
+                                        >
+                                            <i className="fa-brands fa-whatsapp text-lg"></i>
+                                        </a>
+                                    )}
                                     <button onClick={() => handleDeletePerson(s.id, 'SUPPLIER')} className="w-10 h-10 rounded-xl text-red-500 hover:bg-red-50 transition-colors"><i className="fa-solid fa-trash"></i></button>
                                 </div>
                             </div>
@@ -1120,10 +1148,10 @@ const WorkDetail: React.FC = () => {
                             <h2 className="text-3xl font-black text-white mb-2 tracking-tight">Zé da Obra <span className="text-secondary">AI</span></h2>
                             <div className="h-1 w-12 bg-secondary rounded-full mb-6"></div>
                             <p className="text-slate-400 text-sm mb-8 leading-relaxed font-medium">Seu engenheiro virtual particular.</p>
-                            {isPremium ? (
+                            {hasAiAccess ? (
                                 <button onClick={() => setSubView('BONUS_IA_CHAT')} className="w-full py-4 bg-gradient-gold text-white font-black rounded-2xl shadow-lg hover:shadow-orange-500/20 hover:scale-105 transition-all flex items-center justify-center gap-3 group-hover:animate-pulse"><span>INICIAR CONVERSA</span><i className="fa-solid fa-comments"></i></button>
                             ) : (
-                                <button onClick={() => navigate('/settings')} className="w-full py-4 bg-slate-800 text-slate-500 font-bold rounded-2xl border border-slate-700 flex items-center justify-center gap-2 hover:bg-slate-700 transition-colors"><i className="fa-solid fa-lock"></i> BLOQUEADO (PREMIUM)</button>
+                                <button onClick={() => navigate('/checkout?plan=VITALICIO')} className="w-full py-4 bg-slate-800 text-slate-500 font-bold rounded-2xl border border-slate-700 flex items-center justify-center gap-2 hover:bg-slate-700 transition-colors"><i className="fa-solid fa-lock"></i> BLOQUEADO (ASSINAR)</button>
                             )}
                         </div>
                     </div>
@@ -1131,7 +1159,7 @@ const WorkDetail: React.FC = () => {
             );
 
             case 'BONUS_IA_CHAT': 
-                if (!isPremium) return null;
+                if (!hasAiAccess) return null;
                 return (
                 <div className="flex flex-col h-[80vh]">
                     <div className="flex-1 bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-inner overflow-y-auto mb-4 border border-slate-200 dark:border-slate-800">
