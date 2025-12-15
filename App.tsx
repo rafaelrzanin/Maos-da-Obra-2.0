@@ -8,13 +8,13 @@ import { dbService } from './services/db';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 
-// --- Lazy Loading com Type Casting para evitar erro de Build (TS2322) ---
-const CreateWork = lazy(() => import('./pages/CreateWork') as Promise<{ default: React.ComponentType<any> }>);
-const WorkDetail = lazy(() => import('./pages/WorkDetail') as Promise<{ default: React.ComponentType<any> }>);
-const Settings = lazy(() => import('./pages/Settings') as Promise<{ default: React.ComponentType<any> }>);
-const Profile = lazy(() => import('./pages/Profile') as Promise<{ default: React.ComponentType<any> }>);
-const VideoTutorials = lazy(() => import('./pages/VideoTutorials') as Promise<{ default: React.ComponentType<any> }>);
-const Checkout = lazy(() => import('./pages/Checkout') as Promise<{ default: React.ComponentType<any> }>);
+// --- Lazy Loading com Type Casting "unknown" para evitar erro de Build (TS2352) ---
+const CreateWork = lazy(() => import('./pages/CreateWork') as unknown as Promise<{ default: React.ComponentType<any> }>);
+const WorkDetail = lazy(() => import('./pages/WorkDetail') as unknown as Promise<{ default: React.ComponentType<any> }>);
+const Settings = lazy(() => import('./pages/Settings') as unknown as Promise<{ default: React.ComponentType<any> }>);
+const Profile = lazy(() => import('./pages/Profile') as unknown as Promise<{ default: React.ComponentType<any> }>);
+const VideoTutorials = lazy(() => import('./pages/VideoTutorials') as unknown as Promise<{ default: React.ComponentType<any> }>);
+const Checkout = lazy(() => import('./pages/Checkout') as unknown as Promise<{ default: React.ComponentType<any> }>);
 
 // --- Componente de Carregamento ---
 const LoadingScreen = () => (
