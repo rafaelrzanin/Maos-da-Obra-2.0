@@ -52,7 +52,7 @@ const formatDateDisplay = (dateStr: string) => {
 };
 
 const Dashboard: React.FC = () => {
-  const { user, trialDaysRemaining } = useAuth();
+  const { user, trialDaysRemaining, loading: authLoading } = useAuth(); // Import authLoading
   const navigate = useNavigate();
   
   // Data State
@@ -77,19 +77,24 @@ const Dashboard: React.FC = () => {
 
   // 1. Initial Load: Busca lista de obras
   useEffect(() => {
+    // CRITICAL FIX: Do not attempt to load works if Auth is still determining session.
+    // This prevents the dashboard from thinking "User is null" -> "Show Empty State" prematurely.
+    if (authLoading) return;
+
     let isMounted = true;
     
-    // SAFETY: Force stop loading after 8 seconds no matter what
+    // SAFETY: Force stop loading after 4 seconds (reduced from 8s)
     const safetyTimeout = setTimeout(() => {
         if (isMounted && isLoadingWorks) {
             console.warn("Dashboard load timed out. Forcing UI.");
             setIsLoadingWorks(false);
         }
-    }, 8000);
+    }, 4000);
 
     const fetchWorks = async () => {
+        // If auth finished and we still have no user, stop loading (display empty/login state)
         if (!user) {
-            setIsLoadingWorks(false);
+            if (isMounted) setIsLoadingWorks(false);
             return;
         }
         
@@ -125,7 +130,7 @@ const Dashboard: React.FC = () => {
         isMounted = false; 
         clearTimeout(safetyTimeout);
     };
-  }, [user]);
+  }, [user, authLoading]); // Added authLoading dependency
 
   // 2. Details Load: Busca os dados pesados
   useEffect(() => {
@@ -178,7 +183,7 @@ const Dashboard: React.FC = () => {
       }
       
       return () => { isMounted = false; };
-  }, [focusWork?.id, user]); // Removed 'works' to avoid loops
+  }, [focusWork?.id, user]);
 
   useEffect(() => {
     if (user?.isTrial && trialDaysRemaining !== null && trialDaysRemaining <= 1) {
@@ -247,7 +252,7 @@ const Dashboard: React.FC = () => {
 
   // --- RENDERIZADORES ---
 
-  if (isLoadingWorks) return <DashboardSkeleton />;
+  if (authLoading || isLoadingWorks) return <DashboardSkeleton />;
 
   if (works.length === 0) {
       return (
