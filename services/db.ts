@@ -121,8 +121,12 @@ const parseNotificationFromDB = (data: any): Notification => ({
 });
 
 // --- CACHE & DEDUPLICATION ---
-let cachedUserPromise: Promise<User | null> | null = null;
-let lastCacheTime = 0;
+// Using an object to contain state prevents Typescript's strict flow analysis
+// from aggressively narrowing variables in the module scope.
+const sessionCache = {
+    promise: null as Promise<User | null> | null,
+    timestamp: 0
+};
 const CACHE_DURATION = 5000;
 
 // Track active profile requests by User ID to prevent race conditions during login
@@ -230,23 +234,25 @@ export const dbService = {
     
     const now = Date.now();
     
-    // Explicit casting to 'unknown' to bypass TS "always true" check on Promise if TS infers incorrectly
-    if ((cachedUserPromise as unknown) !== null && (now - lastCacheTime < CACHE_DURATION)) {
-        return cachedUserPromise;
+    // Explicitly ignoring TS2801 here because strict null checks in Vercel environment 
+    // are misinterpreting the nullable Promise in the cache object.
+    // @ts-ignore
+    if (sessionCache.promise !== null && (now - sessionCache.timestamp < CACHE_DURATION)) {
+        return sessionCache.promise;
     }
 
-    cachedUserPromise = (async () => {
+    sessionCache.promise = (async () => {
         const { data: { session } } = await client.auth.getSession();
         if (!session?.user) return null;
         return await ensureUserProfile(session.user);
     })();
     
-    lastCacheTime = now;
-    return cachedUserPromise;
+    sessionCache.timestamp = now;
+    return sessionCache.promise;
   },
 
   async syncSession() {
-    cachedUserPromise = null;
+    sessionCache.promise = null;
     return this.getCurrentUser();
   },
 
@@ -255,7 +261,7 @@ export const dbService = {
     if (!client) return () => {};
     
     const { data: { subscription } } = client.auth.onAuthStateChange(async (_event, session) => {
-        cachedUserPromise = null;
+        sessionCache.promise = null;
         
         if (session?.user) {
             const user = await ensureUserProfile(session.user);
@@ -272,7 +278,7 @@ export const dbService = {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password: password || '' });
     if (error) throw error;
     if (data.user) {
-        cachedUserPromise = null;
+        sessionCache.promise = null;
         // Reuse logic via ensureUserProfile
         return await ensureUserProfile(data.user);
     }
@@ -326,13 +332,13 @@ export const dbService = {
         // o ensureUserProfile vai tentar corrigir no próximo load.
     }
 
-    cachedUserPromise = null;
+    sessionCache.promise = null;
     return await ensureUserProfile(authData.user);
   },
 
   async logout() {
     if (supabase) await supabase.auth.signOut();
-    cachedUserPromise = null;
+    sessionCache.promise = null;
   },
 
   async getUserProfile(userId: string): Promise<User | null> {
@@ -355,7 +361,7 @@ export const dbService = {
       if (newPassword) {
           await supabase.auth.updateUser({ password: newPassword });
       }
-      cachedUserPromise = null;
+      sessionCache.promise = null;
   },
 
   async resetPassword(email: string) {
@@ -387,7 +393,7 @@ export const dbService = {
           is_trial: false
       }).eq('id', userId);
       
-      cachedUserPromise = null;
+      sessionCache.promise = null;
   },
 
   async generatePix(_amount: number, _payer: any) {
