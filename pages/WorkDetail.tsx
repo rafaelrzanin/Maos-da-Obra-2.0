@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../App';
 import { dbService } from '../services/db';
 import { Work, Worker, Supplier, Material, Step, Expense, StepStatus, WorkPhoto, WorkFile, FileCategory, ExpenseCategory, PlanType } from '../types';
 import { ZeModal } from '../components/ZeModal';
@@ -27,7 +27,7 @@ const parseDateNoTimezone = (dateStr: string) => {
 const WorkDetail: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
-    const { user, trialDaysRemaining } = useAuth();
+    const { user } = useAuth();
     
     // --- CORE DATA STATE ---
     const [work, setWork] = useState<Work | null>(null);
@@ -45,13 +45,8 @@ const WorkDetail: React.FC = () => {
     const [subView, setSubView] = useState<SubView>('NONE');
     const [uploading, setUploading] = useState(false);
     
-    // --- AI ACCESS LOGIC ---
-    const isVitalicio = user?.plan === PlanType.VITALICIO;
-    const isAiTrialActive = user?.isTrial && trialDaysRemaining !== null && trialDaysRemaining > 0;
-    const hasAiAccess = isVitalicio || isAiTrialActive;
-
-    // --- PREMIUM TOOLS LOCK ---
-    const isPremium = isVitalicio;
+    // --- PREMIUM CHECK ---
+    const isPremium = user?.plan === PlanType.VITALICIO;
 
     // --- MODALS STATE ---
     const [stepModalMode, setStepModalMode] = useState<'ADD' | 'EDIT'>('ADD');
@@ -61,12 +56,8 @@ const WorkDetail: React.FC = () => {
     const [stepStart, setStepStart] = useState('');
     const [stepEnd, setStepEnd] = useState('');
     
-    // Material Filter (Main Tab)
+    // Material Filter
     const [materialFilterStepId, setMaterialFilterStepId] = useState<string>('ALL');
-    
-    // Report Filter
-    const [reportTab, setReportTab] = useState<'CRONO'|'MAT'|'FIN'>('CRONO');
-    const [reportMaterialFilterStepId, setReportMaterialFilterStepId] = useState<string>('ALL');
 
     const [materialModal, setMaterialModal] = useState<{ isOpen: boolean, material: Material | null }>({ isOpen: false, material: null });
     const [matName, setMatName] = useState('');
@@ -86,7 +77,7 @@ const WorkDetail: React.FC = () => {
     const [newMatBuyQty, setNewMatBuyQty] = useState('');
     const [newMatBuyCost, setNewMatBuyCost] = useState('');
 
-    // EXPENSE MODAL STATE
+    // EXPENSE MODAL STATE (UNIFIED ADD/EDIT)
     const [expenseModal, setExpenseModal] = useState<{ isOpen: boolean, mode: 'ADD'|'EDIT', id?: string }>({ isOpen: false, mode: 'ADD' });
     const [expDesc, setExpDesc] = useState('');
     const [expAmount, setExpAmount] = useState('');
@@ -114,6 +105,7 @@ const WorkDetail: React.FC = () => {
     const [calcArea, setCalcArea] = useState('');
     const [calcResult, setCalcResult] = useState<string[]>([]);
     const [activeChecklist, setActiveChecklist] = useState<string | null>(null);
+    const [reportTab, setReportTab] = useState<'CRONO'|'MAT'|'FIN'>('CRONO');
 
     // --- LOAD DATA ---
     const load = async () => {
@@ -403,6 +395,7 @@ const WorkDetail: React.FC = () => {
         });
     };
 
+    // CALCULATORS
     useEffect(() => {
         if (!calcArea) { setCalcResult([]); return; }
         const area = Number(calcArea);
@@ -421,6 +414,7 @@ const WorkDetail: React.FC = () => {
         }
     }, [calcArea, calcType]);
 
+    // EXPORT EXCEL
     const handleExportExcel = () => {
         const wb = XLSX.utils.book_new();
         const wsCrono = XLSX.utils.json_to_sheet(steps.map(s => ({ Etapa: s.name, Inicio: parseDateNoTimezone(s.startDate), Fim: parseDateNoTimezone(s.endDate), Status: s.status })));
@@ -659,11 +653,9 @@ const WorkDetail: React.FC = () => {
                                 </div>
                                 <div className="space-y-3">
                                     {stepExpenses.map(exp => {
-                                        // PAYMENT PROGRESS LOGIC
-                                        // If totalAgreed exists, we show the progress bar regardless if it's partial or full.
-                                        const hasTotal = exp.totalAgreed && exp.totalAgreed > 0;
-                                        const progress = hasTotal ? (exp.amount / exp.totalAgreed!) * 100 : 100;
-                                        const isPaid = hasTotal && exp.amount >= exp.totalAgreed!;
+                                        // PARTIAL PAYMENT LOGIC
+                                        const isPartial = exp.totalAgreed && exp.totalAgreed > exp.amount;
+                                        const progress = isPartial ? (exp.amount / exp.totalAgreed!) * 100 : 100;
 
                                         return (
                                             <div 
@@ -689,15 +681,15 @@ const WorkDetail: React.FC = () => {
                                                     </div>
                                                 </div>
                                                 
-                                                {/* VISUAL FOR PAYMENTS (PARTIAL OR FULL IF TOTAL IS SET) */}
-                                                {hasTotal && (
+                                                {/* VISUAL FOR PARTIAL PAYMENTS */}
+                                                {isPartial && (
                                                     <div className="mt-2 pt-2 border-t border-dashed border-slate-100 dark:border-slate-800">
                                                         <div className="flex justify-between text-[10px] uppercase font-bold text-slate-400 mb-1">
                                                             <span>Pago: R$ {exp.amount.toLocaleString('pt-BR')}</span>
                                                             <span>Total: R$ {exp.totalAgreed?.toLocaleString('pt-BR')}</span>
                                                         </div>
                                                         <div className="h-1.5 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                                                            <div className={`h-full rounded-full ${isPaid ? 'bg-green-500' : 'bg-orange-400'}`} style={{width: `${Math.min(progress, 100)}%`}}></div>
+                                                            <div className="h-full bg-orange-400 rounded-full" style={{width: `${progress}%`}}></div>
                                                         </div>
                                                     </div>
                                                 )}
@@ -862,340 +854,45 @@ const WorkDetail: React.FC = () => {
                 </div>
             );
 
-            case 'REPORTS': {
-                // --- DASHBOARD CALCS ---
-                const today = new Date().toISOString().split('T')[0];
-                const statusCounts = steps.reduce((acc, s) => {
-                    if (s.status === StepStatus.COMPLETED) acc.completed++;
-                    else if (s.startDate && s.endDate < today) acc.delayed++; // Logic: Not done + End Date passed
-                    else if (s.status === StepStatus.IN_PROGRESS) acc.inProgress++;
-                    else acc.pending++;
-                    return acc;
-                }, { pending: 0, inProgress: 0, completed: 0, delayed: 0 });
-                const totalSteps = steps.length;
-                const percentComplete = totalSteps > 0 ? Math.round((statusCounts.completed / totalSteps) * 100) : 0;
-
-                const financeSums = expenses.reduce((acc, e) => {
-                    const val = Number(e.amount);
-                    acc.total += val;
-                    if (e.category === ExpenseCategory.MATERIAL) acc.material += val;
-                    else if (e.category === ExpenseCategory.LABOR) acc.labor += val;
-                    else acc.others += val;
-                    return acc;
-                }, { total: 0, material: 0, labor: 0, others: 0 });
-
-                return (
-                <div className="space-y-6 animate-in fade-in">
-                    
-                    {/* 1. HEADER (Title + Actions) */}
-                    <div className="flex justify-between items-start pt-2 no-print">
-                        <div>
-                            <h2 className="text-2xl font-black text-primary dark:text-white tracking-tight">Relatório Geral</h2>
-                            <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">{work.name}</p>
-                        </div>
-                        <div className="flex gap-2">
-                            <button onClick={handlePrintPDF} className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-lg text-xs font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors flex items-center gap-1">
-                                <i className="fa-solid fa-print"></i> PDF
+            case 'REPORTS': return (
+                <div className="space-y-6">
+                    <div className="flex gap-2 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl no-print">
+                        {['CRONO', 'MAT', 'FIN'].map((rt) => (
+                            <button key={rt} onClick={() => setReportTab(rt as any)} className={`flex-1 py-2 rounded-lg text-xs font-bold ${reportTab === rt ? 'bg-white shadow text-primary' : 'text-slate-500'}`}>
+                                {rt === 'CRONO' ? 'Cronograma' : rt === 'MAT' ? 'Materiais' : 'Financeiro'}
                             </button>
-                            <button onClick={handleExportExcel} className="px-3 py-1.5 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-lg text-xs font-bold hover:bg-green-100 dark:hover:bg-green-900/50 transition-colors flex items-center gap-1">
-                                <i className="fa-solid fa-file-excel"></i> Excel
-                            </button>
-                        </div>
+                        ))}
                     </div>
 
-                    {/* 2. SUMMARY DASHBOARD (3 Columns) */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 no-print">
-                        {/* A. Cronograma */}
-                        <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm relative overflow-hidden">
-                            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3"><i className="fa-solid fa-calendar-check mr-1"></i> Cronograma</h3>
-                            <div className="flex items-end gap-2 mb-2">
-                                <span className="text-3xl font-black text-primary dark:text-white">{percentComplete}%</span>
-                                <span className="text-xs font-bold text-slate-500 mb-1">Concluído</span>
-                            </div>
-                            <div className="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden mb-4">
-                                <div className="h-full bg-blue-500 rounded-full transition-all duration-1000" style={{ width: `${percentComplete}%` }}></div>
-                            </div>
-                            <div className="grid grid-cols-2 gap-2 text-[10px] font-bold uppercase text-slate-500">
-                                <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-green-500"></div> {statusCounts.completed} Finalizadas</div>
-                                <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-orange-500"></div> {statusCounts.inProgress} Em Andamento</div>
-                                <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-red-500"></div> {statusCounts.delayed} Atrasadas</div>
-                                <div className="flex items-center gap-1"><div className="w-2 h-2 rounded-full bg-slate-300"></div> {statusCounts.pending} Pendentes</div>
-                            </div>
-                        </div>
-
-                        {/* B. Materiais */}
-                        <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm relative overflow-hidden">
-                            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3"><i className="fa-solid fa-layer-group mr-1"></i> Materiais</h3>
-                            <div className="flex justify-between items-center mb-4">
-                                <div className="text-center">
-                                    <span className="block text-2xl font-black text-primary dark:text-white">{materials.length}</span>
-                                    <span className="text-[10px] font-bold text-slate-400 uppercase">Itens Totais</span>
-                                </div>
-                                <div className="text-center">
-                                    <span className="block text-2xl font-black text-green-600">{materials.filter(m => m.purchasedQty >= m.plannedQty).length}</span>
-                                    <span className="text-[10px] font-bold text-slate-400 uppercase">Comprados</span>
-                                </div>
-                                <div className="text-center">
-                                    <span className="block text-2xl font-black text-orange-500">{materials.filter(m => m.purchasedQty < m.plannedQty).length}</span>
-                                    <span className="text-[10px] font-bold text-slate-400 uppercase">Faltam</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* C. Financeiro */}
-                        <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm relative overflow-hidden">
-                            <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-3"><i className="fa-solid fa-chart-pie mr-1"></i> Financeiro</h3>
-                            <div className="flex justify-between items-end mb-2">
-                                <span className="text-xl font-black text-primary dark:text-white">R$ {financeSums.total.toLocaleString('pt-BR', { notation: 'compact' })}</span>
-                                <span className="text-xs text-slate-400 font-bold">/ R$ {work.budgetPlanned.toLocaleString('pt-BR', { notation: 'compact' })}</span>
-                            </div>
-                            
-                            {/* Distribution Bar */}
-                            <div className="flex h-2 w-full rounded-full overflow-hidden mb-3">
-                                <div className="bg-amber-500" style={{ width: `${(financeSums.material / (financeSums.total || 1)) * 100}%` }}></div>
-                                <div className="bg-blue-600" style={{ width: `${(financeSums.labor / (financeSums.total || 1)) * 100}%` }}></div>
-                                <div className="bg-slate-300" style={{ width: `${(financeSums.others / (financeSums.total || 1)) * 100}%` }}></div>
-                            </div>
-
-                            <div className="flex justify-between text-[10px] font-bold uppercase text-slate-500">
-                                <span className="text-amber-600"><i className="fa-solid fa-square text-[8px]"></i> Mat</span>
-                                <span className="text-blue-600"><i className="fa-solid fa-square text-[8px]"></i> Mão de Obra</span>
-                                <span className="text-slate-400"><i className="fa-solid fa-square text-[8px]"></i> Outros</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* 3. TABS & TABLE */}
-                    <div>
-                        <div className="flex gap-2 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl mb-4 no-print">
-                            {['CRONO', 'MAT', 'FIN'].map((rt) => (
-                                <button key={rt} onClick={() => setReportTab(rt as any)} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${reportTab === rt ? 'bg-white shadow text-primary' : 'text-slate-500 hover:text-slate-700'}`}>
-                                    {rt === 'CRONO' ? 'Cronograma' : rt === 'MAT' ? 'Materiais' : 'Financeiro'}
-                                </button>
-                            ))}
-                        </div>
-
-                        {reportTab === 'MAT' && (
-                            <div className="mb-4 no-print">
-                                <select 
-                                    value={reportMaterialFilterStepId} 
-                                    onChange={(e) => setReportMaterialFilterStepId(e.target.value)}
-                                    className="w-full p-2.5 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 font-bold text-xs text-slate-600 dark:text-slate-300 shadow-sm outline-none focus:border-secondary transition-all"
-                                >
-                                    <option value="ALL">Todos os Materiais (Geral)</option>
-                                    {steps.map((s, i) => (
-                                        <option key={s.id} value={s.id}>{String(i+1).padStart(2, '0')}. {s.name}</option>
-                                    ))}
-                                    <option value="GENERAL">Materiais sem Etapa</option>
-                                </select>
-                            </div>
-                        )}
-
-                        <div className="bg-white dark:bg-white dark:text-black rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm print:shadow-none print:border-0 print:rounded-none">
-                            
-                            {/* Printable Header (Visible only in Print) */}
-                            <div className="hidden print:block p-8 border-b-2 border-slate-100">
-                                <div className="flex justify-between items-start">
-                                    <div><h1 className="text-3xl font-black text-slate-900 mb-1">MÃOS DA OBRA</h1><p className="text-sm font-bold text-slate-500">Relatório Analítico</p></div>
-                                    <div className="text-right"><h2 className="text-xl font-bold text-slate-800">{work.name}</h2><p className="text-sm text-slate-500">{new Date().toLocaleDateString()}</p></div>
-                                </div>
-                            </div>
-
-                            <table className="w-full text-left text-sm">
-                                <thead className="bg-slate-100 dark:bg-slate-200 border-b border-slate-200">
-                                    <tr>
-                                        <th className="px-6 py-4 font-bold text-slate-500 uppercase text-xs tracking-wider">Item / Descrição</th>
-                                        <th className="px-6 py-4 font-bold text-slate-500 uppercase text-xs text-right tracking-wider">Detalhes / Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-slate-100">
-                                    {reportTab === 'CRONO' && steps.map((s, idx) => {
-                                        const isDone = s.status === StepStatus.COMPLETED;
-                                        // Delayed Logic: End Date Passed AND Not Done
-                                        const isDelayed = s.endDate < today && !isDone;
-                                        const isInProgress = s.status === StepStatus.IN_PROGRESS;
-
-                                        let badgeColor = 'bg-slate-100 text-slate-500';
-                                        let statusText = 'Pendente';
-
-                                        if (isDone) { badgeColor = 'bg-green-100 text-green-700'; statusText = 'Concluído'; }
-                                        else if (isDelayed) { badgeColor = 'bg-red-500 text-white shadow-red-500/30 shadow-md'; statusText = 'Atrasado'; }
-                                        else if (isInProgress) { badgeColor = 'bg-orange-100 text-orange-600'; statusText = 'Em Andamento'; }
-
-                                        return (
-                                            <tr key={s.id} className="hover:bg-slate-50 transition-colors group">
-                                                <td className="px-6 py-4">
-                                                    <div className="flex items-center gap-3">
-                                                        <span className="text-xs font-bold text-slate-300 w-5 group-hover:text-slate-400">{String(idx+1).padStart(2,'0')}</span>
-                                                        <div>
-                                                            <p className={`font-bold ${isDelayed ? 'text-red-600' : 'text-slate-800'}`}>{s.name}</p>
-                                                            <p className="text-xs text-slate-500">{parseDateNoTimezone(s.startDate)} - {parseDateNoTimezone(s.endDate)}</p>
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                                <td className="px-6 py-4 text-right">
-                                                    <span className={`inline-block text-[10px] font-bold px-3 py-1 rounded-full uppercase tracking-wider ${badgeColor}`}>
-                                                        {statusText}
-                                                    </span>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-
-                                    {reportTab === 'MAT' && (
-                                        <>
-                                            {steps.map((step, idx) => {
-                                                // FILTER LOGIC
-                                                if (reportMaterialFilterStepId !== 'ALL' && reportMaterialFilterStepId !== step.id) return null;
-
-                                                const stepMats = materials.filter(m => m.stepId === step.id);
-                                                if (stepMats.length === 0) return null;
-                                                
-                                                return (
-                                                    <React.Fragment key={step.id}>
-                                                        {/* Step Header */}
-                                                        <tr className="bg-slate-50/80 border-y border-slate-200">
-                                                            <td colSpan={2} className="px-6 py-3 border-l-4 border-secondary">
-                                                                <span className="text-xs font-black text-slate-600 uppercase tracking-widest flex items-center gap-2">
-                                                                    <span className="bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded text-[10px]">{String(idx + 1).padStart(2, '0')}</span> 
-                                                                    {step.name}
-                                                                </span>
-                                                            </td>
-                                                        </tr>
-                                                        {/* Materials */}
-                                                        {stepMats.map(m => {
-                                                            const progress = m.plannedQty > 0 ? (m.purchasedQty / m.plannedQty) * 100 : 0;
-                                                            let statusText = 'Pendente';
-                                                            let statusClass = 'bg-slate-100 text-slate-500';
-                                                            
-                                                            if (m.purchasedQty >= m.plannedQty) {
-                                                                statusText = 'Concluído';
-                                                                statusClass = 'bg-green-100 text-green-700';
-                                                            } else if (m.purchasedQty > 0) {
-                                                                statusText = 'Parcial';
-                                                                statusClass = 'bg-orange-100 text-orange-700';
-                                                            }
-
-                                                            return (
-                                                                <tr key={m.id} className="hover:bg-slate-50 transition-colors">
-                                                                    <td className="px-6 py-4 pl-10"> {/* Indent */}
-                                                                        <p className="font-bold text-slate-800">{m.name}</p>
-                                                                        <p className="text-xs text-slate-500 font-bold uppercase">{m.brand || 'Marca não inf.'}</p>
-                                                                    </td>
-                                                                    <td className="px-6 py-4 text-right">
-                                                                        <div className="flex flex-col items-end gap-1">
-                                                                            <div className="font-mono font-bold text-slate-700 text-xs">
-                                                                                {m.purchasedQty} / {m.plannedQty} {m.unit}
-                                                                            </div>
-                                                                            <span className={`text-[9px] font-bold px-2 py-0.5 rounded uppercase ${statusClass}`}>
-                                                                                {statusText}
-                                                                            </span>
-                                                                            <div className="w-20 h-1.5 bg-slate-200 rounded-full overflow-hidden mt-1 shadow-inner">
-                                                                                <div className={`h-full ${m.purchasedQty >= m.plannedQty ? 'bg-green-500' : 'bg-orange-400'}`} style={{ width: `${Math.min(progress, 100)}%` }}></div>
-                                                                            </div>
-                                                                        </div>
-                                                                    </td>
-                                                                </tr>
-                                                            );
-                                                        })}
-                                                    </React.Fragment>
-                                                );
-                                            })}
-                                            {/* Materials without Step */}
-                                            {(reportMaterialFilterStepId === 'ALL' || reportMaterialFilterStepId === 'GENERAL') && materials.filter(m => !m.stepId).length > 0 && (
-                                                 <React.Fragment key="general-mats">
-                                                    <tr className="bg-slate-50/80 border-y border-slate-200">
-                                                        <td colSpan={2} className="px-6 py-3 border-l-4 border-slate-300">
-                                                            <span className="text-xs font-black text-slate-500 uppercase tracking-widest">
-                                                                Materiais Gerais / Sem Etapa
-                                                            </span>
-                                                        </td>
-                                                    </tr>
-                                                    {materials.filter(m => !m.stepId).map(m => {
-                                                         const progress = m.plannedQty > 0 ? (m.purchasedQty / m.plannedQty) * 100 : 0;
-                                                         let statusText = 'Pendente';
-                                                         let statusClass = 'bg-slate-100 text-slate-500';
-                                                         
-                                                         if (m.purchasedQty >= m.plannedQty) {
-                                                             statusText = 'Concluído';
-                                                             statusClass = 'bg-green-100 text-green-700';
-                                                         } else if (m.purchasedQty > 0) {
-                                                             statusText = 'Parcial';
-                                                             statusClass = 'bg-orange-100 text-orange-700';
-                                                         }
-
-                                                         return (
-                                                            <tr key={m.id} className="hover:bg-slate-50 transition-colors">
-                                                                <td className="px-6 py-4 pl-10">
-                                                                    <p className="font-bold text-slate-800">{m.name}</p>
-                                                                    <p className="text-xs text-slate-500 font-bold uppercase">{m.brand || 'Marca não inf.'}</p>
-                                                                </td>
-                                                                <td className="px-6 py-4 text-right">
-                                                                    <div className="flex flex-col items-end gap-1">
-                                                                        <div className="font-mono font-bold text-slate-700 text-xs">
-                                                                            {m.purchasedQty} / {m.plannedQty} {m.unit}
-                                                                        </div>
-                                                                        <span className={`text-[9px] font-bold px-2 py-0.5 rounded uppercase ${statusClass}`}>
-                                                                            {statusText}
-                                                                        </span>
-                                                                        <div className="w-20 h-1.5 bg-slate-200 rounded-full overflow-hidden mt-1 shadow-inner">
-                                                                            <div className={`h-full ${m.purchasedQty >= m.plannedQty ? 'bg-green-500' : 'bg-orange-400'}`} style={{ width: `${Math.min(progress, 100)}%` }}></div>
-                                                                        </div>
-                                                                    </div>
-                                                                </td>
-                                                            </tr>
-                                                         );
-                                                    })}
-                                                 </React.Fragment>
-                                            )}
-                                        </>
-                                    )}
-
-                                    {reportTab === 'FIN' && expenses.map((e) => (
-                                        <tr key={e.id} className="hover:bg-slate-50 transition-colors">
-                                            <td className="px-6 py-4">
-                                                <div className="flex items-center gap-3">
-                                                    {/* Category Icon */}
-                                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs shadow-sm ${e.category === ExpenseCategory.LABOR ? 'bg-blue-100 text-blue-600' : e.category === ExpenseCategory.MATERIAL ? 'bg-amber-100 text-amber-600' : 'bg-slate-100 text-slate-500'}`}>
-                                                        <i className={`fa-solid ${e.category === ExpenseCategory.LABOR ? 'fa-helmet-safety' : e.category === ExpenseCategory.MATERIAL ? 'fa-box' : 'fa-file-invoice'}`}></i>
-                                                    </div>
-                                                    <div>
-                                                        <p className="font-bold text-slate-800">{e.description}</p>
-                                                        <p className="text-xs text-slate-500">{parseDateNoTimezone(e.date)}</p>
-                                                    </div>
-                                                </div>
-                                            </td>
-                                            <td className="px-6 py-4 text-right">
-                                                <p className="font-bold text-slate-800">R$ {e.amount.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
-                                                {e.totalAgreed && (
-                                                    <div className="text-[10px] text-slate-400 font-bold mt-1 flex items-center justify-end gap-1">
-                                                        <span>Total: R$ {e.totalAgreed.toLocaleString('pt-BR')}</span>
-                                                        {e.amount < e.totalAgreed && <i className="fa-solid fa-clock text-orange-400" title="Pagamento Parcial"></i>}
-                                                    </div>
-                                                )}
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
+                    <div className="bg-white dark:bg-white dark:text-black rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm print:shadow-none print:border-0 print:rounded-none">
                         
-                        {/* Print Styles Injection */}
-                        <style>{`
-                            @media print {
-                                .no-print { display: none !important; }
-                                body { background: white; color: black; }
-                                nav, aside, .bottom-nav { display: none !important; }
-                                main { padding: 0 !important; margin: 0 !important; height: auto !important; overflow: visible !important; }
-                                table { width: 100% !important; page-break-inside: auto; }
-                                tr { page-break-inside: avoid; page-break-after: auto; }
-                                td, th { padding: 8px 12px !important; border-bottom: 1px solid #ddd !important; }
-                            }
-                        `}</style>
+                        <div className="hidden print:block p-8 border-b-2 border-slate-100">
+                            <div className="flex justify-between items-start">
+                                <div><h1 className="text-3xl font-black text-slate-900 mb-1">MÃOS DA OBRA</h1><p className="text-sm font-bold text-slate-500">Relatório Geral</p></div>
+                                <div className="text-right"><h2 className="text-xl font-bold text-slate-800">{work.name}</h2><p className="text-sm text-slate-500">{new Date().toLocaleDateString()}</p></div>
+                            </div>
+                        </div>
+
+                        <table className="w-full text-left text-sm">
+                            <thead className="bg-slate-50 dark:bg-slate-100 border-b border-slate-200">
+                                <tr><th className="px-6 py-4 font-bold text-slate-500 uppercase text-xs">Descrição</th><th className="px-6 py-4 font-bold text-slate-500 uppercase text-xs text-right">Detalhes</th></tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                                {reportTab === 'CRONO' && steps.map((s) => (
+                                    <tr key={s.id}><td className="px-6 py-4 font-bold text-slate-800">{s.name}<br/><span className="text-xs text-slate-500 font-normal">{parseDateNoTimezone(s.startDate)} - {parseDateNoTimezone(s.endDate)}</span></td><td className="px-6 py-4 text-right"><span className="text-xs font-bold px-2 py-1 bg-slate-100 rounded">{s.status}</span></td></tr>
+                                ))}
+                                {reportTab === 'MAT' && materials.map((m) => (
+                                    <tr key={m.id}><td className="px-6 py-4 font-bold text-slate-800">{m.name}<br/><span className="text-xs text-slate-500 font-normal">{m.brand}</span></td><td className="px-6 py-4 text-right font-mono font-bold text-slate-700">{m.purchasedQty} / {m.plannedQty} {m.unit}</td></tr>
+                                ))}
+                                {reportTab === 'FIN' && expenses.map((e) => (
+                                    <tr key={e.id}><td className="px-6 py-4 font-bold text-slate-800">{e.description}<br/><span className="text-xs text-slate-500 font-normal">{parseDateNoTimezone(e.date)} - {e.category}</span></td><td className="px-6 py-4 text-right font-bold text-slate-800">R$ {e.amount.toLocaleString('pt-BR')}</td></tr>
+                                ))}
+                            </tbody>
+                        </table>
                     </div>
+                    <button onClick={handlePrintPDF} className="w-full py-3 bg-slate-800 text-white rounded-xl font-bold no-print">Imprimir Relatório</button>
                 </div>
             );
-            }
 
             case 'PHOTOS': return (
                 <div className="space-y-6">
@@ -1506,9 +1203,26 @@ const WorkDetail: React.FC = () => {
                                 </button>
                             )}
                         </div>
+                        
                         <form onSubmit={handleSaveExpense} className="space-y-4">
                             <input placeholder="Descrição (ex: Pagamento Pedreiro)" value={expDesc} onChange={e => setExpDesc(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required />
                             
+                            {/* STATUS VISUAL FOR EDIT MODE ONLY - "TOTAL JÁ PAGO" */}
+                            {expenseModal.mode === 'EDIT' && (
+                                <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-xl border border-green-200 dark:border-green-900 mb-2">
+                                    <div className="flex justify-between items-center mb-1">
+                                        <span className="text-[10px] font-bold text-green-700 dark:text-green-400 uppercase">Total Já Pago</span>
+                                        <span className="text-lg font-black text-green-700 dark:text-green-400">R$ {Number(expAmount).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                                    </div>
+                                    {expTotalAgreed && Number(expTotalAgreed) > Number(expAmount) && (
+                                        <div className="flex justify-between items-center border-t border-green-200 dark:border-green-800 pt-2 mt-2">
+                                            <span className="text-[10px] font-bold text-orange-600 dark:text-orange-400 uppercase">Restante</span>
+                                            <span className="text-sm font-bold text-orange-600 dark:text-orange-400">R$ {(Number(expTotalAgreed) - Number(expAmount)).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
                             <div className="grid grid-cols-2 gap-2">
                                 <div className="relative">
                                     <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Valor Pago Agora</label>
