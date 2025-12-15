@@ -131,7 +131,9 @@ const pendingProfileRequests: Record<string, Promise<User | null>> = {};
 // Função crítica: Garante que o perfil existe. Se falhar com 403, o app trava.
 // Optimized with Deduplication to prevent double-requests on login
 const ensureUserProfile = async (authUser: any): Promise<User | null> => {
-    if (!authUser || !supabase) return null;
+    // Capture local client to ensure non-null type persists in closures
+    const client = supabase;
+    if (!authUser || !client) return null;
 
     // Deduplication: If a request for this user is already in flight, return it.
     if (pendingProfileRequests[authUser.id]) {
@@ -141,7 +143,7 @@ const ensureUserProfile = async (authUser: any): Promise<User | null> => {
     const fetchProfileProcess = async (): Promise<User | null> => {
         try {
             // 1. Tenta ler o perfil existente
-            const { data: existingProfile, error: readError } = await supabase
+            const { data: existingProfile, error: readError } = await client
                 .from('profiles')
                 .select('*')
                 .eq('id', authUser.id)
@@ -176,7 +178,7 @@ const ensureUserProfile = async (authUser: any): Promise<User | null> => {
                 subscription_expires_at: trialExpires.toISOString()
             };
 
-            const { data: createdProfile, error: createError } = await supabase
+            const { data: createdProfile, error: createError } = await client
                 .from('profiles')
                 .insert(newProfileData)
                 .select()
@@ -227,9 +229,11 @@ export const dbService = {
     if (!client) return null;
     
     const now = Date.now();
-    // Explicit null check to avoid TS2801 (TS thinks promise is always truthy in some contexts)
-    if (cachedUserPromise !== null && (now - lastCacheTime < CACHE_DURATION)) {
-        return cachedUserPromise;
+    
+    // Explicit casting to satisfy strict null checks if TS is being overzealous about 'always true'
+    const currentPromise = cachedUserPromise;
+    if (currentPromise && (now - lastCacheTime < CACHE_DURATION)) {
+        return currentPromise;
     }
 
     cachedUserPromise = (async () => {
