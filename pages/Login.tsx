@@ -188,7 +188,7 @@ const Login: React.FC = () => {
                   <button type="submit" disabled={loading}
                       className="w-full py-4 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl transition-all shadow-lg shadow-amber-500/20 disabled:opacity-50 flex items-center justify-center gap-2">
                       {loading && <i className="fa-solid fa-circle-notch fa-spin"></i>}
-                      {isLogin ? 'Entrar' : 'Começar Grátis'}
+                      {isLogin ? 'Entrar' : 'Criar Conta'}
                   </button>
               </form>
 
