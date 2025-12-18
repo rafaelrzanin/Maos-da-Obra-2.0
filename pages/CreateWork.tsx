@@ -1,10 +1,11 @@
 
+
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
-import { dbService } from '../services/db';
-import { WORK_TEMPLATES, ZE_AVATAR, ZE_AVATAR_FALLBACK } from '../services/standards';
-import { WorkStatus } from '../types';
+import { useAuth } from '../contexts/AuthContext.tsx';
+import { dbService } from '../services/db.ts';
+import { WORK_TEMPLATES, ZE_AVATAR, ZE_AVATAR_FALLBACK } from '../services/standards.ts';
+import { WorkStatus } from '../types.ts';
 
 const CreateWork: React.FC = () => {
   const { user } = useAuth();
@@ -254,8 +255,11 @@ const CreateWork: React.FC = () => {
                              <div className="grid grid-cols-2 gap-4 mb-8">
                                 {WORK_TEMPLATES.filter(t => t.id !== 'CONSTRUCAO').map(template => (
                                     <button key={template.id} type="button" onClick={() => setSelectedTemplateId(template.id)} className={`p-5 rounded-2xl border-2 text-left transition-all relative flex flex-col gap-3 group ${selectedTemplateId === template.id ? 'border-secondary bg-secondary/5 shadow-md' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-secondary/50'}`}>
-                                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl transition-colors ${selectedTemplateId === template.id ? 'bg-secondary text-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-400 group-hover:text-secondary'}`}><i className={`fa-solid ${template.icon}`}></i></div>
-                                        <div><h3 className={`font-black text-sm mb-1 ${selectedTemplateId === template.id ? 'text-primary dark:text-white' : 'text-slate-600 dark:text-slate-300'}`}>{template.label}</h3><p className="text-[10px] font-bold text-slate-400 leading-tight">{template.description}</p></div>
+                                        <div className="w-12 h-12 rounded-xl flex items-center justify-center text-xl transition-colors bg-slate-100 dark:bg-slate-700 text-slate-400 group-hover:text-secondary"><i className={`fa-solid ${template.icon}`}></i></div>
+                                        <div>
+                                            <h3 className={`font-black text-sm mb-1 ${selectedTemplateId === template.id ? 'text-primary dark:text-white' : 'text-slate-600 dark:text-slate-300'}`}>{template.label}</h3>
+                                            <p className="text-[10px] font-bold text-slate-400 leading-tight">{template.description}</p>
+                                        </div>
                                     </button>
                                 ))}
                             </div>
