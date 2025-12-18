@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
@@ -7,11 +8,12 @@ import { dbService } from '../services/db.ts';
 import { Work, Worker, Supplier, Material, Step, Expense, StepStatus, WorkPhoto, WorkFile, FileCategory, ExpenseCategory, PlanType } from '../types.ts';
 import { ZeModal } from '../components/ZeModal.tsx';
 import { STANDARD_CHECKLISTS, CONTRACT_TEMPLATES, STANDARD_JOB_ROLES, STANDARD_SUPPLIER_CATEGORIES, ZE_AVATAR, ZE_AVATAR_FALLBACK } from '../services/standards.ts';
-// import { aiService } from '../services/ai.ts'; // AI service is now globally accessed via /ai-chat
+import { aiService } from '../services/ai.ts';
 
 // --- TYPES FOR VIEW STATE ---
 type MainTab = 'SCHEDULE' | 'MATERIALS' | 'FINANCIAL' | 'MORE';
-type SubView = 'NONE' | 'TEAM' | 'SUPPLIERS' | 'REPORTS' | 'PHOTOS' | 'PROJECTS' | 'BONUS_IA' | 'BONUS_IA_CHAT' | 'CALCULATORS' | 'CONTRACTS' | 'CHECKLIST';
+// Fix: Removed BONUS_IA_CHAT as a direct subview, BONUS_IA will now navigate to /ai-chat
+type SubView = 'NONE' | 'TEAM' | 'SUPPLIERS' | 'REPORTS' | 'PHOTOS' | 'PROJECTS' | 'BONUS_IA' | 'CALCULATORS' | 'CONTRACTS' | 'CHECKLIST';
 
 // --- DATE HELPERS ---
 const parseDateNoTimezone = (dateStr: string) => {
@@ -27,7 +29,7 @@ const parseDateNoTimezone = (dateStr: string) => {
 const WorkDetail: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
-    const { user, trialDaysRemaining } = useAuth();
+    const { user, trialDaysRemaining } = useAuth(); // Destructure trialDaysRemaining
     
     // --- CORE DATA STATE ---
     const [work, setWork] = useState<Work | null>(null);
@@ -51,6 +53,7 @@ const WorkDetail: React.FC = () => {
     const hasAiAccess = isVitalicio || isAiTrialActive;
 
     // --- PREMIUM TOOLS LOCK ---
+    // isPremium is used for non-AI premium tools (Calculators, Contracts, Checklist)
     const isPremium = isVitalicio;
 
     // --- MODALS STATE ---
@@ -66,7 +69,6 @@ const WorkDetail: React.FC = () => {
     
     // Report Filter
     const [reportTab, setReportTab] = useState<'CRONO'|'MAT'|'FIN'>('CRONO');
-    // const [reportMaterialFilterStepId, setReportMaterialFilterStepId] = useState<string>('ALL'); // Removed as not used for reports
 
     const [materialModal, setMaterialModal] = useState<{ isOpen: boolean, material: Material | null }>({ isOpen: false, material: null });
     const [matName, setMatName] = useState('');
@@ -108,7 +110,7 @@ const WorkDetail: React.FC = () => {
     const [viewContract, setViewContract] = useState<{title: string, content: string} | null>(null);
     const [zeModal, setZeModal] = useState({ isOpen: false, title: '', message: '', onConfirm: () => {} });
 
-    // AI & TOOLS - Removed AI specific states as it's now a global page
+    // AI & TOOLS - Removed AI specific states for WorkDetail context as it's now a global page
     const [calcType, setCalcType] = useState<'PISO'|'PAREDE'|'PINTURA'>('PISO');
     const [calcArea, setCalcArea] = useState('');
     const [calcResult, setCalcResult] = useState<string[]>([]);
@@ -446,18 +448,6 @@ const WorkDetail: React.FC = () => {
         window.print();
     };
 
-    // Removed handleAiAsk as AI chat is now a global page
-    /*
-    const handleAiAsk = async () => {
-        if (!aiMessage.trim()) return;
-        setAiLoading(true);
-        const response = await aiService.sendMessage(aiMessage);
-        setAiResponse(response);
-        setAiLoading(false);
-        setAiMessage('');
-    };
-    */
-
     if (loading) return <div className="h-screen flex items-center justify-center"><i className="fa-solid fa-circle-notch fa-spin text-3xl text-primary"></i></div>;
     if (!work) return null;
 
@@ -777,7 +767,7 @@ const WorkDetail: React.FC = () => {
                                 </div>
                                 
                                 {/* Zé da Obra AI - Reintroduced with redirection */}
-                                <div onClick={() => setSubView('BONUS_IA')} className="bg-white/10 hover:bg-white/15 p-4 rounded-2xl border border-white/10 mb-4 cursor-pointer flex items-center gap-4 transition-all backdrop-blur-sm group">
+                                <div onClick={() => hasAiAccess ? navigate('/ai-chat') : navigate('/settings')} className="bg-white/10 hover:bg-white/15 p-4 rounded-2xl border border-white/10 mb-4 cursor-pointer flex items-center gap-4 transition-all backdrop-blur-sm group">
                                     <div className="relative">
                                         <img src={ZE_AVATAR} className={`w-14 h-14 rounded-full border-2 border-secondary bg-slate-800 object-cover ${!hasAiAccess ? 'grayscale opacity-70' : ''}`} onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK}/>
                                         <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 border-2 border-slate-800 rounded-full"></div>
@@ -987,19 +977,31 @@ const WorkDetail: React.FC = () => {
                     </div>
                 </div>
             );
-
-            case 'BONUS_IA_CHAT': 
-                // This subview is now just a direct redirect, as the chat lives on its own page
-                useEffect(() => {
-                    navigate('/ai-chat', { replace: true });
-                }, [navigate]);
-                return (
-                    <div className="flex flex-col items-center justify-center min-h-[70vh] p-6 text-center animate-in fade-in">
-                        <i className="fa-solid fa-robot text-5xl text-secondary mb-4 animate-bounce"></i>
-                        <h2 className="text-2xl font-black text-primary dark:text-white mb-2">Carregando Zé da Obra AI...</h2>
-                        <p className="text-slate-500 dark:text-slate-400">Você será redirecionado para a página de chat da IA.</p>
-                    </div>
-                );
+            
+            // Fix: Removed internal logic for BONUS_IA_CHAT, as BONUS_IA now directly navigates.
+            // This case should ideally not be reached if the UX flows correctly.
+            // case 'BONUS_IA_CHAT': 
+            //     if (!hasAiAccess) return null; // Use hasAiAccess here
+            //     return (
+            //     <div className="flex flex-col h-[80vh]">
+            //         <div className="flex-1 bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-inner overflow-y-auto mb-4 border border-slate-200 dark:border-slate-800">
+            //                 <div className="flex gap-4 mb-6">
+            //                 <img src={ZE_AVATAR} className="w-10 h-10 rounded-full border border-slate-200" onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK}/>
+            //                 <div className="bg-slate-100 dark:bg-slate-800 p-3 rounded-tr-xl rounded-b-xl text-sm shadow-sm"><p className="font-bold text-secondary mb-1">Zé da Obra</p><p>Opa! Mestre de obras na área.</p></div>
+            //             </div>
+            //             {aiResponse && (
+            //                 <div className="flex gap-4 mb-6 animate-in fade-in">
+            //                     <img src={ZE_AVATAR} className="w-10 h-10 rounded-full border border-slate-200" onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK}/>
+            //                     <div className="bg-slate-100 dark:bg-slate-800 p-3 rounded-tr-xl rounded-b-xl text-sm shadow-sm"><p className="font-bold text-secondary mb-1">Zé da Obra</p><p className="whitespace-pre-wrap">{aiResponse}</p></div>
+            //                 </div>
+            //             )}
+            //         </div>
+            //         <div className="flex gap-2">
+            //             <input value={aiMessage} onChange={e => setAiMessage(e.target.value)} placeholder="Pergunte ao Zé..." className="flex-1 p-4 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-secondary transition-colors"/>
+            //             <button onClick={handleAiAsk} disabled={aiLoading} className="w-14 bg-secondary text-white rounded-xl flex items-center justify-center shadow-lg hover:bg-orange-600 transition-colors">{aiLoading ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-paper-plane"></i>}</button>
+            //         </div>
+            //     </div>
+            // );
 
             case 'CONTRACTS': return (
                 <div className="space-y-4">
@@ -1264,7 +1266,7 @@ const WorkDetail: React.FC = () => {
                                         <option value={ExpenseCategory.PERMITS}>Taxas</option>
                                         <option value={ExpenseCategory.OTHER}>Outros</option>
                                     </select>
-                                </div>
+                                }</div>
                                 <div>
                                     <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Data</label>
                                     <input type="date" value={expDate} onChange={e => setExpDate(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required />
