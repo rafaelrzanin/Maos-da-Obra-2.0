@@ -2,16 +2,16 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
-import { useAuth } from '../contexts/AuthContext.tsx';
+import { useAuth } from '../contexts/AuthContext.tsx'; 
 import { dbService } from '../services/db.ts';
 import { Work, Worker, Supplier, Material, Step, Expense, StepStatus, WorkPhoto, WorkFile, FileCategory, ExpenseCategory, PlanType } from '../types.ts';
 import { ZeModal } from '../components/ZeModal.tsx';
 import { STANDARD_CHECKLISTS, CONTRACT_TEMPLATES, STANDARD_JOB_ROLES, STANDARD_SUPPLIER_CATEGORIES, ZE_AVATAR, ZE_AVATAR_FALLBACK } from '../services/standards.ts';
-import { aiService } from '../services/ai.ts';
+// import { aiService } from '../services/ai.ts'; // AI service is now globally accessed via /ai-chat
 
 // --- TYPES FOR VIEW STATE ---
 type MainTab = 'SCHEDULE' | 'MATERIALS' | 'FINANCIAL' | 'MORE';
-type SubView = 'NONE' | 'TEAM' | 'SUPPLIERS' | 'REPORTS' | 'PHOTOS' | 'PROJECTS' | 'CALCULATORS' | 'CONTRACTS' | 'CHECKLIST'; // Removed BONUS_IA, BONUS_IA_CHAT
+type SubView = 'NONE' | 'TEAM' | 'SUPPLIERS' | 'REPORTS' | 'PHOTOS' | 'PROJECTS' | 'BONUS_IA' | 'BONUS_IA_CHAT' | 'CALCULATORS' | 'CONTRACTS' | 'CHECKLIST';
 
 // --- DATE HELPERS ---
 const parseDateNoTimezone = (dateStr: string) => {
@@ -66,7 +66,7 @@ const WorkDetail: React.FC = () => {
     
     // Report Filter
     const [reportTab, setReportTab] = useState<'CRONO'|'MAT'|'FIN'>('CRONO');
-    const [reportMaterialFilterStepId, setReportMaterialFilterStepId] = useState<string>('ALL');
+    // const [reportMaterialFilterStepId, setReportMaterialFilterStepId] = useState<string>('ALL'); // Removed as not used for reports
 
     const [materialModal, setMaterialModal] = useState<{ isOpen: boolean, material: Material | null }>({ isOpen: false, material: null });
     const [matName, setMatName] = useState('');
@@ -776,17 +776,15 @@ const WorkDetail: React.FC = () => {
                                     <div><h3 className="text-lg font-black text-white uppercase tracking-tight">Área Premium</h3><p className="text-xs text-slate-400 font-medium">Ferramentas Exclusivas</p></div>
                                 </div>
                                 
-                                {/* Removed Zé da Obra AI card as it's now a top-level nav item */}
-                                {/*
+                                {/* Zé da Obra AI - Reintroduced with redirection */}
                                 <div onClick={() => setSubView('BONUS_IA')} className="bg-white/10 hover:bg-white/15 p-4 rounded-2xl border border-white/10 mb-4 cursor-pointer flex items-center gap-4 transition-all backdrop-blur-sm group">
                                     <div className="relative">
-                                        <img src={ZE_AVATAR} className={`w-14 h-14 rounded-full border-2 border-secondary bg-slate-800 object-cover ${!isPremium ? 'grayscale opacity-70' : ''}`} onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK}/>
+                                        <img src={ZE_AVATAR} className={`w-14 h-14 rounded-full border-2 border-secondary bg-slate-800 object-cover ${!hasAiAccess ? 'grayscale opacity-70' : ''}`} onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK}/>
                                         <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 border-2 border-slate-800 rounded-full"></div>
                                     </div>
                                     <div><h4 className="font-bold text-white text-base group-hover:text-secondary transition-colors">Zé da Obra AI</h4><p className="text-xs text-slate-300">Tire dúvidas técnicas 24h</p></div>
                                     <div className="ml-auto w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-white/50 group-hover:bg-secondary group-hover:text-white transition-all"><i className="fa-solid fa-chevron-right"></i></div>
                                 </div>
-                                */}
 
                                 <div className="grid grid-cols-3 gap-3">
                                     {['CALCULATORS', 'CONTRACTS', 'CHECKLIST'].map(item => (
@@ -964,8 +962,7 @@ const WorkDetail: React.FC = () => {
                 </div>
             );
 
-            // Reusing existing components for other subviews to save space, but ensuring they are rendered
-            /*
+            // Reintroduced BONUS_IA subviews with redirection
             case 'BONUS_IA': return (
                 <div className="flex flex-col items-center justify-center min-h-[70vh] p-6 text-center animate-in fade-in">
                     <div className="w-full max-w-sm bg-gradient-to-br from-slate-900 to-slate-950 rounded-[2.5rem] p-8 shadow-2xl relative overflow-hidden border border-slate-800 group">
@@ -978,39 +975,31 @@ const WorkDetail: React.FC = () => {
                             <h2 className="text-3xl font-black text-white mb-2 tracking-tight">Zé da Obra <span className="text-secondary">AI</span></h2>
                             <div className="h-1 w-12 bg-secondary rounded-full mb-6"></div>
                             <p className="text-slate-400 text-sm mb-8 leading-relaxed font-medium">Seu engenheiro virtual particular.</p>
-                            {isPremium ? (
-                                <button onClick={() => setSubView('BONUS_IA_CHAT')} className="w-full py-4 bg-gradient-gold text-white font-black rounded-2xl shadow-lg hover:shadow-orange-500/20 hover:scale-105 transition-all flex items-center justify-center gap-3 group-hover:animate-pulse"><span>INICIAR CONVERSA</span><i className="fa-solid fa-comments"></i></button>
+                            {hasAiAccess ? (
+                                <button onClick={() => navigate('/ai-chat')} className="w-full py-4 bg-gradient-gold text-white font-black rounded-2xl shadow-lg hover:shadow-orange-500/20 hover:scale-105 transition-all flex items-center justify-center gap-3 group-hover:animate-pulse"><span>INICIAR CONVERSA</span><i className="fa-solid fa-comments"></i></button>
                             ) : (
                                 <button onClick={() => navigate('/settings')} className="w-full py-4 bg-slate-800 text-slate-500 font-bold rounded-2xl border border-slate-700 flex items-center justify-center gap-2 hover:bg-slate-700 transition-colors"><i className="fa-solid fa-lock"></i> BLOQUEADO (PREMIUM)</button>
                             )}
+                            <p className="text-center text-[10px] text-slate-500 mt-4 flex items-center justify-center gap-1">
+                                <i className="fa-solid fa-info-circle"></i> Acesso à IA é exclusivo para assinantes Vitalícios ou em período de trial.
+                            </p>
                         </div>
                     </div>
                 </div>
             );
 
             case 'BONUS_IA_CHAT': 
-                if (!isPremium) return null;
+                // This subview is now just a direct redirect, as the chat lives on its own page
+                useEffect(() => {
+                    navigate('/ai-chat', { replace: true });
+                }, [navigate]);
                 return (
-                <div className="flex flex-col h-[80vh]">
-                    <div className="flex-1 bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-inner overflow-y-auto mb-4 border border-slate-200 dark:border-slate-800">
-                            <div className="flex gap-4 mb-6">
-                            <img src={ZE_AVATAR} className="w-10 h-10 rounded-full border border-slate-200" onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK}/>
-                            <div className="bg-slate-100 dark:bg-slate-800 p-3 rounded-tr-xl rounded-b-xl text-sm shadow-sm"><p className="font-bold text-secondary mb-1">Zé da Obra</p><p>Opa! Mestre de obras na área.</p></div>
-                        </div>
-                        {aiResponse && (
-                            <div className="flex gap-4 mb-6 animate-in fade-in">
-                                <img src={ZE_AVATAR} className="w-10 h-10 rounded-full border border-slate-200" onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK}/>
-                                <div className="bg-slate-100 dark:bg-slate-800 p-3 rounded-tr-xl rounded-b-xl text-sm shadow-sm"><p className="font-bold text-secondary mb-1">Zé da Obra</p><p className="whitespace-pre-wrap">{aiResponse}</p></div>
-                            </div>
-                        )}
+                    <div className="flex flex-col items-center justify-center min-h-[70vh] p-6 text-center animate-in fade-in">
+                        <i className="fa-solid fa-robot text-5xl text-secondary mb-4 animate-bounce"></i>
+                        <h2 className="text-2xl font-black text-primary dark:text-white mb-2">Carregando Zé da Obra AI...</h2>
+                        <p className="text-slate-500 dark:text-slate-400">Você será redirecionado para a página de chat da IA.</p>
                     </div>
-                    <div className="flex gap-2">
-                        <input value={aiMessage} onChange={e => setAiMessage(e.target.value)} placeholder="Pergunte ao Zé..." className="flex-1 p-4 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-secondary transition-colors"/>
-                        <button onClick={handleAiAsk} disabled={aiLoading} className="w-14 bg-secondary text-white rounded-xl flex items-center justify-center shadow-lg hover:bg-orange-600 transition-colors">{aiLoading ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-paper-plane"></i>}</button>
-                    </div>
-                </div>
-            );
-            */
+                );
 
             case 'CONTRACTS': return (
                 <div className="space-y-4">
