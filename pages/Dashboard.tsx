@@ -37,6 +37,150 @@ const DashboardSkeleton = () => (
   </div>
 );
 
+//PAINEL DE RISCO
+const RiskRadar = ({
+  focusWork,
+  stats,
+  dailySummary,
+  materials,
+  onOpenWork,
+}: {
+  focusWork: Work;
+  stats: { totalSpent: number; progress: number; delayedSteps: number };
+  dailySummary: { completedSteps: number; delayedSteps: number; pendingMaterials: number; totalSteps: number };
+  materials: Material[];
+  onOpenWork: () => void;
+}) => {
+  const budgetUsage = focusWork.budgetPlanned > 0 ? (stats.totalSpent / focusWork.budgetPlanned) * 100 : 0;
+  const budgetPct = Math.round(budgetUsage);
+
+  const delayedPct =
+    dailySummary.totalSteps > 0 ? Math.round((dailySummary.delayedSteps / dailySummary.totalSteps) * 100) : 0;
+
+  const budgetTone =
+    budgetPct > 100
+      ? { label: "Estourado", cls: "bg-red-100 dark:bg-red-900/25 text-red-700 dark:text-red-300", bar: "bg-red-500" }
+      : budgetPct > 85
+      ? { label: "No limite", cls: "bg-amber-100 dark:bg-amber-900/20 text-amber-800 dark:text-amber-300", bar: "bg-amber-500" }
+      : { label: "Saudável", cls: "bg-emerald-100 dark:bg-emerald-900/20 text-emerald-800 dark:text-emerald-300", bar: "bg-emerald-500" };
+
+  const scheduleTone =
+    delayedPct >= 20
+      ? { label: "Crítico", cls: "bg-red-100 dark:bg-red-900/25 text-red-700 dark:text-red-300" }
+      : delayedPct >= 10
+      ? { label: "Atenção", cls: "bg-amber-100 dark:bg-amber-900/20 text-amber-800 dark:text-amber-300" }
+      : { label: "Ok", cls: "bg-emerald-100 dark:bg-emerald-900/20 text-emerald-800 dark:text-emerald-300" };
+
+  // Top 3 materiais “críticos” por gap (planejado - comprado)
+  const critical = (materials || [])
+    .map(m => ({ ...m, gap: Math.max(0, (m.plannedQty || 0) - (m.purchasedQty || 0)) }))
+    .filter(m => m.gap > 0)
+    .sort((a, b) => b.gap - a.gap)
+    .slice(0, 3);
+
+  return (
+    <div className={cx(surface, "rounded-2xl p-5")}>
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <p className="text-sm font-black text-slate-900 dark:text-white">Mapa de Riscos</p>
+          <p className={cx("text-xs font-semibold", mutedText)}>
+            Onde pode “dar ruim” antes de dar ruim
+          </p>
+        </div>
+        <button onClick={onOpenWork} className="text-xs font-extrabold text-secondary hover:opacity-80">
+          Ver detalhes →
+        </button>
+      </div>
+
+      {/* 4 mini-métricas */}
+      <div className="grid grid-cols-2 gap-3 mb-4">
+        <div className="rounded-xl p-3 border border-slate-200/60 dark:border-white/10 bg-white/60 dark:bg-slate-950/20">
+          <p className={cx("text-[11px] font-black uppercase tracking-wider", mutedText)}>Ritmo</p>
+          <p className="text-xl font-black text-slate-900 dark:text-white">{stats.progress}%</p>
+          <p className={cx("text-xs font-semibold", mutedText)}>Progresso geral</p>
+        </div>
+
+        <div className="rounded-xl p-3 border border-slate-200/60 dark:border-white/10 bg-white/60 dark:bg-slate-950/20">
+          <p className={cx("text-[11px] font-black uppercase tracking-wider", mutedText)}>Cronograma</p>
+          <div className="flex items-center gap-2">
+            <p className="text-xl font-black text-slate-900 dark:text-white">{delayedPct}%</p>
+            <span className={cx("text-[11px] font-black px-2 py-1 rounded-xl", scheduleTone.cls)}>
+              {scheduleTone.label}
+            </span>
+          </div>
+          <p className={cx("text-xs font-semibold", mutedText)}>{dailySummary.delayedSteps} etapas atrasadas</p>
+        </div>
+
+        <div className="rounded-xl p-3 border border-slate-200/60 dark:border-white/10 bg-white/60 dark:bg-slate-950/20">
+          <p className={cx("text-[11px] font-black uppercase tracking-wider", mutedText)}>Orçamento</p>
+          <div className="flex items-center gap-2">
+            <p className="text-xl font-black text-slate-900 dark:text-white">{budgetPct}%</p>
+            <span className={cx("text-[11px] font-black px-2 py-1 rounded-xl", budgetTone.cls)}>
+              {budgetTone.label}
+            </span>
+          </div>
+          <p className={cx("text-xs font-semibold", mutedText)}>R$ {stats.totalSpent.toLocaleString("pt-BR")}</p>
+        </div>
+
+        <div className="rounded-xl p-3 border border-slate-200/60 dark:border-white/10 bg-white/60 dark:bg-slate-950/20">
+          <p className={cx("text-[11px] font-black uppercase tracking-wider", mutedText)}>Compras</p>
+          <p className="text-xl font-black text-slate-900 dark:text-white">{dailySummary.pendingMaterials}</p>
+          <p className={cx("text-xs font-semibold", mutedText)}>pendências no checklist</p>
+        </div>
+      </div>
+
+      {/* Barra “zona” do orçamento (com marcas 85% e 100%) */}
+      <div className="rounded-xl p-4 border border-slate-200/60 dark:border-white/10 bg-white/60 dark:bg-slate-950/20">
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">
+            Zona do orçamento
+          </p>
+          <p className="text-xs font-extrabold text-slate-600 dark:text-slate-300">
+            R$ {focusWork.budgetPlanned.toLocaleString("pt-BR")}
+          </p>
+        </div>
+
+        <div className="relative h-3 rounded-full bg-slate-200/70 dark:bg-slate-800 overflow-hidden">
+          {/* marcas */}
+          <div className="absolute inset-y-0 left-[85%] w-[2px] bg-amber-400/80" />
+          <div className="absolute inset-y-0 left-[100%] w-[2px] bg-red-400/80" />
+          <div className={cx("h-full rounded-full transition-all", budgetTone.bar)} style={{ width: `${Math.min(100, Math.max(2, budgetUsage))}%` }} />
+        </div>
+
+        <div className="flex justify-between mt-2 text-[11px] font-bold text-slate-500 dark:text-slate-400">
+          <span>0%</span>
+          <span>85%</span>
+          <span>100%</span>
+        </div>
+      </div>
+
+      {/* Compras críticas */}
+      {critical.length > 0 && (
+        <div className="mt-4">
+          <p className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2">
+            Compras críticas
+          </p>
+          <div className="space-y-2">
+            {critical.map((m) => (
+              <div key={m.id} className="flex items-center justify-between rounded-xl p-3 border border-slate-200/60 dark:border-white/10 bg-white/60 dark:bg-slate-950/20">
+                <div className="min-w-0">
+                  <p className="text-sm font-extrabold text-slate-900 dark:text-white truncate">{m.name}</p>
+                  <p className={cx("text-xs font-semibold", mutedText)}>
+                    Falta comprar: {m.gap} {m.unit}
+                  </p>
+                </div>
+                <span className="text-[11px] font-black px-2 py-1 rounded-xl bg-amber-100 dark:bg-amber-900/20 text-amber-800 dark:text-amber-300 whitespace-nowrap">
+                  gap
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
 //ARQUITETURA UX TESTE GPT
 const cx = (...c: Array<string | false | undefined>) => c.filter(Boolean).join(' ');
 
