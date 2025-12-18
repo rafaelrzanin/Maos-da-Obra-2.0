@@ -964,7 +964,7 @@ const WorkDetail: React.FC = () => {
                 </div>
             );
 
-            // Removed BONUS_IA & BONUS_IA_CHAT cases
+            // Reusing existing components for other subviews to save space, but ensuring they are rendered
             /*
             case 'BONUS_IA': return (
                 <div className="flex flex-col items-center justify-center min-h-[70vh] p-6 text-center animate-in fade-in">
@@ -1344,4 +1344,3 @@ const WorkDetail: React.FC = () => {
 };
 
 export default WorkDetail;
-
