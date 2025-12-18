@@ -10,7 +10,7 @@ import Dashboard from './pages/Dashboard.tsx';
 
 // --- Lazy Loading com Type Casting "unknown" para evitar erro de Build (TS2352) ---
 const CreateWork = lazy(() => import('./pages/CreateWork.tsx') as unknown as Promise<{ default: React.ComponentType<any> }>);
-const WorkDetail = lazy(() => import('./pages/WorkDetail.tsx') as unknown as Promise<{ default: React.ComponentType<any> }>); // Corrected path to ./pages/WorkDetail.tsx
+const WorkDetail = lazy(() => import('./pages/WorkDetail.tsx') as unknown as Promise<{ default: React.ComponentType<any> }>);
 const Settings = lazy(() => import('./pages/Settings.tsx') as unknown as Promise<{ default: React.ComponentType<any> }>);
 const Profile = lazy(() => import('./pages/Profile.tsx') as unknown as Promise<{ default: React.ComponentType<any> }>);
 const VideoTutorials = lazy(() => import('./pages/VideoTutorials.tsx') as unknown as Promise<{ default: React.ComponentType<any> }>);
@@ -31,6 +31,70 @@ const LoadingScreen = () => (
   </div>
 );
 
+// --- Global Error Boundary Component ---
+interface ErrorBoundaryProps {
+  children: React.ReactNode;
+}
+
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error: Error | null;
+  errorInfo: React.ErrorInfo | null;
+}
+
+class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) {
+    super(props);
+    this.state = { hasError: false, error: null, errorInfo: null };
+  }
+
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    // Update state so the next render will show the fallback UI.
+    return { hasError: true, error, errorInfo: null };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    // You can also log the error to an error reporting service
+    console.error("[ErrorBoundary] Uncaught error:", error, errorInfo);
+    this.setState({ errorInfo });
+  }
+
+  render() {
+    if (this.state.hasError) {
+      // You can render any custom fallback UI
+      return (
+        <div className="flex flex-col items-center justify-center min-h-screen p-8 bg-danger-light dark:bg-danger-dark text-danger">
+          <i className="fa-solid fa-triangle-exclamation text-5xl mb-4"></i>
+          <h1 className="text-2xl font-bold mb-2">Ops! Algo deu errado.</h1>
+          <p className="text-center text-sm mb-4">
+            Parece que houve um erro inesperado. Por favor, tente recarregar a página.
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-6 py-3 bg-danger text-white font-bold rounded-xl hover:bg-danger-dark transition-colors"
+          >
+            Recarregar Página
+          </button>
+          {this.state.error && (
+            <details className="mt-6 p-4 bg-danger-light/50 border border-danger rounded-lg max-w-lg overflow-auto text-xs text-left">
+              <summary className="font-bold cursor-pointer">Detalhes do Erro</summary>
+              <pre className="whitespace-pre-wrap mt-2 break-words">{this.state.error.toString()}</pre>
+              {this.state.errorInfo?.componentStack && (
+                <div className="mt-2">
+                  <h4 className="font-bold">Component Stack:</h4>
+                  <pre className="whitespace-pre-wrap break-words">{this.state.errorInfo.componentStack}</pre>
+                </div>
+              )}
+            </details>
+          )}
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
 // Layout Component
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, loading, logout, isSubscriptionValid, trialDaysRemaining, updatePlan } = useAuth();
@@ -39,6 +103,12 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showAiTrialBanner, setShowAiTrialBanner] = useState(true); // New state for banner visibility
+
+  // Log Auth State for debugging
+  useEffect(() => {
+    console.log(`[Layout] Render - Loading: ${loading}, User: ${user ? user.email : 'null'}, Path: ${location.pathname}`);
+  }, [loading, user, location.pathname]);
+
 
   // Scroll to top on route change
   useEffect(() => {
@@ -201,20 +271,22 @@ const App: React.FC = () => {
     <BrowserRouter>
       <ThemeProvider>
         <AuthProvider>
-          <Suspense fallback={<LoadingScreen />}>
-            <Routes>
-              <Route path="/login" element={<Layout><Login /></Layout>} />
-              <Route path="/checkout" element={<Layout><Checkout /></Layout>} />
-              <Route path="/" element={<Layout><Dashboard /></Layout>} />
-              <Route path="/create" element={<Layout><CreateWork /></Layout>} />
-              <Route path="/work/:id" element={<Layout><WorkDetail /></Layout>} />
-              <Route path="/ai-chat" element={<Layout><AiChat /></Layout>} /> {/* NOVA ROTA */}
-              <Route path="/settings" element={<Layout><Settings /></Layout>} />
-              <Route path="/profile" element={<Layout><Profile /></Layout>} />
-              <Route path="/tutorials" element={<Layout><VideoTutorials /></Layout>} />
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
-          </Suspense>
+          <ErrorBoundary> {/* Wrap Routes with ErrorBoundary */}
+            <Suspense fallback={<LoadingScreen />}>
+              <Routes>
+                <Route path="/login" element={<Layout><Login /></Layout>} />
+                <Route path="/checkout" element={<Layout><Checkout /></Layout>} />
+                <Route path="/" element={<Layout><Dashboard /></Layout>} />
+                <Route path="/create" element={<Layout><CreateWork /></Layout>} />
+                <Route path="/work/:id" element={<Layout><WorkDetail /></Layout>} />
+                <Route path="/ai-chat" element={<Layout><AiChat /></Layout>} />
+                <Route path="/settings" element={<Layout><Settings /></Layout>} />
+                <Route path="/profile" element={<Layout><Profile /></Layout>} />
+                <Route path="/tutorials" element={<Layout><VideoTutorials /></Layout>} />
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </Suspense>
+          </ErrorBoundary>
         </AuthProvider>
       </ThemeProvider>
     </BrowserRouter>
