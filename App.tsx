@@ -274,8 +274,11 @@ const App: React.FC = () => {
           <ErrorBoundary> {/* Wrap Routes with ErrorBoundary */}
             <Suspense fallback={<LoadingScreen />}>
               <Routes>
-                <Route path="/login" element={<Layout><Login /></Layout>} />
-                <Route path="/checkout" element={<Layout><Checkout /></Layout>} />
+                {/* Rotas públicas (SEM Layout) */}
+                <Route path="/login" element={<Login />} />
+                <Route path="/checkout" element={<Checkout />} />
+
+                {/* Rotas do app (COM Layout) */}
                 <Route path="/" element={<Layout><Dashboard /></Layout>} />
                 <Route path="/create" element={<Layout><CreateWork /></Layout>} />
                 <Route path="/work/:id" element={<Layout><WorkDetail /></Layout>} />
@@ -283,8 +286,9 @@ const App: React.FC = () => {
                 <Route path="/settings" element={<Layout><Settings /></Layout>} />
                 <Route path="/profile" element={<Layout><Profile /></Layout>} />
                 <Route path="/tutorials" element={<Layout><VideoTutorials /></Layout>} />
+
                 <Route path="*" element={<Navigate to="/" replace />} />
-              </Routes>
+            </Routes>
             </Suspense>
           </ErrorBoundary>
         </AuthProvider>
