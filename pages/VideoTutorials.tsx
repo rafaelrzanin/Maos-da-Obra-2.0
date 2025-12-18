@@ -1,79 +1,172 @@
-import React from 'react';
 
-const VideoTutorials: React.FC = () => {
-  const videos = [
-    {
-      id: 'video1',
-      title: 'Primeiros Passos no App',
-      desc: 'Aprenda a criar sua primeira obra e configurar o perfil.',
-      thumb: 'https://images.unsplash.com/photo-1541888946425-d81bb19240f5?q=80&w=600&auto=format&fit=crop',
-      duration: '5:20'
-    },
-    {
-      id: 'video2',
-      title: 'Criando um Cronograma',
-      desc: 'Como definir datas e acompanhar o progresso das etapas.',
-      thumb: 'https://images.unsplash.com/photo-1503387762-592deb58ef4e?q=80&w=600&auto=format&fit=crop',
-      duration: '8:45'
-    },
-    {
-      id: 'video3',
-      title: 'Controle Financeiro',
-      desc: 'Lance gastos, anexe comprovantes e evite estourar o orçamento.',
-      thumb: 'https://images.unsplash.com/photo-1554224155-6726b3ff858f?q=80&w=600&auto=format&fit=crop',
-      duration: '6:10'
-    },
-    {
-      id: 'video4',
-      title: 'Usando a IA Zé da Obra',
-      desc: 'Tire dúvidas técnicas e peça ajuda ao nosso assistente virtual.',
-      thumb: 'https://images.unsplash.com/photo-1531403009284-440f080d1e12?q=80&w=600&auto=format&fit=crop',
-      duration: '4:30'
+import React, { useState, useEffect } from 'react';
+import { useAuth } from '../contexts/AuthContext.tsx';
+import { dbService } from '../services/db.ts';
+
+const Profile: React.FC = () => {
+  const { user, refreshUser } = useAuth();
+  const [name, setName] = useState('');
+  const [whatsapp, setWhatsapp] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [successMsg, setSuccessMsg] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
+
+  useEffect(() => {
+    if (user) {
+      setName(user.name);
+      setWhatsapp(user.whatsapp || '');
     }
-  ];
+  }, [user]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (loading) return;
+    
+    setLoading(true);
+    setErrorMsg('');
+    setSuccessMsg('');
+
+    if (password && password !== confirmPassword) {
+        setErrorMsg("Senhas não conferem.");
+        setLoading(false);
+        return;
+    }
+
+    try {
+        if (!user) throw new Error("Usuário não identificado.");
+        
+        // Timeout para evitar travamento eterno
+        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 10000));
+        
+        await Promise.race([
+            dbService.updateUser(user.id, { name, whatsapp }, password || undefined),
+            timeoutPromise
+        ]);
+
+        await refreshUser();
+        setSuccessMsg("Perfil atualizado com sucesso!");
+        setPassword('');
+        setConfirmPassword('');
+    } catch (error: any) {
+        console.error("Erro no Profile:", error);
+        setErrorMsg(error.message === "Timeout" ? "O servidor demorou para responder, mas seus dados podem ter sido salvos." : `Erro: ${error.message}`);
+    } finally {
+        setLoading(false);
+    }
+  };
+
+  if (!user) return null;
 
   return (
-    <div className="max-w-5xl mx-auto pb-12 pt-4 px-4 font-sans">
-      <div className="flex items-center gap-3 mb-2">
-        <div className="w-10 h-10 rounded-xl bg-red-100 text-red-600 flex items-center justify-center text-xl">
-            <i className="fa-brands fa-youtube"></i>
+    <div className="max-w-2xl mx-auto pb-12 pt-4 px-4 font-sans animate-in fade-in">
+      <div className="flex items-center gap-3 mb-6">
+        <div className="w-12 h-12 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center text-xl text-slate-500 dark:text-slate-300">
+            <i className="fa-solid fa-user"></i>
         </div>
-        <h1 className="text-2xl font-bold text-text-main dark:text-white">Tutoriais em Vídeo</h1>
+        <div>
+            <h1 className="text-2xl font-bold text-primary dark:text-white">Meu Perfil</h1>
+            <p className="text-sm text-slate-500 dark:text-slate-400">Gerencie seus dados pessoais e assinatura.</p>
+        </div>
       </div>
-      <p className="text-text-muted dark:text-slate-400 mb-8 ml-14">Aprenda a usar todas as ferramentas do Mãos da Obra.</p>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {videos.map((vid, idx) => (
-          <div key={idx} className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all group cursor-pointer">
-            <div className="relative aspect-video bg-slate-100 dark:bg-slate-800 overflow-hidden">
-                <img src={vid.thumb} alt={vid.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
-                <div className="absolute inset-0 bg-black/20 group-hover:bg-black/40 transition-colors flex items-center justify-center">
-                    <div className="w-14 h-14 bg-white/90 rounded-full flex items-center justify-center text-red-600 shadow-lg scale-90 group-hover:scale-110 transition-transform">
-                        <i className="fa-solid fa-play ml-1 text-xl"></i>
+      <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 md:p-8 shadow-sm border border-slate-200 dark:border-slate-800 mb-8">
+        <div className="flex items-center gap-4 mb-6 pb-6 border-b border-slate-100 dark:border-slate-800">
+            <div className="w-16 h-16 rounded-full bg-primary text-white flex items-center justify-center text-2xl font-bold">
+                {user.name.charAt(0)}
+            </div>
+            <div>
+                <h2 className="text-xl font-bold text-primary dark:text-white">{user.name}</h2>
+                <p className="text-sm text-slate-500 dark:text-slate-400">{user.email}</p>
+                <div className="flex items-center gap-2 mt-2">
+                    <span className="bg-secondary/10 text-secondary text-xs font-bold px-2 py-0.5 rounded-md uppercase tracking-wide border border-secondary/20">
+                        {user.plan || 'Gratuito'}
+                    </span>
+                    {user.subscriptionExpiresAt && (
+                        <span className="text-xs text-slate-400">
+                            Vence em: {new Date(user.subscriptionExpiresAt).toLocaleDateString()}
+                        </span>
+                    )}
+                </div>
+            </div>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-6">
+            <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nome Completo</label>
+                <input 
+                    type="text" 
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                />
+            </div>
+            
+            <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">WhatsApp</label>
+                <input 
+                    type="text" 
+                    value={whatsapp}
+                    onChange={(e) => setWhatsapp(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                />
+            </div>
+
+            <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
+                <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">Alterar Senha</h3>
+                <div className="p-3 mb-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-700 text-xs text-slate-500">
+                    <i className="fa-solid fa-info-circle mr-2"></i>
+                    A senha é protegida pelo sistema de autenticação e não fica visível.
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nova Senha</label>
+                        <input 
+                            type="password" 
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            placeholder="Deixe em branco para manter"
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Confirmar Senha</label>
+                        <input 
+                            type="password" 
+                            value={confirmPassword}
+                            onChange={(e) => setConfirmPassword(e.target.value)}
+                            placeholder="Repita a nova senha"
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                        />
                     </div>
                 </div>
-                <div className="absolute bottom-3 right-3 bg-black/70 text-white text-xs font-bold px-2 py-1 rounded-md">
-                    {vid.duration}
-                </div>
             </div>
-            <div className="p-5">
-                <h3 className="text-lg font-bold text-primary dark:text-white mb-2 leading-tight group-hover:text-secondary transition-colors">{vid.title}</h3>
-                <p className="text-sm text-slate-500 dark:text-slate-400">{vid.desc}</p>
-            </div>
-          </div>
-        ))}
-      </div>
 
-      <div className="mt-12 p-8 bg-gradient-premium rounded-3xl text-white text-center">
-          <i className="fa-solid fa-headset text-4xl mb-4 text-secondary"></i>
-          <h2 className="text-2xl font-bold mb-2">Ainda com dúvidas?</h2>
-          <p className="text-slate-300 mb-6 max-w-lg mx-auto">Nossa equipe de suporte está pronta para te ajudar. Se você é assinante Vitalício, acesse o grupo VIP.</p>
-          <button className="bg-secondary hover:bg-amber-600 text-white font-bold py-3 px-8 rounded-xl shadow-lg transition-transform hover:scale-105 active:scale-95">
-              Falar com Suporte
-          </button>
+            {errorMsg && (
+                <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900 text-red-600 dark:text-red-400 rounded-xl text-sm font-bold flex items-center gap-2 animate-in fade-in">
+                    <i className="fa-solid fa-triangle-exclamation"></i> {errorMsg}
+                </div>
+            )}
+            
+            {successMsg && (
+            <div className="p-4 bg-green-100 dark:bg-green-900/30 border border-green-200 dark:border-green-900 text-green-700 dark:text-green-300 rounded-xl flex items-center gap-2 animate-in fade-in">
+                <i className="fa-solid fa-check-circle"></i> {successMsg}
+            </div>
+            )}
+
+            <button 
+            type="submit" 
+            disabled={loading}
+            className="w-full py-4 bg-primary hover:bg-primary-dark text-white font-bold rounded-xl shadow-lg shadow-primary/20 transition-all disabled:opacity-70 flex items-center justify-center gap-2"
+            >
+            {loading ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-save"></i>}
+            {loading ? 'Salvando...' : 'Salvar Alterações'}
+            </button>
+        </form>
       </div>
     </div>
   );
 };
 
-export default VideoTutorials;
+export default Profile;
