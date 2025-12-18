@@ -46,13 +46,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     let mounted = true;
+    console.log("[AuthContext] useEffect mounted, initAuth called. Initial loading:", loading);
 
     const initAuth = async () => {
       try {
         const timeoutDuration = 10000; // 10 seconds
         const authPromise = dbService.getCurrentUser();
         
-        // This promise will resolve to either the user, null, or 'TIMEOUT_SIGNAL'
         const resultPromise = Promise.race([
             authPromise,
             new Promise<User | null | 'TIMEOUT_SIGNAL'>((resolve) => 
@@ -63,18 +63,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const result = await resultPromise;
         
         if (mounted) {
-            if (result !== 'TIMEOUT_SIGNAL') { // If it's not a timeout signal, process the user
+            if (result !== 'TIMEOUT_SIGNAL') {
                 setUser(result); 
+                console.log("[AuthContext] initAuth resolved with user:", result?.email, "Setting loading to false.");
             } else {
-                console.warn(`Auth check timed out after ${timeoutDuration / 1000}s. Displaying UI, awaiting onAuthChange.`);
-                // If it timed out, we still stop the initial loading spinner.
-                // The onAuthChange listener will eventually provide the definitive state.
-                // It's better to show an empty UI or login than a perpetual spinner.
+                console.warn(`[AuthContext] initAuth timed out after ${timeoutDuration / 1000}s. Displaying UI, awaiting onAuthChange.`);
             }
             setLoading(false); // Crucial: Stop initial loading spinner here.
         }
       } catch (error) {
-        console.error("Erro auth inicial:", error);
+        console.error("[AuthContext] Erro during initAuth:", error);
         if (mounted) {
             setUser(null);
             setLoading(false); 
@@ -84,24 +82,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     initAuth();
 
-    // The onAuthChange listener is crucial for real-time updates and also acts
-    // as a fallback for `setLoading(false)` if `initAuth` hits a timeout
-    // and `getCurrentUser` eventually resolves or determines no user.
     const unsubscribe = dbService.onAuthChange((u) => {
       if (mounted) {
         setUser(u);
-        // It's important that this also sets loading to false, as the initial initAuth
-        // might have finished due to timeout, but the actual user state might not be
-        // definitively known until onAuthChange fires with the resolved session.
-        // However, initAuth's setLoading(false) is for the *initial mount* to prevent forever spinner.
-        // This one handles *subsequent* state changes.
-        if (loading) setLoading(false); 
+        console.log("[AuthContext] onAuthChange event. User:", u?.email, "Current loading:", loading);
+        if (loading) { // Only set loading to false if it's still true, to avoid unnecessary re-renders
+            setLoading(false);
+            console.log("[AuthContext] onAuthChange setting loading to false.");
+        }
       }
     });
 
     return () => {
       mounted = false;
       unsubscribe();
+      console.log("[AuthContext] useEffect cleanup. Unsubscribed from auth changes.");
     };
   }, []);
 
@@ -125,6 +120,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = async (email: string, password?: string) => {
     setLoading(true);
+    console.log("[AuthContext] login called. Setting loading to true.");
     try {
         const loginPromise = dbService.login(email, password);
         // Timeout de segurança no login manual
@@ -136,32 +132,40 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         if (u) {
             setUser(u);
+            console.log("[AuthContext] login successful. User:", u?.email);
             return true;
         }
+        console.log("[AuthContext] login failed.");
         return false;
     } catch (e) {
-        console.error("Login exception:", e);
+        console.error("[AuthContext] Login exception:", e);
         return false;
     } finally {
         setLoading(false);
+        console.log("[AuthContext] login finished. Setting loading to false.");
     }
   };
 
   const signup = async (name: string, email: string, whatsapp: string, password?: string, cpf?: string, planType?: string | null) => {
     setLoading(true);
+    console.log("[AuthContext] signup called. Setting loading to true.");
     try {
         const u = await dbService.signup(name, email, whatsapp, password, cpf, planType);
         if (u) {
             setUser(u);
+            console.log("[AuthContext] signup successful. User:", u?.email);
             return true;
         }
+        console.log("[AuthContext] signup failed.");
         return false;
     } finally {
         setLoading(false);
+        console.log("[AuthContext] signup finished. Setting loading to false.");
     }
   };
 
   const logout = () => {
+    console.log("[AuthContext] logout called.");
     dbService.logout();
     setUser(null);
   };
