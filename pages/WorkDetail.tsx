@@ -309,7 +309,7 @@ const WorkDetail: React.FC = () => {
                     date: new Date(expDate).toISOString(),
                     category: expCategory,
                     stepId: finalStepId,
-                    totalAgreed: finalTotalAgreed
+                    totalAgreed: finalTotalAgreed // Fixed typo here
                 });
             }
         }
@@ -775,7 +775,7 @@ const WorkDetail: React.FC = () => {
                                 {/* Zé da Obra AI */}
                                 <div onClick={() => navigate('/ai-chat')} className="bg-white/10 hover:bg-white/15 p-4 rounded-2xl border border-white/10 mb-4 cursor-pointer flex items-center gap-4 transition-all backdrop-blur-sm group">
                                     <div className="relative">
-                                        <img src={ZE_AVATAR} className={`w-14 h-14 rounded-full border-2 border-secondary bg-slate-800 object-cover ${!hasAiAccess ? 'grayscale opacity-70' : ''}`} onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK}/>
+                                        <img src={ZE_AVATAR} className={`w-14 h-14 rounded-full border-2 border-secondary bg-slate-800 object-cover ${!hasAiAccess ? 'grayscale opacity-70' : ''}`} onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK} alt="Zé da Obra AI" />
                                         <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 border-2 border-slate-800 rounded-full"></div>
                                     </div>
                                     <div><h4 className="font-bold text-white text-base group-hover:text-secondary transition-colors">Zé da Obra AI</h4><p className="text-xs text-slate-300">Tire dúvidas técnicas 24h</p></div>
