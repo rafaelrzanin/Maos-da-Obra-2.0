@@ -1,103 +1,54 @@
 
-import { PlanType, User } from '../types.ts';
+import { GoogleGenAI } from "@google/genai";
 
-// --- CONFIGURAÇÃO DO GATEWAY ---
-// Coloca aquí las credenciales de tu portal de pago
-// const API_URL = "https://api.tu-portal-de-pago.com/v1"; // Reemplazar con la URL real
-// const PUBLIC_KEY = "TU_PUBLIC_KEY"; // Si la API requiere auth desde el front
+const env = (import.meta as any).env || {};
+const apiKey = env.VITE_GOOGLE_API_KEY;
 
-// IDs de los planes en tu portal de pago
-const GATEWAY_PLAN_IDS = {
-  [PlanType.MENSAL]: "plan_id_mensal_real",
-  [PlanType.SEMESTRAL]: "plan_id_semestral_real",
-  [PlanType.VITALICIO]: "plan_id_vitalicio_real"
-};
+// Campo para chave manual se não configurar no .env
+// Exemplo: const MANUAL_KEY = "AIza...";
+const MANUAL_KEY = "";
 
-export const gatewayService = {
-  /**
-   * Crea una sesión de checkout en el portal de pago.
-   */
-  checkout: async (user: User, planType: PlanType): Promise<string> => {
-    console.log(`[Gateway] Iniciando checkout para ${user.email} no plano ${planType}...`);
+let ai: GoogleGenAI | null = null;
+const effectiveKey = apiKey || MANUAL_KEY;
 
-    try {
-      // 1. Preparar el cuerpo de la solicitud según la documentación de tu API
-      /* 
-      const payload = {
-        items: [
-          {
-            id: GATEWAY_PLAN_IDS[planType],
-            title: `Assinatura Mãos da Obra - ${planType}`,
-            quantity: 1,
-            currency_id: 'BRL',
-            unit_price: planType === PlanType.VITALICIO ? 247.00 : (planType === PlanType.SEMESTRAL ? 97.00 : 29.90)
-          }
-        ],
-        payer: {
-          email: user.email,
-          name: user.name,
-          // phone: user.whatsapp // Opcional dependiendo de la API
-        },
-        external_reference: user.id, // IMPORTANTE: Para vincular el pago al usuario en el Webhook
-        back_urls: {
-          success: `${window.location.origin}/settings?status=success`,
-          failure: `${window.location.origin}/settings?status=failure`,
-          pending: `${window.location.origin}/settings?status=pending`
-        },
-        auto_return: "approved"
-      };
-      */
+if (effectiveKey) {
+  ai = new GoogleGenAI({ apiKey: effectiveKey });
+}
 
-      // 2. Hacer la llamada a la API (Ejemplo genérico, ajustar headers según documentación)
-      /* 
-      const response = await fetch(`${API_URL}/checkout/preferences`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${PUBLIC_KEY}`
-        },
-        body: JSON.stringify(payload),
-      });
+export const aiService = {
+  sendMessage: async (message: string): Promise<string> => {
+    if (!ai) {
+      // OFFLINE FALLBACK MODE
+      const lowerMsg = message.toLowerCase();
+      
+      await new Promise(r => setTimeout(r, 1000)); 
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Erro ao criar preferência de pagamento');
+      if (lowerMsg.includes('concreto') || lowerMsg.includes('traço')) {
+          return "Para um concreto bom, estrutural (25 Mpa), a medida segura é 1 lata de cimento, 2 de areia e 3 de brita. Não exagere na água pra não enfraquecer.";
+      }
+      if (lowerMsg.includes('piso') || lowerMsg.includes('cerâmica')) {
+          return "O segredo do piso é a base nivelada e a argamassa certa. Use AC-III se for porcelanato ou área externa. E respeite a junta que o fabricante pede na caixa.";
+      }
+      if (lowerMsg.includes('tinta') || lowerMsg.includes('pintura')) {
+          return "Antes de pintar, lixe bem e tire o pó. Se a parede for nova, passe selador. Se for repintura com cor escura, talvez precise de mais demãos.";
       }
 
-      const data = await response.json();
-      return data.init_point; // URL de redirección (Mercado Pago usa init_point, Stripe usa url, etc.)
-      */
+      return "Estou sem sinal da central agora (sem chave de API). Mas estou aqui, pode conferir suas anotações.";
+    }
 
-      // --- SIMULACIÓN PARA MANTENER LA APP FUNCIONANDO MIENTRAS INTEGRAS ---
-      await new Promise(resolve => setTimeout(resolve, 1000));
+    try {
+      const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: message,
+        config: {
+          systemInstruction: "Seu nome é Zé da Obra (não Zeca). Você é um mestre de obras e engenheiro extremamente experiente, com décadas de canteiro. \n\nSua Personalidade:\n- Confiável e Técnico: Você sabe o que diz. Não chuta. Cita as normas quando necessário (mas sem ser chato).\n- Parceiro: Você é aquele amigo mais velho que entende tudo de obra. Não use gírias forçadas ('E aí, chefe', 'Beleza, patrão'). Use um tom de respeito e camaradagem.\n- Direto ao Ponto: Responda o que foi perguntado. Se tiver risco de prejuízo ou segurança, avise imediatamente.\n\nExemplo de tom: 'Olha, para essa laje o ideal é usar malha pop 15x15. Se fizer sem, vai trincar tudo depois. O barato sai caro.'\n\nSeu objetivo: Ajudar o usuário a ter uma obra segura, de qualidade e sem desperdício de dinheiro.",
+        }
+      });
       
-      // Simula que la API devolveu una URL de pago real
-      // Em produção, descomenta o bloque fetch de cima e elimina isso
-      const mockCheckoutUrl = `https://checkout.pagamento.com/pay/${GATEWAY_PLAN_IDS[planType]}?ref=${user.id}`;
-      console.warn("MODO SIMULACIÓN: Redirecionando a URL ficticia. Implementar fetch real em services/gateway.ts");
-      
-      return mockCheckoutUrl;
-
+      return response.text || "Não entendi direito. Pode me explicar melhor o que você precisa na obra?";
     } catch (error) {
-      console.error("Erro no gateway de pagamento:", error);
-      throw error;
+      console.error("Erro na IA:", error);
+      return "Tive um problema de conexão aqui. Tenta de novo em um minutinho.";
     }
-  },
-
-  /**
-   * Verifica se uma transação foi exitosa baseado nos parâmetros de la URL
-   * (Útil para feedback imediato no frontend, mas NO para segurança final)
-   */
-  checkPaymentStatus: (searchParams: URLSearchParams): 'success' | 'failure' | 'pending' | null => {
-    const status = searchParams.get('status');
-    // const paymentId = searchParams.get('payment_id'); // O el parámetro que use tu gateway
-
-    if (status === 'approved' || status === 'success') {
-      return 'success';
-    }
-    if (status === 'failure' || status === 'rejected') {
-      return 'failure';
-    }
-    return null;
   }
 };
