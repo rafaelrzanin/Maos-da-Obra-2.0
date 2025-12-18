@@ -186,6 +186,8 @@ const ensureUserProfile = async (authUser: any): Promise<User | null> => {
                 id: authUser.id,
                 name: authUser.user_metadata?.name || authUser.email?.split('@')[0] || 'Novo Usuário',
                 email: authUser.email,
+                whatsapp: null, // Default to null for new profile
+                cpf: null, // Default to null for new profile
                 plan: PlanType.MENSAL,
                 is_trial: true,
                 subscription_expires_at: trialExpires.toISOString()
@@ -202,7 +204,7 @@ const ensureUserProfile = async (authUser: any): Promise<User | null> => {
                 return {
                     id: authUser.id,
                     name: newProfileData.name,
-                    email: authUser.email || '',
+                    email: authData.user.email || '',
                     plan: PlanType.MENSAL,
                     isTrial: true,
                     subscriptionExpiresAt: trialExpires.toISOString()
@@ -664,7 +666,6 @@ export const dbService = {
     if (purchaseInfo && data) {
       // Also record as an expense
       await this.addExpense({
-        id: Math.random().toString(36).substr(2, 9),
         workId: material.workId,
         description: `Compra de ${material.name}`,
         amount: purchaseInfo.cost,
@@ -724,7 +725,6 @@ export const dbService = {
 
     // 2. Record as an expense
     await this.addExpense({
-      id: Math.random().toString(36).substr(2, 9),
       workId: existingMaterial.work_id,
       description: `Compra de ${name} (${qty} ${unit})`,
       amount: cost,
@@ -1154,4 +1154,3 @@ export const dbService = {
     }
   },
 };
-
