@@ -241,7 +241,8 @@ export const dbService = {
     
     const now = Date.now();
     
-    if (sessionCachePromise && (now - sessionCacheTimestamp < AUTH_CACHE_DURATION)) {
+    // Fix TS2801: Explicitly check for null
+    if (sessionCachePromise !== null && (now - sessionCacheTimestamp < AUTH_CACHE_DURATION)) {
         return sessionCachePromise;
     }
 
@@ -381,7 +382,7 @@ export const dbService = {
           }
           
           sessionCachePromise = null; // Invalida cache para forçar refresh
-      } catch (e) {
+      } catch (e: any) { // Explicitly type as any to allow .message access
           console.error("Erro updateUser:", e);
           throw e; // Repassa erro para a UI tratar
       }
@@ -583,9 +584,13 @@ export const dbService = {
         if (error) throw error;
         
         _dashboardCache.works = null; // Invalidate cache
-    } catch (error) {
+    } catch (error: unknown) { // Fix TS18046: Explicitly type as unknown
         console.error("Erro ao apagar obra e dados relacionados:", error);
-        throw new Error(`Falha ao apagar obra: ${error.message}`);
+        if (error instanceof Error) {
+            throw new Error(`Falha ao apagar obra: ${error.message}`);
+        } else {
+            throw new Error(`Falha ao apagar obra: Um erro desconhecido ocorreu.`);
+        }
     }
   },
 
@@ -1150,8 +1155,9 @@ export const dbService = {
                 });
             }
         }
-    } catch (error) {
+    } catch (error: any) { // Explicitly type as any to allow .message access
         console.error("Erro ao gerar notificações inteligentes:", error);
     }
   },
 };
+
