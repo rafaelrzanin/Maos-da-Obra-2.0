@@ -856,154 +856,76 @@ const WorkDetail: React.FC = () => {
             );
 
          case 'REPORTS': {
-  const workProgressPercentage = stats?.progress || 0;
-  const totalSpent = expenses.reduce((sum, e) => sum + Number(e.amount), 0);
+            const workProgressPercentage = stats?.progress || 0;
+            const totalSpent = expenses.reduce((sum, e) => sum + Number(e.amount), 0);
 
-  return (
-    <div className="space-y-6 animate-in fade-in">
-      {/* Report Dashboard Section */}
-      <div className="bg-gradient-premium rounded-3xl p-6 text-white shadow-xl relative overflow-hidden mb-8">
-        <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2"></div>
+            return (
+                <div className="space-y-6 animate-in fade-in">
+                    <div className="bg-gradient-premium rounded-3xl p-6 text-white shadow-xl relative overflow-hidden mb-8">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2"></div>
+                        <div className="relative z-10">
+                            <h3 className="text-xl font-black mb-1 text-secondary uppercase tracking-widest">Resumo da Obra</h3>
+                            <h2 className="text-3xl font-black text-white leading-tight mb-4">{work.name}</h2>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div className="bg-white/10 p-4 rounded-xl border border-white/20">
+                                    <p className="text-xs font-bold uppercase text-white/70 mb-1">Total Gasto</p>
+                                    <p className="text-xl font-black">R$ {totalSpent.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                                </div>
+                                <div className="bg-white/10 p-4 rounded-xl border border-white/20">
+                                    <p className="text-xs font-bold uppercase text-white/70 mb-1">Orçamento</p>
+                                    <p className="text-xl font-black">R$ {Number(work.budgetPlanned || 0).toLocaleString('pt-BR')}</p>
+                                </div>
+                                <div className="bg-white/10 p-4 rounded-xl border border-white/20 sm:col-span-2">
+                                    <p className="text-xs font-bold uppercase text-white/70 mb-1">Progresso Geral</p>
+                                    <div className="h-3 bg-white/20 rounded-full overflow-hidden mb-2">
+                                        <div className="h-full bg-secondary" style={{ width: `${workProgressPercentage}%` }} />
+                                    </div>
+                                    <p className="text-sm font-bold">{workProgressPercentage}% Concluído</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
 
-        <div className="relative z-10">
-          <h3 className="text-xl font-black mb-1 text-secondary uppercase tracking-widest">
-            Resumo da Obra
-          </h3>
+                    <div className="flex justify-end gap-3 mb-6 no-print">
+                        <button onClick={handleExportExcel} className="px-6 py-3 bg-green-600 text-white font-bold rounded-xl shadow-md flex items-center gap-2">
+                            <i className="fa-solid fa-file-excel"></i> Excel
+                        </button>
+                        <button onClick={handlePrintPDF} className="px-6 py-3 bg-blue-600 text-white font-bold rounded-xl shadow-md flex items-center gap-2">
+                            <i className="fa-solid fa-print"></i> PDF
+                        </button>
+                    </div>
 
-          <h2 className="text-3xl font-black text-white leading-tight mb-4">
-            {work.name}
-          </h2>
+                    <div className="flex gap-2 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl no-print">
+                        {(['CRONO', 'MAT', 'FIN'] as const).map((rt) => (
+                            <button key={rt} onClick={() => setReportTab(rt)} className={`flex-1 py-2 rounded-lg text-xs font-bold ${reportTab === rt ? 'bg-white shadow text-primary' : 'text-slate-500'}`}>
+                                {rt === 'CRONO' ? 'Cronograma' : rt === 'MAT' ? 'Materiais' : 'Financeiro'}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            );
+        } // FIM DA CASE REPORTS
 
-          {/* ✅ grid responsivo: mobile 1 coluna / desktop 2 colunas */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="bg-white/10 p-4 rounded-xl backdrop-blur-sm border border-white/20 min-w-0">
-              <p className="text-xs font-bold uppercase text-white/70 mb-1">Total Gasto</p>
-              <p className="text-xl sm:text-2xl font-black leading-none break-words">
-                R$ {totalSpent.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-              </p>
-            </div>
-
-            <div className="bg-white/10 p-4 rounded-xl backdrop-blur-sm border border-white/20 min-w-0">
-              <p className="text-xs font-bold uppercase text-white/70 mb-1">Orçamento Planejado</p>
-              <p className="text-xl sm:text-2xl font-black leading-none break-words">
-                R$ {Number(work.budgetPlanned || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-              </p>
-            </div>
-
-            <div className="bg-white/10 p-4 rounded-xl backdrop-blur-sm border border-white/20 sm:col-span-2">
-              <p className="text-xs font-bold uppercase text-white/70 mb-1">Progresso Geral</p>
-
-              <div className="h-3 bg-white/20 rounded-full overflow-hidden mb-2">
-                <div
-                  className="h-full bg-secondary shadow-[0_0_10px_rgba(217,119,6,0.5)]"
-                  style={{ width: `${workProgressPercentage}%` }}
-                />
-              </div>
-
-              <p className="text-sm font-bold">{workProgressPercentage}% Concluído</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Print/Export Buttons - Moved to top of report section */}
-      <div className="flex justify-end gap-3 mb-6 no-print">
-        <button
-          onClick={handleExportExcel}
-          className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl shadow-md transition-all flex items-center gap-2"
-        >
-          <i className="fa-solid fa-file-excel"></i> Exportar Excel
-        </button>
-
-        <button
-          onClick={handlePrintPDF}
-          className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-md transition-all flex items-center gap-2"
-        >
-          <i className="fa-solid fa-print"></i> Imprimir PDF
-        </button>
-      </div>
-
-      {/* Tab selection for reports */}
-      <div className="flex gap-2 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl no-print">
-        {(['CRONO', 'MAT', 'FIN'] as const).map((rt) => (
-          <button
-            key={rt}
-            onClick={() => setReportTab(rt)}
-            className={`flex-1 py-2 rounded-lg text-xs font-bold ${
-              reportTab === rt ? 'bg-white shadow text-primary dark:text-white' : 'text-slate-500 dark:text-slate-400'
-            }`}
-          >
-            {rt === 'CRONO' ? 'Cronograma' : rt === 'MAT' ? 'Materiais' : 'Financeiro'}
-          </button>
-        ))}
-      </div>
-
-      {/* Report Content */}
-      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm print:shadow-none print:border-0 print:rounded-none">
-        {/* Print Header */}
-        <div className="hidden print:block p-8 border-b-2 border-slate-100 dark:border-slate-800">
-          <div className="flex justify-between items-start">
-            <div>
-              <h1 className="text-3xl font-black text-slate-900 mb-1">MÃOS DA OBRA</h1>
-              <p className="text-sm font-bold text-slate-500">Relatório Geral</p>
-            </div>
-            <div className="text-right">
-              <h2 className="text-xl font-bold text-slate-800">{work.name}</h2>
-              <p className="text-sm text-slate-500">{new Date().toLocaleDateString()}</p>
-            </div>
-          </div>
-        </div>
-
-        {reportTab === 'CRONO' && (
-          <div className="p-6">
-            {/* ... seu conteúdo CRONO aqui (mantém igual) ... */}
-          </div>
-        )}
-
-        {reportTab === 'MAT' && (
-          <div className="p-6">
-            {/* ... seu conteúdo MAT aqui (mantém igual) ... */}
-          </div>
-        )}
-
-        {reportTab === 'FIN' && (
-          <div className="p-6">
-            {/* ... seu conteúdo FIN aqui (mantém igual) ... */}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-        
-            case 'SUPPLIERS': return (
+        case 'SUPPLIERS':
+            return (
                 <div className="space-y-6">
                     <div className="bg-amber-50 dark:bg-amber-900/20 p-6 rounded-3xl border border-amber-100 dark:border-amber-900 mb-2">
                         <h3 className="text-xl font-bold text-primary dark:text-white mb-1">Fornecedores</h3>
-                        <button onClick={() => openPersonModal('SUPPLIER')} className="w-full mt-4 py-4 rounded-2xl bg-amber-600 text-white font-bold hover:bg-amber-700 transition-colors shadow-lg shadow-amber-600/20 flex items-center justify-center gap-2">
+                        <button onClick={() => openPersonModal('SUPPLIER')} className="w-full mt-4 py-4 rounded-2xl bg-amber-600 text-white font-bold shadow-lg flex items-center justify-center gap-2">
                             <i className="fa-solid fa-plus"></i> Adicionar Fornecedor
                         </button>
                     </div>
                     <div className="space-y-3">
                         {suppliers.length === 0 && <p className="text-center text-slate-400 py-10">Nenhum fornecedor cadastrado.</p>}
                         {suppliers.map(s => (
-                            <div key={s.id} className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm flex items-center justify-between">
+                            <div key={s.id} className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 flex items-center justify-between">
                                 <div className="flex items-center gap-4 cursor-pointer flex-1" onClick={() => openPersonModal('SUPPLIER', s)}>
                                     <div className="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 text-xl"><i className="fa-solid fa-store"></i></div>
                                     <div><h4 className="font-bold text-primary dark:text-white">{s.name}</h4><p className="text-xs text-slate-500 font-bold">{s.category}</p></div>
                                 </div>
                                 <div className="flex gap-2">
-                                    {s.phone && (
-                                        <a 
-                                            href={`https://wa.me/55${s.phone.replace(/\D/g, '')}`} 
-                                            target="_blank" 
-                                            rel="noopener noreferrer"
-                                            className="w-10 h-10 rounded-xl bg-green-100 text-green-600 hover:bg-green-200 transition-colors flex items-center justify-center"
-                                        >
-                                            <i className="fa-brands fa-whatsapp text-lg"></i>
-                                        </a>
-                                    )}
-                                    <button onClick={() => handleDeletePerson(s.id, 'SUPPLIER')} className="w-10 h-10 rounded-xl text-red-500 hover:bg-red-50 transition-colors"><i className="fa-solid fa-trash"></i></button>
+                                    {s.phone && <a href={`https://wa.me/55${s.phone.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" className="w-10 h-10 rounded-xl bg-green-100 text-green-600 flex items-center justify-center"><i className="fa-brands fa-whatsapp text-lg"></i></a>}
+                                    <button onClick={() => handleDeletePerson(s.id, 'SUPPLIER')} className="w-10 h-10 rounded-xl text-red-500"><i className="fa-solid fa-trash"></i></button>
                                 </div>
                             </div>
                         ))}
