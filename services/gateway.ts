@@ -1,4 +1,5 @@
-import { PlanType, User } from '../types';
+
+import { PlanType, User } from '../types.ts';
 
 // --- CONFIGURAÇÃO DO GATEWAY ---
 // Coloca aquí las credenciales de tu portal de pago
@@ -70,10 +71,10 @@ export const gatewayService = {
       // --- SIMULACIÓN PARA MANTENER LA APP FUNCIONANDO MIENTRAS INTEGRAS ---
       await new Promise(resolve => setTimeout(resolve, 1000));
       
-      // Simula que la API devolvió una URL de pago real
-      // En produção, descomenta el bloque fetch de arriba y elimina esto
+      // Simula que la API devolveu una URL de pago real
+      // Em produção, descomenta o bloque fetch de cima e elimina isso
       const mockCheckoutUrl = `https://checkout.pagamento.com/pay/${GATEWAY_PLAN_IDS[planType]}?ref=${user.id}`;
-      console.warn("MODO SIMULACIÓN: Redirigiendo a URL ficticia. Implementar fetch real en services/gateway.ts");
+      console.warn("MODO SIMULACIÓN: Redirecionando a URL ficticia. Implementar fetch real em services/gateway.ts");
       
       return mockCheckoutUrl;
 
@@ -84,8 +85,8 @@ export const gatewayService = {
   },
 
   /**
-   * Verifica si una transacción fue exitosa basado en los parámetros de la URL
-   * (Útil para feedback inmediato en el frontend, pero NO para seguridad final)
+   * Verifica se uma transação foi exitosa baseado nos parâmetros de la URL
+   * (Útil para feedback imediato no frontend, mas NO para segurança final)
    */
   checkPaymentStatus: (searchParams: URLSearchParams): 'success' | 'failure' | 'pending' | null => {
     const status = searchParams.get('status');
