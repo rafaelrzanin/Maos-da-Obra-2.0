@@ -38,6 +38,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [showAiTrialBanner, setShowAiTrialBanner] = useState(true); // New state for banner visibility
 
   // Scroll to top on route change
   useEffect(() => {
@@ -68,7 +69,8 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const isCheckoutPage = location.pathname === '/checkout';
   
   // Condição para exibir banner de trial
-  const isAiTrialActive = user?.isTrial && trialDaysRemaining !== null && trialDaysRemaining > 0;
+  // Modified to exclude VITALICIO users from seeing the trial banner
+  const isAiTrialActive = user?.isTrial && trialDaysRemaining !== null && trialDaysRemaining > 0 && user?.plan !== PlanType.VITALICIO;
 
   if (!isSubscriptionValid && !isAiTrialActive && !isSettingsPage && !isCheckoutPage) {
       return <Navigate to="/settings" replace />;
@@ -169,8 +171,8 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       <main className="flex-1 md:ml-64 pt-20 md:pt-0 min-h-screen transition-all">
         <div className="p-4 md:p-8 max-w-7xl mx-auto" key={location.pathname}>
             {/* Trial Banner - ZÉ DA OBRA ONLY */}
-            {isAiTrialActive && (
-                <div className="mb-6 bg-gradient-to-r from-purple-600 to-indigo-700 text-white px-6 py-4 rounded-2xl shadow-lg flex flex-col md:flex-row items-center justify-between gap-4 animate-in fade-in slide-in-from-top-2">
+            {isAiTrialActive && showAiTrialBanner && (
+                <div className="mb-6 bg-gradient-to-r from-purple-600 to-indigo-700 text-white px-6 py-4 rounded-2xl shadow-lg flex flex-col md:flex-row items-center justify-between gap-4 animate-in fade-in slide-in-from-top-2 relative">
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center animate-pulse"><i className="fa-solid fa-robot text-xl"></i></div>
                         <div>
@@ -180,6 +182,10 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                     </div>
                     <button onClick={() => navigate('/checkout?plan=VITALICIO')} className="px-6 py-2 bg-white text-indigo-700 font-bold rounded-xl text-sm hover:bg-slate-100 transition-colors shadow-sm whitespace-nowrap">
                         Garantir Vitalício
+                    </button>
+                    {/* Close button for the banner */}
+                    <button onClick={() => setShowAiTrialBanner(false)} className="absolute top-2 right-2 text-white/70 hover:text-white p-1 rounded-full">
+                        <i className="fa-solid fa-xmark text-lg"></i>
                     </button>
                 </div>
             )}
