@@ -1175,34 +1175,7 @@ const WorkDetail: React.FC = () => {
                 </div>
             );
 
-            // Reusing existing components for other subviews to save space, but ensuring they are rendered
-            case 'BONUS_IA': return (
-                <div className="flex flex-col items-center justify-center min-h-[70vh] p-6 text-center animate-in fade-in">
-                    <div className="w-full max-w-sm bg-gradient-to-br from-slate-900 to-slate-950 rounded-[2.5rem] p-8 shadow-2xl relative overflow-hidden border border-slate-800 group">
-                        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20"></div>
-                        <div className="absolute -top-20 -right-20 w-40 h-40 bg-secondary/30 rounded-full blur-3xl animate-pulse"></div>
-                        <div className="relative z-10 flex flex-col items-center">
-                            <div className="w-28 h-28 rounded-full border-4 border-slate-800 p-1 bg-gradient-gold shadow-[0_0_30px_rgba(217,119,6,0.4)] mb-6 transform hover:scale-105 transition-transform duration-500">
-                                <img src={ZE_AVATAR} className="w-full h-full object-cover rounded-full bg-white" onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK}/>
-                            </div>
-                            <h2 className="text-3xl font-black text-white mb-2 tracking-tight">Zé da Obra <span className="text-secondary">AI</span></h2>
-                            <div className="h-1 w-12 bg-secondary rounded-full mb-6"></div>
-                            <p className="text-slate-400 text-sm mb-8 leading-relaxed font-medium">Seu engenheiro virtual particular.</p>
-                            {hasAiAccess ? (
-                                <button onClick={() => navigate('/ai-chat')} className="w-full py-4 bg-gradient-gold text-white font-black rounded-2xl shadow-lg hover:shadow-orange-500/20 hover:scale-105 transition-all flex items-center justify-center gap-3 group-hover:animate-pulse"><span>INICIAR CONVERSA</span><i className="fa-solid fa-comments"></i></button>
-                            ) : (
-                                <button onClick={() => navigate('/settings')} className="w-full py-4 bg-slate-800 text-slate-500 font-bold rounded-2xl border border-slate-700 flex items-center justify-center gap-2 hover:bg-slate-700 transition-colors"><i className="fa-solid fa-lock"></i> BLOQUEADO (PREMIUM)</button>
-                            )}
-                            <p className="text-center text-[10px] text-slate-500 mt-4 flex items-center justify-center gap-1">
-                                <i className="fa-solid fa-info-circle"></i> Acesso à IA é exclusivo para assinantes Vitalícios ou em período de trial.
-                            </p>
-                        </div>
-                    </div>
-                </div>
-            );
-
-            // Removed case 'BONUS_IA_CHAT' as it is handled by dedicated page /ai-chat
-
+            // Removed case 'BONUS_IA' as AI chat is now handled by a dedicated page.
             case 'CONTRACTS': return (
                 <div className="space-y-4">
                     {CONTRACT_TEMPLATES.map(ct => (
@@ -1535,4 +1508,3 @@ const WorkDetail: React.FC = () => {
 };
 
 export default WorkDetail;
-
