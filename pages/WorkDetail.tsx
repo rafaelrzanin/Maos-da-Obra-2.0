@@ -1,8 +1,9 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../contexts/AuthContext'; // Corrected import path
 import { dbService } from '../services/db';
 import { Work, Worker, Supplier, Material, Step, Expense, StepStatus, WorkPhoto, WorkFile, FileCategory, ExpenseCategory, PlanType } from '../types';
 import { ZeModal } from '../components/ZeModal';
@@ -11,7 +12,7 @@ import { aiService } from '../services/ai';
 
 // --- TYPES FOR VIEW STATE ---
 type MainTab = 'SCHEDULE' | 'MATERIALS' | 'FINANCIAL' | 'MORE';
-type SubView = 'NONE' | 'TEAM' | 'SUPPLIERS' | 'REPORTS' | 'PHOTOS' | 'PROJECTS' | 'CALCULATORS' | 'CONTRACTS' | 'CHECKLIST'; // Removed BONUS_IA, BONUS_IA_CHAT
+type SubView = 'NONE' | 'TEAM' | 'SUPPLIERS' | 'REPORTS' | 'PHOTOS' | 'PROJECTS' | 'BONUS_IA' | 'BONUS_IA_CHAT' | 'CALCULATORS' | 'CONTRACTS' | 'CHECKLIST';
 
 // --- DATE HELPERS ---
 const parseDateNoTimezone = (dateStr: string) => {
@@ -27,7 +28,7 @@ const parseDateNoTimezone = (dateStr: string) => {
 const WorkDetail: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
-    const { user, trialDaysRemaining } = useAuth();
+    const { user } = useAuth();
     
     // --- CORE DATA STATE ---
     const [work, setWork] = useState<Work | null>(null);
@@ -45,13 +46,8 @@ const WorkDetail: React.FC = () => {
     const [subView, setSubView] = useState<SubView>('NONE');
     const [uploading, setUploading] = useState(false);
     
-    // --- AI ACCESS LOGIC ---
-    const isVitalicio = user?.plan === PlanType.VITALICIO;
-    const isAiTrialActive = user?.isTrial && trialDaysRemaining !== null && trialDaysRemaining > 0;
-    const hasAiAccess = isVitalicio || isAiTrialActive;
-
-    // --- PREMIUM TOOLS LOCK ---
-    const isPremium = isVitalicio;
+    // --- PREMIUM CHECK ---
+    const isPremium = user?.plan === PlanType.VITALICIO;
 
     // --- MODALS STATE ---
     const [stepModalMode, setStepModalMode] = useState<'ADD' | 'EDIT'>('ADD');
@@ -61,12 +57,8 @@ const WorkDetail: React.FC = () => {
     const [stepStart, setStepStart] = useState('');
     const [stepEnd, setStepEnd] = useState('');
     
-    // Material Filter (Main Tab)
+    // Material Filter
     const [materialFilterStepId, setMaterialFilterStepId] = useState<string>('ALL');
-    
-    // Report Filter
-    const [reportTab, setReportTab] = useState<'CRONO'|'MAT'|'FIN'>('CRONO');
-    const [reportMaterialFilterStepId, setReportMaterialFilterStepId] = useState<string>('ALL');
 
     const [materialModal, setMaterialModal] = useState<{ isOpen: boolean, material: Material | null }>({ isOpen: false, material: null });
     const [matName, setMatName] = useState('');
@@ -86,7 +78,7 @@ const WorkDetail: React.FC = () => {
     const [newMatBuyQty, setNewMatBuyQty] = useState('');
     const [newMatBuyCost, setNewMatBuyCost] = useState('');
 
-    // EXPENSE MODAL STATE
+    // EXPENSE MODAL STATE (UNIFIED ADD/EDIT)
     const [expenseModal, setExpenseModal] = useState<{ isOpen: boolean, mode: 'ADD'|'EDIT', id?: string }>({ isOpen: false, mode: 'ADD' });
     const [expDesc, setExpDesc] = useState('');
     const [expAmount, setExpAmount] = useState('');
@@ -96,6 +88,7 @@ const WorkDetail: React.FC = () => {
     const [expDate, setExpDate] = useState('');
     // NEW STATE: Tracks the amount already in DB to support cumulative logic
     const [expSavedAmount, setExpSavedAmount] = useState(0);
+
 
     const [isPersonModalOpen, setIsPersonModalOpen] = useState(false);
     const [personMode, setPersonMode] = useState<'WORKER'|'SUPPLIER'>('WORKER');
@@ -108,11 +101,15 @@ const WorkDetail: React.FC = () => {
     const [viewContract, setViewContract] = useState<{title: string, content: string} | null>(null);
     const [zeModal, setZeModal] = useState({ isOpen: false, title: '', message: '', onConfirm: () => {} });
 
-    // AI & TOOLS - Removed AI specific states as it's now a global page
+    // AI & TOOLS
+    const [aiMessage, setAiMessage] = useState('');
+    const [aiResponse, setAiResponse] = useState('');
+    const [aiLoading, setAiLoading] = useState(false);
     const [calcType, setCalcType] = useState<'PISO'|'PAREDE'|'PINTURA'>('PISO');
     const [calcArea, setCalcArea] = useState('');
     const [calcResult, setCalcResult] = useState<string[]>([]);
     const [activeChecklist, setActiveChecklist] = useState<string | null>(null);
+    const [reportTab, setReportTab] = useState<'CRONO'|'MAT'|'FIN'>('CRONO');
 
     // --- LOAD DATA ---
     const load = async () => {
@@ -446,8 +443,6 @@ const WorkDetail: React.FC = () => {
         window.print();
     };
 
-    // Removed handleAiAsk as AI chat is now a global page
-    /*
     const handleAiAsk = async () => {
         if (!aiMessage.trim()) return;
         setAiLoading(true);
@@ -456,7 +451,6 @@ const WorkDetail: React.FC = () => {
         setAiLoading(false);
         setAiMessage('');
     };
-    */
 
     if (loading) return <div className="h-screen flex items-center justify-center"><i className="fa-solid fa-circle-notch fa-spin text-3xl text-primary"></i></div>;
     if (!work) return null;
@@ -775,9 +769,7 @@ const WorkDetail: React.FC = () => {
                                     <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center text-white shadow-lg shadow-secondary/30"><i className="fa-solid fa-crown"></i></div>
                                     <div><h3 className="text-lg font-black text-white uppercase tracking-tight">Área Premium</h3><p className="text-xs text-slate-400 font-medium">Ferramentas Exclusivas</p></div>
                                 </div>
-                                
-                                {/* Removed Zé da Obra AI card as it's now a top-level nav item */}
-                                {/*
+
                                 <div onClick={() => setSubView('BONUS_IA')} className="bg-white/10 hover:bg-white/15 p-4 rounded-2xl border border-white/10 mb-4 cursor-pointer flex items-center gap-4 transition-all backdrop-blur-sm group">
                                     <div className="relative">
                                         <img src={ZE_AVATAR} className={`w-14 h-14 rounded-full border-2 border-secondary bg-slate-800 object-cover ${!isPremium ? 'grayscale opacity-70' : ''}`} onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK}/>
@@ -786,7 +778,6 @@ const WorkDetail: React.FC = () => {
                                     <div><h4 className="font-bold text-white text-base group-hover:text-secondary transition-colors">Zé da Obra AI</h4><p className="text-xs text-slate-300">Tire dúvidas técnicas 24h</p></div>
                                     <div className="ml-auto w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-white/50 group-hover:bg-secondary group-hover:text-white transition-all"><i className="fa-solid fa-chevron-right"></i></div>
                                 </div>
-                                */}
 
                                 <div className="grid grid-cols-3 gap-3">
                                     {['CALCULATORS', 'CONTRACTS', 'CHECKLIST'].map(item => (
@@ -964,8 +955,7 @@ const WorkDetail: React.FC = () => {
                 </div>
             );
 
-            // Removed BONUS_IA & BONUS_IA_CHAT cases
-            /*
+            // Reusing existing components for other subviews to save space, but ensuring they are rendered
             case 'BONUS_IA': return (
                 <div className="flex flex-col items-center justify-center min-h-[70vh] p-6 text-center animate-in fade-in">
                     <div className="w-full max-w-sm bg-gradient-to-br from-slate-900 to-slate-950 rounded-[2.5rem] p-8 shadow-2xl relative overflow-hidden border border-slate-800 group">
@@ -1010,7 +1000,6 @@ const WorkDetail: React.FC = () => {
                     </div>
                 </div>
             );
-            */
 
             case 'CONTRACTS': return (
                 <div className="space-y-4">
@@ -1344,3 +1333,4 @@ const WorkDetail: React.FC = () => {
 };
 
 export default WorkDetail;
+
