@@ -3,13 +3,22 @@ import { createClient } from '@supabase/supabase-js';
 
 // Helper function to safely get environment variables, checking both import.meta.env and process.env
 const safeGetEnv = (key: string): string | undefined => {
-  if (typeof import.meta !== 'undefined' && import.meta.env && typeof import.meta.env[key] === 'string') {
-    return import.meta.env[key];
+  const vEnv = (typeof import.meta !== "undefined" ? (import.meta as any).env : undefined) as
+    | Record<string, unknown>
+    | undefined;
+
+  if (vEnv && typeof vEnv[key] === "string") {
+    return vEnv[key] as string;
   }
-  // Fallback for environments where process.env might be used or polyfilled
-  if (typeof process !== 'undefined' && process.env && typeof process.env[key] === 'string') {
-    return process.env[key];
+
+  const pEnv = (typeof process !== "undefined" ? (process as any).env : undefined) as
+    | Record<string, unknown>
+    | undefined;
+
+  if (pEnv && typeof pEnv[key] === "string") {
+    return pEnv[key] as string;
   }
+
   return undefined;
 };
 
