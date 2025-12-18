@@ -13,8 +13,8 @@ const safeGetEnv = (key: string): string | undefined => {
   return undefined;
 };
 
-const supabaseUrl = safeGetEnv('VITE_SUPABASE_URL');
-const supabaseKey = safeGetEnv('VITE_SUPABASE_ANON_KEY');
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 // Throw an error if environment variables are missing
 if (!supabaseUrl || !supabaseKey) {
