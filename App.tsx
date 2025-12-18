@@ -15,6 +15,8 @@ const Settings = lazy(() => import('./pages/Settings') as unknown as Promise<{ d
 const Profile = lazy(() => import('./pages/Profile') as unknown as Promise<{ default: React.ComponentType<any> }>);
 const VideoTutorials = lazy(() => import('./pages/VideoTutorials') as unknown as Promise<{ default: React.ComponentType<any> }>);
 const Checkout = lazy(() => import('./pages/Checkout') as unknown as Promise<{ default: React.ComponentType<any> }>);
+const AiChat = lazy(() => import('./pages/AiChat') as unknown as Promise<{ default: React.ComponentType<any> }>);
+
 
 // --- Componente de Carregamento ---
 const LoadingScreen = () => (
@@ -65,13 +67,17 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const isSettingsPage = location.pathname === '/settings';
   const isCheckoutPage = location.pathname === '/checkout';
   
-  if (!isSubscriptionValid && !isSettingsPage && !isCheckoutPage) {
+  // Condição para exibir banner de trial
+  const isAiTrialActive = user?.isTrial && trialDaysRemaining !== null && trialDaysRemaining > 0;
+
+  if (!isSubscriptionValid && !isAiTrialActive && !isSettingsPage && !isCheckoutPage) {
       return <Navigate to="/settings" replace />;
   }
 
   const navItems = [
     { label: 'Painel Geral', path: '/', icon: 'fa-house' },
     { label: 'Nova Obra', path: '/create', icon: 'fa-plus-circle' },
+    { label: 'Zé da Obra AI', path: '/ai-chat', icon: 'fa-robot' }, // NOVO BOTÃO
     { label: 'Tutoriais', path: '/tutorials', icon: 'fa-circle-play' },
     { label: 'Meu Perfil', path: '/profile', icon: 'fa-user' },
     { label: 'Assinatura', path: '/settings', icon: 'fa-gear' },
@@ -163,7 +169,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       <main className="flex-1 md:ml-64 pt-20 md:pt-0 min-h-screen transition-all">
         <div className="p-4 md:p-8 max-w-7xl mx-auto" key={location.pathname}>
             {/* Trial Banner - ZÉ DA OBRA ONLY */}
-            {user.plan !== PlanType.VITALICIO && user.isTrial && trialDaysRemaining !== null && trialDaysRemaining > 0 && (
+            {isAiTrialActive && (
                 <div className="mb-6 bg-gradient-to-r from-purple-600 to-indigo-700 text-white px-6 py-4 rounded-2xl shadow-lg flex flex-col md:flex-row items-center justify-between gap-4 animate-in fade-in slide-in-from-top-2">
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center animate-pulse"><i className="fa-solid fa-robot text-xl"></i></div>
@@ -196,6 +202,7 @@ const App: React.FC = () => {
               <Route path="/" element={<Layout><Dashboard /></Layout>} />
               <Route path="/create" element={<Layout><CreateWork /></Layout>} />
               <Route path="/work/:id" element={<Layout><WorkDetail /></Layout>} />
+              <Route path="/ai-chat" element={<Layout><AiChat /></Layout>} /> {/* NOVA ROTA */}
               <Route path="/settings" element={<Layout><Settings /></Layout>} />
               <Route path="/profile" element={<Layout><Profile /></Layout>} />
               <Route path="/tutorials" element={<Layout><VideoTutorials /></Layout>} />
@@ -209,4 +216,3 @@ const App: React.FC = () => {
 };
 
 export default App;
-
