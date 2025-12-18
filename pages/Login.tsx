@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../contexts/AuthContext';
+import { useAuth } from '../contexts/AuthContext.tsx';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { dbService } from '../services/db';
+import { dbService } from '../services/db.ts';
 
 const Login: React.FC = () => {
   const { login, signup, user, loading: authLoading, isSubscriptionValid } = useAuth();
@@ -242,4 +242,3 @@ const Login: React.FC = () => {
 };
 
 export default Login;
-
