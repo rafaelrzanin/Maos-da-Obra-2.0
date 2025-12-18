@@ -152,7 +152,7 @@ const ensureUserProfile = async (authUser: any): Promise<User | null> => {
     if (!authUser) return null;
 
     if (pendingProfileRequests[authUser.id]) {
-        return pendingProfileRequests[authUser.id];
+        return pendingProfileRequests[authUser.id]!;
     }
 
     const fetchProfileProcess = async (): Promise<User | null> => {
