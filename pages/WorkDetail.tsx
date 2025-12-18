@@ -890,36 +890,32 @@ const WorkDetail: React.FC = () => {
                 </div>
             );
 
-            case 'REPORTS': 
-            const workProgressPercentage = stats?.progress || 0; // Use stats.progress for the dashboard
-            return (
-                <div className="space-y-6 animate-in fade-in">
-                    {/* Report Dashboard Section */}
-                    <div className="bg-gradient-premium rounded-3xl p-6 text-white shadow-xl relative overflow-hidden mb-8">
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2"></div>
-                        <div className="relative z-10">
-                            <h3 className="text-xl font-black mb-1 text-secondary uppercase tracking-widest">Resumo da Obra</h3>
-                            <h2 className="text-3xl font-black text-white leading-tight mb-4">{work.name}</h2>
-                            
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="bg-white/10 p-4 rounded-xl backdrop-blur-sm border border-white/20">
-                                    <p className="text-xs font-bold uppercase text-white/70 mb-1">Total Gasto</p>
-                                    <p className="text-2xl font-black">R$ {expenses.reduce((sum, e) => sum + Number(e.amount), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
-                                </div>
-                                <div className="bg-white/10 p-4 rounded-xl backdrop-blur-sm border border-white/20">
-                                    <p className="text-xs font-bold uppercase text-white/70 mb-1">Orçamento Planejado</p>
-                                    <p className="text-2xl font-black">R$ {work.budgetPlanned.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
-                                </div>
-                                <div className="bg-white/10 p-4 rounded-xl backdrop-blur-sm border border-white/20 col-span-2">
-                                     <p className="text-xs font-bold uppercase text-white/70 mb-1">Progresso Geral</p>
-                                     <div className="h-3 bg-white/20 rounded-full overflow-hidden mb-2">
-                                        <div className="h-full bg-secondary shadow-[0_0_10px_rgba(217,119,6,0.5)]" style={{ width: `${workProgressPercentage}%` }}></div>
-                                     </div>
-                                     <p className="text-sm font-bold">{workProgressPercentage}% Concluído</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
+           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+  <div className="bg-white/10 p-4 rounded-xl backdrop-blur-sm border border-white/20">
+    <p className="text-xs font-bold uppercase text-white/70 mb-1">Total Gasto</p>
+    <p className="text-xl sm:text-2xl font-black leading-none break-words">
+      R$ {expenses.reduce((sum, e) => sum + Number(e.amount), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+    </p>
+  </div>
+
+  <div className="bg-white/10 p-4 rounded-xl backdrop-blur-sm border border-white/20">
+    <p className="text-xs font-bold uppercase text-white/70 mb-1">Orçamento Planejado</p>
+    <p className="text-xl sm:text-2xl font-black leading-none break-words">
+      R$ {work.budgetPlanned.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+    </p>
+  </div>
+
+  <div className="bg-white/10 p-4 rounded-xl backdrop-blur-sm border border-white/20 sm:col-span-2">
+    <p className="text-xs font-bold uppercase text-white/70 mb-1">Progresso Geral</p>
+    <div className="h-3 bg-white/20 rounded-full overflow-hidden mb-2">
+      <div
+        className="h-full bg-secondary shadow-[0_0_10px_rgba(217,119,6,0.5)]"
+        style={{ width: `${workProgressPercentage}%` }}
+      />
+    </div>
+    <p className="text-sm font-bold">{workProgressPercentage}% Concluído</p>
+  </div>
+</div>
 
                     {/* Print/Export Buttons - Moved to top of report section */}
                     <div className="flex justify-end gap-3 mb-6 no-print">
