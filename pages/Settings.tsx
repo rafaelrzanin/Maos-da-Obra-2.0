@@ -1,9 +1,9 @@
 
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
-import { PlanType } from '../types';
-import { LIFETIME_BONUSES } from '../services/standards';
+import { useAuth } from '../contexts/AuthContext.tsx';
+import { PlanType } from '../types.ts';
+import { LIFETIME_BONUSES } from '../services/standards.ts';
 
 const Settings: React.FC = () => {
   const { user, isSubscriptionValid, isNewAccount } = useAuth();
@@ -251,4 +251,3 @@ const Settings: React.FC = () => {
 };
 
 export default Settings;
-
