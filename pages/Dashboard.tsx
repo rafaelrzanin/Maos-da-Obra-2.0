@@ -488,103 +488,107 @@ const Dashboard: React.FC = () => {
       {/* Access Button (OLD POSITION) - REMOVED FROM HERE */}
 
       {/* MAIN HUD (SKELETON IF LOADING) */}
-      {isLoadingDetails ? (
-          <div className="glass-panel rounded-3xl p-1 shadow-2xl mb-8 relative z-0 animate-pulse">
-              <div className="bg-white/50 dark:bg-slate-800/60 rounded-[1.4rem] p-6 h-64"></div>
+   {isLoadingDetails ? (
+  <div className={cx("rounded-3xl p-1 mb-8 animate-pulse", surface)}>
+    <div className="rounded-[1.4rem] p-6 h-64 bg-slate-100/70 dark:bg-slate-800/40"></div>
+  </div>
+) : (
+  <div className={cx("rounded-3xl p-6 lg:p-8 mb-8", surface)}>
+    {/* Header do bloco */}
+    <div className="flex items-center justify-between gap-4 mb-6">
+      <div className="flex items-center gap-4">
+        <div className={cx("w-14 h-14 rounded-2xl bg-gradient-to-br flex items-center justify-center text-white text-2xl shadow-lg -rotate-2", statusGradient)}>
+          <i className={`fa-solid ${statusIcon}`}></i>
+        </div>
+        <div className="min-w-0">
+          <h2 className="text-2xl font-black text-slate-900 dark:text-white leading-tight">{statusMessage}</h2>
+          <p className={cx("text-sm font-semibold", mutedText)}>Resumo de hoje</p>
+        </div>
+      </div>
+
+      {/* Donut de progresso (gráfico simples) */}
+      <div className="hidden md:block">
+        <Donut value={stats.progress} label="Andamento" />
+      </div>
+    </div>
+
+    {/* Grid KPIs */}
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <KpiCard
+        onClick={handleAccessWork}
+        icon="fa-solid fa-list-check"
+        iconClass={hasDelay ? "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400" : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300"}
+        value={hasDelay ? dailySummary.delayedSteps : dailySummary.completedSteps}
+        label={hasDelay ? "Atrasadas" : "Concluídas"}
+        badge={hasDelay ? <span className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse mt-1" /> : null}
+        accent={hasDelay ? "danger" : "ok"}
+      />
+
+      <KpiCard
+        onClick={handleAccessWork}
+        icon="fa-solid fa-cart-shopping"
+        iconClass="bg-orange-100 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300"
+        value={dailySummary.pendingMaterials}
+        label="Materiais pendentes"
+        accent={dailySummary.pendingMaterials > 2 ? "warn" : "ok"}
+      />
+
+      <div className={cx(surface, card, "md:col-span-1", "flex flex-col justify-between")}>
+        <div className="flex items-start justify-between">
+          <div className={cx("w-11 h-11 rounded-2xl grid place-items-center", "bg-primary/10 dark:bg-white/10 text-primary dark:text-white")}>
+            <i className="fa-solid fa-wallet"></i>
           </div>
-      ) : (
-          <div className="glass-panel rounded-3xl p-1 shadow-2xl mb-8 relative z-0">
-              <div className="bg-white/50 dark:bg-slate-800/60 rounded-[1.4rem] p-6 lg:p-8 backdrop-blur-xl">
-                  {/* Status Header */}
-                  <div className="flex items-center gap-4 mb-8">
-                      <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${statusGradient} flex items-center justify-center text-white text-3xl shadow-lg transform -rotate-3`}>
-                          <i className={`fa-solid ${statusIcon}`}></i>
-                      </div>
-                      <div>
-                          <h2 className="text-2xl font-bold text-primary dark:text-white leading-tight">{statusMessage}</h2>
-                          <p className="text-slate-500 dark:text-slate-400 font-medium">Resumo de hoje</p>
-                      </div>
-                  </div>
-
-                  {/* Metrics Grid */}
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mb-8">
-                      {/* Card 1: Tarefas */}
-                      <div 
-                        onClick={handleAccessWork}
-                        className={`p-5 rounded-2xl border transition-all cursor-pointer hover:-translate-y-1 hover:shadow-lg bg-white dark:bg-slate-800/80 ${hasDelay ? 'border-red-500/30' : 'border-slate-100 dark:border-slate-700'}`}
-                      >
-                          <div className="flex justify-between items-start mb-3">
-                              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${hasDelay ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400' : 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400'}`}>
-                                  <i className="fa-solid fa-list-check"></i>
-                              </div>
-                              {hasDelay && <span className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></span>}
-                          </div>
-                          <p className="text-3xl font-extrabold text-primary dark:text-white mb-1">
-                              {hasDelay ? dailySummary.delayedSteps : dailySummary.completedSteps}
-                          </p>
-                          <p className={`text-xs font-bold uppercase tracking-wider ${hasDelay ? 'text-red-500 dark:text-red-400' : 'text-slate-500 dark:text-slate-400'}`}>
-                              {hasDelay ? 'Atrasadas' : 'Concluídas'}
-                          </p>
-                      </div>
-
-                      {/* Card 2: Compras */}
-                      <div 
-                        onClick={handleAccessWork}
-                        className="p-5 rounded-2xl bg-white dark:bg-slate-800/80 border border-slate-100 dark:border-slate-700 transition-all cursor-pointer hover:-translate-y-1 hover:shadow-lg"
-                      >
-                          <div className="flex justify-between items-start mb-3">
-                              <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-slate-700 text-secondary flex items-center justify-center">
-                                  <i className="fa-solid fa-cart-shopping"></i>
-                              </div>
-                          </div>
-                          <p className="text-3xl font-extrabold text-primary dark:text-white mb-1">
-                              {dailySummary.pendingMaterials}
-                          </p>
-                          <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                              Pendentes
-                          </p>
-                      </div>
-
-                      {/* Card 3: Progresso (Full width on mobile) */}
-                      <div className="col-span-2 md:col-span-1 p-5 rounded-2xl bg-gradient-to-br from-primary to-slate-800 text-white shadow-xl relative overflow-hidden">
-                          <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2"></div>
-                          <div className="relative z-10">
-                            <div className="flex justify-between items-start mb-3">
-                                <div className="w-10 h-10 rounded-full bg-white/20 dark:bg-primary/10 flex items-center justify-center backdrop-blur-sm">
-                                    <i className="fa-solid fa-chart-pie"></i>
-                                </div>
-                                <span className="font-bold text-lg">{stats.progress}%</span>
-                            </div>
-                            <div className="h-2 bg-black/20 rounded-full overflow-hidden mb-2">
-                                <div className="h-full bg-secondary shadow-[0_0_10px_rgba(217,119,6,0.5)]" style={{ width: `${stats.progress}%` }}></div>
-                            </div>
-                            <p className="text-[10px] uppercase tracking-wider opacity-70 font-bold">Progresso Geral</p>
-                          </div>
-                      </div>
-                  </div>
-
-                  {/* Financial Strip */}
-                  <div className="bg-slate-50 dark:bg-slate-800/80 rounded-2xl p-6 border border-slate-200 dark:border-slate-700 relative overflow-hidden">
-                      <div className="absolute bottom-0 left-0 h-1 bg-slate-200 dark:bg-slate-700 w-full"></div>
-                      <div className={`absolute bottom-0 left-0 h-1 transition-all duration-1000 ${isOverBudget ? 'bg-danger shadow-[0_0_15px_red]' : 'bg-success shadow-[0_0_15px_lime]'}`} style={{ width: `${Math.min(budgetPercentage, 100)}%` }}></div>
-
-                      <div className="flex justify-between items-end mb-2 relative z-10">
-                          <div>
-                              <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1">Orçamento Utilizado</p>
-                              <p className="text-xl font-bold text-primary dark:text-white">
-                                  R$ {stats.totalSpent.toLocaleString('pt-BR')} 
-                                  <span className="text-sm font-normal text-slate-400 dark:text-slate-500 mx-2">/</span>
-                                  <span className="text-sm text-slate-400 dark:text-slate-500">R$ {focusWork.budgetPlanned.toLocaleString('pt-BR')}</span>
-                              </p>
-                          </div>
-                          <div className={`px-3 py-1 rounded-lg text-sm font-bold ${isOverBudget ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400' : 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'}`}>
-                              {budgetPercentage}%
-                          </div>
-                      </div>
-                  </div>
-              </div>
+          <div className={cx("text-xs font-extrabold tracking-widest uppercase", mutedText)}>
+            orçamento
           </div>
-      )}
+        </div>
+
+        <div className="mt-4">
+          <div className="flex items-end justify-between gap-3 mb-2">
+            <div className="min-w-0">
+              <p className="text-lg font-black text-slate-900 dark:text-white leading-tight truncate">
+                R$ {stats.totalSpent.toLocaleString("pt-BR")}
+                <span className={cx("text-sm font-semibold mx-2", mutedText)}>/</span>
+                <span className={cx("text-sm font-semibold", mutedText)}>
+                  R$ {focusWork.budgetPlanned.toLocaleString("pt-BR")}
+                </span>
+              </p>
+              <p className={cx("text-xs font-semibold", mutedText)}>Utilizado</p>
+            </div>
+
+            <div className={cx(
+              "px-3 py-1 rounded-xl text-sm font-black",
+              isOverBudget
+                ? "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300"
+                : isNearBudget
+                ? "bg-amber-100 dark:bg-amber-900/20 text-amber-800 dark:text-amber-300"
+                : "bg-emerald-100 dark:bg-emerald-900/20 text-emerald-800 dark:text-emerald-300"
+            )}>
+              {budgetPercentage}%
+            </div>
+          </div>
+
+          <div className="h-2.5 rounded-full bg-slate-200/70 dark:bg-slate-800 overflow-hidden">
+            <div
+              className={cx(
+                "h-full rounded-full transition-all duration-700",
+                isOverBudget ? "bg-red-500" : isNearBudget ? "bg-amber-500" : "bg-emerald-500"
+              )}
+              style={{ width: `${Math.min(budgetPercentage, 100)}%` }}
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {/* Mobile donut */}
+    <div className="md:hidden">
+      <div className={cx(surface, "rounded-2xl p-4")}>
+        <Donut value={stats.progress} label="Andamento" />
+      </div>
+    </div>
+  </div>
+)}
 
       {/* UPCOMING STEPS & NOTIFICATIONS */}
       {isLoadingDetails ? (
