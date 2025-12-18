@@ -897,22 +897,7 @@ const WorkDetail: React.FC = () => {
         </div>
       </div>
 
-      {/* ✅ aqui você mantém o resto do seu relatório (botões, tabs, tabelas...) */}
-      {/* Print/Export Buttons */}
-      <div className="flex justify-end gap-3 mb-6 no-print">
-        <button onClick={handleExportExcel} className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl shadow-md transition-all flex items-center gap-2">
-          <i className="fa-solid fa-file-excel"></i> Exportar Excel
-        </button>
-        <button onClick={handlePrintPDF} className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-md transition-all flex items-center gap-2">
-          <i className="fa-solid fa-print"></i> Imprimir PDF
-        </button>
-      </div>
-
-      {/* ... o restante do seu reportTab (CRONO/MAT/FIN) continua igual ... */}
-    </div>
-  );
-}
-     
+        
 
             case 'SUPPLIERS': return (
                 <div className="space-y-6">
