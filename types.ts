@@ -1,4 +1,5 @@
 
+
 export enum PlanType {
   MENSAL = 'MENSAL',
   SEMESTRAL = 'SEMESTRAL',
@@ -188,5 +189,29 @@ export interface Worker {
   phone: string;
   dailyRate?: number;
   notes?: string;
+}
+
+// Fix: Add ambient module declarations for import.meta.env AND process.env
+// This resolves TypeScript errors like "Property 'env' does not exist on type 'ImportMeta')"
+// When types.ts is a module (has exports), ambient declarations must be in a 'declare global {}' block
+declare global {
+  interface ImportMetaEnv {
+    readonly VITE_SUPABASE_URL: string;
+    readonly VITE_SUPABASE_ANON_KEY: string;
+    // Add other VITE_ prefixed environment variables as needed here
+  }
+
+  interface ImportMeta {
+    readonly env: ImportMetaEnv;
+  }
+
+  // Augment the NodeJS namespace to include process.env
+  namespace NodeJS {
+    interface ProcessEnv {
+      readonly API_KEY: string;
+      readonly NEON_SECRET_KEY: string; // From api/create-pix.js
+      // Add other process.env variables as needed here
+    }
+  }
 }
 
