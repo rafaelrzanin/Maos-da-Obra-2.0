@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, createContext, useContext, useMemo } from 'react';
-import { User, PlanType } from '../types';
-import { dbService } from '../services/db';
+import { User, PlanType } from '../types.ts';
+import { dbService } from '../services/db.ts';
 
 // --- Theme Context ---
 type Theme = 'light' | 'dark';
@@ -49,9 +49,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const initAuth = async () => {
       try {
-        // Aumentado timeout para 10s para evitar logout indevido em conexões lentas ou cold start
-        const timeoutPromise = new Promise((resolve) => 
-            setTimeout(() => resolve('TIMEOUT'), 10000) 
+        const timeoutDuration = 10000; // 10 seconds
+        const timeoutPromise = new Promise<User | null | 'TIMEOUT'>((resolve) => 
+            setTimeout(() => resolve('TIMEOUT'), timeoutDuration) 
         );
         const authPromise = dbService.getCurrentUser();
         
@@ -59,26 +59,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         if (mounted) {
             if (result === 'TIMEOUT') {
-                console.warn("Auth check timed out, waiting for listener...");
-                // Não setamos null aqui para não forçar logout, deixamos o listener do onAuthChange resolver
+                console.warn(`Auth check timed out after ${timeoutDuration / 1000}s. Waiting for onAuthChange listener to resolve...`);
+                // If it timed out, we keep loading=true and wait for `onAuthChange` to eventually fire
+                // with the definitive user state (either logged in or null), which will then set loading=false.
+                // This prevents prematurely showing unauthenticated state if `getCurrentUser` is just slow.
             } else {
-                setUser(result as User | null);
+                // If getCurrentUser resolved within the timeout, we have a definitive state.
+                setUser(result); // result can be User or null
+                setLoading(false); // Initial auth check is complete.
             }
         }
       } catch (error) {
         console.error("Erro auth inicial:", error);
-      } finally {
-        // Só removemos o loading se já tivermos uma resposta definitiva ou se o listener assumir
-        if (mounted && user !== null) setLoading(false);
+        if (mounted) {
+            setUser(null); // Explicitly set user to null on any error during initial fetch
+            setLoading(false); // Stop loading on error
+        }
       }
+      // The `finally` block with conditional setLoading(false) was removed as it was the source of the issue.
+      // Now, setLoading(false) is either called directly after a successful fetch/error,
+      // or by the onAuthChange listener if the initial fetch timed out.
     };
 
     initAuth();
 
+    // The onAuthChange listener is crucial for real-time updates and also acts
+    // as a fallback for `setLoading(false)` if `initAuth` hits a timeout
+    // and `getCurrentUser` eventually resolves or determines no user.
     const unsubscribe = dbService.onAuthChange((u) => {
       if (mounted) {
         setUser(u);
-        setLoading(false);
+        setLoading(false); // This is the definitive point where loading is set to false
+                         // if the session changes after the initial `initAuth` or if `initAuth` timed out.
       }
     });
 
