@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../contexts/AuthContext';
-import { dbService } from '../services/db';
+import { useAuth } from '../contexts/AuthContext.tsx';
+import { dbService } from '../services/db.ts';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { PlanType } from '../types';
+import { PlanType } from '../types.ts';
 
 // Preços atualizados
 const PLAN_PRICES: Record<string, number> = {
@@ -299,7 +299,7 @@ const Checkout: React.FC = () => {
 
                     <div className="p-8">
                         {errorMsg && (
-                            <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl flex items-center gap-3 text-red-600 dark:text-red-400 animate-in slide-in-from-top-2">
+                            <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-800 rounded-xl flex items-center gap-3 text-red-600 dark:text-red-400 animate-in slide-in-from-top-2">
                                 <i className="fa-solid fa-triangle-exclamation"></i>
                                 <span className="text-sm font-bold">{errorMsg}</span>
                             </div>
@@ -412,17 +412,16 @@ const Checkout: React.FC = () => {
                                     >
                                         <option value="1">1x de R$ {planDetails.price.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</option>
                                         {planDetails.price > 50 && <option value="2">2x de R$ {(planDetails.price / 2).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</option>}
-                                        {planDetails.price > 100 && <option value="3">3x de R$ {(planDetails.price / 3).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</option>}
                                     </select>
                                 </div>
 
                                 <button 
                                     type="submit"
                                     disabled={processing}
-                                    className="w-full py-4 mt-4 bg-primary hover:bg-primary-dark text-white font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-wait"
+                                    className="w-full py-4 bg-primary hover:bg-primary-dark text-white font-bold rounded-xl shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-70"
                                 >
-                                    {processing ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-lock"></i>}
-                                    {processing ? 'Processando...' : `Pagar R$ ${planDetails.price.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`}
+                                    {processing ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-credit-card"></i>}
+                                    {processing ? 'Processando...' : 'Pagar com Cartão'}
                                 </button>
                             </form>
                         )}
@@ -436,4 +435,3 @@ const Checkout: React.FC = () => {
 };
 
 export default Checkout;
-
