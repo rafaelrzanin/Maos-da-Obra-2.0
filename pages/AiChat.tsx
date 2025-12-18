@@ -1,10 +1,11 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
-import { aiService } from '../services/ai';
-import { PlanType } from '../types';
-import { ZE_AVATAR, ZE_AVATAR_FALLBACK } from '../services/standards';
+import { useAuth } from '../contexts/AuthContext.tsx';
+import { aiService } from '../services/ai.ts';
+import { PlanType } from '../types.ts';
+import { ZE_AVATAR, ZE_AVATAR_FALLBACK } from '../services/standards.ts';
 
 const AiChat: React.FC = () => {
   const { user, trialDaysRemaining } = useAuth();
