@@ -50,35 +50,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const initAuth = async () => {
       try {
         const timeoutDuration = 10000; // 10 seconds
-        const timeoutPromise = new Promise<User | null | 'TIMEOUT'>((resolve) => 
-            setTimeout(() => resolve('TIMEOUT'), timeoutDuration) 
-        );
         const authPromise = dbService.getCurrentUser();
         
-        const result = await Promise.race([authPromise, timeoutPromise]);
+        // This promise will resolve to either the user, null, or 'TIMEOUT_SIGNAL'
+        const resultPromise = Promise.race([
+            authPromise,
+            new Promise<User | null | 'TIMEOUT_SIGNAL'>((resolve) => 
+                setTimeout(() => resolve('TIMEOUT_SIGNAL'), timeoutDuration) 
+            )
+        ]);
+
+        const result = await resultPromise;
         
         if (mounted) {
-            if (result === 'TIMEOUT') {
-                console.warn(`Auth check timed out after ${timeoutDuration / 1000}s. Waiting for onAuthChange listener to resolve...`);
-                // If it timed out, we keep loading=true and wait for `onAuthChange` to eventually fire
-                // with the definitive user state (either logged in or null), which will then set loading=false.
-                // This prevents prematurely showing unauthenticated state if `getCurrentUser` is just slow.
+            if (result !== 'TIMEOUT_SIGNAL') { // If it's not a timeout signal, process the user
+                setUser(result); 
             } else {
-                // If getCurrentUser resolved within the timeout, we have a definitive state.
-                setUser(result); // result can be User or null
-                setLoading(false); // Initial auth check is complete.
+                console.warn(`Auth check timed out after ${timeoutDuration / 1000}s. Displaying UI, awaiting onAuthChange.`);
+                // If it timed out, we still stop the initial loading spinner.
+                // The onAuthChange listener will eventually provide the definitive state.
+                // It's better to show an empty UI or login than a perpetual spinner.
             }
+            setLoading(false); // Crucial: Stop initial loading spinner here.
         }
       } catch (error) {
         console.error("Erro auth inicial:", error);
         if (mounted) {
-            setUser(null); // Explicitly set user to null on any error during initial fetch
-            setLoading(false); // Stop loading on error
+            setUser(null);
+            setLoading(false); 
         }
       }
-      // The `finally` block with conditional setLoading(false) was removed as it was the source of the issue.
-      // Now, setLoading(false) is either called directly after a successful fetch/error,
-      // or by the onAuthChange listener if the initial fetch timed out.
     };
 
     initAuth();
@@ -89,8 +90,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const unsubscribe = dbService.onAuthChange((u) => {
       if (mounted) {
         setUser(u);
-        setLoading(false); // This is the definitive point where loading is set to false
-                         // if the session changes after the initial `initAuth` or if `initAuth` timed out.
+        // It's important that this also sets loading to false, as the initial initAuth
+        // might have finished due to timeout, but the actual user state might not be
+        // definitively known until onAuthChange fires with the resolved session.
+        // However, initAuth's setLoading(false) is for the *initial mount* to prevent forever spinner.
+        // This one handles *subsequent* state changes.
+        if (loading) setLoading(false); 
       }
     });
 
@@ -174,4 +179,3 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     </AuthContext.Provider>
   );
 };
-
