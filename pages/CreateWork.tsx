@@ -1,5 +1,4 @@
 
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.tsx';
@@ -55,10 +54,15 @@ const CreateWork: React.FC = () => {
       });
   };
 
+  // Refatorado para validar passos específicos
   const validateStep = (step: number) => {
     if (step === 1) {
        if (!formData.name.trim()) { alert("Por favor, dê um apelido para sua obra."); return false; }
        if (!formData.budgetPlanned) { alert("Quanto você pretende gastar (mesmo que seja um chute)?"); return false; }
+    } else if (step === 2) {
+        if (!workCategory) { alert("Escolha entre Construção ou Reforma."); return false; }
+        if (!selectedTemplateId) { alert("Selecione o tipo específico da obra."); return false; }
+        if (!formData.startDate) { alert("Qual a data de início?"); return false; }
     }
     return true;
   };
@@ -74,12 +78,9 @@ const CreateWork: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user) return;
-    if (!validateStep(currentStep)) return;
     
-    // Validate Step 2 specific
-    if (!workCategory) { alert("Escolha entre Construção ou Reforma."); return; }
-    if (!selectedTemplateId) { alert("Selecione o tipo específico da obra."); return; }
-    if (!formData.startDate) { alert("Qual a data de início?"); return; }
+    // Valida o passo final antes de realmente submeter
+    if (!validateStep(totalSteps)) return; 
 
     setLoading(true);
     setGenerationMode(true); // Activate overlay
@@ -321,7 +322,7 @@ const CreateWork: React.FC = () => {
                       Próximo <i className="fa-solid fa-arrow-right"></i>
                   </button>
               ) : (
-                  <button type="submit" disabled={loading} className="px-8 py-4 bg-gradient-gold text-white font-bold rounded-2xl shadow-lg hover:shadow-orange-500/30 hover:scale-105 transition-all flex items-center gap-3 disabled:opacity-70 disabled:scale-100">
+                  <button type="submit" disabled={loading} className="px-8 py-4 bg-gradient-gold text-white font-bold rounded-2xl shadow-lg hover:shadow-orange-500/30 hover:scale-105 transition-all flex items-center justify-center gap-3 disabled:opacity-70 disabled:scale-100">
                       {loading ? 'Gerando...' : 'Criar Obra'} <i className="fa-solid fa-check"></i>
                   </button>
               )}
@@ -332,4 +333,3 @@ const CreateWork: React.FC = () => {
 };
 
 export default CreateWork;
-
