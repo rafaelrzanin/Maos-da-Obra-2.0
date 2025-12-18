@@ -10,7 +10,7 @@ import Dashboard from './pages/Dashboard.tsx';
 
 // --- Lazy Loading com Type Casting "unknown" para evitar erro de Build (TS2352) ---
 const CreateWork = lazy(() => import('./pages/CreateWork.tsx') as unknown as Promise<{ default: React.ComponentType<any> }>);
-const WorkDetail = lazy(() => import('./pages/WorkDetail.tsx') as unknown as Promise<{ default: React.ComponentType<any> }>);
+const WorkDetail = lazy(() => import('./pages/WorkDetail.tsx') as unknown as Promise<{ default: React.ComponentType<any> }>); // Corrected path to ./pages/WorkDetail.tsx
 const Settings = lazy(() => import('./pages/Settings.tsx') as unknown as Promise<{ default: React.ComponentType<any> }>);
 const Profile = lazy(() => import('./pages/Profile.tsx') as unknown as Promise<{ default: React.ComponentType<any> }>);
 const VideoTutorials = lazy(() => import('./pages/VideoTutorials.tsx') as unknown as Promise<{ default: React.ComponentType<any> }>);
