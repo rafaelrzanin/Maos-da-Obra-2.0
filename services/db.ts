@@ -142,17 +142,16 @@ const parseNotificationFromDB = (data: any): Notification => ({
 });
 
 // --- AUTH CACHE & DEDUPLICATION ---
-// Refactored to address TS2801
 let sessionCache: { promise: Promise<User | null>, timestamp: number } | null = null;
 const AUTH_CACHE_DURATION = 5000;
-const pendingProfileRequests: Partial<Record<string, Promise<User | null>>> = {};
+const pendingProfileRequests: Record<string, Promise<User | null>> = {};
 
 const ensureUserProfile = async (authUser: any): Promise<User | null> => {
     const client = supabase; // Supabase is guaranteed to be initialized now
     if (!authUser) return null;
 
     if (pendingProfileRequests[authUser.id]) {
-        return pendingProfileRequests[authUser.id]!;
+        return pendingProfileRequests[authUser.id];
     }
 
     const fetchProfileProcess = async (): Promise<User | null> => {
@@ -237,7 +236,7 @@ const ensureUserProfile = async (authUser: any): Promise<User | null> => {
 export const dbService = {
   // --- AUTH ---
   async getCurrentUser() {
-    const client = supabase; // Supabase is guaranteed to be initialized now
+    const client = supabase;
     
     const now = Date.now();
     
@@ -245,7 +244,8 @@ export const dbService = {
     const currentSessionCache = sessionCache; 
 
     // Check if we have a valid cached promise
-    if (currentSessionCache && (now - currentSessionCache.timestamp < AUTH_CACHE_DURATION)) {
+    // Refactored to address TS2801: check if currentSessionCache is not null AND if its promise property is not null
+    if (currentSessionCache !== null && currentSessionCache.promise !== null && (now - currentSessionCache.timestamp < AUTH_CACHE_DURATION)) {
         return currentSessionCache.promise;
     }
 
@@ -1108,61 +1108,97 @@ export const dbService = {
     return summary;
   },
 
-  async generateSmartNotifications(userId: string, workId: string): Promise<void> {
+  // Modificado para aceitar dados pré-carregados, evitando buscas redundantes.
+  async generateSmartNotifications(
+    userId: string, 
+    workId: string, 
+    prefetchedSteps?: Step[], 
+    prefetchedExpenses?: Expense[], 
+    prefetchedMaterials?: Material[], 
+    prefetchedWork?: Work
+  ): Promise<void> {
     // Supabase is guaranteed to be initialized now
     
-    // This is a placeholder for a more complex notification generation logic.
-    // In a real app, this would check for:
-    // - Steps nearing deadline or delayed
-    // - Materials low on stock
-    // - Budget nearing limit
-    // - Important dates (e.g., permits expiring)
-
     try {
-        const steps = await this.getSteps(workId);
-        const expenses = await this.getExpenses(workId);
-        const materials = await this.getMaterials(workId);
-        const work = await this.getWorkById(workId);
+        // Usa dados pré-carregados se disponíveis, senão busca do DB.
+        const currentSteps = prefetchedSteps || await this.getSteps(workId);
+        const currentExpenses = prefetchedExpenses || await this.getExpenses(workId);
+        const currentMaterials = prefetchedMaterials || await this.getMaterials(workId);
+        const currentWork = prefetchedWork || await this.getWorkById(workId);
 
         const today = new Date();
         today.setHours(0,0,0,0);
 
         // Example: Notification for delayed steps
-        const delayedSteps = steps.filter(s => s.status !== StepStatus.COMPLETED && new Date(s.endDate) < today);
+        const delayedSteps = currentSteps.filter(s => s.status !== StepStatus.COMPLETED && new Date(s.endDate) < today);
         for (const step of delayedSteps) {
-            await this.addNotification({
-                userId,
-                title: 'Etapa Atrasada!',
-                message: `A etapa "${step.name}" está atrasada. Verifique o cronograma!`,
-                date: new Date().toISOString(),
-                read: false,
-                type: 'WARNING'
-            });
-        }
+            // Verifica se a notificação já existe para evitar duplicação em execuções rápidas
+            const { data: existingNotif } = await supabase
+                .from('notifications')
+                .select('id')
+                .eq('user_id', userId)
+                .eq('title', 'Etapa Atrasada!')
+                .like('message', `%${step.name}%`)
+                .eq('read', false)
+                .maybeSingle();
 
-        // Example: Notification for budget usage (if work and expenses are available)
-        if (work && work.budgetPlanned > 0) {
-            const totalSpent = expenses.reduce((sum, e) => sum + e.amount, 0);
-            const budgetUsage = (totalSpent / work.budgetPlanned) * 100;
-
-            if (budgetUsage > 90 && budgetUsage <= 100) {
+            if (!existingNotif) {
                 await this.addNotification({
                     userId,
-                    title: 'Atenção ao Orçamento!',
-                    message: `Você já usou ${Math.round(budgetUsage)}% do orçamento da obra "${work.name}".`,
+                    title: 'Etapa Atrasada!',
+                    message: `A etapa "${step.name}" está atrasada. Verifique o cronograma!`,
                     date: new Date().toISOString(),
                     read: false,
                     type: 'WARNING'
                 });
+            }
+        }
+
+        // Example: Notification for budget usage (if work and expenses are available)
+        if (currentWork && currentWork.budgetPlanned > 0) {
+            const totalSpent = currentExpenses.reduce((sum, e) => sum + e.amount, 0);
+            const budgetUsage = (totalSpent / currentWork.budgetPlanned) * 100;
+
+            if (budgetUsage > 90 && budgetUsage <= 100) {
+                 const { data: existingNotif } = await supabase
+                    .from('notifications')
+                    .select('id')
+                    .eq('user_id', userId)
+                    .eq('title', 'Atenção ao Orçamento!')
+                    .like('message', `%${currentWork.name}%`)
+                    .eq('read', false)
+                    .maybeSingle();
+
+                if (!existingNotif) {
+                    await this.addNotification({
+                        userId,
+                        title: 'Atenção ao Orçamento!',
+                        message: `Você já usou ${Math.round(budgetUsage)}% do orçamento da obra "${currentWork.name}".`,
+                        date: new Date().toISOString(),
+                        read: false,
+                        type: 'WARNING'
+                    });
+                }
             } else if (budgetUsage > 100) {
-                await this.addNotification({
-                    userId,
-                    title: 'Orçamento Estourado!',
-                    message: `O orçamento da obra "${work.name}" foi excedido em ${Math.round(budgetUsage - 100)}%.`,
-                    date: new Date().toISOString(),
-                    read: false,
-                    type: 'ERROR'
-                });
+                 const { data: existingNotif } = await supabase
+                    .from('notifications')
+                    .select('id')
+                    .eq('user_id', userId)
+                    .eq('title', 'Orçamento Estourado!')
+                    .like('message', `%${currentWork.name}%`)
+                    .eq('read', false)
+                    .maybeSingle();
+                
+                if (!existingNotif) {
+                    await this.addNotification({
+                        userId,
+                        title: 'Orçamento Estourado!',
+                        message: `O orçamento da obra "${currentWork.name}" foi excedido em ${Math.round(budgetUsage - 100)}%.`,
+                        date: new Date().toISOString(),
+                        read: false,
+                        type: 'ERROR'
+                    });
+                }
             }
         }
     } catch (error: any) { // Explicitly type as any to allow .message access
