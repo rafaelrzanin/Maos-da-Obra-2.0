@@ -855,7 +855,7 @@ const WorkDetail: React.FC = () => {
                 </div>
             );
 
-           case 'REPORTS': {
+         case 'REPORTS': {
   const workProgressPercentage = stats?.progress || 0;
   const totalSpent = expenses.reduce((sum, e) => sum + Number(e.amount), 0);
 
@@ -864,10 +864,12 @@ const WorkDetail: React.FC = () => {
       {/* Report Dashboard Section */}
       <div className="bg-gradient-premium rounded-3xl p-6 text-white shadow-xl relative overflow-hidden mb-8">
         <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2"></div>
+
         <div className="relative z-10">
           <h3 className="text-xl font-black mb-1 text-secondary uppercase tracking-widest">
             Resumo da Obra
           </h3>
+
           <h2 className="text-3xl font-black text-white leading-tight mb-4">
             {work.name}
           </h2>
@@ -884,24 +886,96 @@ const WorkDetail: React.FC = () => {
             <div className="bg-white/10 p-4 rounded-xl backdrop-blur-sm border border-white/20 min-w-0">
               <p className="text-xs font-bold uppercase text-white/70 mb-1">Orçamento Planejado</p>
               <p className="text-xl sm:text-2xl font-black leading-none break-words">
-                R$ {work.budgetPlanned.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                R$ {Number(work.budgetPlanned || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
               </p>
             </div>
 
             <div className="bg-white/10 p-4 rounded-xl backdrop-blur-sm border border-white/20 sm:col-span-2">
               <p className="text-xs font-bold uppercase text-white/70 mb-1">Progresso Geral</p>
+
               <div className="h-3 bg-white/20 rounded-full overflow-hidden mb-2">
                 <div
                   className="h-full bg-secondary shadow-[0_0_10px_rgba(217,119,6,0.5)]"
                   style={{ width: `${workProgressPercentage}%` }}
                 />
               </div>
+
               <p className="text-sm font-bold">{workProgressPercentage}% Concluído</p>
             </div>
           </div>
         </div>
       </div>
-      );   
+
+      {/* Print/Export Buttons - Moved to top of report section */}
+      <div className="flex justify-end gap-3 mb-6 no-print">
+        <button
+          onClick={handleExportExcel}
+          className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl shadow-md transition-all flex items-center gap-2"
+        >
+          <i className="fa-solid fa-file-excel"></i> Exportar Excel
+        </button>
+
+        <button
+          onClick={handlePrintPDF}
+          className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-md transition-all flex items-center gap-2"
+        >
+          <i className="fa-solid fa-print"></i> Imprimir PDF
+        </button>
+      </div>
+
+      {/* Tab selection for reports */}
+      <div className="flex gap-2 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl no-print">
+        {(['CRONO', 'MAT', 'FIN'] as const).map((rt) => (
+          <button
+            key={rt}
+            onClick={() => setReportTab(rt)}
+            className={`flex-1 py-2 rounded-lg text-xs font-bold ${
+              reportTab === rt ? 'bg-white shadow text-primary dark:text-white' : 'text-slate-500 dark:text-slate-400'
+            }`}
+          >
+            {rt === 'CRONO' ? 'Cronograma' : rt === 'MAT' ? 'Materiais' : 'Financeiro'}
+          </button>
+        ))}
+      </div>
+
+      {/* Report Content */}
+      <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm print:shadow-none print:border-0 print:rounded-none">
+        {/* Print Header */}
+        <div className="hidden print:block p-8 border-b-2 border-slate-100 dark:border-slate-800">
+          <div className="flex justify-between items-start">
+            <div>
+              <h1 className="text-3xl font-black text-slate-900 mb-1">MÃOS DA OBRA</h1>
+              <p className="text-sm font-bold text-slate-500">Relatório Geral</p>
+            </div>
+            <div className="text-right">
+              <h2 className="text-xl font-bold text-slate-800">{work.name}</h2>
+              <p className="text-sm text-slate-500">{new Date().toLocaleDateString()}</p>
+            </div>
+          </div>
+        </div>
+
+        {reportTab === 'CRONO' && (
+          <div className="p-6">
+            {/* ... seu conteúdo CRONO aqui (mantém igual) ... */}
+          </div>
+        )}
+
+        {reportTab === 'MAT' && (
+          <div className="p-6">
+            {/* ... seu conteúdo MAT aqui (mantém igual) ... */}
+          </div>
+        )}
+
+        {reportTab === 'FIN' && (
+          <div className="p-6">
+            {/* ... seu conteúdo FIN aqui (mantém igual) ... */}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+        
             case 'SUPPLIERS': return (
                 <div className="space-y-6">
                     <div className="bg-amber-50 dark:bg-amber-900/20 p-6 rounded-3xl border border-amber-100 dark:border-amber-900 mb-2">
