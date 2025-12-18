@@ -142,8 +142,8 @@ const parseNotificationFromDB = (data: any): Notification => ({
 });
 
 // --- AUTH CACHE & DEDUPLICATION ---
-let sessionCachePromise: Promise<User | null> | null = null;
-let sessionCacheTimestamp = 0;
+// Refactored to address TS2801
+let sessionCache: { promise: Promise<User | null>, timestamp: number } | null = null;
 const AUTH_CACHE_DURATION = 5000;
 const pendingProfileRequests: Record<string, Promise<User | null>> = {};
 
@@ -241,23 +241,33 @@ export const dbService = {
     
     const now = Date.now();
     
-    // Fix TS2801: Explicitly check for null
-    if (sessionCachePromise !== null && (now - sessionCacheTimestamp < AUTH_CACHE_DURATION)) {
-        return sessionCachePromise;
+    // Capture sessionCache locally for better type narrowing by TypeScript
+    const currentSessionCache = sessionCache; 
+
+    // Check if we have a valid cached promise
+    if (currentSessionCache && (now - currentSessionCache.timestamp < AUTH_CACHE_DURATION)) {
+        return currentSessionCache.promise;
     }
 
-    sessionCachePromise = (async () => {
+    // If no valid cache, create a new promise
+    const newPromise = (async () => {
         const { data: { session } } = await client.auth.getSession();
-        if (!session?.user) return null;
+        if (!session?.user) {
+            // If no user, ensure sessionCache is null before returning
+            sessionCache = null; 
+            return null;
+        }
+        // Ensure profile for the user
         return await ensureUserProfile(session.user);
     })();
     
-    sessionCacheTimestamp = now;
-    return sessionCachePromise;
+    // Store the new promise and its timestamp
+    sessionCache = { promise: newPromise, timestamp: now };
+    return newPromise;
   },
 
   async syncSession() {
-    sessionCachePromise = null;
+    sessionCache = null; // Invalidate cache to force a fresh fetch
     return this.getCurrentUser();
   },
 
@@ -265,7 +275,7 @@ export const dbService = {
     const client = supabase; // Supabase is guaranteed to be initialized now
     
     const { data: { subscription } } = client.auth.onAuthStateChange(async (_event, session) => {
-        sessionCachePromise = null;
+        sessionCache = null; // Clear cache on auth state change
         
         if (session?.user) {
             const user = await ensureUserProfile(session.user);
@@ -287,7 +297,7 @@ export const dbService = {
     const { data, error } = await supabase.auth.signInWithPassword({ email, password: password || '' });
     if (error) throw error;
     if (data.user) {
-        sessionCachePromise = null;
+        sessionCache = null; // Invalidate cache
         return await ensureUserProfile(data.user);
     }
     return null;
@@ -338,14 +348,14 @@ export const dbService = {
         console.error("Erro ao criar perfil no signup:", profileError);
     }
 
-    sessionCachePromise = null;
+    sessionCache = null; // Invalidate cache
     return await ensureUserProfile(authData.user);
   },
 
   async logout() {
     // Supabase is guaranteed to be initialized now
     await supabase.auth.signOut();
-    sessionCachePromise = null;
+    sessionCache = null; // Invalidate cache
     // Clear Dashboard Cache
     _dashboardCache.works = null;
     _dashboardCache.stats = {};
@@ -381,7 +391,7 @@ export const dbService = {
               if (passError) throw new Error("Erro ao atualizar senha: " + passError.message);
           }
           
-          sessionCachePromise = null; // Invalida cache para forçar refresh
+          sessionCache = null; // Invalida cache para forçar refresh
       } catch (e: any) { // Explicitly type as any to allow .message access
           console.error("Erro updateUser:", e);
           throw e; // Repassa erro para a UI tratar
@@ -416,7 +426,7 @@ export const dbService = {
           is_trial: false
       }).eq('id', userId);
       
-      sessionCachePromise = null;
+      sessionCache = null; // Invalida cache
   },
 
   async generatePix(_amount: number, _payer: any) {
@@ -660,7 +670,7 @@ export const dbService = {
       planned_qty: material.plannedQty,
       purchased_qty: purchaseInfo?.qty || 0,
       unit: material.unit,
-      step_id: material.stepId,
+      stepId: material.stepId,
       category: material.category
     }).select().single();
 
@@ -1160,4 +1170,3 @@ export const dbService = {
     }
   },
 };
-
