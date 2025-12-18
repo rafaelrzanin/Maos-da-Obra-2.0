@@ -189,3 +189,4 @@ export interface Worker {
   dailyRate?: number;
   notes?: string;
 }
+
