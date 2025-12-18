@@ -397,6 +397,19 @@ const KpiCard = ({
   );
 };
 
+//Isso faz o light “recortar” MUITO melhor sem deixar “pesado”.
+const cardBase =
+  "rounded-2xl border transition-all";
+
+const cardLight =
+  "bg-white border-slate-200 shadow-[0_10px_25px_-18px_rgba(15,23,42,0.35)] ring-1 ring-black/5";
+
+const cardDark =
+  "dark:bg-slate-900 dark:border-slate-800 dark:shadow-none dark:ring-0";
+
+const cardHover =
+  "hover:shadow-[0_18px_45px_-25px_rgba(15,23,42,0.45)] hover:-translate-y-0.5 hover:border-secondary/40";
+
 
 // Helper para formatar data
 const formatDateDisplay = (dateStr: string) => {
