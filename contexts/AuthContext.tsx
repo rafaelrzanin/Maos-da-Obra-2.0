@@ -44,13 +44,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
+  console.log("[AuthProvider] Component rendered. Initial loading state:", loading);
+
   useEffect(() => {
     let mounted = true;
-    console.log("[AuthContext] useEffect mounted, initAuth called. Initial loading:", loading);
+    console.log("[AuthContext] useEffect mounted, initAuth called. Mounted:", mounted, "Initial loading:", loading);
 
     const initAuth = async () => {
       try {
         const timeoutDuration = 10000; // 10 seconds
+        console.log("[AuthContext] initAuth: Calling dbService.getCurrentUser()");
         const authPromise = dbService.getCurrentUser();
         
         const resultPromise = Promise.race([
@@ -65,11 +68,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (mounted) {
             if (result !== 'TIMEOUT_SIGNAL') {
                 setUser(result); 
-                console.log("[AuthContext] initAuth resolved with user:", result?.email, "Setting loading to false.");
+                console.log("[AuthContext] initAuth resolved. User:", result ? result.email : 'null', "Setting loading to false.");
             } else {
                 console.warn(`[AuthContext] initAuth timed out after ${timeoutDuration / 1000}s. Displaying UI, awaiting onAuthChange.`);
             }
             setLoading(false); // Crucial: Stop initial loading spinner here.
+        } else {
+            console.log("[AuthContext] initAuth resolved, but component is unmounted. Skipping state update.");
         }
       } catch (error) {
         console.error("[AuthContext] Erro during initAuth:", error);
@@ -85,11 +90,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const unsubscribe = dbService.onAuthChange((u) => {
       if (mounted) {
         setUser(u);
-        console.log("[AuthContext] onAuthChange event. User:", u?.email, "Current loading:", loading);
+        console.log("[AuthContext] onAuthChange event. User:", u ? u.email : 'null', "Current loading state:", loading);
         if (loading) { // Only set loading to false if it's still true, to avoid unnecessary re-renders
             setLoading(false);
             console.log("[AuthContext] onAuthChange setting loading to false.");
         }
+      } else {
+        console.log("[AuthContext] onAuthChange event, but component is unmounted. Skipping state update.");
       }
     });
 
@@ -114,6 +121,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [user]);
 
   const refreshUser = async () => {
+      console.log("[AuthContext] refreshUser called.");
       const currentUser = await dbService.syncSession();
       if (currentUser) setUser(currentUser);
   };
@@ -132,10 +140,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         if (u) {
             setUser(u);
-            console.log("[AuthContext] login successful. User:", u?.email);
+            console.log("[AuthContext] login successful. User:", u ? u.email : 'null');
             return true;
         }
-        console.log("[AuthContext] login failed.");
+        console.log("[AuthContext] login failed. No user returned.");
         return false;
     } catch (e) {
         console.error("[AuthContext] Login exception:", e);
@@ -153,10 +161,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const u = await dbService.signup(name, email, whatsapp, password, cpf, planType);
         if (u) {
             setUser(u);
-            console.log("[AuthContext] signup successful. User:", u?.email);
+            console.log("[AuthContext] signup successful. User:", u ? u.email : 'null');
             return true;
         }
-        console.log("[AuthContext] signup failed.");
+        console.log("[AuthContext] signup failed. No user returned.");
         return false;
     } finally {
         setLoading(false);
@@ -172,6 +180,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const updatePlan = async (plan: PlanType) => {
     if (user) {
+      console.log("[AuthContext] updatePlan called for user:", user.email, "Plan:", plan);
       await dbService.updatePlan(user.id, plan);
       await refreshUser();
     }
