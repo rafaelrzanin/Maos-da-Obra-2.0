@@ -555,4 +555,3 @@ export const LIFETIME_BONUSES = [
     desc: 'Listas de verificação passo-a-passo para não deixar passar nada.'
   }
 ];
-
