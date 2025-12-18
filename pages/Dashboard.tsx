@@ -660,14 +660,14 @@ const Dashboard: React.FC = () => {
   let statusMessage = 'Tudo sob controle';
   
   if (hasDelay || isOverBudget) {
-      statusGradient = 'from-red-600 to-red-400';
-      statusIcon = 'fa-triangle-exclamation';
-      statusMessage = 'Atenção necessária';
-  } else if (isNearBudget || dailySummary.pendingMaterials > 2) {
-      statusGradient = 'from-orange-500 to-amber-400';
-      statusIcon = 'fa-circle-exclamation';
-      statusMessage = 'Pontos de atenção';
-  }
+  statusGradient = 'from-red-600 to-red-400';
+  statusIcon = 'fa-triangle-exclamation';
+  statusMessage = 'Atenção necessária';
+} else if (isNearBudget) {
+  statusGradient = 'from-orange-500 to-amber-400';
+  statusIcon = 'fa-circle-exclamation';
+  statusMessage = 'Pontos de atenção';
+}
 
   return (
     <div className="max-w-4xl mx-auto pb-28 pt-6 px-4 md:px-0 font-sans animate-in fade-in">
