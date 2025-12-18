@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
@@ -28,7 +27,7 @@ const parseDateNoTimezone = (dateStr: string) => {
 const WorkDetail: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
-    const { user } = useAuth();
+    const { user, trialDaysRemaining } = useAuth(); // Destructure trialDaysRemaining
     
     // --- CORE DATA STATE ---
     const [work, setWork] = useState<Work | null>(null);
@@ -46,8 +45,14 @@ const WorkDetail: React.FC = () => {
     const [subView, setSubView] = useState<SubView>('NONE');
     const [uploading, setUploading] = useState(false);
     
-    // --- PREMIUM CHECK ---
-    const isPremium = user?.plan === PlanType.VITALICIO;
+    // --- AI ACCESS LOGIC ---
+    const isVitalicio = user?.plan === PlanType.VITALICIO;
+    const isAiTrialActive = user?.isTrial && trialDaysRemaining !== null && trialDaysRemaining > 0;
+    const hasAiAccess = isVitalicio || isAiTrialActive;
+
+    // --- PREMIUM TOOLS LOCK ---
+    // isPremium is used for non-AI premium tools (Calculators, Contracts, Checklist)
+    const isPremium = isVitalicio;
 
     // --- MODALS STATE ---
     const [stepModalMode, setStepModalMode] = useState<'ADD' | 'EDIT'>('ADD');
@@ -57,8 +62,11 @@ const WorkDetail: React.FC = () => {
     const [stepStart, setStepStart] = useState('');
     const [stepEnd, setStepEnd] = useState('');
     
-    // Material Filter
+    // Material Filter (Main Tab)
     const [materialFilterStepId, setMaterialFilterStepId] = useState<string>('ALL');
+    
+    // Report Filter
+    const [reportTab, setReportTab] = useState<'CRONO'|'MAT'|'FIN'>('CRONO');
 
     const [materialModal, setMaterialModal] = useState<{ isOpen: boolean, material: Material | null }>({ isOpen: false, material: null });
     const [matName, setMatName] = useState('');
@@ -78,7 +86,7 @@ const WorkDetail: React.FC = () => {
     const [newMatBuyQty, setNewMatBuyQty] = useState('');
     const [newMatBuyCost, setNewMatBuyCost] = useState('');
 
-    // EXPENSE MODAL STATE (UNIFIED ADD/EDIT)
+    // EXPENSE MODAL STATE
     const [expenseModal, setExpenseModal] = useState<{ isOpen: boolean, mode: 'ADD'|'EDIT', id?: string }>({ isOpen: false, mode: 'ADD' });
     const [expDesc, setExpDesc] = useState('');
     const [expAmount, setExpAmount] = useState('');
@@ -88,7 +96,6 @@ const WorkDetail: React.FC = () => {
     const [expDate, setExpDate] = useState('');
     // NEW STATE: Tracks the amount already in DB to support cumulative logic
     const [expSavedAmount, setExpSavedAmount] = useState(0);
-
 
     const [isPersonModalOpen, setIsPersonModalOpen] = useState(false);
     const [personMode, setPersonMode] = useState<'WORKER'|'SUPPLIER'>('WORKER');
@@ -109,7 +116,6 @@ const WorkDetail: React.FC = () => {
     const [calcArea, setCalcArea] = useState('');
     const [calcResult, setCalcResult] = useState<string[]>([]);
     const [activeChecklist, setActiveChecklist] = useState<string | null>(null);
-    const [reportTab, setReportTab] = useState<'CRONO'|'MAT'|'FIN'>('CRONO');
 
     // --- LOAD DATA ---
     const load = async () => {
@@ -148,6 +154,7 @@ const WorkDetail: React.FC = () => {
         if (!work || !stepName) return;
 
         if (stepModalMode === 'ADD') {
+            // REMOVED CLIENT-SIDE ID GENERATION
             await dbService.addStep({
                 workId: work.id,
                 name: stepName,
@@ -185,7 +192,8 @@ const WorkDetail: React.FC = () => {
     const handleAddMaterial = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!work || !newMatName) return;
-        const mat: Omit<Material, 'id'> = { // Removed client-side ID generation
+        // REMOVED CLIENT-SIDE ID GENERATION from the mat object
+        const mat: Omit<Material, 'id'> = { // Explicitly define type to omit id
             workId: work.id,
             name: newMatName,
             brand: newMatBrand,
@@ -275,6 +283,7 @@ const WorkDetail: React.FC = () => {
         const inputAmount = Number(expAmount) || 0;
 
         if (expenseModal.mode === 'ADD') {
+            // REMOVED CLIENT-SIDE ID GENERATION
             await dbService.addExpense({
                 workId: work.id,
                 description: expDesc,
@@ -282,7 +291,6 @@ const WorkDetail: React.FC = () => {
                 date: new Date(expDate).toISOString(),
                 category: expCategory,
                 stepId: finalStepId,
-                // Fix: Corrected typo from `finalTotalAgumed` to `finalTotalAgreed`.
                 totalAgreed: finalTotalAgreed
             });
         } else if (expenseModal.mode === 'EDIT' && expenseModal.id) {
@@ -326,6 +334,7 @@ const WorkDetail: React.FC = () => {
                 await new Promise(r => setTimeout(r, 800));
                 
                 if (type === 'PHOTO') {
+                    // REMOVED CLIENT-SIDE ID GENERATION
                     await dbService.addPhoto({
                         workId: work.id,
                         url: base64,
@@ -334,6 +343,7 @@ const WorkDetail: React.FC = () => {
                         type: 'PROGRESS'
                     });
                 } else {
+                    // REMOVED CLIENT-SIDE ID GENERATION
                     await dbService.addFile({
                         workId: work.id,
                         name: file.name,
@@ -765,10 +775,11 @@ const WorkDetail: React.FC = () => {
                                     <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center text-white shadow-lg shadow-secondary/30"><i className="fa-solid fa-crown"></i></div>
                                     <div><h3 className="text-lg font-black text-white uppercase tracking-tight">Área Premium</h3><p className="text-xs text-slate-400 font-medium">Ferramentas Exclusivas</p></div>
                                 </div>
-
+                                
+                                {/* Zé da Obra AI */}
                                 <div onClick={() => setSubView('BONUS_IA')} className="bg-white/10 hover:bg-white/15 p-4 rounded-2xl border border-white/10 mb-4 cursor-pointer flex items-center gap-4 transition-all backdrop-blur-sm group">
                                     <div className="relative">
-                                        <img src={ZE_AVATAR} className={`w-14 h-14 rounded-full border-2 border-secondary bg-slate-800 object-cover ${!isPremium ? 'grayscale opacity-70' : ''}`} onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK}/>
+                                        <img src={ZE_AVATAR} className={`w-14 h-14 rounded-full border-2 border-secondary bg-slate-800 object-cover ${!hasAiAccess ? 'grayscale opacity-70' : ''}`} onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK}/>
                                         <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 border-2 border-slate-800 rounded-full"></div>
                                     </div>
                                     <div><h4 className="font-bold text-white text-base group-hover:text-secondary transition-colors">Zé da Obra AI</h4><p className="text-xs text-slate-300">Tire dúvidas técnicas 24h</p></div>
@@ -964,18 +975,21 @@ const WorkDetail: React.FC = () => {
                             <h2 className="text-3xl font-black text-white mb-2 tracking-tight">Zé da Obra <span className="text-secondary">AI</span></h2>
                             <div className="h-1 w-12 bg-secondary rounded-full mb-6"></div>
                             <p className="text-slate-400 text-sm mb-8 leading-relaxed font-medium">Seu engenheiro virtual particular.</p>
-                            {isPremium ? (
-                                <button onClick={() => setSubView('BONUS_IA_CHAT')} className="w-full py-4 bg-gradient-gold text-white font-black rounded-2xl shadow-lg hover:shadow-orange-500/20 hover:scale-105 transition-all flex items-center justify-center gap-3 group-hover:animate-pulse"><span>INICIAR CONVERSA</span><i className="fa-solid fa-comments"></i></button>
+                            {hasAiAccess ? (
+                                <button onClick={() => navigate('/ai-chat')} className="w-full py-4 bg-gradient-gold text-white font-black rounded-2xl shadow-lg hover:shadow-orange-500/20 hover:scale-105 transition-all flex items-center justify-center gap-3 group-hover:animate-pulse"><span>INICIAR CONVERSA</span><i className="fa-solid fa-comments"></i></button>
                             ) : (
                                 <button onClick={() => navigate('/settings')} className="w-full py-4 bg-slate-800 text-slate-500 font-bold rounded-2xl border border-slate-700 flex items-center justify-center gap-2 hover:bg-slate-700 transition-colors"><i className="fa-solid fa-lock"></i> BLOQUEADO (PREMIUM)</button>
                             )}
+                            <p className="text-center text-[10px] text-slate-500 mt-4 flex items-center justify-center gap-1">
+                                <i className="fa-solid fa-info-circle"></i> Acesso à IA é exclusivo para assinantes Vitalícios ou em período de trial.
+                            </p>
                         </div>
                     </div>
                 </div>
             );
 
             case 'BONUS_IA_CHAT': 
-                if (!isPremium) return null;
+                if (!hasAiAccess) return null;
                 return (
                 <div className="flex flex-col h-[80vh]">
                     <div className="flex-1 bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-inner overflow-y-auto mb-4 border border-slate-200 dark:border-slate-800">
