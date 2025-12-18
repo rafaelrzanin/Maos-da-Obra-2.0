@@ -22,20 +22,27 @@ const DashboardSkeleton = () => (
       {/* Zé Tip Skeleton */}
       <div className="h-24 w-full bg-slate-200 dark:bg-slate-800 rounded-2xl mb-8"></div>
       
-      {/* Main HUD Skeleton */}
-      <div className="h-64 w-full bg-slate-200 dark:bg-slate-800 rounded-[1.4rem] mb-8"></div>
-      
-      {/* List Skeleton */}
-      <div className="space-y-4">
-          <div className="h-4 w-32 bg-slate-200 dark:bg-slate-800 rounded-full mb-2"></div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <div className="h-20 bg-slate-200 dark:bg-slate-800 rounded-2xl"></div>
-              <div className="h-20 bg-slate-200 dark:bg-slate-800 rounded-2xl"></div>
-              <div className="h-20 bg-slate-200 dark:bg-slate-800 rounded-2xl"></div>
-          </div>
+     {/* Main HUD Skeleton */}
+<div className="mb-8 rounded-[1.6rem] border border-slate-200 bg-white shadow-[0_18px_45px_-30px_rgba(15,23,42,0.45)] ring-1 ring-black/5 dark:border-slate-800 dark:bg-slate-900 dark:shadow-none dark:ring-0">
+  <div className="h-64 w-full rounded-[1.6rem] bg-gradient-to-b from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-900"></div>
+</div>
+
+{/* List Skeleton */}
+<div className="space-y-4">
+  <div className="h-4 w-32 rounded-full bg-slate-200 dark:bg-slate-800 mb-2"></div>
+
+  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+    {[1,2,3].map((i) => (
+      <div
+        key={i}
+        className="h-20 rounded-2xl border border-slate-200 bg-white shadow-[0_12px_30px_-24px_rgba(15,23,42,0.40)] ring-1 ring-black/5 dark:border-slate-800 dark:bg-slate-900 dark:shadow-none dark:ring-0"
+      >
+        <div className="h-full w-full rounded-2xl bg-gradient-to-b from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-900"></div>
       </div>
+    ))}
   </div>
-);
+</div>
+
 
 //PAINEL DE RISCO
 const RiskRadar = ({
