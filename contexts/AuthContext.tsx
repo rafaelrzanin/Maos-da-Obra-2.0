@@ -71,6 +71,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 console.log("[AuthContext] initAuth resolved. User:", result ? result.email : 'null', "Setting loading to false.");
             } else {
                 console.warn(`[AuthContext] initAuth timed out after ${timeoutDuration / 1000}s. Displaying UI, awaiting onAuthChange.`);
+                // Even on timeout, ensure loading is false to unblock UI
             }
             setLoading(false); // Crucial: Stop initial loading spinner here.
         } else {
@@ -79,8 +80,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } catch (error) {
         console.error("[AuthContext] Erro during initAuth:", error);
         if (mounted) {
-            setUser(null);
-            setLoading(false); 
+            setUser(null); // Ensure user is null on error
+            setLoading(false); // Ensure loading is false on error
         }
       }
     };
