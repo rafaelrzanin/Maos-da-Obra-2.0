@@ -901,6 +901,7 @@ const WorkDetail: React.FC = () => {
           </div>
         </div>
       </div>
+      );   
             case 'SUPPLIERS': return (
                 <div className="space-y-6">
                     <div className="bg-amber-50 dark:bg-amber-900/20 p-6 rounded-3xl border border-amber-100 dark:border-amber-900 mb-2">
