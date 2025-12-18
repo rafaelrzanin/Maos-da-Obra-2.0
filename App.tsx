@@ -1,21 +1,21 @@
 
 import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { PlanType } from './types';
-import { AuthProvider, ThemeProvider, useAuth, useTheme } from './contexts/AuthContext';
+import { PlanType } from './types.ts';
+import { AuthProvider, ThemeProvider, useAuth, useTheme } from './contexts/AuthContext.tsx';
 
 // --- IMPORTAÇÕES ESTÁTICAS (Críticas para velocidade inicial) ---
-import Login from './pages/Login';
-import Dashboard from './pages/Dashboard';
+import Login from './pages/Login.tsx';
+import Dashboard from './pages/Dashboard.tsx';
 
 // --- Lazy Loading com Type Casting "unknown" para evitar erro de Build (TS2352) ---
-const CreateWork = lazy(() => import('./pages/CreateWork') as unknown as Promise<{ default: React.ComponentType<any> }>);
-const WorkDetail = lazy(() => import('./pages/WorkDetail') as unknown as Promise<{ default: React.ComponentType<any> }>);
-const Settings = lazy(() => import('./pages/Settings') as unknown as Promise<{ default: React.ComponentType<any> }>);
-const Profile = lazy(() => import('./pages/Profile') as unknown as Promise<{ default: React.ComponentType<any> }>);
-const VideoTutorials = lazy(() => import('./pages/VideoTutorials') as unknown as Promise<{ default: React.ComponentType<any> }>);
-const Checkout = lazy(() => import('./pages/Checkout') as unknown as Promise<{ default: React.ComponentType<any> }>);
-const AiChat = lazy(() => import('./pages/AiChat') as unknown as Promise<{ default: React.ComponentType<any> }>);
+const CreateWork = lazy(() => import('./pages/CreateWork.tsx') as unknown as Promise<{ default: React.ComponentType<any> }>);
+const WorkDetail = lazy(() => import('./pages/WorkDetail.tsx') as unknown as Promise<{ default: React.ComponentType<any> }>);
+const Settings = lazy(() => import('./pages/Settings.tsx') as unknown as Promise<{ default: React.ComponentType<any> }>);
+const Profile = lazy(() => import('./pages/Profile.tsx') as unknown as Promise<{ default: React.ComponentType<any> }>);
+const VideoTutorials = lazy(() => import('./pages/VideoTutorials.tsx') as unknown as Promise<{ default: React.ComponentType<any> }>);
+const Checkout = lazy(() => import('./pages/Checkout.tsx') as unknown as Promise<{ default: React.ComponentType<any> }>);
+const AiChat = lazy(() => import('./pages/AiChat.tsx') as unknown as Promise<{ default: React.ComponentType<any> }>);
 
 
 // --- Componente de Carregamento ---
@@ -203,7 +203,7 @@ const App: React.FC = () => {
         <AuthProvider>
           <Suspense fallback={<LoadingScreen />}>
             <Routes>
-              <Route path="/login" element={<Login />} />
+              <Route path="/login" element={<Layout><Login /></Layout>} />
               <Route path="/checkout" element={<Layout><Checkout /></Layout>} />
               <Route path="/" element={<Layout><Dashboard /></Layout>} />
               <Route path="/create" element={<Layout><CreateWork /></Layout>} />
