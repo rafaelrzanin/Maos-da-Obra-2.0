@@ -1,8 +1,21 @@
 
 import { GoogleGenAI } from "@google/genai";
 
-const env = (import.meta as any).env || {};
-const apiKey = env.VITE_GOOGLE_API_KEY;
+// Helper function to safely get environment variables, checking both process.env and import.meta.env
+const safeGetEnv = (key: string): string | undefined => {
+  // Prefer process.env first as per GenAI guidelines
+  if (typeof process !== 'undefined' && process.env && typeof process.env[key] === 'string') {
+    return process.env[key];
+  }
+  // Fallback to import.meta.env for Vite client-side environments if necessary
+  if (typeof import.meta !== 'undefined' && import.meta.env && typeof import.meta.env[key] === 'string') {
+    return import.meta.env[key];
+  }
+  return undefined;
+};
+
+// Access API_KEY using the safeGetEnv helper
+const apiKey = safeGetEnv('API_KEY');
 
 // Campo para chave manual se não configurar no .env
 // Exemplo: const MANUAL_KEY = "AIza...";
@@ -52,3 +65,4 @@ export const aiService = {
     }
   }
 };
+
