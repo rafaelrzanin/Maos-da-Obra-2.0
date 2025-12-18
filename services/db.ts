@@ -144,15 +144,17 @@ const parseNotificationFromDB = (data: any): Notification => ({
 // --- AUTH CACHE & DEDUPLICATION ---
 let sessionCache: { promise: Promise<User | null>, timestamp: number } | null = null;
 const AUTH_CACHE_DURATION = 5000;
-const pendingProfileRequests: Record<string, Promise<User | null>> = {};
+const pendingProfileRequests: Partial<Record<string, Promise<User | null>>> = {};
 
 const ensureUserProfile = async (authUser: any): Promise<User | null> => {
     const client = supabase; // Supabase is guaranteed to be initialized now
     if (!authUser) return null;
 
-    if (pendingProfileRequests[authUser.id]) {
-        return pendingProfileRequests[authUser.id];
-    }
+  const pending = pendingProfileRequests[authUser.id];
+if (pending) {
+  return pending;
+  }
+
 
     const fetchProfileProcess = async (): Promise<User | null> => {
         try {
