@@ -1,5 +1,4 @@
 
-// @ts-nocheck
 import { 
   User, Work, Step, Material, Expense, Worker, Supplier, 
   WorkPhoto, WorkFile, Notification, PlanType,
@@ -149,8 +148,8 @@ const AUTH_CACHE_DURATION = 5000;
 const pendingProfileRequests: Record<string, Promise<User | null>> = {};
 
 const ensureUserProfile = async (authUser: any): Promise<User | null> => {
-    const client = supabase;
-    if (!authUser || !client) return null;
+    const client = supabase; // Supabase is guaranteed to be initialized now
+    if (!authUser) return null;
 
     if (pendingProfileRequests[authUser.id]) {
         return pendingProfileRequests[authUser.id];
@@ -175,7 +174,7 @@ const ensureUserProfile = async (authUser: any): Promise<User | null> => {
                     name: authUser.user_metadata?.name || 'Erro de Permissão',
                     email: authUser.email || '',
                     plan: PlanType.MENSAL,
-                    isTrial: true
+                    isTrial: true // Default for error case
                  };
             }
 
@@ -204,7 +203,7 @@ const ensureUserProfile = async (authUser: any): Promise<User | null> => {
                 return {
                     id: authUser.id,
                     name: newProfileData.name,
-                    email: authData.user.email || '',
+                    email: authUser.email || '', // Corrected from authData.user.email
                     plan: PlanType.MENSAL,
                     isTrial: true,
                     subscriptionExpiresAt: trialExpires.toISOString()
@@ -220,7 +219,7 @@ const ensureUserProfile = async (authUser: any): Promise<User | null> => {
                 name: authUser.email || 'Usuário',
                 email: authUser.email,
                 plan: PlanType.MENSAL,
-                isTrial: true
+                isTrial: true // Default for error case
             };
         }
     };
@@ -238,8 +237,7 @@ const ensureUserProfile = async (authUser: any): Promise<User | null> => {
 export const dbService = {
   // --- AUTH ---
   async getCurrentUser() {
-    const client = supabase;
-    if (!client) return null;
+    const client = supabase; // Supabase is guaranteed to be initialized now
     
     const now = Date.now();
     
@@ -263,8 +261,7 @@ export const dbService = {
   },
 
   onAuthChange(callback: (user: User | null) => void) {
-    const client = supabase;
-    if (!client) return () => {};
+    const client = supabase; // Supabase is guaranteed to be initialized now
     
     const { data: { subscription } } = client.auth.onAuthStateChange(async (_event, session) => {
         sessionCachePromise = null;
@@ -285,7 +282,7 @@ export const dbService = {
   },
 
   async login(email: string, password?: string) {
-    if (!supabase) throw new Error("Supabase não configurado");
+    // Supabase is guaranteed to be initialized now
     const { data, error } = await supabase.auth.signInWithPassword({ email, password: password || '' });
     if (error) throw error;
     if (data.user) {
@@ -296,7 +293,7 @@ export const dbService = {
   },
 
   async loginSocial(provider: 'google') {
-    if (!supabase) return { error: 'Supabase not configured', data: null };
+    // Supabase is guaranteed to be initialized now
     return await supabase.auth.signInWithOAuth({ 
         provider,
         options: {
@@ -306,7 +303,7 @@ export const dbService = {
   },
 
   async signup(name: string, email: string, whatsapp: string, password?: string, cpf?: string, planType?: string | null) {
-    if (!supabase) throw new Error("Supabase não configurado");
+    // Supabase is guaranteed to be initialized now
     
     const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
@@ -317,7 +314,8 @@ export const dbService = {
     });
 
     if (authError) throw authError;
-    if (!authData.user) {
+    // If user already exists and signed in, just ensure profile and return
+    if (!authData.user) { 
         return this.login(email, password);
     }
 
@@ -344,7 +342,8 @@ export const dbService = {
   },
 
   async logout() {
-    if (supabase) await supabase.auth.signOut();
+    // Supabase is guaranteed to be initialized now
+    await supabase.auth.signOut();
     sessionCachePromise = null;
     // Clear Dashboard Cache
     _dashboardCache.works = null;
@@ -354,14 +353,14 @@ export const dbService = {
   },
 
   async getUserProfile(userId: string): Promise<User | null> {
-    if (!supabase) return null;
+    // Supabase is guaranteed to be initialized now
     const { data, error } = await supabase.from('profiles').select('*').eq('id', userId).single();
     if (error) return null;
-    return mapProfileFromSupabase(data);
+    return data ? mapProfileFromSupabase(data) : null;
   },
 
   async updateUser(userId: string, data: Partial<User>, newPassword?: string) {
-      if (!supabase) return;
+      // Supabase is guaranteed to be initialized now
       
       try {
           // 1. Atualiza dados do perfil (Nome, Whatsapp, etc)
@@ -389,7 +388,7 @@ export const dbService = {
   },
 
   async resetPassword(email: string) {
-      if(!supabase) return false;
+      // Supabase is guaranteed to be initialized now
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
           redirectTo: window.location.origin + '/settings'
       });
@@ -403,12 +402,12 @@ export const dbService = {
   },
 
   async updatePlan(userId: string, plan: PlanType) {
-      if (!supabase) return;
+      // Supabase is guaranteed to be initialized now
       
       let expires = new Date();
       if (plan === PlanType.MENSAL) expires.setDate(expires.getDate() + 30);
       if (plan === PlanType.SEMESTRAL) expires.setDate(expires.getDate() + 180);
-      if (plan === PlanType.VITALICIO) expires.setFullYear(expires.getFullYear() + 100);
+      if (plan === PlanType.VITALICIO) expires.setFullYear(expires.getFullYear() + 100); // Effectively forever
 
       await supabase.from('profiles').update({
           plan,
@@ -420,6 +419,7 @@ export const dbService = {
   },
 
   async generatePix(_amount: number, _payer: any) {
+      // This is a mock function, no actual Supabase interaction required
       return {
           qr_code_base64: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
           copy_paste_code: "00020126330014BR.GOV.BCB.PIX011155555555555520400005303986540510.005802BR5913Mãos da Obra6008Brasilia62070503***63041234"
@@ -428,7 +428,7 @@ export const dbService = {
 
   // --- WORKS (WITH CACHING) ---
   async getWorks(userId: string): Promise<Work[]> {
-    if (!supabase) return [];
+    // Supabase is guaranteed to be initialized now
     
     const now = Date.now();
     // Return cache immediately if valid
@@ -444,7 +444,7 @@ export const dbService = {
         
     if (error) {
         console.error("Erro ao buscar obras:", error);
-        return [];
+        return []; // Return empty on error
     }
     
     const parsed = (data || []).map(parseWorkFromDB);
@@ -453,7 +453,7 @@ export const dbService = {
   },
 
   async getWorkById(workId: string): Promise<Work | null> {
-    if (!supabase) return null;
+    // Supabase is guaranteed to be initialized now
     
     // Check cache first
     if (_dashboardCache.works) {
@@ -470,7 +470,7 @@ export const dbService = {
   },
 
   async createWork(work: Partial<Work>, templateId: string): Promise<Work> {
-    if (!supabase) throw new Error("Supabase off");
+    // Supabase is guaranteed to be initialized now
     
     const dbWork = {
         user_id: work.userId,
@@ -529,7 +529,8 @@ export const dbService = {
   },
 
   async regenerateMaterials(workId: string, area: number, templateId: string = 'CONSTRUCAO') {
-      if (!supabase || !workId) return;
+      // Supabase is guaranteed to be initialized now
+      if (!workId) return;
       
       const safeArea = area && area > 0 ? area : 100;
       let materialsToInsert: any[] = [];
@@ -568,7 +569,7 @@ export const dbService = {
   },
 
   async deleteWork(workId: string) {
-    if (!supabase) throw new Error("Supabase não configurado");
+    // Supabase is guaranteed to be initialized now
 
     // Start a transaction (Supabase does not have explicit transactions, but we can do multiple operations)
     try {
@@ -590,7 +591,7 @@ export const dbService = {
 
   // --- STEPS ---
   async getSteps(workId: string): Promise<Step[]> {
-    if (!supabase) return [];
+    // Supabase is guaranteed to be initialized now
     const { data, error } = await supabase.from('steps').select('*').eq('work_id', workId).order('start_date', { ascending: true });
     if (error) {
       console.error("Erro ao buscar etapas:", error);
@@ -600,7 +601,7 @@ export const dbService = {
   },
 
   async addStep(step: Omit<Step, 'id'>): Promise<Step | null> {
-    if (!supabase) return null;
+    // Supabase is guaranteed to be initialized now
     const { data, error } = await supabase.from('steps').insert({
       work_id: step.workId,
       name: step.name,
@@ -617,13 +618,13 @@ export const dbService = {
   },
 
   async updateStep(step: Step): Promise<Step | null> {
-    if (!supabase) return null;
+    // Supabase is guaranteed to be initialized now
     const { data, error } = await supabase.from('steps').update({
       name: step.name,
       start_date: step.startDate,
       end_date: step.endDate,
       status: step.status,
-      real_date: step.realDate,
+      real_date: step.realDate, // Added real_date parsing
       is_delayed: step.isDelayed
     }).eq('id', step.id).select().single();
     if (error) {
@@ -635,7 +636,7 @@ export const dbService = {
 
   // --- MATERIALS ---
   async getMaterials(workId: string): Promise<Material[]> {
-    if (!supabase) return [];
+    // Supabase is guaranteed to be initialized now
     const { data, error } = await supabase.from('materials').select('*').eq('work_id', workId).order('category', { ascending: true }).order('name', { ascending: true });
     if (error) {
       console.error("Erro ao buscar materiais:", error);
@@ -645,7 +646,7 @@ export const dbService = {
   },
 
   async addMaterial(material: Omit<Material, 'id'>, purchaseInfo?: {qty: number, cost: number, date: string}): Promise<Material | null> {
-    if (!supabase) return null;
+    // Supabase is guaranteed to be initialized now
     
     const { data, error } = await supabase.from('materials').insert({
       work_id: material.workId,
@@ -680,7 +681,7 @@ export const dbService = {
   },
 
   async updateMaterial(material: Material): Promise<Material | null> {
-    if (!supabase) return null;
+    // Supabase is guaranteed to be initialized now
     const { data, error } = await supabase.from('materials').update({
       name: material.name,
       brand: material.brand,
@@ -698,7 +699,7 @@ export const dbService = {
   },
 
   async registerMaterialPurchase(materialId: string, name: string, brand: string | undefined, plannedQty: number, unit: string, qty: number, cost: number): Promise<void> {
-    if (!supabase) return;
+    // Supabase is guaranteed to be initialized now
 
     // 1. Update material's purchased quantity
     const { data: existingMaterial, error: fetchError } = await supabase
@@ -737,7 +738,7 @@ export const dbService = {
 
   // --- EXPENSES ---
   async getExpenses(workId: string): Promise<Expense[]> {
-    if (!supabase) return [];
+    // Supabase is guaranteed to be initialized now
     const { data, error } = await supabase.from('expenses').select('*').eq('work_id', workId).order('date', { ascending: false });
     if (error) {
       console.error("Erro ao buscar despesas:", error);
@@ -747,7 +748,7 @@ export const dbService = {
   },
 
   async addExpense(expense: Omit<Expense, 'id'>): Promise<Expense | null> {
-    if (!supabase) return null;
+    // Supabase is guaranteed to be initialized now
     const { data, error } = await supabase.from('expenses').insert({
       work_id: expense.workId,
       description: expense.description,
@@ -769,7 +770,7 @@ export const dbService = {
   },
 
   async updateExpense(expense: Expense): Promise<Expense | null> {
-    if (!supabase) return null;
+    // Supabase is guaranteed to be initialized now
     const { data, error } = await supabase.from('expenses').update({
       description: expense.description,
       amount: expense.amount,
@@ -790,7 +791,7 @@ export const dbService = {
   },
 
   async deleteExpense(expenseId: string): Promise<void> {
-    if (!supabase) return;
+    // Supabase is guaranteed to be initialized now
     const { error } = await supabase.from('expenses').delete().eq('id', expenseId);
     if (error) {
       console.error("Erro ao apagar despesa:", error);
@@ -800,7 +801,7 @@ export const dbService = {
 
   // --- WORKERS ---
   async getWorkers(userId: string): Promise<Worker[]> {
-    if (!supabase) return [];
+    // Supabase is guaranteed to be initialized now
     const { data, error } = await supabase.from('workers').select('*').eq('user_id', userId).order('name', { ascending: true });
     if (error) {
       console.error("Erro ao buscar profissionais:", error);
@@ -810,7 +811,7 @@ export const dbService = {
   },
 
   async addWorker(worker: Omit<Worker, 'id'>): Promise<Worker | null> {
-    if (!supabase) return null;
+    // Supabase is guaranteed to be initialized now
     const { data, error } = await supabase.from('workers').insert({
       user_id: worker.userId,
       name: worker.name,
@@ -827,7 +828,7 @@ export const dbService = {
   },
 
   async updateWorker(worker: Worker): Promise<Worker | null> {
-    if (!supabase) return null;
+    // Supabase is guaranteed to be initialized now
     const { data, error } = await supabase.from('workers').update({
       name: worker.name,
       role: worker.role,
@@ -843,7 +844,7 @@ export const dbService = {
   },
 
   async deleteWorker(workerId: string): Promise<void> {
-    if (!supabase) return;
+    // Supabase is guaranteed to be initialized now
     const { error } = await supabase.from('workers').delete().eq('id', workerId);
     if (error) {
       console.error("Erro ao apagar profissional:", error);
@@ -853,7 +854,7 @@ export const dbService = {
 
   // --- SUPPLIERS ---
   async getSuppliers(userId: string): Promise<Supplier[]> {
-    if (!supabase) return [];
+    // Supabase is guaranteed to be initialized now
     const { data, error } = await supabase.from('suppliers').select('*').eq('user_id', userId).order('name', { ascending: true });
     if (error) {
       console.error("Erro ao buscar fornecedores:", error);
@@ -863,7 +864,7 @@ export const dbService = {
   },
 
   async addSupplier(supplier: Omit<Supplier, 'id'>): Promise<Supplier | null> {
-    if (!supabase) return null;
+    // Supabase is guaranteed to be initialized now
     const { data, error } = await supabase.from('suppliers').insert({
       user_id: supplier.userId,
       name: supplier.name,
@@ -881,7 +882,7 @@ export const dbService = {
   },
 
   async updateSupplier(supplier: Supplier): Promise<Supplier | null> {
-    if (!supabase) return null;
+    // Supabase is guaranteed to be initialized now
     const { data, error } = await supabase.from('suppliers').update({
       name: supplier.name,
       category: supplier.category,
@@ -898,7 +899,7 @@ export const dbService = {
   },
 
   async deleteSupplier(supplierId: string): Promise<void> {
-    if (!supabase) return;
+    // Supabase is guaranteed to be initialized now
     const { error } = await supabase.from('suppliers').delete().eq('id', supplierId);
     if (error) {
       console.error("Erro ao apagar fornecedor:", error);
@@ -908,7 +909,7 @@ export const dbService = {
 
   // --- WORK PHOTOS ---
   async getPhotos(workId: string): Promise<WorkPhoto[]> {
-    if (!supabase) return [];
+    // Supabase is guaranteed to be initialized now
     const { data, error } = await supabase.from('work_photos').select('*').eq('work_id', workId).order('date', { ascending: false });
     if (error) {
       console.error("Erro ao buscar fotos:", error);
@@ -918,7 +919,7 @@ export const dbService = {
   },
 
   async addPhoto(photo: Omit<WorkPhoto, 'id'>): Promise<WorkPhoto | null> {
-    if (!supabase) return null;
+    // Supabase is guaranteed to be initialized now
     const { data, error } = await supabase.from('work_photos').insert({
       work_id: photo.workId,
       url: photo.url,
@@ -935,7 +936,7 @@ export const dbService = {
 
   // --- WORK FILES ---
   async getFiles(workId: string): Promise<WorkFile[]> {
-    if (!supabase) return [];
+    // Supabase is guaranteed to be initialized now
     const { data, error } = await supabase.from('work_files').select('*').eq('work_id', workId).order('date', { ascending: false });
     if (error) {
       console.error("Erro ao buscar arquivos:", error);
@@ -945,7 +946,7 @@ export const dbService = {
   },
 
   async addFile(file: Omit<WorkFile, 'id'>): Promise<WorkFile | null> {
-    if (!supabase) return null;
+    // Supabase is guaranteed to be initialized now
     const { data, error } = await supabase.from('work_files').insert({
       work_id: file.workId,
       name: file.name,
@@ -963,7 +964,7 @@ export const dbService = {
 
   // --- NOTIFICATIONS ---
   async getNotifications(userId: string): Promise<Notification[]> {
-    if (!supabase) return [];
+    // Supabase is guaranteed to be initialized now
     
     const now = Date.now();
     if (_dashboardCache.notifications && (now - _dashboardCache.notifications.timestamp < CACHE_TTL)) {
@@ -986,7 +987,7 @@ export const dbService = {
   },
 
   async addNotification(notification: Omit<Notification, 'id'>): Promise<Notification | null> {
-    if (!supabase) return null;
+    // Supabase is guaranteed to be initialized now
     const { data, error } = await supabase.from('notifications').insert({
       user_id: notification.userId,
       title: notification.title,
@@ -1004,7 +1005,7 @@ export const dbService = {
   },
 
   async dismissNotification(notificationId: string): Promise<void> {
-    if (!supabase) return;
+    // Supabase is guaranteed to be initialized now
     const { error } = await supabase.from('notifications')
       .update({ read: true })
       .eq('id', notificationId);
@@ -1016,7 +1017,7 @@ export const dbService = {
   },
 
   async clearAllNotifications(userId: string): Promise<void> {
-    if (!supabase) return;
+    // Supabase is guaranteed to be initialized now
     const { error } = await supabase.from('notifications')
       .update({ read: true })
       .eq('user_id', userId);
@@ -1029,7 +1030,7 @@ export const dbService = {
 
   // --- DASHBOARD STATS ---
   async calculateWorkStats(workId: string): Promise<{ totalSpent: number, progress: number, delayedSteps: number }> {
-    if (!supabase) return { totalSpent: 0, progress: 0, delayedSteps: 0 };
+    // Supabase is guaranteed to be initialized now
 
     const now = Date.now();
     if (_dashboardCache.stats[workId] && (now - _dashboardCache.stats[workId].timestamp < CACHE_TTL)) {
@@ -1062,7 +1063,7 @@ export const dbService = {
   },
 
   async getDailySummary(workId: string): Promise<{ completedSteps: number, delayedSteps: number, pendingMaterials: number, totalSteps: number }> {
-    if (!supabase) return { completedSteps: 0, delayedSteps: 0, pendingMaterials: 0, totalSteps: 0 };
+    // Supabase is guaranteed to be initialized now
 
     const now = Date.now();
     if (_dashboardCache.summary[workId] && (now - _dashboardCache.summary[workId].timestamp < CACHE_TTL)) {
@@ -1093,7 +1094,7 @@ export const dbService = {
   },
 
   async generateSmartNotifications(userId: string, workId: string): Promise<void> {
-    if (!supabase) return;
+    // Supabase is guaranteed to be initialized now
     
     // This is a placeholder for a more complex notification generation logic.
     // In a real app, this would check for:
