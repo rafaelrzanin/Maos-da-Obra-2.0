@@ -81,6 +81,136 @@ const Donut = ({ value, label }: { value: number; label: string }) => {
   );
 };
 
+const MiniBars = ({
+  aLabel, aValue, aMax, aClass,
+  bLabel, bValue, bMax, bClass,
+  cLabel, cValue, cMax, cClass,
+}: {
+  aLabel: string; aValue: number; aMax: number; aClass: string;
+  bLabel: string; bValue: number; bMax: number; bClass: string;
+  cLabel: string; cValue: number; cMax: number; cClass: string;
+}) => {
+  const w = (v: number, m: number) => `${Math.max(6, Math.min(100, m ? (v / m) * 100 : 0))}%`;
+
+  return (
+    <div className={cx(surface, "rounded-2xl p-5")}>
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <p className="text-sm font-black text-slate-900 dark:text-white">Painel Vivo</p>
+          <p className={cx("text-xs font-semibold", mutedText)}>Radar rápido do dia</p>
+        </div>
+        <div className="text-xs font-extrabold tracking-widest uppercase text-slate-500 dark:text-slate-400">
+          hoje
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        <div>
+          <div className="flex justify-between text-xs font-bold mb-1">
+            <span className={mutedText}>{aLabel}</span>
+            <span className="text-slate-900 dark:text-white">{aValue}</span>
+          </div>
+          <div className="h-2.5 rounded-full bg-slate-200/70 dark:bg-slate-800 overflow-hidden">
+            <div className={cx("h-full rounded-full", aClass)} style={{ width: w(aValue, aMax) }} />
+          </div>
+        </div>
+
+        <div>
+          <div className="flex justify-between text-xs font-bold mb-1">
+            <span className={mutedText}>{bLabel}</span>
+            <span className="text-slate-900 dark:text-white">{bValue}</span>
+          </div>
+          <div className="h-2.5 rounded-full bg-slate-200/70 dark:bg-slate-800 overflow-hidden">
+            <div className={cx("h-full rounded-full", bClass)} style={{ width: w(bValue, bMax) }} />
+          </div>
+        </div>
+
+        <div>
+          <div className="flex justify-between text-xs font-bold mb-1">
+            <span className={mutedText}>{cLabel}</span>
+            <span className="text-slate-900 dark:text-white">{cValue}</span>
+          </div>
+          <div className="h-2.5 rounded-full bg-slate-200/70 dark:bg-slate-800 overflow-hidden">
+            <div className={cx("h-full rounded-full", cClass)} style={{ width: w(cValue, cMax) }} />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const LiveTimeline = ({
+  steps,
+  onClick,
+}: {
+  steps: Step[];
+  onClick: () => void;
+}) => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const getDiffDays = (dateStr: string) => {
+    const [y, m, d] = dateStr.split("-").map(Number);
+    const dt = new Date(y, m - 1, d);
+    const diffTime = dt.getTime() - today.getTime();
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  };
+
+  return (
+    <div className={cx(surface, "rounded-2xl p-5")}>
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <p className="text-sm font-black text-slate-900 dark:text-white">Próximas Etapas</p>
+          <p className={cx("text-xs font-semibold", mutedText)}>Linha do tempo da obra</p>
+        </div>
+        <button onClick={onClick} className="text-xs font-extrabold text-secondary hover:opacity-80">
+          Abrir obra →
+        </button>
+      </div>
+
+      <div className="space-y-3">
+        {steps.slice(0, 4).map((s, idx) => {
+          const diffDays = getDiffDays(s.startDate);
+
+          const pill =
+            diffDays < 0
+              ? { text: "Atrasado", cls: "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300" }
+              : diffDays === 0
+              ? { text: "Hoje", cls: "bg-emerald-100 dark:bg-emerald-900/20 text-emerald-800 dark:text-emerald-300" }
+              : { text: `Em ${diffDays}d`, cls: "bg-amber-100 dark:bg-amber-900/20 text-amber-800 dark:text-amber-300" };
+
+          return (
+            <div key={s.id} onClick={onClick} className={cx("cursor-pointer", cardHover, "rounded-xl p-3 border border-slate-200/50 dark:border-white/10 bg-white/60 dark:bg-slate-950/20")}>
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 grid place-items-center text-slate-600 dark:text-slate-300">
+                  <i className="fa-regular fa-calendar"></i>
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-extrabold text-slate-900 dark:text-white truncate">{s.name}</p>
+                  <p className={cx("text-xs font-semibold", mutedText)}>{formatDateDisplay(s.startDate)}</p>
+                </div>
+
+                <span className={cx("text-[11px] font-black px-2.5 py-1 rounded-xl whitespace-nowrap", pill.cls)}>
+                  {pill.text}
+                </span>
+              </div>
+
+              {/* barrinha de “posição” na timeline */}
+              <div className="mt-3 h-1.5 rounded-full bg-slate-200/70 dark:bg-slate-800 overflow-hidden">
+                <div
+                  className={cx("h-full rounded-full", diffDays < 0 ? "bg-red-500" : diffDays === 0 ? "bg-emerald-500" : "bg-amber-500")}
+                  style={{ width: `${Math.max(18, 100 - idx * 18)}%` }}
+                />
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
 const KpiCard = ({
   onClick,
   icon,
