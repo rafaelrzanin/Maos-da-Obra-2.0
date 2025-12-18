@@ -244,8 +244,8 @@ export const dbService = {
     const currentSessionCache = sessionCache; 
 
     // Check if we have a valid cached promise
-    // Refactored to address TS2801: check if currentSessionCache is not null AND if its promise property is not null
-    if (currentSessionCache !== null && currentSessionCache.promise !== null && (now - currentSessionCache.timestamp < AUTH_CACHE_DURATION)) {
+    // Refactored to address TS2801: check if currentSessionCache is not null
+    if (currentSessionCache !== null && (now - currentSessionCache.timestamp < AUTH_CACHE_DURATION)) {
         return currentSessionCache.promise;
     }
 
