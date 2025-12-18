@@ -864,25 +864,18 @@ const Dashboard: React.FC = () => {
   </div>
 )}
 
-      {/* PAINEL VIVO: mini-barras + timeline */}
-<div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
-  <MiniBars
-    aLabel="Etapas concluídas (hoje)"
-    aValue={dailySummary.completedSteps}
-    aMax={Math.max(1, dailySummary.totalSteps)}
-    aClass="bg-emerald-500"
-    bLabel="Etapas atrasadas"
-    bValue={dailySummary.delayedSteps}
-    bMax={Math.max(1, dailySummary.totalSteps)}
-    bClass="bg-red-500"
-    cLabel="Materiais pendentes"
-    cValue={dailySummary.pendingMaterials}
-    cMax={Math.max(1, materials.length || dailySummary.pendingMaterials || 1)}
-    cClass="bg-amber-500"
+     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
+  <RiskRadar
+    focusWork={focusWork}
+    stats={stats}
+    dailySummary={dailySummary}
+    materials={materials}
+    onOpenWork={handleAccessWork}
   />
 
   <LiveTimeline steps={upcomingSteps} onClick={handleAccessWork} />
 </div>
+
 
 
             {/* NEW POSITION FOR ACCESS WORK BUTTON */}
