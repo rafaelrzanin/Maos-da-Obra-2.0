@@ -11,8 +11,8 @@ import { STANDARD_CHECKLISTS, CONTRACT_TEMPLATES, STANDARD_JOB_ROLES, STANDARD_S
 
 // --- TYPES FOR VIEW STATE ---
 type MainTab = 'SCHEDULE' | 'MATERIALS' | 'FINANCIAL' | 'MORE';
-// Removed 'BONUS_IA' and 'BONUS_IA_CHAT' as they are replaced by a dedicated page.
-type SubView = 'NONE' | 'TEAM' | 'SUPPLIERS' | 'REPORTS' | 'PHOTOS' | 'PROJECTS' | 'CALCULATORS' | 'CONTRACTS' | 'CHECKLIST'; 
+// Fix: Removed 'BONUS_IA' and 'BONUS_IA_CHAT' as AI chat is now a dedicated page.
+type SubView = 'NONE' | 'TEAM' | 'SUPPLIERS' | 'REPORTS' | 'PHOTOS' | 'PROJECTS' | 'CALCULATORS' | 'CONTRACTS' | 'CHECKLIST';
 
 // --- DATE HELPERS ---
 const parseDateNoTimezone = (dateStr: string) => {
@@ -28,6 +28,7 @@ const parseDateNoTimezone = (dateStr: string) => {
 const WorkDetail: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
+    // Fix: Destructure trialDaysRemaining from useAuth to resolve 'hasAiAccess' error.
     const { user, trialDaysRemaining } = useAuth(); 
     
     // --- CORE DATA STATE ---
@@ -45,13 +46,14 @@ const WorkDetail: React.FC = () => {
 
     // --- UI STATE ---
     const [activeTab, setActiveTab] = useState<MainTab>('SCHEDULE');
+    // Fix: Removed 'BONUS_IA' and 'BONUS_IA_CHAT' from SubView.
     const [subView, setSubView] = useState<SubView>('NONE');
     const [uploading, setUploading] = useState(false);
     
     // --- AI ACCESS LOGIC ---
     const isVitalicio = user?.plan === PlanType.VITALICIO;
     const isAiTrialActive = user?.isTrial && trialDaysRemaining !== null && trialDaysRemaining > 0;
-    const hasAiAccess = isVitalicio || isAiTrialActive; // This flag will still be used to determine if the AI icon is "locked" or "unlocked" visually.
+    const hasAiAccess = isVitalicio || isAiTrialActive;
 
     // --- PREMIUM TOOLS LOCK ---
     // isPremium is used for non-AI premium tools (Calculators, Contracts, Checklist)
@@ -70,7 +72,7 @@ const WorkDetail: React.FC = () => {
     
     // Report Filter
     const [reportTab, setReportTab] = useState<'CRONO'|'MAT'|'FIN'>('CRONO');
-    // New state for material filter specific to the Report tab
+    // Fix: Add missing state for material filter specific to the Report tab
     const [reportMaterialFilterStepId, setReportMaterialFilterStepId] = useState<string>('ALL');
 
 
@@ -90,6 +92,7 @@ const WorkDetail: React.FC = () => {
     const [newMatStepId, setNewMatStepId] = useState('');
     const [newMatBuyNow, setNewMatBuyNow] = useState(false);
     const [newMatBuyQty, setNewMatBuyQty] = useState('');
+    // Fix: Corrected useState hook declaration
     const [newMatBuyCost, setNewMatBuyCost] = useState('');
 
     // EXPENSE MODAL STATE
@@ -115,7 +118,7 @@ const WorkDetail: React.FC = () => {
     const [zeModal, setZeModal] = useState({ isOpen: false, title: '', message: '', onConfirm: () => {} });
 
     // AI & TOOLS
-    // Removed aiMessage, aiResponse, aiLoading as they are now in AiChat.tsx
+    // Fix: Removed AI-related states as AI chat is now a dedicated page.
     const [calcType, setCalcType] = useState<'PISO'|'PAREDE'|'PINTURA'>('PISO');
     const [calcArea, setCalcArea] = useState('');
     const [calcResult, setCalcResult] = useState<string[]>([]);
@@ -160,6 +163,7 @@ const WorkDetail: React.FC = () => {
         if (!work || !stepName) return;
 
         if (stepModalMode === 'ADD') {
+            // REMOVED CLIENT-SIDE ID GENERATION
             await dbService.addStep({
                 workId: work.id,
                 name: stepName,
@@ -197,7 +201,8 @@ const WorkDetail: React.FC = () => {
     const handleAddMaterial = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!work || !newMatName) return;
-        const mat: Omit<Material, 'id'> = {
+        // REMOVED CLIENT-SIDE ID GENERATION from the mat object
+        const mat: Omit<Material, 'id'> = { // Explicitly define type to omit id
             workId: work.id,
             name: newMatName,
             brand: newMatBrand,
@@ -224,31 +229,36 @@ const WorkDetail: React.FC = () => {
         
         const hasPurchase = matBuyQty && Number(matBuyQty) > 0;
 
-        // 1. Update Definition
-        const updatedMaterial = {
-            ...materialModal.material,
-            name: matName,
-            brand: matBrand,
-            plannedQty: Number(matPlannedQty),
-            unit: matUnit
-        };
-        await dbService.updateMaterial(updatedMaterial);
+        try {
+            // 1. Update Definition
+            const updatedMaterial = {
+                ...materialModal.material,
+                name: matName,
+                brand: matBrand,
+                plannedQty: Number(matPlannedQty),
+                unit: matUnit
+            };
+            await dbService.updateMaterial(updatedMaterial);
 
-        // 2. Register Purchase (if applicable)
-        if (hasPurchase) {
-            await dbService.registerMaterialPurchase(
-                materialModal.material.id,
-                matName,
-                matBrand,
-                Number(matPlannedQty),
-                matUnit,
-                Number(matBuyQty),
-                Number(matBuyCost)
-            );
+            // 2. Register Purchase (if applicable)
+            if (hasPurchase) {
+                await dbService.registerMaterialPurchase(
+                    materialModal.material.id,
+                    matName,
+                    matBrand,
+                    Number(matPlannedQty),
+                    matUnit,
+                    Number(matBuyQty),
+                    Number(matBuyCost)
+                );
+            }
+
+            setMaterialModal({ isOpen: false, material: null });
+            await load(); // Reload all data after successful update/purchase
+        } catch (error: any) {
+            console.error("Erro ao salvar material:", error);
+            alert(`Falha ao salvar material: ${error.message || "Erro desconhecido."}`);
         }
-
-        setMaterialModal({ isOpen: false, material: null });
-        await load();
     };
 
     const openAddExpense = () => {
@@ -286,35 +296,41 @@ const WorkDetail: React.FC = () => {
         const finalTotalAgreed = expTotalAgreed ? Number(expTotalAgreed) : undefined;
         const inputAmount = Number(expAmount) || 0;
 
-        if (expenseModal.mode === 'ADD') {
-            await dbService.addExpense({
-                workId: work.id,
-                description: expDesc,
-                amount: inputAmount,
-                date: new Date(expDate).toISOString(),
-                category: expCategory,
-                stepId: finalStepId,
-                totalAgreed: finalTotalAgreed
-            });
-        } else if (expenseModal.mode === 'EDIT' && expenseModal.id) {
-            const existing = expenses.find(e => e.id === expenseModal.id);
-            if (existing) {
-                // LOGIC: New Total = Old Saved Total + New Input
-                const newTotalAmount = expSavedAmount + inputAmount;
-
-                await dbService.updateExpense({
-                    ...existing,
+        try {
+            if (expenseModal.mode === 'ADD') {
+                // REMOVED CLIENT-SIDE ID GENERATION
+                await dbService.addExpense({
+                    workId: work.id,
                     description: expDesc,
-                    amount: newTotalAmount,
+                    amount: inputAmount,
                     date: new Date(expDate).toISOString(),
                     category: expCategory,
                     stepId: finalStepId,
-                    totalAgreed: finalTotalAgreed // Fixed typo here
+                    totalAgreed: finalTotalAgreed
                 });
+            } else if (expenseModal.mode === 'EDIT' && expenseModal.id) {
+                const existing = expenses.find(e => e.id === expenseModal.id);
+                if (existing) {
+                    // LOGIC: New Total = Old Saved Total + New Input
+                    const newTotalAmount = expSavedAmount + inputAmount;
+
+                    await dbService.updateExpense({
+                        ...existing,
+                        description: expDesc,
+                        amount: newTotalAmount,
+                        date: new Date(expDate).toISOString(),
+                        category: expCategory,
+                        stepId: finalStepId,
+                        totalAgreed: finalTotalAgreed // Fixed typo here
+                    });
+                }
             }
+            setExpenseModal({ isOpen: false, mode: 'ADD' });
+            await load(); // Reload all data after successful save/update
+        } catch (error: any) {
+            console.error("Erro ao salvar despesa:", error);
+            alert(`Falha ao salvar despesa: ${error.message || "Erro desconhecido."}`);
         }
-        setExpenseModal({ isOpen: false, mode: 'ADD' });
-        await load();
     };
 
     const handleDeleteExpense = async () => {
@@ -337,6 +353,7 @@ const WorkDetail: React.FC = () => {
                 await new Promise(r => setTimeout(r, 800));
                 
                 if (type === 'PHOTO') {
+                    // REMOVED CLIENT-SIDE ID GENERATION
                     await dbService.addPhoto({
                         workId: work.id,
                         url: base64,
@@ -345,6 +362,7 @@ const WorkDetail: React.FC = () => {
                         type: 'PROGRESS'
                     });
                 } else {
+                    // REMOVED CLIENT-SIDE ID GENERATION
                     await dbService.addFile({
                         workId: work.id,
                         name: file.name,
@@ -1175,7 +1193,7 @@ const WorkDetail: React.FC = () => {
                 </div>
             );
 
-            // Removed case 'BONUS_IA' as AI chat is now handled by a dedicated page.
+            // Fix: Removed BONUS_IA case as AI chat is now handled by a dedicated page.
             case 'CONTRACTS': return (
                 <div className="space-y-4">
                     {CONTRACT_TEMPLATES.map(ct => (
@@ -1220,7 +1238,7 @@ const WorkDetail: React.FC = () => {
                         <span className="block text-sm font-bold text-teal-600">{uploading ? 'Enviando...' : 'Adicionar PDF/Projeto'}</span>
                         <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'FILE')} disabled={uploading} />
                     </label>
-                    <div className="space-y-2">{files.map(f => <div key={f.id} className="p-4 bg-white rounded-xl border flex items-center gap-3"><i className="fa-solid fa-file text-slate-400"></i> <span className="text-sm font-bold truncate flex-1">{f.name}</span><a href={f.url} download={f.name}><i className="fa-solid fa-download text-primary"></i></a></div>)}</div>
+                    <div className="space-y-2">{files.map(f => <div key={f.id} className="p-4 bg-white rounded-xl border flex items-center gap-3"><i className="fa-solid fa-file text-slate-400"></i> <span className="font-bold text-sm truncate flex-1">{f.name}</span><a href={f.url} download={f.name}><i className="fa-solid fa-download text-primary"></i></a></div>)}</div>
                 </div>
             );
 
