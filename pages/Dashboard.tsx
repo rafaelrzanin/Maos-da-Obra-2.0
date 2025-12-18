@@ -37,6 +37,93 @@ const DashboardSkeleton = () => (
   </div>
 );
 
+//ARQUITETURA UX TESTE GPT
+const cx = (...c: Array<string | false | undefined>) => c.filter(Boolean).join(' ');
+
+const surface =
+  "bg-white/80 dark:bg-slate-900/70 backdrop-blur-xl border border-slate-200/60 dark:border-white/10 shadow-[0_12px_35px_rgba(2,6,23,0.10)] dark:shadow-[0_18px_45px_rgba(0,0,0,0.35)]";
+
+const card =
+  "rounded-2xl p-5 transition-all";
+
+const cardHover =
+  "hover:-translate-y-0.5 hover:shadow-[0_18px_45px_rgba(2,6,23,0.14)] dark:hover:shadow-[0_22px_55px_rgba(0,0,0,0.45)]";
+
+const subtleText = "text-slate-600 dark:text-slate-300";
+const mutedText = "text-slate-500 dark:text-slate-400";
+
+const SectionTitle = ({ icon, children }: { icon: string; children: React.ReactNode }) => (
+  <h3 className="text-xs font-extrabold tracking-[0.22em] uppercase text-slate-500 dark:text-slate-400 flex items-center gap-2 mb-4 px-1">
+    <i className={icon}></i> {children}
+  </h3>
+);
+
+const Donut = ({ value, label }: { value: number; label: string }) => {
+  const v = Math.max(0, Math.min(100, value));
+  return (
+    <div className="flex items-center gap-4">
+      <div
+        className="relative w-14 h-14 rounded-full"
+        style={{
+          background: `conic-gradient(var(--tw-prose-links, rgb(245 158 11)) ${v * 3.6}deg, rgba(148,163,184,0.25) 0deg)`,
+        }}
+      >
+        <div className="absolute inset-[6px] rounded-full bg-white dark:bg-slate-950/60 border border-slate-200/50 dark:border-white/10"></div>
+        <div className="absolute inset-0 grid place-items-center text-xs font-black text-slate-700 dark:text-slate-200">
+          {v}%
+        </div>
+      </div>
+      <div className="min-w-0">
+        <p className="text-sm font-extrabold text-slate-900 dark:text-white leading-tight">{label}</p>
+        <p className={cx("text-xs font-semibold", mutedText)}>Progresso geral</p>
+      </div>
+    </div>
+  );
+};
+
+const KpiCard = ({
+  onClick,
+  icon,
+  iconClass,
+  value,
+  label,
+  badge,
+  accent,
+}: {
+  onClick?: () => void;
+  icon: string;
+  iconClass: string;
+  value: React.ReactNode;
+  label: string;
+  badge?: React.ReactNode;
+  accent?: "ok" | "warn" | "danger";
+}) => {
+  const ring =
+    accent === "danger"
+      ? "ring-1 ring-red-500/20"
+      : accent === "warn"
+      ? "ring-1 ring-amber-500/20"
+      : "ring-1 ring-emerald-500/10";
+
+  return (
+    <div
+      onClick={onClick}
+      className={cx(surface, card, cardHover, "cursor-pointer", ring)}
+      role={onClick ? "button" : undefined}
+    >
+      <div className="flex items-start justify-between mb-3">
+        <div className={cx("w-11 h-11 rounded-2xl grid place-items-center", iconClass)}>
+          <i className={icon}></i>
+        </div>
+        {badge}
+      </div>
+      <div className="text-3xl font-black text-slate-900 dark:text-white leading-none mb-1">{value}</div>
+      <div className={cx("text-[11px] font-extrabold tracking-widest uppercase", mutedText)}>{label}</div>
+    </div>
+  );
+};
+
+
 // Helper para formatar data
 const formatDateDisplay = (dateStr: string) => {
     if (!dateStr) return '--/--';
