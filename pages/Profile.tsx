@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { useAuth } from '../contexts/AuthContext';
-import { dbService } from '../services/db';
+import { useAuth } from '../contexts/AuthContext.tsx';
+import { dbService } from '../services/db.ts';
 
 const Profile: React.FC = () => {
   const { user, refreshUser } = useAuth();
@@ -170,4 +170,3 @@ const Profile: React.FC = () => {
 };
 
 export default Profile;
-
