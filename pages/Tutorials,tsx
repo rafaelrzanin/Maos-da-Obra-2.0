@@ -1,6 +1,7 @@
+
 import React from 'react';
 
-const Tutorials: React.FC = () => {
+const VideoTutorials: React.FC = () => {
   const videos = [
     {
       id: 'video1',
@@ -76,4 +77,4 @@ const Tutorials: React.FC = () => {
   );
 };
 
-export default Tutorials;
+export default VideoTutorials;
