@@ -54,17 +54,18 @@ export const WORK_TEMPLATES: WorkTemplate[] = [
       'Levantamento de paredes', 
       'Lajes e Vigas', 
       'Telhado',
-      'Tubulação de Água/Esgoto', 
-      'Fiação Elétrica', 
+      // Usar os pacotes genéricos de instalações para construção do zero
+      'Tubulação de Água/Esgoto Geral', 
+      'Fiação Elétrica Geral', 
       'Chapisco e Reboco', 
       'Contrapiso',
       'Impermeabilização', 
       'Gesso / Forro', 
       'Pisos e Revestimentos', 
       'Esquadrias (Janelas/Portas)',
-      'Marmoraria (Bancadas)', 
+      'Marmoraria Geral (Bancadas)', // Usar o geral para construção
       'Pintura Paredes/Tetos', 
-      'Instalação de Louças e Metais', 
+      'Instalação de Louças e Metais Geral', // Usar o geral para construção
       'Instalação de Luminárias',
       'Limpeza Final e Entrega'
     ]
@@ -78,13 +79,16 @@ export const WORK_TEMPLATES: WorkTemplate[] = [
     includedSteps: [
       'Demolição', 
       'Retirada de entulho', 
-      'Tubulação de Água/Esgoto', 
-      'Fiação Elétrica',
+      // Para reforma completa, ainda podemos usar os gerais, mas o ideal seria ter um "Reforma Elétrica Geral" etc.
+      // Por enquanto, mantenho os nomes das etapas para que busquem materiais genéricos ou mais amplos,
+      // e os específicos (Banheiro/Cozinha) terão seus próprios.
+      'Tubulação de Água/Esgoto Geral', 
+      'Fiação Elétrica Geral',
       'Gesso / Forro', 
       'Pisos e Revestimentos', 
-      'Marmoraria (Bancadas)',
+      'Marmoraria Geral (Bancadas)', // Usar o geral para reforma completa
       'Pintura Paredes/Tetos', 
-      'Instalação de Louças e Metais', 
+      'Instalação de Louças e Metais Geral', // Usar o geral para reforma completa
       'Instalação de Luminárias', 
       'Limpeza Final e Entrega'
     ]
@@ -96,14 +100,15 @@ export const WORK_TEMPLATES: WorkTemplate[] = [
     description: 'Troca de piso, louças e impermeabilização.',
     defaultDurationDays: 15,
     includedSteps: [
-      'Demolição', 
-      'Tubulação de Água/Esgoto', 
-      'Impermeabilização', 
-      'Contrapiso', 
-      'Pisos e Revestimentos', 
-      'Gesso / Forro', 
-      'Marmoraria (Bancadas)',
-      'Instalação de Louças e Metais', 
+      'Demolição de Banheiro', 
+      'Hidráulica de Banheiro', 
+      'Elétrica de Banheiro', // Nova etapa específica
+      'Impermeabilização de Banheiro', 
+      'Contrapiso de Banheiro', 
+      'Pisos e Revestimentos de Banheiro', 
+      'Gesso / Forro de Banheiro', 
+      'Bancada de Banheiro', // Nova etapa específica
+      'Louças e Metais de Banheiro', // Nova etapa específica
       'Limpeza Final e Entrega'
     ]
   },
@@ -114,12 +119,12 @@ export const WORK_TEMPLATES: WorkTemplate[] = [
     description: 'Azulejos, bancadas e instalações.',
     defaultDurationDays: 20,
     includedSteps: [
-      'Demolição', 
-      'Tubulação de Água/Esgoto', 
-      'Fiação Elétrica',
-      'Pisos e Revestimentos', 
-      'Marmoraria (Bancadas)', 
-      'Instalação de Louças e Metais', 
+      'Demolição de Cozinha', 
+      'Hidráulica de Cozinha', 
+      'Elétrica de Cozinha', // Nova etapa específica
+      'Pisos e Revestimentos de Cozinha', 
+      'Bancada de Cozinha', // Nova etapa específica
+      'Louças e Metais de Cozinha', // Nova etapa específica
       'Limpeza Final e Entrega'
     ]
   },
@@ -130,7 +135,8 @@ export const WORK_TEMPLATES: WorkTemplate[] = [
     description: 'Renovar as paredes e tetos.',
     defaultDurationDays: 10,
     includedSteps: [
-      'Proteção do piso', 
+      'Proteção do Piso para Pintura', // Etapa específica de preparação para pintura
+      'Preparação de Superfície (Lixar/Massa)', // Nova etapa específica
       'Pintura Paredes/Tetos', 
       'Limpeza Final e Entrega'
     ]
@@ -193,7 +199,7 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
     ]
   },
   {
-    category: 'Impermeabilização',
+    category: 'Impermeabilização', // Geral
     items: [
       { name: 'Emulsão Asfáltica (Neutrol)', unit: 'latas 18L', multiplier: 0.02 },
       { name: 'Manta Líquida (Lajes/Áreas frias)', unit: 'balde 18kg', multiplier: 0.03 },
@@ -213,7 +219,7 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
     ]
   },
   {
-    category: 'Contrapiso',
+    category: 'Contrapiso', // Geral
     items: [
       { name: 'Cimento CP-II', unit: 'sacos', multiplier: 0.15 },
       { name: 'Areia Média', unit: 'm³', multiplier: 0.05 },
@@ -233,8 +239,156 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
       { name: 'Calhas e Rufos', unit: 'm', multiplier: 0.5 }
     ]
   },
+  // NOVOS PACOTES DE MATERIAIS ESPECÍFICOS PARA REFORMAS
   {
-    category: 'Fiação Elétrica',
+    category: 'Demolição de Banheiro',
+    items: [
+      { name: 'Sacos de Ráfia (Entulho)', unit: 'un', multiplier: 0.5 },
+      { name: 'Caçamba Pequena (Entulho)', unit: 'un', multiplier: 0.01 }
+    ]
+  },
+  {
+    category: 'Demolição de Cozinha',
+    items: [
+      { name: 'Sacos de Ráfia (Entulho)', unit: 'un', multiplier: 0.5 },
+      { name: 'Caçamba Pequena (Entulho)', unit: 'un', multiplier: 0.01 }
+    ]
+  },
+  {
+    category: 'Hidráulica de Banheiro',
+    items: [
+      { name: 'Tubo Soldável 25mm (Água Fria)', unit: 'barras 6m', multiplier: 0.05 },
+      { name: 'Joelho 90 graus 25mm', unit: 'un', multiplier: 0.4 },
+      { name: 'Tê Soldável 25mm', unit: 'un', multiplier: 0.1 },
+      { name: 'Tubo Esgoto 100mm (Vaso)', unit: 'barras 6m', multiplier: 0.02 },
+      { name: 'Tubo Esgoto 40mm/50mm (Pia/Chuveiro)', unit: 'barras 6m', multiplier: 0.05 },
+      { name: 'Caixa Sifonada 150x150', unit: 'un', multiplier: 0.01 },
+      { name: 'Registro de Pressão 3/4 (Chuveiro)', unit: 'un', multiplier: 0.01 },
+      { name: 'Registro de Gaveta 1/2 (Pia/Vaso)', unit: 'un', multiplier: 0.02 },
+      { name: 'Cola PVC', unit: 'frasco', multiplier: 0.01 }
+    ]
+  },
+  {
+    category: 'Elétrica de Banheiro',
+    items: [
+      { name: 'Eletroduto Corrugado 3/4', unit: 'rolos', multiplier: 0.02 },
+      { name: 'Caixa de Luz 4x2', unit: 'un', multiplier: 0.03 },
+      { name: 'Cabo Flexível 2.5mm (Tomadas)', unit: 'm', multiplier: 20 },
+      { name: 'Cabo Flexível 6.0mm (Chuveiro)', unit: 'm', multiplier: 10 },
+      { name: 'Disjuntor Bipolar (Chuveiro)', unit: 'un', multiplier: 0.01 }
+    ]
+  },
+  {
+    category: 'Impermeabilização de Banheiro',
+    items: [
+      { name: 'Manta Líquida (Balde 4kg)', unit: 'balde', multiplier: 0.05 }, // Multiplicador ajustado para área de banheiro
+      { name: 'Tela de Poliéster (Reforço)', unit: 'm', multiplier: 1 }, // Multiplicador ajustado para área de banheiro
+      { name: 'Impermeabilizante Rígido (Viaplus 1000)', unit: 'kg', multiplier: 2 }
+    ]
+  },
+  {
+    category: 'Contrapiso de Banheiro',
+    items: [
+      { name: 'Cimento CP-II', unit: 'sacos', multiplier: 0.02 }, // Multiplicador ajustado para área de banheiro
+      { name: 'Areia Média', unit: 'm³', multiplier: 0.005 }
+    ]
+  },
+  {
+    category: 'Pisos e Revestimentos de Banheiro',
+    items: [
+      { name: 'Piso / Porcelanato (Chão)', unit: 'm²', multiplier: 1.15 },
+      { name: 'Revestimento (Parede)', unit: 'm²', multiplier: 2.0 }, // Multiplicador maior para paredes de banheiro
+      { name: 'Argamassa AC-II/III', unit: 'sacos 20kg', multiplier: 0.15 },
+      { name: 'Rejunte Epóxi (Anti-mofo)', unit: 'kg', multiplier: 0.1 },
+      { name: 'Espaçadores e Cunhas', unit: 'pacote', multiplier: 0.01 }
+    ]
+  },
+  {
+    category: 'Gesso / Forro de Banheiro',
+    items: [
+      { name: 'Placa de Gesso 60x60 (Resistente à umidade)', unit: 'un', multiplier: 0.5 },
+      { name: 'Gesso Cola', unit: 'sacas', multiplier: 0.01 }
+    ]
+  },
+  {
+    category: 'Bancada de Banheiro',
+    items: [
+      { name: 'Bancada Banheiro (Granito/Mármore)', unit: 'm', multiplier: 1.0 },
+      { name: 'Cuba de Louça (Banheiro)', unit: 'un', multiplier: 1.0 },
+      { name: 'Silicone PU', unit: 'tubo', multiplier: 0.01 }
+    ]
+  },
+  {
+    category: 'Louças e Metais de Banheiro',
+    items: [
+      { name: 'Vaso Sanitário com Caixa Acoplada', unit: 'un', multiplier: 1.0 },
+      { name: 'Assento Sanitário', unit: 'un', multiplier: 1.0 },
+      { name: 'Torneira de Lavatório', unit: 'un', multiplier: 1.0 },
+      { name: 'Chuveiro / Ducha', unit: 'un', multiplier: 1.0 },
+      { name: 'Kit Acessórios (Toalheiro/Papeleira)', unit: 'kit', multiplier: 1.0 },
+      { name: 'Sifão Universal', unit: 'un', multiplier: 1.0 },
+      { name: 'Engate Flexível', unit: 'un', multiplier: 2.0 } // 2 engates para pia
+    ]
+  },
+  {
+    category: 'Hidráulica de Cozinha',
+    items: [
+      { name: 'Tubo Soldável 25mm (Água Fria)', unit: 'barras 6m', multiplier: 0.05 },
+      { name: 'Joelho 90 graus 25mm', unit: 'un', multiplier: 0.4 },
+      { name: 'Tê Soldável 25mm', unit: 'un', multiplier: 0.1 },
+      { name: 'Tubo Esgoto 50mm (Pia/Lava-louça)', unit: 'barras 6m', multiplier: 0.05 },
+      { name: 'Caixa de Gordura', unit: 'un', multiplier: 0.01 },
+      { name: 'Registro de Gaveta 3/4 (Geral da cozinha)', unit: 'un', multiplier: 0.01 },
+      { name: 'Cola PVC', unit: 'frasco', multiplier: 0.01 }
+    ]
+  },
+  {
+    category: 'Elétrica de Cozinha',
+    items: [
+      { name: 'Eletroduto Corrugado 3/4', unit: 'rolos', multiplier: 0.05 },
+      { name: 'Caixa de Luz 4x2', unit: 'un', multiplier: 0.05 },
+      { name: 'Cabo Flexível 2.5mm (Tomadas)', unit: 'm', multiplier: 50 },
+      { name: 'Cabo Flexível 4.0mm (Forno/Cooktop)', unit: 'm', multiplier: 20 },
+      { name: 'Disjuntor Unipolar (Tomadas)', unit: 'un', multiplier: 0.05 },
+      { name: 'Disjuntor Bipolar (Forno/Cooktop)', unit: 'un', multiplier: 0.02 }
+    ]
+  },
+  {
+    category: 'Bancada de Cozinha',
+    items: [
+      { name: 'Bancada Cozinha (Granito/Mármore)', unit: 'm²', multiplier: 1.0 },
+      { name: 'Cuba de Inox (Cozinha)', unit: 'un', multiplier: 1.0 },
+      { name: 'Silicone PU (Vedação)', unit: 'tubo', multiplier: 0.02 }
+    ]
+  },
+  {
+    category: 'Louças e Metais de Cozinha',
+    items: [
+      { name: 'Torneira de Cozinha (Bancada/Parede)', unit: 'un', multiplier: 1.0 },
+      { name: 'Filtro de Água (Ponto)', unit: 'un', multiplier: 0.01 },
+      { name: 'Sifão para Pia de Cozinha', unit: 'un', multiplier: 1.0 },
+      { name: 'Engate Flexível', unit: 'un', multiplier: 2.0 } // 2 engates para pia
+    ]
+  },
+  {
+    category: 'Proteção do Piso para Pintura',
+    items: [
+      { name: 'Lona Plástica (Proteção Pintura)', unit: 'm²', multiplier: 1.0 },
+      { name: 'Fita Crepe (Mascaramento)', unit: 'rolos', multiplier: 0.1 }
+    ]
+  },
+  {
+    category: 'Preparação de Superfície (Lixar/Massa)',
+    items: [
+      { name: 'Lixa de Parede (Grão Fino/Médio)', unit: 'folhas', multiplier: 1.0 },
+      { name: 'Massa Corrida (Lata 18L)', unit: 'lata', multiplier: 0.05 },
+      { name: 'Espátula de Aço', unit: 'un', multiplier: 0.01 }
+    ]
+  },
+
+  // PACOTES GENÉRICOS (mantidos para o template de CONSTRUÇÃO e REFORMA_APTO)
+  {
+    category: 'Fiação Elétrica Geral', // Reativado para uso geral
     items: [
       { name: 'Eletroduto Corrugado 3/4 (Amarelo)', unit: 'rolos', multiplier: 0.15 },
       { name: 'Caixa de Luz 4x2 (Parede)', unit: 'un', multiplier: 0.5 },
@@ -249,7 +403,7 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
     ]
   },
   {
-    category: 'Tubulação de Água/Esgoto',
+    category: 'Tubulação de Água/Esgoto Geral', // Reativado para uso geral
     items: [
       { name: 'Tubo Soldável 25mm (Água Fria)', unit: 'barras 6m', multiplier: 0.3 },
       { name: 'Tubo Soldável 50mm (Alimentação)', unit: 'barras 6m', multiplier: 0.05 },
@@ -264,30 +418,7 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
     ]
   },
   {
-    category: 'Gesso / Forro',
-    items: [
-      { name: 'Placa de Gesso 60x60 (Plaquinha)', unit: 'un', multiplier: 3.0 },
-      { name: 'Chapa Drywall ST (Standard)', unit: 'chapa', multiplier: 0.4 },
-      { name: 'Perfil Canaleta/Tabica', unit: 'un', multiplier: 0.5 },
-      { name: 'Arame Galvanizado 18', unit: 'kg', multiplier: 0.02 },
-      { name: 'Gesso Cola', unit: 'sacas', multiplier: 0.05 },
-      { name: 'Sisal', unit: 'kg', multiplier: 0.01 }
-    ]
-  },
-  {
-    category: 'Pisos e Revestimentos',
-    items: [
-      { name: 'Piso / Porcelanato (Chão)', unit: 'm²', multiplier: 1.15 },
-      { name: 'Revestimento (Parede)', unit: 'm²', multiplier: 0.8 },
-      { name: 'Argamassa AC-I (Interna)', unit: 'sacos 20kg', multiplier: 0.15 },
-      { name: 'Argamassa AC-III (Porcelanato/Externa)', unit: 'sacos 20kg', multiplier: 0.2 },
-      { name: 'Rejunte Acrílico/Epóxi', unit: 'kg', multiplier: 0.4 },
-      { name: 'Espaçadores e Cunhas (Nivelamento)', unit: 'pacote', multiplier: 0.05 },
-      { name: 'Rodapé (Poliestireno ou Cerâmico)', unit: 'm', multiplier: 1.1 }
-    ]
-  },
-  {
-    category: 'Marmoraria (Bancadas)',
+    category: 'Marmoraria Geral (Bancadas)', // Reativado para uso geral
     items: [
       { name: 'Bancada Cozinha (Granito/Mármore)', unit: 'm²', multiplier: 0.02 },
       { name: 'Bancada Banheiro', unit: 'un', multiplier: 0.025 },
@@ -299,18 +430,19 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
     ]
   },
   {
-    category: 'Esquadrias (Janelas/Portas)',
+    category: 'Pisos e Revestimentos', // Geral
     items: [
-      { name: 'Porta de Madeira Completa (Interna)', unit: 'un', multiplier: 0.08 },
-      { name: 'Fechadura Interna', unit: 'un', multiplier: 0.08 },
-      { name: 'Dobradiças', unit: 'jogo', multiplier: 0.08 },
-      { name: 'Janela (Alumínio/Vidro)', unit: 'un', multiplier: 0.06 },
-      { name: 'Porta de Entrada (Externa)', unit: 'un', multiplier: 0.01 },
-      { name: 'Espuma Expansiva', unit: 'lata', multiplier: 0.05 }
+      { name: 'Piso / Porcelanato (Chão)', unit: 'm²', multiplier: 1.15 },
+      { name: 'Revestimento (Parede)', unit: 'm²', multiplier: 0.8 },
+      { name: 'Argamassa AC-I (Interna)', unit: 'sacos 20kg', multiplier: 0.15 },
+      { name: 'Argamassa AC-III (Porcelanato/Externa)', unit: 'sacos 20kg', multiplier: 0.2 },
+      { name: 'Rejunte Acrílico/Epóxi', unit: 'kg', multiplier: 0.4 },
+      { name: 'Espaçadores e Cunhas (Nivelamento)', unit: 'pacote', multiplier: 0.05 },
+      { name: 'Rodapé (Poliestireno ou Cerâmico)', unit: 'm', multiplier: 1.1 }
     ]
   },
   {
-    category: 'Instalação de Louças e Metais',
+    category: 'Instalação de Louças e Metais Geral', // Reativado para uso geral
     items: [
       { name: 'Vaso Sanitário com Caixa Acoplada', unit: 'un', multiplier: 0.025 },
       { name: 'Assento Sanitário', unit: 'un', multiplier: 0.025 },
@@ -320,6 +452,19 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
       { name: 'Kit Acessórios (Toalheiro/Papeleira)', unit: 'kit', multiplier: 0.025 },
       { name: 'Sifão Universal', unit: 'un', multiplier: 0.05 },
       { name: 'Engate Flexível', unit: 'un', multiplier: 0.05 }
+    ]
+  },
+  // FIM PACOTES GENÉRICOS
+
+  {
+    category: 'Esquadrias (Janelas/Portas)',
+    items: [
+      { name: 'Porta de Madeira Completa (Interna)', unit: 'un', multiplier: 0.08 },
+      { name: 'Fechadura Interna', unit: 'un', multiplier: 0.08 },
+      { name: 'Dobradiças', unit: 'jogo', multiplier: 0.08 },
+      { name: 'Janela (Alumínio/Vidro)', unit: 'un', multiplier: 0.06 },
+      { name: 'Porta de Entrada (Externa)', unit: 'un', multiplier: 0.01 },
+      { name: 'Espuma Expansiva', unit: 'lata', multiplier: 0.05 }
     ]
   },
   {
@@ -333,7 +478,7 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
     ]
   },
   {
-    category: 'Pintura Paredes/Tetos',
+    category: 'Pintura Paredes/Tetos', // Geral para todas as pinturas
     items: [
       { name: 'Lixa de Parede (100/150/220)', unit: 'folhas', multiplier: 0.8 },
       { name: 'Selador Acrílico (Fundo)', unit: 'latas 18L', multiplier: 0.03 },
@@ -349,7 +494,7 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
     ]
   },
   {
-    category: 'Limpeza Final e Entrega',
+    category: 'Limpeza Final e Entrega', // Geral para todos
     items: [
       { name: 'Ácido para Limpeza de Pedras', unit: 'galão', multiplier: 0.02 },
       { name: 'Detergente Pós-Obra', unit: 'galão', multiplier: 0.02 },
