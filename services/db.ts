@@ -145,7 +145,7 @@ const parseNotificationFromDB = (data: any): Notification => ({
 // Refactored to address TS2801
 let sessionCache: { promise: Promise<User | null>, timestamp: number } | null = null;
 const AUTH_CACHE_DURATION = 5000;
-const pendingProfileRequests: Record<string, Promise<User | null>> = {};
+const pendingProfileRequests: Partial<Record<string, Promise<User | null>>> = {};
 
 const ensureUserProfile = async (authUser: any): Promise<User | null> => {
     const client = supabase; // Supabase is guaranteed to be initialized now
