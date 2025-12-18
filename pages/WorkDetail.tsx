@@ -11,7 +11,7 @@ import { aiService } from '../services/ai';
 
 // --- TYPES FOR VIEW STATE ---
 type MainTab = 'SCHEDULE' | 'MATERIALS' | 'FINANCIAL' | 'MORE';
-type SubView = 'NONE' | 'TEAM' | 'SUPPLIERS' | 'REPORTS' | 'PHOTOS' | 'PROJECTS' | 'BONUS_IA' | 'BONUS_IA_CHAT' | 'CALCULATORS' | 'CONTRACTS' | 'CHECKLIST';
+type SubView = 'NONE' | 'TEAM' | 'SUPPLIERS' | 'REPORTS' | 'PHOTOS' | 'PROJECTS' | 'CALCULATORS' | 'CONTRACTS' | 'CHECKLIST'; // Removed BONUS_IA, BONUS_IA_CHAT
 
 // --- DATE HELPERS ---
 const parseDateNoTimezone = (dateStr: string) => {
@@ -108,10 +108,7 @@ const WorkDetail: React.FC = () => {
     const [viewContract, setViewContract] = useState<{title: string, content: string} | null>(null);
     const [zeModal, setZeModal] = useState({ isOpen: false, title: '', message: '', onConfirm: () => {} });
 
-    // AI & TOOLS
-    const [aiMessage, setAiMessage] = useState('');
-    const [aiResponse, setAiResponse] = useState('');
-    const [aiLoading, setAiLoading] = useState(false);
+    // AI & TOOLS - Removed AI specific states as it's now a global page
     const [calcType, setCalcType] = useState<'PISO'|'PAREDE'|'PINTURA'>('PISO');
     const [calcArea, setCalcArea] = useState('');
     const [calcResult, setCalcResult] = useState<string[]>([]);
@@ -449,6 +446,8 @@ const WorkDetail: React.FC = () => {
         window.print();
     };
 
+    // Removed handleAiAsk as AI chat is now a global page
+    /*
     const handleAiAsk = async () => {
         if (!aiMessage.trim()) return;
         setAiLoading(true);
@@ -457,6 +456,7 @@ const WorkDetail: React.FC = () => {
         setAiLoading(false);
         setAiMessage('');
     };
+    */
 
     if (loading) return <div className="h-screen flex items-center justify-center"><i className="fa-solid fa-circle-notch fa-spin text-3xl text-primary"></i></div>;
     if (!work) return null;
@@ -775,7 +775,9 @@ const WorkDetail: React.FC = () => {
                                     <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center text-white shadow-lg shadow-secondary/30"><i className="fa-solid fa-crown"></i></div>
                                     <div><h3 className="text-lg font-black text-white uppercase tracking-tight">Área Premium</h3><p className="text-xs text-slate-400 font-medium">Ferramentas Exclusivas</p></div>
                                 </div>
-
+                                
+                                {/* Removed Zé da Obra AI card as it's now a top-level nav item */}
+                                {/*
                                 <div onClick={() => setSubView('BONUS_IA')} className="bg-white/10 hover:bg-white/15 p-4 rounded-2xl border border-white/10 mb-4 cursor-pointer flex items-center gap-4 transition-all backdrop-blur-sm group">
                                     <div className="relative">
                                         <img src={ZE_AVATAR} className={`w-14 h-14 rounded-full border-2 border-secondary bg-slate-800 object-cover ${!isPremium ? 'grayscale opacity-70' : ''}`} onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK}/>
@@ -784,6 +786,7 @@ const WorkDetail: React.FC = () => {
                                     <div><h4 className="font-bold text-white text-base group-hover:text-secondary transition-colors">Zé da Obra AI</h4><p className="text-xs text-slate-300">Tire dúvidas técnicas 24h</p></div>
                                     <div className="ml-auto w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-white/50 group-hover:bg-secondary group-hover:text-white transition-all"><i className="fa-solid fa-chevron-right"></i></div>
                                 </div>
+                                */}
 
                                 <div className="grid grid-cols-3 gap-3">
                                     {['CALCULATORS', 'CONTRACTS', 'CHECKLIST'].map(item => (
@@ -961,7 +964,8 @@ const WorkDetail: React.FC = () => {
                 </div>
             );
 
-            // Reusing existing components for other subviews to save space, but ensuring they are rendered
+            // Removed BONUS_IA & BONUS_IA_CHAT cases
+            /*
             case 'BONUS_IA': return (
                 <div className="flex flex-col items-center justify-center min-h-[70vh] p-6 text-center animate-in fade-in">
                     <div className="w-full max-w-sm bg-gradient-to-br from-slate-900 to-slate-950 rounded-[2.5rem] p-8 shadow-2xl relative overflow-hidden border border-slate-800 group">
@@ -1006,6 +1010,7 @@ const WorkDetail: React.FC = () => {
                     </div>
                 </div>
             );
+            */
 
             case 'CONTRACTS': return (
                 <div className="space-y-4">
@@ -1339,4 +1344,3 @@ const WorkDetail: React.FC = () => {
 };
 
 export default WorkDetail;
-
