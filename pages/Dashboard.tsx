@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.tsx';
 import { dbService } from '../services/db.ts';
-import { Work, Notification, Step, StepStatus, PlanType } from '../types.ts';
+import { Work, Notification, Step, StepStatus, PlanType, Expense, Material } from '../types.ts'; // Importe Expense e Material
 import { ZE_AVATAR, ZE_AVATAR_FALLBACK, getRandomZeTip, ZeTip } from '../services/standards.ts';
 import { ZeModal } from '../components/ZeModal.tsx';
 
@@ -58,6 +58,8 @@ const Dashboard: React.FC = () => {
   // Data State
   const [works, setWorks] = useState<Work[]>([]);
   const [focusWork, setFocusWork] = useState<Work | null>(null);
+  const [expenses, setExpenses] = useState<Expense[]>([]); // Adicionado para passar para notifications
+  const [materials, setMaterials] = useState<Material[]>([]); // Adicionado para passar para notifications
   
   // Dashboard Metrics State
   const [stats, setStats] = useState({ totalSpent: 0, progress: 0, delayedSteps: 0 });
@@ -145,26 +147,31 @@ const Dashboard: React.FC = () => {
           setIsLoadingDetails(true);
           
           try {
-            const [workStats, summary, notifs, steps] = await Promise.all([
+            const [workStats, summary, notifs, workSteps, workExpenses, workMaterials] = await Promise.all([
                 dbService.calculateWorkStats(focusWork.id),
                 dbService.getDailySummary(focusWork.id),
                 dbService.getNotifications(user.id),
-                dbService.getSteps(focusWork.id)
+                dbService.getSteps(focusWork.id), // Busca etapas aqui
+                dbService.getExpenses(focusWork.id), // Busca despesas aqui
+                dbService.getMaterials(focusWork.id) // Busca materiais aqui
             ]);
 
             if (isMounted) {
                 setStats(workStats);
                 setDailySummary(summary);
                 setNotifications(notifs);
+                setExpenses(workExpenses); // Salva despesas no estado
+                setMaterials(workMaterials); // Salva materiais no estado
 
-                const nextSteps = steps
+                const nextSteps = workSteps // Use workSteps recém-buscado
                     .filter(s => s.status !== StepStatus.COMPLETED)
                     .sort((a: Step, b: Step) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
                     .slice(0, 3);
                 setUpcomingSteps(nextSteps);
             }
             
-            dbService.generateSmartNotifications(user.id, focusWork.id);
+            // Passa os dados já carregados para evitar buscas redundantes na geração de notificações
+            dbService.generateSmartNotifications(user.id, focusWork.id, workSteps, workExpenses, workMaterials, focusWork);
 
           } catch (e) {
               console.error("Erro nos detalhes:", e);
@@ -186,7 +193,7 @@ const Dashboard: React.FC = () => {
   }, [focusWork?.id, user]);
 
   useEffect(() => {
-    if (user?.isTrial && trialDaysRemaining !== null && trialDaysRemaining <= 1) {
+    if (user?.plan !== PlanType.VITALICIO && user?.isTrial && trialDaysRemaining !== null && trialDaysRemaining <= 1) {
         setShowTrialUpsell(true);
     }
   }, [user, trialDaysRemaining]);
