@@ -21,7 +21,11 @@ const Login: React.FC = () => {
   // Password Recovery State
   const [showForgotModal, setShowForgotModal] = useState(false);
   const [forgotEmail, setForgotEmail] = useState('');
+  // Fix: Correctly define the state for `forgotStatus` using `useState` with a union type.
   const [forgotStatus, setForgotStatus] = useState<'IDLE' | 'SENDING' | 'SENT' | 'ERROR'>('IDLE');
+
+  console.log("[Login] Component rendered. Current user from AuthContext:", user ? user.email : 'null', "Auth Loading:", authLoading);
+
 
   // Detect plan from URL
   useEffect(() => {
@@ -35,22 +39,33 @@ const Login: React.FC = () => {
 
   // Main redirect logic
   useEffect(() => {
+    console.log("[Login] useEffect trigger. AuthState:", { user: user ? user.email : 'null', authLoading, isSubscriptionValid, selectedPlan, currentPath: location.pathname });
+
     // Only redirect if user exists and auth is done loading
     if (user && !authLoading) {
+        console.log("[Login] User exists and Auth not loading. Checking redirect conditions...");
         // 1. Se tem um plano selecionado na URL (fluxo de compra), vai pro Checkout
         if (selectedPlan) {
+            console.log("[Login] Redirecting to /checkout due to selectedPlan:", selectedPlan);
             navigate('/checkout', { replace: true });
         } 
         // 2. Se já tem assinatura válida (Vitalício ou Ativo), vai pro Dashboard
         else if (isSubscriptionValid) {
+            console.log("[Login] Redirecting to / (Dashboard) due to valid subscription.");
             navigate('/', { replace: true });
         } 
         // 3. Se é conta nova ou expirada sem plano selecionado, vai para Configurações escolher
         else {
+            console.log("[Login] Redirecting to /settings (Subscription management).");
             navigate('/settings', { replace: true });
         }
+    } else if (!user && !authLoading) {
+        console.log("[Login] No user found and Auth not loading. Displaying login form.");
+        // This is the state where the login form should actually be visible.
+    } else if (authLoading) {
+        console.log("[Login] Auth is still loading. Waiting...");
     }
-  }, [user, navigate, selectedPlan, authLoading, isSubscriptionValid]);
+  }, [user, navigate, selectedPlan, authLoading, isSubscriptionValid, location.pathname]);
 
   // Helper for CPF mask
   const handleCpfChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -242,3 +257,4 @@ const Login: React.FC = () => {
 };
 
 export default Login;
+
