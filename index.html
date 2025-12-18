@@ -1,4 +1,5 @@
 
+
 <!DOCTYPE html>
 <html lang="pt-BR">
   <head>
@@ -149,6 +150,20 @@
     <div id="root"></div>
     <script type="module" src="./index.tsx"></script>
     <script>
+      // Global error handler for any uncaught JavaScript errors
+      window.onerror = function(message, source, lineno, colno, error) {
+        console.error('GLOBAL ERROR CAPTURED:', {
+          message: message,
+          source: source,
+          lineno: lineno,
+          colno: colno,
+          error: error ? error.stack : 'No stack trace available'
+        });
+        // Optionally, you could display a user-friendly message or send to an error tracking service
+        // For debugging a blank page, this is invaluable.
+        return false; // Prevent default browser error handling
+      };
+
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
            // PWA Service Worker placeholder
@@ -157,4 +172,3 @@
     </script>
   </body>
 </html>
-
