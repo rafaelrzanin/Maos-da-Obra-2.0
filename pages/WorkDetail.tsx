@@ -7,11 +7,12 @@ import { dbService } from '../services/db.ts';
 import { Work, Worker, Supplier, Material, Step, Expense, StepStatus, WorkPhoto, WorkFile, FileCategory, ExpenseCategory, PlanType } from '../types.ts';
 import { ZeModal } from '../components/ZeModal.tsx';
 import { STANDARD_CHECKLISTS, CONTRACT_TEMPLATES, STANDARD_JOB_ROLES, STANDARD_SUPPLIER_CATEGORIES, ZE_AVATAR, ZE_AVATAR_FALLBACK } from '../services/standards.ts';
-import { aiService } from '../services/ai.ts';
+// Removed aiService import as it's no longer used directly in this component
 
 // --- TYPES FOR VIEW STATE ---
 type MainTab = 'SCHEDULE' | 'MATERIALS' | 'FINANCIAL' | 'MORE';
-type SubView = 'NONE' | 'TEAM' | 'SUPPLIERS' | 'REPORTS' | 'PHOTOS' | 'PROJECTS' | 'BONUS_IA' | 'BONUS_IA_CHAT' | 'CALCULATORS' | 'CONTRACTS' | 'CHECKLIST';
+// Removed 'BONUS_IA' and 'BONUS_IA_CHAT' as they are replaced by a dedicated page.
+type SubView = 'NONE' | 'TEAM' | 'SUPPLIERS' | 'REPORTS' | 'PHOTOS' | 'PROJECTS' | 'CALCULATORS' | 'CONTRACTS' | 'CHECKLIST'; 
 
 // --- DATE HELPERS ---
 const parseDateNoTimezone = (dateStr: string) => {
@@ -27,7 +28,7 @@ const parseDateNoTimezone = (dateStr: string) => {
 const WorkDetail: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
-    const { user, trialDaysRemaining } = useAuth(); // Destructure trialDaysRemaining
+    const { user, trialDaysRemaining } = useAuth(); 
     
     // --- CORE DATA STATE ---
     const [work, setWork] = useState<Work | null>(null);
@@ -39,7 +40,9 @@ const WorkDetail: React.FC = () => {
     const [suppliers, setSuppliers] = useState<Supplier[]>([]);
     const [photos, setPhotos] = useState<WorkPhoto[]>([]);
     const [files, setFiles] = useState<WorkFile[]>([]);
-    
+    // Dashboard Stats for Report
+    const [stats, setStats] = useState<{ totalSpent: number, progress: number, delayedSteps: number } | null>(null);
+
     // --- UI STATE ---
     const [activeTab, setActiveTab] = useState<MainTab>('SCHEDULE');
     const [subView, setSubView] = useState<SubView>('NONE');
@@ -48,7 +51,7 @@ const WorkDetail: React.FC = () => {
     // --- AI ACCESS LOGIC ---
     const isVitalicio = user?.plan === PlanType.VITALICIO;
     const isAiTrialActive = user?.isTrial && trialDaysRemaining !== null && trialDaysRemaining > 0;
-    const hasAiAccess = isVitalicio || isAiTrialActive;
+    const hasAiAccess = isVitalicio || isAiTrialActive; // This flag will still be used to determine if the AI icon is "locked" or "unlocked" visually.
 
     // --- PREMIUM TOOLS LOCK ---
     // isPremium is used for non-AI premium tools (Calculators, Contracts, Checklist)
@@ -67,6 +70,9 @@ const WorkDetail: React.FC = () => {
     
     // Report Filter
     const [reportTab, setReportTab] = useState<'CRONO'|'MAT'|'FIN'>('CRONO');
+    // New state for material filter specific to the Report tab
+    const [reportMaterialFilterStepId, setReportMaterialFilterStepId] = useState<string>('ALL');
+
 
     const [materialModal, setMaterialModal] = useState<{ isOpen: boolean, material: Material | null }>({ isOpen: false, material: null });
     const [matName, setMatName] = useState('');
@@ -109,9 +115,7 @@ const WorkDetail: React.FC = () => {
     const [zeModal, setZeModal] = useState({ isOpen: false, title: '', message: '', onConfirm: () => {} });
 
     // AI & TOOLS
-    const [aiMessage, setAiMessage] = useState('');
-    const [aiResponse, setAiResponse] = useState('');
-    const [aiLoading, setAiLoading] = useState(false);
+    // Removed aiMessage, aiResponse, aiLoading as they are now in AiChat.tsx
     const [calcType, setCalcType] = useState<'PISO'|'PAREDE'|'PINTURA'>('PISO');
     const [calcArea, setCalcArea] = useState('');
     const [calcResult, setCalcResult] = useState<string[]>([]);
@@ -124,14 +128,15 @@ const WorkDetail: React.FC = () => {
         setWork(w || null);
         
         if (w) {
-            const [s, m, e, wk, sp, ph, fl] = await Promise.all([
+            const [s, m, e, wk, sp, ph, fl, workStats] = await Promise.all([ // Added workStats to parallel fetch
                 dbService.getSteps(w.id),
                 dbService.getMaterials(w.id),
                 dbService.getExpenses(w.id),
                 dbService.getWorkers(w.userId),
                 dbService.getSuppliers(w.userId),
                 dbService.getPhotos(w.id),
-                dbService.getFiles(w.id)
+                dbService.getFiles(w.id),
+                dbService.calculateWorkStats(w.id) // Fetch work stats here
             ]);
             
             setSteps(s ? s.sort((a,b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()) : []);
@@ -141,6 +146,7 @@ const WorkDetail: React.FC = () => {
             setSuppliers(sp || []);
             setPhotos(ph || []);
             setFiles(fl || []);
+            setStats(workStats); // Set dashboard stats
         }
         setLoading(false);
     };
@@ -154,7 +160,6 @@ const WorkDetail: React.FC = () => {
         if (!work || !stepName) return;
 
         if (stepModalMode === 'ADD') {
-            // REMOVED CLIENT-SIDE ID GENERATION
             await dbService.addStep({
                 workId: work.id,
                 name: stepName,
@@ -192,8 +197,7 @@ const WorkDetail: React.FC = () => {
     const handleAddMaterial = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!work || !newMatName) return;
-        // REMOVED CLIENT-SIDE ID GENERATION from the mat object
-        const mat: Omit<Material, 'id'> = { // Explicitly define type to omit id
+        const mat: Omit<Material, 'id'> = {
             workId: work.id,
             name: newMatName,
             brand: newMatBrand,
@@ -283,7 +287,6 @@ const WorkDetail: React.FC = () => {
         const inputAmount = Number(expAmount) || 0;
 
         if (expenseModal.mode === 'ADD') {
-            // REMOVED CLIENT-SIDE ID GENERATION
             await dbService.addExpense({
                 workId: work.id,
                 description: expDesc,
@@ -334,7 +337,6 @@ const WorkDetail: React.FC = () => {
                 await new Promise(r => setTimeout(r, 800));
                 
                 if (type === 'PHOTO') {
-                    // REMOVED CLIENT-SIDE ID GENERATION
                     await dbService.addPhoto({
                         workId: work.id,
                         url: base64,
@@ -343,7 +345,6 @@ const WorkDetail: React.FC = () => {
                         type: 'PROGRESS'
                     });
                 } else {
-                    // REMOVED CLIENT-SIDE ID GENERATION
                     await dbService.addFile({
                         workId: work.id,
                         name: file.name,
@@ -442,6 +443,8 @@ const WorkDetail: React.FC = () => {
         XLSX.utils.book_append_sheet(wb, wsCrono, "Cronograma");
         const wsMat = XLSX.utils.json_to_sheet(materials.map(m => ({ Material: m.name, Qtd: m.plannedQty, Comprado: m.purchasedQty })));
         XLSX.utils.book_append_sheet(wb, wsMat, "Materiais");
+        const wsFin = XLSX.utils.json_to_sheet(expenses.map(e => ({ Descrição: e.description, Valor: e.amount, Categoria: e.category, Data: parseDateNoTimezone(e.date), Etapa: steps.find(s => s.id === e.stepId)?.name || 'N/A' })));
+        XLSX.utils.book_append_sheet(wb, wsFin, "Financeiro");
         XLSX.writeFile(wb, `Obra_${work?.name}.xlsx`);
     };
 
@@ -449,14 +452,7 @@ const WorkDetail: React.FC = () => {
         window.print();
     };
 
-    const handleAiAsk = async () => {
-        if (!aiMessage.trim()) return;
-        setAiLoading(true);
-        const response = await aiService.sendMessage(aiMessage);
-        setAiResponse(response);
-        setAiLoading(false);
-        setAiMessage('');
-    };
+    // Removed handleAiAsk as AI chat is now a dedicated page
 
     if (loading) return <div className="h-screen flex items-center justify-center"><i className="fa-solid fa-circle-notch fa-spin text-3xl text-primary"></i></div>;
     if (!work) return null;
@@ -777,7 +773,7 @@ const WorkDetail: React.FC = () => {
                                 </div>
                                 
                                 {/* Zé da Obra AI */}
-                                <div onClick={() => setSubView('BONUS_IA')} className="bg-white/10 hover:bg-white/15 p-4 rounded-2xl border border-white/10 mb-4 cursor-pointer flex items-center gap-4 transition-all backdrop-blur-sm group">
+                                <div onClick={() => navigate('/ai-chat')} className="bg-white/10 hover:bg-white/15 p-4 rounded-2xl border border-white/10 mb-4 cursor-pointer flex items-center gap-4 transition-all backdrop-blur-sm group">
                                     <div className="relative">
                                         <img src={ZE_AVATAR} className={`w-14 h-14 rounded-full border-2 border-secondary bg-slate-800 object-cover ${!hasAiAccess ? 'grayscale opacity-70' : ''}`} onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK}/>
                                         <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 border-2 border-slate-800 rounded-full"></div>
@@ -876,43 +872,260 @@ const WorkDetail: React.FC = () => {
                 </div>
             );
 
-            case 'REPORTS': return (
-                <div className="space-y-6">
+            case 'REPORTS': 
+            const workProgressPercentage = stats?.progress || 0; // Use stats.progress for the dashboard
+            return (
+                <div className="space-y-6 animate-in fade-in">
+                    {/* Report Dashboard Section */}
+                    <div className="bg-gradient-premium rounded-3xl p-6 text-white shadow-xl relative overflow-hidden mb-8">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2"></div>
+                        <div className="relative z-10">
+                            <h3 className="text-xl font-black mb-1 text-secondary uppercase tracking-widest">Resumo da Obra</h3>
+                            <h2 className="text-3xl font-black text-white leading-tight mb-4">{work.name}</h2>
+                            
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="bg-white/10 p-4 rounded-xl backdrop-blur-sm border border-white/20">
+                                    <p className="text-xs font-bold uppercase text-white/70 mb-1">Total Gasto</p>
+                                    <p className="text-2xl font-black">R$ {expenses.reduce((sum, e) => sum + Number(e.amount), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                                </div>
+                                <div className="bg-white/10 p-4 rounded-xl backdrop-blur-sm border border-white/20">
+                                    <p className="text-xs font-bold uppercase text-white/70 mb-1">Orçamento Planejado</p>
+                                    <p className="text-2xl font-black">R$ {work.budgetPlanned.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                                </div>
+                                <div className="bg-white/10 p-4 rounded-xl backdrop-blur-sm border border-white/20 col-span-2">
+                                     <p className="text-xs font-bold uppercase text-white/70 mb-1">Progresso Geral</p>
+                                     <div className="h-3 bg-white/20 rounded-full overflow-hidden mb-2">
+                                        <div className="h-full bg-secondary shadow-[0_0_10px_rgba(217,119,6,0.5)]" style={{ width: `${workProgressPercentage}%` }}></div>
+                                     </div>
+                                     <p className="text-sm font-bold">{workProgressPercentage}% Concluído</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Print/Export Buttons - Moved to top of report section */}
+                    <div className="flex justify-end gap-3 mb-6 no-print">
+                        <button onClick={handleExportExcel} className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl shadow-md transition-all flex items-center gap-2">
+                            <i className="fa-solid fa-file-excel"></i> Exportar Excel
+                        </button>
+                        <button onClick={handlePrintPDF} className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-md transition-all flex items-center gap-2">
+                            <i className="fa-solid fa-print"></i> Imprimir PDF
+                        </button>
+                    </div>
+
+                    {/* Tab selection for reports */}
                     <div className="flex gap-2 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl no-print">
                         {['CRONO', 'MAT', 'FIN'].map((rt) => (
-                            <button key={rt} onClick={() => setReportTab(rt as any)} className={`flex-1 py-2 rounded-lg text-xs font-bold ${reportTab === rt ? 'bg-white shadow text-primary' : 'text-slate-500'}`}>
+                            <button key={rt} onClick={() => setReportTab(rt as any)} className={`flex-1 py-2 rounded-lg text-xs font-bold ${reportTab === rt ? 'bg-white shadow text-primary dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}>
                                 {rt === 'CRONO' ? 'Cronograma' : rt === 'MAT' ? 'Materiais' : 'Financeiro'}
                             </button>
                         ))}
                     </div>
 
-                    <div className="bg-white dark:bg-white dark:text-black rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm print:shadow-none print:border-0 print:rounded-none">
+                    {/* Report Content */}
+                    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm print:shadow-none print:border-0 print:rounded-none">
                         
-                        <div className="hidden print:block p-8 border-b-2 border-slate-100">
+                        {/* Print Header */}
+                        <div className="hidden print:block p-8 border-b-2 border-slate-100 dark:border-slate-800">
                             <div className="flex justify-between items-start">
-                                <div><h1 className="text-3xl font-black text-slate-900 mb-1">MÃOS DA OBRA</h1><p className="text-sm font-bold text-slate-500">Relatório Geral</p></div>
-                                <div className="text-right"><h2 className="text-xl font-bold text-slate-800">{work.name}</h2><p className="text-sm text-slate-500">{new Date().toLocaleDateString()}</p></div>
+                                <div>
+                                    <h1 className="text-3xl font-black text-slate-900 mb-1">MÃOS DA OBRA</h1>
+                                    <p className="text-sm font-bold text-slate-500">Relatório Geral</p>
+                                </div>
+                                <div className="text-right">
+                                    <h2 className="text-xl font-bold text-slate-800">{work.name}</h2>
+                                    <p className="text-sm text-slate-500">{new Date().toLocaleDateString()}</p>
+                                </div>
                             </div>
                         </div>
 
-                        <table className="w-full text-left text-sm">
-                            <thead className="bg-slate-50 dark:bg-slate-100 border-b border-slate-200">
-                                <tr><th className="px-6 py-4 font-bold text-slate-500 uppercase text-xs">Descrição</th><th className="px-6 py-4 font-bold text-slate-500 uppercase text-xs text-right">Detalhes</th></tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100">
-                                {reportTab === 'CRONO' && steps.map((s) => (
-                                    <tr key={s.id}><td className="px-6 py-4 font-bold text-slate-800">{s.name}<br/><span className="text-xs text-slate-500 font-normal">{parseDateNoTimezone(s.startDate)} - {parseDateNoTimezone(s.endDate)}</span></td><td className="px-6 py-4 text-right"><span className="text-xs font-bold px-2 py-1 bg-slate-100 rounded">{s.status}</span></td></tr>
-                                ))}
-                                {reportTab === 'MAT' && materials.map((m) => (
-                                    <tr key={m.id}><td className="px-6 py-4 font-bold text-slate-800">{m.name}<br/><span className="text-xs text-slate-500 font-normal">{m.brand}</span></td><td className="px-6 py-4 text-right font-mono font-bold text-slate-700">{m.purchasedQty} / {m.plannedQty} {m.unit}</td></tr>
-                                ))}
-                                {reportTab === 'FIN' && expenses.map((e) => (
-                                    <tr key={e.id}><td className="px-6 py-4 font-bold text-slate-800">{e.description}<br/><span className="text-xs text-slate-500 font-normal">{parseDateNoTimezone(e.date)} - {e.category}</span></td><td className="px-6 py-4 text-right font-bold text-slate-800">R$ {e.amount.toLocaleString('pt-BR')}</td></tr>
-                                ))}
-                            </tbody>
-                        </table>
+                        {reportTab === 'CRONO' && (
+                            <div className="p-6"> {/* Added padding for premium feel */}
+                                <h3 className="text-lg font-bold text-primary dark:text-white mb-4">Cronograma Detalhado</h3>
+                                <table className="w-full text-left text-sm table-fixed"> {/* table-fixed for consistent column width */}
+                                    <thead className="bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
+                                        <tr>
+                                            <th className="px-4 py-3 font-bold text-slate-500 uppercase text-xs w-1/2">Etapa</th>
+                                            <th className="px-4 py-3 font-bold text-slate-500 uppercase text-xs w-1/4">Datas</th>
+                                            <th className="px-4 py-3 font-bold text-slate-500 uppercase text-xs text-right w-1/4">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                                        {steps.map((s) => {
+                                            const isDone = s.status === StepStatus.COMPLETED;
+                                            const isInProgress = s.status === StepStatus.IN_PROGRESS;
+                                            const today = new Date().toISOString().split('T')[0];
+                                            const isDelayed = s.endDate < today && !isDone;
+
+                                            let statusBadgeClass = 'bg-slate-100 text-slate-500';
+                                            let statusText = 'Pendente';
+                                            let iconClass = 'fa-clock'; // Default icon
+
+                                            if (isDone) {
+                                                statusBadgeClass = 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400';
+                                                statusText = 'Concluído';
+                                                iconClass = 'fa-check';
+                                            } else if (isDelayed) {
+                                                statusBadgeClass = 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400';
+                                                statusText = 'Atrasado';
+                                                iconClass = 'fa-triangle-exclamation';
+                                            } else if (isInProgress) {
+                                                statusBadgeClass = 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400';
+                                                statusText = 'Em Andamento';
+                                                iconClass = 'fa-hammer';
+                                            }
+                                            return (
+                                                <tr key={s.id}>
+                                                    <td className="px-4 py-3 font-bold text-primary dark:text-white">{s.name}</td>
+                                                    <td className="px-4 py-3 text-slate-600 dark:text-slate-300 text-xs">
+                                                        {parseDateNoTimezone(s.startDate)} - {parseDateNoTimezone(s.endDate)}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-right">
+                                                        <span className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase flex items-center justify-end gap-1 ${statusBadgeClass}`}>
+                                                            <i className={`fa-solid ${iconClass}`}></i> {statusText}
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+
+                        {reportTab === 'MAT' && (
+                            <div className="p-6">
+                                <h3 className="text-lg font-bold text-primary dark:text-white mb-4">Materiais por Etapa</h3>
+                                
+                                {/* Report Material Filter */}
+                                <div className="mb-6 no-print">
+                                    <select 
+                                        value={reportMaterialFilterStepId}
+                                        onChange={(e) => setReportMaterialFilterStepId(e.target.value)}
+                                        className="w-full p-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-bold text-sm text-slate-600 dark:text-slate-300 shadow-sm focus:border-secondary focus:ring-1 focus:ring-secondary outline-none transition-all"
+                                    >
+                                        <option value="ALL">Todas as Etapas</option>
+                                        {steps.map((s, idx) => (
+                                            <option key={s.id} value={s.id}>{String(idx+1).padStart(2, '0')}. {s.name}</option>
+                                        ))}
+                                    </select>
+                                </div>
+
+                                <table className="w-full text-left text-sm table-fixed">
+                                    <thead className="bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
+                                        <tr>
+                                            <th className="px-4 py-3 font-bold text-slate-500 uppercase text-xs w-1/2">Material</th>
+                                            <th className="px-4 py-3 font-bold text-slate-500 uppercase text-xs text-center w-1/4">Qtd. Planejada</th>
+                                            <th className="px-4 py-3 font-bold text-slate-500 uppercase text-xs text-right w-1/4">Qtd. Comprada</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                                        {steps.map((step) => {
+                                            const originalIdx = steps.findIndex(s => s.id === step.id);
+                                            const stepMaterials = materials.filter(m => m.stepId === step.id);
+
+                                            const filteredMaterials = reportMaterialFilterStepId === 'ALL'
+                                                ? stepMaterials
+                                                : stepMaterials.filter(m => m.stepId === reportMaterialFilterStepId);
+
+                                            if (filteredMaterials.length === 0 && reportMaterialFilterStepId !== 'ALL') {
+                                                return null; // Don't show step header if no materials after filtering
+                                            }
+                                            if (filteredMaterials.length === 0 && reportMaterialFilterStepId === 'ALL') return null; // Only show steps with materials when not filtering
+                                            
+                                            return (
+                                                <React.Fragment key={step.id}>
+                                                    <tr className="bg-slate-100 dark:bg-slate-700">
+                                                        <td colSpan={3} className="px-4 py-2 font-black text-sm text-primary dark:text-white uppercase tracking-tight border-b-2 border-secondary/50">
+                                                            {String(originalIdx+1).padStart(2,'0')}. {step.name}
+                                                        </td>
+                                                    </tr>
+                                                    {filteredMaterials.map(m => (
+                                                        <tr key={m.id}>
+                                                            <td className="px-4 py-3 font-bold text-primary dark:text-white">{m.name} {m.brand && <span className="text-xs text-slate-500 font-normal">({m.brand})</span>}</td>
+                                                            <td className="px-4 py-3 text-center font-mono text-slate-700 dark:text-slate-300">{m.plannedQty} {m.unit}</td>
+                                                            <td className="px-4 py-3 text-right font-mono font-bold text-green-700 dark:text-green-400">{m.purchasedQty} {m.unit}</td>
+                                                        </tr>
+                                                    ))}
+                                                </React.Fragment>
+                                            );
+                                        })}
+                                        {/* Handle case where no materials are found for selected filter */}
+                                        {reportMaterialFilterStepId !== 'ALL' && materials.filter(m => m.stepId === reportMaterialFilterStepId).length === 0 && (
+                                            <tr>
+                                                <td colSpan={3} className="px-4 py-6 text-center text-slate-400 italic">Nenhum material cadastrado para esta etapa.</td>
+                                            </tr>
+                                        )}
+                                        {reportMaterialFilterStepId === 'ALL' && materials.length === 0 && (
+                                            <tr>
+                                                <td colSpan={3} className="px-4 py-6 text-center text-slate-400 italic">Nenhum material cadastrado na obra.</td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+
+                        {reportTab === 'FIN' && (
+                            <div className="p-6">
+                                <h3 className="text-lg font-bold text-primary dark:text-white mb-4">Detalhamento Financeiro</h3>
+                                <div className="space-y-6">
+                                    {[
+                                        ...steps.map(s => ({ id: s.id, name: s.name, type: 'STEP' })),
+                                        { id: 'general', name: 'Despesas Gerais / Sem Etapa', type: 'GENERAL' }
+                                    ].map(group => {
+                                        const groupExpenses = expenses.filter(e => {
+                                            if (group.type === 'STEP') return e.stepId === group.id;
+                                            return !e.stepId;
+                                        });
+
+                                        if (groupExpenses.length === 0) return null;
+
+                                        return (
+                                            <div key={group.id} className="bg-slate-50 dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
+                                                <h4 className="font-bold text-primary dark:text-white text-sm uppercase tracking-wide mb-3 flex items-center gap-2">
+                                                    {group.type === 'STEP' && <i className="fa-solid fa-calendar-alt text-secondary"></i>}
+                                                    {group.type === 'GENERAL' && <i className="fa-solid fa-folder text-slate-500"></i>}
+                                                    {group.name}
+                                                </h4>
+                                                <ul className="divide-y divide-slate-100 dark:divide-slate-700">
+                                                    {groupExpenses.map(exp => {
+                                                        const relatedMaterial = exp.relatedMaterialId ? materials.find(m => m.id === exp.relatedMaterialId) : null;
+                                                        const expenseWorker = exp.workerId ? workers.find(w => w.id === exp.workerId) : null;
+
+                                                        let categoryIcon = 'fa-tag';
+                                                        let categoryColor = 'text-slate-500';
+                                                        if (exp.category === ExpenseCategory.MATERIAL) {
+                                                            categoryIcon = 'fa-box';
+                                                            categoryColor = 'text-amber-600';
+                                                        } else if (exp.category === ExpenseCategory.LABOR) {
+                                                            categoryIcon = 'fa-helmet-safety';
+                                                            categoryColor = 'text-blue-600';
+                                                        }
+
+                                                        return (
+                                                            <li key={exp.id} className="py-3 flex justify-between items-center text-xs">
+                                                                <div>
+                                                                    <p className="font-bold text-primary dark:text-white">{exp.description}</p>
+                                                                    <p className="text-slate-500 mt-1 flex items-center gap-2">
+                                                                        <span className={`flex items-center gap-1 ${categoryColor}`}><i className={`fa-solid ${categoryIcon}`}></i> {exp.category}</span>
+                                                                        <span>• {parseDateNoTimezone(exp.date)}</span>
+                                                                        {relatedMaterial && <span className="text-sm font-medium text-slate-400">(Material: {relatedMaterial.name})</span>}
+                                                                        {expenseWorker && <span className="text-sm font-medium text-slate-400">(Profissional: {expenseWorker.name})</span>}
+                                                                    </p>
+                                                                </div>
+                                                                <span className="font-bold text-primary dark:text-white whitespace-nowrap">R$ {Number(exp.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                                            </li>
+                                                        );
+                                                    })}
+                                                </ul>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
                     </div>
-                    <button onClick={handlePrintPDF} className="w-full py-3 bg-slate-800 text-white rounded-xl font-bold no-print">Imprimir Relatório</button>
                 </div>
             );
 
@@ -988,28 +1201,7 @@ const WorkDetail: React.FC = () => {
                 </div>
             );
 
-            case 'BONUS_IA_CHAT': 
-                if (!hasAiAccess) return null;
-                return (
-                <div className="flex flex-col h-[80vh]">
-                    <div className="flex-1 bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-inner overflow-y-auto mb-4 border border-slate-200 dark:border-slate-800">
-                            <div className="flex gap-4 mb-6">
-                            <img src={ZE_AVATAR} className="w-10 h-10 rounded-full border border-slate-200" onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK}/>
-                            <div className="bg-slate-100 dark:bg-slate-800 p-3 rounded-tr-xl rounded-b-xl text-sm shadow-sm"><p className="font-bold text-secondary mb-1">Zé da Obra</p><p>Opa! Mestre de obras na área.</p></div>
-                        </div>
-                        {aiResponse && (
-                            <div className="flex gap-4 mb-6 animate-in fade-in">
-                                <img src={ZE_AVATAR} className="w-10 h-10 rounded-full border border-slate-200" onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK}/>
-                                <div className="bg-slate-100 dark:bg-slate-800 p-3 rounded-tr-xl rounded-b-xl text-sm shadow-sm"><p className="font-bold text-secondary mb-1">Zé da Obra</p><p className="whitespace-pre-wrap">{aiResponse}</p></div>
-                            </div>
-                        )}
-                    </div>
-                    <div className="flex gap-2">
-                        <input value={aiMessage} onChange={e => setAiMessage(e.target.value)} placeholder="Pergunte ao Zé..." className="flex-1 p-4 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-secondary transition-colors"/>
-                        <button onClick={handleAiAsk} disabled={aiLoading} className="w-14 bg-secondary text-white rounded-xl flex items-center justify-center shadow-lg hover:bg-orange-600 transition-colors">{aiLoading ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-paper-plane"></i>}</button>
-                    </div>
-                </div>
-            );
+            // Removed case 'BONUS_IA_CHAT' as it is handled by dedicated page /ai-chat
 
             case 'CONTRACTS': return (
                 <div className="space-y-4">
@@ -1343,3 +1535,4 @@ const WorkDetail: React.FC = () => {
 };
 
 export default WorkDetail;
+
