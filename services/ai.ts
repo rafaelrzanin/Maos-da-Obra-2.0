@@ -24,7 +24,7 @@ const safeGetEnv = (key: string): string | undefined => {
 };
 
 // Access API_KEY using the safeGetEnv helper
-const apiKey = safeGetEnv("API_KEY");
+const apiKey = safeGetEnv("VITE_GOOGLE_API_KEY");
 
 // Campo para chave manual se não configurar no .env
 // Exemplo: const MANUAL_KEY = "AIza...";
