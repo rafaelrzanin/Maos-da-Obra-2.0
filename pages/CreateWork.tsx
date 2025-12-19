@@ -95,8 +95,19 @@ const CreateWork: React.FC = () => {
       if (!formData.startDate) {
           newErrors.startDate = "Qual a data de início?"; 
       // Fix: Compare Date objects' time values (milliseconds since epoch) for accurate date comparison.
-      } else if (new Date(formData.startDate).getTime() < new Date().setHours(0,0,0,0)) {
-          newErrors.startDate = "A data de início não pode ser no passado.";
+      } else {
+          // --- INÍCIO DA CORREÇÃO DA VALIDAÇÃO DE DATA ---
+          // Garante que ambas as datas são comparadas como "início do dia" na hora LOCAL.
+          const [year, month, day] = formData.startDate.split('-').map(Number);
+          const selectedDateAtLocalMidnight = new Date(year, month - 1, day).getTime();
+
+          const today = new Date();
+          const todayAtLocalMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+
+          if (selectedDateAtLocalMidnight < todayAtLocalMidnight) {
+              newErrors.startDate = "A data de início não pode ser no passado.";
+          }
+          // --- FIM DA CORREÇÃO DA VALIDAÇÃO DE DATA ---
       }
     }
     setFormErrors(newErrors);
