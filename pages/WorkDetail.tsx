@@ -11,7 +11,7 @@ import { STANDARD_CHECKLISTS, CONTRACT_TEMPLATES, STANDARD_JOB_ROLES, STANDARD_S
 type MainTab = 'SCHEDULE' | 'MATERIALS' | 'FINANCIAL' | 'MORE';
 type SubView = 'NONE' | 'TEAM' | 'SUPPLIERS' | 'REPORTS' | 'PHOTOS' | 'PROJECTS' | 'CALCULATORS' | 'CONTRACTS' | 'CHECKLIST';
 
-// --- DATE HELPERS ---
+// --- DATE HELPERS2 ---
 const parseDateNoTimezone = (dateStr: string) => {
     if (!dateStr) return '';
     const cleanDate = dateStr.split('T')[0];
