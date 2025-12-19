@@ -74,14 +74,17 @@ export default function Register() {
             cleanPhone, // Pass clean phone to signup
             formData.password,
             cleanCpf, // Pass clean CPF to signup
-            planParam // Pass selected plan type
+            planParam // Pass selected plan type - used for redirection to checkout
         );
 
-        if (!success) {
+        if (success) {
+            // CORREÇÃO: Redireciona explicitamente para o checkout após o cadastro bem-sucedido.
+            // Isso garante que o fluxo de pagamento seja ativado para o plano desejado.
+            navigate(`/checkout?plan=${planParam}`, { replace: true });
+        } else {
             // signup function in AuthContext already handles alert for common errors
             setErrorMsg("Falha ao criar conta. Verifique os dados e tente novamente.");
         }
-        // If success, AuthContext useEffect handles redirect
     } catch (error: any) {
         console.error("Erro ao registrar:", error);
         let msg = "Erro no registro. Tente novamente.";
@@ -197,4 +200,3 @@ export default function Register() {
     </div>
   );
 }
-    
