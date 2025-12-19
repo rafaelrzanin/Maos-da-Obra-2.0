@@ -494,7 +494,7 @@ const Dashboard: React.FC = () => {
     else setIsLoadingDetails(false);
 
     return () => { isMounted = false; };
-  }, [focusWork?.id, user]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [focusWork?.id, user, authLoading]); // Added authLoading to dependencies
 
   useEffect(() => {
     if (user?.plan !== PlanType.VITALICIO && user?.isTrial && trialDaysRemaining !== null && trialDaysRemaining <= 1) {
