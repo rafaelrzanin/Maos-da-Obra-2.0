@@ -156,6 +156,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  async function loginSocial(provider: 'google') {
+    setLoading(true);
+    console.log("[AuthContext] loginSocial called. Setting loading to true.");
+    try {
+        const { error } = await dbService.loginSocial(provider);
+
+        if (error) {
+            console.error("[AuthContext] Error in social login:", error);
+            alert("Erro no login Google. Verifique se o domínio da Vercel está autorizado no Supabase.");
+            return false;
+        } 
+        // If successful, Supabase handles the redirect automatically.
+        // The onAuthChange listener should pick it up and set user/loading.
+        return true;
+    } catch (e) {
+        console.error("[AuthContext] Social login exception:", e);
+        return false;
+    } finally {
+        setLoading(false); // Ensure loading is reset even if redirect happens very fast or an uncaught exception occurs
+        console.log("[AuthContext] loginSocial finished. Setting loading to false.");
+    }
+  };
+
   const signup = async (name: string, email: string, whatsapp: string, password?: string, cpf?: string, planType?: string | null) => {
     setLoading(true);
     console.log("[AuthContext] signup called. Setting loading to true.");
