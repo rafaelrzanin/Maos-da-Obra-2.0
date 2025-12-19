@@ -33,7 +33,7 @@ const WorkDetail: React.FC = () => {
     
     // --- CORE DATA STATE ---
     const [work, setWork] = useState<Work | null>(null);
-    const [loading, setLoading] = useState(true); // Local loading for work details
+    const [loading, setLoading] = useState(true);
     const [steps, setSteps] = useState<Step[]>([]);
     const [materials, setMaterials] = useState<Material[]>([]);
     const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -517,7 +517,7 @@ const WorkDetail: React.FC = () => {
                              // Red style for delayed items
                              statusBadgeClass = 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400';
                              statusText = 'Atrasado';
-                             cardBorderClass = 'border-red-200 dark:border-900/30';
+                             cardBorderClass = 'border-red-200 dark:border-red-900/30';
                              iconColor = 'bg-red-500 border-red-500 text-white animate-pulse';
                              iconClass = 'fa-triangle-exclamation';
                          } else if (isInProgress) {
@@ -1048,4 +1048,428 @@ const WorkDetail: React.FC = () => {
 
                                     if (groupExpenses.length === 0) return null;
 
-                                    const isGeneral =
+                                    const isGeneral = step.id === 'general-fin';
+                                    const stepLabel = isGeneral ? step.name : `Etapa: ${step.name}`;
+
+                                    return (
+                                        <div key={step.id} className="bg-slate-50 dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
+                                            <h4 className="font-bold text-primary dark:text-white text-sm uppercase tracking-wide mb-3">{stepLabel}</h4>
+                                            <ul className="divide-y divide-slate-100 dark:divide-slate-700">
+                                                {groupExpenses.map(exp => {
+                                                    const relatedMaterial = exp.relatedMaterialId ? materials.find(m => m.id === exp.relatedMaterialId) : null;
+                                                    const expenseWorker = exp.workerId ? workers.find(w => w.id === exp.workerId) : null;
+
+                                                    let categoryIcon = 'fa-tag';
+                                                    let categoryColor = 'text-slate-500';
+                                                    if (exp.category === ExpenseCategory.MATERIAL) {
+                                                        categoryIcon = 'fa-box';
+                                                        categoryColor = 'text-amber-600';
+                                                    } else if (exp.category === ExpenseCategory.LABOR) {
+                                                        categoryIcon = 'fa-helmet-safety';
+                                                        categoryColor = 'text-blue-600';
+                                                    }
+
+                                                    return (
+                                                        <li key={exp.id} className="py-3 flex justify-between items-center text-xs">
+                                                            <div>
+                                                                <p className="font-bold text-primary dark:text-white">{exp.description}</p>
+                                                                <p className="text-slate-500 mt-1 flex items-center gap-2">
+                                                                    <span className={`flex items-center gap-1 ${categoryColor}`}><i className={`fa-solid ${categoryIcon}`}></i> {exp.category}</span>
+                                                                    <span>• {parseDateNoTimezone(exp.date)}</span>
+                                                                    {relatedMaterial && <span className="text-sm font-medium text-slate-400">(Material: {relatedMaterial.name})</span>}
+                                                                    {expenseWorker && <span className="text-sm font-medium text-slate-400">(Profissional: {expenseWorker.name})</span>}
+                                                                </p>
+                                                            </div>
+                                                            <span className="font-bold text-primary dark:text-white whitespace-nowrap">R$ {Number(exp.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                                        </li>
+                                                    );
+                                                })}
+                                            </ul>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+
+            case 'PHOTOS': return (
+                <div className="space-y-6">
+                    <label className="block w-full py-8 border-2 border-dashed border-pink-300 bg-pink-50 rounded-2xl cursor-pointer hover:bg-pink-100 transition-all text-center">
+                        <i className="fa-solid fa-camera text-2xl text-pink-400 mb-2"></i>
+                        <span className="block text-sm font-bold text-pink-600">{uploading ? 'Enviando...' : 'Adicionar Foto'}</span>
+                        <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, 'PHOTO')} disabled={uploading} />
+                    </label>
+                    <div className="grid grid-cols-2 gap-4">
+                        {photos.map(p => (
+                            <div key={p.id} className="relative group rounded-xl overflow-hidden shadow-sm">
+                                <img src={p.url} className="w-full aspect-square object-cover" alt="Obra" />
+                                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                                    <span className="text-white text-xs font-bold">{parseDateNoTimezone(p.date)}</span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+
+            case 'CALCULATORS': return (
+                <div className="space-y-6">
+                    <div className="grid grid-cols-3 gap-2">
+                        {['PISO', 'PAREDE', 'PINTURA'].map(t => (
+                            <button key={t} onClick={() => {setCalcType(t as any); setCalcResult([])}} className={`flex flex-col items-center justify-center py-4 rounded-xl border-2 font-bold text-xs transition-all gap-2 ${calcType === t ? 'border-secondary bg-secondary/10 text-secondary' : 'border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-400'}`}>
+                                <i className={`fa-solid ${t === 'PISO' ? 'fa-layer-group' : 'fa-building'} text-xl`}></i>
+                                {t}
+                            </button>
+                        ))}
+                    </div>
+                    <div className="bg-gradient-to-br from-slate-800 to-slate-900 text-white p-8 rounded-3xl shadow-xl relative overflow-hidden">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-secondary/20 rounded-full blur-3xl"></div>
+                        <h3 className="text-lg font-bold mb-6 text-center uppercase tracking-widest text-secondary">Calculadora de {calcType}</h3>
+                        <div className="relative mb-8">
+                            <input type="number" value={calcArea} onChange={e => setCalcArea(e.target.value)} placeholder="0" className="w-full bg-white/10 border border-white/20 rounded-2xl p-4 text-center text-3xl font-black text-white outline-none focus:border-secondary transition-colors" />
+                            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-white/30 font-bold">m²</span>
+                        </div>
+                        <div className="space-y-3">
+                            {calcResult.length > 0 ? calcResult.map((res, i) => (
+                                <div key={i} className="bg-white/10 p-3 rounded-xl flex items-center gap-3 backdrop-blur-sm"><i className="fa-solid fa-check text-green-400"></i> <span className="font-bold text-sm">{res}</span></div>
+                            )) : <p className="text-center text-white/30 text-sm">Digite a área para calcular.</p>}
+                        </div>
+                    </div>
+                </div>
+            );
+
+            // Fix: Removed BONUS_IA case as AI chat is now handled by a dedicated page.
+            case 'CONTRACTS': return (
+                <div className="space-y-4">
+                    {CONTRACT_TEMPLATES.map(ct => (
+                        <div key={ct.id} onClick={() => setViewContract({ title: ct.title, content: ct.contentTemplate })} className="group bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-secondary/50 cursor-pointer shadow-sm transition-all hover:translate-x-1">
+                            <div className="flex items-center gap-4">
+                                <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center text-xl group-hover:bg-indigo-600 group-hover:text-white transition-colors"><i className="fa-solid fa-file-contract"></i></div>
+                                <div><h4 className="font-bold text-primary dark:text-white">{ct.title}</h4><p className="text-xs text-slate-500">Toque para abrir modelo</p></div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            );
+
+            case 'CHECKLIST': return (
+                <div className="space-y-4">
+                    {STANDARD_CHECKLISTS.map((cl, idx) => (
+                        <div key={idx} className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
+                            <button onClick={() => setActiveChecklist(activeChecklist === cl.category ? null : cl.category)} className="w-full p-5 flex justify-between items-center text-left hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+                                <span className="font-bold text-sm flex items-center gap-3 text-primary dark:text-white"><div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${activeChecklist === cl.category ? 'bg-green-500 text-white' : 'bg-green-100 text-green-600'}`}><i className="fa-solid fa-list-check"></i></div>{cl.category}</span>
+                                <i className={`fa-solid fa-chevron-down transition-transform text-slate-400 ${activeChecklist === cl.category ? 'rotate-180' : ''}`}></i>
+                            </button>
+                            {activeChecklist === cl.category && (
+                                <div className="p-5 pt-0 border-t border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/30 animate-in slide-in-from-top-2">
+                                    {cl.items.map((item, i) => (
+                                        <label key={i} className="flex items-start gap-3 py-3 cursor-pointer border-b border-dashed border-slate-200 dark:border-slate-700 last:border-0 hover:bg-white/50 rounded-lg px-2 transition-colors">
+                                            <input type="checkbox" className="mt-1 rounded border-slate-300 text-secondary focus:ring-secondary w-5 h-5" />
+                                            <span className="text-sm text-slate-600 dark:text-slate-300 leading-tight">{item}</span>
+                                        </label>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    ))}
+                </div>
+            );
+
+            // PROJECTS reuse
+            case 'PROJECTS': return (
+                <div className="space-y-6">
+                    <label className="block w-full py-8 border-2 border-dashed border-teal-300 bg-teal-50 rounded-2xl cursor-pointer hover:bg-teal-100 transition-all text-center">
+                        <i className="fa-solid fa-file-pdf text-2xl text-teal-400 mb-2"></i>
+                        <span className="block text-sm font-bold text-teal-600">{uploading ? 'Enviando...' : 'Adicionar PDF/Projeto'}</span>
+                        <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'FILE')} disabled={uploading} />
+                    </label>
+                    <div className="space-y-2">{files.map(f => <div key={f.id} className="p-4 bg-white rounded-xl border flex items-center gap-3"><i className="fa-solid fa-file text-slate-400"></i> <span className="font-bold text-sm truncate flex-1">{f.name}</span><a href={f.url} download={f.name}><i className="fa-solid fa-download text-primary"></i></a></div>)}</div>
+                </div>
+            );
+
+            default: return null;
+        }
+    };
+
+    return (
+        <div className="max-w-4xl mx-auto min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col font-sans relative">
+            <div className="bg-white dark:bg-slate-900 px-6 pt-6 pb-2 sticky top-0 z-20 shadow-sm border-b border-slate-100 dark:border-slate-800 no-print">
+                <div className="flex justify-between items-center mb-1">
+                    <button onClick={() => subView !== 'NONE' ? setSubView('NONE') : navigate('/')} className="text-slate-400 hover:text-primary dark:hover:text-white"><i className="fa-solid fa-arrow-left text-xl"></i></button>
+                    <h1 className="text-lg font-black text-primary dark:text-white uppercase tracking-tight truncate max-w-[200px]">
+                        {subView !== 'NONE' 
+                            ? (subView === 'TEAM' ? 'Minha Equipe' : subView === 'SUPPLIERS' ? 'Fornecedores' : subView === 'REPORTS' ? 'Relatórios' : 'Detalhes')
+                            : work.name
+                        }
+                    </h1>
+                    <div className="w-6"></div> 
+                </div>
+            </div>
+
+            <div className="flex-1 p-4 pb-32 overflow-y-auto">
+                {subView !== 'NONE' ? renderSubViewContent() : renderMainTab()}
+            </div>
+
+            {/* MAIN NAVIGATION BOTTOM BAR (Only visible on main tabs) */}
+            {subView === 'NONE' && (
+                <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 pb-safe z-40 shadow-[0_-5px_20px_rgba(0,0,0,0.05)] no-print">
+                    <div className="flex justify-around items-center max-w-4xl mx-auto h-16">
+                        <button onClick={() => setActiveTab('SCHEDULE')} className={`flex flex-col items-center justify-center w-full h-full gap-1 transition-all ${activeTab === 'SCHEDULE' ? 'text-secondary' : 'text-slate-400'}`}><i className={`fa-solid fa-calendar-days text-xl ${activeTab === 'SCHEDULE' ? 'scale-110' : ''}`}></i><span className="text-[10px] font-bold uppercase">Cronograma</span></button>
+                        <button onClick={() => setActiveTab('MATERIALS')} className={`flex flex-col items-center justify-center w-full h-full gap-1 transition-all ${activeTab === 'MATERIALS' ? 'text-secondary' : 'text-slate-400'}`}><i className={`fa-solid fa-layer-group text-xl ${activeTab === 'MATERIALS' ? 'scale-110' : ''}`}></i><span className="text-[10px] font-bold uppercase">Materiais</span></button>
+                        <button onClick={() => setActiveTab('FINANCIAL')} className={`flex flex-col items-center justify-center w-full h-full gap-1 transition-all ${activeTab === 'FINANCIAL' ? 'text-secondary' : 'text-slate-400'}`}><i className={`fa-solid fa-chart-pie text-xl ${activeTab === 'FINANCIAL' ? 'scale-110' : ''}`}></i><span className="text-[10px] font-bold uppercase">Financeiro</span></button>
+                        <button onClick={() => setActiveTab('MORE')} className={`flex flex-col items-center justify-center w-full h-full gap-1 transition-all ${activeTab === 'MORE' ? 'text-secondary' : 'text-slate-400'}`}><i className={`fa-solid fa-bars text-xl ${activeTab === 'MORE' ? 'scale-110' : ''}`}></i><span className="text-[10px] font-bold uppercase">Mais</span></button>
+                    </div>
+                </div>
+            )}
+
+            {/* --- ALL MODALS (RENDERED AT ROOT LEVEL) --- */}
+            
+            {/* ADD/EDIT STEP MODAL */}
+            {isStepModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-6 shadow-2xl">
+                        <h3 className="text-xl font-bold mb-4 text-primary dark:text-white">{stepModalMode === 'ADD' ? 'Nova Etapa' : 'Editar Etapa'}</h3>
+                        <form onSubmit={handleSaveStep} className="space-y-4">
+                            <input placeholder="Nome da Etapa" value={stepName} onChange={e => setStepName(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required />
+                            <div className="grid grid-cols-2 gap-2">
+                                <div><label className="text-[10px] uppercase font-bold text-slate-400 ml-1">Início</label><input type="date" value={stepStart} onChange={e => setStepStart(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required /></div>
+                                <div><label className="text-[10px] uppercase font-bold text-slate-400 ml-1">Fim</label><input type="date" value={stepEnd} onChange={e => setStepEnd(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required /></div>
+                            </div>
+                            <div className="flex gap-2 pt-2">
+                                <button type="button" onClick={() => setIsStepModalOpen(false)} className="flex-1 bg-slate-100 dark:bg-slate-800 text-slate-500 py-3 rounded-xl font-bold">Cancelar</button>
+                                <button type="submit" className="flex-1 bg-primary text-white py-3 rounded-xl font-bold">Salvar</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* ADD MATERIAL MODAL */}
+            {addMatModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-6 shadow-2xl overflow-y-auto max-h-[90vh]">
+                        <h3 className="text-xl font-bold mb-4 text-primary dark:text-white">Novo Material</h3>
+                        <form onSubmit={handleAddMaterial} className="space-y-4">
+                            <input placeholder="Nome do Material" value={newMatName} onChange={e => setNewMatName(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required />
+                            <div className="grid grid-cols-2 gap-2">
+                                <input type="number" placeholder="Qtd" value={newMatQty} onChange={e => setNewMatQty(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required />
+                                <input placeholder="Unidade (un, m2)" value={newMatUnit} onChange={e => setNewMatUnit(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required />
+                            </div>
+                            <select value={newMatStepId} onChange={e => setNewMatStepId(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
+                                <option value="">Sem etapa definida</option>
+                                {steps.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                            </select>
+                            
+                            <div className="border-t pt-4 mt-2">
+                                <label className="flex items-center gap-2 mb-2 font-bold text-sm"><input type="checkbox" checked={newMatBuyNow} onChange={e => setNewMatBuyNow(e.target.checked)} className="w-4 h-4" /> Já comprei este material</label>
+                                {newMatBuyNow && (
+                                    <div className="grid grid-cols-2 gap-2 animate-in slide-in-from-top-2">
+                                        <input type="number" placeholder="Qtd Comprada" value={newMatBuyQty} onChange={e => setNewMatBuyQty(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" />
+                                        <input type="number" placeholder="Valor Total (R$)" value={newMatBuyCost} onChange={e => setNewMatBuyCost(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" />
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="flex gap-2">
+                                <button type="button" onClick={() => setAddMatModal(false)} className="flex-1 bg-slate-100 py-3 rounded-xl font-bold">Cancelar</button>
+                                <button type="submit" className="flex-1 bg-primary text-white py-3 rounded-xl font-bold">Salvar</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* EDIT MATERIAL MODAL */}
+            {materialModal.isOpen && materialModal.material && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-6 shadow-2xl overflow-y-auto max-h-[90vh]">
+                        <h3 className="text-xl font-bold mb-4 text-primary dark:text-white">Editar Material</h3>
+                        
+                        <form onSubmit={handleUpdateMaterial} className="space-y-6">
+                            {/* EDITABLE DEFINITION */}
+                            <div className="space-y-3">
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Nome do Produto</label>
+                                    <input 
+                                        value={matName} 
+                                        onChange={e => setMatName(e.target.value)} 
+                                        className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold"
+                                    />
+                                </div>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Qtd Planejada</label>
+                                        <input 
+                                            type="number"
+                                            value={matPlannedQty} 
+                                            onChange={e => setMatPlannedQty(e.target.value)} 
+                                            className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Unidade</label>
+                                        <input 
+                                            value={matUnit} 
+                                            onChange={e => setMatUnit(e.target.value)} 
+                                            className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* READ-ONLY STATUS */}
+                            <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-xl border border-green-200 dark:border-green-900 flex justify-between items-center">
+                                <span className="text-sm font-bold text-green-700 dark:text-green-400">Total Já Comprado:</span>
+                                <span className="font-mono font-black text-lg text-green-700 dark:text-green-400">{materialModal.material.purchasedQty} {materialModal.material.unit}</span>
+                            </div>
+
+                            {/* OPTIONAL NEW PURCHASE */}
+                            <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
+                                <label className="block text-xs font-black text-secondary uppercase mb-2 tracking-widest"><i className="fa-solid fa-cart-plus"></i> Registrar Nova Compra</label>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <input type="number" placeholder="Qtd" value={matBuyQty} onChange={e => setMatBuyQty(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" />
+                                    <input type="number" placeholder="Valor (R$)" value={matBuyCost} onChange={e => setMatBuyCost(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" />
+                                </div>
+                                <p className="text-[10px] text-slate-400 mt-2">*Preencha apenas se houver nova compra. Se quiser só corrigir o nome/planejado, deixe vazio.</p>
+                            </div>
+
+                            <div className="flex gap-2">
+                                <button type="button" onClick={() => setMaterialModal({isOpen: false, material: null})} className="flex-1 bg-slate-100 py-3 rounded-xl font-bold">Cancelar</button>
+                                <button type="submit" className="flex-1 bg-primary text-white py-3 rounded-xl font-bold shadow-lg">Salvar Alterações</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* EXPENSE MODAL (ADD / EDIT) */}
+            {expenseModal.isOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-6 shadow-2xl">
+                        <div className="flex justify-between items-center mb-4">
+                            <h3 className="text-xl font-bold text-primary dark:text-white">
+                                {expenseModal.mode === 'ADD' ? 'Novo Gasto' : 'Editar Gasto'}
+                            </h3>
+                            {expenseModal.mode === 'EDIT' && (
+                                <button onClick={handleDeleteExpense} className="text-red-500 hover:bg-red-50 p-2 rounded-lg transition-colors">
+                                    <i className="fa-solid fa-trash"></i>
+                                </button>
+                            )}
+                        </div>
+                        
+                        <form onSubmit={handleSaveExpense} className="space-y-4">
+                            <input placeholder="Descrição (ex: Pagamento Pedreiro)" value={expDesc} onChange={e => setExpDesc(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required />
+                            
+                            {/* STATUS VISUAL FOR EDIT MODE ONLY - "TOTAL JÁ PAGO" */}
+                            {expenseModal.mode === 'EDIT' && (
+                                <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-xl border border-green-200 dark:border-green-900 mb-2">
+                                    <div className="flex justify-between items-center mb-1">
+                                        <span className="text-[10px] font-bold text-green-700 dark:text-green-400 uppercase">Total Já Pago</span>
+                                        <span className="text-lg font-black text-green-700 dark:text-green-400">R$ {Number(expSavedAmount).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                                    </div>
+                                    {expTotalAgreed && Number(expTotalAgreed) > Number(expSavedAmount) && (
+                                        <div className="flex justify-between items-center border-t border-green-200 dark:border-green-800 pt-2 mt-2">
+                                            <span className="text-[10px] font-bold text-orange-600 dark:text-orange-400 uppercase">Restante</span>
+                                            <span className="text-sm font-bold text-orange-600 dark:text-orange-400">R$ {(Number(expTotalAgreed) - (Number(expSavedAmount) + (Number(expAmount) || 0))).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Valor Pago Agora</label>
+                                    <div className="relative">
+                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">R$</span>
+                                        <input type="number" placeholder="0.00" value={expAmount} onChange={e => setExpAmount(e.target.value)} className="w-full pl-10 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Total Combinado</label>
+                                    <div className="relative">
+                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">R$</span>
+                                        <input type="number" placeholder="(Opcional)" value={expTotalAgreed} onChange={e => setExpTotalAgreed(e.target.value)} className="w-full pl-10 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Categoria</label>
+                                    <select value={expCategory} onChange={e => setExpCategory(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
+                                        <option value={ExpenseCategory.LABOR}>Mão de Obra</option>
+                                        <option value={ExpenseCategory.MATERIAL}>Material</option>
+                                        <option value={ExpenseCategory.PERMITS}>Taxas</option>
+                                        <option value={ExpenseCategory.OTHER}>Outros</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Data</label>
+                                    <input type="date" value={expDate} onChange={e => setExpDate(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required />
+                                </div>
+                            </div>
+                            
+                            {/* STEP SELECTION - ENSURING VISIBILITY */}
+                            <div>
+                                <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Etapa Relacionada</label>
+                                <select value={expStepId} onChange={e => setExpStepId(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold text-sm">
+                                    <option value="">Sem Etapa (Geral)</option>
+                                    {steps.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                                </select>
+                            </div>
+
+                            <div className="flex gap-2 pt-2">
+                                <button type="button" onClick={() => setExpenseModal({isOpen: false, mode: 'ADD'})} className="flex-1 bg-slate-100 py-3 rounded-xl font-bold">Cancelar</button>
+                                <button type="submit" className="flex-1 bg-primary text-white py-3 rounded-xl font-bold">Salvar</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+            
+            {/* TEAM & SUPPLIER FORM MODAL */}
+            {isPersonModalOpen && (
+                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-6 shadow-2xl overflow-y-auto max-h-[90vh]">
+                        <div className="flex items-center gap-3 mb-4">
+                             <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl ${personMode === 'WORKER' ? 'bg-blue-100 text-blue-600' : 'bg-amber-100 text-amber-600'}`}><i className={`fa-solid ${personMode === 'WORKER' ? 'fa-helmet-safety' : 'fa-truck'}`}></i></div>
+                             <div><h3 className="text-lg font-bold text-primary dark:text-white leading-tight">{personId ? 'Editar' : 'Adicionar'} {personMode === 'WORKER' ? 'Profissional' : 'Fornecedor'}</h3></div>
+                        </div>
+                        <form onSubmit={handleSavePerson} className="space-y-4">
+                            <div><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Nome</label><input required className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold" value={personName} onChange={e => setPersonName(e.target.value)} /></div>
+                            <div><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{personMode === 'WORKER' ? 'Função' : 'Categoria'}</label><select required className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold text-sm" value={personRole} onChange={e => setPersonRole(e.target.value)}>{(personMode === 'WORKER' ? STANDARD_JOB_ROLES : STANDARD_SUPPLIER_CATEGORIES).map(r => <option key={r} value={r}>{r}</option>)}</select></div>
+                            <div><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Telefone / WhatsApp</label><input className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold" placeholder="51 99999-9999" value={personPhone} onChange={e => setPersonPhone(e.target.value)} /></div>
+                            <div><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Observações</label><textarea className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold h-20 resize-none" placeholder="Detalhes opcionais..." value={personNotes} onChange={e => setPersonNotes(e.target.value)}></textarea></div>
+                            <div className="flex gap-2 pt-2"><button type="button" onClick={() => setIsPersonModalOpen(false)} className="flex-1 py-3 font-bold text-slate-500 hover:bg-slate-100 rounded-xl">Cancelar</button><button type="submit" className="flex-1 py-3 font-bold bg-primary text-white rounded-xl shadow-lg">Salvar</button></div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* CONTRACT VIEWER MODAL */}
+            {viewContract && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-lg p-6 shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+                        <div className="flex justify-between items-center mb-4 pb-4 border-b border-slate-100 dark:border-slate-800">
+                            <h3 className="text-xl font-bold text-primary dark:text-white">{viewContract.title}</h3>
+                            <button onClick={() => setViewContract(null)} className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500"><i className="fa-solid fa-xmark"></i></button>
+                        </div>
+                        <div className="flex-1 overflow-y-auto p-4 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 mb-4">
+                            <pre className="whitespace-pre-wrap font-mono text-xs text-slate-600 dark:text-slate-300 leading-relaxed">{viewContract.content}</pre>
+                        </div>
+                        <div className="flex gap-3">
+                            <button onClick={() => {navigator.clipboard.writeText(viewContract.content); alert("Copiado!"); setViewContract(null);}} className="flex-1 py-3 bg-slate-100 dark:bg-slate-800 text-primary dark:text-white font-bold rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"><i className="fa-regular fa-copy mr-2"></i> Copiar</button>
+                            <button onClick={() => {const blob = new Blob([viewContract.content], {type: "application/msword"}); const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = `${viewContract.title}.doc`; link.click();}} className="flex-1 py-3 bg-primary text-white font-bold rounded-xl hover:bg-primary-light transition-colors"><i className="fa-solid fa-download mr-2"></i> Baixar Word</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            <ZeModal isOpen={zeModal.isOpen} title={zeModal.title} message={zeModal.message} onConfirm={zeModal.onConfirm} onCancel={() => setZeModal(prev => ({ ...prev, isOpen: false }))} />
+        </div>
+    );
+};
+
+export default WorkDetail;
