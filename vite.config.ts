@@ -1,3 +1,4 @@
+
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
@@ -8,5 +9,9 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     assetsDir: 'assets',
+  },
+  // NEW: Expose VAPID_PUBLIC_KEY to client-side
+  define: {
+    'import.meta.env.VITE_VAPID_PUBLIC_KEY': JSON.stringify(process.env.VAPID_PUBLIC_KEY),
   },
 });
