@@ -1,0 +1,55 @@
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.pnpm-store/
+
+# Diagnostic reports (https://nodejs.org/api/report.html)
+.report/
+
+# Runtime data
+.vscode-test
+.vscode-test-web
+
+# Directory for `.vscode-test`
+.vscode-test-web
+
+# Dependencies
+node_modules/
+/dist
+/.vitepress/cache
+/.vitepress/dist
+/.temp
+
+# TypeScript files
+*.tsbuildinfo
+*.d.ts.map
+
+# Optional npm cache directory
+.npm/
+
+# Optional eslint cache
+.eslintcache
+
+# Optional stylelint cache
+.stylelintcache
+
+# Caching for JavaScript languages
+*.js.map
+
+# Environment variables
+.env
+.env.*
+!.env.production
+.env.local
+
+# Service worker compilation output
+/dist/service-worker.js
+
+# Output of `vite-plugin-pwa`
+.next/
+dist-electron/
