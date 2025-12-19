@@ -94,18 +94,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (mounted) {
         setUser(u);
         console.log("[AuthContext] onAuthChange event. User:", u ? u.email : 'null', "Current loading state:", loading);
-        // Garante que o loading é sempre definido como false em qualquer mudança de autenticação
-        setLoading(false); 
+        setLoading(false); // Garante que o loading é sempre definido como false em qualquer mudança de autenticação
         console.log("[AuthContext] onAuthChange setting loading to false.");
       } else {
         console.log("[AuthContext] onAuthChange event, but component is unmounted. Skipping state update.");
       }
     });
 
+    // Adição para garantir que o estado de loading seja desativado após o setup inicial do useEffect
+    // Isso pega qualquer caso de corrida onde onAuthChange ou initAuth.finally demorem mais.
+    if (mounted) {
+        setLoading(false);
+        console.log("[AuthContext] useEffect initial setup: Forcibly setting loading to false.");
+    }
+
     return () => {
       mounted = false;
       unsubscribe();
       console.log("[AuthContext] useEffect cleanup. Unsubscribed from auth changes.");
+      // Não adicionar mais setLoading(false) aqui, pois pode causar race conditions com atualizações mais recentes.
+      // As outras garantias (initAuth.finally, onAuthChange) já devem cobrir.
     };
   }, []);
 
