@@ -4,12 +4,12 @@ import { useAuth } from '../contexts/AuthContext.tsx';
 import { dbService } from '../services/db.ts';
 
 const Profile: React.FC = () => {
-  const { user, refreshUser } = useAuth();
+  const { user, refreshUser, authLoading } = useAuth(); // Use authLoading
   const [name, setName] = useState('');
   const [whatsapp, setWhatsapp] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(false); // Local loading for form submission
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
@@ -57,6 +57,11 @@ const Profile: React.FC = () => {
     }
   };
 
+  if (authLoading) return (
+    <div className="flex items-center justify-center min-h-[80vh] text-primary dark:text-white">
+        <i className="fa-solid fa-circle-notch fa-spin text-3xl"></i>
+    </div>
+  );
   if (!user) return null;
 
   return (
@@ -144,13 +149,13 @@ const Profile: React.FC = () => {
             </div>
 
             {errorMsg && (
-                <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900 text-red-600 dark:text-red-400 rounded-xl text-sm font-bold flex items-center gap-2 animate-in fade-in">
+                <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-900 text-red-600 dark:text-red-400 rounded-xl text-sm font-bold flex items-center gap-2 animate-in fade-in">
                     <i className="fa-solid fa-triangle-exclamation"></i> {errorMsg}
                 </div>
             )}
             
             {successMsg && (
-            <div className="p-4 bg-green-100 dark:bg-green-900/30 border border-green-200 dark:border-green-900 text-green-700 dark:text-green-300 rounded-xl flex items-center gap-2 animate-in fade-in">
+            <div className="p-4 bg-green-100 dark:bg-green-900/30 border border-green-200 dark:border-900 text-green-700 dark:text-green-300 rounded-xl flex items-center gap-2 animate-in fade-in">
                 <i className="fa-solid fa-check-circle"></i> {successMsg}
             </div>
             )}
@@ -170,3 +175,4 @@ const Profile: React.FC = () => {
 };
 
 export default Profile;
+    
