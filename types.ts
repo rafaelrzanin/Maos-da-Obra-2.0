@@ -17,6 +17,15 @@ export interface User {
   isTrial?: boolean; // New field for trial status
 }
 
+// NEW: Interface para armazenar a PushSubscription de um usuário
+export interface PushSubscriptionInfo {
+  id: string; // UUID do Supabase
+  userId: string;
+  // O objeto PushSubscription é o que o navegador retorna e é necessário para enviar notificações
+  subscription: PushSubscriptionJSON; 
+  endpoint: string; // Para facilitar a busca
+}
+
 export enum WorkStatus {
   PLANNING = 'Planejamento',
   IN_PROGRESS = 'Em Andamento',
@@ -198,7 +207,8 @@ declare global {
   interface ImportMetaEnv {
     readonly VITE_SUPABASE_URL: string;
     readonly VITE_SUPABASE_ANON_KEY: string;
-    // Add other VITE_ prefixed environment variables as needed here
+    // Add an index signature to allow dynamic access with string keys
+    [key: string]: string | undefined; 
   }
 
   interface ImportMeta {
@@ -210,8 +220,11 @@ declare global {
     interface ProcessEnv {
       readonly API_KEY: string;
       readonly NEON_SECRET_KEY: string; // From api/create-pix.js
-      // Add other process.env variables as needed here
+      // NEW: VAPID keys for Web Push Notifications
+      readonly VAPID_PUBLIC_KEY: string;
+      readonly VAPID_PRIVATE_KEY: string;
+      // Add an index signature to allow dynamic access with string keys
+      [key: string]: string | undefined; 
     }
   }
 }
-
