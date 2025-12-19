@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.tsx';
@@ -152,6 +153,7 @@ const RiskRadar = ({
   focusWork,
   stats,
   dailySummary,
+  materials,
   onOpenWork,
 }: {
   focusWork: Work;
@@ -341,7 +343,7 @@ const LiveTimeline = ({
  *  Dashboard
  *  ========================= */
 const Dashboard: React.FC = () => {
-  const { user, trialDaysRemaining, loading: authLoading } = useAuth();
+  const { user, trialDaysRemaining, authLoading } = useAuth(); // Use authLoading
   const navigate = useNavigate();
 
   // Data State
@@ -370,7 +372,7 @@ const Dashboard: React.FC = () => {
 
   // 1) Initial Load: obras
   useEffect(() => {
-    if (authLoading) return;
+    if (authLoading) return; // Wait for AuthContext to finish loading
 
     let isMounted = true;
 
@@ -886,7 +888,7 @@ const Dashboard: React.FC = () => {
             </div>
             <div className="p-8">
               <p className="text-center text-slate-600 dark:text-slate-300 text-sm mb-6 leading-relaxed">
-                Não perca o acesso às suas obras. Garanta o plano <strong>Vitalício</strong> agora e nunca mais se preocupe com mensalidades.
+                Não perca o acesso às suas obras. Garante o plano <strong>Vitalício</strong> agora e nunca mais se preocupe com mensalidades.
               </p>
               <div className="space-y-3">
                 <button
@@ -916,3 +918,4 @@ const Dashboard: React.FC = () => {
 };
 
 export default Dashboard;
+    
