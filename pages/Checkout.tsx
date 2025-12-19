@@ -20,7 +20,7 @@ const PLAN_LABELS: Record<string, string> = {
 };
 
 const Checkout: React.FC = () => {
-  const { user, updatePlan } = useAuth();
+  const { user, updatePlan, authLoading } = useAuth(); // Use authLoading
   const navigate = useNavigate();
   const location = useLocation();
   
@@ -29,7 +29,7 @@ const Checkout: React.FC = () => {
   const [paymentMethod, setPaymentMethod] = useState<'PIX' | 'CREDIT_CARD'>('PIX');
   
   // Estados de UI
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true); // Local loading for checkout details
   const [processing, setProcessing] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   
@@ -48,8 +48,14 @@ const Checkout: React.FC = () => {
 
   // 1. INICIALIZAÇÃO ROBUSTA (PROTEÇÃO CONTRA TELA BRANCA)
   useEffect(() => {
+    if (authLoading) {
+        // Wait for AuthContext to finish loading before proceeding
+        return;
+    }
+
     if (!user) {
-        // AuthProvider deve cuidar disso, mas por segurança paramos o loading
+        // If auth is done loading but no user, redirect to login (AuthContext/Layout should handle this)
+        // For now, just set local loading to false to prevent infinite spinner if somehow here.
         setLoading(false);
         return;
     }
@@ -96,7 +102,7 @@ const Checkout: React.FC = () => {
     };
 
     setupPlan();
-  }, [user, location, navigate]);
+  }, [user, location, navigate, authLoading]); // Add authLoading to dependencies
 
   // --- MÉTODOS AUXILIARES ---
 
@@ -225,7 +231,8 @@ const Checkout: React.FC = () => {
   };
 
   // UI LOADING
-  if (loading) return (
+  // Show loading if AuthContext is still loading OR if local checkout details are loading
+  if (authLoading || loading) return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-950">
       <div className="w-16 h-16 border-4 border-secondary border-t-transparent rounded-full animate-spin mb-4"></div>
       <p className="text-slate-500 font-medium">Carregando pagamento...</p>
@@ -438,3 +445,4 @@ const Checkout: React.FC = () => {
 };
 
 export default Checkout;
+    
