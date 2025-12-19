@@ -5,17 +5,19 @@ import { PlanType } from './types.ts';
 import { AuthProvider, ThemeProvider, useAuth, useTheme } from './contexts/AuthContext.tsx';
 
 // --- IMPORTAÇÕES ESTÁTICAS (Críticas para velocidade inicial) ---
-import Login from './pages/Login.tsx';
-import Dashboard from './pages/Dashboard.tsx';
+import Login from './pages/Login.tsx'; // Keep Login static as it's the entry point for unauthenticated users
 
 // --- Lazy Loading sem tipagem 'as unknown as Promise' e sem extensão .tsx ---
-const CreateWork = lazy(() => import('./pages/CreateWork'));
-const WorkDetail = lazy(() => import('./pages/WorkDetail'));
-const Settings = lazy(() => import('./pages/Settings'));
-const Profile = lazy(() => import('./pages/Profile'));
-const VideoTutorials = lazy(() => import('./pages/VideoTutorials'));
-const Checkout = lazy(() => import('./pages/Checkout'));
-const AiChat = lazy(() => import('./pages/AiChat'));
+// Fix: Add '.tsx' extension to dynamic imports for correct TypeScript resolution of default exports.
+const Dashboard = lazy(() => import('./pages/Dashboard.tsx'));
+const CreateWork = lazy(() => import('./pages/CreateWork.tsx'));
+const WorkDetail = lazy(() => import('./pages/WorkDetail.tsx'));
+const Settings = lazy(() => import('./pages/Settings.tsx'));
+const Profile = lazy(() => import('./pages/Profile.tsx'));
+const VideoTutorials = lazy(() => import('./pages/VideoTutorials.tsx'));
+const Checkout = lazy(() => import('./pages/Checkout.tsx'));
+const AiChat = lazy(() => import('./pages/AiChat.tsx')); // NEW: Lazy load AiChat page
+const Register = lazy(() => import('./pages/Register.tsx')); 
 
 
 // --- Componente de Carregamento ---
@@ -95,19 +97,19 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
   }
 }
 
-// Layout Component
+// Layout Component - Only applies to authenticated, subscribed areas of the app
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, loading, logout, isSubscriptionValid, trialDaysRemaining, updatePlan } = useAuth();
+  const { user, authLoading, isAuthReady, logout, isSubscriptionValid, trialDaysRemaining, updatePlan } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false); // Corrected variable name
-  const [showAiTrialBanner, setShowAiTrialBanner] = useState(true); // New state for banner visibility
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [showAiTrialBanner, setShowAiTrialBanner] = useState(true);
 
   // Log Auth State for debugging
   useEffect(() => {
-    console.log(`[Layout] Render - Loading: ${loading}, User: ${user ? user.email : 'null'}, Path: ${location.pathname}`);
-  }, [loading, user, location.pathname]);
+    console.log(`[Layout] Render - authLoading: ${authLoading}, isAuthReady: ${isAuthReady}, User: ${user ? user.email : 'null'}, Path: ${location.pathname}`);
+  }, [authLoading, isAuthReady, user, location.pathname]);
 
 
   // Scroll to top on route change
@@ -115,6 +117,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     window.scrollTo(0, 0);
   }, [location.pathname]);
 
+  // Handle plan update from checkout success
   useEffect(() => {
       const params = new URLSearchParams(location.search);
       const status = params.get('status');
@@ -132,7 +135,10 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       }
   }, [location.search, user, updatePlan, navigate, location.pathname]);
 
-  if (loading) return <LoadingScreen />;
+  // Use authLoading for the initial loading screen
+  if (authLoading || !isAuthReady) return <LoadingScreen />;
+  
+  // If no user, redirect to login. This covers all protected routes
   if (!user) return <Navigate to="/login" replace />;
 
   const isSettingsPage = location.pathname === '/settings';
@@ -142,6 +148,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // Modified to exclude VITALICIO users from seeing the trial banner
   const isAiTrialActive = user?.isTrial && trialDaysRemaining !== null && trialDaysRemaining > 0 && user?.plan !== PlanType.VITALICIO;
 
+  // If subscription is not valid and AI trial is not active, and not on settings/checkout page, redirect to settings
   if (!isSubscriptionValid && !isAiTrialActive && !isSettingsPage && !isCheckoutPage) {
       return <Navigate to="/settings" replace />;
   }
@@ -149,7 +156,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const navItems = [
     { label: 'Painel Geral', path: '/', icon: 'fa-house' },
     { label: 'Nova Obra', path: '/create', icon: 'fa-plus-circle' },
-    { label: 'Zé da Obra AI', path: '/ai-chat', icon: 'fa-robot' }, // NOVO BOTÃO
+    { label: 'Zé da Obra AI', path: '/ai-chat', icon: 'fa-robot' },
     { label: 'Tutoriais', path: '/tutorials', icon: 'fa-circle-play' },
     { label: 'Meu Perfil', path: '/profile', icon: 'fa-user' },
     { label: 'Assinatura', path: '/settings', icon: 'fa-gear' },
@@ -274,21 +281,22 @@ const App: React.FC = () => {
           <ErrorBoundary> {/* Wrap Routes with ErrorBoundary */}
             <Suspense fallback={<LoadingScreen />}>
               <Routes>
-                {/* Rotas públicas (SEM Layout) */}
+                {/* Public Routes - Not wrapped by Layout. They handle their own minimal layout. */}
                 <Route path="/login" element={<Login />} />
-                <Route path="/checkout" element={<Checkout />} />
-
-                {/* Rotas do app (COM Layout) */}
+                <Route path="/register" element={<Register />} /> 
+                
+                {/* Protected Routes - Wrapped by Layout */}
                 <Route path="/" element={<Layout><Dashboard /></Layout>} />
                 <Route path="/create" element={<Layout><CreateWork /></Layout>} />
                 <Route path="/work/:id" element={<Layout><WorkDetail /></Layout>} />
-                <Route path="/ai-chat" element={<Layout><AiChat /></Layout>} />
+                <Route path="/ai-chat" element={<Layout><AiChat /></Layout>} /> {/* NEW Protected Route for AiChat */}
                 <Route path="/settings" element={<Layout><Settings /></Layout>} />
                 <Route path="/profile" element={<Layout><Profile /></Layout>} />
                 <Route path="/tutorials" element={<Layout><VideoTutorials /></Layout>} />
-
+                <Route path="/checkout" element={<Layout><Checkout /></Layout>} /> 
+                
                 <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
+              </Routes>
             </Suspense>
           </ErrorBoundary>
         </AuthProvider>
@@ -298,4 +306,3 @@ const App: React.FC = () => {
 };
 
 export default App;
-
