@@ -345,16 +345,13 @@ export const dbService = {
         email,
         whatsapp,
         cpf,
-        // CORREÇÃO: Sempre inicia com plano MENSAL (trial) no signup.
-        // O plano desejado pelo usuário (planType) será usado para redirecionar ao checkout,
-        // onde o plano pago será efetivamente ativado após o pagamento.
         plan: planType || PlanType.MENSAL, 
         is_trial: true,
         subscription_expires_at: trialExpires.toISOString()
     });
 
     if (profileError) {
-        console.error("Erro ao criar perfil no signup:", profileError);
+        console.error("Erro ao criar perfil:", profileError);
     }
 
     sessionCache = null; // Invalidate cache
@@ -1147,7 +1144,7 @@ export const dbService = {
         const currentExpenses = prefetchedExpenses || await this.getExpenses(workId);
         const currentMaterials = prefetchedMaterials || await this.getMaterials(workId);
         // Fix: Corrected typo 'prefetfetchedWork' to 'prefetchedWork'
-        const currentWork = prefetfetchedWork || await this.getWorkById(workId);
+        const currentWork = prefetchedWork || await this.getWorkById(workId);
 
         const today = new Date();
         today.setHours(0,0,0,0);
