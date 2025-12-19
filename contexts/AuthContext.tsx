@@ -73,7 +73,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 console.warn(`[AuthContext] initAuth timed out after ${timeoutDuration / 1000}s. Displaying UI, awaiting onAuthChange.`);
                 // Even on timeout, ensure loading is false to unblock UI
             }
-            setLoading(false); // Crucial: Stop initial loading spinner here.
+            // Mover setLoading(false) para o bloco finally para garantir execução
         } else {
             console.log("[AuthContext] initAuth resolved, but component is unmounted. Skipping state update.");
         }
@@ -81,8 +81,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.error("[AuthContext] Erro during initAuth:", error);
         if (mounted) {
             setUser(null); // Ensure user is null on error
-            setLoading(false); // Ensure loading is false on error
+            // Mover setLoading(false) para o bloco finally para garantir execução
         }
+      } finally { // Adicionado bloco finally
+          if (mounted) {
+              setLoading(false); // GARANTIDO: loading é sempre definido como false
+              console.log("[AuthContext] initAuth finally block. Setting loading to false.");
+          }
       }
     };
 
