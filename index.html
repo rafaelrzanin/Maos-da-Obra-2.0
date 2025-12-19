@@ -140,7 +140,8 @@
     "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.1.1",
     "@supabase/supabase-js": "https://aistudiocdn.com/@supabase/supabase-js@^2.86.0",
     "@google/genai": "https://esm.run/@google/genai",
-    "xlsx": "https://esm.run/xlsx"
+    "xlsx": "https://esm.run/xlsx",
+    "web-push": "https://esm.sh/web-push@^3.6.7"
   }
 }
 </script>
@@ -165,7 +166,14 @@
 
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-           // PWA Service Worker placeholder
+           // PWA Service Worker registration
+           navigator.serviceWorker.register('/service-worker.js')
+             .then(registration => {
+               console.log('Service Worker registered with scope:', registration.scope);
+             })
+             .catch(error => {
+               console.error('Service Worker registration failed:', error);
+             });
         });
       }
     </script>
