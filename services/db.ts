@@ -1,4 +1,3 @@
-
 import { 
   User, Work, Step, Material, Expense, Worker, Supplier, 
   WorkPhoto, WorkFile, Notification, PlanType,
@@ -341,7 +340,10 @@ export const dbService = {
         email,
         whatsapp,
         cpf,
-        plan: planType || PlanType.MENSAL, 
+        // CORREÇÃO: Sempre inicia com plano MENSAL (trial) no signup.
+        // O plano desejado pelo usuário (planType) será usado para redirecionar ao checkout,
+        // onde o plano pago será efetivamente ativado após o pagamento.
+        plan: PlanType.MENSAL, 
         is_trial: true,
         subscription_expires_at: trialExpires.toISOString()
     });
@@ -499,7 +501,7 @@ export const dbService = {
         bedrooms: work.bedrooms,
         bathrooms: work.bathrooms,
         kitchens: work.kitchens,
-        living_rooms: work.livingRooms,
+        livingRooms: work.livingRooms,
         has_leisure_area: work.hasLeisureArea
     };
 
