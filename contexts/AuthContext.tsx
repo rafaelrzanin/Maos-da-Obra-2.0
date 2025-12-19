@@ -71,9 +71,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 console.log("[AuthContext] initAuth resolved. User:", result ? result.email : 'null', "Setting loading to false.");
             } else {
                 console.warn(`[AuthContext] initAuth timed out after ${timeoutDuration / 1000}s. Displaying UI, awaiting onAuthChange.`);
-                // Even on timeout, ensure loading is false to unblock UI
             }
-            // Mover setLoading(false) para o bloco finally para garantir execução
         } else {
             console.log("[AuthContext] initAuth resolved, but component is unmounted. Skipping state update.");
         }
@@ -81,9 +79,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.error("[AuthContext] Erro during initAuth:", error);
         if (mounted) {
             setUser(null); // Ensure user is null on error
-            // Mover setLoading(false) para o bloco finally para garantir execução
         }
-      } finally { // Adicionado bloco finally
+      } finally {
           if (mounted) {
               setLoading(false); // GARANTIDO: loading é sempre definido como false
               console.log("[AuthContext] initAuth finally block. Setting loading to false.");
@@ -97,10 +94,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (mounted) {
         setUser(u);
         console.log("[AuthContext] onAuthChange event. User:", u ? u.email : 'null', "Current loading state:", loading);
-        if (loading) { // Only set loading to false if it's still true, to avoid unnecessary re-renders
-            setLoading(false);
-            console.log("[AuthContext] onAuthChange setting loading to false.");
-        }
+        // Garante que o loading é sempre definido como false em qualquer mudança de autenticação
+        setLoading(false); 
+        console.log("[AuthContext] onAuthChange setting loading to false.");
       } else {
         console.log("[AuthContext] onAuthChange event, but component is unmounted. Skipping state update.");
       }
@@ -198,3 +194,4 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     </AuthContext.Provider>
   );
 };
+    
