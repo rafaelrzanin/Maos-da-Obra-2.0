@@ -352,7 +352,7 @@ export const dbService = {
         // CORREÇÃO: Sempre inicia com plano MENSAL (trial) no signup.
         // O plano desejado pelo usuário (planType) será usado para redirecionar ao checkout,
         // onde o plano pago será efetivamente ativado após o pagamento.
-        plan: PlanType.MENSAL, 
+        plan: planType || PlanType.MENSAL, 
         is_trial: true,
         subscription_expires_at: trialExpires.toISOString()
     });
@@ -524,7 +524,7 @@ export const dbService = {
         bathrooms: work.bathrooms,
         kitchens: work.kitchens,
         livingRooms: work.livingRooms,
-        has_leisure_area: work.hasLeisureArea
+        hasLeisureArea: work.hasLeisureArea
     };
 
     const { data: savedWork, error } = await supabase.from('works').insert(dbWork).select().single();
@@ -798,10 +798,10 @@ export const dbService = {
       quantity: expense.quantity || 1, // Default quantity to 1 if not provided
       date: expense.date,
       category: expense.category,
-      stepId: expense.stepId,
-      relatedMaterialId: expense.relatedMaterialId,
-      workerId: expense.workerId,
-      totalAgreed: expense.totalAgreed
+      step_id: expense.stepId,
+      related_material_id: expense.relatedMaterialId,
+      worker_id: expense.workerId,
+      total_agreed: expense.totalAgreed
     }).select().single();
     if (error) {
       console.error("Erro ao adicionar despesa:", error);
