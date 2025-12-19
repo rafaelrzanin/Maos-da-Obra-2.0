@@ -1,5 +1,18 @@
+
 {
   "rewrites": [
+    {
+      "source": "/api/subscribe-push",
+      "destination": "/api/subscribe-push.js"
+    },
+    {
+      "source": "/api/send-event-notification",
+      "destination": "/api/send-event-notification.js"
+    },
+    {
+      "source": "/api/send-daily-notifications",
+      "destination": "/api/send-daily-notifications.js"
+    },
     {
       "source": "/(.*)",
       "destination": "/index.html"
