@@ -1,10 +1,9 @@
 
-
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.tsx';
 import { dbService } from '../services/db.ts';
-import { Work, Notification, Step, StepStatus, PlanType, Expense, Material } from '../types.ts';
+import { StepStatus, PlanType, type Work, type Notification, type Step, type Expense, type Material } from '../types.ts';
 import { ZE_AVATAR, ZE_AVATAR_FALLBACK, getRandomZeTip, ZeTip } from '../services/standards.ts';
 import { ZeModal } from '../components/ZeModal.tsx';
 
