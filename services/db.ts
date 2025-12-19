@@ -411,8 +411,21 @@ export const dbService = {
   },
 
   isSubscriptionActive(user: User): boolean {
+    // Se o plano é Vitalício, ele está sempre ativo, independentemente de `isTrial`
     if (user.plan === PlanType.VITALICIO) return true;
+
+    // Se o usuário está em modo de `isTrial` (teste da IA), e não é Vitalício,
+    // o acesso completo ao aplicativo é considerado INATIVO.
+    // Isso garante que o app não seja "gratuito" por 7 dias, apenas a IA.
+    if (user.isTrial) {
+        return false;
+    }
+
+    // Para todos os outros planos (Mensal, Semestral)
+    // Se não há data de expiração, a assinatura não está ativa.
     if (!user.subscriptionExpiresAt) return false;
+
+    // Se a data de expiração existe e está no futuro, a assinatura está ativa.
     return new Date(user.subscriptionExpiresAt) > new Date();
   },
 
@@ -427,7 +440,7 @@ export const dbService = {
       await supabase.from('profiles').update({
           plan,
           subscription_expires_at: expires.toISOString(),
-          is_trial: false
+          is_trial: false // Após o pagamento do plano, a flag `is_trial` para o app principal é desativada
       }).eq('id', userId);
       
       sessionCache = null; // Invalida cache
