@@ -1,9 +1,5 @@
 
-import { 
-  User, Work, Step, Material, Expense, Worker, Supplier, 
-  WorkPhoto, WorkFile, Notification, PlanType, PushSubscriptionInfo,
-  ExpenseCategory, StepStatus, FileCategory
-} from '../types.ts';
+import { PlanType, ExpenseCategory, StepStatus, FileCategory, User, Work, Step, Material, Expense, Worker, Supplier, WorkPhoto, WorkFile, Notification, PushSubscriptionInfo } from '../types.ts';
 import { WORK_TEMPLATES, FULL_MATERIAL_PACKAGES } from './standards.ts';
 import { supabase } from './supabase.ts';
 
@@ -1151,7 +1147,7 @@ export const dbService = {
         const currentExpenses = prefetchedExpenses || await this.getExpenses(workId);
         const currentMaterials = prefetchedMaterials || await this.getMaterials(workId);
         // Fix: Corrected typo 'prefetfetchedWork' to 'prefetchedWork'
-        const currentWork = prefetchedWork || await this.getWorkById(workId);
+        const currentWork = prefetfetchedWork || await this.getWorkById(workId);
 
         const today = new Date();
         today.setHours(0,0,0,0);
