@@ -1,39 +1,72 @@
 
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.tsx';
 import { aiService } from '../services/ai.ts';
 import { PlanType } from '../types.ts';
 import { ZE_AVATAR, ZE_AVATAR_FALLBACK } from '../services/standards.ts';
 
+interface Message {
+  id: string;
+  sender: 'user' | 'ai';
+  text: string;
+}
+
 const AiChat: React.FC = () => {
-  const { user, trialDaysRemaining } = useAuth();
+  const { user, trialDaysRemaining, authLoading } = useAuth(); // Use authLoading
   const navigate = useNavigate();
 
+  const [messages, setMessages] = useState<Message[]>([]);
   const [aiMessage, setAiMessage] = useState('');
-  const [aiResponse, setAiResponse] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
+
+  const chatMessagesRef = useRef<HTMLDivElement>(null);
 
   const isVitalicio = user?.plan === PlanType.VITALICIO;
   const isAiTrialActive = user?.isTrial && trialDaysRemaining !== null && trialDaysRemaining > 0;
   const hasAiAccess = isVitalicio || isAiTrialActive;
 
   useEffect(() => {
-    // Clear response when component mounts to start fresh
-    setAiResponse('');
-  }, []);
+    // Add initial AI welcome message
+    if (hasAiAccess && messages.length === 0 && !authLoading) { // Check authLoading
+      setMessages([{ id: 'ai-welcome', sender: 'ai', text: 'Opa! Mestre de obras na área. No que posso te ajudar hoje?' }]);
+    }
+  }, [hasAiAccess, messages.length, authLoading]); // Add authLoading to dependencies
 
-  const handleAiAsk = async () => {
-    if (!aiMessage.trim()) return;
-    if (!hasAiAccess) return; // Should not happen if button is disabled, but for safety
+  useEffect(() => {
+    // Scroll to bottom of chat messages whenever messages update
+    if (chatMessagesRef.current) {
+      chatMessagesRef.current.scrollTop = chatMessagesRef.current.scrollHeight;
+    }
+  }, [messages]);
 
+  const handleAiAsk = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!aiMessage.trim() || !hasAiAccess) return;
+
+    const userMessage: Message = { id: Date.now().toString(), sender: 'user', text: aiMessage };
+    setMessages(prevMessages => [...prevMessages, userMessage]);
     setAiLoading(true);
-    const response = await aiService.sendMessage(aiMessage);
-    setAiResponse(response);
-    setAiLoading(false);
-    setAiMessage('');
+    setAiMessage(''); // Clear input immediately
+
+    try {
+      const response = await aiService.sendMessage(userMessage.text);
+      const aiResponse: Message = { id: (Date.now() + 1).toString(), sender: 'ai', text: response };
+      setMessages(prevMessages => [...prevMessages, aiResponse]);
+    } catch (error) {
+      console.error("Error sending message to AI:", error);
+      const errorMessage: Message = { id: (Date.now() + 1).toString(), sender: 'ai', text: 'Tive um problema de conexão aqui. Tenta de novo em um minutinho.' };
+      setMessages(prevMessages => [...prevMessages, errorMessage]);
+    } finally {
+      setAiLoading(false);
+    }
   };
+
+  if (authLoading) return ( // Show loading if AuthContext is still loading
+    <div className="flex items-center justify-center min-h-[70vh] text-primary dark:text-white">
+        <i className="fa-solid fa-circle-notch fa-spin text-3xl"></i>
+    </div>
+  );
 
   if (!hasAiAccess) {
     return (
@@ -43,7 +76,7 @@ const AiChat: React.FC = () => {
           <div className="absolute -top-20 -right-20 w-40 h-40 bg-secondary/30 rounded-full blur-3xl animate-pulse"></div>
           <div className="relative z-10 flex flex-col items-center">
             <div className="w-28 h-28 rounded-full border-4 border-slate-800 p-1 bg-gradient-gold shadow-[0_0_30px_rgba(217,119,6,0.4)] mb-6 transform hover:scale-105 transition-transform duration-500">
-              <img src={ZE_AVATAR} className="w-full h-full object-cover rounded-full bg-white" onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK} />
+              <img src={ZE_AVATAR} className="w-full h-full object-cover rounded-full bg-white" onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK} alt="Zé da Obra AI" />
             </div>
             <h2 className="text-3xl font-black text-white mb-2 tracking-tight">Zé da Obra <span className="text-secondary">AI</span></h2>
             <div className="h-1 w-12 bg-secondary rounded-full mb-6"></div>
@@ -52,7 +85,7 @@ const AiChat: React.FC = () => {
               <i className="fa-solid fa-crown"></i> Liberar Acesso Vitalício
             </button>
             <p className="text-center text-[10px] text-slate-500 mt-4 flex items-center justify-center gap-1">
-                <i className="fa-solid fa-info-circle"></i> Acesso à IA é exclusivo para assinantes Vitalícios
+                <i className="fa-solid fa-info-circle"></i> Acesso à IA é exclusivo para assinantes Vitalícios ou em período de trial.
             </p>
           </div>
         </div>
@@ -66,25 +99,36 @@ const AiChat: React.FC = () => {
         <h1 className="text-3xl font-black text-primary dark:text-white mb-2 tracking-tight">Zé da Obra <span className="text-secondary">AI</span></h1>
         <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">Seu especialista 24h na palma da mão.</p>
       </div>
-      <div className="flex-1 bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-inner overflow-y-auto mb-4 border border-slate-200 dark:border-slate-800">
-        <div className="flex gap-4 mb-6">
-          <img src={ZE_AVATAR} className="w-10 h-10 rounded-full border border-slate-200" onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK} />
-          <div className="bg-slate-100 dark:bg-slate-800 p-3 rounded-tr-xl rounded-b-xl text-sm shadow-sm">
-            <p className="font-bold text-secondary mb-1">Zé da Obra</p>
-            <p>Opa! Mestre de obras na área. No que posso te ajudar hoje?</p>
+      
+      {/* Chat Messages Area */}
+      <div ref={chatMessagesRef} className="flex-1 bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-inner overflow-y-auto mb-4 border border-slate-200 dark:border-slate-800">
+        {messages.map((msg) => (
+          <div key={msg.id} className={`flex gap-4 mb-6 animate-in fade-in ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+            {msg.sender === 'ai' && (
+              <img src={ZE_AVATAR} className="w-10 h-10 rounded-full border border-slate-200" onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK} alt="Zé da Obra Avatar" />
+            )}
+            <div className={`p-3 rounded-2xl max-w-[80%] ${
+              msg.sender === 'ai' 
+                ? 'bg-slate-100 dark:bg-slate-800 rounded-tl-none text-slate-700 dark:text-slate-300 shadow-sm' 
+                : 'bg-primary text-white rounded-tr-none shadow-md'
+            }`}>
+              {msg.sender === 'ai' && <p className="font-bold text-secondary mb-1">Zé da Obra</p>}
+              <p className="whitespace-pre-wrap">{msg.text}</p>
+            </div>
           </div>
-        </div>
-        {aiResponse && (
-          <div className="flex gap-4 mb-6 animate-in fade-in">
-            <img src={ZE_AVATAR} className="w-10 h-10 rounded-full border border-slate-200" onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK} />
-            <div className="bg-slate-100 dark:bg-slate-800 p-3 rounded-tr-xl rounded-b-xl text-sm shadow-sm">
-              <p className="font-bold text-secondary mb-1">Zé da Obra</p>
-              <p className="whitespace-pre-wrap">{aiResponse}</p>
+        ))}
+        {aiLoading && (
+          <div className="flex gap-4 mb-6">
+            <img src={ZE_AVATAR} className="w-10 h-10 rounded-full border border-slate-200" onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK} alt="Zé da Obra Avatar" />
+            <div className="bg-slate-100 dark:bg-slate-800 p-3 rounded-tr-xl rounded-b-xl text-sm shadow-sm flex items-center">
+              <span className="animate-pulse text-secondary">Digitando...</span>
             </div>
           </div>
         )}
       </div>
-      <div className="flex gap-2">
+
+      {/* Input Bar */}
+      <form onSubmit={handleAiAsk} className="flex gap-2">
         <input
           value={aiMessage}
           onChange={(e) => setAiMessage(e.target.value)}
@@ -93,15 +137,16 @@ const AiChat: React.FC = () => {
           disabled={aiLoading}
         />
         <button
-          onClick={handleAiAsk}
+          type="submit"
           disabled={aiLoading || !aiMessage.trim()}
           className="w-14 bg-secondary text-white rounded-xl flex items-center justify-center shadow-lg hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {aiLoading ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-paper-plane"></i>}
         </button>
-      </div>
+      </form>
     </div>
   );
 };
 
 export default AiChat;
+    
