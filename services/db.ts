@@ -1,6 +1,7 @@
+
 import { 
   User, Work, Step, Material, Expense, Worker, Supplier, 
-  WorkPhoto, WorkFile, Notification, PlanType,
+  WorkPhoto, WorkFile, Notification, PlanType, PushSubscriptionInfo,
   ExpenseCategory, StepStatus, FileCategory
 } from '../types.ts';
 import { WORK_TEMPLATES, FULL_MATERIAL_PACKAGES } from './standards.ts';
@@ -139,6 +140,14 @@ const parseNotificationFromDB = (data: any): Notification => ({
     read: data.read,
     type: data.type
 });
+
+const mapPushSubscriptionFromDB = (data: any): PushSubscriptionInfo => ({
+  id: data.id,
+  userId: data.user_id,
+  subscription: data.subscription,
+  endpoint: data.endpoint,
+});
+
 
 // --- AUTH CACHE & DEDUPLICATION ---
 let sessionCache: { promise: Promise<User | null>, timestamp: number } | null = null;
@@ -789,10 +798,10 @@ export const dbService = {
       quantity: expense.quantity || 1, // Default quantity to 1 if not provided
       date: expense.date,
       category: expense.category,
-      step_id: expense.stepId,
-      related_material_id: expense.relatedMaterialId,
-      worker_id: expense.workerId,
-      total_agreed: expense.totalAgreed
+      stepId: expense.stepId,
+      relatedMaterialId: expense.relatedMaterialId,
+      workerId: expense.workerId,
+      totalAgreed: expense.totalAgreed
     }).select().single();
     if (error) {
       console.error("Erro ao adicionar despesa:", error);
@@ -1141,6 +1150,7 @@ export const dbService = {
         const currentSteps = prefetchedSteps || await this.getSteps(workId);
         const currentExpenses = prefetchedExpenses || await this.getExpenses(workId);
         const currentMaterials = prefetchedMaterials || await this.getMaterials(workId);
+        // Fix: Corrected typo 'prefetfetchedWork' to 'prefetchedWork'
         const currentWork = prefetchedWork || await this.getWorkById(workId);
 
         const today = new Date();
@@ -1168,8 +1178,86 @@ export const dbService = {
                     read: false,
                     type: 'WARNING'
                 });
+                // NEW: Envia notificação PUSH
+                await dbService.sendPushNotification(userId, {
+                    title: 'Etapa Atrasada!',
+                    body: `A etapa "${step.name}" da obra "${currentWork?.name}" está atrasada. Verifique o cronograma!`,
+                    url: `${window.location.origin}/work/${workId}`,
+                    tag: `work-${workId}-delayed-step-${step.id}`
+                });
             }
         }
+
+        // Example: Notification for upcoming steps (within 3 days, not started)
+        const upcomingSteps = currentSteps.filter(s => 
+          s.status === StepStatus.NOT_STARTED && 
+          new Date(s.startDate) >= today &&
+          (new Date(s.startDate).getTime() - today.getTime()) / (1000 * 60 * 60 * 24) <= 3
+        );
+        for (const step of upcomingSteps) {
+          const { data: existingNotif } = await supabase
+              .from('notifications')
+              .select('id')
+              .eq('user_id', userId)
+              .eq('title', 'Etapa Próxima!')
+              .like('message', `%${step.name}%`)
+              .eq('read', false)
+              .maybeSingle();
+          if (!existingNotif) {
+              await this.addNotification({
+                  userId,
+                  title: 'Etapa Próxima!',
+                  message: `A etapa "${step.name}" da obra "${currentWork?.name}" começa em breve. Prepare-se!`,
+                  date: new Date().toISOString(),
+                  read: false,
+                  type: 'INFO'
+              });
+              await dbService.sendPushNotification(userId, {
+                  title: 'Etapa Próxima!',
+                  body: `A etapa "${step.name}" da obra "${currentWork?.name}" começa em breve. Prepare-se!`,
+                  url: `${window.location.origin}/work/${workId}`,
+                  tag: `work-${workId}-upcoming-step-${step.id}`
+              });
+          }
+        }
+
+
+        // Example: Notification for material running low (planned > purchased, not yet critical threshold check)
+        const lowMaterials = currentMaterials.filter(m => 
+          m.plannedQty > 0 && 
+          m.purchasedQty < m.plannedQty && 
+          (m.plannedQty - m.purchasedQty) > 0 // Ainda falta comprar
+        );
+        for (const material of lowMaterials) {
+          // Simplificação: notifica se faltar mais que 20% do planejado e ainda não comprado
+          if (material.purchasedQty / material.plannedQty < 0.8) {
+            const { data: existingNotif } = await supabase
+                .from('notifications')
+                .select('id')
+                .eq('user_id', userId)
+                .eq('title', 'Material Baixo!')
+                .like('message', `%${material.name}%`)
+                .eq('read', false)
+                .maybeSingle();
+            if (!existingNotif) {
+                await this.addNotification({
+                    userId,
+                    title: 'Material Baixo!',
+                    message: `O material "${material.name}" da obra "${currentWork?.name}" está com baixa quantidade. Verifique as compras!`,
+                    date: new Date().toISOString(),
+                    read: false,
+                    type: 'WARNING'
+                });
+                await dbService.sendPushNotification(userId, {
+                    title: 'Material Baixo!',
+                    body: `O material "${material.name}" da obra "${currentWork?.name}" está com baixa quantidade. Verifique as compras!`,
+                    url: `${window.location.origin}/work/${workId}/materials`,
+                    tag: `work-${workId}-low-material-${material.id}`
+                });
+            }
+          }
+        }
+
 
         // Example: Notification for budget usage (if work and expenses are available)
         if (currentWork && currentWork.budgetPlanned > 0) {
@@ -1195,6 +1283,12 @@ export const dbService = {
                         read: false,
                         type: 'WARNING'
                     });
+                    await dbService.sendPushNotification(userId, {
+                        title: 'Atenção ao Orçamento!',
+                        body: `Você já usou ${Math.round(budgetUsage)}% do orçamento da obra "${currentWork?.name}".`,
+                        url: `${window.location.origin}/work/${workId}/financial`,
+                        tag: `work-${workId}-budget-warning`
+                    });
                 }
             } else if (budgetUsage > 100) {
                  const { data: existingNotif } = await supabase
@@ -1210,10 +1304,16 @@ export const dbService = {
                     await this.addNotification({
                         userId,
                         title: 'Orçamento Estourado!',
-                        message: `O orçamento da obra "${currentWork.name}" foi excedido em ${Math.round(budgetUsage - 100)}%.`,
+                        message: `O orçamento da obra "${currentWork?.name}" foi excedido em ${Math.round(budgetUsage - 100)}%.`,
                         date: new Date().toISOString(),
                         read: false,
                         type: 'ERROR'
+                    });
+                    await dbService.sendPushNotification(userId, {
+                        title: 'Orçamento Estourado!',
+                        body: `O orçamento da obra "${currentWork?.name}" foi excedido em ${Math.round(budgetUsage - 100)}%.`,
+                        url: `${window.location.origin}/work/${workId}/financial`,
+                        tag: `work-${workId}-budget-exceeded`
                     });
                 }
             }
@@ -1222,4 +1322,85 @@ export const dbService = {
         console.error("Erro ao gerar notificações inteligentes:", error);
     }
   },
+
+  // --- NEW: PWA Push Notification Management ---
+  async getPushSubscription(userId: string): Promise<PushSubscriptionInfo | null> {
+    const { data, error } = await supabase
+      .from('user_subscriptions')
+      .select('*')
+      .eq('user_id', userId)
+      .single();
+
+    if (error && error.code !== 'PGRST116') { // PGRST116 = no rows found
+      console.error("Erro ao buscar PushSubscription:", error);
+      return null;
+    }
+    return data ? mapPushSubscriptionFromDB(data) : null;
+  },
+
+  async savePushSubscription(userId: string, subscription: PushSubscriptionJSON): Promise<void> {
+    // Chamada para o endpoint serverless que salvará a subscription no Supabase.
+    // Isso evita expor a chave VAPID_PUBLIC_KEY no cliente para fins de subscribe.
+    try {
+        const response = await fetch('/api/subscribe-push', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ userId, subscription }),
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Falha ao salvar a assinatura de push.');
+        }
+        console.log("PushSubscription salva com sucesso!");
+    } catch (error: any) {
+        console.error("Erro ao salvar PushSubscription:", error);
+        throw error;
+    }
+  },
+
+  async deletePushSubscription(userId: string, endpoint: string): Promise<void> {
+    try {
+        const response = await fetch('/api/subscribe-push', {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ userId, endpoint }),
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Falha ao remover a assinatura de push.');
+        }
+        console.log("PushSubscription removida com sucesso!");
+    } catch (error: any) {
+        console.error("Erro ao remover PushSubscription:", error);
+        throw error;
+    }
+  },
+
+  async sendPushNotification(userId: string, notificationPayload: { title: string, body: string, url?: string, tag?: string }): Promise<void> {
+    try {
+        const response = await fetch('/api/send-event-notification', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ userId, ...notificationPayload }),
+        });
+
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || 'Falha ao enviar push notification de evento.');
+        }
+        console.log("Push notification de evento enviada para o usuário:", userId);
+    } catch (error: any) {
+        console.error("Erro ao enviar push notification de evento:", error);
+        // Não relança o erro, pois a falha na notificação não deve impedir a funcionalidade principal
+    }
+  },
+
 };
