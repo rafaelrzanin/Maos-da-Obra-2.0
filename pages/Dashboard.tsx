@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.tsx';
 import { dbService } from '../services/db.ts';
@@ -33,6 +33,24 @@ const formatDateDisplay = (dateStr: string) => {
     return dateStr;
   }
 };
+
+// ======================================
+// NEW: Helper function to convert VAPID public key
+// ======================================
+function urlBase64ToUint8Array(base64String: string) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding)
+    .replace(/\-/g, '+')
+    .replace(/_/g, '/');
+
+  const rawData = window.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
 
 /** =========================
  *  Skeleton (carregamento)
@@ -369,6 +387,11 @@ const Dashboard: React.FC = () => {
     isOpen: false, title: '', message: ''
   });
   const [showTrialUpsell, setShowTrialUpsell] = useState(false);
+  // NEW: State for push notification permission UI
+  const [notificationStatus, setNotificationStatus] = useState<'default' | 'granted' | 'denied' | 'unsupported'>('default');
+  const [showNotificationPrompt, setShowNotificationPrompt] = useState(false);
+  const [isSubscribedToPush, setIsSubscribedToPush] = useState(false);
+
 
   // 1) Initial Load: obras
   useEffect(() => {
@@ -478,6 +501,99 @@ const Dashboard: React.FC = () => {
     }
   }, [user, trialDaysRemaining]);
 
+  // ======================================
+  // NEW: PWA Notification Logic
+  // ======================================
+
+  const checkNotificationStatus = useCallback(async () => {
+    if (!('Notification' in window) || !('serviceWorker' in navigator)) {
+      setNotificationStatus('unsupported');
+      return;
+    }
+
+    setNotificationStatus(Notification.permission as 'default' | 'granted' | 'denied');
+
+    if (Notification.permission === 'granted' && user) {
+      const existingSubscription = await dbService.getPushSubscription(user.id);
+      setIsSubscribedToPush(!!existingSubscription);
+    } else {
+      setIsSubscribedToPush(false);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (authLoading || !user) return;
+    checkNotificationStatus();
+    // Show prompt only if permission is default and user hasn't explicitly dismissed it in this session
+    if (Notification.permission === 'default') {
+      setShowNotificationPrompt(true);
+    }
+  }, [user, authLoading, checkNotificationStatus]);
+
+
+  const subscribeUserToPush = async () => {
+    if (!user || notificationStatus !== 'default') return;
+
+    setShowNotificationPrompt(false); // Hide the prompt while asking
+
+    try {
+      const permission = await Notification.requestPermission();
+      setNotificationStatus(permission);
+
+      if (permission === 'granted') {
+        const serviceWorkerRegistration = await navigator.serviceWorker.ready;
+        
+        // IMPORTANT: Replace with your VAPID public key
+        // This key should be retrieved from an environment variable (e.g., process.env.VAPID_PUBLIC_KEY)
+        // For client-side, it's typically injected by the build system (e.g., Vite)
+        // Assuming VITE_VAPID_PUBLIC_KEY is set in your .env or similar.
+        const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY; 
+
+        if (!VAPID_PUBLIC_KEY) {
+          console.error("VAPID Public Key not defined in client environment.");
+          alert("Erro na configuração de notificações. Chave VAPID ausente.");
+          return;
+        }
+
+        const subscription = await serviceWorkerRegistration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+        });
+
+        await dbService.savePushSubscription(user.id, subscription.toJSON());
+        setIsSubscribedToPush(true);
+        alert('Notificações ativadas! Você receberá avisos importantes da sua obra.');
+
+      } else {
+        alert('As notificações foram bloqueadas. Você pode ativá-las nas configurações do navegador.');
+      }
+    } catch (error: any) {
+      console.error('Erro ao inscrever para notificações push:', error);
+      alert(`Erro ao ativar notificações: ${error.message}`);
+      setNotificationStatus('denied');
+    }
+  };
+
+  const unsubscribeUserFromPush = async () => {
+    if (!user) return;
+
+    try {
+      const serviceWorkerRegistration = await navigator.serviceWorker.ready;
+      const subscription = await serviceWorkerRegistration.pushManager.getSubscription();
+
+      if (subscription) {
+        await subscription.unsubscribe(); // Unsubscribe from browser
+        await dbService.deletePushSubscription(user.id, subscription.endpoint); // Delete from backend
+        setIsSubscribedToPush(false);
+        alert('Notificações desativadas com sucesso.');
+      }
+    } catch (error: any) {
+      console.error('Erro ao desinscrever de notificações push:', error);
+      alert(`Erro ao desativar notificações: ${error.message}`);
+    }
+  };
+
+
   const handleSwitchWork = (work: Work) => {
     if (focusWork?.id !== work.id) {
       setFocusWork(work);
@@ -542,7 +658,7 @@ const Dashboard: React.FC = () => {
     return (
       <div className="flex flex-col items-center justify-center min-h-[80vh] px-4 text-center animate-in fade-in duration-500">
         <div className="w-24 h-24 bg-gradient-gold rounded-[2rem] flex items-center justify-center text-white mb-8 shadow-glow transform rotate-3">
-          <i className="fa-solid fa-helmet-safety text-5xl"></i>
+          <i className="fa-solid fa-helmet-safety"></i>
         </div>
         <h2 className="text-3xl font-bold text-primary dark:text-white mb-4 tracking-tight">Bem-vindo ao Mãos da Obra</h2>
         <p className="text-slate-600 dark:text-slate-300 max-w-md mb-10 leading-relaxed">
@@ -644,6 +760,63 @@ const Dashboard: React.FC = () => {
           </div>
         )}
       </div>
+
+      {/* NEW: PWA Notification Prompt / Status Banner */}
+      {showNotificationPrompt && notificationStatus === 'default' && (
+        <div className="mb-6 bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-4 rounded-2xl shadow-lg flex flex-col md:flex-row items-center justify-between gap-4 animate-in fade-in slide-in-from-top-2 relative">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center"><i className="fa-regular fa-bell text-xl"></i></div>
+            <div>
+              <p className="font-bold text-sm md:text-base">Ativar Notificações da Obra</p>
+              <p className="text-xs opacity-90">Receba alertas importantes sobre sua obra mesmo fora do app.</p>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button onClick={subscribeUserToPush} className="px-6 py-2 bg-white text-blue-700 font-bold rounded-xl text-sm hover:bg-slate-100 transition-colors shadow-sm whitespace-nowrap">
+              Ativar
+            </button>
+            <button onClick={() => setShowNotificationPrompt(false)} className="px-6 py-2 bg-white/20 text-white font-bold rounded-xl text-sm hover:bg-white/30 transition-colors shadow-sm whitespace-nowrap">
+              Agora Não
+            </button>
+          </div>
+          <button onClick={() => setShowNotificationPrompt(false)} className="absolute top-2 right-2 text-white/70 hover:text-white p-1 rounded-full">
+              <i className="fa-solid fa-xmark text-lg"></i>
+          </button>
+        </div>
+      )}
+
+      {isSubscribedToPush && notificationStatus === 'granted' && (
+        <div className="mb-6 bg-gradient-to-r from-emerald-600 to-emerald-700 text-white px-6 py-4 rounded-2xl shadow-lg flex flex-col md:flex-row items-center justify-between gap-4 animate-in fade-in slide-in-from-top-2 relative">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center"><i className="fa-solid fa-bell text-xl"></i></div>
+            <div>
+              <p className="font-bold text-sm md:text-base">Notificações Ativas</p>
+              <p className="text-xs opacity-90">Você receberá alertas importantes da sua obra.</p>
+            </div>
+          </div>
+          <button onClick={unsubscribeUserFromPush} className="px-6 py-2 bg-white/20 text-white font-bold rounded-xl text-sm hover:bg-white/30 transition-colors shadow-sm whitespace-nowrap">
+            Desativar
+          </button>
+          <button onClick={() => setIsSubscribedToPush(false)} className="absolute top-2 right-2 text-white/70 hover:text-white p-1 rounded-full">
+              <i className="fa-solid fa-xmark text-lg"></i>
+          </button>
+        </div>
+      )}
+
+      {notificationStatus === 'denied' && (
+        <div className="mb-6 bg-gradient-to-r from-red-600 to-red-700 text-white px-6 py-4 rounded-2xl shadow-lg flex flex-col md:flex-row items-center justify-between gap-4 animate-in fade-in slide-in-from-top-2 relative">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center"><i className="fa-solid fa-bell-slash text-xl"></i></div>
+            <div>
+              <p className="font-bold text-sm md:text-base">Notificações Bloqueadas</p>
+              <p className="text-xs opacity-90">Ative nas configurações do seu navegador para receber alertas.</p>
+            </div>
+          </div>
+          <button onClick={() => setShowNotificationPrompt(false)} className="absolute top-2 right-2 text-white/70 hover:text-white p-1 rounded-full">
+              <i className="fa-solid fa-xmark text-lg"></i>
+          </button>
+        </div>
+      )}
 
       {/* ZÉ DA OBRA TIP */}
       <div className="mb-8 relative overflow-hidden rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm group hover:shadow-md transition-all">
@@ -918,4 +1091,3 @@ const Dashboard: React.FC = () => {
 };
 
 export default Dashboard;
-    
