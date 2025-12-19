@@ -1,5 +1,5 @@
 
-import { PlanType, ExpenseCategory, StepStatus, FileCategory, User, Work, Step, Material, Expense, Worker, Supplier, WorkPhoto, WorkFile, Notification, PushSubscriptionInfo } from '../types.ts';
+import { PlanType, ExpenseCategory, StepStatus, FileCategory, type User, type Work, type Step, type Material, type Expense, type Worker, type Supplier, type WorkPhoto, type WorkFile, type Notification, type PushSubscriptionInfo } from '../types.ts';
 import { WORK_TEMPLATES, FULL_MATERIAL_PACKAGES } from './standards.ts';
 import { supabase } from './supabase.ts';
 
@@ -791,10 +791,10 @@ export const dbService = {
       quantity: expense.quantity || 1, // Default quantity to 1 if not provided
       date: expense.date,
       category: expense.category,
-      step_id: expense.stepId,
-      related_material_id: expense.relatedMaterialId,
-      worker_id: expense.workerId,
-      total_agreed: expense.totalAgreed
+      stepId: expense.stepId,
+      relatedMaterialId: expense.relatedMaterialId,
+      workerId: expense.workerId,
+      totalAgreed: expense.totalAgreed
     }).select().single();
     if (error) {
       console.error("Erro ao adicionar despesa:", error);
