@@ -54,35 +54,6 @@ const CreateWork: React.FC = () => {
       });
   };
 
-  // Refatorado para validar passos específicos
-  const validateStep = (step: number) => {
-  if (step === 1) {
-    if (!formData.name.trim()) {
-        alert("Por favor, dê um apelido para sua obra."); 
-        return false;
-    }
-    if (!formData.budgetPlanned) {
-        alert("Quanto você pretende gastar (mesmo que seja um chute)?"); 
-        return false;
-    }
-  } 
-  else if (step === 2) {
-    if (!workCategory) {
-        alert("Escolha entre Construção ou Reforma."); 
-        return false;
-    }
-    if (!selectedTemplateId) {
-        alert("Selecione o tipo específico da obra."); 
-        return false;
-    }
-    if (!formData.startDate) {
-        alert("Qual a data de início?"); 
-        return false;
-    }
-  }
-  return true;
-};
-
   const handleCategorySelect = (category: 'CONSTRUCTION' | 'RENOVATION') => {
       setWorkCategory(category);
       if (category === 'CONSTRUCTION') setSelectedTemplateId('CONSTRUCAO');
