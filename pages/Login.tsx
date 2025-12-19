@@ -5,45 +5,40 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { dbService } from '../services/db.ts';
 
 const Login: React.FC = () => {
-  const { login, signup, user, loading: authLoading, isSubscriptionValid } = useAuth();
+  const { login, user, authLoading, isAuthReady, isSubscriptionValid } = useAuth(); // Use authLoading and isAuthReady
   const navigate = useNavigate();
   const location = useLocation();
   
-  const [isLogin, setIsLogin] = useState(true);
+  // Removed isLogin state, name, whatsapp, cpf states and handlers
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
-  const [whatsapp, setWhatsapp] = useState('');
-  const [cpf, setCpf] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(false); // Local loading for form submission, not global auth loading
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
 
   // Password Recovery State
   const [showForgotModal, setShowForgotModal] = useState(false);
   const [forgotEmail, setForgotEmail] = useState('');
-  // Fix: Correctly define the state for `forgotStatus` using `useState` with a union type.
   const [forgotStatus, setForgotStatus] = useState<'IDLE' | 'SENDING' | 'SENT' | 'ERROR'>('IDLE');
 
-  console.log("[Login] Component rendered. Current user from AuthContext:", user ? user.email : 'null', "Auth Loading:", authLoading);
+  console.log("[Login] Component rendered. Current user from AuthContext:", user ? user.email : 'null', "Auth Loading:", authLoading, "isAuthReady:", isAuthReady);
 
 
-  // Detect plan from URL
+  // Detect plan from URL (for immediate redirect after social login/signup)
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const plan = params.get('plan');
     if (plan) {
       setSelectedPlan(plan);
-      setIsLogin(false);
     }
   }, [location.search]);
 
   // Main redirect logic
   useEffect(() => {
-    console.log("[Login] useEffect trigger. AuthState:", { user: user ? user.email : 'null', authLoading, isSubscriptionValid, selectedPlan, currentPath: location.pathname });
+    console.log("[Login] useEffect trigger. AuthState:", { user: user ? user.email : 'null', authLoading, isAuthReady, isSubscriptionValid, selectedPlan, currentPath: location.pathname });
 
-    // Only redirect if user exists and auth is done loading
-    if (user && !authLoading) {
-        console.log("[Login] User exists and Auth not loading. Checking redirect conditions...");
+    // Only redirect if auth is ready (initial check done) AND user exists
+    if (isAuthReady && user && !authLoading) {
+        console.log("[Login] Auth Ready, User exists, and Auth not loading. Checking redirect conditions...");
         // 1. Se tem um plano selecionado na URL (fluxo de compra), vai pro Checkout
         if (selectedPlan) {
             console.log("[Login] Redirecting to /checkout due to selectedPlan:", selectedPlan);
@@ -59,25 +54,14 @@ const Login: React.FC = () => {
             console.log("[Login] Redirecting to /settings (Subscription management).");
             navigate('/settings', { replace: true });
         }
-    } else if (!user && !authLoading) {
-        console.log("[Login] No user found and Auth not loading. Displaying login form.");
+    } else if (!user && isAuthReady && !authLoading) {
+        console.log("[Login] No user found, Auth Ready, and Auth not loading. Displaying login form.");
         // This is the state where the login form should actually be visible.
-    } else if (authLoading) {
-        console.log("[Login] Auth is still loading. Waiting...");
+    } else if (authLoading || !isAuthReady) {
+        console.log("[Login] Auth is still loading or not ready. Waiting...");
     }
-  }, [user, navigate, selectedPlan, authLoading, isSubscriptionValid, location.pathname]);
+  }, [user, navigate, selectedPlan, authLoading, isAuthReady, isSubscriptionValid, location.pathname]);
 
-  // Helper for CPF mask
-  const handleCpfChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      let v = e.target.value.replace(/\D/g, '');
-      if (v.length > 11) v = v.slice(0, 11);
-      
-      if (v.length > 9) v = v.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
-      else if (v.length > 6) v = v.replace(/(\d{3})(\d{3})(\d{1,3})/, "$1.$2.$3");
-      else if (v.length > 3) v = v.replace(/(\d{3})(\d{1,3})/, "$1.$2");
-      
-      setCpf(v);
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -85,59 +69,37 @@ const Login: React.FC = () => {
     setLoading(true);
 
     try {
-        if (isLogin) {
-            const success = await login(email, password);
-            if (!success) {
-                // Se login retornar false, é erro de credencial (geralmente tratado dentro do dbService com throw, mas se retornar false é genérico)
-                alert('E-mail ou senha incorretos.');
-                setLoading(false); 
-            } 
-            // If success, useEffect will handle redirect.
-        } else {
-            // Signup Flow
-            const cleanCpf = cpf.replace(/\D/g, '');
-            
-            if (!name || cleanCpf.length !== 11) {
-                alert('Nome e um CPF válido (11 números) são obrigatórios.');
-                setLoading(false);
-                return;
-            }
-            
-            const success = await signup(name, email, whatsapp, password, cpf, selectedPlan);
-            if (!success) {
-                alert("Falha ao criar conta. Tente novamente.");
-                setLoading(false);
-            }
-            // If success, user state updates, triggering useEffect -> navigate
-        }
+        const success = await login(email, password);
+        if (!success) {
+            alert('E-mail ou senha incorretos.');
+        } 
+        // If success, useEffect will handle redirect.
     } catch (error: any) {
         console.error(error);
         
         let msg = "Erro no sistema. Verifique sua conexão.";
         if (error.message?.includes("Invalid login")) {
-            msg = "Conta não encontrada ou senha incorreta. Se você ainda não tem cadastro, clique em 'Criar conta' abaixo.";
-        } else if (error.message?.includes("User already registered")) {
-            msg = "E-mail já cadastrado.";
+            msg = "E-mail ou senha incorretos. Se você ainda não tem cadastro, clique em 'Criar conta' abaixo.";
         } else if (error.message?.includes("security purposes")) {
             msg = "Muitas tentativas. Aguarde alguns minutos.";
         }
         
         alert(msg);
+    } finally {
         setLoading(false);
     }
   };
 
   const handleSocialLogin = async (provider: 'google') => {
     setLoading(true);
-    // loginSocial returns the result of supabase.auth.signInWithOAuth
     const { error } = await dbService.loginSocial(provider);
 
     if (error) {
         console.error(error);
         alert("Erro no login Google. Verifique se o domínio da Vercel está autorizado no Supabase.");
-        setLoading(false);
     } 
     // If successful, Supabase handles the redirect automatically.
+    setLoading(false); // Ensure loading is reset even if redirect happens
   };
 
   const handleForgotPassword = async (e: React.FormEvent) => {
@@ -155,6 +117,26 @@ const Login: React.FC = () => {
           setForgotStatus('ERROR');
       }
   };
+
+  // Only show loading screen if auth is still determining user
+  if (authLoading || !isAuthReady) { 
+    return (
+        <div className="relative min-h-screen w-full flex items-center justify-center p-4 bg-slate-900 font-sans">
+            <div className="absolute inset-0 z-0">
+                <img 
+                    src="https://images.unsplash.com/photo-1600585154340-be6161a56a0c?q=80&w=2070" 
+                    className="w-full h-full object-cover opacity-60"
+                    alt="Background"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-black/30"></div>
+            </div>
+            <div className="relative z-10 text-center text-white">
+                <i className="fa-solid fa-circle-notch fa-spin text-4xl text-amber-500 mb-4"></i>
+                <p className="text-xl font-bold">Carregando...</p>
+            </div>
+        </div>
+    );
+  }
 
   return (
     <div className="relative min-h-screen w-full flex items-center justify-center p-4 bg-slate-900 font-sans">
@@ -180,20 +162,10 @@ const Login: React.FC = () => {
 
           <div className="backdrop-blur-xl bg-black/70 border border-white/10 rounded-[2.5rem] p-8 shadow-2xl">
               <h2 className="text-xl font-bold text-white text-center mb-6">
-                  {isLogin ? 'Bem-vindo de volta' : 'Crie sua conta'}
+                  Bem-vindo de volta
               </h2>
 
               <form onSubmit={handleSubmit} className="space-y-4">
-                  {!isLogin && (
-                    <>
-                        <input type="text" placeholder="Nome Completo" value={name} onChange={e => setName(e.target.value)}
-                            className="w-full px-4 py-3 bg-white/10 border border-white/10 rounded-xl text-white outline-none focus:border-amber-500/50" />
-                        <input type="text" placeholder="WhatsApp (DDD + Número)" value={whatsapp} onChange={e => setWhatsapp(e.target.value)}
-                            className="w-full px-4 py-3 bg-white/10 border border-white/10 rounded-xl text-white outline-none focus:border-amber-500/50" />
-                        <input type="text" placeholder="CPF" value={cpf} onChange={handleCpfChange}
-                            className="w-full px-4 py-3 bg-white/10 border border-white/10 rounded-xl text-white outline-none focus:border-amber-500/50" />
-                    </>
-                  )}
                   <input type="email" placeholder="E-mail" value={email} onChange={e => setEmail(e.target.value)}
                       className="w-full px-4 py-3 bg-white/10 border border-white/10 rounded-xl text-white outline-none focus:border-amber-500/50" />
                   
@@ -203,7 +175,7 @@ const Login: React.FC = () => {
                   <button type="submit" disabled={loading}
                       className="w-full py-4 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl transition-all shadow-lg shadow-amber-500/20 disabled:opacity-50 flex items-center justify-center gap-2">
                       {loading && <i className="fa-solid fa-circle-notch fa-spin"></i>}
-                      {isLogin ? 'Entrar' : 'Criar Conta'}
+                      Entrar
                   </button>
               </form>
 
@@ -214,14 +186,12 @@ const Login: React.FC = () => {
                   </button>
 
                   <div className="flex justify-between items-center text-sm">
-                      <button onClick={() => setIsLogin(!isLogin)} className="text-white/70 hover:text-white font-medium">
-                          {isLogin ? 'Criar conta' : 'Já tenho conta'}
+                      <button onClick={() => navigate('/register')} className="text-white/70 hover:text-white font-medium">
+                          Criar conta
                       </button>
-                      {isLogin && (
-                          <button onClick={() => setShowForgotModal(true)} className="text-amber-400 hover:text-amber-300 font-medium">
-                              Esqueci a senha
-                          </button>
-                      )}
+                      <button onClick={() => setShowForgotModal(true)} className="text-amber-400 hover:text-amber-300 font-medium">
+                          Esqueci a senha
+                      </button>
                   </div>
               </div>
           </div>
@@ -257,4 +227,4 @@ const Login: React.FC = () => {
 };
 
 export default Login;
-
+    
