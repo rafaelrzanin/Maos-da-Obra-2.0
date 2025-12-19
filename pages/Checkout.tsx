@@ -162,9 +162,20 @@ const Checkout: React.FC = () => {
       const data = await response.json();
       
       if (data && (data.qrcode || data.emv)) {
+          const qrCodeBase64 = data.qrcode?.base64 || data.qrcode || '';
+          const copyPasteCode = data.emv || data.qrcode?.emv || data.code || '';
+
+          // NOVA VALIDAÇÃO: Verifica se a string base64 do QR Code tem um tamanho mínimo aceitável
+          // Um QR Code real tem centenas a milhares de caracteres. Se for muito curto, é inválido.
+          const MIN_QR_CODE_BASE64_LENGTH = 200; // Heurística para um QR Code válido (após o prefixo data:image)
+
+          if (qrCodeBase64.length < MIN_QR_CODE_BASE64_LENGTH && copyPasteCode.length === 0) {
+              throw new Error("QR Code gerado inválido ou incompleto. Tente novamente ou use o método de pagamento por cartão.");
+          }
+
           setPixData({
-              qr_code_base64: data.qrcode?.base64 || data.qrcode || '', 
-              copy_paste_code: data.emv || data.qrcode?.emv || data.code || ''
+              qr_code_base64: qrCodeBase64, 
+              copy_paste_code: copyPasteCode
           });
           setProcessing(false);
           return; 
@@ -172,13 +183,15 @@ const Checkout: React.FC = () => {
       throw new Error("Dados PIX incompletos");
 
     } catch (error: any) {
-      console.warn("Usando Fallback Mock PIX");
+      console.warn("Usando Fallback Mock PIX", error.message);
+      setErrorMsg(error.message.includes("QR Code gerado inválido") ? error.message : "Erro ao gerar QR Code Pix. Tente novamente mais tarde ou use o código Pix copia e cola.");
+      
       const mockData = await dbService.generatePix(planDetails.price, {
         name: user.name,
         email: user.email,
         cpf: '000.000.000-00'
       });
-      setPixData(mockData);
+      setPixData(mockData); // Ainda exibe o mock se o erro não for crítico.
 
     } finally {
       setProcessing(false);
@@ -314,7 +327,7 @@ const Checkout: React.FC = () => {
 
                         {paymentMethod === 'PIX' && (
                             <div className="animate-in fade-in">
-                                {!pixData ? (
+                                {!pixData || errorMsg.includes("QR Code gerado inválido") ? ( // Exibir o botão se não tiver dados ou se houver erro crítico na geração
                                     <div className="text-center py-4">
                                         <p className="text-slate-500 text-sm mb-6 max-w-md mx-auto">
                                             Liberação imediata. Clique abaixo para gerar o código.
@@ -445,4 +458,3 @@ const Checkout: React.FC = () => {
 };
 
 export default Checkout;
-    
