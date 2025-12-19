@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.tsx';
@@ -40,9 +39,20 @@ const CreateWork: React.FC = () => {
   const selectedTemplate = WORK_TEMPLATES.find(t => t.id === selectedTemplateId);
   const needsDetailedInputs = workCategory === 'CONSTRUCTION' || selectedTemplateId === 'REFORMA_APTO';
 
+  // --- NEW: Error States ---
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [generalError, setGeneralError] = useState('');
+  // --- END NEW ---
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
     setFormData({ ...formData, [e.target.name]: value });
+    // Clear error for the field being edited
+    setFormErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[e.target.name];
+        return newErrors;
+    });
   };
 
   const handleCounter = (field: keyof typeof formData, increment: boolean) => {
@@ -52,41 +62,57 @@ const CreateWork: React.FC = () => {
           if (field === 'floors' && newVal < 1) return prev;
           return { ...prev, [field]: String(newVal) };
       });
+      setFormErrors(prev => { // Clear error for the field being edited
+        const newErrors = { ...prev };
+        delete newErrors[field];
+        return newErrors;
+    });
   };
 
   // Refatorado para validar passos específicos
   const validateStep = (step: number) => {
-  if (step === 1) {
-    if (!formData.name.trim()) {
-        alert("Por favor, dê um apelido para sua obra."); 
-        return false;
+    const newErrors: Record<string, string> = {};
+    if (step === 1) {
+      if (!formData.name.trim()) {
+          newErrors.name = "Por favor, dê um apelido para sua obra."; 
+      }
+      if (!formData.budgetPlanned) {
+          newErrors.budgetPlanned = "Quanto você pretende gastar (mesmo que seja um chute)?"; 
+      } else if (Number(formData.budgetPlanned) <= 0) {
+          newErrors.budgetPlanned = "O orçamento deve ser maior que zero.";
+      }
+      if (formData.area && Number(formData.area) <= 0) {
+        newErrors.area = "A área deve ser maior que zero.";
+      }
+    } 
+    else if (step === 2) {
+      if (!workCategory) {
+          newErrors.workCategory = "Escolha entre Construção ou Reforma."; 
+      }
+      if (!selectedTemplateId) {
+          newErrors.selectedTemplate = "Selecione o tipo específico da obra."; 
+      }
+      if (!formData.startDate) {
+          newErrors.startDate = "Qual a data de início?"; 
+      // Fix: Compare Date objects' time values (milliseconds since epoch) for accurate date comparison.
+      } else if (new Date(formData.startDate).getTime() < new Date().setHours(0,0,0,0)) {
+          newErrors.startDate = "A data de início não pode ser no passado.";
+      }
     }
-    if (!formData.budgetPlanned) {
-        alert("Quanto você pretende gastar (mesmo que seja um chute)?"); 
-        return false;
-    }
-  } 
-  else if (step === 2) {
-    if (!workCategory) {
-        alert("Escolha entre Construção ou Reforma."); 
-        return false;
-    }
-    if (!selectedTemplateId) {
-        alert("Selecione o tipo específico da obra."); 
-        return false;
-    }
-    if (!formData.startDate) {
-        alert("Qual a data de início?"); 
-        return false;
-    }
-  }
-  return true;
-};
+    setFormErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
   const handleCategorySelect = (category: 'CONSTRUCTION' | 'RENOVATION') => {
       setWorkCategory(category);
       if (category === 'CONSTRUCTION') setSelectedTemplateId('CONSTRUCAO');
       else setSelectedTemplateId('');
+      setFormErrors(prev => { // Clear category specific errors on selection
+        const newErrors = { ...prev };
+        delete newErrors.workCategory;
+        delete newErrors.selectedTemplate;
+        return newErrors;
+      });
   };
 
   const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -100,6 +126,7 @@ const CreateWork: React.FC = () => {
 
     setLoading(true);
     setGenerationMode(true); // Activate overlay
+    setGeneralError(''); // Clear general error before submission
 
     // Timeout safety
     const timeoutPromise = new Promise((_, reject) => {
@@ -155,11 +182,11 @@ const CreateWork: React.FC = () => {
         setGenStep(0);
         
         if (error.message === 'TIMEOUT' || error.message?.includes('Supabase off')) {
-            alert("Erro de conexão ou Banco de Dados não configurado. Verifique se você criou as tabelas no Supabase.");
+            setGeneralError("Erro de conexão ou Banco de Dados não configurado. Verifique se você criou as tabelas no Supabase.");
         } else if (error.message?.includes('permission denied')) {
-            alert("Erro de Permissão. Verifique se você está logado corretamente.");
+            setGeneralError("Erro de Permissão. Verifique se você está logado corretamente.");
         } else {
-            alert(`Erro ao salvar: ${error.message}`);
+            setGeneralError(`Erro ao salvar: ${error.message}`);
         }
     }
   };
@@ -231,15 +258,18 @@ const CreateWork: React.FC = () => {
                             <div>
                                 <label className="block text-xs font-black text-slate-700 dark:text-slate-300 uppercase mb-2 tracking-widest pl-1">Nome ou Apelido da Obra</label>
                                 <input name="name" autoFocus placeholder="Ex: Reforma da Cozinha..." value={formData.name} className="w-full px-5 py-4 text-lg font-bold border-2 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white rounded-2xl focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all placeholder:text-slate-300" onChange={handleChange} />
+                                {formErrors.name && <p className="text-red-500 text-sm mt-1">{formErrors.name}</p>}
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="block text-xs font-black text-slate-700 dark:text-slate-300 uppercase mb-2 tracking-widest pl-1">Tamanho (m²)</label>
                                     <input name="area" type="number" placeholder="0" value={formData.area} className="w-full px-5 py-4 text-lg font-bold border-2 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white rounded-2xl focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all placeholder:text-slate-300" onChange={handleChange} />
+                                    {formErrors.area && <p className="text-red-500 text-sm mt-1">{formErrors.area}</p>}
                                 </div>
                                 <div>
                                     <label className="block text-xs font-black text-slate-700 dark:text-slate-300 uppercase mb-2 tracking-widest pl-1">Orçamento (R$)</label>
                                     <input name="budgetPlanned" type="number" placeholder="0,00" value={formData.budgetPlanned} className="w-full px-5 py-4 text-lg font-bold border-2 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white rounded-2xl focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all placeholder:text-slate-300" onChange={handleChange} />
+                                    {formErrors.budgetPlanned && <p className="text-red-500 text-sm mt-1">{formErrors.budgetPlanned}</p>}
                                 </div>
                             </div>
                             <div>
@@ -267,6 +297,7 @@ const CreateWork: React.FC = () => {
                                     <div><h3 className="font-black text-xl text-primary dark:text-white mb-1">Reforma</h3><p className="text-sm font-bold text-slate-400">Melhoria ou Reparo</p></div>
                                 </button>
                             </div>
+                            {formErrors.workCategory && <p className="text-red-500 text-sm mt-4">{formErrors.workCategory}</p>}
                         </div>
                     </div>
                 );
@@ -281,7 +312,7 @@ const CreateWork: React.FC = () => {
                         {workCategory === 'RENOVATION' && (
                              <div className="grid grid-cols-2 gap-4 mb-8">
                                 {WORK_TEMPLATES.filter(t => t.id !== 'CONSTRUCAO').map(template => (
-                                    <button key={template.id} type="button" onClick={() => setSelectedTemplateId(template.id)} className={`p-5 rounded-2xl border-2 text-left transition-all relative flex flex-col gap-3 group ${selectedTemplateId === template.id ? 'border-secondary bg-secondary/5 shadow-md' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-secondary/50'}`}>
+                                    <button key={template.id} type="button" onClick={() => { setSelectedTemplateId(template.id); setFormErrors(prev => { const newErrors = { ...prev }; delete newErrors.selectedTemplate; return newErrors; }); }} className={`p-5 rounded-2xl border-2 text-left transition-all relative flex flex-col gap-3 group ${selectedTemplateId === template.id ? 'border-secondary bg-secondary/5 shadow-md' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-secondary/50'}`}>
                                         <div className="w-12 h-12 rounded-xl flex items-center justify-center text-xl transition-colors bg-slate-100 dark:bg-slate-700 text-slate-400 group-hover:text-secondary"><i className={`fa-solid ${template.icon}`}></i></div>
                                         <div>
                                             <h3 className="font-black text-sm mb-1">{template.label}</h3>
@@ -291,6 +322,8 @@ const CreateWork: React.FC = () => {
                                 ))}
                             </div>
                         )}
+                        {formErrors.selectedTemplate && <p className="text-red-500 text-sm mt-1 mb-4">{formErrors.selectedTemplate}</p>}
+
                         {needsDetailedInputs && (
                              <div className="mb-8">
                                  {workCategory === 'CONSTRUCTION' && (
@@ -318,7 +351,9 @@ const CreateWork: React.FC = () => {
                         
                         <div>
                             <label className="block text-xs font-black text-slate-700 dark:text-slate-300 uppercase mb-2 tracking-widest pl-1">Data de Início</label>
-                            <input type="date" name="startDate" value={formData.startDate} onChange={handleChange} className="w-full px-5 py-4 text-base font-bold border-2 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white rounded-2xl focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all" />
+                            {/* Fix: Removed duplicate onChange={handleChange} prop */}
+                            <input type="date" name="startDate" value={formData.startDate} onChange={handleChange} className="w-full px-5 py-4 text-base font-bold border-2 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white rounded-2xl focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all placeholder:text-slate-300" />
+                            {formErrors.startDate && <p className="text-red-500 text-sm mt-1">{formErrors.startDate}</p>}
                         </div>
                     </div>
                 </div>
@@ -330,7 +365,7 @@ const CreateWork: React.FC = () => {
   return (
     <div className="max-w-2xl mx-auto pb-12 pt-6 px-4">
       <div className="flex items-center justify-between mb-8">
-          <button onClick={() => currentStep === 1 ? navigate('/') : setCurrentStep(prev => prev - 1)} className="text-slate-400 hover:text-primary dark:hover:text-white transition-colors"><i className="fa-solid fa-arrow-left text-xl"></i></button>
+          <button onClick={() => { if(currentStep === 1) navigate('/'); else setCurrentStep(prev => prev - 1); setFormErrors({}); setGeneralError(''); }} className="text-slate-400 hover:text-primary dark:hover:text-white transition-colors"><i className="fa-solid fa-arrow-left text-xl"></i></button>
           <div className="flex gap-2">
               {[1, 2].map(s => (
                   <div key={s} className={`h-2 rounded-full transition-all duration-500 ${s <= currentStep ? 'w-8 bg-secondary' : 'w-2 bg-slate-200 dark:bg-slate-700'}`}></div>
@@ -340,11 +375,16 @@ const CreateWork: React.FC = () => {
       </div>
 
       <form onSubmit={handleSubmit}>
+          {generalError && (
+              <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900 text-red-600 dark:text-red-400 rounded-xl text-sm font-bold flex items-center gap-2 animate-in fade-in">
+                  <i className="fa-solid fa-triangle-exclamation"></i> {generalError}
+              </div>
+          )}
           {renderStepContent()}
           
           <div className="mt-8 flex justify-end">
               {currentStep < totalSteps ? (
-                  <button type="button" onClick={() => { if(validateStep(currentStep)) setCurrentStep(prev => prev + 1); }} className="px-8 py-4 bg-primary text-white font-bold rounded-2xl shadow-lg hover:bg-primary-light transition-all flex items-center gap-3">
+                  <button type="button" onClick={() => { if(validateStep(currentStep)) setCurrentStep(prev => prev + 1); setGeneralError(''); }} className="px-8 py-4 bg-primary text-white font-bold rounded-2xl shadow-lg hover:bg-primary-light transition-all flex items-center gap-3">
                       Próximo <i className="fa-solid fa-arrow-right"></i>
                   </button>
               ) : (
@@ -359,4 +399,3 @@ const CreateWork: React.FC = () => {
 };
 
 export default CreateWork;
-    
