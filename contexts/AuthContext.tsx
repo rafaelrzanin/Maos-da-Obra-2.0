@@ -26,7 +26,8 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 // --- Auth Context ---
 interface AuthContextType {
   user: User | null;
-  loading: boolean;
+  authLoading: boolean; // Renamed from 'loading'
+  isAuthReady: boolean; // New flag to indicate initial auth check is complete
   login: (email: string, password?: string) => Promise<boolean>;
   signup: (name: string, email: string, whatsapp: string, password?: string, cpf?: string, planType?: string | null) => Promise<boolean>;
   logout: () => void;
@@ -42,13 +43,14 @@ export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [authLoading, setAuthLoading] = useState(true); // Renamed from 'loading'
+  const [isAuthReady, setIsAuthReady] = useState(false); // New state for initial auth check completion
 
-  console.log("[AuthProvider] Component rendered. Initial loading state:", loading);
+  console.log("[AuthProvider] Component rendered. Initial authLoading state:", authLoading, "isAuthReady:", isAuthReady);
 
   useEffect(() => {
     let mounted = true;
-    console.log("[AuthContext] useEffect mounted, initAuth called. Mounted:", mounted, "Initial loading:", loading);
+    console.log("[AuthContext] useEffect mounted, initAuth called. Mounted:", mounted, "Initial authLoading:", authLoading);
 
     const initAuth = async () => {
       try {
@@ -68,7 +70,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (mounted) {
             if (result !== 'TIMEOUT_SIGNAL') {
                 setUser(result); 
-                console.log("[AuthContext] initAuth resolved. User:", result ? result.email : 'null', "Setting loading to false.");
+                console.log("[AuthContext] initAuth resolved. User:", result ? result.email : 'null', "Setting authLoading to false.");
             } else {
                 console.warn(`[AuthContext] initAuth timed out after ${timeoutDuration / 1000}s. Displaying UI, awaiting onAuthChange.`);
             }
@@ -82,8 +84,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       } finally {
           if (mounted) {
-              setLoading(false); // GARANTIDO: loading é sempre definido como false
-              console.log("[AuthContext] initAuth finally block. Setting loading to false.");
+              setAuthLoading(false); // GARANTIDO: authLoading é sempre definido como false
+              setIsAuthReady(true); // Initial auth check is now complete
+              console.log("[AuthContext] initAuth finally block. Setting authLoading to false and isAuthReady to true.");
           }
       }
     };
@@ -93,27 +96,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const unsubscribe = dbService.onAuthChange((u) => {
       if (mounted) {
         setUser(u);
-        console.log("[AuthContext] onAuthChange event. User:", u ? u.email : 'null', "Current loading state:", loading);
-        setLoading(false); // Garante que o loading é sempre definido como false em qualquer mudança de autenticação
-        console.log("[AuthContext] onAuthChange setting loading to false.");
+        console.log("[AuthContext] onAuthChange event. User:", u ? u.email : 'null');
+        // No longer explicitly setting authLoading to false here.
+        // It's handled by login/signup/loginSocial finally blocks or initAuth.
       } else {
         console.log("[AuthContext] onAuthChange event, but component is unmounted. Skipping state update.");
       }
     });
 
-    // Adição para garantir que o estado de loading seja desativado após o setup inicial do useEffect
-    // Isso pega qualquer caso de corrida onde onAuthChange ou initAuth.finally demorem mais.
-    if (mounted) {
-        setLoading(false);
-        console.log("[AuthContext] useEffect initial setup: Forcibly setting loading to false.");
-    }
-
     return () => {
       mounted = false;
       unsubscribe();
       console.log("[AuthContext] useEffect cleanup. Unsubscribed from auth changes.");
-      // Não adicionar mais setLoading(false) aqui, pois pode causar race conditions com atualizações mais recentes.
-      // As outras garantias (initAuth.finally, onAuthChange) já devem cobrir.
     };
   }, []);
 
@@ -137,8 +131,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const login = async (email: string, password?: string) => {
-    setLoading(true);
-    console.log("[AuthContext] login called. Setting loading to true.");
+    setAuthLoading(true);
+    console.log("[AuthContext] login called. Setting authLoading to true.");
     try {
         const loginPromise = dbService.login(email, password);
         // Timeout de segurança no login manual
@@ -159,14 +153,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.error("[AuthContext] Login exception:", e);
         return false;
     } finally {
-        setLoading(false);
-        console.log("[AuthContext] login finished. Setting loading to false.");
+        setAuthLoading(false);
+        console.log("[AuthContext] login finished. Setting authLoading to false.");
     }
   };
 
   async function loginSocial(provider: 'google') {
-    setLoading(true);
-    console.log("[AuthContext] loginSocial called. Setting loading to true.");
+    setAuthLoading(true);
+    console.log("[AuthContext] loginSocial called. Setting authLoading to true.");
     try {
         const { error } = await dbService.loginSocial(provider);
 
@@ -176,20 +170,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             return false;
         } 
         // If successful, Supabase handles the redirect automatically.
-        // The onAuthChange listener should pick it up and set user/loading.
+        // The onAuthChange listener should pick it up and set user/authLoading.
         return true;
     } catch (e) {
         console.error("[AuthContext] Social login exception:", e);
         return false;
     } finally {
-        setLoading(false); // Ensure loading is reset even if redirect happens very fast or an uncaught exception occurs
-        console.log("[AuthContext] loginSocial finished. Setting loading to false.");
+        setAuthLoading(false); // Ensure authLoading is reset even if redirect happens very fast or an uncaught exception occurs
+        console.log("[AuthContext] loginSocial finished. Setting authLoading to false.");
     }
   };
 
   const signup = async (name: string, email: string, whatsapp: string, password?: string, cpf?: string, planType?: string | null) => {
-    setLoading(true);
-    console.log("[AuthContext] signup called. Setting loading to true.");
+    setAuthLoading(true);
+    console.log("[AuthContext] signup called. Setting authLoading to true.");
     try {
         const u = await dbService.signup(name, email, whatsapp, password, cpf, planType);
         if (u) {
@@ -200,8 +194,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.log("[AuthContext] signup failed. No user returned.");
         return false;
     } finally {
-        setLoading(false);
-        console.log("[AuthContext] signup finished. Setting loading to false.");
+        setAuthLoading(false);
+        console.log("[AuthContext] signup finished. Setting authLoading to false.");
     }
   };
 
@@ -220,7 +214,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, signup, logout, updatePlan, refreshUser, isSubscriptionValid, isNewAccount, trialDaysRemaining }}>
+    <AuthContext.Provider value={{ user, authLoading, isAuthReady, login, signup, logout, updatePlan, refreshUser, isSubscriptionValid, isNewAccount, trialDaysRemaining }}>
       {children}
     </AuthContext.Provider>
   );
