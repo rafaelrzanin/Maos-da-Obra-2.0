@@ -1,4 +1,5 @@
 
+
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.tsx';
@@ -71,7 +72,7 @@ const DashboardSkeleton = () => (
 
     {/* Main HUD Skeleton */}
     <div className="mb-8 rounded-[1.6rem] border border-slate-200 bg-white shadow-[0_18px_45px_-30px_rgba(15,23,42,0.45)] ring-1 ring-black/5 dark:border-slate-800 dark:bg-slate-900 dark:shadow-none dark:ring-0">
-      <div className="h-64 w-full rounded-[1.6rem] bg-gradient-to-b from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-900"></div>
+      <div className="h-64 w-full rounded-[1.6rem] bg-gradient-to-b from-slate-100 to-slate-200 dark:from-slate-800 to-slate-900"></div>
     </div>
 
     {/* List Skeleton */}
@@ -84,7 +85,7 @@ const DashboardSkeleton = () => (
             key={i}
             className="h-20 rounded-2xl border border-slate-200 bg-white shadow-[0_12px_30px_-24px_rgba(15,23,42,0.40)] ring-1 ring-black/5 dark:border-slate-800 dark:bg-slate-900 dark:shadow-none dark:ring-0"
           >
-            <div className="h-full w-full rounded-2xl bg-gradient-to-b from-slate-100 to-slate-200 dark:from-slate-800 dark:to-slate-900"></div>
+            <div className="h-full w-full rounded-2xl bg-gradient-to-b from-slate-100 to-slate-200 dark:from-slate-800 to-slate-900"></div>
           </div>
         ))}
       </div>
@@ -183,6 +184,7 @@ const RiskRadar = ({
   const budgetUsage = focusWork.budgetPlanned > 0 ? (stats.totalSpent / focusWork.budgetPlanned) * 100 : 0;
   const budgetPct = Math.round(budgetUsage);
 
+  // Fix: Calculate delayedPct locally
   const delayedPct =
     dailySummary.totalSteps > 0 ? Math.round((dailySummary.delayedSteps / dailySummary.totalSteps) * 100) : 0;
 
