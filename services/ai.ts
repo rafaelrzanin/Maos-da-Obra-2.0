@@ -1,30 +1,34 @@
+
 import { GoogleGenAI } from "@google/genai";
 
 // Helper function to safely get environment variables, checking both process.env and import.meta.env
 const safeGetEnv = (key: string): string | undefined => {
-  // Prefer process.env first (Node/server environments)
-  const pEnv = (typeof process !== "undefined" ? (process as any).env : undefined) as
-    | Record<string, unknown>
-    | undefined;
+  let value: string | undefined;
 
-  if (pEnv && typeof pEnv[key] === "string") {
-    return pEnv[key] as string;
+  // Prefer process.env first as per GenAI guidelines
+  if (typeof process !== 'undefined' && process.env && typeof process.env[key] === 'string') {
+    value = process.env[key];
+    console.log(`[AI safeGetEnv] Lendo ${key} de process.env. Valor: ${value ? 'CONFIGURADO' : 'UNDEFINED'}`);
+    if (value) return value;
+  } else {
+    console.log(`[AI safeGetEnv] process.env.${key} não disponível ou não é string.`);
+  }
+  
+  // Fallback to import.meta.env for Vite client-side environments if necessary
+  if (typeof import.meta !== 'undefined' && import.meta.env && typeof import.meta.env[key] === 'string') {
+    value = import.meta.env[key];
+    console.log(`[AI safeGetEnv] Lendo ${key} de import.meta.env. Valor: ${value ? 'CONFIGURADO' : 'UNDEFINED'}`);
+    if (value) return value;
+  } else {
+    console.log(`[AI safeGetEnv] import.meta.env.${key} não disponível ou não é string.`);
   }
 
-  // Fallback to import.meta.env (Vite/client build-time env)
-  const vEnv = (typeof import.meta !== "undefined" ? (import.meta as any).env : undefined) as
-    | Record<string, unknown>
-    | undefined;
-
-  if (vEnv && typeof vEnv[key] === "string") {
-    return vEnv[key] as string;
-  }
-
+  console.warn(`[AI safeGetEnv] Variável de ambiente '${key}' não encontrada em nenhum contexto.`);
   return undefined;
 };
 
 // Access API_KEY using the safeGetEnv helper
-const apiKey = safeGetEnv("VITE_GOOGLE_API_KEY");
+const apiKey = safeGetEnv('API_KEY');
 
 // Campo para chave manual se não configurar no .env
 // Exemplo: const MANUAL_KEY = "AIza...";
@@ -74,4 +78,4 @@ export const aiService = {
     }
   }
 };
-
+    
