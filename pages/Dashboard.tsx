@@ -643,8 +643,8 @@ const Dashboard: React.FC = () => {
             message: "Não foi possível identificar a obra para exclusão. Tente novamente.", 
             type: 'ERROR',
             confirmText: "Entendido",
-            onConfirm: () => setZeModal(p => ({ ...p, isOpen: false, onConfirm: undefined })), // Closes and resets
-            onCancel: () => setZeModal(p => ({ ...p, isOpen: false, onConfirm: undefined })) // Closes and resets
+            onConfirm: () => setZeModal(p => ({ ...p, isOpen: false })), // Closes and resets, no re-attempt
+            onCancel: () => setZeModal(p => ({ ...p, isOpen: false })) // Closes and resets
         }));
         return;
     }
@@ -654,7 +654,7 @@ const Dashboard: React.FC = () => {
       await dbService.deleteWork(zeModal.workId);
       
       // Close modal immediately after successful delete operation
-      setZeModal(prev => ({ ...prev, isOpen: false, onConfirm: undefined, onCancel: () => {} })); // Ensure onConfirm is also reset to default
+      setZeModal(prev => ({ ...prev, isOpen: false, onConfirm: () => {}, onCancel: () => {} })); // Ensure onConfirm is also reset to default
 
       const updatedWorks = await dbService.getWorks(user.id);
       setWorks(updatedWorks);
@@ -679,8 +679,8 @@ const Dashboard: React.FC = () => {
         message: `Erro ao excluir obra: ${e.message || "Um erro desconhecido ocorreu."}`, 
         type: 'ERROR', 
         confirmText: "Entendido", // Change to simple "understood"
-        onConfirm: () => setZeModal(p => ({ ...p, isOpen: false, onConfirm: undefined })), // Closes and resets
-        onCancel: () => setZeModal(p => ({ ...p, isOpen: false, onConfirm: undefined })) // Closes and resets
+        onConfirm: () => setZeModal(p => ({ ...p, isOpen: false })), // Closes and resets, no re-attempt
+        onCancel: () => setZeModal(p => ({ ...p, isOpen: false })) // Closes and resets
       }));
     } finally {
       setIsDeletingWork(false); // NEW: Reset loading regardless of success/failure
@@ -1031,13 +1031,13 @@ const Dashboard: React.FC = () => {
               let titleColorClass = 'text-primary dark:text-white';
 
               if (notif.type === 'WARNING') {
-                cardBgClass = 'bg-amber-50 dark:bg-amber-900/10';
-                cardBorderClass = 'border-amber-200 dark:border-amber-900/30'; // Changed to amber-200 for border
-                iconBgClass = 'bg-amber-100 dark:bg-amber-900/30';
-                iconColorClass = 'text-amber-700 dark:text-amber-400';
-                iconType = 'fa-triangle-exclamation';
-                textColorClass = 'text-amber-800 dark:text-amber-200';
-                titleColorClass = 'text-amber-900 dark:text-amber-100';
+                // FIX: Updated color classes for WARNING type notifications for better contrast
+                cardBgClass = 'bg-amber-100 dark:bg-amber-950/20'; // Lighter amber bg
+                cardBorderClass = 'border-amber-300 dark:border-amber-900'; // Stronger amber border
+                iconBgClass = 'bg-amber-400/20 dark:bg-amber-600/30'; // Darker amber for icon bg
+                iconColorClass = 'text-amber-700 dark:text-amber-300'; // Vibrant amber for icon color
+                textColorClass = 'text-amber-900 dark:text-amber-100'; // Darker text for light mode, lighter for dark mode
+                titleColorClass = 'text-amber-900 dark:text-amber-100'; // Darker text for light mode, lighter for dark mode
               } else if (notif.type === 'ERROR') {
                 cardBgClass = 'bg-red-50 dark:bg-red-900/10';
                 cardBorderClass = 'border-red-200 dark:border-red-900/30'; // Changed to red-200 for border
@@ -1153,7 +1153,7 @@ const Dashboard: React.FC = () => {
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-500">
           <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] w-full max-w-sm p-0 shadow-2xl border border-slate-800 relative overflow-hidden transform scale-100 animate-in zoom-in-95">
             <div className="bg-gradient-premium p-8 relative overflow-hidden text-center">
-              <div className="absolute top-0 right-0 w-40 h-40 bg-secondary/20 rounded-full blur-3xl translate-x-10 -translate-y-10"></div>
+              <div className="absolute top-0 right-0 w-40 h-40 bg-secondary/20 rounded-full blur-3xl translate-x-10 -translate-y-1/2"></div>
               <div className="w-20 h-20 mx-auto rounded-full bg-red-600 border-4 border-slate-900 flex items-center justify-center text-3xl text-white shadow-xl mb-4 animate-pulse">
                 <i className="fa-solid fa-hourglass-end"></i>
               </div>
