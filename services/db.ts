@@ -172,15 +172,19 @@ if (pending) {
                 return mapProfileFromSupabase(existingProfile);
             }
 
+            // FIX: If RLS denies access (42501), return null instead of a partial user.
+            // This ensures AuthContext correctly identifies a non-accessible profile,
+            // preventing login loops and inconsistent state.
             if (readError && readError.code === '42501') { 
-                 console.error("ERRO CRÍTICO 403: Permissão negada ao ler perfil.");
-                 return {
-                    id: authUser.id,
-                    name: authUser.user_metadata?.name || 'Erro de Permissão',
-                    email: authUser.email || '',
-                    plan: PlanType.MENSAL,
-                    isTrial: true // Default for error case
-                 };
+                 console.error("ERRO CRÍTICO 403: Permissão negada ao ler perfil. Retornando null.");
+                 return null;
+            }
+
+            // Other read errors that are not RLS-related should still be logged and might prevent creation.
+            if (readError) {
+                console.error("Erro ao buscar perfil existente:", readError);
+                // Depending on the error, you might want to throw or return null.
+                // For now, proceed to create, but log the original read error.
             }
 
             const trialExpires = new Date();
@@ -205,27 +209,16 @@ if (pending) {
 
             if (createError) {
                 console.error("Erro ao criar perfil:", createError);
-                return {
-                    id: authUser.id,
-                    name: newProfileData.name,
-                    email: authUser.email || '', // Corrected from authData.user.email
-                    plan: PlanType.MENSAL,
-                    isTrial: true,
-                    subscriptionExpiresAt: trialExpires.toISOString()
-                };
+                // On creation error, return null to signify profile couldn't be established.
+                return null;
             }
 
             return mapProfileFromSupabase(createdProfile);
 
-        } catch (e) {
+        } catch (e: any) {
             console.error("Exceção no ensureUserProfile", e);
-            return {
-                id: authUser.id,
-                name: authUser.email || 'Usuário',
-                email: authUser.email,
-                plan: PlanType.MENSAL,
-                isTrial: true // Default for error case
-            };
+            // On any unexpected exception, ensure null is returned.
+            return null;
         }
     };
 
