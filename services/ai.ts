@@ -6,6 +6,7 @@ const safeGetEnv = (key: string): string | undefined => {
   let value: string | undefined;
 
   // Prefer process.env first as per GenAI guidelines
+  // With Vite's define, process.env.API_KEY will be directly available in the browser.
   if (typeof process !== 'undefined' && process.env && typeof process.env[key] === 'string') {
     value = process.env[key];
     console.log(`[AI safeGetEnv] Lendo ${key} de process.env. Valor: ${value ? 'CONFIGURADO' : 'UNDEFINED'}`);
@@ -15,6 +16,7 @@ const safeGetEnv = (key: string): string | undefined => {
   }
   
   // Fallback to import.meta.env for Vite client-side environments if necessary
+  // (though with 'define' for process.env.API_KEY, this block might become less critical for API_KEY specifically)
   if (typeof import.meta !== 'undefined' && import.meta.env && typeof import.meta.env[key] === 'string') {
     value = import.meta.env[key];
     console.log(`[AI safeGetEnv] Lendo ${key} de import.meta.env. Valor: ${value ? 'CONFIGURADO' : 'UNDEFINED'}`);
@@ -30,15 +32,17 @@ const safeGetEnv = (key: string): string | undefined => {
 // Access API_KEY using the safeGetEnv helper
 const apiKey = safeGetEnv('API_KEY');
 
-// Campo para chave manual se não configurar no .env
-// Exemplo: const MANUAL_KEY = "AIza...";
-const MANUAL_KEY = "";
-
 let ai: GoogleGenAI | null = null;
-const effectiveKey = apiKey || MANUAL_KEY;
 
-if (effectiveKey) {
-  ai = new GoogleGenAI({ apiKey: effectiveKey });
+// NEW: Strict check for API key
+if (!apiKey) {
+  console.error("ERRO CRÍTICO: Google GenAI API Key (process.env.API_KEY) não está configurada.");
+  console.error("Por favor, adicione sua chave de API nas variáveis de ambiente do seu ambiente de deploy (Vercel, etc.) ou no seu arquivo .env local.");
+  // A mensagem no frontend já indicará a falta, mas o console será mais explícito.
+  // Não lançaremos um erro para que o fallback offline possa ser exibido.
+} else {
+  ai = new GoogleGenAI({ apiKey: apiKey });
+  console.log("Google GenAI inicializado com sucesso.");
 }
 
 export const aiService = {
@@ -59,7 +63,7 @@ export const aiService = {
           return "Antes de pintar, lixe bem e tire o pó. Se a parede for nova, passe selador. Se for repintura com cor escura, talvez precise de mais demãos.";
       }
 
-      return "Estou sem sinal da central agora (sem chave de API). Mas estou aqui, pode conferir suas anotações.";
+      return "Estou sem sinal da central agora (sem chave de API). Por favor, configure sua chave de API para o Zé da Obra AI funcionar. Mas estou aqui, pode conferir suas anotações.";
     }
 
     try {
@@ -78,4 +82,3 @@ export const aiService = {
     }
   }
 };
-    
