@@ -1429,4 +1429,182 @@ const WorkDetail: React.FC = () => {
                             <input placeholder="Nome da Etapa" value={stepName} onChange={e => setStepName(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required />
                             <div className="grid grid-cols-2 gap-2">
                                 <div><label className="text-[10px] uppercase font-bold text-slate-400 ml-1">Início</label><input type="date" value={stepStart} onChange={e => setStepStart(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required /></div>
-                                <div><label className="text-[10px] uppercase font-bold text-slate-400 ml-1">Fim</label><input type="date" value={stepEnd} onChange={e => setStepEnd(e.target.value)} className="w-full p-3 bg-slate-
+                                <div><label className="text-[10px] uppercase font-bold text-slate-400 ml-1">Fim</label><input type="date" value={stepEnd} onChange={e => setStepEnd(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required /></div>
+                            </div>
+                            <div className="flex justify-end gap-3 mt-6">
+                                <button type="button" onClick={() => setIsStepModalOpen(false)} className="px-5 py-3 rounded-xl text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 font-bold transition-colors">Cancelar</button>
+                                <button type="submit" className="px-5 py-3 rounded-xl bg-primary text-white font-bold hover:bg-primary-dark transition-colors">Salvar</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* ADD MATERIAL MODAL */}
+            {addMatModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-6 shadow-2xl">
+                        <h3 className="text-xl font-bold mb-4 text-primary dark:text-white">Adicionar Material</h3>
+                        <form onSubmit={handleAddMaterial} className="space-y-4">
+                            <input placeholder="Nome do Material" value={newMatName} onChange={e => setNewMatName(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required />
+                            <input placeholder="Marca (Opcional)" value={newMatBrand} onChange={e => setNewMatBrand(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" />
+                            <div className="grid grid-cols-2 gap-2">
+                                <input type="number" placeholder="Qtd. Planejada" value={newMatQty} onChange={e => setNewMatQty(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required />
+                                <input placeholder="Unidade (Ex: m², un, kg)" value={newMatUnit} onChange={e => setNewMatUnit(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required />
+                            </div>
+                            {/* Material Step ID selection */}
+                            <select value={newMatStepId} onChange={e => setNewMatStepId(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white">
+                                <option value="">Sem etapa definida</option>
+                                {steps.map((s, idx) => (
+                                    <option key={s.id} value={s.id}>{String(idx+1).padStart(2,'0')}. {s.name}</option>
+                                ))}
+                            </select>
+
+                            <label className="flex items-center gap-3 text-sm font-medium text-primary dark:text-white cursor-pointer">
+                                <input type="checkbox" checked={newMatBuyNow} onChange={e => setNewMatBuyNow(e.target.checked)} className="rounded border-slate-300 text-secondary focus:ring-secondary" />
+                                Comprar Agora?
+                            </label>
+
+                            {newMatBuyNow && (
+                                <div className="grid grid-cols-2 gap-2 animate-in fade-in">
+                                    <input type="number" placeholder="Qtd. Comprada" value={newMatBuyQty} onChange={e => setNewMatBuyQty(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required />
+                                    <input type="number" placeholder="Custo Total (R$)" value={newMatBuyCost} onChange={e => setNewMatBuyCost(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required />
+                                </div>
+                            )}
+
+                            <div className="flex justify-end gap-3 mt-6">
+                                <button type="button" onClick={() => setAddMatModal(false)} className="px-5 py-3 rounded-xl text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 font-bold transition-colors">Cancelar</button>
+                                <button type="submit" className="px-5 py-3 rounded-xl bg-primary text-white font-bold hover:bg-primary-dark transition-colors">Adicionar</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* EDIT MATERIAL MODAL */}
+            {materialModal.isOpen && materialModal.material && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-6 shadow-2xl">
+                        <h3 className="text-xl font-bold mb-4 text-primary dark:text-white">Editar Material</h3>
+                        <form onSubmit={handleUpdateMaterial} className="space-y-4">
+                            <input placeholder="Nome do Material" value={matName} onChange={e => setMatName(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required />
+                            <input placeholder="Marca (Opcional)" value={matBrand} onChange={e => setMatBrand(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" />
+                            <div className="grid grid-cols-2 gap-2">
+                                <input type="number" placeholder="Qtd. Planejada" value={matPlannedQty} onChange={e => setMatPlannedQty(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required />
+                                <input placeholder="Unidade (Ex: m², un, kg)" value={matUnit} onChange={e => setMatUnit(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required />
+                            </div>
+
+                            <p className="text-sm font-bold text-slate-700 dark:text-slate-300 mt-6 pt-4 border-t border-slate-100 dark:border-slate-800">Registrar Nova Compra:</p>
+                            <div className="grid grid-cols-2 gap-2 animate-in fade-in">
+                                <input type="number" placeholder="Qtd. Comprada (nova)" value={matBuyQty} onChange={e => setMatBuyQty(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" />
+                                <input type="number" placeholder="Custo Total (R$)" value={matBuyCost} onChange={e => setMatBuyCost(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" />
+                            </div>
+
+                            <div className="flex justify-end gap-3 mt-6">
+                                <button type="button" onClick={() => setMaterialModal({isOpen: false, material: null})} className="px-5 py-3 rounded-xl text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 font-bold transition-colors">Cancelar</button>
+                                <button type="submit" className="px-5 py-3 rounded-xl bg-primary text-white font-bold hover:bg-primary-dark transition-colors">Salvar</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* ADD/EDIT EXPENSE MODAL */}
+            {expenseModal.isOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-6 shadow-2xl">
+                        <h3 className="text-xl font-bold mb-4 text-primary dark:text-white">{expenseModal.mode === 'ADD' ? 'Nova Despesa' : 'Editar Despesa'}</h3>
+                        <form onSubmit={handleSaveExpense} className="space-y-4">
+                            <input placeholder="Descrição do Gasto" value={expDesc} onChange={e => setExpDesc(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required />
+                            
+                            {expenseModal.mode === 'EDIT' && (
+                                <div className="p-3 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-sm text-slate-600 dark:text-slate-300">
+                                    <p className="font-bold mb-1">Total Já Pago: <span className="text-primary dark:text-white">R$ {expSavedAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></p>
+                                    <p className="text-xs">O valor abaixo será **adicionado** ao total existente.</p>
+                                </div>
+                            )}
+                            
+                            <input type="number" placeholder="Valor (R$)" value={expAmount} onChange={e => setExpAmount(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required />
+                            <input type="number" placeholder="Valor Total Acordado (Opcional)" value={expTotalAgreed} onChange={e => setExpTotalAgreed(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" />
+                            
+                            <select value={expCategory} onChange={e => setExpCategory(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white">
+                                {Object.values(ExpenseCategory).map(cat => (
+                                    <option key={cat} value={cat}>{cat}</option>
+                                ))}
+                                <option value="Outros">Outros</option>
+                            </select>
+                            <select value={expStepId} onChange={e => setExpStepId(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white">
+                                <option value="">Sem etapa definida</option>
+                                {steps.map((s, idx) => (
+                                    <option key={s.id} value={s.id}>{String(idx+1).padStart(2,'0')}. {s.name}</option>
+                                ))}
+                            </select>
+                            <input type="date" value={expDate} onChange={e => setExpDate(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required />
+
+                            <div className="flex justify-between items-center mt-6 pt-4 border-t border-slate-100 dark:border-slate-800">
+                                {expenseModal.mode === 'EDIT' && (
+                                    <button type="button" onClick={handleDeleteExpense} className="px-4 py-2 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-xl font-bold transition-colors"><i className="fa-solid fa-trash mr-2"></i> Excluir</button>
+                                )}
+                                <div className="flex gap-3 ml-auto">
+                                    <button type="button" onClick={() => setExpenseModal({isOpen: false, mode: 'ADD'})} className="px-5 py-3 rounded-xl text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 font-bold transition-colors">Cancelar</button>
+                                    <button type="submit" className="px-5 py-3 rounded-xl bg-primary text-white font-bold hover:bg-primary-dark transition-colors">Salvar</button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* ADD/EDIT PERSON (WORKER/SUPPLIER) MODAL */}
+            {isPersonModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-6 shadow-2xl">
+                        <h3 className="text-xl font-bold mb-4 text-primary dark:text-white">{personId ? `Editar ${personMode === 'WORKER' ? 'Profissional' : 'Fornecedor'}` : `Adicionar ${personMode === 'WORKER' ? 'Profissional' : 'Fornecedor'}`}</h3>
+                        <form onSubmit={handleSavePerson} className="space-y-4">
+                            <input placeholder="Nome" value={personName} onChange={e => setPersonName(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required />
+                            <select value={personRole} onChange={e => setPersonRole(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white">
+                                {personMode === 'WORKER' ? STANDARD_JOB_ROLES.map(role => <option key={role} value={role}>{role}</option>) : STANDARD_SUPPLIER_CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                            </select>
+                            <input placeholder="Telefone (WhatsApp)" value={personPhone} onChange={e => setPersonPhone(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" />
+                            <textarea placeholder="Observações" value={personNotes} onChange={e => setPersonNotes(e.target.value)} rows={3} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700"></textarea>
+                            
+                            <div className="flex justify-end gap-3 mt-6">
+                                <button type="button" onClick={() => setIsPersonModalOpen(false)} className="px-5 py-3 rounded-xl text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 font-bold transition-colors">Cancelar</button>
+                                <button type="submit" className="px-5 py-3 rounded-xl bg-primary text-white font-bold hover:bg-primary-dark transition-colors">Salvar</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* VIEW CONTRACT MODAL */}
+            {viewContract && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-2xl p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
+                        <h3 className="text-xl font-bold mb-4 text-primary dark:text-white">{viewContract.title}</h3>
+                        <div className="prose dark:prose-invert max-w-none text-slate-700 dark:text-slate-300 text-sm leading-relaxed whitespace-pre-wrap">
+                            {viewContract.content}
+                        </div>
+                        <div className="flex justify-end gap-3 mt-6">
+                            <button type="button" onClick={() => setViewContract(null)} className="px-5 py-3 rounded-xl bg-primary text-white font-bold hover:bg-primary-dark transition-colors">Fechar</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            
+            {/* Confirmation Modal */}
+            <ZeModal
+                isOpen={zeModal.isOpen}
+                title={zeModal.title}
+                message={zeModal.message}
+                confirmText={zeModal.confirmText}
+                onConfirm={zeModal.onConfirm}
+                onCancel={zeModal.onCancel}
+                type={zeModal.type}
+            />
+
+        </div>
+    );
+};
+
+export default WorkDetail;
