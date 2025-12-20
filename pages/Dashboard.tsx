@@ -999,33 +999,33 @@ const Dashboard: React.FC = () => {
             notificationsToDisplay.map(notif => {
               let cardBgClass = 'bg-white dark:bg-slate-900';
               let cardBorderClass = 'border-slate-200 dark:border-slate-800';
-              let iconBgClass = 'bg-blue-100 dark:bg-blue-900/30';
+              let iconBgGradient = 'from-blue-100 to-blue-200 dark:from-blue-900/30 dark:to-blue-900/50';
               let iconColorClass = 'text-blue-600 dark:text-blue-400';
-              let iconType = 'fa-info-circle'; // Default INFO icon
+              let iconType = 'fa-lightbulb'; // Default INFO icon
               let textColorClass = 'text-slate-700 dark:text-slate-300';
               let titleColorClass = 'text-primary dark:text-white';
 
               if (notif.type === 'WARNING') {
                 cardBgClass = 'bg-amber-50 dark:bg-amber-900/10';
-                cardBorderClass = 'border-amber-200 dark:border-amber-900/30';
-                iconBgClass = 'bg-amber-100 dark:bg-amber-900/30';
-                iconColorClass = 'text-amber-600 dark:text-amber-400';
+                cardBorderClass = 'border-amber-300 dark:border-amber-900/40';
+                iconBgGradient = 'from-amber-100 to-amber-200 dark:from-amber-900/30 dark:to-amber-900/50';
+                iconColorClass = 'text-amber-700 dark:text-amber-400';
                 iconType = 'fa-triangle-exclamation';
                 textColorClass = 'text-amber-800 dark:text-amber-200';
                 titleColorClass = 'text-amber-900 dark:text-amber-100';
               } else if (notif.type === 'ERROR') {
                 cardBgClass = 'bg-red-50 dark:bg-red-900/10';
-                cardBorderClass = 'border-red-200 dark:border-red-900/30';
-                iconBgClass = 'bg-red-100 dark:bg-red-900/30';
-                iconColorClass = 'text-red-600 dark:text-red-400';
-                iconType = 'fa-exclamation-circle';
+                cardBorderClass = 'border-red-300 dark:border-red-900/40';
+                iconBgGradient = 'from-red-100 to-red-200 dark:from-red-900/30 dark:to-red-900/50';
+                iconColorClass = 'text-red-700 dark:text-red-400';
+                iconType = 'fa-circle-xmark';
                 textColorClass = 'text-red-800 dark:text-red-200';
                 titleColorClass = 'text-red-900 dark:text-red-100';
               } else if (notif.type === 'SUCCESS') {
                 cardBgClass = 'bg-green-50 dark:bg-green-900/10';
-                cardBorderClass = 'border-green-200 dark:border-green-900/30';
-                iconBgClass = 'bg-green-100 dark:bg-green-900/30';
-                iconColorClass = 'text-green-600 dark:text-green-400';
+                cardBorderClass = 'border-green-300 dark:border-green-900/40';
+                iconBgGradient = 'from-green-100 to-green-200 dark:from-green-900/30 dark:to-green-900/50';
+                iconColorClass = 'text-green-700 dark:text-green-400';
                 iconType = 'fa-check-circle';
                 textColorClass = 'text-green-800 dark:text-green-200';
                 titleColorClass = 'text-green-900 dark:text-green-100';
@@ -1035,42 +1035,42 @@ const Dashboard: React.FC = () => {
                 <div
                   key={notif.id}
                   className={cx(
-                    "group relative p-4 rounded-2xl border flex items-start gap-4 transition-all duration-300",
+                    "group relative p-5 rounded-3xl border-2 flex items-start gap-5 transition-all duration-300",
                     cardBgClass,
                     cardBorderClass,
-                    "shadow-[0_12px_30px_-24px_rgba(15,23,42,0.15)] ring-1 ring-black/5 dark:shadow-none dark:ring-0",
-                    "hover:scale-[1.01] hover:shadow-lg dark:hover:border-white/20"
+                    "shadow-md ring-1 ring-black/5 dark:shadow-none dark:ring-0",
+                    "hover:-translate-y-1 hover:shadow-xl dark:hover:border-white/20"
                   )}
                 >
                   <div className={cx(
-                    "w-12 h-12 rounded-full flex items-center justify-center shrink-0 shadow-sm",
-                    iconBgClass,
+                    "w-16 h-16 rounded-full flex items-center justify-center shrink-0 shadow-lg p-1",
+                    `bg-gradient-to-br ${iconBgGradient}`,
                     iconColorClass,
-                    "text-xl" // Larger icon
+                    "text-2xl" 
                   )}>
                     <i className={`fa-solid ${iconType}`}></i>
                   </div>
 
                   <div className="flex-1 pr-6">
-                    <h4 className={cx("font-bold text-base mb-1 leading-tight", titleColorClass)}>{notif.title}</h4>
-                    <p className={cx("text-sm leading-snug font-medium", textColorClass)}>{notif.message}</p>
+                    <h4 className={cx("font-extrabold text-lg mb-1 leading-tight", titleColorClass)}>{notif.title}</h4>
+                    <p className={cx("text-base leading-relaxed font-medium", textColorClass)}>{notif.message}</p>
                   </div>
 
                   <button
                     onClick={() => handleDismiss(notif.id)}
-                    className="absolute top-2 right-2 text-slate-300 hover:text-slate-500 p-2 opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="absolute top-3 right-3 text-slate-300 hover:text-slate-500 p-2.5 opacity-0 group-hover:opacity-100 transition-opacity rounded-full"
                     aria-label="Dispensar notificação"
                   >
-                    <i className="fa-solid fa-xmark text-lg"></i>
+                    <i className="fa-solid fa-circle-xmark text-xl"></i>
                   </button>
                 </div>
               );
             })
           ) : (
-            <div className="text-center py-10 rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 animate-in fade-in">
-              <i className="fa-solid fa-cloud-check text-5xl text-slate-400 mb-4"></i>
-              <p className="text-slate-500 dark:text-slate-400 text-base font-medium">Nenhum aviso urgente. Tudo em paz por aqui! 🍃</p>
-              <p className="text-xs text-slate-400 mt-2">Novidades importantes aparecerão aqui automaticamente.</p>
+            <div className="text-center py-16 rounded-3xl border-2 border-dashed border-slate-300 dark:border-slate-700 animate-in fade-in">
+              <i className="fa-solid fa-heart-circle-check text-6xl text-slate-400 mb-5"></i>
+              <p className="text-slate-500 dark:text-slate-400 text-lg font-medium">Nenhum aviso urgente. Tudo em paz por aqui! 🍃</p>
+              <p className="text-sm text-slate-400 mt-3">Novidades importantes aparecerão aqui automaticamente.</p>
             </div>
           )}
           {hasMoreNotifications && (
