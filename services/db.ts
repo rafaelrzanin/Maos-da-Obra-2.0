@@ -84,7 +84,7 @@ const parseExpenseFromDB = (data: any): Expense => ({
     stepId: data.step_id,
     relatedMaterialId: data.related_material_id,
     workerId: data.worker_id, // Added workerId parsing
-    totalAgreed: data.total_agagreed ? Number(data.total_agreed) : undefined
+    totalAgreed: data.total_agreed ? Number(data.total_agreed) : undefined // FIX: Changed from total_agagreed to total_agreed
 });
 
 const parseWorkerFromDB = (data: any): Worker => ({
@@ -459,7 +459,7 @@ export const dbService = {
   async generatePix(_amount: number, _payer: any) {
       // This is a mock function, no actual Supabase interaction required
       return {
-          qr_code_base64: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+          qr_code_base64: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQyF2NgYGBgAAAABQAEV9D3sgAAAABJRU5ErkJggg==",
           copy_paste_code: "00020126330014BR.GOV.BCB.PIX011155555555555520400005303986540510.005802BR5913Mãos da Obra6008Brasilia62070503***63041234"
       };
   },
