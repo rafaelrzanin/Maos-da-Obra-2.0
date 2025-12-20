@@ -18,7 +18,7 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 // These should be set as environment variables in Vercel
 const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY;
 const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
-const VAPID_EMAIL = "mailto:seuemail@example.com"; // Replace with your actual email
+const VAPID_EMAIL = "appmaosdaobra@gmail.com"; // Replace with your actual email
 
 if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
   console.error("ERRO CRÍTICO: Chaves VAPID (PUBLIC_KEY ou PRIVATE_KEY) faltando para notificações push.");
