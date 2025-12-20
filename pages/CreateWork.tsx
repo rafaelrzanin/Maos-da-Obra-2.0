@@ -309,7 +309,7 @@ const CreateWork: React.FC = () => {
                                     <div><h3 className="font-black text-xl text-primary dark:text-white mb-1">Reforma</h3><p className="text-sm font-bold text-slate-400">Melhoria ou Reparo</p></div>
                                 </button>
                             </div>
-                            {formErrors.workCategory && <p className="text-red-500 text-sm mt-4">{formErrors.workCategory}</p>}
+                            {formErrors.workCategory && <p className="text-orange-500 text-sm mt-4">{formErrors.workCategory}</p>}
                         </div>
                     </div>
                 );
