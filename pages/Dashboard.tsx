@@ -985,7 +985,7 @@ const Dashboard: React.FC = () => {
       <div className="mb-6">
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-            <i className="fa-regular fa-bell"></i> Avisos Recentes
+            <i className="fa-regular fa-bell"></i> Central de Notificações
           </h3>
           {notifications.length > 0 && (
             <button onClick={handleClearAll} className="text-xs font-bold text-slate-400 hover:text-primary transition-colors">
