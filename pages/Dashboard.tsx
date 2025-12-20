@@ -1,10 +1,11 @@
+
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.tsx';
 import { dbService } from '../services/db.ts';
 import { StepStatus, PlanType, type Work, type Notification, type Step, type Expense, type Material } from '../types.ts';
 import { ZE_AVATAR, ZE_AVATAR_FALLBACK, getRandomZeTip, ZeTip } from '../services/standards.ts';
-import { ZeModal } from '../components/ZeModal.tsx';
+import { ZeModal, ZeModalProps } from '../components/ZeModal.tsx'; // Importa ZeModalProps
 
 /** =========================
  *  UI helpers (UX + sombras)
@@ -383,16 +384,13 @@ const Dashboard: React.FC = () => {
   // UI States
   const [currentTip] = useState<ZeTip>(() => getRandomZeTip());
   const [showWorkSelector, setShowWorkSelector] = useState(false);
-  // Fix: Updated the type of zeModal state to explicitly include `confirmText`, `onConfirm`, and `type`.
-  const [zeModal, setZeModal] = useState<{ 
-    isOpen: boolean; 
-    title: string; 
-    message: string; 
-    workId?: string;
-    confirmText?: string;
-    onConfirm?: () => void;
-    type?: 'DANGER' | 'INFO' | 'SUCCESS' | 'WARNING';
-  }>({ isOpen: false, title: '', message: '' });
+  // Fix: Updated the type of zeModal state to explicitly use ZeModalProps.
+  const [zeModal, setZeModal] = useState<ZeModalProps & { workId?: string }>({ 
+    isOpen: false, 
+    title: '', 
+    message: '',
+    onCancel: () => {}, // Necessário para satisfazer ZeModalProps
+  });
   const [showTrialUpsell, setShowTrialUpsell] = useState(false);
   // NEW: State for push notification permission UI
   const [notificationStatus, setNotificationStatus] = useState<'default' | 'granted' | 'denied' | 'unsupported'>('default');
@@ -629,8 +627,9 @@ const Dashboard: React.FC = () => {
       title: "Apagar Obra",
       message: `Tem certeza? Ao apagar a obra "${workName}", todo o histórico de gastos, compras e cronograma será perdido permanentemente.`,
       workId,
-      onConfirm: confirmDelete, // Ensure onConfirm is set for this modal
-      type: 'DANGER' // Set type to DANGER for deletion
+      onConfirm: confirmDelete, 
+      type: 'DANGER',
+      onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })) // Pass a no-op if onConfirm is present
     });
   };
 
@@ -643,8 +642,8 @@ const Dashboard: React.FC = () => {
 
       const updatedWorks = await dbService.getWorks(user.id);
       setWorks(updatedWorks);
-      setZeModal({ isOpen: false, title: '', message: '' }); // Clear modal state
-
+      setZeModal(prev => ({ ...prev, isOpen: false })); // Clear modal state, ensure onCancel is defined
+      
       if (updatedWorks.length > 0) {
         const stillExists = updatedWorks.find(w => w.id === focusWork?.id);
         if (stillExists) {
@@ -1079,9 +1078,10 @@ const Dashboard: React.FC = () => {
         isOpen={zeModal.isOpen}
         title={zeModal.title}
         message={zeModal.message}
-        confirmText="Sim, apagar obra"
-        onConfirm={confirmDelete}
-        onCancel={() => setZeModal({ isOpen: false, title: '', message: '' })}
+        confirmText={zeModal.confirmText}
+        onConfirm={zeModal.onConfirm || (() => {})} // Garante que onConfirm seja uma função
+        onCancel={zeModal.onCancel} // onCancel é obrigatório
+        type={zeModal.type === 'WARNING' ? 'INFO' : zeModal.type || 'INFO'} // Garante que o tipo seja reconhecido
       />
 
       {showTrialUpsell && (
