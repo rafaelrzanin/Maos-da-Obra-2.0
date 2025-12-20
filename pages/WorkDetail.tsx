@@ -1,10 +1,9 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import { useAuth } from '../contexts/AuthContext.tsx'; 
 import { dbService } from '../services/db.ts';
-import { Work, Worker, Supplier, Material, Step, Expense, StepStatus, WorkPhoto, WorkFile, FileCategory, ExpenseCategory, PlanType } from '../types.ts';
+import { StepStatus, FileCategory, ExpenseCategory, PlanType, type Work, type Worker, type Supplier, type Material, type Step, type Expense, type WorkPhoto, type WorkFile } from '../types.ts';
 import { ZeModal } from '../components/ZeModal.tsx';
 import { STANDARD_CHECKLISTS, CONTRACT_TEMPLATES, STANDARD_JOB_ROLES, STANDARD_SUPPLIER_CATEGORIES, ZE_AVATAR, ZE_AVATAR_FALLBACK } from '../services/standards.ts';
 // Removed aiService import as it's no longer used directly in this component
@@ -106,7 +105,8 @@ const WorkDetail: React.FC = () => {
     const [expTotalAgreed, setExpTotalAgreed] = useState('');
     const [expCategory, setExpCategory] = useState<string>(ExpenseCategory.LABOR);
     const [expStepId, setExpStepId] = useState('');
-    const [expDate, setExpDate] = useState('');
+    // Fix: Declare expDate state variable
+    const [expDate, setExpDate] = useState(new Date().toISOString().split('T')[0]);
     // NEW STATE: Tracks the amount already in DB to support cumulative logic
     const [expSavedAmount, setExpSavedAmount] = useState(0);
 
@@ -119,7 +119,15 @@ const WorkDetail: React.FC = () => {
     const [personNotes, setPersonNotes] = useState('');
 
     const [viewContract, setViewContract] = useState<{title: string, content: string} | null>(null);
-    const [zeModal, setZeModal] = useState({ isOpen: false, title: '', message: '', onConfirm: () => {} });
+    // Fix: Updated the type of zeModal state to explicitly include `confirmText`, `onConfirm`, and `type`.
+    const [zeModal, setZeModal] = useState<{ 
+        isOpen: boolean; 
+        title: string; 
+        message: string; 
+        confirmText?: string; 
+        onConfirm?: () => void; 
+        type?: 'DANGER' | 'INFO' | 'SUCCESS' | 'WARNING'; 
+    }>({ isOpen: false, title: '', message: '' });
 
     // AI & TOOLS
     // Fix: Removed AI-related states as AI chat is now a dedicated page.
@@ -159,7 +167,8 @@ const WorkDetail: React.FC = () => {
         setLoading(false);
     };
 
-    useEffect(() => { load(); }, [id, authLoading]); // Add authLoading to dependencies
+    // Fix: Re-added authLoading to dependency array as its presence is critical for loading state
+    useEffect(() => { load(); }, [id, authLoading]);
 
     // --- HANDLERS ---
 
@@ -276,6 +285,7 @@ const WorkDetail: React.FC = () => {
         setExpTotalAgreed('');
         setExpCategory(ExpenseCategory.LABOR);
         setExpStepId('');
+        // Fix: Set expDate for new expense
         setExpDate(new Date().toISOString().split('T')[0]);
     };
 
@@ -292,6 +302,7 @@ const WorkDetail: React.FC = () => {
         setExpTotalAgreed(expense.totalAgreed ? String(expense.totalAgreed) : '');
         setExpCategory(expense.category);
         setExpStepId(expense.stepId || '');
+        // Fix: Set expDate when opening for edit
         setExpDate(expense.date.split('T')[0]);
     };
 
@@ -310,6 +321,7 @@ const WorkDetail: React.FC = () => {
                     workId: work.id,
                     description: expDesc,
                     amount: inputAmount,
+                    // Fix: Use expDate from state
                     date: new Date(expDate).toISOString(),
                     category: expCategory,
                     stepId: finalStepId,
@@ -325,6 +337,7 @@ const WorkDetail: React.FC = () => {
                         ...existing,
                         description: expDesc,
                         amount: newTotalAmount,
+                        // Fix: Use expDate from state
                         date: new Date(expDate).toISOString(),
                         category: expCategory,
                         stepId: finalStepId,
@@ -416,11 +429,11 @@ const WorkDetail: React.FC = () => {
             notes: personNotes
         };
 
-        if (personMode === 'WORKER') {
-            if (personId) await dbService.updateWorker({ ...payload, id: personId, role: personRole });
-            else await dbService.addWorker({ ...payload, role: personRole });
+        if (personId) {
+            if (personMode === 'WORKER') await dbService.updateWorker({ ...payload, id: personId, role: personRole });
+            else await dbService.updateSupplier({ ...payload, id: personId, category: personRole });
         } else {
-            if (personId) await dbService.updateSupplier({ ...payload, id: personId, category: personRole });
+            if (personMode === 'WORKER') await dbService.addWorker({ ...payload, role: personRole });
             else await dbService.addSupplier({ ...payload, category: personRole });
         }
         
@@ -708,8 +721,8 @@ const WorkDetail: React.FC = () => {
                                             >
                                                 <div className="flex items-center justify-between mb-2">
                                                     <div className="flex items-center gap-4">
-                                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${exp.category === 'Material' ? 'bg-amber-100 text-amber-600' : 'bg-blue-100 text-blue-600'}`}>
-                                                            <i className={`fa-solid ${exp.category === 'Material' ? 'fa-box' : 'fa-helmet-safety'}`}></i>
+                                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${exp.category === ExpenseCategory.MATERIAL ? 'bg-amber-100 text-amber-600' : 'bg-blue-100 text-blue-600'}`}>
+                                                            <i className={`fa-solid ${exp.category === ExpenseCategory.MATERIAL ? 'fa-box' : 'fa-helmet-safety'}`}></i>
                                                         </div>
                                                         <div>
                                                             <p className="font-bold text-primary dark:text-white text-base leading-tight">{exp.description}</p>
@@ -810,7 +823,7 @@ const WorkDetail: React.FC = () => {
 
                                 <div className="grid grid-cols-3 gap-3">
                                     {['CALCULATORS', 'CONTRACTS', 'CHECKLIST'].map(item => (
-                                        <button key={item} onClick={() => setSubView(item as SubView)} className={`p-3 bg-white/5 hover:bg-white/10 rounded-xl border border-white/5 flex flex-col items-center gap-2 text-center transition-colors group ${!isPremium ? 'opacity-70' : ''}`}>
+                                        <button key={item} onClick={() => setSubView(item as SubView)} disabled={!isPremium} className={`p-3 bg-white/5 hover:bg-white/10 rounded-xl border border-white/5 flex flex-col items-center gap-2 text-center transition-colors group ${!isPremium ? 'opacity-70' : ''}`}>
                                             <i className={`fa-solid ${item === 'CALCULATORS' ? 'fa-calculator' : item === 'CONTRACTS' ? 'fa-file-signature' : 'fa-clipboard-check'} text-slate-300 group-hover:text-secondary text-2xl mb-1 transition-colors`}></i>
                                             <span className="text-[10px] font-bold text-white uppercase tracking-wide">{item === 'CALCULATORS' ? 'Calculadoras' : item === 'CONTRACTS' ? 'Contratos' : 'Checklist'}</span>
                                         </button>
@@ -825,8 +838,11 @@ const WorkDetail: React.FC = () => {
         return null;
     };
 
-    // --- RENDER SUBVIEW ---
+    // Fix: Consolidated multiple renderSubViewContent definitions into one.
+    // This function is now responsible for rendering all sub-views based on the `subView` state.
     const renderSubViewContent = () => {
+        const today = new Date().toISOString().split('T')[0]; // Define today once for date comparisons
+
         switch(subView) {
             case 'TEAM': return (
                 <div className="space-y-6">
@@ -900,7 +916,6 @@ const WorkDetail: React.FC = () => {
 
             case 'REPORTS': 
             const workProgressPercentage = stats?.progress || 0; 
-            const today = new Date().toISOString().split('T')[0];
 
             return (
                 <div className="space-y-6 animate-in fade-in">
@@ -1087,7 +1102,7 @@ const WorkDetail: React.FC = () => {
                                                             <li key={exp.id} className="py-3 flex justify-between items-center text-xs">
                                                                 <div>
                                                                     <p className="font-bold text-primary dark:text-white">{exp.description}</p>
-                                                                    <p className="text-slate-500 mt-1 flex items-center gap-2">
+                                                                <p className="text-slate-500 mt-1 flex items-center gap-2">
                                                                         <span className={`flex items-center gap-1 ${categoryColor}`}><i className={`fa-solid ${categoryIcon}`}></i> {exp.category}</span>
                                                                         <span>• {parseDateNoTimezone(exp.date)}</span>
                                                                         {relatedMaterial && <span className="text-sm font-medium text-slate-400">(Material: {relatedMaterial.name})</span>}
@@ -1314,12 +1329,12 @@ const WorkDetail: React.FC = () => {
             case 'CONTRACTS': return (
                 <div className="space-y-4">
                     {CONTRACT_TEMPLATES.map(ct => (
-                        <div key={ct.id} onClick={() => setViewContract({ title: ct.title, content: ct.contentTemplate })} className="group bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-secondary/50 cursor-pointer shadow-sm transition-all hover:translate-x-1">
+                        <button key={ct.id} onClick={() => setViewContract({ title: ct.title, content: ct.contentTemplate })} disabled={!isPremium} className={`group bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 hover:border-secondary/50 cursor-pointer shadow-sm transition-all hover:translate-x-1 ${!isPremium ? 'opacity-70 cursor-not-allowed' : ''}`}>
                             <div className="flex items-center gap-4">
                                 <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center text-xl group-hover:bg-indigo-600 group-hover:text-white transition-colors"><i className="fa-solid fa-file-contract"></i></div>
                                 <div><h4 className="font-bold text-primary dark:text-white">{ct.title}</h4><p className="text-xs text-slate-500">Toque para abrir modelo</p></div>
                             </div>
-                        </div>
+                        </button>
                     ))}
                 </div>
             );
@@ -1328,7 +1343,7 @@ const WorkDetail: React.FC = () => {
                 <div className="space-y-4">
                     {STANDARD_CHECKLISTS.map((cl, idx) => (
                         <div key={idx} className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm">
-                            <button onClick={() => setActiveChecklist(activeChecklist === cl.category ? null : cl.category)} className="w-full p-5 flex justify-between items-center text-left hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+                            <button onClick={() => setActiveChecklist(activeChecklist === cl.category ? null : cl.category)} disabled={!isPremium} className={`w-full p-5 flex justify-between items-center text-left hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors ${!isPremium ? 'opacity-70 cursor-not-allowed' : ''}`}>
                                 <span className="font-bold text-sm flex items-center gap-3 text-primary dark:text-white"><div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${activeChecklist === cl.category ? 'bg-green-500 text-white' : 'bg-green-100 text-green-600'}`}><i className="fa-solid fa-list-check"></i></div>{cl.category}</span>
                                 <i className={`fa-solid fa-chevron-down transition-transform text-slate-400 ${activeChecklist === cl.category ? 'rotate-180' : ''}`}></i>
                             </button>
@@ -1370,7 +1385,7 @@ const WorkDetail: React.FC = () => {
                     <button onClick={() => subView !== 'NONE' ? setSubView('NONE') : navigate('/')} className="text-slate-400 hover:text-primary dark:hover:text-white"><i className="fa-solid fa-arrow-left text-xl"></i></button>
                     <h1 className="text-lg font-black text-primary dark:text-white uppercase tracking-tight truncate max-w-[200px]">
                         {subView !== 'NONE' 
-                            ? (subView === 'TEAM' ? 'Minha Equipe' : subView === 'SUPPLIERS' ? 'Fornecedores' : subView === 'REPORTS' ? 'Relatórios' : 'Detalhes')
+                            ? (subView === 'TEAM' ? 'Minha Equipe' : subView === 'SUPPLIERS' ? 'Fornecedores' : subView === 'REPORTS' ? 'Relatórios' : subView === 'PHOTOS' ? 'Fotos' : subView === 'PROJECTS' ? 'Projetos' : subView === 'CALCULATORS' ? 'Calculadoras' : subView === 'CONTRACTS' ? 'Contratos' : subView === 'CHECKLIST' ? 'Checklist' : 'Detalhes')
                             : work.name
                         }
                     </h1>
@@ -1470,12 +1485,13 @@ const WorkDetail: React.FC = () => {
                                 </div>
                                 <div className="grid grid-cols-2 gap-3">
                                     <div>
-                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Qtd Planejada</label>
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Qtd Plane</label>
                                         <input 
-                                            type="number"
+                                            type="number" 
                                             value={matPlannedQty} 
                                             onChange={e => setMatPlannedQty(e.target.value)} 
                                             className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold"
+                                            required
                                         />
                                     </div>
                                     <div>
@@ -1484,163 +1500,182 @@ const WorkDetail: React.FC = () => {
                                             value={matUnit} 
                                             onChange={e => setMatUnit(e.target.value)} 
                                             className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold"
+                                            required
+                                        />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Marca/Fornecedor (Opcional)</label>
+                                    <input 
+                                        value={matBrand} 
+                                        onChange={e => setMatBrand(e.target.value)} 
+                                        className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold"
+                                    />
+                                </div>
+                            </div>
+                            
+                            {/* REGISTER NEW PURCHASE (Optional) */}
+                            <div className="border-t pt-6 mt-4">
+                                <h4 className="text-sm font-bold text-slate-500 uppercase mb-3">Registrar Nova Compra</h4>
+                                <p className="text-xs text-slate-400 mb-4">A quantidade já comprada ({materialModal.material.purchasedQty} {materialModal.material.unit}) será atualizada.</p>
+                                <div className="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Qtd Comprada AGORA</label>
+                                        <input 
+                                            type="number" 
+                                            placeholder="0" 
+                                            value={matBuyQty} 
+                                            onChange={e => setMatBuyQty(e.target.value)} 
+                                            className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold"
+                                        />
+                                    </div>
+                                    <div>
+                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Custo Total DESSA Compra (R$)</label>
+                                        <input 
+                                            type="number" 
+                                            placeholder="0.00" 
+                                            value={matBuyCost} 
+                                            onChange={e => setMatBuyCost(e.target.value)} 
+                                            className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold"
                                         />
                                     </div>
                                 </div>
                             </div>
 
-                            {/* READ-ONLY STATUS */}
-                            <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-xl border border-green-200 dark:border-green-900 flex justify-between items-center">
-                                <span className="text-sm font-bold text-green-700 dark:text-green-400">Total Já Comprado:</span>
-                                <span className="font-mono font-black text-lg text-green-700 dark:text-green-400">{materialModal.material.purchasedQty} {materialModal.material.unit}</span>
-                            </div>
-
-                            {/* OPTIONAL NEW PURCHASE */}
-                            <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
-                                <label className="block text-xs font-black text-secondary uppercase mb-2 tracking-widest"><i className="fa-solid fa-cart-plus"></i> Registrar Nova Compra</label>
-                                <div className="grid grid-cols-2 gap-3">
-                                    <input type="number" placeholder="Qtd" value={matBuyQty} onChange={e => setMatBuyQty(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" />
-                                    <input type="number" placeholder="Valor (R$)" value={matBuyCost} onChange={e => setMatBuyCost(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" />
-                                </div>
-                                <p className="text-[10px] text-slate-400 mt-2">*Preencha apenas se houver nova compra. Se quiser só corrigir o nome/planejado, deixe vazio.</p>
-                            </div>
-
-                            <div className="flex gap-2">
-                                <button type="button" onClick={() => setMaterialModal({isOpen: false, material: null})} className="flex-1 bg-slate-100 py-3 rounded-xl font-bold">Cancelar</button>
-                                <button type="submit" className="flex-1 bg-primary text-white py-3 rounded-xl font-bold shadow-lg">Salvar Alterações</button>
+                            <div className="flex gap-2 pt-4">
+                                <button type="button" onClick={() => setMaterialModal({isOpen: false, material: null})} className="flex-1 bg-slate-100 dark:bg-slate-800 text-slate-500 py-3 rounded-xl font-bold">Cancelar</button>
+                                <button type="submit" className="flex-1 bg-primary text-white py-3 rounded-xl font-bold">Salvar Alterações</button>
                             </div>
                         </form>
                     </div>
                 </div>
             )}
 
-            {/* EXPENSE MODAL (ADD / EDIT) */}
+            {/* ADD/EDIT EXPENSE MODAL */}
             {expenseModal.isOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
-                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-6 shadow-2xl">
-                        <div className="flex justify-between items-center mb-4">
-                            <h3 className="text-xl font-bold text-primary dark:text-white">
-                                {expenseModal.mode === 'ADD' ? 'Novo Gasto' : 'Editar Gasto'}
-                            </h3>
-                            {expenseModal.mode === 'EDIT' && (
-                                <button onClick={handleDeleteExpense} className="text-red-500 hover:bg-red-50 p-2 rounded-lg transition-colors">
-                                    <i className="fa-solid fa-trash"></i>
-                                </button>
-                            )}
-                        </div>
-                        
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-6 shadow-2xl overflow-y-auto max-h-[90vh]">
+                        <h3 className="text-xl font-bold mb-4 text-primary dark:text-white">{expenseModal.mode === 'ADD' ? 'Nova Despesa' : 'Editar Gasto'}</h3>
                         <form onSubmit={handleSaveExpense} className="space-y-4">
-                            <input placeholder="Descrição (ex: Pagamento Pedreiro)" value={expDesc} onChange={e => setExpDesc(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required />
+                            <div>
+                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Descrição do Gasto</label>
+                                <input placeholder="Ex: Cimento, Diária Pedreiro, Licença" value={expDesc} onChange={e => setExpDesc(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold" required />
+                            </div>
                             
-                            {/* STATUS VISUAL FOR EDIT MODE ONLY - "TOTAL JÁ PAGO" */}
                             {expenseModal.mode === 'EDIT' && (
-                                <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-xl border border-green-200 dark:border-green-900 mb-2">
-                                    <div className="flex justify-between items-center mb-1">
-                                        <span className="text-[10px] font-bold text-green-700 dark:text-green-400 uppercase">Total Já Pago</span>
-                                        <span className="text-lg font-black text-green-700 dark:text-green-400">R$ {Number(expSavedAmount).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
-                                    </div>
-                                    {expTotalAgreed && Number(expTotalAgreed) > Number(expSavedAmount) && (
-                                        <div className="flex justify-between items-center border-t border-green-200 dark:border-green-800 pt-2 mt-2">
-                                            <span className="text-[10px] font-bold text-orange-600 dark:text-orange-400 uppercase">Restante</span>
-                                            <span className="text-sm font-bold text-orange-600 dark:text-orange-400">R$ {(Number(expTotalAgreed) - (Number(expSavedAmount) + (Number(expAmount) || 0))).toLocaleString('pt-BR', {minimumFractionDigits: 2})}</span>
-                                        </div>
-                                    )}
+                                <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-xs text-slate-500 font-bold">
+                                    <p className="mb-1">Valor já pago: <span className="text-primary dark:text-white">R$ {expSavedAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></p>
+                                    <p className="text-orange-500"><i className="fa-solid fa-info-circle mr-1"></i> Digite APENAS o valor do NOVO PAGAMENTO.</p>
                                 </div>
                             )}
 
-                            <div className="grid grid-cols-2 gap-2">
-                                <div className="relative">
-                                    <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Valor Pago Agora</label>
-                                    <div className="relative">
-                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">R$</span>
-                                        <input type="number" placeholder="0.00" value={expAmount} onChange={e => setExpAmount(e.target.value)} className="w-full pl-10 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required />
-                                    </div>
-                                </div>
-                                <div className="relative">
-                                    <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Total Combinado</label>
-                                    <div className="relative">
-                                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold">R$</span>
-                                        <input type="number" placeholder="(Opcional)" value={expTotalAgreed} onChange={e => setExpTotalAgreed(e.target.value)} className="w-full pl-10 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" />
-                                    </div>
-                                </div>
+                            <div>
+                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">{expenseModal.mode === 'ADD' ? 'Valor Total (R$)' : 'Valor do NOVO Pagamento (R$)'}</label>
+                                <input type="number" placeholder="0.00" value={expAmount} onChange={e => setExpAmount(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold" required />
                             </div>
 
-                            <div className="grid grid-cols-2 gap-2">
-                                <div>
-                                    <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Categoria</label>
-                                    <select value={expCategory} onChange={e => setExpCategory(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
-                                        <option value={ExpenseCategory.LABOR}>Mão de Obra</option>
-                                        <option value={ExpenseCategory.MATERIAL}>Material</option>
-                                        <option value={ExpenseCategory.PERMITS}>Taxas</option>
-                                        <option value={ExpenseCategory.OTHER}>Outros</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Data</label>
-                                    <input type="date" value={expDate} onChange={e => setExpDate(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required />
-                                </div>
-                            </div>
-                            
-                            {/* STEP SELECTION - ENSURING VISIBILITY */}
                             <div>
-                                <label className="text-[10px] font-bold text-slate-400 uppercase ml-1">Etapa Relacionada</label>
-                                <select value={expStepId} onChange={e => setExpStepId(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold text-sm">
-                                    <option value="">Sem Etapa (Geral)</option>
+                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Valor Total ACORDADO (para pagamentos parcelados/adiantados)</label>
+                                <input type="number" placeholder="Opcional: Ex: 1000.00" value={expTotalAgreed} onChange={e => setExpTotalAgreed(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold" />
+                            </div>
+
+                            <div>
+                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Categoria</label>
+                                <select value={expCategory} onChange={e => setExpCategory(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold">
+                                    {Object.values(ExpenseCategory).map(cat => (
+                                        <option key={cat} value={cat}>{cat}</option>
+                                    ))}
+                                    <option value="Serviços">Serviços</option>
+                                    <option value="Equipamentos">Equipamentos</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Etapa Relacionada (Opcional)</label>
+                                <select value={expStepId} onChange={e => setExpStepId(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold">
+                                    <option value="">Nenhuma</option>
                                     {steps.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
                                 </select>
                             </div>
 
+                            <div>
+                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Data do Pagamento</label>
+                                <input type="date" value={expDate} onChange={e => setExpDate(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold" required />
+                            </div>
+
                             <div className="flex gap-2 pt-2">
-                                <button type="button" onClick={() => setExpenseModal({isOpen: false, mode: 'ADD'})} className="flex-1 bg-slate-100 py-3 rounded-xl font-bold">Cancelar</button>
+                                {expenseModal.mode === 'EDIT' && (
+                                    <button type="button" onClick={handleDeleteExpense} className="w-12 h-12 bg-red-500/10 text-red-500 rounded-xl flex items-center justify-center shrink-0"><i className="fa-solid fa-trash"></i></button>
+                                )}
+                                <button type="button" onClick={() => setExpenseModal({ isOpen: false, mode: 'ADD' })} className="flex-1 bg-slate-100 dark:bg-slate-800 text-slate-500 py-3 rounded-xl font-bold">Cancelar</button>
                                 <button type="submit" className="flex-1 bg-primary text-white py-3 rounded-xl font-bold">Salvar</button>
                             </div>
                         </form>
                     </div>
                 </div>
             )}
-            
-            {/* TEAM & SUPPLIER FORM MODAL */}
+
+            {/* ADD/EDIT PERSON MODAL (Worker/Supplier) */}
             {isPersonModalOpen && (
-                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
                     <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-6 shadow-2xl overflow-y-auto max-h-[90vh]">
-                        <div className="flex items-center gap-3 mb-4">
-                             <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl ${personMode === 'WORKER' ? 'bg-blue-100 text-blue-600' : 'bg-amber-100 text-amber-600'}`}><i className={`fa-solid ${personMode === 'WORKER' ? 'fa-helmet-safety' : 'fa-truck'}`}></i></div>
-                             <div><h3 className="text-lg font-bold text-primary dark:text-white leading-tight">{personId ? 'Editar' : 'Adicionar'} {personMode === 'WORKER' ? 'Profissional' : 'Fornecedor'}</h3></div>
-                        </div>
+                        <h3 className="text-xl font-bold mb-4 text-primary dark:text-white">
+                            {personId ? 'Editar ' : 'Novo '} {personMode === 'WORKER' ? 'Profissional' : 'Fornecedor'}
+                        </h3>
                         <form onSubmit={handleSavePerson} className="space-y-4">
-                            <div><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Nome</label><input required className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold" value={personName} onChange={e => setPersonName(e.target.value)} /></div>
-                            <div><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{personMode === 'WORKER' ? 'Função' : 'Categoria'}</label><select required className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold text-sm" value={personRole} onChange={e => setPersonRole(e.target.value)}>{(personMode === 'WORKER' ? STANDARD_JOB_ROLES : STANDARD_SUPPLIER_CATEGORIES).map(r => <option key={r} value={r}>{r}</option>)}</select></div>
-                            <div><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Telefone / WhatsApp</label><input className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold" placeholder="51 99999-9999" value={personPhone} onChange={e => setPersonPhone(e.target.value)} /></div>
-                            <div><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Observações</label><textarea className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold h-20 resize-none" placeholder="Detalhes opcionais..." value={personNotes} onChange={e => setPersonNotes(e.target.value)}></textarea></div>
-                            <div className="flex gap-2 pt-2"><button type="button" onClick={() => setIsPersonModalOpen(false)} className="flex-1 py-3 font-bold text-slate-500 hover:bg-slate-100 rounded-xl">Cancelar</button><button type="submit" className="flex-1 py-3 font-bold bg-primary text-white rounded-xl shadow-lg">Salvar</button></div>
+                            <input placeholder="Nome" value={personName} onChange={e => setPersonName(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required />
+                            
+                            {personMode === 'WORKER' && (
+                                <select value={personRole} onChange={e => setPersonRole(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
+                                    {STANDARD_JOB_ROLES.map(role => <option key={role} value={role}>{role}</option>)}
+                                </select>
+                            )}
+                            {personMode === 'SUPPLIER' && (
+                                <select value={personRole} onChange={e => setPersonRole(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
+                                    {STANDARD_SUPPLIER_CATEGORIES.map(category => <option key={category} value={category}>{category}</option>)}
+                                </select>
+                            )}
+
+                            <input placeholder="Telefone (WhatsApp)" value={personPhone} onChange={e => setPersonPhone(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required />
+                            <textarea placeholder="Observações (endereço, especialidade, etc.)" value={personNotes} onChange={e => setPersonNotes(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 h-24"></textarea>
+
+                            <div className="flex gap-2 pt-2">
+                                <button type="button" onClick={() => setIsPersonModalOpen(false)} className="flex-1 bg-slate-100 dark:bg-slate-800 text-slate-500 py-3 rounded-xl font-bold">Cancelar</button>
+                                <button type="submit" className="flex-1 bg-primary text-white py-3 rounded-xl font-bold">Salvar</button>
+                            </div>
                         </form>
                     </div>
                 </div>
             )}
 
-            {/* CONTRACT VIEWER MODAL */}
+            {/* View Contract Modal */}
             {viewContract && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
-                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-lg p-6 shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
-                        <div className="flex justify-between items-center mb-4 pb-4 border-b border-slate-100 dark:border-slate-800">
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-lg p-6 shadow-2xl overflow-y-auto max-h-[90vh]">
+                        <div className="flex justify-between items-center mb-4">
                             <h3 className="text-xl font-bold text-primary dark:text-white">{viewContract.title}</h3>
-                            <button onClick={() => setViewContract(null)} className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500"><i className="fa-solid fa-xmark"></i></button>
+                            <button onClick={() => setViewContract(null)} className="text-slate-400 hover:text-primary dark:hover:text-white"><i className="fa-solid fa-xmark text-xl"></i></button>
                         </div>
-                        <div className="flex-1 overflow-y-auto p-4 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 mb-4">
-                            <pre className="whitespace-pre-wrap font-mono text-xs text-slate-600 dark:text-slate-300 leading-relaxed">{viewContract.content}</pre>
+                        <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-300">
+                            {viewContract.content}
                         </div>
-                        <div className="flex gap-3">
-                            <button onClick={() => {navigator.clipboard.writeText(viewContract.content); alert("Copiado!"); setViewContract(null);}} className="flex-1 py-3 bg-slate-100 dark:bg-slate-800 text-primary dark:text-white font-bold rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"><i className="fa-regular fa-copy mr-2"></i> Copiar</button>
-                            <button onClick={() => {const blob = new Blob([viewContract.content], {type: "application/msword"}); const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = `${viewContract.title}.doc`; link.click();}} className="flex-1 py-3 bg-primary text-white font-bold rounded-xl hover:bg-primary-light transition-colors"><i className="fa-solid fa-download mr-2"></i> Baixar Word</button>
-                        </div>
+                        <button onClick={() => setViewContract(null)} className="mt-6 w-full py-3 bg-primary text-white font-bold rounded-xl">Fechar</button>
                     </div>
                 </div>
             )}
 
-            <ZeModal isOpen={zeModal.isOpen} title={zeModal.title} message={zeModal.message} onConfirm={zeModal.onConfirm} onCancel={() => setZeModal(prev => ({ ...prev, isOpen: false }))} />
+            {/* Generic Confirmation Modal */}
+            <ZeModal
+                isOpen={zeModal.isOpen}
+                title={zeModal.title}
+                message={zeModal.message}
+                confirmText={zeModal.confirmText || "Confirmar"}
+                onConfirm={zeModal.onConfirm}
+                onCancel={() => setZeModal(prev => ({ ...prev, isOpen: false }))}
+                type={zeModal.type || 'DANGER'} // Default to DANGER for confirmation modals
+            />
         </div>
     );
 };
 
 export default WorkDetail;
-    
