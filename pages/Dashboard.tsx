@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.tsx';
@@ -244,6 +243,7 @@ const RiskRadar = ({
         </div>
 
         <div className="rounded-xl p-3 border border-slate-200/60 dark:border-white/10 bg-white/60 dark:bg-slate-950/20">
+          {/* FIX: Removed duplicate 'className' attribute. */}
           <p className={cx("text-[11px] font-black uppercase tracking-wider", mutedText)}>Compras</p>
           <p className="text-xl font-black text-slate-900 dark:text-white">{dailySummary.pendingMaterials}</p>
           <p className={cx("text-xs font-semibold", mutedText)}>pendências no checklist</p>
@@ -386,7 +386,7 @@ const Dashboard: React.FC = () => {
   const [currentTip] = useState<ZeTip>(() => getRandomZeTip());
   const [showWorkSelector, setShowWorkSelector] = useState(false);
   // Fix: Updated the type of zeModal state to explicitly use ZeModalProps.
-  const [zeModal, setZeModal] = useState<ZeModalProps & { workId?: string }>({ 
+  const [zeModal, setZeModal] = useState<ZeModalProps & { workIdToDelete?: string }>({ // NEW: Renamed to workIdToDelete
     isOpen: false, 
     title: '', 
     message: '',
@@ -465,7 +465,7 @@ const Dashboard: React.FC = () => {
       setIsLoadingDetails(true);
 
       try {
-        const [workStats, summary, notifs, workSteps, workExpenses, workMaterials] = await Promise.all([
+        const [workStats, summary, fetchedNotifs, workSteps, workExpenses, workMaterials] = await Promise.all([
           dbService.calculateWorkStats(focusWork.id),
           dbService.getDailySummary(focusWork.id),
           dbService.getNotifications(user.id),
@@ -478,9 +478,15 @@ const Dashboard: React.FC = () => {
 
         setStats(workStats);
         setDailySummary(summary);
-        setNotifications(notifs);
         setExpenses(workExpenses);
         setMaterials(workMaterials);
+
+        // NEW: Filter notifications to only show those for existing works or general notifications
+        const activeWorkIds = new Set(works.map(w => w.id));
+        const filteredNotifs = fetchedNotifs.filter(n => 
+          !n.workId || activeWorkIds.has(n.workId)
+        );
+        setNotifications(filteredNotifs);
 
         const nextSteps = workSteps
           .filter(s => s.status !== StepStatus.COMPLETED)
@@ -489,6 +495,7 @@ const Dashboard: React.FC = () => {
 
         setUpcomingSteps(nextSteps);
 
+        // Generate smart notifications for the *current focused work*
         dbService.generateSmartNotifications(user.id, focusWork.id, workSteps, workExpenses, workMaterials, focusWork);
       } catch (e) {
         console.error("Erro nos detalhes:", e);
@@ -497,12 +504,17 @@ const Dashboard: React.FC = () => {
       }
     };
 
-    if (focusWork?.id) fetchDetails();
-    else if (works.length > 0 && !focusWork) setFocusWork(works[0]);
-    else setIsLoadingDetails(false);
+    if (focusWork?.id && works.length > 0) { // Only fetch details if works are loaded and focusWork is set
+      fetchDetails();
+    } else if (works.length > 0 && !focusWork) {
+      // This case should ideally be handled by the initial load, but as a safeguard
+      setFocusWork(works[0]);
+    } else {
+      setIsLoadingDetails(false);
+    }
 
     return () => { isMounted = false; };
-  }, [focusWork?.id, user, authLoading]); // Added authLoading to dependencies
+  }, [focusWork?.id, user, authLoading, works]); // Added works to dependencies
 
   useEffect(() => {
     if (user?.plan !== PlanType.VITALICIO && user?.isTrial && trialDaysRemaining !== null && trialDaysRemaining <= 1) {
@@ -623,67 +635,89 @@ const Dashboard: React.FC = () => {
 
   const handleDeleteClick = (e: React.MouseEvent, workId: string, workName: string) => {
     e.stopPropagation();
+    console.log(`[DASHBOARD DELETE] handleDeleteClick chamado. workId: ${workId}, workName: ${workName}, userId: ${user?.id}`);
     setZeModal({
       isOpen: true,
       title: "Apagar Obra",
       message: `Tem certeza? Ao apagar a obra "${workName}", todo o histórico de gastos, compras e cronograma será perdido permanentemente.`,
-      workId,
+      workIdToDelete: workId, // Pass workId directly
       onConfirm: confirmDelete, 
       type: 'DANGER',
-      onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })) // Pass a no-op if onConfirm is present
+      onCancel: () => {
+        console.log("[DASHBOARD DELETE] Delete cancelado pelo usuário.");
+        setZeModal(prev => ({ ...prev, isOpen: false }))
+      }
     });
   };
 
   const confirmDelete = async () => {
-    if (!zeModal.workId || !user) {
-        console.error("Erro: workId ou usuário não disponível para exclusão.");
-        // Ensure modal is closed or shows error
+    // NEW: Use workIdToDelete directly from modal state
+    const workId = zeModal.workIdToDelete;
+    console.log(`[DASHBOARD DELETE] confirmDelete chamado. workIdToDelete: ${workId}, userId: ${user?.id}`);
+
+    if (!workId || !user) {
+        console.error("[DASHBOARD DELETE] Erro: workIdToDelete ou usuário não disponível para exclusão.");
         setZeModal(prev => ({ 
             ...prev, 
             message: "Não foi possível identificar a obra para exclusão. Tente novamente.", 
             type: 'ERROR',
             confirmText: "Entendido",
-            onConfirm: () => setZeModal(p => ({ ...p, isOpen: false })), // Closes and resets, no re-attempt
-            onCancel: () => setZeModal(p => ({ ...p, isOpen: false })) // Closes and resets
+            onConfirm: () => setZeModal(p => ({ ...p, isOpen: false, onConfirm: () => {}, onCancel: () => {} })),
+            onCancel: () => setZeModal(p => ({ ...p, isOpen: false, onConfirm: () => {}, onCancel: () => {} }))
         }));
         return;
     }
 
-    setIsDeletingWork(true); // NEW: Set loading for delete operation
+    setIsDeletingWork(true);
     try {
-      await dbService.deleteWork(zeModal.workId);
+      console.log(`[DASHBOARD DELETE] Iniciando dbService.deleteWork para workId: ${workId}`);
+      await dbService.deleteWork(workId);
+      console.log(`[DASHBOARD DELETE] dbService.deleteWork concluído com sucesso para workId: ${workId}`);
       
-      // Close modal immediately after successful delete operation
-      setZeModal(prev => ({ ...prev, isOpen: false, onConfirm: () => {}, onCancel: () => {} })); // Ensure onConfirm is also reset to default
+      setZeModal(prev => ({ ...prev, isOpen: false, onConfirm: () => {}, onCancel: () => {} }));
 
       const updatedWorks = await dbService.getWorks(user.id);
+      console.log(`[DASHBOARD DELETE] Obras atualizadas após exclusão: ${updatedWorks.length}`);
       setWorks(updatedWorks);
       
       if (updatedWorks.length > 0) {
         const stillExists = updatedWorks.find(w => w.id === focusWork?.id);
         if (stillExists) {
             setFocusWork(stillExists);
+            console.log(`[DASHBOARD DELETE] FocusWork mantido: ${stillExists.name}`);
         } else {
-            // If the focused work was deleted, set the first available work as focus, or null if none.
-            setFocusWork(updatedWorks.length > 0 ? updatedWorks[0] : null);
+            setFocusWork(updatedWorks[0]);
+            console.log(`[DASHBOARD DELETE] FocusWork atualizado para: ${updatedWorks[0].name}`);
         }
       } else {
         setFocusWork(null);
+        console.log("[DASHBOARD DELETE] Nenhuma obra restante, FocusWork definido como null.");
       }
+      // NEW: Force refresh notifications as well to clean up any remaining stale ones
+      setNotifications([]); // Clear instantly
+      dbService.getNotifications(user.id).then(fetched => {
+        const activeWorkIds = new Set(updatedWorks.map(w => w.id));
+        const filteredNotifs = fetched.filter(n => 
+          !n.workId || activeWorkIds.has(n.workId)
+        );
+        setNotifications(filteredNotifs);
+      });
+      
+
     } catch (e: any) {
-      console.error("Erro ao apagar", e);
-      // Removed `alert` call to centralize feedback in ZeModal
+      console.error(`[DASHBOARD DELETE] Erro ao apagar obra ${workId}:`, e);
       setZeModal(prev => ({ 
         ...prev, 
-        title: "Erro ao Excluir", // Changed title for error state
-        message: `Erro ao excluir obra: ${e.message || "Um erro desconhecido ocorreu."}`, 
+        title: "Erro ao Excluir", 
+        message: `Erro ao excluir obra "${workId}": ${e.message || "Um erro desconhecido ocorreu."}`, 
         type: 'ERROR', 
-        confirmText: "Entendido", // Change to simple "understood"
-        onConfirm: () => setZeModal(p => ({ ...p, isOpen: false })), // Closes and resets, no re-attempt
-        onCancel: () => setZeModal(p => ({ ...p, isOpen: false })) // Closes and resets
+        confirmText: "Entendido",
+        onConfirm: () => setZeModal(p => ({ ...p, isOpen: false, onConfirm: () => {}, onCancel: () => {} })),
+        onCancel: () => setZeModal(p => ({ ...p, isOpen: false, onConfirm: () => {}, onCancel: () => {} }))
       }));
     } finally {
-      setIsDeletingWork(false); // NEW: Reset loading regardless of success/failure
+      setIsDeletingWork(false);
+      console.log(`[DASHBOARD DELETE] Fim do confirmDelete para workId: ${workId}. isDeletingWork: false`);
     }
   };
 
@@ -873,7 +907,7 @@ const Dashboard: React.FC = () => {
       <div className="mb-8 relative overflow-hidden rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm group hover:shadow-md transition-all">
         <div className="absolute top-0 right-0 w-32 h-32 bg-secondary/10 rounded-full blur-3xl translate-x-10 -translate-y-10 group-hover:bg-secondary/20 transition-all"></div>
         <div className="flex items-center gap-5 p-5 relative z-10">
-          <div className="w-16 h-16 rounded-full p-1 bg-gradient-to-br from-slate-100 to-slate-300 dark:from-slate-700 dark:to-slate-800 shrink-0 shadow-inner">
+          <div className="w-16 h-16 rounded-full p-1 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-800 shrink-0 shadow-inner">
             <img
               src={ZE_AVATAR}
               alt="Zeca da Obra"
