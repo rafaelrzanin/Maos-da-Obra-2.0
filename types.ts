@@ -151,6 +151,7 @@ export interface WorkFile {
 export interface Notification {
   id: string;
   userId: string;
+  workId?: string; // NEW: Added workId to link notification to a specific work
   title: string;
   message: string;
   date: string;
