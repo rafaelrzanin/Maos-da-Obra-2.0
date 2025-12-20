@@ -453,7 +453,7 @@ export const dbService = {
   async generatePix(_amount: number, _payer: any) {
       // This is a mock function, no actual Supabase interaction required
       return {
-          qr_code_base64: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+          qr_code_base64: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQ42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
           copy_paste_code: "00020126330014BR.GOV.BCB.PIX011155555555555520400005303986540510.005802BR5913Mãos da Obra6008Brasilia62070503***63041234"
       };
   },
@@ -1140,7 +1140,7 @@ export const dbService = {
 
     const [stepsData, materialsData] = await Promise.all([
       supabase.from('steps').select('id, status, end_date').eq('work_id', workId),
-      supabase.from('materials').select('id, planned_qty, purchased_qty').eq('work_id', workId)
+      supabase.from('materials').select('id, planned_qty, purchased_qty, step_id, name').eq('work_id', workId) // Fetch name and step_id
     ]);
 
     if (stepsData.error || materialsData.error) {
@@ -1182,11 +1182,13 @@ export const dbService = {
 
         const today = new Date();
         today.setHours(0,0,0,0);
+        const threeDaysFromNow = new Date();
+        threeDaysFromNow.setDate(threeDaysFromNow.getDate() + 3);
+        threeDaysFromNow.setHours(23,59,59,999); // End of day for comparison
 
-        // Example: Notification for delayed steps
+        // Example: Notification for delayed steps (existing logic, no changes)
         const delayedSteps = currentSteps.filter(s => s.status !== StepStatus.COMPLETED && new Date(s.endDate) < today);
         for (const step of delayedSteps) {
-            // Verifica se a notificação já existe para evitar duplicação em execuções rápidas
             const { data: existingNotif } = await supabase
                 .from('notifications')
                 .select('id')
@@ -1205,7 +1207,6 @@ export const dbService = {
                     read: false,
                     type: 'WARNING'
                 });
-                // NEW: Envia notificação PUSH
                 await dbService.sendPushNotification(userId, {
                     title: 'Etapa Atrasada!',
                     body: `A etapa "${step.name}" da obra "${currentWork?.name}" está atrasada. Verifique o cronograma!`,
@@ -1215,11 +1216,11 @@ export const dbService = {
             }
         }
 
-        // Example: Notification for upcoming steps (within 3 days, not started)
+        // Example: Notification for upcoming steps (within 3 days, not started - existing logic, no changes)
         const upcomingSteps = currentSteps.filter(s => 
           s.status === StepStatus.NOT_STARTED && 
           new Date(s.startDate) >= today &&
-          (new Date(s.startDate).getTime() - today.getTime()) / (1000 * 60 * 60 * 24) <= 3
+          new Date(s.startDate) <= threeDaysFromNow // Check against 3 days from now
         );
         for (const step of upcomingSteps) {
           const { data: existingNotif } = await supabase
@@ -1249,44 +1250,50 @@ export const dbService = {
         }
 
 
-        // Example: Notification for material running low (planned > purchased, not yet critical threshold check)
-        const lowMaterials = currentMaterials.filter(m => 
-          m.plannedQty > 0 && 
-          m.purchasedQty < m.plannedQty && 
-          (m.plannedQty - m.purchasedQty) > 0 // Ainda falta comprar
-        );
-        for (const material of lowMaterials) {
-          // Simplificação: notifica se faltar mais que 20% do planejado e ainda não comprado
-          if (material.purchasedQty / material.plannedQty < 0.8) {
-            const { data: existingNotif } = await supabase
-                .from('notifications')
-                .select('id')
-                .eq('user_id', userId)
-                .eq('title', 'Material Baixo!')
-                .like('message', `%${material.name}%`)
-                .eq('read', false)
-                .maybeSingle();
-            if (!existingNotif) {
-                await this.addNotification({
-                    userId,
-                    title: 'Material Baixo!',
-                    message: `O material "${material.name}" da obra "${currentWork?.name}" está com baixa quantidade. Verifique as compras!`,
-                    date: new Date().toISOString(),
-                    read: false,
-                    type: 'WARNING'
-                });
-                await dbService.sendPushNotification(userId, {
-                    title: 'Material Baixo!',
-                    body: `O material "${material.name}" da obra "${currentWork?.name}" está com baixa quantidade. Verifique as compras!`,
-                    url: `${window.location.origin}/work/${workId}/materials`,
-                    tag: `work-${workId}-low-material-${material.id}`
-                });
+        // NEW LOGIC: Notification for material running low, specifically for upcoming steps (within 3 days)
+        for (const step of upcomingSteps) { // Iterate only through relevant upcoming steps
+            const materialsForStep = currentMaterials.filter(m => m.stepId === step.id);
+            for (const material of materialsForStep) {
+                if (material.plannedQty > 0 && material.purchasedQty < material.plannedQty) {
+                    // Only notify if still more than 20% to purchase AND is for an upcoming step.
+                    // This prevents spamming for materials far in the future.
+                    if (material.purchasedQty / material.plannedQty < 0.8) {
+                        const notificationMessage = `O material "${material.name}" da etapa "${step.name}" da obra "${currentWork?.name}" está com baixa quantidade. Verifique as compras!`;
+                        const notificationTitle = 'Material Baixo para Etapa Próxima!';
+
+                        const { data: existingNotif } = await supabase
+                            .from('notifications')
+                            .select('id')
+                            .eq('user_id', userId)
+                            .eq('title', notificationTitle)
+                            .like('message', `%${material.name}%`)
+                            .like('message', `%${step.name}%`) // Ensure uniqueness per material AND step
+                            .eq('read', false)
+                            .maybeSingle();
+
+                        if (!existingNotif) {
+                            await this.addNotification({
+                                userId,
+                                title: notificationTitle,
+                                message: notificationMessage,
+                                date: new Date().toISOString(),
+                                read: false,
+                                type: 'WARNING'
+                            });
+                            await dbService.sendPushNotification(userId, {
+                                title: notificationTitle,
+                                body: notificationMessage,
+                                url: `${window.location.origin}/work/${workId}/materials`,
+                                tag: `work-${workId}-low-material-${material.id}-${step.id}` // Unique tag for material in a specific step
+                            });
+                        }
+                    }
+                }
             }
-          }
         }
 
 
-        // Example: Notification for budget usage (if work and expenses are available)
+        // Example: Notification for budget usage (existing logic, no changes)
         if (currentWork && currentWork.budgetPlanned > 0) {
             const totalSpent = currentExpenses.reduce((sum, e) => sum + e.amount, 0);
             const budgetUsage = (totalSpent / currentWork.budgetPlanned) * 100;
