@@ -646,13 +646,13 @@ const Dashboard: React.FC = () => {
       type: 'DANGER',
       onCancel: () => {
         console.log("[DASHBOARD DELETE] Delete cancelado pelo usuário.");
-        setZeModal(prev => ({ ...prev, isOpen: false }))
+        setZeModal(prev => ({ ...prev, isOpen: false, onConfirm: () => {}, onCancel: () => {} })) // Clear callbacks explicitly
       }
     });
   };
 
   const confirmDelete = async () => {
-    // NEW: Use workIdToDelete directly from modal state
+    // NEW: Ensure workIdToDelete is of type string, as it's optional in ZeModalProps
     const workId = zeModal.workIdToDelete;
     console.log(`[DASHBOARD DELETE] confirmDelete chamado. workIdToDelete: ${workId}, userId: ${user?.id}`);
 
@@ -675,27 +675,33 @@ const Dashboard: React.FC = () => {
       await dbService.deleteWork(workId);
       console.log(`[DASHBOARD DELETE] dbService.deleteWork concluído com sucesso para workId: ${workId}`);
       
-      setZeModal(prev => ({ ...prev, isOpen: false, onConfirm: () => {}, onCancel: () => {} }));
+      // Close the modal upon successful deletion
+      setZeModal(prev => ({ ...prev, isOpen: false, onConfirm: () => {}, onCancel: () => {} })); // Clear callbacks explicitly
 
+      // Re-fetch all works to get the latest list
       const updatedWorks = await dbService.getWorks(user.id);
       console.log(`[DASHBOARD DELETE] Obras atualizadas após exclusão: ${updatedWorks.length}`);
       setWorks(updatedWorks);
       
+      // Update focusWork based on the new list
       if (updatedWorks.length > 0) {
+        // Try to keep the focus on the current work if it still exists
         const stillExists = updatedWorks.find(w => w.id === focusWork?.id);
         if (stillExists) {
             setFocusWork(stillExists);
             console.log(`[DASHBOARD DELETE] FocusWork mantido: ${stillExists.name}`);
         } else {
+            // If the deleted work was the focus or it no longer exists, set focus to the first work
             setFocusWork(updatedWorks[0]);
             console.log(`[DASHBOARD DELETE] FocusWork atualizado para: ${updatedWorks[0].name}`);
         }
       } else {
+        // If no works remain, clear focusWork
         setFocusWork(null);
         console.log("[DASHBOARD DELETE] Nenhuma obra restante, FocusWork definido como null.");
       }
       // NEW: Force refresh notifications as well to clean up any remaining stale ones
-      setNotifications([]); // Clear instantly
+      setNotifications([]); // Clear instantly for better UX
       dbService.getNotifications(user.id).then(fetched => {
         const activeWorkIds = new Set(updatedWorks.map(w => w.id));
         const filteredNotifs = fetched.filter(n => 
@@ -707,14 +713,15 @@ const Dashboard: React.FC = () => {
 
     } catch (e: any) {
       console.error(`[DASHBOARD DELETE] Erro ao apagar obra ${workId}:`, e);
+      // Update modal to show an error message
       setZeModal(prev => ({ 
         ...prev, 
         title: "Erro ao Excluir", 
-        message: `Erro ao excluir obra "${workId}": ${e.message || "Um erro desconhecido ocorreu."}`, 
+        message: `Erro ao excluir obra "${focusWork?.name || workId}": ${e.message || "Um erro desconhecido ocorreu."}`, // More specific message
         type: 'ERROR', 
-        confirmText: "Entendido",
-        onConfirm: () => setZeModal(p => ({ ...p, isOpen: false, onConfirm: () => {}, onCancel: () => {} })),
-        onCancel: () => setZeModal(p => ({ ...p, isOpen: false, onConfirm: () => {}, onCancel: () => {} }))
+        confirmText: "Entendido", // Change text for error acknowledgment
+        onConfirm: () => setZeModal(p => ({ ...p, isOpen: false, onConfirm: () => {}, onCancel: () => {} })), // Close on "Entendido"
+        onCancel: () => setZeModal(p => ({ ...p, isOpen: false, onConfirm: () => {}, onCancel: () => {} })) // Also close if user attempts to cancel error modal
       }));
     } finally {
       setIsDeletingWork(false);
