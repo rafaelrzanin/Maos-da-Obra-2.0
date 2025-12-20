@@ -1,5 +1,4 @@
 
-
 export enum PlanType {
   MENSAL = 'MENSAL',
   SEMESTRAL = 'SEMESTRAL',
@@ -207,6 +206,7 @@ declare global {
   interface ImportMetaEnv {
     readonly VITE_SUPABASE_URL: string;
     readonly VITE_SUPABASE_ANON_KEY: string;
+    readonly VITE_VAPID_PUBLIC_KEY: string; // Adicionado explicitamente para client-side
     // Add an index signature to allow dynamic access with string keys
     [key: string]: string | undefined; 
   }
@@ -223,6 +223,9 @@ declare global {
       // NEW: VAPID keys for Web Push Notifications
       readonly VAPID_PUBLIC_KEY: string;
       readonly VAPID_PRIVATE_KEY: string;
+      // Adicionado explicitamente para serverless functions/process.env
+      readonly VITE_SUPABASE_URL: string; 
+      readonly VITE_SUPABASE_ANON_KEY: string;
       // Add an index signature to allow dynamic access with string keys
       [key: string]: string | undefined; 
     }
