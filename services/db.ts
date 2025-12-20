@@ -90,6 +90,7 @@ const parseExpenseFromDB = (data: any): Expense => ({
 const parseWorkerFromDB = (data: any): Worker => ({
     id: data.id,
     userId: data.user_id,
+    workId: data.work_id, // NEW: Parse work_id
     name: data.name,
     role: data.role,
     phone: data.phone,
@@ -100,6 +101,7 @@ const parseWorkerFromDB = (data: any): Worker => ({
 const parseSupplierFromDB = (data: any): Supplier => ({
     id: data.id,
     userId: data.user_id,
+    workId: data.work_id, // NEW: Parse work_id
     name: data.name,
     category: data.category,
     phone: data.phone,
@@ -618,6 +620,9 @@ export const dbService = {
         await supabase.from('expenses').delete().eq('work_id', workId);
         await supabase.from('work_photos').delete().eq('work_id', workId);
         await supabase.from('work_files').delete().eq('work_id', workId);
+        // NEW: Delete workers and suppliers tied to this work
+        await supabase.from('workers').delete().eq('work_id', workId);
+        await supabase.from('suppliers').delete().eq('work_id', workId);
         
         const { error } = await supabase.from('works').delete().eq('id', workId);
         if (error) throw error;
@@ -871,9 +876,9 @@ export const dbService = {
   },
 
   // --- WORKERS ---
-  async getWorkers(userId: string): Promise<Worker[]> {
+  async getWorkers(workId: string): Promise<Worker[]> { // NEW: Accepts workId
     // Supabase is guaranteed to be initialized now
-    const { data, error } = await supabase.from('workers').select('*').eq('user_id', userId).order('name', { ascending: true });
+    const { data, error } = await supabase.from('workers').select('*').eq('work_id', workId).order('name', { ascending: true }); // NEW: Filter by work_id
     if (error) {
       console.error("Erro ao buscar profissionais:", error);
       return [];
@@ -885,6 +890,7 @@ export const dbService = {
     // Supabase is guaranteed to be initialized now
     const { data, error } = await supabase.from('workers').insert({
       user_id: worker.userId,
+      work_id: worker.workId, // NEW: Include work_id
       name: worker.name,
       role: worker.role,
       phone: worker.phone,
@@ -906,7 +912,7 @@ export const dbService = {
       phone: worker.phone,
       daily_rate: worker.dailyRate,
       notes: worker.notes
-    }).eq('id', worker.id).select().single();
+    }).eq('id', worker.id).eq('work_id', worker.workId).select().single(); // NEW: Filter by work_id
     if (error) {
       console.error("Erro ao atualizar profissional:", error);
       throw error;
@@ -914,9 +920,9 @@ export const dbService = {
     return parseWorkerFromDB(data);
   },
 
-  async deleteWorker(workerId: string): Promise<void> {
+  async deleteWorker(workerId: string, workId: string): Promise<void> { // NEW: Accepts workId
     // Supabase is guaranteed to be initialized now
-    const { error } = await supabase.from('workers').delete().eq('id', workerId);
+    const { error } = await supabase.from('workers').delete().eq('id', workerId).eq('work_id', workId); // NEW: Filter by work_id
     if (error) {
       console.error("Erro ao apagar profissional:", error);
       throw error;
@@ -924,9 +930,9 @@ export const dbService = {
   },
 
   // --- SUPPLIERS ---
-  async getSuppliers(userId: string): Promise<Supplier[]> {
+  async getSuppliers(workId: string): Promise<Supplier[]> { // NEW: Accepts workId
     // Supabase is guaranteed to be initialized now
-    const { data, error } = await supabase.from('suppliers').select('*').eq('user_id', userId).order('name', { ascending: true });
+    const { data, error } = await supabase.from('suppliers').select('*').eq('work_id', workId).order('name', { ascending: true }); // NEW: Filter by work_id
     if (error) {
       console.error("Erro ao buscar fornecedores:", error);
       return [];
@@ -938,6 +944,7 @@ export const dbService = {
     // Supabase is guaranteed to be initialized now
     const { data, error } = await supabase.from('suppliers').insert({
       user_id: supplier.userId,
+      work_id: supplier.workId, // NEW: Include work_id
       name: supplier.name,
       category: supplier.category,
       phone: supplier.phone,
@@ -961,7 +968,7 @@ export const dbService = {
       email: supplier.email,
       address: supplier.address,
       notes: supplier.notes
-    }).eq('id', supplier.id).select().single();
+    }).eq('id', supplier.id).eq('work_id', supplier.workId).select().single(); // NEW: Filter by work_id
     if (error) {
       console.error("Erro ao atualizar fornecedor:", error);
       throw error;
@@ -969,9 +976,9 @@ export const dbService = {
     return parseSupplierFromDB(data);
   },
 
-  async deleteSupplier(supplierId: string): Promise<void> {
+  async deleteSupplier(supplierId: string, workId: string): Promise<void> { // NEW: Accepts workId
     // Supabase is guaranteed to be initialized now
-    const { error } = await supabase.from('suppliers').delete().eq('id', supplierId);
+    const { error } = await supabase.from('suppliers').delete().eq('id', supplierId).eq('work_id', workId); // NEW: Filter by work_id
     if (error) {
       console.error("Erro ao apagar fornecedor:", error);
       throw error;
@@ -1197,6 +1204,7 @@ export const dbService = {
 
         const todayLocalMidnight = new Date();
         todayLocalMidnight.setHours(0, 0, 0, 0); // Local midnight today
+        const todayDateString = todayLocalMidnight.toISOString().split('T')[0]; // For daily tag
 
         const threeDaysFromNowLocalMidnight = new Date();
         threeDaysFromNowLocalMidnight.setDate(threeDaysFromNowLocalMidnight.getDate() + 3);
@@ -1258,7 +1266,7 @@ export const dbService = {
             // Calculate days until start for more precise message
             const daysUntilStart = Math.ceil((getLocalMidnightDate(step.startDate).getTime() - todayLocalMidnight.getTime()) / (1000 * 60 * 60 * 24));
 
-            const notificationTag = `work-${workId}-upcoming-step-${step.id}`; // Unique tag
+            const notificationTag = `work-${workId}-upcoming-step-${step.id}-${todayDateString}`; // NEW: Add daily tag
             const { data: existingNotif } = await supabase
                 .from('notifications')
                 .select('id')
@@ -1293,7 +1301,7 @@ export const dbService = {
         // FIX: Ensure this logic runs for materials tied to *truly* upcoming steps
         for (const step of upcomingSteps) { 
             const materialsForStep = currentMaterials.filter(m => m.stepId === step.id);
-            console.log(`[NOTIF DEBUG] Materials for upcoming step "${step.name}": ${materialsForStep.map(m => m.name).join(', ')}`);
+            console.log(`[NOTIF DEBUG] Materials for upcoming step "${step.name}": ${materialsForStep.map(m => `${m.name} (Planned: ${m.plannedQty}, Purchased: ${m.purchasedQty})`).join(', ')}`);
 
             for (const material of materialsForStep) {
                 // FIX: Ensure plannedQty is greater than 0 to avoid division by zero and irrelevant notifications
@@ -1301,7 +1309,7 @@ export const dbService = {
                     // Only notify if still more than 20% to purchase
                     if ((material.purchasedQty / material.plannedQty) < 0.8) {
                         // FIX: Add current date to the tag to ensure daily re-notification if not dismissed/resolved
-                        const notificationTag = `work-${workId}-low-material-${material.id}-${step.id}-${todayLocalMidnight.toISOString().split('T')[0]}`; 
+                        const notificationTag = `work-${workId}-low-material-${material.id}-${step.id}-${todayDateString}`; 
 
                         const { data: existingNotif } = await supabase
                             .from('notifications')
