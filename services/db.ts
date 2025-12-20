@@ -132,6 +132,7 @@ const parseFileFromDB = (data: any): WorkFile => ({
 const parseNotificationFromDB = (data: any): Notification => ({
     id: data.id,
     userId: data.user_id,
+    workId: data.work_id, // NEW: Parse work_id
     title: data.title,
     message: data.message,
     date: data.date,
@@ -623,6 +624,8 @@ export const dbService = {
         // NEW: Delete workers and suppliers tied to this work
         await supabase.from('workers').delete().eq('work_id', workId);
         await supabase.from('suppliers').delete().eq('work_id', workId);
+        // NEW: Delete notifications tied to this work
+        await supabase.from('notifications').delete().eq('work_id', workId);
         
         const { error } = await supabase.from('works').delete().eq('id', workId);
         if (error) throw error;
@@ -1068,6 +1071,7 @@ export const dbService = {
     // Supabase is guaranteed to be initialized now
     const { data, error } = await supabase.from('notifications').insert({
       user_id: notification.userId,
+      work_id: notification.workId, // NEW: Include work_id
       title: notification.title,
       message: notification.message,
       date: notification.date,
@@ -1234,6 +1238,7 @@ export const dbService = {
                 console.log(`[NOTIF GENERATION] Adding delayed step notification: ${step.name}`); // Debug log
                 await this.addNotification({
                     userId,
+                    workId, // NEW: Add workId to notification
                     title: 'Etapa Atrasada!',
                     message: `A etapa "${step.name}" da obra "${currentWork?.name}" está atrasada. Verifique o cronograma!`,
                     date: new Date().toISOString(),
@@ -1279,6 +1284,7 @@ export const dbService = {
                 console.log(`[NOTIF GENERATION] Adding upcoming step notification: ${step.name}`); // Debug log
                 await this.addNotification({
                     userId,
+                    workId, // NEW: Add workId to notification
                     // FIX: Improved phrasing
                     title: `Próxima Etapa: ${step.name}!`,
                     message: `A etapa "${step.name}" da obra "${currentWork?.name}" inicia em ${daysUntilStart} dia(s). Prepare-se!`,
@@ -1325,6 +1331,7 @@ export const dbService = {
                             console.log(`[NOTIF GENERATION] Adding low material notification: ${material.name} for step ${step.name}`); // Debug log
                             await this.addNotification({
                                 userId,
+                                workId, // NEW: Add workId to notification
                                 // FIX: Improved phrasing
                                 title: `Atenção: Material em falta para a etapa ${step.name}!`,
                                 message: `O material "${material.name}" (${material.purchasedQty}/${material.plannedQty} ${material.unit}) para a etapa "${step.name}" da obra "${currentWork?.name}" está em falta. Faça a compra!`,
@@ -1365,6 +1372,7 @@ export const dbService = {
                     console.log(`[NOTIF GENERATION] Adding budget warning notification: ${currentWork.name}`); // Debug log
                     await this.addNotification({
                         userId,
+                        workId, // NEW: Add workId to notification
                         title: 'Atenção ao Orçamento!',
                         message: `Você já usou ${Math.round(budgetUsage)}% do orçamento da obra "${currentWork.name}".`,
                         date: new Date().toISOString(),
@@ -1393,6 +1401,7 @@ export const dbService = {
                     console.log(`[NOTIF GENERATION] Adding budget exceeded notification: ${currentWork.name}`); // Debug log
                     await this.addNotification({
                         userId,
+                        workId, // NEW: Add workId to notification
                         title: 'Orçamento Estourado!',
                         message: `O orçamento da obra "${currentWork?.name}" foi excedido em ${Math.round(budgetUsage - 100)}%.`,
                         date: new Date().toISOString(),
