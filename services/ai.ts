@@ -1,4 +1,5 @@
 
+
 import { GoogleGenAI } from "@google/genai";
 
 // Helper function to safely get environment variables, checking both process.env and import.meta.env
@@ -32,14 +33,14 @@ const safeGetEnv = (key: string): string | undefined => {
 };
 
 // Access API_KEY using the safeGetEnv helper
-const apiKey = safeGetEnv('API_KEY');
+const apiKey = safeGetEnv('API_KEY'); // This will now correctly map to VITE_GOOGLE_API_KEY via vite.config.ts
 
 let ai: GoogleGenAI | null = null;
 
 // NEW: Strict check for API key
 if (!apiKey) {
   console.error("ERRO CRÍTICO: Google GenAI API Key (process.env.API_KEY) não está configurada.");
-  console.error("Por favor, adicione sua chave de API nas variáveis de ambiente do seu ambiente de deploy (Vercel, etc.) ou no seu arquivo .env local.");
+  console.error("Por favor, adicione sua chave de API nas variáveis de ambiente do seu ambiente de deploy (Vercel, etc.) como 'VITE_GOOGLE_API_KEY' ou no seu arquivo .env local.");
   // A mensagem no frontend já indicará a falta, mas o console será mais explícito.
   // Não lançaremos um erro para que o fallback offline possa ser exibido.
 } else {
