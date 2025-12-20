@@ -147,8 +147,8 @@ const WorkDetail: React.FC = () => {
                 dbService.getSteps(w.id),
                 dbService.getMaterials(w.id),
                 dbService.getExpenses(w.id),
-                dbService.getWorkers(w.userId),
-                dbService.getSuppliers(w.userId),
+                dbService.getWorkers(w.id), // NEW: Fetch workers for this specific work
+                dbService.getSuppliers(w.id), // NEW: Fetch suppliers for this specific work
                 dbService.getPhotos(w.id),
                 dbService.getFiles(w.id),
                 dbService.calculateWorkStats(w.id) // Fetch work stats here
@@ -399,6 +399,11 @@ const WorkDetail: React.FC = () => {
     };
 
     const openPersonModal = (mode: 'WORKER' | 'SUPPLIER', item?: Worker | Supplier) => {
+        if (!user || !work) {
+            console.error("Usuário ou Obra não disponíveis para abrir modal de pessoa.");
+            return;
+        }
+
         setPersonMode(mode);
         if (item) {
             setPersonId(item.id);
@@ -419,10 +424,14 @@ const WorkDetail: React.FC = () => {
 
     const handleSavePerson = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!work) return;
+        if (!user || !work) {
+            console.error("Usuário ou Obra não disponíveis para salvar pessoa.");
+            return;
+        }
 
         const payload = {
-            userId: work.userId,
+            userId: user.id, // Keep user ownership
+            workId: work.id, // NEW: Link to specific work
             name: personName,
             phone: personPhone,
             notes: personNotes
@@ -440,14 +449,14 @@ const WorkDetail: React.FC = () => {
         setIsPersonModalOpen(false);
     };
 
-    const handleDeletePerson = (id: string, mode: 'WORKER' | 'SUPPLIER') => {
+    const handleDeletePerson = (id: string, workId: string, mode: 'WORKER' | 'SUPPLIER') => { // NEW: Pass workId
         setZeModal({
             isOpen: true,
             title: mode === 'WORKER' ? 'Excluir Profissional' : 'Excluir Fornecedor',
-            message: 'Tem certeza? Essa ação não pode ser desfeita.',
+            message: 'Tem certeza? Essa ação não pode ser desfeita. O profissional/fornecedor será removido APENAS desta obra.',
             onConfirm: async () => {
-                if (mode === 'WORKER') await dbService.deleteWorker(id);
-                else await dbService.deleteSupplier(id);
+                if (mode === 'WORKER') await dbService.deleteWorker(id, workId); // NEW: Pass workId
+                else await dbService.deleteSupplier(id, workId); // NEW: Pass workId
                 await load();
                 setZeModal(prev => ({ ...prev, isOpen: false, onCancel: () => {} })); // Reset onCancel when modal closes
             },
@@ -853,7 +862,7 @@ const WorkDetail: React.FC = () => {
                         </button>
                     </div>
                     <div className="space-y-3">
-                        {workers.length === 0 && <p className="text-center text-slate-400 py-10">Nenhum profissional cadastrado.</p>}
+                        {workers.length === 0 && <p className="text-center text-slate-400 py-10">Nenhum profissional cadastrado para esta obra.</p>}
                         {workers.map(w => (
                             <div key={w.id} className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm flex items-center justify-between">
                                 <div className="flex items-center gap-4 cursor-pointer flex-1" onClick={() => openPersonModal('WORKER', w)}>
@@ -871,7 +880,7 @@ const WorkDetail: React.FC = () => {
                                             <i className="fa-brands fa-whatsapp text-lg"></i>
                                         </a>
                                     )}
-                                    <button onClick={() => handleDeletePerson(w.id, 'WORKER')} className="w-10 h-10 rounded-xl text-red-500 hover:bg-red-50 transition-colors"><i className="fa-solid fa-trash"></i></button>
+                                    <button onClick={() => handleDeletePerson(w.id, w.workId, 'WORKER')} className="w-10 h-10 rounded-xl text-red-500 hover:bg-red-50 transition-colors"><i className="fa-solid fa-trash"></i></button>
                                 </div>
                             </div>
                         ))}
@@ -888,7 +897,7 @@ const WorkDetail: React.FC = () => {
                         </button>
                     </div>
                     <div className="space-y-3">
-                        {suppliers.length === 0 && <p className="text-center text-slate-400 py-10">Nenhum fornecedor cadastrado.</p>}
+                        {suppliers.length === 0 && <p className="text-center text-slate-400 py-10">Nenhum fornecedor cadastrado para esta obra.</p>}
                         {suppliers.map(s => (
                             <div key={s.id} className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm flex items-center justify-between">
                                 <div className="flex items-center gap-4 cursor-pointer flex-1" onClick={() => openPersonModal('SUPPLIER', s)}>
@@ -906,7 +915,7 @@ const WorkDetail: React.FC = () => {
                                             <i className="fa-brands fa-whatsapp text-lg"></i>
                                         </a>
                                     )}
-                                    <button onClick={() => handleDeletePerson(s.id, 'SUPPLIER')} className="w-10 h-10 rounded-xl text-red-500 hover:bg-red-50 transition-colors"><i className="fa-solid fa-trash"></i></button>
+                                    <button onClick={() => handleDeletePerson(s.id, s.workId, 'SUPPLIER')} className="w-10 h-10 rounded-xl text-red-500 hover:bg-red-50 transition-colors"><i className="fa-solid fa-trash"></i></button>
                                 </div>
                             </div>
                         ))}
@@ -1420,262 +1429,4 @@ const WorkDetail: React.FC = () => {
                             <input placeholder="Nome da Etapa" value={stepName} onChange={e => setStepName(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required />
                             <div className="grid grid-cols-2 gap-2">
                                 <div><label className="text-[10px] uppercase font-bold text-slate-400 ml-1">Início</label><input type="date" value={stepStart} onChange={e => setStepStart(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required /></div>
-                                <div><label className="text-[10px] uppercase font-bold text-slate-400 ml-1">Fim</label><input type="date" value={stepEnd} onChange={e => setStepEnd(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required /></div>
-                            </div>
-                            <div className="flex gap-2 pt-2">
-                                <button type="button" onClick={() => setIsStepModalOpen(false)} className="flex-1 bg-slate-100 dark:bg-slate-800 text-slate-500 py-3 rounded-xl font-bold">Cancelar</button>
-                                <button type="submit" className="flex-1 bg-primary text-white py-3 rounded-xl font-bold">Salvar</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
-
-            {/* ADD MATERIAL MODAL */}
-            {addMatModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
-                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-6 shadow-2xl overflow-y-auto max-h-[90vh]">
-                        <h3 className="text-xl font-bold mb-4 text-primary dark:text-white">Novo Material</h3>
-                        <form onSubmit={handleAddMaterial} className="space-y-4">
-                            <input placeholder="Nome do Material" value={newMatName} onChange={e => setNewMatName(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required />
-                            <div className="grid grid-cols-2 gap-2">
-                                <input type="number" placeholder="Qtd" value={newMatQty} onChange={e => setNewMatQty(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required />
-                                <input placeholder="Unidade (un, m2)" value={newMatUnit} onChange={e => setNewMatUnit(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required />
-                            </div>
-                            <select value={newMatStepId} onChange={e => setNewMatStepId(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
-                                <option value="">Sem etapa definida</option>
-                                {steps.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                            </select>
-                            
-                            <div className="border-t pt-4 mt-2">
-                                <label className="flex items-center gap-2 mb-2 font-bold text-sm"><input type="checkbox" checked={newMatBuyNow} onChange={e => setNewMatBuyNow(e.target.checked)} className="w-4 h-4" /> Já comprei este material</label>
-                                {newMatBuyNow && (
-                                    <div className="grid grid-cols-2 gap-2 animate-in slide-in-from-top-2">
-                                        <input type="number" placeholder="Qtd Comprada" value={newMatBuyQty} onChange={e => setNewMatBuyQty(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" />
-                                        <input type="number" placeholder="Valor Total (R$)" value={newMatBuyCost} onChange={e => setNewMatBuyCost(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" />
-                                    </div>
-                                )}
-                            </div>
-
-                            <div className="flex gap-2">
-                                <button type="button" onClick={() => setAddMatModal(false)} className="flex-1 bg-slate-100 py-3 rounded-xl font-bold">Cancelar</button>
-                                <button type="submit" className="flex-1 bg-primary text-white py-3 rounded-xl font-bold">Salvar</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
-
-            {/* EDIT MATERIAL MODAL */}
-            {materialModal.isOpen && materialModal.material && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
-                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-6 shadow-2xl overflow-y-auto max-h-[90vh]">
-                        <h3 className="text-xl font-bold mb-4 text-primary dark:text-white">Editar Material</h3>
-                        
-                        <form onSubmit={handleUpdateMaterial} className="space-y-6">
-                            {/* EDITABLE DEFINITION */}
-                            <div className="space-y-3">
-                                <div>
-                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Nome do Produto</label>
-                                    <input 
-                                        value={matName} 
-                                        onChange={e => setMatName(e.target.value)} 
-                                        className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold"
-                                    />
-                                </div>
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div>
-                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Qtd Plane</label>
-                                        <input 
-                                            type="number" 
-                                            value={matPlannedQty} 
-                                            onChange={e => setMatPlannedQty(e.target.value)} 
-                                            className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold"
-                                            required
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Unidade</label>
-                                        <input 
-                                            value={matUnit} 
-                                            onChange={e => setMatUnit(e.target.value)} 
-                                            className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold"
-                                            required
-                                        />
-                                    </div>
-                                </div>
-                                <div>
-                                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Marca/Fornecedor (Opcional)</label>
-                                    <input 
-                                        value={matBrand} 
-                                        onChange={e => setMatBrand(e.target.value)} 
-                                        className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold"
-                                    />
-                                </div>
-                            </div>
-                            
-                            {/* REGISTER NEW PURCHASE (Optional) */}
-                            <div className="border-t pt-6 mt-4">
-                                <h4 className="text-sm font-bold text-slate-500 uppercase mb-3">Registrar Nova Compra</h4>
-                                <p className="text-xs text-slate-400 mb-4">A quantidade já comprada ({materialModal.material.purchasedQty} {materialModal.material.unit}) será atualizada.</p>
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div>
-                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Qtd Comprada AGORA</label>
-                                        <input 
-                                            type="number" 
-                                            placeholder="0" 
-                                            value={matBuyQty} 
-                                            onChange={e => setMatBuyQty(e.target.value)} 
-                                            className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Custo Total DESSA Compra (R$)</label>
-                                        <input 
-                                            type="number" 
-                                            placeholder="0.00" 
-                                            value={matBuyCost} 
-                                            onChange={e => setMatBuyCost(e.target.value)} 
-                                            className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold"
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="flex gap-2 pt-4">
-                                <button type="button" onClick={() => setMaterialModal({isOpen: false, material: null})} className="flex-1 bg-slate-100 dark:bg-slate-800 text-slate-500 py-3 rounded-xl font-bold">Cancelar</button>
-                                <button type="submit" className="flex-1 bg-primary text-white py-3 rounded-xl font-bold">Salvar Alterações</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
-
-            {/* ADD/EDIT EXPENSE MODAL */}
-            {expenseModal.isOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
-                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-6 shadow-2xl overflow-y-auto max-h-[90vh]">
-                        <h3 className="text-xl font-bold mb-4 text-primary dark:text-white">{expenseModal.mode === 'ADD' ? 'Nova Despesa' : 'Editar Gasto'}</h3>
-                        <form onSubmit={handleSaveExpense} className="space-y-4">
-                            <div>
-                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Descrição do Gasto</label>
-                                <input placeholder="Ex: Cimento, Diária Pedreiro, Licença" value={expDesc} onChange={e => setExpDesc(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold" required />
-                            </div>
-                            
-                            {expenseModal.mode === 'EDIT' && (
-                                <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-xs text-slate-500 font-bold">
-                                    <p className="mb-1">Valor já pago: <span className="text-primary dark:text-white">R$ {expSavedAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></p>
-                                    <p className="text-orange-500"><i className="fa-solid fa-info-circle mr-1"></i> Digite APENAS o valor do NOVO PAGAMENTO.</p>
-                                </div>
-                            )}
-
-                            <div>
-                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">{expenseModal.mode === 'ADD' ? 'Valor Total (R$)' : 'Valor do NOVO Pagamento (R$)'}</label>
-                                <input type="number" placeholder="0.00" value={expAmount} onChange={e => setExpAmount(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold" required />
-                            </div>
-
-                            <div>
-                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Valor Total ACORDADO (para pagamentos parcelados/adiantados)</label>
-                                <input type="number" placeholder="Opcional: Ex: 1000.00" value={expTotalAgreed} onChange={e => setExpTotalAgreed(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold" />
-                            </div>
-
-                            <div>
-                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Categoria</label>
-                                <select value={expCategory} onChange={e => setExpCategory(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold">
-                                    {Object.values(ExpenseCategory).map(cat => (
-                                        <option key={cat} value={cat}>{cat}</option>
-                                    ))}
-                                    <option value="Serviços">Serviços</option>
-                                    <option value="Equipamentos">Equipamentos</option>
-                                </select>
-                            </div>
-
-                            <div>
-                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Etapa Relacionada (Opcional)</label>
-                                <select value={expStepId} onChange={e => setExpStepId(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold">
-                                    <option value="">Nenhuma</option>
-                                    {steps.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                                </select>
-                            </div>
-
-                            <div>
-                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">Data do Pagamento</label>
-                                <input type="date" value={expDate} onChange={e => setExpDate(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 font-bold" required />
-                            </div>
-
-                            <div className="flex gap-2 pt-2">
-                                {expenseModal.mode === 'EDIT' && (
-                                    <button type="button" onClick={handleDeleteExpense} className="w-12 h-12 bg-red-500/10 text-red-500 rounded-xl flex items-center justify-center shrink-0"><i className="fa-solid fa-trash"></i></button>
-                                )}
-                                <button type="button" onClick={() => setExpenseModal({ isOpen: false, mode: 'ADD' })} className="flex-1 bg-slate-100 dark:bg-slate-800 text-slate-500 py-3 rounded-xl font-bold">Cancelar</button>
-                                <button type="submit" className="flex-1 bg-primary text-white py-3 rounded-xl font-bold">Salvar</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
-
-            {/* ADD/EDIT PERSON MODAL (Worker/Supplier) */}
-            {isPersonModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
-                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-6 shadow-2xl overflow-y-auto max-h-[90vh]">
-                        <h3 className="text-xl font-bold mb-4 text-primary dark:text-white">
-                            {personId ? 'Editar ' : 'Novo '} {personMode === 'WORKER' ? 'Profissional' : 'Fornecedor'}
-                        </h3>
-                        <form onSubmit={handleSavePerson} className="space-y-4">
-                            <input placeholder="Nome" value={personName} onChange={e => setPersonName(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required />
-                            
-                            {personMode === 'WORKER' && (
-                                <select value={personRole} onChange={e => setPersonRole(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
-                                    {STANDARD_JOB_ROLES.map(role => <option key={role} value={role}>{role}</option>)}
-                                </select>
-                            )}
-                            {personMode === 'SUPPLIER' && (
-                                <select value={personRole} onChange={e => setPersonRole(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
-                                    {STANDARD_SUPPLIER_CATEGORIES.map(category => <option key={category} value={category}>{category}</option>)}
-                                </select>
-                            )}
-
-                            <input placeholder="Telefone (WhatsApp)" value={personPhone} onChange={e => setPersonPhone(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700" required />
-                            <textarea placeholder="Observações (endereço, especialidade, etc.)" value={personNotes} onChange={e => setPersonNotes(e.target.value)} className="w-full p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 h-24"></textarea>
-
-                            <div className="flex gap-2 pt-2">
-                                <button type="button" onClick={() => setIsPersonModalOpen(false)} className="flex-1 bg-slate-100 dark:bg-slate-800 text-slate-500 py-3 rounded-xl font-bold">Cancelar</button>
-                                <button type="submit" className="flex-1 bg-primary text-white py-3 rounded-xl font-bold">Salvar</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
-
-            {/* View Contract Modal */}
-            {viewContract && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in">
-                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-lg p-6 shadow-2xl overflow-y-auto max-h-[90vh]">
-                        <div className="flex justify-between items-center mb-4">
-                            <h3 className="text-xl font-bold text-primary dark:text-white">{viewContract.title}</h3>
-                            <button onClick={() => setViewContract(null)} className="text-slate-400 hover:text-primary dark:hover:text-white"><i className="fa-solid fa-xmark text-xl"></i></button>
-                        </div>
-                        <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-300">
-                            {viewContract.content}
-                        </div>
-                        <button onClick={() => setViewContract(null)} className="mt-6 w-full py-3 bg-primary text-white font-bold rounded-xl">Fechar</button>
-                    </div>
-                </div>
-            )}
-
-            {/* Generic Confirmation Modal */}
-            <ZeModal
-                isOpen={zeModal.isOpen}
-                title={zeModal.title}
-                message={zeModal.message}
-                confirmText={zeModal.confirmText || "Confirmar"}
-                onConfirm={zeModal.onConfirm || (() => {})} // Garante que onConfirm seja uma função
-                onCancel={zeModal.onCancel} // onCancel é obrigatório
-                type={zeModal.type === 'WARNING' ? 'INFO' : zeModal.type || 'INFO'} // Garante que o tipo seja reconhecido
-            />
-        </div>
-    );
-};
-
-export default WorkDetail;
+                                <div><label className="text-[10px] uppercase font-bold text-slate-400 ml-1">Fim</label><input type="date" value={stepEnd} onChange={e => setStepEnd(e.target.value)} className="w-full p-3 bg-slate-
