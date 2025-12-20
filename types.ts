@@ -1,3 +1,4 @@
+
 export enum PlanType {
   MENSAL = 'MENSAL',
   SEMESTRAL = 'SEMESTRAL',
@@ -210,6 +211,7 @@ declare global {
     readonly VITE_SUPABASE_URL: string;
     readonly VITE_SUPABASE_ANON_KEY: string;
     readonly VITE_VAPID_PUBLIC_KEY: string; // Adicionado explicitamente para client-side
+    readonly VITE_GOOGLE_API_KEY: string; // NEW: Adicionado para a chave da IA com o nome específico
     // Add an index signature to allow dynamic access with string keys
     [key: string]: string | undefined; 
   }
@@ -221,7 +223,8 @@ declare global {
   // Augment the NodeJS namespace to include process.env
   namespace NodeJS {
     interface ProcessEnv {
-      readonly API_KEY: string;
+      readonly API_KEY: string; // Keep this as per Google GenAI guidelines
+      readonly VITE_GOOGLE_API_KEY: string; // NEW: Variável de ambiente real para a chave da IA
       readonly NEON_SECRET_KEY: string; // From api/create-pix.js
       // NEW: VAPID keys for Web Push Notifications
       readonly VAPID_PUBLIC_KEY: string;
