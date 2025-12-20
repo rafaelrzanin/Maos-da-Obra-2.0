@@ -1,10 +1,11 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import { useAuth } from '../contexts/AuthContext.tsx'; 
 import { dbService } from '../services/db.ts';
 import { StepStatus, FileCategory, ExpenseCategory, PlanType, type Work, type Worker, type Supplier, type Material, type Step, type Expense, type WorkPhoto, type WorkFile } from '../types.ts';
-import { ZeModal } from '../components/ZeModal.tsx';
+import { ZeModal, ZeModalProps } from '../components/ZeModal.tsx'; // Importa ZeModalProps
 import { STANDARD_CHECKLISTS, CONTRACT_TEMPLATES, STANDARD_JOB_ROLES, STANDARD_SUPPLIER_CATEGORIES, ZE_AVATAR, ZE_AVATAR_FALLBACK } from '../services/standards.ts';
 // Removed aiService import as it's no longer used directly in this component
 
@@ -119,15 +120,13 @@ const WorkDetail: React.FC = () => {
     const [personNotes, setPersonNotes] = useState('');
 
     const [viewContract, setViewContract] = useState<{title: string, content: string} | null>(null);
-    // Fix: Updated the type of zeModal state to explicitly include `confirmText`, `onConfirm`, and `type`.
-    const [zeModal, setZeModal] = useState<{ 
-        isOpen: boolean; 
-        title: string; 
-        message: string; 
-        confirmText?: string; 
-        onConfirm?: () => void; 
-        type?: 'DANGER' | 'INFO' | 'SUCCESS' | 'WARNING'; 
-    }>({ isOpen: false, title: '', message: '' });
+    // Fix: Updated the type of zeModal state to explicitly use ZeModalProps.
+    const [zeModal, setZeModal] = useState<ZeModalProps & { id?: string }>({ 
+        isOpen: false, 
+        title: '', 
+        message: '',
+        onCancel: () => {}, // Necessário para satisfazer ZeModalProps
+    });
 
     // AI & TOOLS
     // Fix: Removed AI-related states as AI chat is now a dedicated page.
@@ -450,8 +449,9 @@ const WorkDetail: React.FC = () => {
                 if (mode === 'WORKER') await dbService.deleteWorker(id);
                 else await dbService.deleteSupplier(id);
                 await load();
-                setZeModal(prev => ({ ...prev, isOpen: false }));
-            }
+                setZeModal(prev => ({ ...prev, isOpen: false, onCancel: () => {} })); // Reset onCancel when modal closes
+            },
+            onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false, onCancel: () => {} })) // Also reset onCancel for cancel action
         });
     };
 
@@ -1670,9 +1670,9 @@ const WorkDetail: React.FC = () => {
                 title={zeModal.title}
                 message={zeModal.message}
                 confirmText={zeModal.confirmText || "Confirmar"}
-                onConfirm={zeModal.onConfirm}
-                onCancel={() => setZeModal(prev => ({ ...prev, isOpen: false }))}
-                type={zeModal.type || 'DANGER'} // Default to DANGER for confirmation modals
+                onConfirm={zeModal.onConfirm || (() => {})} // Garante que onConfirm seja uma função
+                onCancel={zeModal.onCancel} // onCancel é obrigatório
+                type={zeModal.type === 'WARNING' ? 'INFO' : zeModal.type || 'INFO'} // Garante que o tipo seja reconhecido
             />
         </div>
     );
