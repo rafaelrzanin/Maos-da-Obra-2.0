@@ -15,6 +15,6 @@ export default defineConfig({
     'import.meta.env.VITE_VAPID_PUBLIC_KEY': JSON.stringify(process.env.VAPID_PUBLIC_KEY),
     'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(process.env.VITE_SUPABASE_URL),
     'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(process.env.VITE_SUPABASE_ANON_KEY),
-    'process.env.API_KEY': JSON.stringify(process.env.API_KEY), // Inject API_KEY for GenAI
+    'process.env.API_KEY': JSON.stringify(process.env.VITE_GOOGLE_API_KEY), // Inject VITE_GOOGLE_API_KEY for GenAI
   },
 });
