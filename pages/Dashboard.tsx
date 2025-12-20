@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.tsx';
@@ -384,14 +383,24 @@ const Dashboard: React.FC = () => {
   // UI States
   const [currentTip] = useState<ZeTip>(() => getRandomZeTip());
   const [showWorkSelector, setShowWorkSelector] = useState(false);
-  const [zeModal, setZeModal] = useState<{ isOpen: boolean; title: string; message: string; workId?: string }>({
-    isOpen: false, title: '', message: ''
-  });
+  // Fix: Updated the type of zeModal state to explicitly include `confirmText`, `onConfirm`, and `type`.
+  const [zeModal, setZeModal] = useState<{ 
+    isOpen: boolean; 
+    title: string; 
+    message: string; 
+    workId?: string;
+    confirmText?: string;
+    onConfirm?: () => void;
+    type?: 'DANGER' | 'INFO' | 'SUCCESS' | 'WARNING';
+  }>({ isOpen: false, title: '', message: '' });
   const [showTrialUpsell, setShowTrialUpsell] = useState(false);
   // NEW: State for push notification permission UI
   const [notificationStatus, setNotificationStatus] = useState<'default' | 'granted' | 'denied' | 'unsupported'>('default');
   const [showNotificationPrompt, setShowNotificationPrompt] = useState(false);
   const [isSubscribedToPush, setIsSubscribedToPush] = useState(false);
+
+  // NEW: State to toggle showing all notifications
+  const [showAllNotifications, setShowAllNotifications] = useState(false);
 
 
   // 1) Initial Load: obras
@@ -619,7 +628,9 @@ const Dashboard: React.FC = () => {
       isOpen: true,
       title: "Apagar Obra",
       message: `Tem certeza? Ao apagar a obra "${workName}", todo o histórico de gastos, compras e cronograma será perdido permanentemente.`,
-      workId
+      workId,
+      onConfirm: confirmDelete, // Ensure onConfirm is set for this modal
+      type: 'DANGER' // Set type to DANGER for deletion
     });
   };
 
@@ -632,7 +643,7 @@ const Dashboard: React.FC = () => {
 
       const updatedWorks = await dbService.getWorks(user.id);
       setWorks(updatedWorks);
-      setZeModal({ isOpen: false, title: '', message: '' });
+      setZeModal({ isOpen: false, title: '', message: '' }); // Clear modal state
 
       if (updatedWorks.length > 0) {
         const stillExists = updatedWorks.find(w => w.id === focusWork?.id);
@@ -709,6 +720,10 @@ const Dashboard: React.FC = () => {
     statusIcon = 'fa-circle-exclamation';
     statusMessage = 'Pontos de atenção';
   }
+
+  // Determine which notifications to display based on showAllNotifications state
+  const notificationsToDisplay = showAllNotifications ? notifications : notifications.slice(0, 3);
+  const hasMoreNotifications = notifications.length > 3;
 
   return (
     <div className="max-w-4xl mx-auto pb-28 pt-6 px-4 md:px-0 font-sans animate-in fade-in">
@@ -982,7 +997,7 @@ const Dashboard: React.FC = () => {
 
         <div className="space-y-3">
           {notifications.length > 0 ? (
-            notifications.map(notif => (
+            notificationsToDisplay.map(notif => (
               <div
                 key={notif.id}
                 className={cx(
@@ -1019,6 +1034,14 @@ const Dashboard: React.FC = () => {
             <div className="text-center py-8 rounded-2xl border border-dashed border-slate-300 dark:border-slate-700">
               <p className="text-slate-400 text-sm font-medium">Nenhum aviso urgente. Tudo em paz! 🍃</p>
             </div>
+          )}
+          {hasMoreNotifications && (
+            <button
+              onClick={() => setShowAllNotifications(!showAllNotifications)}
+              className="w-full mt-4 py-3 bg-slate-100 dark:bg-slate-800 text-secondary font-bold rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+            >
+              {showAllNotifications ? 'Ver menos' : `Ver todos (${notifications.length})`}
+            </button>
           )}
         </div>
       </div>
@@ -1104,4 +1127,3 @@ const Dashboard: React.FC = () => {
 };
 
 export default Dashboard;
-    
