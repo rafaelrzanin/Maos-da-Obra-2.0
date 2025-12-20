@@ -518,8 +518,7 @@ export const dbService = {
         bedrooms: work.bedrooms,
         bathrooms: work.bathrooms,
         kitchens: work.kitchens,
-        livingRooms: work.livingRooms,
-        // FIX: Changed to snake_case for DB column compatibility
+        living_rooms: work.livingRooms, // FIX: Changed to snake_case for DB column compatibility
         has_leisure_area: work.hasLeisureArea 
     };
 
@@ -1400,4 +1399,3 @@ export const dbService = {
   },
 
 };
-    
