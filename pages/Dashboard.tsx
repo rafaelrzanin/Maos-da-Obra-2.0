@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.tsx';
@@ -380,6 +379,7 @@ const Dashboard: React.FC = () => {
   // Loading States
   const [isLoadingWorks, setIsLoadingWorks] = useState(true);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
+  const [isDeletingWork, setIsDeletingWork] = useState(false); // NEW: State for delete operation loading
 
   // UI States
   const [currentTip] = useState<ZeTip>(() => getRandomZeTip());
@@ -636,13 +636,15 @@ const Dashboard: React.FC = () => {
   const confirmDelete = async () => {
     if (!zeModal.workId || !user) return;
 
+    setIsDeletingWork(true); // NEW: Set loading for delete operation
     try {
-      setIsLoadingWorks(true);
       await dbService.deleteWork(zeModal.workId);
+      
+      // Close modal immediately after successful delete operation
+      setZeModal(prev => ({ ...prev, isOpen: false, onCancel: () => {} })); // Ensure onCancel is also reset
 
       const updatedWorks = await dbService.getWorks(user.id);
       setWorks(updatedWorks);
-      setZeModal(prev => ({ ...prev, isOpen: false })); // Clear modal state, ensure onCancel is defined
       
       if (updatedWorks.length > 0) {
         const stillExists = updatedWorks.find(w => w.id === focusWork?.id);
@@ -655,11 +657,20 @@ const Dashboard: React.FC = () => {
       } else {
         setFocusWork(null);
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error("Erro ao apagar", e);
       alert("Erro ao excluir obra.");
+      // Fix: Used 'ERROR' type which is now supported in ZeModalProps
+      setZeModal(prev => ({ 
+        ...prev, 
+        message: `Erro ao excluir obra: ${e.message || "Tente novamente."}`, 
+        type: 'ERROR', // Changed type to 'ERROR'
+        confirmText: "Entendido", // Change to simple "understood"
+        onConfirm: undefined, // Remove confirm action for this error state
+        onCancel: () => setZeModal(p => ({ ...p, isOpen: false, onConfirm: undefined })) // Allow closing and reset onConfirm
+      }));
     } finally {
-      setIsLoadingWorks(false);
+      setIsDeletingWork(false); // NEW: Reset loading regardless of success/failure
     }
   };
 
@@ -1122,6 +1133,7 @@ const Dashboard: React.FC = () => {
         onConfirm={zeModal.onConfirm || (() => {})} // Garante que onConfirm seja uma função
         onCancel={zeModal.onCancel} // onCancel é obrigatório
         type={zeModal.type === 'WARNING' ? 'INFO' : zeModal.type || 'INFO'} // Garante que o tipo seja reconhecido
+        isConfirming={isDeletingWork} // NEW: Pass the loading state
       />
 
       {showTrialUpsell && (
