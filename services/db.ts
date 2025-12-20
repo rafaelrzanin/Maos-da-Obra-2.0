@@ -152,16 +152,23 @@ const pendingProfileRequests: Partial<Record<string, Promise<User | null>>> = {}
 
 const ensureUserProfile = async (authUser: any): Promise<User | null> => {
     const client = supabase; // Supabase is guaranteed to be initialized now
-    if (!authUser) return null;
+    if (!authUser) {
+        console.log("[ensureUserProfile] authUser é nulo, retornando null.");
+        return null;
+    }
 
-  const pending = pendingProfileRequests[authUser.id];
-if (pending) {
-  return pending;
-  }
+    console.log(`[ensureUserProfile] Processando usuário autenticado: ${authUser.id} (${authUser.email})`);
+
+    const pending = pendingProfileRequests[authUser.id];
+    if (pending) {
+        console.log(`[ensureUserProfile] Requisição de perfil para ${authUser.id} já em andamento, retornando promessa existente.`);
+        return pending;
+    }
 
 
     const fetchProfileProcess = async (): Promise<User | null> => {
         try {
+            console.log(`[ensureUserProfile] Buscando perfil existente para ${authUser.id}...`);
             const { data: existingProfile, error: readError } = await client
                 .from('profiles')
                 .select('*')
@@ -169,22 +176,23 @@ if (pending) {
                 .maybeSingle();
 
             if (existingProfile) {
+                console.log(`[ensureUserProfile] Perfil encontrado para ${authUser.id}.`);
                 return mapProfileFromSupabase(existingProfile);
             }
 
             // FIX: If RLS denies access (42501), return null instead of a partial user.
             // This ensures AuthContext correctly identifies a non-accessible profile,
             // preventing login loops and inconsistent state.
-            if (readError && readError.code === '42501') { 
-                 console.error("ERRO CRÍTICO 403: Permissão negada ao ler perfil. Retornando null.");
-                 return null;
-            }
-
-            // Other read errors that are not RLS-related should still be logged and might prevent creation.
             if (readError) {
-                console.error("Erro ao buscar perfil existente:", readError);
-                // Depending on the error, you might want to throw or return null.
-                // For now, proceed to create, but log the original read error.
+                console.error(`[ensureUserProfile] Erro ao buscar perfil para ${authUser.id}:`, readError);
+                if (readError.code === '42501') { 
+                     console.error("[ensureUserProfile] ERRO CRÍTICO 403: Permissão RLS negada ao ler perfil. Retornando null para evitar loops de login.");
+                     return null;
+                }
+                // Para outros erros de leitura, logar e continuar para tentar criar o perfil
+                console.warn("[ensureUserProfile] Outro erro na leitura do perfil, tentando criar novo perfil...");
+            } else {
+                console.log(`[ensureUserProfile] Nenhum perfil existente encontrado para ${authUser.id}. Criando um novo...`);
             }
 
             const trialExpires = new Date();
@@ -208,15 +216,16 @@ if (pending) {
                 .single();
 
             if (createError) {
-                console.error("Erro ao criar perfil:", createError);
+                console.error(`[ensureUserProfile] Erro ao criar perfil para ${authUser.id}:`, createError);
                 // On creation error, return null to signify profile couldn't be established.
                 return null;
             }
 
+            console.log(`[ensureUserProfile] Perfil criado com sucesso para ${authUser.id}.`);
             return mapProfileFromSupabase(createdProfile);
 
         } catch (e: any) {
-            console.error("Exceção no ensureUserProfile", e);
+            console.error(`[ensureUserProfile] Exceção inesperada ao processar perfil para ${authUser.id}:`, e);
             // On any unexpected exception, ensure null is returned.
             return null;
         }
@@ -1390,3 +1399,4 @@ export const dbService = {
   },
 
 };
+    
