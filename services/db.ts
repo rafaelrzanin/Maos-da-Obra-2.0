@@ -83,7 +83,7 @@ const parseExpenseFromDB = (data: any): Expense => ({
     stepId: data.step_id,
     relatedMaterialId: data.related_material_id,
     workerId: data.worker_id, // Added workerId parsing
-    totalAgreed: data.total_agreed ? Number(data.total_agreed) : undefined
+    totalAgreed: data.total_agagreed ? Number(data.total_agreed) : undefined
 });
 
 const parseWorkerFromDB = (data: any): Worker => ({
@@ -1184,14 +1184,27 @@ export const dbService = {
         // Fix: Corrected typo 'prefetfetchedWork' to 'prefetchedWork'
         const currentWork = prefetchedWork || await this.getWorkById(workId);
 
-        const today = new Date();
-        today.setHours(0,0,0,0);
-        const threeDaysFromNow = new Date();
-        threeDaysFromNow.setDate(threeDaysFromNow.getDate() + 3);
-        threeDaysFromNow.setHours(23,59,59,999); // End of day for comparison
+        // --- INÍCIO DA CORREÇÃO DA LÓGICA DE DATAS ---
+        const getLocalMidnightDate = (dateString: string) => {
+            const [year, month, day] = dateString.split('-').map(Number);
+            return new Date(year, month - 1, day, 0, 0, 0, 0); // Local midnight
+        };
+
+        const todayLocalMidnight = new Date();
+        todayLocalMidnight.setHours(0, 0, 0, 0); // Local midnight today
+
+        const threeDaysFromNowLocalMidnight = new Date();
+        threeDaysFromNowLocalMidnight.setDate(threeDaysFromNowLocalMidnight.getDate() + 3);
+        threeDaysFromNowLocalMidnight.setHours(0, 0, 0, 0); // Local midnight 3 days from now (inclusive)
+        // --- FIM DA CORREÇÃO DA LÓGICA DE DATAS ---
+
 
         // Example: Notification for delayed steps (existing logic, no changes)
-        const delayedSteps = currentSteps.filter(s => s.status !== StepStatus.COMPLETED && new Date(s.endDate) < today);
+        const delayedSteps = currentSteps.filter(s => {
+            const stepEndDate = getLocalMidnightDate(s.endDate);
+            return s.status !== StepStatus.COMPLETED && stepEndDate < todayLocalMidnight;
+        });
+
         for (const step of delayedSteps) {
             const notificationTag = `work-${workId}-delayed-step-${step.id}`; // Unique tag for this notification
             const { data: existingNotif } = await supabase
@@ -1222,11 +1235,15 @@ export const dbService = {
         }
 
         // Example: Notification for upcoming steps (within 3 days, not started - existing logic, no changes)
-        const upcomingSteps = currentSteps.filter(s => 
-          s.status === StepStatus.NOT_STARTED && 
-          new Date(s.startDate) >= today &&
-          new Date(s.startDate) <= threeDaysFromNow // Check against 3 days from now
-        );
+        const upcomingSteps = currentSteps.filter(s => {
+            const stepStartDate = getLocalMidnightDate(s.startDate);
+            return (
+                s.status === StepStatus.NOT_STARTED && 
+                stepStartDate >= todayLocalMidnight && // Starts today or in the future
+                stepStartDate <= threeDaysFromNowLocalMidnight // Starts within the next 3 days (inclusive of day 3)
+            );
+        });
+
         for (const step of upcomingSteps) {
           const notificationTag = `work-${workId}-upcoming-step-${step.id}`; // Unique tag
           const { data: existingNotif } = await supabase
