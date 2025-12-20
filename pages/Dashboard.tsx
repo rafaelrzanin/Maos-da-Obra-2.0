@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.tsx';
@@ -634,14 +635,26 @@ const Dashboard: React.FC = () => {
   };
 
   const confirmDelete = async () => {
-    if (!zeModal.workId || !user) return;
+    if (!zeModal.workId || !user) {
+        console.error("Erro: workId ou usuário não disponível para exclusão.");
+        // Ensure modal is closed or shows error
+        setZeModal(prev => ({ 
+            ...prev, 
+            message: "Não foi possível identificar a obra para exclusão. Tente novamente.", 
+            type: 'ERROR',
+            confirmText: "Entendido",
+            onConfirm: () => setZeModal(p => ({ ...p, isOpen: false, onConfirm: undefined })), // Closes and resets
+            onCancel: () => setZeModal(p => ({ ...p, isOpen: false, onConfirm: undefined })) // Closes and resets
+        }));
+        return;
+    }
 
     setIsDeletingWork(true); // NEW: Set loading for delete operation
     try {
       await dbService.deleteWork(zeModal.workId);
       
       // Close modal immediately after successful delete operation
-      setZeModal(prev => ({ ...prev, isOpen: false, onCancel: () => {} })); // Ensure onCancel is also reset
+      setZeModal(prev => ({ ...prev, isOpen: false, onConfirm: undefined, onCancel: () => {} })); // Ensure onConfirm is also reset to default
 
       const updatedWorks = await dbService.getWorks(user.id);
       setWorks(updatedWorks);
@@ -659,15 +672,15 @@ const Dashboard: React.FC = () => {
       }
     } catch (e: any) {
       console.error("Erro ao apagar", e);
-      alert("Erro ao excluir obra.");
-      // Fix: Used 'ERROR' type which is now supported in ZeModalProps
+      // Removed `alert` call to centralize feedback in ZeModal
       setZeModal(prev => ({ 
         ...prev, 
-        message: `Erro ao excluir obra: ${e.message || "Tente novamente."}`, 
-        type: 'ERROR', // Changed type to 'ERROR'
+        title: "Erro ao Excluir", // Changed title for error state
+        message: `Erro ao excluir obra: ${e.message || "Um erro desconhecido ocorreu."}`, 
+        type: 'ERROR', 
         confirmText: "Entendido", // Change to simple "understood"
-        onConfirm: undefined, // Remove confirm action for this error state
-        onCancel: () => setZeModal(p => ({ ...p, isOpen: false, onConfirm: undefined })) // Allow closing and reset onConfirm
+        onConfirm: () => setZeModal(p => ({ ...p, isOpen: false, onConfirm: undefined })), // Closes and resets
+        onCancel: () => setZeModal(p => ({ ...p, isOpen: false, onConfirm: undefined })) // Closes and resets
       }));
     } finally {
       setIsDeletingWork(false); // NEW: Reset loading regardless of success/failure
@@ -1130,9 +1143,9 @@ const Dashboard: React.FC = () => {
         title={zeModal.title}
         message={zeModal.message}
         confirmText={zeModal.confirmText}
-        onConfirm={zeModal.onConfirm || (() => {})} // Garante que onConfirm seja uma função
-        onCancel={zeModal.onCancel} // onCancel é obrigatório
-        type={zeModal.type === 'WARNING' ? 'INFO' : zeModal.type || 'INFO'} // Garante que o tipo seja reconhecido
+        onConfirm={zeModal.onConfirm} // onConfirm is now guaranteed to be a function
+        onCancel={zeModal.onCancel} // onCancel is always required
+        type={zeModal.type} // Pass type directly, it can now be 'ERROR'
         isConfirming={isDeletingWork} // NEW: Pass the loading state
       />
 
