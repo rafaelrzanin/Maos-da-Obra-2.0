@@ -1,4 +1,3 @@
-
 import { PlanType, ExpenseCategory, StepStatus, FileCategory, type User, type Work, type Step, type Material, type Expense, type Worker, type Supplier, type WorkPhoto, type WorkFile, type Notification, type PushSubscriptionInfo } from '../types.ts';
 import { WORK_TEMPLATES, FULL_MATERIAL_PACKAGES } from './standards.ts';
 import { supabase } from './supabase.ts';
@@ -134,7 +133,8 @@ const parseNotificationFromDB = (data: any): Notification => ({
     message: data.message,
     date: data.date,
     read: data.read,
-    type: data.type
+    type: data.type,
+    tag: data.tag // NEW: Parse the tag from DB
 });
 
 const mapPushSubscriptionFromDB = (data: any): PushSubscriptionInfo => ({
@@ -341,16 +341,18 @@ export const dbService = {
     const trialExpires = new Date();
     trialExpires.setDate(trialExpires.getDate() + 7);
 
-    const { error: profileError } = await supabase.from('profiles').insert({
+    const newProfileData = {
         id: authData.user.id,
-        name,
-        email,
-        whatsapp,
-        cpf,
+        name: authData.user.user_metadata?.name || authData.user.email?.split('@')[0] || 'Novo Usuário',
+        email: authData.user.email,
+        whatsapp: null, // Default to null for new profile
+        cpf: null, // Default to null for new profile
         plan: planType || PlanType.MENSAL, 
         is_trial: true,
         subscription_expires_at: trialExpires.toISOString()
-    });
+    };
+
+    const { error: profileError } = await supabase.from('profiles').insert(newProfileData);
 
     if (profileError) {
         console.error("Erro ao criar perfil:", profileError);
@@ -453,7 +455,7 @@ export const dbService = {
   async generatePix(_amount: number, _payer: any) {
       // This is a mock function, no actual Supabase interaction required
       return {
-          qr_code_base64: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQ42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+          qr_code_base64: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
           copy_paste_code: "00020126330014BR.GOV.BCB.PIX011155555555555520400005303986540510.005802BR5913Mãos da Obra6008Brasilia62070503***63041234"
       };
   },
@@ -1062,7 +1064,8 @@ export const dbService = {
       message: notification.message,
       date: notification.date,
       read: notification.read,
-      type: notification.type
+      type: notification.type,
+      tag: notification.tag // NEW: Save the tag to DB
     }).select().single();
     if (error) {
       console.error("Erro ao adicionar notificação:", error);
@@ -1133,6 +1136,7 @@ export const dbService = {
   async getDailySummary(workId: string): Promise<{ completedSteps: number, delayedSteps: number, pendingMaterials: number, totalSteps: number }> {
     // Supabase is guaranteed to be initialized now
 
+    // Corrected `Date.Now()` to `Date.now()`
     const now = Date.now();
     if (_dashboardCache.summary[workId] && (now - _dashboardCache.summary[workId].timestamp < CACHE_TTL)) {
         return _dashboardCache.summary[workId].data;
@@ -1189,12 +1193,12 @@ export const dbService = {
         // Example: Notification for delayed steps (existing logic, no changes)
         const delayedSteps = currentSteps.filter(s => s.status !== StepStatus.COMPLETED && new Date(s.endDate) < today);
         for (const step of delayedSteps) {
+            const notificationTag = `work-${workId}-delayed-step-${step.id}`; // Unique tag for this notification
             const { data: existingNotif } = await supabase
                 .from('notifications')
                 .select('id')
                 .eq('user_id', userId)
-                .eq('title', 'Etapa Atrasada!')
-                .like('message', `%${step.name}%`)
+                .eq('tag', notificationTag) // Use tag for unique check
                 .eq('read', false)
                 .maybeSingle();
 
@@ -1205,13 +1209,14 @@ export const dbService = {
                     message: `A etapa "${step.name}" está atrasada. Verifique o cronograma!`,
                     date: new Date().toISOString(),
                     read: false,
-                    type: 'WARNING'
+                    type: 'WARNING',
+                    tag: notificationTag // Save tag
                 });
                 await dbService.sendPushNotification(userId, {
                     title: 'Etapa Atrasada!',
                     body: `A etapa "${step.name}" da obra "${currentWork?.name}" está atrasada. Verifique o cronograma!`,
                     url: `${window.location.origin}/work/${workId}`,
-                    tag: `work-${workId}-delayed-step-${step.id}`
+                    tag: notificationTag
                 });
             }
         }
@@ -1223,12 +1228,12 @@ export const dbService = {
           new Date(s.startDate) <= threeDaysFromNow // Check against 3 days from now
         );
         for (const step of upcomingSteps) {
+          const notificationTag = `work-${workId}-upcoming-step-${step.id}`; // Unique tag
           const { data: existingNotif } = await supabase
               .from('notifications')
               .select('id')
               .eq('user_id', userId)
-              .eq('title', 'Etapa Próxima!')
-              .like('message', `%${step.name}%`)
+              .eq('tag', notificationTag) // Use tag for unique check
               .eq('read', false)
               .maybeSingle();
           if (!existingNotif) {
@@ -1238,13 +1243,14 @@ export const dbService = {
                   message: `A etapa "${step.name}" da obra "${currentWork?.name}" começa em breve. Prepare-se!`,
                   date: new Date().toISOString(),
                   read: false,
-                  type: 'INFO'
+                  type: 'INFO',
+                  tag: notificationTag // Save tag
               });
               await dbService.sendPushNotification(userId, {
                   title: 'Etapa Próxima!',
                   body: `A etapa "${step.name}" da obra "${currentWork?.name}" começa em breve. Prepare-se!`,
                   url: `${window.location.origin}/work/${workId}`,
-                  tag: `work-${workId}-upcoming-step-${step.id}`
+                  tag: notificationTag
               });
           }
         }
@@ -1260,14 +1266,13 @@ export const dbService = {
                     if (material.purchasedQty / material.plannedQty < 0.8) {
                         const notificationMessage = `O material "${material.name}" da etapa "${step.name}" da obra "${currentWork?.name}" está com baixa quantidade. Verifique as compras!`;
                         const notificationTitle = 'Material Baixo para Etapa Próxima!';
+                        const notificationTag = `work-${workId}-low-material-${material.id}-${step.id}`; // Unique tag for material in a specific step
 
                         const { data: existingNotif } = await supabase
                             .from('notifications')
                             .select('id')
                             .eq('user_id', userId)
-                            .eq('title', notificationTitle)
-                            .like('message', `%${material.name}%`)
-                            .like('message', `%${step.name}%`) // Ensure uniqueness per material AND step
+                            .eq('tag', notificationTag) // Use tag for unique check
                             .eq('read', false)
                             .maybeSingle();
 
@@ -1278,13 +1283,14 @@ export const dbService = {
                                 message: notificationMessage,
                                 date: new Date().toISOString(),
                                 read: false,
-                                type: 'WARNING'
+                                type: 'WARNING',
+                                tag: notificationTag // Save tag
                             });
                             await dbService.sendPushNotification(userId, {
                                 title: notificationTitle,
                                 body: notificationMessage,
                                 url: `${window.location.origin}/work/${workId}/materials`,
-                                tag: `work-${workId}-low-material-${material.id}-${step.id}` // Unique tag for material in a specific step
+                                tag: notificationTag
                             });
                         }
                     }
@@ -1299,12 +1305,12 @@ export const dbService = {
             const budgetUsage = (totalSpent / currentWork.budgetPlanned) * 100;
 
             if (budgetUsage > 90 && budgetUsage <= 100) {
+                 const notificationTag = `work-${workId}-budget-warning`; // Unique tag
                  const { data: existingNotif } = await supabase
                     .from('notifications')
                     .select('id')
                     .eq('user_id', userId)
-                    .eq('title', 'Atenção ao Orçamento!')
-                    .like('message', `%${currentWork.name}%`)
+                    .eq('tag', notificationTag) // Use tag for unique check
                     .eq('read', false)
                     .maybeSingle();
 
@@ -1315,22 +1321,23 @@ export const dbService = {
                         message: `Você já usou ${Math.round(budgetUsage)}% do orçamento da obra "${currentWork.name}".`,
                         date: new Date().toISOString(),
                         read: false,
-                        type: 'WARNING'
+                        type: 'WARNING',
+                        tag: notificationTag // Save tag
                     });
                     await dbService.sendPushNotification(userId, {
                         title: 'Atenção ao Orçamento!',
                         body: `Você já usou ${Math.round(budgetUsage)}% do orçamento da obra "${currentWork?.name}".`,
                         url: `${window.location.origin}/work/${workId}/financial`,
-                        tag: `work-${workId}-budget-warning`
+                        tag: notificationTag
                     });
                 }
             } else if (budgetUsage > 100) {
+                 const notificationTag = `work-${workId}-budget-exceeded`; // Unique tag
                  const { data: existingNotif } = await supabase
                     .from('notifications')
                     .select('id')
                     .eq('user_id', userId)
-                    .eq('title', 'Orçamento Estourado!')
-                    .like('message', `%${currentWork.name}%`)
+                    .eq('tag', notificationTag) // Use tag for unique check
                     .eq('read', false)
                     .maybeSingle();
                 
@@ -1341,13 +1348,14 @@ export const dbService = {
                         message: `O orçamento da obra "${currentWork?.name}" foi excedido em ${Math.round(budgetUsage - 100)}%.`,
                         date: new Date().toISOString(),
                         read: false,
-                        type: 'ERROR'
+                        type: 'ERROR',
+                        tag: notificationTag // Save tag
                     });
                     await dbService.sendPushNotification(userId, {
                         title: 'Orçamento Estourado!',
                         body: `O orçamento da obra "${currentWork?.name}" foi excedido em ${Math.round(budgetUsage - 100)}%.`,
                         url: `${window.location.origin}/work/${workId}/financial`,
-                        tag: `work-${workId}-budget-exceeded`
+                        tag: notificationTag
                     });
                 }
             }
