@@ -691,7 +691,7 @@ export const dbService = {
       planned_qty: material.plannedQty,
       purchased_qty: purchaseInfo?.qty || 0,
       unit: material.unit,
-      stepId: material.stepId,
+      step_id: material.stepId, // FIX: Changed to snake_case
       category: material.category
     }).select().single();
 
@@ -724,7 +724,7 @@ export const dbService = {
       planned_qty: material.plannedQty,
       purchased_qty: material.purchasedQty,
       unit: material.unit,
-      step_id: material.stepId,
+      step_id: material.stepId, // This is already snake_case
       category: material.category
     }).eq('id', material.id).select().single();
     if (error) {
@@ -793,10 +793,10 @@ export const dbService = {
       quantity: expense.quantity || 1, // Default quantity to 1 if not provided
       date: expense.date,
       category: expense.category,
-      stepId: expense.stepId,
-      relatedMaterialId: expense.relatedMaterialId,
-      workerId: expense.workerId,
-      totalAgreed: expense.totalAgreed
+      step_id: expense.stepId, // FIX: Changed to snake_case
+      related_material_id: expense.relatedMaterialId, // FIX: Changed to snake_case
+      worker_id: expense.workerId, // FIX: Changed to snake_case
+      total_agreed: expense.totalAgreed // FIX: Changed to snake_case
     }).select().single();
     if (error) {
       console.error("Erro ao adicionar despesa:", error);
@@ -814,9 +814,9 @@ export const dbService = {
       quantity: expense.quantity,
       date: expense.date,
       category: expense.category,
-      step_id: expense.stepId,
-      related_material_id: expense.relatedMaterialId,
-      worker_id: expense.workerId,
+      step_id: expense.stepId, // This is already snake_case
+      related_material_id: expense.relatedMaterialId, // This is already snake_case
+      worker_id: expense.workerId, // This is already snake_case
       total_agreed: expense.totalAgreed
     }).eq('id', expense.id).select().single();
     if (error) {
