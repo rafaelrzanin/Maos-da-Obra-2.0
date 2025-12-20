@@ -1,4 +1,3 @@
-
 import { PlanType, ExpenseCategory, StepStatus, FileCategory, type User, type Work, type Step, type Material, type Expense, type Worker, type Supplier, type WorkPhoto, type WorkFile, type Notification, type PushSubscriptionInfo } from '../types.ts';
 import { WORK_TEMPLATES, FULL_MATERIAL_PACKAGES } from './standards.ts';
 import { supabase } from './supabase.ts';
@@ -616,25 +615,44 @@ export const dbService = {
 
     // Start a transaction (Supabase does not have explicit transactions, but we can do multiple operations)
     try {
+        console.log(`[DB DELETE] Iniciando exclusão para workId: ${workId}`);
         await supabase.from('steps').delete().eq('work_id', workId);
+        console.log(`[DB DELETE] Etapas para ${workId} deletadas.`);
         await supabase.from('materials').delete().eq('work_id', workId);
+        console.log(`[DB DELETE] Materiais para ${workId} deletados.`);
         await supabase.from('expenses').delete().eq('work_id', workId);
+        console.log(`[DB DELETE] Despesas para ${workId} deletadas.`);
         await supabase.from('work_photos').delete().eq('work_id', workId);
+        console.log(`[DB DELETE] Fotos para ${workId} deletadas.`);
         await supabase.from('work_files').delete().eq('work_id', workId);
+        console.log(`[DB DELETE] Arquivos para ${workId} deletados.`);
         // NEW: Delete workers and suppliers tied to this work
         await supabase.from('workers').delete().eq('work_id', workId);
+        console.log(`[DB DELETE] Profissionais para ${workId} deletados.`);
         await supabase.from('suppliers').delete().eq('work_id', workId);
+        console.log(`[DB DELETE] Fornecedores para ${workId} deletados.`);
         // NEW: Delete notifications tied to this work
-        await supabase.from('notifications').delete().eq('work_id', workId);
+        // FIX: Removed unnecessary `limit(1000)` from the delete operation.
+        // When deleting all associated notifications for a work, `eq('work_id', workId)` already targets them all.
+        const { count: deletedNotifsCount, error: notifDeleteError } = await supabase.from('notifications').delete().eq('work_id', workId).select('*', { count: 'exact' }); // Limit for safety
+        if (notifDeleteError) {
+            console.error(`[DB DELETE] Erro ao deletar notificações para ${workId}:`, notifDeleteError);
+        } else {
+            console.log(`[DB DELETE] ${deletedNotifsCount} notificações deletadas para ${workId}.`);
+        }
         
         const { error } = await supabase.from('works').delete().eq('id', workId);
         if (error) throw error;
+        console.log(`[DB DELETE] Obra ${workId} deletada com sucesso.`);
         
         _dashboardCache.works = null; // Invalidate cache
         delete _dashboardCache.stats[workId]; // Invalidate specific stats for deleted work
         delete _dashboardCache.summary[workId]; // Invalidate specific summary for deleted work
+        _dashboardCache.notifications = null; // NEW: Invalidate global notification cache
+        console.log(`[DB DELETE] Caches para workId ${workId} invalidados.`);
+
     } catch (error: unknown) { // Fix TS18046: Explicitly type as unknown
-        console.error("Erro ao apagar obra e dados relacionados:", error);
+        console.error(`[DB DELETE] Erro ao apagar obra e dados relacionados para ${workId}:`, error);
         if (error instanceof Error) {
             throw new Error(`Falha ao apagar obra: ${error.message}`);
         } else {
@@ -671,6 +689,7 @@ export const dbService = {
     // Invalidate cache for work stats/summary
     delete _dashboardCache.stats[step.workId];
     delete _dashboardCache.summary[step.workId];
+    _dashboardCache.notifications = null; // NEW: Invalidate notifications cache
     return parseStepFromDB(data);
   },
 
@@ -691,6 +710,7 @@ export const dbService = {
     // Invalidate cache for work stats/summary
     delete _dashboardCache.stats[step.workId];
     delete _dashboardCache.summary[step.workId];
+    _dashboardCache.notifications = null; // NEW: Invalidate notifications cache
     return parseStepFromDB(data);
   },
 
@@ -739,6 +759,7 @@ export const dbService = {
     // Invalidate cache for work stats/summary
     delete _dashboardCache.stats[material.workId];
     delete _dashboardCache.summary[material.workId];
+    _dashboardCache.notifications = null; // NEW: Invalidate notifications cache
     return parseMaterialFromDB(data);
   },
 
@@ -760,6 +781,7 @@ export const dbService = {
     // Invalidate cache for work stats/summary
     delete _dashboardCache.stats[material.workId];
     delete _dashboardCache.summary[material.workId];
+    _dashboardCache.notifications = null; // NEW: Invalidate notifications cache
     return parseMaterialFromDB(data);
   },
 
@@ -802,6 +824,7 @@ export const dbService = {
     // Invalidate cache for work stats/summary after purchase
     delete _dashboardCache.stats[existingMaterial.work_id];
     delete _dashboardCache.summary[existingMaterial.work_id];
+    _dashboardCache.notifications = null; // NEW: Invalidate notifications cache
   },
 
   // --- EXPENSES ---
@@ -837,6 +860,7 @@ export const dbService = {
     // Invalidate cache for work stats/summary
     delete _dashboardCache.stats[expense.workId];
     delete _dashboardCache.summary[expense.workId];
+    _dashboardCache.notifications = null; // NEW: Invalidate notifications cache
     return parseExpenseFromDB(data);
   },
 
@@ -861,6 +885,7 @@ export const dbService = {
     // Invalidate cache for work stats/summary
     delete _dashboardCache.stats[expense.workId];
     delete _dashboardCache.summary[expense.workId];
+    _dashboardCache.notifications = null; // NEW: Invalidate notifications cache
     return parseExpenseFromDB(data);
   },
 
@@ -875,6 +900,7 @@ export const dbService = {
         // Invalidate cache for work stats/summary of the work where the expense was deleted
         delete _dashboardCache.stats[deletedExpense.work_id];
         delete _dashboardCache.summary[deletedExpense.work_id];
+        _dashboardCache.notifications = null; // NEW: Invalidate notifications cache
     }
   },
 
@@ -1189,15 +1215,27 @@ export const dbService = {
     // Supabase is guaranteed to be initialized now
     
     try {
+        console.log(`[NOTIF DEBUG START] =================================================`);
+        console.log(`[NOTIF DEBUG START] Generating smart notifications for User: ${userId}, Work: ${workId}`);
+
         // Usa dados pré-carregados se disponíveis, senão busca do DB.
         const currentSteps = prefetchedSteps || await this.getSteps(workId);
+        // FIX: Corrected typo from `prefetfetchedMaterials` to `prefetchedMaterials`.
         const currentMaterials = prefetchedMaterials || await this.getMaterials(workId);
         const currentExpenses = prefetchedExpenses || await this.getExpenses(workId); // Added for budget check
         const currentWork = prefetchedWork || await this.getWorkById(workId);
 
-        console.log(`[NOTIF DEBUG] Running generateSmartNotifications for user ${userId}, work ${workId}`);
-        console.log(`[NOTIF DEBUG] Total steps fetched: ${currentSteps.length}`);
-        console.log(`[NOTIF DEBUG] Total materials fetched: ${currentMaterials.length}`);
+        if (!currentWork) {
+            console.warn(`[NOTIF DEBUG] Work ${workId} not found. Skipping notification generation.`);
+            console.log(`[NOTIF DEBUG END] ===================================================`);
+            return;
+        }
+
+        console.log(`[NOTIF DEBUG] Processing work "${currentWork.name}" (ID: ${currentWork.id})`);
+        console.log(`[NOTIF DEBUG] Total steps fetched for this work: ${currentSteps.length}`);
+        currentSteps.forEach(s => console.log(`  - Step: ${s.name} (ID: ${s.id}, WorkID: ${s.workId}, Status: ${s.status}, Start: ${s.startDate}, End: ${s.endDate})`));
+        console.log(`[NOTIF DEBUG] Total materials fetched for this work: ${currentMaterials.length}`);
+        currentMaterials.forEach(m => console.log(`  - Material: ${m.name} (ID: ${m.id}, WorkID: ${m.workId}, StepID: ${m.stepId}, Planned: ${m.plannedQty}, Purchased: ${m.purchasedQty})`));
 
 
         // --- INÍCIO DA CORREÇÃO DA LÓGICA DE DATAS ---
@@ -1221,7 +1259,7 @@ export const dbService = {
             const stepEndDate = getLocalMidnightDate(s.endDate);
             return s.status !== StepStatus.COMPLETED && stepEndDate < todayLocalMidnight;
         });
-        console.log(`[NOTIF DEBUG] Delayed steps identified: ${delayedSteps.map(s => s.name).join(', ')}`);
+        console.log(`[NOTIF DEBUG] Delayed steps identified for work "${currentWork.name}": ${delayedSteps.map(s => s.name).join(', ') || 'Nenhum'}`);
 
 
         for (const step of delayedSteps) {
@@ -1230,17 +1268,18 @@ export const dbService = {
                 .from('notifications')
                 .select('id')
                 .eq('user_id', userId)
+                .eq('work_id', workId) // NEW: Ensure to check for work_id here
                 .eq('tag', notificationTag) // Use tag for unique check
                 .eq('read', false)
                 .maybeSingle();
 
             if (!existingNotif) {
-                console.log(`[NOTIF GENERATION] Adding delayed step notification: ${step.name}`); // Debug log
+                console.log(`[NOTIF GENERATION] Adding delayed step notification: "${step.name}" for work "${currentWork.name}"`); // Debug log
                 await this.addNotification({
                     userId,
                     workId, // NEW: Add workId to notification
                     title: 'Etapa Atrasada!',
-                    message: `A etapa "${step.name}" da obra "${currentWork?.name}" está atrasada. Verifique o cronograma!`,
+                    message: `A etapa "${step.name}" da obra "${currentWork.name}" está atrasada. Verifique o cronograma!`,
                     date: new Date().toISOString(),
                     read: false,
                     type: 'WARNING',
@@ -1248,7 +1287,7 @@ export const dbService = {
                 });
                 await dbService.sendPushNotification(userId, {
                     title: 'Etapa Atrasada!',
-                    body: `A etapa "${step.name}" da obra "${currentWork?.name}" está atrasada. Verifique o cronograma!`,
+                    body: `A etapa "${step.name}" da obra "${currentWork.name}" está atrasada. Verifique o cronograma!`,
                     url: `${window.location.origin}/work/${workId}`,
                     tag: notificationTag
                 });
@@ -1264,7 +1303,7 @@ export const dbService = {
                 stepStartDate <= threeDaysFromNowLocalMidnight // Starts within the next 3 days (inclusive of day 3)
             );
         });
-        console.log(`[NOTIF DEBUG] Upcoming steps identified (within 3 days): ${upcomingSteps.map(s => s.name).join(', ')}`);
+        console.log(`[NOTIF DEBUG] Upcoming steps identified (within 3 days) for work "${currentWork.name}": ${upcomingSteps.map(s => s.name).join(', ') || 'Nenhum'}`);
 
 
         for (const step of upcomingSteps) {
@@ -1276,18 +1315,19 @@ export const dbService = {
                 .from('notifications')
                 .select('id')
                 .eq('user_id', userId)
+                .eq('work_id', workId) // NEW: Ensure to check for work_id here
                 .eq('tag', notificationTag) // Use tag for unique check
                 .eq('read', false)
                 .maybeSingle();
 
             if (!existingNotif) {
-                console.log(`[NOTIF GENERATION] Adding upcoming step notification: ${step.name}`); // Debug log
+                console.log(`[NOTIF GENERATION] Adding upcoming step notification: "${step.name}" for work "${currentWork.name}"`); // Debug log
                 await this.addNotification({
                     userId,
                     workId, // NEW: Add workId to notification
                     // FIX: Improved phrasing
                     title: `Próxima Etapa: ${step.name}!`,
-                    message: `A etapa "${step.name}" da obra "${currentWork?.name}" inicia em ${daysUntilStart} dia(s). Prepare-se!`,
+                    message: `A etapa "${step.name}" da obra "${currentWork.name}" inicia em ${daysUntilStart} dia(s). Prepare-se!`,
                     date: new Date().toISOString(),
                     read: false,
                     type: 'INFO',
@@ -1295,7 +1335,7 @@ export const dbService = {
                 });
                 await dbService.sendPushNotification(userId, {
                     title: `Próxima Etapa: ${step.name}!`,
-                    body: `A etapa "${step.name}" da obra "${currentWork?.name}" inicia em ${daysUntilStart} dia(s). Prepare-se!`,
+                    body: `A etapa "${step.name}" da obra "${currentWork.name}" inicia em ${daysUntilStart} dia(s). Prepare-se!`,
                     url: `${window.location.origin}/work/${workId}`,
                     tag: notificationTag
                 });
@@ -1307,7 +1347,7 @@ export const dbService = {
         // FIX: Ensure this logic runs for materials tied to *truly* upcoming steps
         for (const step of upcomingSteps) { 
             const materialsForStep = currentMaterials.filter(m => m.stepId === step.id);
-            console.log(`[NOTIF DEBUG] Materials for upcoming step "${step.name}": ${materialsForStep.map(m => `${m.name} (Planned: ${m.plannedQty}, Purchased: ${m.purchasedQty})`).join(', ')}`);
+            console.log(`[NOTIF DEBUG] Checking materials for upcoming step "${step.name}" (Work: "${currentWork.name}"): ${materialsForStep.map(m => `${m.name} (Planned: ${m.plannedQty}, Purchased: ${m.purchasedQty})`).join(', ') || 'Nenhum'}`);
 
             for (const material of materialsForStep) {
                 // FIX: Ensure plannedQty is greater than 0 to avoid division by zero and irrelevant notifications
@@ -1321,6 +1361,7 @@ export const dbService = {
                             .from('notifications')
                             .select('id')
                             .eq('user_id', userId)
+                            .eq('work_id', workId) // NEW: Ensure to check for work_id here
                             .eq('tag', notificationTag) 
                             .eq('read', false)
                             .maybeSingle();
@@ -1328,13 +1369,13 @@ export const dbService = {
                         console.log(`[NOTIF DEBUG] Checking material "${material.name}" for step "${step.name}". Tag: ${notificationTag}. Existing unread notif: ${!!existingNotif}`);
 
                         if (!existingNotif) {
-                            console.log(`[NOTIF GENERATION] Adding low material notification: ${material.name} for step ${step.name}`); // Debug log
+                            console.log(`[NOTIF GENERATION] Adding low material notification: "${material.name}" for step "${step.name}" (Work: "${currentWork.name}")`); // Debug log
                             await this.addNotification({
                                 userId,
                                 workId, // NEW: Add workId to notification
                                 // FIX: Improved phrasing
                                 title: `Atenção: Material em falta para a etapa ${step.name}!`,
-                                message: `O material "${material.name}" (${material.purchasedQty}/${material.plannedQty} ${material.unit}) para a etapa "${step.name}" da obra "${currentWork?.name}" está em falta. Faça a compra!`,
+                                message: `O material "${material.name}" (${material.purchasedQty}/${material.plannedQty} ${material.unit}) para a etapa "${step.name}" da obra "${currentWork.name}" está em falta. Faça a compra!`,
                                 date: new Date().toISOString(),
                                 read: false,
                                 type: 'WARNING',
@@ -1342,7 +1383,7 @@ export const dbService = {
                             });
                             await dbService.sendPushNotification(userId, {
                                 title: `Atenção: Material em falta para a etapa ${step.name}!`,
-                                body: `O material "${material.name}" (${material.purchasedQty}/${material.plannedQty} ${material.unit}) para a etapa "${step.name}" da obra "${currentWork?.name}" está em falta. Faça a compra!`,
+                                body: `O material "${material.name}" (${material.purchasedQty}/${material.plannedQty} ${material.unit}) para a etapa "${step.name}" da obra "${currentWork.name}" está em falta. Faça a compra!`,
                                 url: `${window.location.origin}/work/${workId}/materials`,
                                 tag: notificationTag
                             });
@@ -1364,12 +1405,13 @@ export const dbService = {
                     .from('notifications')
                     .select('id')
                     .eq('user_id', userId)
+                    .eq('work_id', workId) // NEW: Ensure to check for work_id here
                     .eq('tag', notificationTag) // Use tag for unique check
                     .eq('read', false)
                     .maybeSingle();
 
                 if (!existingNotif) {
-                    console.log(`[NOTIF GENERATION] Adding budget warning notification: ${currentWork.name}`); // Debug log
+                    console.log(`[NOTIF GENERATION] Adding budget warning notification for work "${currentWork.name}"`); // Debug log
                     await this.addNotification({
                         userId,
                         workId, // NEW: Add workId to notification
@@ -1382,7 +1424,7 @@ export const dbService = {
                     });
                     await dbService.sendPushNotification(userId, {
                         title: 'Atenção ao Orçamento!',
-                        body: `Você já usou ${Math.round(budgetUsage)}% do orçamento da obra "${currentWork?.name}".`,
+                        body: `Você já usou ${Math.round(budgetUsage)}% do orçamento da obra "${currentWork.name}".`,
                         url: `${window.location.origin}/work/${workId}/financial`,
                         tag: notificationTag
                     });
@@ -1393,17 +1435,18 @@ export const dbService = {
                     .from('notifications')
                     .select('id')
                     .eq('user_id', userId)
+                    .eq('work_id', workId) // NEW: Ensure to check for work_id here
                     .eq('tag', notificationTag) // Use tag for unique check
                     .eq('read', false)
                     .maybeSingle();
                 
                 if (!existingNotif) {
-                    console.log(`[NOTIF GENERATION] Adding budget exceeded notification: ${currentWork.name}`); // Debug log
+                    console.log(`[NOTIF GENERATION] Adding budget exceeded notification for work "${currentWork.name}"`); // Debug log
                     await this.addNotification({
                         userId,
                         workId, // NEW: Add workId to notification
                         title: 'Orçamento Estourado!',
-                        message: `O orçamento da obra "${currentWork?.name}" foi excedido em ${Math.round(budgetUsage - 100)}%.`,
+                        message: `O orçamento da obra "${currentWork.name}" foi excedido em ${Math.round(budgetUsage - 100)}%.`,
                         date: new Date().toISOString(),
                         read: false,
                         type: 'ERROR',
@@ -1411,15 +1454,19 @@ export const dbService = {
                     });
                     await dbService.sendPushNotification(userId, {
                         title: 'Orçamento Estourado!',
-                        body: `O orçamento da obra "${currentWork?.name}" foi excedido em ${Math.round(budgetUsage - 100)}%.`,
+                        body: `O orçamento da obra "${currentWork.name}" foi excedido em ${Math.round(budgetUsage - 100)}%.`,
                         url: `${window.location.origin}/work/${workId}/financial`,
                         tag: notificationTag
                     });
                 }
             }
         }
+        console.log(`[NOTIF DEBUG END] ===================================================`);
+
     } catch (error: any) { // Explicitly type as any to allow .message access
-        console.error("Erro ao gerar notificações inteligentes:", error);
+        console.error(`[NOTIF DEBUG ERROR] Erro ao gerar notificações inteligentes para work ${workId}:`, error);
+        console.log(`[NOTIF DEBUG END] ===================================================`);
+
     }
   },
 
