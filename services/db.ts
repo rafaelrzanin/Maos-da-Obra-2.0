@@ -1,3 +1,4 @@
+
 import { PlanType, ExpenseCategory, StepStatus, FileCategory, type User, type Work, type Step, type Material, type Expense, type Worker, type Supplier, type WorkPhoto, type WorkFile, type Notification, type PushSubscriptionInfo } from '../types.ts';
 import { WORK_TEMPLATES, FULL_MATERIAL_PACKAGES } from './standards.ts';
 import { supabase } from './supabase.ts';
@@ -632,13 +633,12 @@ export const dbService = {
         await supabase.from('suppliers').delete().eq('work_id', workId);
         console.log(`[DB DELETE] Fornecedores para ${workId} deletados.`);
         // NEW: Delete notifications tied to this work
-        // FIX: Removed unnecessary `limit(1000)` from the delete operation.
-        // When deleting all associated notifications for a work, `eq('work_id', workId)` already targets them all.
-        const { count: deletedNotifsCount, error: notifDeleteError } = await supabase.from('notifications').delete().eq('work_id', workId).select('*', { count: 'exact' }); // Limit for safety
+        // FIX: Corrected syntax for deleting notifications to avoid TS2554 error
+        const { count: deletedNotifsCount, error: notifDeleteError } = await supabase.from('notifications').delete().eq('work_id', workId);
         if (notifDeleteError) {
             console.error(`[DB DELETE] Erro ao deletar notificações para ${workId}:`, notifDeleteError);
         } else {
-            console.log(`[DB DELETE] ${deletedNotifsCount} notificações deletadas para ${workId}.`);
+            console.log(`[DB DELETE] ${deletedNotifsCount || 0} notificações deletadas para ${workId}.`); // Use || 0 as count can be null
         }
         
         const { error } = await supabase.from('works').delete().eq('id', workId);
