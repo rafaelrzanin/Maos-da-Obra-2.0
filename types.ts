@@ -157,6 +157,7 @@ export interface Notification {
   date: string;
   read: boolean;
   type: 'INFO' | 'WARNING' | 'SUCCESS' | 'ERROR';
+  tag?: string; // NEW: Unique identifier for notification deduplication
 }
 
 export interface ChecklistItem {
