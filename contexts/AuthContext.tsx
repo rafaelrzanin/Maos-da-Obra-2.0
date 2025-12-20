@@ -52,53 +52,46 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     let mounted = true;
     console.log("[AuthContext] useEffect mounted, initAuth called. Mounted:", mounted, "Initial authLoading:", authLoading);
 
+    // This function will fetch the current user and set the initial state.
+    // It is called once on mount. Subsequent changes are handled by onAuthChange.
     const initAuth = async () => {
-      try {
-        const timeoutDuration = 10000; // 10 seconds
-        console.log("[AuthContext] initAuth: Calling dbService.getCurrentUser()");
-        const authPromise = dbService.getCurrentUser();
-        
-        const resultPromise = Promise.race([
-            authPromise,
-            new Promise<User | null | 'TIMEOUT_SIGNAL'>((resolve) => 
-                setTimeout(() => resolve('TIMEOUT_SIGNAL'), timeoutDuration) 
-            )
-        ]);
-
-        const result = await resultPromise;
-        
-        if (mounted) {
-            if (result !== 'TIMEOUT_SIGNAL') {
-                setUser(result); 
-                console.log("[AuthContext] initAuth resolved. User:", result ? result.email : 'null', "Setting authLoading to false.");
+        try {
+            console.log("[AuthContext] initAuth: Calling dbService.getCurrentUser()");
+            const currentUser = await dbService.getCurrentUser();
+            if (mounted) {
+                setUser(currentUser);
+                console.log("[AuthContext] initAuth resolved. User:", currentUser ? currentUser.email : 'null');
             } else {
-                console.warn(`[AuthContext] initAuth timed out after ${timeoutDuration / 1000}s. Displaying UI, awaiting onAuthChange.`);
+                console.log("[AuthContext] initAuth resolved, but component is unmounted. Skipping state update.");
             }
-        } else {
-            console.log("[AuthContext] initAuth resolved, but component is unmounted. Skipping state update.");
+        } catch (error) {
+            console.error("[AuthContext] Erro during initAuth:", error);
+            if (mounted) {
+                setUser(null); // Ensure user is null on error
+            }
+        } finally {
+            if (mounted) {
+                setAuthLoading(false); // Ensure authLoading is false after initial check
+                setIsAuthReady(true); // Initial auth check is now complete
+                console.log("[AuthContext] initAuth finally block. Setting authLoading to false and isAuthReady to true.");
+            }
         }
-      } catch (error) {
-        console.error("[AuthContext] Erro during initAuth:", error);
-        if (mounted) {
-            setUser(null); // Ensure user is null on error
-        }
-      } finally {
-          if (mounted) {
-              setAuthLoading(false); // GARANTIDO: authLoading é sempre definido como false
-              setIsAuthReady(true); // Initial auth check is now complete
-              console.log("[AuthContext] initAuth finally block. Setting authLoading to false and isAuthReady to true.");
-          }
-      }
     };
 
     initAuth();
 
-    const unsubscribe = dbService.onAuthChange((u) => {
+    // Set up the listener for auth state changes
+    const unsubscribe = dbService.onAuthChange(async (u) => {
       if (mounted) {
-        setUser(u);
         console.log("[AuthContext] onAuthChange event. User:", u ? u.email : 'null');
-        // No longer explicitly setting authLoading to false here.
-        // It's handled by login/signup/loginSocial finally blocks or initAuth.
+        setAuthLoading(true); // Set loading while we process the new user object
+        // dbService.onAuthChange now passes the raw user object,
+        // we might need to fetch the profile explicitly if not already done.
+        // However, dbService.getCurrentUser (which is used internally by onAuthChange for full user object)
+        // already handles ensureUserProfile, so we just set the user.
+        setUser(u);
+        setAuthLoading(false); // Auth state has been updated
+        setIsAuthReady(true); // Ensure this is true after any auth change
       } else {
         console.log("[AuthContext] onAuthChange event, but component is unmounted. Skipping state update.");
       }
@@ -126,21 +119,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const refreshUser = async () => {
       console.log("[AuthContext] refreshUser called.");
+      setAuthLoading(true); // Set loading while refreshing
       const currentUser = await dbService.syncSession();
       if (currentUser) setUser(currentUser);
+      setAuthLoading(false); // Loading complete
   };
 
   const login = async (email: string, password?: string) => {
     setAuthLoading(true);
     console.log("[AuthContext] login called. Setting authLoading to true.");
     try {
-        const loginPromise = dbService.login(email, password);
-        // Timeout de segurança no login manual
-        const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error("Tempo limite excedido. Verifique sua conexão.")), 15000)
-        );
-        
-        const u = await Promise.race([loginPromise, timeoutPromise]) as User | null;
+        const u = await dbService.login(email, password);
         
         if (u) {
             setUser(u);
@@ -149,8 +138,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
         console.log("[AuthContext] login failed. No user returned.");
         return false;
-    } catch (e) {
+    } catch (e: any) {
         console.error("[AuthContext] Login exception:", e);
+        // dbService.login already throws, catch and return false to indicate failure.
+        // The calling component (Login.tsx) will handle the specific error message.
         return false;
     } finally {
         setAuthLoading(false);
@@ -176,8 +167,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.error("[AuthContext] Social login exception:", e);
         return false;
     } finally {
-        setAuthLoading(false); // Ensure authLoading is reset even if redirect happens very fast or an uncaught exception occurs
-        console.log("[AuthContext] loginSocial finished. Setting authLoading to false.");
+        // IMPORTANT: DO NOT setAuthLoading(false) here.
+        // The `onAuthChange` listener will be triggered by the redirect from Supabase,
+        // and it is responsible for setting `authLoading(false)` once the new session is processed.
+        console.log("[AuthContext] loginSocial finished. `onAuthChange` will handle final authLoading state.");
     }
   };
 
@@ -192,6 +185,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             return true;
         }
         console.log("[AuthContext] signup failed. No user returned.");
+        return false;
+    } catch (e: any) {
+        console.error("[AuthContext] Signup exception:", e);
         return false;
     } finally {
         setAuthLoading(false);
@@ -208,8 +204,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const updatePlan = async (plan: PlanType) => {
     if (user) {
       console.log("[AuthContext] updatePlan called for user:", user.email, "Plan:", plan);
+      setAuthLoading(true); // Set loading while updating plan
       await dbService.updatePlan(user.id, plan);
       await refreshUser();
+      setAuthLoading(false); // Loading complete
     }
   };
 
