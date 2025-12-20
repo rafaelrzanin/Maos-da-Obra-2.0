@@ -10,10 +10,11 @@ export default defineConfig({
     outDir: 'dist',
     assetsDir: 'assets',
   },
-  // NEW: Expose VAPID_PUBLIC_KEY, SUPABASE_URL and SUPABASE_ANON_KEY to client-side
+  // NEW: Expose VAPID_PUBLIC_KEY, SUPABASE_URL, SUPABASE_ANON_KEY, and API_KEY to client-side
   define: {
     'import.meta.env.VITE_VAPID_PUBLIC_KEY': JSON.stringify(process.env.VAPID_PUBLIC_KEY),
     'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(process.env.VITE_SUPABASE_URL),
     'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(process.env.VITE_SUPABASE_ANON_KEY),
+    'process.env.API_KEY': JSON.stringify(process.env.API_KEY), // Inject API_KEY for GenAI
   },
 });
