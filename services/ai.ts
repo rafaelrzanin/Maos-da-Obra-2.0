@@ -10,7 +10,8 @@ const safeGetEnv = (key: string): string | undefined => {
   if (typeof process !== 'undefined' && process.env && typeof process.env[key] === 'string') {
     value = process.env[key];
     console.log(`[AI safeGetEnv] Lendo ${key} de process.env. Valor: ${value ? 'CONFIGURADO' : 'UNDEFINED'}`);
-    if (value) return value;
+    // FIX: Explicitly check for the string "undefined" which can occur if JSON.stringify(undefined) is used.
+    if (value && value !== 'undefined') return value;
   } else {
     console.log(`[AI safeGetEnv] process.env.${key} não disponível ou não é string.`);
   }
@@ -20,7 +21,8 @@ const safeGetEnv = (key: string): string | undefined => {
   if (typeof import.meta !== 'undefined' && import.meta.env && typeof import.meta.env[key] === 'string') {
     value = import.meta.env[key];
     console.log(`[AI safeGetEnv] Lendo ${key} de import.meta.env. Valor: ${value ? 'CONFIGURADO' : 'UNDEFINED'}`);
-    if (value) return value;
+    // FIX: Explicitly check for the string "undefined".
+    if (value && value !== 'undefined') return value;
   } else {
     console.log(`[AI safeGetEnv] import.meta.env.${key} não disponível ou não é string.`);
   }
