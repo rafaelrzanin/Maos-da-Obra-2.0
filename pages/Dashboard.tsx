@@ -71,7 +71,7 @@ const DashboardSkeleton = () => (
 
     {/* Main HUD Skeleton */}
     <div className="mb-8 rounded-[1.6rem] border border-slate-200 bg-white shadow-[0_18px_45px_-30px_rgba(15,23,42,0.45)] ring-1 ring-black/5 dark:border-slate-800 dark:bg-slate-900 dark:shadow-none dark:ring-0">
-      <div className="h-64 w-full rounded-[1.6rem] bg-gradient-to-b from-slate-100 to-slate-200 dark:from-slate-800 to-slate-900"></div>
+      <div className="h-64 w-full rounded-[1.4rem] bg-gradient-to-b from-slate-100 to-slate-200 dark:from-slate-800 to-slate-900"></div>
     </div>
 
     {/* List Skeleton */}
@@ -507,14 +507,21 @@ const Dashboard: React.FC = () => {
   // ======================================
 
   const checkNotificationStatus = useCallback(async () => {
-    if (!('Notification' in window) || !('serviceWorker' in navigator)) {
+    // CRITICAL FIX: Even more robust check for `Notification` object itself
+    // `typeof window !== 'undefined'` handles SSR. `window.Notification` directly accesses the global.
+    // `typeof window.Notification.permission === 'string'` ensures the API is fully functional.
+    if (typeof window === 'undefined' || !window.Notification || typeof window.Notification.permission !== 'string') {
+      setNotificationStatus('unsupported');
+      return;
+    }
+    if (!('serviceWorker' in navigator)) { // ServiceWorker is also critical for push notifications
       setNotificationStatus('unsupported');
       return;
     }
 
-    setNotificationStatus(Notification.permission as 'default' | 'granted' | 'denied');
+    setNotificationStatus(window.Notification.permission as 'default' | 'granted' | 'denied'); // Use window.Notification directly
 
-    if (Notification.permission === 'granted' && user) {
+    if (window.Notification.permission === 'granted' && user) {
       const existingSubscription = await dbService.getPushSubscription(user.id);
       setIsSubscribedToPush(!!existingSubscription);
     } else {
@@ -524,35 +531,30 @@ const Dashboard: React.FC = () => {
 
   useEffect(() => {
     if (authLoading || !user) return;
-    // CRITICAL FIX: Ensure window.Notification and navigator.serviceWorker are available before calling checkNotificationStatus
-    if (typeof window !== 'undefined' && 'Notification' in window && 'serviceWorker' in navigator) {
-      checkNotificationStatus();
-      // Show prompt only if permission is default and user hasn't explicitly dismissed it in this session
-      if (Notification.permission === 'default') {
-        setShowNotificationPrompt(true);
-      }
-    } else {
-      setNotificationStatus('unsupported'); // Explicitly set to unsupported if APIs are missing
+    
+    checkNotificationStatus(); // Call the now more robust check
+    
+    // Only show prompt if permission is 'default' and Notification API is actually supported.
+    // This second check is necessary because `checkNotificationStatus` might have set 'unsupported'.
+    if (typeof window !== 'undefined' && window.Notification && window.Notification.permission === 'default') {
+      setShowNotificationPrompt(true);
     }
   }, [user, authLoading, checkNotificationStatus]);
 
 
   const subscribeUserToPush = async () => {
-    if (!user || notificationStatus !== 'default') return;
+    // Only proceed if Notification API is supported and current status is 'default'
+    if (typeof window === 'undefined' || !window.Notification || window.Notification.permission !== 'default' || !user) return;
 
     setShowNotificationPrompt(false); // Hide the prompt while asking
 
     try {
-      const permission = await Notification.requestPermission();
+      const permission = await window.Notification.requestPermission(); // Use window.Notification directly
       setNotificationStatus(permission);
 
       if (permission === 'granted') {
         const serviceWorkerRegistration = await navigator.serviceWorker.ready;
         
-        // IMPORTANT: Replace with your VAPID public key
-        // This key should be retrieved from an environment variable (e.g., process.env.VAPID_PUBLIC_KEY)
-        // For client-side, it's typically injected by the build system (e.g., Vite)
-        // Assuming VITE_VAPID_PUBLIC_KEY is set in your .env or similar.
         const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY; 
 
         if (!VAPID_PUBLIC_KEY) {
