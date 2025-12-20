@@ -1032,12 +1032,12 @@ const Dashboard: React.FC = () => {
 
               if (notif.type === 'WARNING') {
                 // FIX: Updated color classes for WARNING type notifications for better contrast
-                cardBgClass = 'bg-amber-100 dark:bg-amber-950/20'; // Lighter amber bg
-                cardBorderClass = 'border-amber-300 dark:border-amber-900'; // Stronger amber border
-                iconBgClass = 'bg-amber-400/20 dark:bg-amber-600/30'; // Darker amber for icon bg
-                iconColorClass = 'text-amber-700 dark:text-amber-300'; // Vibrant amber for icon color
-                textColorClass = 'text-amber-900 dark:text-amber-100'; // Darker text for light mode, lighter for dark mode
-                titleColorClass = 'text-amber-900 dark:text-amber-100'; // Darker text for light mode, lighter for dark mode
+                cardBgClass = 'bg-amber-100 dark:bg-amber-900/30'; // Lighter amber bg, more opaque in dark mode
+                cardBorderClass = 'border-amber-400 dark:border-amber-800'; // Stronger amber border
+                iconBgClass = 'bg-amber-500/20 dark:bg-amber-600/30'; // Darker amber for icon bg
+                iconColorClass = 'text-amber-800 dark:text-amber-50'; // Vibrant amber for icon color, very light for dark mode
+                textColorClass = 'text-amber-950 dark:text-amber-50'; // Darker text for light mode, lighter for dark mode
+                titleColorClass = 'text-amber-950 dark:text-amber-50'; // Darker text for light mode, lighter for dark mode
               } else if (notif.type === 'ERROR') {
                 cardBgClass = 'bg-red-50 dark:bg-red-900/10';
                 cardBorderClass = 'border-red-200 dark:border-red-900/30'; // Changed to red-200 for border
