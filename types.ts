@@ -1,4 +1,3 @@
-
 export enum PlanType {
   MENSAL = 'MENSAL',
   SEMESTRAL = 'SEMESTRAL',
@@ -182,6 +181,7 @@ export interface ContractTemplate {
 export interface Supplier {
   id: string;
   userId: string;
+  workId: string; // NEW: Added workId to link supplier to a specific work
   name: string;
   category: string;
   phone: string;
@@ -193,6 +193,7 @@ export interface Supplier {
 export interface Worker {
   id: string;
   userId: string;
+  workId: string; // NEW: Added workId to link worker to a specific work
   name: string;
   role: string;
   phone: string;
