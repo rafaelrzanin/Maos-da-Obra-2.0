@@ -1,3 +1,4 @@
+
 import { PlanType, ExpenseCategory, StepStatus, FileCategory, type User, type Work, type Step, type Material, type Expense, type Worker, type Supplier, type WorkPhoto, type WorkFile, type Notification, type PushSubscriptionInfo } from '../types.ts';
 import { WORK_TEMPLATES, FULL_MATERIAL_PACKAGES } from './standards.ts';
 import { supabase } from './supabase.ts';
@@ -1181,7 +1182,6 @@ export const dbService = {
         const currentSteps = prefetchedSteps || await this.getSteps(workId);
         const currentExpenses = prefetchedExpenses || await this.getExpenses(workId);
         const currentMaterials = prefetchedMaterials || await this.getMaterials(workId);
-        // Fix: Corrected typo 'prefetfetchedWork' to 'prefetchedWork'
         const currentWork = prefetchedWork || await this.getWorkById(workId);
 
         // --- INÍCIO DA CORREÇÃO DA LÓGICA DE DATAS ---
@@ -1216,6 +1216,7 @@ export const dbService = {
                 .maybeSingle();
 
             if (!existingNotif) {
+                console.log(`[NOTIF GENERATION] Adding delayed step notification: ${step.name}`); // Debug log
                 await this.addNotification({
                     userId,
                     title: 'Etapa Atrasada!',
@@ -1254,6 +1255,7 @@ export const dbService = {
               .eq('read', false)
               .maybeSingle();
           if (!existingNotif) {
+              console.log(`[NOTIF GENERATION] Adding upcoming step notification: ${step.name}`); // Debug log
               await this.addNotification({
                   userId,
                   title: 'Etapa Próxima!',
@@ -1277,6 +1279,7 @@ export const dbService = {
         for (const step of upcomingSteps) { // Iterate only through relevant upcoming steps
             const materialsForStep = currentMaterials.filter(m => m.stepId === step.id);
             for (const material of materialsForStep) {
+                // FIX: Ensure plannedQty is greater than 0 to avoid division by zero and irrelevant notifications
                 if (material.plannedQty > 0 && material.purchasedQty < material.plannedQty) {
                     // Only notify if still more than 20% to purchase AND is for an upcoming step.
                     // This prevents spamming for materials far in the future.
@@ -1294,6 +1297,7 @@ export const dbService = {
                             .maybeSingle();
 
                         if (!existingNotif) {
+                            console.log(`[NOTIF GENERATION] Adding low material notification: ${material.name} for step ${step.name}`); // Debug log
                             await this.addNotification({
                                 userId,
                                 title: notificationTitle,
@@ -1332,6 +1336,7 @@ export const dbService = {
                     .maybeSingle();
 
                 if (!existingNotif) {
+                    console.log(`[NOTIF GENERATION] Adding budget warning notification: ${currentWork.name}`); // Debug log
                     await this.addNotification({
                         userId,
                         title: 'Atenção ao Orçamento!',
@@ -1359,6 +1364,7 @@ export const dbService = {
                     .maybeSingle();
                 
                 if (!existingNotif) {
+                    console.log(`[NOTIF GENERATION] Adding budget exceeded notification: ${currentWork.name}`); // Debug log
                     await this.addNotification({
                         userId,
                         title: 'Orçamento Estourado!',
