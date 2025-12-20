@@ -533,6 +533,8 @@ export const dbService = {
     
     // Invalidate Cache
     _dashboardCache.works = null;
+    delete _dashboardCache.stats[parsedWork.id]; // Invalidate specific stats for new work
+    delete _dashboardCache.summary[parsedWork.id]; // Invalidate specific summary for new work
 
     // Generate Steps
     const template = WORK_TEMPLATES.find(t => t.id === templateId);
@@ -598,6 +600,9 @@ export const dbService = {
           await supabase.from('materials').delete().eq('work_id', workId);
           await supabase.from('materials').insert(materialsToInsert);
       }
+      // Invalidate cache for materials after regeneration
+      delete _dashboardCache.stats[workId];
+      delete _dashboardCache.summary[workId];
   },
 
   async deleteWork(workId: string) {
@@ -615,6 +620,8 @@ export const dbService = {
         if (error) throw error;
         
         _dashboardCache.works = null; // Invalidate cache
+        delete _dashboardCache.stats[workId]; // Invalidate specific stats for deleted work
+        delete _dashboardCache.summary[workId]; // Invalidate specific summary for deleted work
     } catch (error: unknown) { // Fix TS18046: Explicitly type as unknown
         console.error("Erro ao apagar obra e dados relacionados:", error);
         if (error instanceof Error) {
@@ -650,6 +657,9 @@ export const dbService = {
       console.error("Erro ao adicionar etapa:", error);
       throw error;
     }
+    // Invalidate cache for work stats/summary
+    delete _dashboardCache.stats[step.workId];
+    delete _dashboardCache.summary[step.workId];
     return parseStepFromDB(data);
   },
 
@@ -667,6 +677,9 @@ export const dbService = {
       console.error("Erro ao atualizar etapa:", error);
       throw error;
     }
+    // Invalidate cache for work stats/summary
+    delete _dashboardCache.stats[step.workId];
+    delete _dashboardCache.summary[step.workId];
     return parseStepFromDB(data);
   },
 
@@ -712,7 +725,9 @@ export const dbService = {
         stepId: material.stepId
       });
     }
-
+    // Invalidate cache for work stats/summary
+    delete _dashboardCache.stats[material.workId];
+    delete _dashboardCache.summary[material.workId];
     return parseMaterialFromDB(data);
   },
 
@@ -731,6 +746,9 @@ export const dbService = {
       console.error("Erro ao atualizar material:", error);
       throw error;
     }
+    // Invalidate cache for work stats/summary
+    delete _dashboardCache.stats[material.workId];
+    delete _dashboardCache.summary[material.workId];
     return parseMaterialFromDB(data);
   },
 
@@ -770,6 +788,9 @@ export const dbService = {
       relatedMaterialId: materialId,
       stepId: existingMaterial.step_id
     });
+    // Invalidate cache for work stats/summary after purchase
+    delete _dashboardCache.stats[existingMaterial.work_id];
+    delete _dashboardCache.summary[existingMaterial.work_id];
   },
 
   // --- EXPENSES ---
@@ -802,6 +823,9 @@ export const dbService = {
       console.error("Erro ao adicionar despesa:", error);
       throw error;
     }
+    // Invalidate cache for work stats/summary
+    delete _dashboardCache.stats[expense.workId];
+    delete _dashboardCache.summary[expense.workId];
     return parseExpenseFromDB(data);
   },
 
@@ -823,15 +847,23 @@ export const dbService = {
       console.error("Erro ao atualizar despesa:", error);
       throw error;
     }
+    // Invalidate cache for work stats/summary
+    delete _dashboardCache.stats[expense.workId];
+    delete _dashboardCache.summary[expense.workId];
     return parseExpenseFromDB(data);
   },
 
   async deleteExpense(expenseId: string): Promise<void> {
     // Supabase is guaranteed to be initialized now
-    const { error } = await supabase.from('expenses').delete().eq('id', expenseId);
-    if (error) {
-      console.error("Erro ao apagar despesa:", error);
-      throw error;
+    const { data: deletedExpense, error: deleteError } = await supabase.from('expenses').delete().eq('id', expenseId).select('work_id').single();
+    if (deleteError) {
+      console.error("Erro ao apagar despesa:", deleteError);
+      throw deleteError;
+    }
+    if (deletedExpense) {
+        // Invalidate cache for work stats/summary of the work where the expense was deleted
+        delete _dashboardCache.stats[deletedExpense.work_id];
+        delete _dashboardCache.summary[deletedExpense.work_id];
     }
   },
 
