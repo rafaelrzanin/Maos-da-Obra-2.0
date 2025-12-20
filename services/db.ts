@@ -519,7 +519,8 @@ export const dbService = {
         bathrooms: work.bathrooms,
         kitchens: work.kitchens,
         livingRooms: work.livingRooms,
-        hasLeisureArea: work.hasLeisureArea
+        // FIX: Changed to snake_case for DB column compatibility
+        has_leisure_area: work.hasLeisureArea 
     };
 
     const { data: savedWork, error } = await supabase.from('works').insert(dbWork).select().single();
@@ -706,7 +707,7 @@ export const dbService = {
         workId: material.workId,
         description: `Compra de ${material.name}`,
         amount: purchaseInfo.cost,
-        date: purchaseInfo.date,
+        date: new Date().toISOString(),
         category: ExpenseCategory.MATERIAL,
         relatedMaterialId: data.id,
         stepId: material.stepId
