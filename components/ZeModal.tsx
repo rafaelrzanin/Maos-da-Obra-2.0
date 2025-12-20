@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { ZE_AVATAR, ZE_AVATAR_FALLBACK } from '../services/standards.ts';
 
@@ -8,9 +7,11 @@ export interface ZeModalProps {
   message: string;
   confirmText?: string; // Made optional
   cancelText?: string; // Made optional
-  type?: 'DANGER' | 'INFO' | 'SUCCESS' | 'WARNING'; // Added WARNING for consistency
+  // Fix: Added 'ERROR' to the type union for consistency with usage
+  type?: 'DANGER' | 'INFO' | 'SUCCESS' | 'WARNING' | 'ERROR';
   onConfirm?: () => void; // Made optional
   onCancel: () => void; // Still required as the primary way to close
+  isConfirming?: boolean; // NEW: To disable confirm button during async ops
 }
 
 export const ZeModal: React.FC<ZeModalProps> = ({ 
@@ -21,7 +22,8 @@ export const ZeModal: React.FC<ZeModalProps> = ({
   cancelText = "Cancelar", 
   type = 'INFO', // Default to INFO
   onConfirm, 
-  onCancel 
+  onCancel,
+  isConfirming = false // NEW: Default to false
 }) => {
   if (!isOpen) return null;
   
@@ -31,25 +33,6 @@ export const ZeModal: React.FC<ZeModalProps> = ({
   const finalConfirmText = isSimpleAlert ? "Entendido" : confirmText;
   const confirmButtonHandler = isSimpleAlert ? onCancel : onConfirm;
 
-  // These are not used directly as the user explicitly asked to NOT change UI/UX/aesthetics,
-  // and the existing layout within ZeModal uses a fixed style for the info block.
-  // Kept here for potential future flexibility without violating current rules.
-  /*
-  let iconClass = 'fa-solid fa-info-circle text-blue-600';
-  let bgColorClass = 'bg-blue-50 dark:bg-blue-900/20 border-blue-100 dark:border-blue-900 text-blue-800 dark:text-blue-200';
-
-  if (type === 'DANGER') {
-    iconClass = 'fa-solid fa-triangle-exclamation text-red-600';
-    bgColorClass = 'bg-red-50 dark:bg-red-900/20 border-red-100 dark:border-red-900 text-red-800 dark:text-red-200';
-  } else if (type === 'WARNING') {
-    iconClass = 'fa-solid fa-exclamation-triangle text-amber-600';
-    bgColorClass = 'bg-amber-50 dark:bg-amber-900/20 border-amber-100 dark:border-amber-900 text-amber-800 dark:text-amber-200';
-  } else if (type === 'SUCCESS') {
-    iconClass = 'fa-solid fa-check-circle text-green-600';
-    bgColorClass = 'bg-green-50 dark:bg-green-900/20 border-green-100 dark:border-green-900 text-green-800 dark:text-green-200';
-  }
-  */
-
   // Determine background color for the message box based on type
   let messageBoxBgClass = 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300';
   if (type === 'DANGER') {
@@ -58,6 +41,8 @@ export const ZeModal: React.FC<ZeModalProps> = ({
     messageBoxBgClass = 'bg-amber-50 dark:bg-amber-900/20 border-amber-100 dark:border-amber-900 text-amber-800 dark:text-amber-200';
   } else if (type === 'SUCCESS') {
     messageBoxBgClass = 'bg-green-50 dark:bg-green-900/20 border-green-100 dark:border-green-900 text-green-800 dark:text-green-200';
+  } else if (type === 'ERROR') { // Added handler for 'ERROR' type
+    messageBoxBgClass = 'bg-red-50 dark:bg-red-900/20 border-red-100 dark:border-red-900 text-red-800 dark:text-red-200';
   }
 
 
@@ -98,14 +83,16 @@ export const ZeModal: React.FC<ZeModalProps> = ({
             <div className="flex flex-col gap-3">
                 <button 
                     onClick={() => confirmButtonHandler && confirmButtonHandler()} 
-                    className={`w-full py-4 rounded-xl text-white font-bold transition-all shadow-lg active:scale-[0.98] ${isDangerOrWarning ? 'bg-danger hover:bg-red-700 shadow-red-500/20' : 'bg-primary hover:bg-slate-800 shadow-slate-500/20'}`}
+                    disabled={isConfirming} // NEW: Disable button while confirming
+                    className={`w-full py-4 rounded-xl text-white font-bold transition-all shadow-lg active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2 ${isDangerOrWarning ? 'bg-danger hover:bg-red-700 shadow-red-500/20' : 'bg-primary hover:bg-slate-800 shadow-slate-500/20'}`}
                 >
-                    {finalConfirmText}
+                    {isConfirming ? <i className="fa-solid fa-circle-notch fa-spin"></i> : finalConfirmText} {/* NEW: Show spinner */}
                 </button>
                 {!isSimpleAlert && ( 
                     <button 
                         onClick={onCancel} 
-                        className="w-full py-3 rounded-xl text-slate-500 font-bold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
+                        disabled={isConfirming} // NEW: Disable cancel button too
+                        className="w-full py-3 rounded-xl text-slate-500 font-bold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
                     >
                         {cancelText}
                     </button>
