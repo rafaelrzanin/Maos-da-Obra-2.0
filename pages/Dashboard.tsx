@@ -524,10 +524,15 @@ const Dashboard: React.FC = () => {
 
   useEffect(() => {
     if (authLoading || !user) return;
-    checkNotificationStatus();
-    // Show prompt only if permission is default and user hasn't explicitly dismissed it in this session
-    if (Notification.permission === 'default') {
-      setShowNotificationPrompt(true);
+    // CRITICAL FIX: Ensure window.Notification and navigator.serviceWorker are available before calling checkNotificationStatus
+    if (typeof window !== 'undefined' && 'Notification' in window && 'serviceWorker' in navigator) {
+      checkNotificationStatus();
+      // Show prompt only if permission is default and user hasn't explicitly dismissed it in this session
+      if (Notification.permission === 'default') {
+        setShowNotificationPrompt(true);
+      }
+    } else {
+      setNotificationStatus('unsupported'); // Explicitly set to unsupported if APIs are missing
     }
   }, [user, authLoading, checkNotificationStatus]);
 
@@ -629,7 +634,12 @@ const Dashboard: React.FC = () => {
 
       if (updatedWorks.length > 0) {
         const stillExists = updatedWorks.find(w => w.id === focusWork?.id);
-        setFocusWork(stillExists || updatedWorks[0]);
+        if (stillExists) {
+            setFocusWork(stillExists);
+        } else {
+            // If the focused work was deleted, set the first available work as focus, or null if none.
+            setFocusWork(updatedWorks.length > 0 ? updatedWorks[0] : null);
+        }
       } else {
         setFocusWork(null);
       }
