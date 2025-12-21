@@ -5,7 +5,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { dbService } from '../services/db.ts';
 
 const Login: React.FC = () => {
-  const { login, user, authLoading, isAuthReady, isSubscriptionValid } = useAuth(); // Use authLoading and isAuthReady
+  const { login, user, authLoading, isUserAuthFinished, isSubscriptionValid } = useAuth(); // Updated isAuthReady
   const navigate = useNavigate();
   const location = useLocation();
   
@@ -20,7 +20,7 @@ const Login: React.FC = () => {
   const [forgotEmail, setForgotEmail] = useState('');
   const [forgotStatus, setForgotStatus] = useState<'IDLE' | 'SENDING' | 'SENT' | 'ERROR'>('IDLE');
 
-  console.log("[Login] Component rendered. Current user from AuthContext:", user ? user.email : 'null', "Auth Loading:", authLoading, "isAuthReady:", isAuthReady);
+  console.log("[Login] Component rendered. Current user from AuthContext:", user ? user.email : 'null', "Auth Loading:", authLoading, "isUserAuthFinished:", isUserAuthFinished); // Updated isAuthReady
 
 
   // Detect plan from URL (for immediate redirect after social login/signup)
@@ -34,11 +34,12 @@ const Login: React.FC = () => {
 
   // Main redirect logic
   useEffect(() => {
-    console.log("[Login] useEffect trigger. AuthState:", { user: user ? user.email : 'null', authLoading, isAuthReady, isSubscriptionValid, selectedPlan, currentPath: location.pathname });
+    console.log("[Login] useEffect trigger. AuthState:", { user: user ? user.email : 'null', authLoading, isUserAuthFinished, isSubscriptionValid, selectedPlan, currentPath: location.pathname }); // Updated isAuthReady
 
     // Only redirect if auth is ready (initial check done) AND user exists
-    if (isAuthReady && user && !authLoading) {
-        console.log("[Login] Auth Ready, User exists, and Auth not loading. Checking redirect conditions...");
+    // The `authLoading` here primarily catches *explicit* login/signup operations.
+    if (isUserAuthFinished && user && !authLoading) { // Updated isAuthReady
+        console.log("[Login] Auth Finished, User exists, and Auth not loading. Checking redirect conditions...");
         // 1. Se tem um plano selecionado na URL (fluxo de compra), vai pro Checkout
         if (selectedPlan) {
             console.log("[Login] Redirecting to /checkout due to selectedPlan:", selectedPlan);
@@ -54,13 +55,13 @@ const Login: React.FC = () => {
             console.log("[Login] Redirecting to /settings (Subscription management).");
             navigate('/settings', { replace: true });
         }
-    } else if (!user && isAuthReady && !authLoading) {
-        console.log("[Login] No user found, Auth Ready, and Auth not loading. Displaying login form.");
+    } else if (!user && isUserAuthFinished && !authLoading) { // Updated isAuthReady
+        console.log("[Login] No user found, Auth Finished, and Auth not loading. Displaying login form.");
         // This is the state where the login form should actually be visible.
-    } else if (authLoading || !isAuthReady) {
-        console.log("[Login] Auth is still loading or not ready. Waiting...");
+    } else if (!isUserAuthFinished || authLoading) { // Updated isAuthReady
+        console.log("[Login] Auth is still loading or not finished. Waiting...");
     }
-  }, [user, navigate, selectedPlan, authLoading, isAuthReady, isSubscriptionValid, location.pathname]);
+  }, [user, navigate, selectedPlan, authLoading, isUserAuthFinished, isSubscriptionValid, location.pathname]); // Updated isAuthReady
 
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -118,8 +119,8 @@ const Login: React.FC = () => {
       }
   };
 
-  // Only show loading screen if auth is still determining user
-  if (authLoading || !isAuthReady) { 
+  // Only show loading screen if initial auth check is not done OR an active auth operation is in progress
+  if (!isUserAuthFinished || authLoading) { // Updated isAuthReady
     return (
         <div className="relative min-h-screen w-full flex items-center justify-center p-4 bg-slate-900 font-sans">
             <div className="absolute inset-0 z-0">
@@ -227,4 +228,3 @@ const Login: React.FC = () => {
 };
 
 export default Login;
-    
