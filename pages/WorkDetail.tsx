@@ -10,8 +10,7 @@ import { STANDARD_CHECKLISTS, CONTRACT_TEMPLATES, STANDARD_JOB_ROLES, STANDARD_S
 
 // --- TYPES FOR VIEW STATE ---
 type MainTab = 'SCHEDULE' | 'MATERIALS' | 'FINANCIAL' | 'MORE';
-type SubView = 'NONE' | 'TEAM' | 'SUPPLIERS' | 'REPORTS' | 'PHOTOS' | 'PROJECTS' | 'CALCULATORS' | 'CONTRACTS' | 'CHECKLIST';
-type ReportSubTab = 'CRONOGRAMA' | 'MATERIAIS' | 'FINANCEIRO';
+// Removed SubView type, as it's being reverted
 
 // --- DATE HELPERS ---
 const parseDateNoTimezone = (dateStr: string) => {
@@ -44,9 +43,9 @@ const WorkDetail: React.FC = () => {
 
     // --- UI STATE ---
     const [activeTab, setActiveTab] = useState<MainTab>('SCHEDULE');
-    const [subView, setSubView] = useState<SubView>('NONE');
+    // Removed subView state
     const [uploading, setUploading] = useState(false);
-    const [reportActiveTab, setReportActiveTab] = useState<ReportSubTab>('CRONOGRAMA');
+    // Removed reportActiveTab state
     
     // --- AI ACCESS LOGIC ---
     const isVitalicio = user?.plan === PlanType.VITALICIO;
@@ -119,10 +118,15 @@ const WorkDetail: React.FC = () => {
         onCancel: () => {}, 
     });
 
-    // CALCULATOR STATES
+    // CALCULATOR STATES (will be inline or in modal now)
+    const [isCalculatorModalOpen, setIsCalculatorModalOpen] = useState(false);
     const [calcType, setCalcType] = useState<'PISO'|'PAREDE'|'PINTURA'>('PISO');
     const [calcArea, setCalcArea] = useState('');
     const [calcResult, setCalcResult] = useState<string[]>([]);
+
+    // --- Inline views management ---
+    const [inlineView, setInlineView] = useState<'NONE' | 'TEAM' | 'SUPPLIERS' | 'PHOTOS' | 'PROJECTS' | 'CALCULATORS' | 'CONTRACTS' | 'CHECKLIST'>('NONE');
+
 
     // --- LOAD DATA ---
     const load = async () => {
@@ -463,12 +467,47 @@ const WorkDetail: React.FC = () => {
     // EXPORT EXCEL
     const handleExportExcel = () => {
         const wb = XLSX.utils.book_new();
-        const wsCrono = XLSX.utils.json_to_sheet(steps.map(s => ({ Etapa: s.name, Inicio: parseDateNoTimezone(s.startDate), Fim: parseDateNoTimezone(s.endDate), Status: s.status })));
+
+        // Cronograma Sheet
+        const wsCrono = XLSX.utils.json_to_sheet(steps.map(s => ({
+            'Nome da Etapa': s.name,
+            'Início Planejado': parseDateNoTimezone(s.startDate),
+            'Fim Planejado': parseDateNoTimezone(s.endDate),
+            'Status Atual': s.status
+        })));
         XLSX.utils.book_append_sheet(wb, wsCrono, "Cronograma");
-        const wsMat = XLSX.utils.json_to_sheet(materials.map(m => ({ Material: m.name, Qtd: m.plannedQty, Comprado: m.purchasedQty })));
+
+        // Materiais Sheet
+        const wsMat = XLSX.utils.json_to_sheet(materials.map(m => ({
+            'Nome do Material': m.name,
+            'Marca': m.brand || 'N/A',
+            'Qtd. Planejada': m.plannedQty,
+            'Unidade': m.unit,
+            'Qtd. Comprada': m.purchasedQty,
+            'Status Compra': m.purchasedQty >= m.plannedQty ? 'Completa' : 'Pendente'
+        })));
         XLSX.utils.book_append_sheet(wb, wsMat, "Materiais");
-        const wsFin = XLSX.utils.json_to_sheet(expenses.map(e => ({ Descrição: e.description, Valor: e.amount, Categoria: e.category, Data: parseDateNoTimezone(e.date), Etapa: steps.find(s => s.id === e.stepId)?.name || 'N/A' })));
+
+        // Financeiro Sheet
+        const wsFin = XLSX.utils.json_to_sheet(expenses.map(e => {
+            const stepName = steps.find(s => s.id === e.stepId)?.name || 'N/A';
+            const workerOrSupplierName = (workers.find(w => w.id === e.workerId)?.name || suppliers.find(s => s.id === e.supplierId)?.name || 'N/A');
+            const totalAgreedValue = e.totalAgreed || e.amount;
+            const saldoAPagar = totalAgreedValue - e.amount;
+
+            return {
+                'Descrição': e.description,
+                'Valor Lançado': Number(e.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 }),
+                'Total Acordado': Number(totalAgreedValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 }),
+                'Diferença (Saldo)': Number(saldoAPagar).toLocaleString('pt-BR', { minimumFractionDigits: 2 }),
+                'Categoria': e.category,
+                'Data': parseDateNoTimezone(e.date),
+                'Etapa Associada': stepName,
+                'Profissional/Fornecedor': workerOrSupplierName
+            };
+        }));
         XLSX.utils.book_append_sheet(wb, wsFin, "Financeiro");
+
         XLSX.writeFile(wb, `Obra_${work?.name}.xlsx`);
     };
 
@@ -480,166 +519,7 @@ const WorkDetail: React.FC = () => {
     if (authLoading || !isUserAuthFinished || loading) return <div className="h-screen flex items-center justify-center"><i className="fa-solid fa-circle-notch fa-spin text-3xl text-primary"></i></div>;
     if (!work) return <div className="text-center text-xl text-red-500 py-10">Obra não encontrada.</div>;
 
-
-    // --- RENDER FUNCTIONS FOR REPORT SECTIONS (REUSABLE) ---
-    const today = new Date().toISOString().split('T')[0]; // Define today once for date comparisons
-
-    const RenderCronogramaReport: React.FC = () => (
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm p-6 print:shadow-none print:border-0 print:rounded-none">
-            <h3 className="text-lg font-bold text-primary dark:text-white mb-4 flex items-center gap-2">
-                <i className="fa-solid fa-calendar-days text-secondary"></i> Cronograma
-            </h3>
-            <div className="space-y-4">
-                {steps.map((s, idx) => {
-                    const isDone = s.status === StepStatus.COMPLETED;
-                    const isInProgress = s.status === StepStatus.IN_PROGRESS;
-                    const isDelayed = s.endDate < today && !isDone;
-
-                    let bgColorClass = 'bg-slate-50 dark:bg-slate-800';
-                    let textColorClass = 'text-slate-600 dark:text-slate-300';
-                    let iconClass = 'fa-clock';
-                    let iconColor = 'text-slate-400';
-
-                    if (isDone) {
-                        bgColorClass = 'bg-green-50 dark:bg-green-900/10';
-                        textColorClass = 'text-green-700 dark:text-green-400';
-                        iconClass = 'fa-check-circle';
-                        iconColor = 'text-green-600';
-                    } else if (isDelayed) {
-                        bgColorClass = 'bg-red-50 dark:bg-red-900/10';
-                        textColorClass = 'text-red-700 dark:text-red-400';
-                        iconClass = 'fa-triangle-exclamation';
-                        iconColor = 'text-red-600';
-                    } else if (isInProgress) {
-                        bgColorClass = 'bg-orange-50 dark:bg-orange-900/10';
-                        textColorClass = 'text-orange-700 dark:text-orange-400';
-                        iconClass = 'fa-hammer';
-                        iconColor = 'text-orange-600';
-                    }
-                    
-                    return (
-                        <div key={s.id} className={`p-3 rounded-xl border ${bgColorClass} border-slate-200 dark:border-slate-700`}>
-                            <div className="flex items-center gap-3 mb-2">
-                                <i className={`fa-solid ${iconClass} ${iconColor} text-lg`}></i>
-                                <p className={`font-bold text-sm ${textColorClass}`}>{String(idx + 1).padStart(2, '0')}. {s.name}</p>
-                            </div>
-                            <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400">
-                                <span>Início: {parseDateNoTimezone(s.startDate)}</span>
-                                <span>Fim: {parseDateNoTimezone(s.endDate)}</span>
-                            </div>
-                        </div>
-                    );
-                })}
-            </div>
-        </div>
-    );
-
-    const RenderMateriaisReport: React.FC = () => (
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm p-6 print:shadow-none print:border-0 print:rounded-none">
-            <h3 className="text-lg font-bold text-primary dark:text-white mb-4 flex items-center gap-2">
-                <i className="fa-solid fa-boxes-stacked text-secondary"></i> Materiais
-            </h3>
-            <div className="space-y-6">
-                {[...steps, { id: 'general-mat', name: 'Materiais Gerais / Sem Etapa', startDate: '', endDate: '', status: StepStatus.NOT_STARTED, workId: '', isDelayed: false }].map((step) => {
-                    const groupMaterials = materials.filter(m => {
-                        if (step.id === 'general-mat') return !m.stepId;
-                        return m.stepId === step.id;
-                    });
-
-                    if (groupMaterials.length === 0) return null;
-
-                    const isGeneral = step.id === 'general-mat';
-                    const stepLabel = isGeneral ? step.name : `Etapa: ${step.name}`;
-
-                    return (
-                        <div key={step.id} className="bg-slate-50 dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
-                            <h4 className="font-bold text-primary dark:text-white text-sm uppercase tracking-wide mb-3">{stepLabel}</h4>
-                            <ul className="divide-y divide-slate-100 dark:divide-slate-700">
-                                {groupMaterials.map(m => {
-                                    const isFullyPurchased = m.purchasedQty >= m.plannedQty;
-                                    const itemStatusClass = isFullyPurchased ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-400';
-                                    const itemIconClass = isFullyPurchased ? 'fa-check-circle' : 'fa-circle-exclamation';
-
-                                    return (
-                                        <li key={m.id} className="py-3 flex flex-col sm:flex-row justify-between items-start sm:items-center text-xs">
-                                            <p className="font-bold text-primary dark:text-white mb-1 sm:mb-0">{m.name} {m.brand && <span className="text-slate-500 font-normal">({m.brand})</span>}</p>
-                                            <div className="flex items-center gap-2 font-mono text-right">
-                                                <span className="text-slate-700 dark:text-slate-300">Sug.: {m.plannedQty} {m.unit}</span>
-                                                <span className={`font-bold ${itemStatusClass} flex items-center gap-1`}>
-                                                    <i className={`fa-solid ${itemIconClass}`}></i> Compr.: {m.purchasedQty} {m.unit}
-                                                </span>
-                                            </div>
-                                        </li>
-                                    );
-                                })}
-                            </ul>
-                        </div>
-                    );
-                })}
-            </div>
-        </div>
-    );
-
-    const RenderFinanceiroReport: React.FC = () => (
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm p-6 print:shadow-none print:border-0 print:rounded-none">
-            <h3 className="text-lg font-bold text-primary dark:text-white mb-4 flex items-center gap-2">
-                <i className="fa-solid fa-dollar-sign text-secondary"></i> Financeiro
-            </h3>
-            <div className="space-y-6">
-                {[...steps, { id: 'general-fin', name: 'Despesas Gerais / Sem Etapa', startDate: '', endDate: '', status: StepStatus.NOT_STARTED, workId: '', isDelayed: false }].map((step) => {
-                    const groupExpenses = expenses.filter(e => {
-                        if (step.id === 'general-fin') return !e.stepId;
-                        return e.stepId === step.id;
-                    });
-
-                    if (groupExpenses.length === 0) return null;
-
-                    const isGeneral = step.id === 'general-fin';
-                    const stepLabel = isGeneral ? step.name : `Etapa: ${step.name}`;
-
-                    return (
-                        <div key={step.id} className="bg-slate-50 dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
-                            <h4 className="font-bold text-primary dark:text-white text-sm uppercase tracking-wide mb-3">{stepLabel}</h4>
-                            <ul className="divide-y divide-slate-100 dark:divide-slate-700">
-                                {groupExpenses.map(exp => {
-                                    const relatedMaterial = exp.relatedMaterialId ? materials.find(m => m.id === exp.relatedMaterialId) : null;
-                                    const expenseWorker = exp.workerId ? workers.find(w => w.id === exp.workerId) : null;
-
-                                    let categoryIcon = 'fa-tag';
-                                    let categoryColor = 'text-slate-500';
-                                    if (exp.category === ExpenseCategory.MATERIAL) {
-                                        categoryIcon = 'fa-box';
-                                        categoryColor = 'text-amber-600';
-                                    } else if (exp.category === ExpenseCategory.LABOR) {
-                                        categoryIcon = 'fa-helmet-safety';
-                                        categoryColor = 'text-blue-600';
-                                    }
-
-                                    return (
-                                        <li key={exp.id} className="py-3 flex justify-between items-center text-xs">
-                                            <div>
-                                                <p className="font-bold text-primary dark:text-white">{exp.description}</p>
-                                                <p className="text-slate-500 mt-1 flex items-center gap-2">
-                                                    <span className={`flex items-center gap-1 ${categoryColor}`}><i className={`fa-solid ${categoryIcon}`}></i> {exp.category}</span>
-                                                    <span>• {parseDateNoTimezone(exp.date)}</span>
-                                                    {relatedMaterial && <span className="text-sm font-medium text-slate-400">(Material: {relatedMaterial.name})</span>}
-                                                    {expenseWorker && <span className="text-sm font-medium text-slate-400">(Profissional: {expenseWorker.name})</span>}
-                                                </p>
-                                            </div>
-                                            <span className="font-bold text-primary dark:text-white whitespace-nowrap">R$ {Number(exp.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                                        </li>
-                                    );
-                                })}
-                            </ul>
-                        </div>
-                    );
-                })}
-            </div>
-        </div>
-    );
-
     // --- RENDER CONTENT ---
-
     const renderMainTab = () => {
         if (activeTab === 'SCHEDULE') {
             return (
@@ -905,379 +785,414 @@ const WorkDetail: React.FC = () => {
                     <div className="flex justify-between items-end mb-2 px-2">
                         <div>
                             <h2 className="text-2xl font-black text-primary dark:text-white">Mais Ferramentas</h2>
-                            <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Bônus & Relatórios</p>
+                            <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Ações Adicionais</p>
                         </div>
                     </div>
 
-                    <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm mb-6">
-                        <h3 className="text-lg font-bold text-primary dark:text-white mb-4">Gerenciamento Avançado</h3>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                            <button onClick={() => setSubView('TEAM')} className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors flex flex-col items-center justify-center text-sm font-medium text-primary dark:text-white">
-                                <i className="fa-solid fa-people-group text-2xl mb-2 text-secondary"></i> Equipe
-                            </button>
-                            <button onClick={() => setSubView('SUPPLIERS')} className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors flex flex-col items-center justify-center text-sm font-medium text-primary dark:text-white">
-                                <i className="fa-solid fa-truck-field text-2xl mb-2 text-secondary"></i> Fornecedores
-                            </button>
-                            <button onClick={() => setSubView('PHOTOS')} className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors flex flex-col items-center justify-center text-sm font-medium text-primary dark:text-white">
-                                <i className="fa-solid fa-camera text-2xl mb-2 text-secondary"></i> Fotos da Obra
-                            </button>
-                            <button onClick={() => setSubView('PROJECTS')} className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors flex flex-col items-center justify-center text-sm font-medium text-primary dark:text-white">
-                                <i className="fa-solid fa-folder-open text-2xl mb-2 text-secondary"></i> Projetos e Docs
-                            </button>
-                            {isPremium ? (
-                                <>
-                                <button onClick={() => setSubView('CALCULATORS')} className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800 hover:bg-secondary/10 dark:hover:bg-secondary/20 transition-colors flex flex-col items-center justify-center text-sm font-medium text-secondary border border-secondary/20">
-                                    <i className="fa-solid fa-calculator text-2xl mb-2 text-secondary"></i> Calculadoras
-                                </button>
-                                <button onClick={() => setSubView('CONTRACTS')} className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800 hover:bg-secondary/10 dark:hover:bg-secondary/20 transition-colors flex flex-col items-center justify-center text-sm font-medium text-secondary border border-secondary/20">
-                                    <i className="fa-solid fa-file-contract text-2xl mb-2 text-secondary"></i> Contratos
-                                </button>
-                                <button onClick={() => setSubView('CHECKLIST')} className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800 hover:bg-secondary/10 dark:hover:bg-secondary/20 transition-colors flex flex-col items-center justify-center text-sm font-medium text-secondary border border-secondary/20">
-                                    <i className="fa-solid fa-list-check text-2xl mb-2 text-secondary"></i> Checklists
-                                </button>
-                                </>
+                    <div className="space-y-4">
+                        {/* --- EQUPE --- */}
+                        <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                            <div className="flex justify-between items-center mb-3">
+                                <h3 className="font-bold text-primary dark:text-white text-base leading-tight flex items-center gap-2"><i className="fa-solid fa-people-group text-secondary"></i> Equipe</h3>
+                                <button onClick={() => openPersonModal('WORKER')} className="text-secondary text-sm font-bold hover:underline"><i className="fa-solid fa-plus mr-1"></i> Adicionar</button>
+                            </div>
+                            {workers.length === 0 ? (
+                                <p className="text-center text-slate-400 py-2 italic text-sm">Nenhum profissional cadastrado.</p>
                             ) : (
-                                <div className="p-4 rounded-xl bg-gradient-to-tr from-slate-700 to-slate-900 text-white flex flex-col items-center justify-center text-sm font-medium relative overflow-hidden">
-                                    <div className="absolute inset-0 bg-gradient-gold opacity-10"></div>
-                                    <i className="fa-solid fa-lock text-3xl mb-2 text-amber-300 relative z-10"></i>
-                                    <span className="font-bold text-amber-200 text-xs text-center relative z-10">Recursos Premium</span>
-                                    <button onClick={() => navigate('/settings')} className="absolute inset-0 text-xs font-bold bg-black/60 hover:bg-black/80 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
-                                        <i className="fa-solid fa-arrow-up-right-from-square mr-2 text-white/80"></i> <span className="text-white">Desbloquear</span>
-                                    </button>
-                                </div>
+                                <ul className="space-y-2">
+                                    {workers.map(worker => (
+                                        <li key={worker.id} className="flex justify-between items-center text-sm bg-slate-50 dark:bg-slate-800 p-2 rounded-lg">
+                                            <span className="font-medium text-primary dark:text-white">{worker.name} ({worker.role})</span>
+                                            <button onClick={() => openPersonModal('WORKER', worker)} className="text-slate-400 hover:text-secondary"><i className="fa-solid fa-pen"></i></button>
+                                        </li>
+                                    ))}
+                                </ul>
                             )}
                         </div>
-                    </div>
 
-                    <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
-                        <h3 className="text-lg font-bold text-primary dark:text-white mb-4">Relatórios</h3>
-                        <div className="grid grid-cols-2 gap-4">
-                            <button onClick={() => setSubView('REPORTS')} className="p-4 rounded-xl bg-blue-50 dark:bg-blue-900/10 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-900 hover:bg-blue-100 dark:hover:bg-blue-900/20 transition-colors flex flex-col items-center justify-center text-sm font-medium">
-                                <i className="fa-solid fa-file-pdf text-2xl mb-2"></i> PDF
-                            </button>
-                            <button onClick={handleExportExcel} className="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-900/10 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900 hover:bg-emerald-100 dark:hover:bg-emerald-900/20 transition-colors flex flex-col items-center justify-center text-sm font-medium">
-                                <i className="fa-solid fa-file-excel text-2xl mb-2"></i> Excel
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            );
-        }
-        // This function is defined as a const inside the component scope.
-        // If it's not found, it implies the file itself is incomplete or there's a parse error.
-        // It should be accessible here.
-    };
-
-    const renderSubView = () => { // DEFINITION FOR renderSubView
-        if (subView === 'TEAM') {
-            return (
-                <div className="animate-in fade-in">
-                    <div className="flex justify-between items-end mb-2 px-2">
-                        <div>
-                            <h2 className="text-2xl font-black text-primary dark:text-white">Equipe</h2>
-                            <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Profissionais da Obra</p>
-                        </div>
-                        <button onClick={() => openPersonModal('WORKER')} className="bg-primary text-white w-10 h-10 rounded-xl shadow-lg flex items-center justify-center hover:scale-105 transition-transform"><i className="fa-solid fa-plus"></i></button>
-                    </div>
-                    <div className="space-y-4">
-                        {workers.length === 0 ? (
-                            <div className="text-center text-slate-400 py-8 italic text-sm">Nenhum profissional cadastrado.</div>
-                        ) : (
-                            workers.map(worker => (
-                                <div key={worker.id} onClick={() => openPersonModal('WORKER', worker)} className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md dark:hover:border-white/20">
-                                    <div className="flex justify-between items-center">
-                                        <div>
-                                            <h3 className="font-bold text-primary dark:text-white text-base leading-tight">{worker.name}</h3>
-                                            <p className="text-xs text-slate-500 dark:text-slate-400">{worker.role}</p>
-                                        </div>
-                                        <div className="flex items-center gap-3">
-                                            {worker.dailyRate && <span className="text-sm font-bold text-secondary">R$ {worker.dailyRate.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/dia</span>}
-                                            <button onClick={(e) => { e.stopPropagation(); handleDeletePerson(worker.id, worker.workId, 'WORKER'); }} className="text-red-400 hover:text-red-600 transition-colors p-1"><i className="fa-solid fa-trash"></i></button>
-                                        </div>
-                                    </div>
-                                </div>
-                            ))
-                        )}
-                    </div>
-                </div>
-            );
-        }
-        if (subView === 'SUPPLIERS') {
-            return (
-                <div className="animate-in fade-in">
-                    <div className="flex justify-between items-end mb-2 px-2">
-                        <div>
-                            <h2 className="text-2xl font-black text-primary dark:text-white">Fornecedores</h2>
-                            <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Parceiros da Obra</p>
-                        </div>
-                        <button onClick={() => openPersonModal('SUPPLIER')} className="bg-primary text-white w-10 h-10 rounded-xl shadow-lg flex items-center justify-center hover:scale-105 transition-transform"><i className="fa-solid fa-plus"></i></button>
-                    </div>
-                    <div className="space-y-4">
-                        {suppliers.length === 0 ? (
-                            <div className="text-center text-slate-400 py-8 italic text-sm">Nenhum fornecedor cadastrado.</div>
-                        ) : (
-                            suppliers.map(supplier => (
-                                <div key={supplier.id} onClick={() => openPersonModal('SUPPLIER', supplier)} className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md dark:hover:border-white/20">
-                                    <div className="flex justify-between items-center">
-                                        <div>
-                                            <h3 className="font-bold text-primary dark:text-white text-base leading-tight">{supplier.name}</h3>
-                                            <p className="text-xs text-slate-500 dark:text-slate-400">{supplier.category}</p>
-                                        </div>
-                                        <button onClick={(e) => { e.stopPropagation(); handleDeletePerson(supplier.id, supplier.workId, 'SUPPLIER'); }} className="text-red-400 hover:text-red-600 transition-colors p-1"><i className="fa-solid fa-trash"></i></button>
-                                    </div>
-                                </div>
-                            ))
-                        )}
-                    </div>
-                </div>
-            );
-        }
-        if (subView === 'PHOTOS') {
-            return (
-                <div className="animate-in fade-in">
-                    <div className="flex justify-between items-end mb-2 px-2">
-                        <div>
-                            <h2 className="text-2xl font-black text-primary dark:text-white">Fotos</h2>
-                            <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Registro Visual</p>
-                        </div>
-                        <div className="relative">
-                            <input 
-                                type="file" 
-                                accept="image/*" 
-                                onChange={(e) => handleFileUpload(e, 'PHOTO')} 
-                                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" 
-                                disabled={uploading}
-                            />
-                            <button className="bg-primary text-white w-10 h-10 rounded-xl shadow-lg flex items-center justify-center hover:scale-105 transition-transform" disabled={uploading}>
-                                {uploading ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-plus"></i>}
-                            </button>
-                        </div>
-                    </div>
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                        {photos.length === 0 ? (
-                            <div className="col-span-full text-center text-slate-400 py-8 italic text-sm">Nenhuma foto adicionada.</div>
-                        ) : (
-                            photos.map(photo => (
-                                <div key={photo.id} className="relative aspect-square rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-800 shadow-sm group">
-                                    <img src={photo.url} alt={photo.description} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent p-3 flex flex-col justify-end text-white opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <p className="text-xs font-medium">{parseDateNoTimezone(photo.date)}</p>
-                                        <p className="text-sm font-bold">{photo.description}</p>
-                                    </div>
-                                </div>
-                            ))
-                        )}
-                    </div>
-                </div>
-            );
-        }
-        if (subView === 'PROJECTS') {
-            return (
-                <div className="animate-in fade-in">
-                    <div className="flex justify-between items-end mb-2 px-2">
-                        <div>
-                            <h2 className="text-2xl font-black text-primary dark:text-white">Projetos & Docs</h2>
-                            <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Arquivos Importantes</p>
-                        </div>
-                        <div className="relative">
-                            <input 
-                                type="file" 
-                                onChange={(e) => handleFileUpload(e, 'FILE')} 
-                                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" 
-                                disabled={uploading}
-                            />
-                            <button className="bg-primary text-white w-10 h-10 rounded-xl shadow-lg flex items-center justify-center hover:scale-105 transition-transform" disabled={uploading}>
-                                {uploading ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-plus"></i>}
-                            </button>
-                        </div>
-                    </div>
-                    <div className="space-y-4">
-                        {files.length === 0 ? (
-                            <div className="col-span-full text-center text-slate-400 py-8 italic text-sm">Nenhum arquivo adicionado.</div>
-                        ) : (
-                            files.map(file => (
-                                <a href={file.url} target="_blank" rel="noopener noreferrer" key={file.id} className="flex items-center gap-4 bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md transition-all group">
-                                    <div className="w-10 h-10 rounded-lg bg-secondary/10 dark:bg-secondary/20 text-secondary flex items-center justify-center shrink-0">
-                                        <i className="fa-solid fa-file text-xl"></i>
-                                    </div>
-                                    <div className="flex-1">
-                                        <h3 className="font-bold text-primary dark:text-white text-base leading-tight group-hover:text-secondary">{file.name}</h3>
-                                        <p className="text-xs text-slate-500 dark:text-slate-400">{file.category} • {parseDateNoTimezone(file.date)}</p>
-                                    </div>
-                                    <i className="fa-solid fa-arrow-up-right-from-square text-slate-400 group-hover:text-secondary"></i>
-                                </a>
-                            ))
-                        )}
-                    </div>
-                </div>
-            );
-        }
-        if (subView === 'REPORTS') {
-            return (
-                <div className="animate-in fade-in">
-                    <div className="flex justify-between items-end mb-2 px-2 print:hidden">
-                        <div>
-                            <h2 className="text-2xl font-black text-primary dark:text-white">Relatórios</h2>
-                            <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Gerar e Imprimir</p>
-                        </div>
-                        <button onClick={handlePrintPDF} className="bg-primary text-white w-10 h-10 rounded-xl shadow-lg flex items-center justify-center hover:scale-105 transition-transform"><i className="fa-solid fa-print"></i></button>
-                    </div>
-
-                    <div className="md:hidden mb-4 print:hidden">
-                        <div className="flex bg-slate-100 dark:bg-slate-800 rounded-xl p-1 text-sm font-bold text-slate-500">
-                            <button onClick={() => setReportActiveTab('CRONOGRAMA')} className={`flex-1 py-2 rounded-lg transition-colors ${reportActiveTab === 'CRONOGRAMA' ? 'bg-white text-primary shadow-sm dark:bg-slate-900 dark:text-white' : 'hover:text-primary dark:hover:text-white'}`}>Cronograma</button>
-                            <button onClick={() => setReportActiveTab('MATERIAIS')} className={`flex-1 py-2 rounded-lg transition-colors ${reportActiveTab === 'MATERIAIS' ? 'bg-white text-primary shadow-sm dark:bg-slate-900 dark:text-white' : 'hover:text-primary dark:hover:text-white'}`}>Materiais</button>
-                            <button onClick={() => setReportActiveTab('FINANCEIRO')} className={`flex-1 py-2 rounded-lg transition-colors ${reportActiveTab === 'FINANCEIRO' ? 'bg-white text-primary shadow-sm dark:bg-slate-900 dark:text-white' : 'hover:text-primary dark:hover:text-white'}`}>Financeiro</button>
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div className="md:col-span-1 print:block hidden-in-print">
-                            <RenderCronogramaReport />
-                        </div>
-                        <div className="md:col-span-1 print:block hidden-in-print">
-                            <RenderMateriaisReport />
-                        </div>
-                        <div className="md:col-span-1 print:block hidden-in-print">
-                            <RenderFinanceiroReport />
-                        </div>
-
-                        {/* Mobile view rendering based on reportActiveTab */}
-                        <div className="md:hidden">
-                            {reportActiveTab === 'CRONOGRAMA' && <RenderCronogramaReport />}
-                            {reportActiveTab === 'MATERIAIS' && <RenderMateriaisReport />}
-                            {reportActiveTab === 'FINANCEIRO' && <RenderFinanceiroReport />}
-                        </div>
-                    </div>
-                </div>
-            );
-        }
-        if (subView === 'CALCULATORS') {
-            return (
-                <div className="animate-in fade-in">
-                    <div className="flex justify-between items-end mb-2 px-2">
-                        <div>
-                            <h2 className="text-2xl font-black text-primary dark:text-white">Calculadoras</h2>
-                            <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Estimativas Rápidas</p>
-                        </div>
-                    </div>
-                    <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm mb-6">
-                        <div className="flex bg-slate-100 dark:bg-slate-800 rounded-xl p-1 text-sm font-bold text-slate-500 mb-6">
-                            <button onClick={() => setCalcType('PISO')} className={`flex-1 py-2 rounded-lg transition-colors ${calcType === 'PISO' ? 'bg-white text-primary shadow-sm dark:bg-slate-900 dark:text-white' : 'hover:text-primary dark:hover:text-white'}`}>Piso</button>
-                            <button onClick={() => setCalcType('PAREDE')} className={`flex-1 py-2 rounded-lg transition-colors ${calcType === 'PAREDE' ? 'bg-white text-primary shadow-sm dark:bg-slate-900 dark:text-white' : 'hover:text-primary dark:hover:text-white'}`}>Parede</button>
-                            <button onClick={() => setCalcType('PINTURA')} className={`flex-1 py-2 rounded-lg transition-colors ${calcType === 'PINTURA' ? 'bg-white text-primary shadow-sm dark:bg-slate-900 dark:text-white' : 'hover:text-primary dark:hover:text-white'}`}>Pintura</button>
-                        </div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Área em m²</label>
-                        <input type="number" value={calcArea} onChange={(e) => setCalcArea(e.target.value)} placeholder="Ex: 50" className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/50 transition-all mb-6" />
-                        {calcResult.length > 0 && (
-                            <div className="p-4 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-sm">
-                                <h4 className="font-bold text-primary dark:text-white mb-2">Resultado Estimado:</h4>
-                                <ul className="space-y-1 text-slate-600 dark:text-slate-300">
-                                    {calcResult.map((res, idx) => <li key={idx}><i className="fa-solid fa-check-circle text-secondary mr-2"></i>{res}</li>)}
+                        {/* --- FORNECEDORES --- */}
+                        <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                            <div className="flex justify-between items-center mb-3">
+                                <h3 className="font-bold text-primary dark:text-white text-base leading-tight flex items-center gap-2"><i className="fa-solid fa-truck-field text-secondary"></i> Fornecedores</h3>
+                                <button onClick={() => openPersonModal('SUPPLIER')} className="text-secondary text-sm font-bold hover:underline"><i className="fa-solid fa-plus mr-1"></i> Adicionar</button>
+                            </div>
+                            {suppliers.length === 0 ? (
+                                <p className="text-center text-slate-400 py-2 italic text-sm">Nenhum fornecedor cadastrado.</p>
+                            ) : (
+                                <ul className="space-y-2">
+                                    {suppliers.map(supplier => (
+                                        <li key={supplier.id} className="flex justify-between items-center text-sm bg-slate-50 dark:bg-slate-800 p-2 rounded-lg">
+                                            <span className="font-medium text-primary dark:text-white">{supplier.name} ({supplier.category})</span>
+                                            <button onClick={() => openPersonModal('SUPPLIER', supplier)} className="text-slate-400 hover:text-secondary"><i className="fa-solid fa-pen"></i></button>
+                                        </li>
+                                    ))}
                                 </ul>
-                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-3">
-                                    <i className="fa-solid fa-info-circle mr-1"></i> Valores aproximados, podem variar.
-                                </p>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            );
-        }
-        if (subView === 'CONTRACTS') {
-            return (
-                <div className="animate-in fade-in">
-                    <div className="flex justify-between items-end mb-2 px-2">
-                        <div>
-                            <h2 className="text-2xl font-black text-primary dark:text-white">Contratos</h2>
-                            <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Modelos Prontos</p>
+                            )}
                         </div>
-                    </div>
-                    <div className="space-y-4">
-                        {CONTRACT_TEMPLATES.map(template => (
-                            <div key={template.id} onClick={() => setViewContract({ title: template.title, content: template.contentTemplate })} className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md dark:hover:border-white/20">
-                                <h3 className="font-bold text-primary dark:text-white text-base leading-tight">{template.title}</h3>
-                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{template.description}</p>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            );
-        }
-        if (subView === 'CHECKLIST') {
-            return (
-                <div className="animate-in fade-in">
-                    <div className="flex justify-between items-end mb-2 px-2">
-                        <div>
-                            <h2 className="text-2xl font-black text-primary dark:text-white">Checklists</h2>
-                            <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Verificação de Qualidade</p>
-                        </div>
-                    </div>
-                    <div className="space-y-4">
-                        {STANDARD_CHECKLISTS.map((checklist) => (
-                            <div key={checklist.category} onClick={() => setActiveChecklist(activeChecklist === checklist.category ? null : checklist.category)} className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md dark:hover:border-white/20">
-                                <div className="flex justify-between items-center">
-                                    <h3 className="font-bold text-primary dark:text-white text-base leading-tight">{checklist.category}</h3>
-                                    <i className={`fa-solid ${activeChecklist === checklist.category ? 'fa-chevron-up' : 'fa-chevron-down'} text-secondary text-sm`}></i>
+
+                        {/* --- FOTOS --- */}
+                        <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                            <div className="flex justify-between items-center mb-3">
+                                <h3 className="font-bold text-primary dark:text-white text-base leading-tight flex items-center gap-2"><i className="fa-solid fa-camera text-secondary"></i> Fotos da Obra</h3>
+                                <div className="relative">
+                                    <input 
+                                        type="file" 
+                                        accept="image/*" 
+                                        onChange={(e) => handleFileUpload(e, 'PHOTO')} 
+                                        className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" 
+                                        disabled={uploading}
+                                    />
+                                    <button className="text-secondary text-sm font-bold hover:underline" disabled={uploading}>
+                                        {uploading ? <i className="fa-solid fa-circle-notch fa-spin mr-1"></i> : <i className="fa-solid fa-plus mr-1"></i>} Adicionar
+                                    </button>
                                 </div>
-                                {activeChecklist === checklist.category && (
-                                    <ul className="mt-4 space-y-2 text-sm text-slate-600 dark:text-slate-300">
-                                        {checklist.items.map((item, idx) => (
-                                            <li key={idx} className="flex items-start">
-                                                <i className="fa-regular fa-square mr-3 mt-1 text-slate-400"></i> {item}
-                                            </li>
-                                        ))}
-                                    </ul>
+                            </div>
+                            {photos.length === 0 ? (
+                                <p className="text-center text-slate-400 py-2 italic text-sm">Nenhuma foto adicionada.</p>
+                            ) : (
+                                <div className="grid grid-cols-3 gap-2">
+                                    {photos.slice(0,3).map(photo => ( // Show first 3 photos
+                                        <img key={photo.id} src={photo.url} alt={photo.description} className="w-full h-20 object-cover rounded-md" />
+                                    ))}
+                                    {photos.length > 3 && (
+                                        <div className="w-full h-20 bg-slate-100 dark:bg-slate-800 rounded-md flex items-center justify-center text-xs text-slate-500">
+                                            +{photos.length - 3}
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+                            {photos.length > 0 && <button className="w-full text-center text-sm font-bold text-secondary mt-3 hover:underline" onClick={() => setInlineView('PHOTOS')}>Ver Todas</button>}
+                        </div>
+                        
+                        {/* --- PROJETOS E DOCUMENTOS --- */}
+                        <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                            <div className="flex justify-between items-center mb-3">
+                                <h3 className="font-bold text-primary dark:text-white text-base leading-tight flex items-center gap-2"><i className="fa-solid fa-folder-open text-secondary"></i> Projetos e Docs</h3>
+                                <div className="relative">
+                                    <input 
+                                        type="file" 
+                                        onChange={(e) => handleFileUpload(e, 'FILE')} 
+                                        className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" 
+                                        disabled={uploading}
+                                    />
+                                    <button className="text-secondary text-sm font-bold hover:underline" disabled={uploading}>
+                                        {uploading ? <i className="fa-solid fa-circle-notch fa-spin mr-1"></i> : <i className="fa-solid fa-plus mr-1"></i>} Adicionar
+                                    </button>
+                                </div>
+                            </div>
+                            {files.length === 0 ? (
+                                <p className="text-center text-slate-400 py-2 italic text-sm">Nenhum arquivo adicionado.</p>
+                            ) : (
+                                <ul className="space-y-2">
+                                    {files.slice(0,3).map(file => (
+                                        <li key={file.id} className="flex justify-between items-center text-sm bg-slate-50 dark:bg-slate-800 p-2 rounded-lg">
+                                            <a href={file.url} target="_blank" rel="noopener noreferrer" className="font-medium text-primary dark:text-white truncate max-w-[calc(100%-30px)]">{file.name}</a>
+                                            <i className="fa-solid fa-external-link-alt text-slate-400 text-xs"></i>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                            {files.length > 3 && <button className="w-full text-center text-sm font-bold text-secondary mt-3 hover:underline" onClick={() => setInlineView('PROJECTS')}>Ver Todos</button>}
+                        </div>
+
+                        {/* --- CALCULADORAS --- */}
+                        <div className={`p-4 rounded-2xl border shadow-sm ${isPremium ? 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800' : 'bg-gradient-to-tr from-slate-700 to-slate-900 text-white'}`}>
+                            <div className="flex justify-between items-center mb-3">
+                                <h3 className={`font-bold text-base leading-tight flex items-center gap-2 ${isPremium ? 'text-primary dark:text-white' : 'text-amber-200'}`}>
+                                    <i className={`fa-solid fa-calculator ${isPremium ? 'text-secondary' : 'text-amber-300'}`}></i> Calculadoras
+                                </h3>
+                                {!isPremium && (
+                                    <button onClick={() => navigate('/settings')} className="text-xs font-bold bg-white/10 hover:bg-white/20 text-white px-3 py-1 rounded-md">
+                                        Desbloquear
+                                    </button>
                                 )}
                             </div>
-                        ))}
+                            {isPremium ? (
+                                <>
+                                    <p className="text-sm text-slate-600 dark:text-slate-300 mb-3">Calcule materiais rapidamente.</p>
+                                    <button onClick={() => setIsCalculatorModalOpen(true)} className="w-full text-center text-sm font-bold text-secondary mt-3 hover:underline">Abrir Calculadora</button>
+                                </>
+                            ) : (
+                                <p className="text-sm text-slate-400">Exclusivo para assinantes Vitalícios.</p>
+                            )}
+                        </div>
+
+                        {/* --- CONTRATOS --- */}
+                        <div className={`p-4 rounded-2xl border shadow-sm ${isPremium ? 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800' : 'bg-gradient-to-tr from-slate-700 to-slate-900 text-white'}`}>
+                            <div className="flex justify-between items-center mb-3">
+                                <h3 className={`font-bold text-base leading-tight flex items-center gap-2 ${isPremium ? 'text-primary dark:text-white' : 'text-amber-200'}`}>
+                                    <i className={`fa-solid fa-file-contract ${isPremium ? 'text-secondary' : 'text-amber-300'}`}></i> Contratos
+                                </h3>
+                                {!isPremium && (
+                                    <button onClick={() => navigate('/settings')} className="text-xs font-bold bg-white/10 hover:bg-white/20 text-white px-3 py-1 rounded-md">
+                                        Desbloquear
+                                    </button>
+                                )}
+                            </div>
+                            {isPremium ? (
+                                <>
+                                    <p className="text-sm text-slate-600 dark:text-slate-300 mb-3">Modelos prontos para sua segurança jurídica.</p>
+                                    <button className="w-full text-center text-sm font-bold text-secondary mt-3 hover:underline" onClick={() => setInlineView('CONTRACTS')}>Ver Modelos</button>
+                                </>
+                            ) : (
+                                <p className="text-sm text-slate-400">Exclusivo para assinantes Vitalícios.</p>
+                            )}
+                        </div>
+
+                        {/* --- CHECKLISTS --- */}
+                        <div className={`p-4 rounded-2xl border shadow-sm ${isPremium ? 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800' : 'bg-gradient-to-tr from-slate-700 to-slate-900 text-white'}`}>
+                            <div className="flex justify-between items-center mb-3">
+                                <h3 className={`font-bold text-base leading-tight flex items-center gap-2 ${isPremium ? 'text-primary dark:text-white' : 'text-amber-200'}`}>
+                                    <i className="fa-solid fa-list-check text-secondary"></i> Checklists
+                                </h3>
+                                {!isPremium && (
+                                    <button onClick={() => navigate('/settings')} className="text-xs font-bold bg-white/10 hover:bg-white/20 text-white px-3 py-1 rounded-md">
+                                        Desbloquear
+                                    </button>
+                                )}
+                            </div>
+                            {isPremium ? (
+                                <>
+                                    <p className="text-sm text-slate-600 dark:text-slate-300 mb-3">Listas de verificação para controle de qualidade.</p>
+                                    <button className="w-full text-center text-sm font-bold text-secondary mt-3 hover:underline" onClick={() => setInlineView('CHECKLIST')}>Ver Checklists</button>
+                                </>
+                            ) : (
+                                <p className="text-sm text-slate-400">Exclusivo para assinantes Vitalícios.</p>
+                            )}
+                        </div>
+
+                        {/* --- RELATÓRIOS --- */}
+                        <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm">
+                            <h3 className="font-bold text-primary dark:text-white text-base leading-tight flex items-center gap-2 mb-3"><i className="fa-solid fa-file-alt text-secondary"></i> Relatórios</h3>
+                            <p className="text-sm text-slate-600 dark:text-slate-300 mb-4">Gere relatórios detalhados da sua obra.</p>
+                            <div className="grid grid-cols-2 gap-4">
+                                <button onClick={handlePrintPDF} className="p-3 rounded-xl bg-blue-50 dark:bg-blue-900/10 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-900 hover:bg-blue-100 dark:hover:bg-blue-900/20 transition-colors flex flex-col items-center justify-center text-sm font-medium">
+                                    <i className="fa-solid fa-file-pdf text-xl mb-1"></i> PDF
+                                </button>
+                                <button onClick={handleExportExcel} className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-900/10 text-emerald-700 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-900 hover:bg-emerald-100 dark:hover:bg-emerald-900/20 transition-colors flex flex-col items-center justify-center text-sm font-medium">
+                                    <i className="fa-solid fa-file-excel text-xl mb-1"></i> Excel
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             );
         }
-        return null;
     };
+    
+    // --- Inline Content Renders ---
+    const RenderPhotosInline: React.FC = () => (
+        <div className="animate-in fade-in">
+            <h2 className="text-2xl font-black text-primary dark:text-white mb-4">Fotos da Obra</h2>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                {photos.map(photo => (
+                    <div key={photo.id} className="relative aspect-square rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-800 shadow-sm group">
+                        <img src={photo.url} alt={photo.description} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent p-3 flex flex-col justify-end text-white opacity-0 group-hover:opacity-100 transition-opacity">
+                            <p className="text-xs font-medium">{parseDateNoTimezone(photo.date)}</p>
+                            <p className="text-sm font-bold">{photo.description}</p>
+                        </div>
+                    </div>
+                ))}
+            </div>
+            <div className="flex justify-end mt-4">
+                <button onClick={() => setInlineView('NONE')} className="px-4 py-2 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl">Fechar</button>
+            </div>
+        </div>
+    );
+
+    const RenderProjectsInline: React.FC = () => (
+        <div className="animate-in fade-in">
+            <h2 className="text-2xl font-black text-primary dark:text-white mb-4">Projetos e Documentos</h2>
+            <div className="space-y-4">
+                {files.map(file => (
+                    <a href={file.url} target="_blank" rel="noopener noreferrer" key={file.id} className="flex items-center gap-4 bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md transition-all group">
+                        <div className="w-10 h-10 rounded-lg bg-secondary/10 dark:bg-secondary/20 text-secondary flex items-center justify-center shrink-0">
+                            <i className="fa-solid fa-file text-xl"></i>
+                        </div>
+                        <div className="flex-1">
+                            <h3 className="font-bold text-primary dark:text-white text-base leading-tight group-hover:text-secondary">{file.name}</h3>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">{file.category} • {parseDateNoTimezone(file.date)}</p>
+                        </div>
+                        <i className="fa-solid fa-arrow-up-right-from-square text-slate-400 group-hover:text-secondary"></i>
+                    </a>
+                ))}
+            </div>
+            <div className="flex justify-end mt-4">
+                <button onClick={() => setInlineView('NONE')} className="px-4 py-2 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl">Fechar</button>
+            </div>
+        </div>
+    );
+
+    const RenderCalculatorsModal: React.FC = () => (
+        <div className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in">
+            <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 w-full max-w-md shadow-2xl border border-slate-200 dark:border-slate-800 animate-in zoom-in-95">
+                <h3 className="text-xl font-bold text-primary dark:text-white mb-4 flex items-center gap-2"><i className="fa-solid fa-calculator text-secondary"></i> Calculadoras</h3>
+                <div className="flex bg-slate-100 dark:bg-slate-800 rounded-xl p-1 text-sm font-bold text-slate-500 mb-6">
+                    <button onClick={() => setCalcType('PISO')} className={`flex-1 py-2 rounded-lg transition-colors ${calcType === 'PISO' ? 'bg-white text-primary shadow-sm dark:bg-slate-900 dark:text-white' : 'hover:text-primary dark:hover:text-white'}`}>Piso</button>
+                    <button onClick={() => setCalcType('PAREDE')} className={`flex-1 py-2 rounded-lg transition-colors ${calcType === 'PAREDE' ? 'bg-white text-primary shadow-sm dark:bg-slate-900 dark:text-white' : 'hover:text-primary dark:hover:text-white'}`}>Parede</button>
+                    <button onClick={() => setCalcType('PINTURA')} className={`flex-1 py-2 rounded-lg transition-colors ${calcType === 'PINTURA' ? 'bg-white text-primary shadow-sm dark:bg-slate-900 dark:text-white' : 'hover:text-primary dark:hover:text-white'}`}>Pintura</button>
+                </div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Área em m²</label>
+                <input type="number" value={calcArea} onChange={(e) => setCalcArea(e.target.value)} placeholder="Ex: 50" className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/50 transition-all mb-6" />
+                {calcResult.length > 0 && (
+                    <div className="p-4 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-sm">
+                        <h4 className="font-bold text-primary dark:text-white mb-2">Resultado Estimado:</h4>
+                        <ul className="space-y-1 text-slate-600 dark:text-slate-300">
+                            {calcResult.map((res, idx) => <li key={idx}><i className="fa-solid fa-check-circle text-secondary mr-2"></i>{res}</li>)}
+                        </ul>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-3">
+                            <i className="fa-solid fa-info-circle mr-1"></i> Valores aproximados, podem variar.
+                        </p>
+                    </div>
+                )}
+                <div className="flex justify-end gap-3 mt-6">
+                    <button type="button" onClick={() => setIsCalculatorModalOpen(false)} className="px-5 py-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800">Fechar</button>
+                </div>
+            </div>
+        </div>
+    );
+
+    const RenderContractsInline: React.FC = () => (
+        <div className="animate-in fade-in">
+            <h2 className="text-2xl font-black text-primary dark:text-white mb-4">Modelos de Contrato</h2>
+            <div className="space-y-4">
+                {CONTRACT_TEMPLATES.map(template => (
+                    <div key={template.id} onClick={() => setViewContract({ title: template.title, content: template.contentTemplate })} className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md dark:hover:border-white/20">
+                        <h3 className="font-bold text-primary dark:text-white text-base leading-tight">{template.title}</h3>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{template.description}</p>
+                    </div>
+                ))}
+            </div>
+            <div className="flex justify-end mt-4">
+                <button onClick={() => setInlineView('NONE')} className="px-4 py-2 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl">Fechar</button>
+            </div>
+        </div>
+    );
+
+    const RenderChecklistInline: React.FC = () => (
+        <div className="animate-in fade-in">
+            <h2 className="text-2xl font-black text-primary dark:text-white mb-4">Checklists de Qualidade</h2>
+            <div className="space-y-4">
+                {STANDARD_CHECKLISTS.map((checklist) => (
+                    <div key={checklist.category} onClick={() => setActiveChecklist(activeChecklist === checklist.category ? null : checklist.category)} className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md dark:hover:border-white/20">
+                        <div className="flex justify-between items-center">
+                            <h3 className="font-bold text-primary dark:text-white text-base leading-tight">{checklist.category}</h3>
+                            <i className={`fa-solid ${activeChecklist === checklist.category ? 'fa-chevron-up' : 'fa-chevron-down'} text-secondary text-sm`}></i>
+                        </div>
+                        {activeChecklist === checklist.category && (
+                            <ul className="mt-4 space-y-2 text-sm text-slate-600 dark:text-slate-300">
+                                {checklist.items.map((item, idx) => (
+                                    <li key={idx} className="flex items-start">
+                                        <i className="fa-regular fa-square mr-3 mt-1 text-slate-400"></i> {item}
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </div>
+                ))}
+            </div>
+            <div className="flex justify-end mt-4">
+                <button onClick={() => setInlineView('NONE')} className="px-4 py-2 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl">Fechar</button>
+            </div>
+        </div>
+    );
+
+    // Main render logic, simplified
+    const renderContent = () => {
+        switch (inlineView) {
+            case 'PHOTOS': return <RenderPhotosInline />;
+            case 'PROJECTS': return <RenderProjectsInline />;
+            case 'CONTRACTS': return <RenderContractsInline />;
+            case 'CHECKLIST': return <RenderChecklistInline />;
+            case 'NONE': return renderMainTab();
+            case 'TEAM': 
+                return (
+                    <div className="animate-in fade-in">
+                        <h2 className="text-2xl font-black text-primary dark:text-white mb-4">Equipe</h2>
+                        {workers.length === 0 ? (
+                            <p className="text-center text-slate-400 py-8 italic text-sm">Nenhum profissional cadastrado.</p>
+                        ) : (
+                            <div className="space-y-4">
+                                {workers.map(worker => (
+                                    <div key={worker.id} onClick={() => openPersonModal('WORKER', worker)} className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md dark:hover:border-white/20">
+                                        <div className="flex justify-between items-center">
+                                            <div>
+                                                <h3 className="font-bold text-primary dark:text-white text-base leading-tight">{worker.name}</h3>
+                                                <p className="text-xs text-slate-500 dark:text-slate-400">{worker.role}</p>
+                                            </div>
+                                            <div className="flex items-center gap-3">
+                                                {worker.dailyRate && <span className="text-sm font-bold text-secondary">R$ {worker.dailyRate.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/dia</span>}
+                                                <button onClick={(e) => { e.stopPropagation(); handleDeletePerson(worker.id, worker.workId, 'WORKER'); }} className="text-red-400 hover:text-red-600 transition-colors p-1"><i className="fa-solid fa-trash"></i></button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                        <div className="flex justify-end mt-4">
+                            <button onClick={() => setInlineView('NONE')} className="px-4 py-2 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl">Fechar</button>
+                        </div>
+                    </div>
+                );
+            case 'SUPPLIERS': 
+                return (
+                    <div className="animate-in fade-in">
+                        <h2 className="text-2xl font-black text-primary dark:text-white mb-4">Fornecedores</h2>
+                        {suppliers.length === 0 ? (
+                            <p className="text-center text-slate-400 py-8 italic text-sm">Nenhum fornecedor cadastrado.</p>
+                        ) : (
+                            <div className="space-y-4">
+                                {suppliers.map(supplier => (
+                                    <div key={supplier.id} onClick={() => openPersonModal('SUPPLIER', supplier)} className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md dark:hover:border-white/20">
+                                        <div className="flex justify-between items-center">
+                                            <div>
+                                                <h3 className="font-bold text-primary dark:text-white text-base leading-tight">{supplier.name}</h3>
+                                                <p className="text-xs text-slate-500 dark:text-slate-400">{supplier.category}</p>
+                                            </div>
+                                            <button onClick={(e) => { e.stopPropagation(); handleDeletePerson(supplier.id, supplier.workId, 'SUPPLIER'); }} className="text-red-400 hover:text-red-600 transition-colors p-1"><i className="fa-solid fa-trash"></i></button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                        <div className="flex justify-end mt-4">
+                            <button onClick={() => setInlineView('NONE')} className="px-4 py-2 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl">Fechar</button>
+                        </div>
+                    </div>
+                );
+            default: return null;
+        }
+    };
+
 
     return (
         <div className="max-w-4xl mx-auto pb-28 pt-6 px-4 md:px-0 font-sans">
             {/* Header with Work Name */}
             <div className="flex items-center justify-between mb-8">
-                <button onClick={() => subView === 'NONE' ? navigate('/') : setSubView('NONE')} className="text-slate-400 hover:text-primary dark:hover:text-white transition-colors"><i className="fa-solid fa-arrow-left text-xl"></i></button>
+                {/* Back button logic updated to manage inline views */}
+                <button onClick={() => inlineView === 'NONE' ? navigate('/') : setInlineView('NONE')} className="text-slate-400 hover:text-primary dark:hover:text-white transition-colors"><i className="fa-solid fa-arrow-left text-xl"></i></button>
                 <h1 className="text-2xl font-black text-primary dark:text-white mx-auto">{work.name}</h1>
                 <div className="w-6"></div> {/* Spacer */}
             </div>
 
-            {subView !== 'NONE' && (
-                <div className="mb-6">
-                    <button onClick={() => setSubView('NONE')} className="text-sm font-bold text-secondary hover:underline">
-                        <i className="fa-solid fa-arrow-left mr-2"></i> Voltar para Ferramentas
-                    </button>
-                </div>
-            )}
+            {/* Main Tabs Navigation */}
+            <nav className="mb-6 bg-slate-100 dark:bg-slate-900 rounded-2xl p-1 flex shadow-sm border border-slate-200 dark:border-slate-800">
+                <button onClick={() => { setActiveTab('SCHEDULE'); setInlineView('NONE'); }} className={`flex-1 py-3 text-sm font-bold rounded-xl transition-all ${activeTab === 'SCHEDULE' ? 'bg-white text-primary dark:bg-slate-800 dark:text-white shadow-md' : 'text-slate-500 hover:text-primary dark:hover:text-white'}`}>
+                    <i className="fa-solid fa-calendar-days mr-2"></i> Cronograma
+                </button>
+                <button onClick={() => { setActiveTab('MATERIALS'); setInlineView('NONE'); }} className={`flex-1 py-3 text-sm font-bold rounded-xl transition-all ${activeTab === 'MATERIALS' ? 'bg-white text-primary dark:bg-slate-800 dark:text-white shadow-md' : 'text-slate-500 hover:text-primary dark:hover:text-white'}`}>
+                    <i className="fa-solid fa-boxes-stacked mr-2"></i> Materiais
+                </button>
+                <button onClick={() => { setActiveTab('FINANCIAL'); setInlineView('NONE'); }} className={`flex-1 py-3 text-sm font-bold rounded-xl transition-all ${activeTab === 'FINANCIAL' ? 'bg-white text-primary dark:bg-slate-800 dark:text-white shadow-md' : 'text-slate-500 hover:text-primary dark:hover:text-white'}`}>
+                    <i className="fa-solid fa-dollar-sign mr-2"></i> Financeiro
+                </button>
+                <button onClick={() => { setActiveTab('MORE'); setInlineView('NONE'); }} className={`flex-1 py-3 text-sm font-bold rounded-xl transition-all ${activeTab === 'MORE' ? 'bg-white text-primary dark:bg-slate-800 dark:text-white shadow-md' : 'text-slate-500 hover:text-primary dark:hover:text-white'}`}>
+                    <i className="fa-solid fa-ellipsis-h mr-2"></i> Mais
+                </button>
+            </nav>
 
-            {subView === 'NONE' ? (
-                <>
-                    {/* Main Tabs Navigation */}
-                    <nav className="mb-6 bg-slate-100 dark:bg-slate-900 rounded-2xl p-1 flex shadow-sm border border-slate-200 dark:border-slate-800">
-                        <button onClick={() => setActiveTab('SCHEDULE')} className={`flex-1 py-3 text-sm font-bold rounded-xl transition-all ${activeTab === 'SCHEDULE' ? 'bg-white text-primary dark:bg-slate-800 dark:text-white shadow-md' : 'text-slate-500 hover:text-primary dark:hover:text-white'}`}>
-                            <i className="fa-solid fa-calendar-days mr-2"></i> Cronograma
-                        </button>
-                        <button onClick={() => setActiveTab('MATERIALS')} className={`flex-1 py-3 text-sm font-bold rounded-xl transition-all ${activeTab === 'MATERIALS' ? 'bg-white text-primary dark:bg-slate-800 dark:text-white shadow-md' : 'text-slate-500 hover:text-primary dark:hover:text-white'}`}>
-                            <i className="fa-solid fa-boxes-stacked mr-2"></i> Materiais
-                        </button>
-                        <button onClick={() => setActiveTab('FINANCIAL')} className={`flex-1 py-3 text-sm font-bold rounded-xl transition-all ${activeTab === 'FINANCIAL' ? 'bg-white text-primary dark:bg-slate-800 dark:text-white shadow-md' : 'text-slate-500 hover:text-primary dark:hover:text-white'}`}>
-                            <i className="fa-solid fa-dollar-sign mr-2"></i> Financeiro
-                        </button>
-                        <button onClick={() => setActiveTab('MORE')} className={`flex-1 py-3 text-sm font-bold rounded-xl transition-all ${activeTab === 'MORE' ? 'bg-white text-primary dark:bg-slate-800 dark:text-white shadow-md' : 'text-slate-500 hover:text-primary dark:hover:text-white'}`}>
-                            <i className="fa-solid fa-ellipsis-h mr-2"></i> Mais
-                        </button>
-                    </nav>
-
-                    {renderMainTab()}
-                </>
-            ) : (
-                renderSubView()
-            )}
+            {renderContent()}
 
             {/* Modals */}
             {isStepModalOpen && (
@@ -1522,6 +1437,8 @@ const WorkDetail: React.FC = () => {
                     </div>
                 </div>
             )}
+            
+            {isCalculatorModalOpen && <RenderCalculatorsModal />}
 
             {/* General Purpose Modal (for delete confirmations etc.) */}
             <ZeModal
