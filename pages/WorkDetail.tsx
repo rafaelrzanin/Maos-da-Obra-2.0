@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
@@ -340,7 +339,8 @@ const WorkDetail: React.FC = () => {
                         date: new Date(expDate).toISOString(),
                         category: expCategory,
                         stepId: finalStepId,
-                        totalAgreed: finalTotalAgreed // Fixed typo here
+                        // Fix: Corrected typo from totalAgumed to totalAgreed
+                        totalAgreed: finalTotalAgreed
                     });
                 }
             }
@@ -489,7 +489,7 @@ const WorkDetail: React.FC = () => {
         const wsCrono = XLSX.utils.json_to_sheet(steps.map(s => ({ Etapa: s.name, Inicio: parseDateNoTimezone(s.startDate), Fim: parseDateNoTimezone(s.endDate), Status: s.status })));
         XLSX.utils.book_append_sheet(wb, wsCrono, "Cronograma");
         const wsMat = XLSX.utils.json_to_sheet(materials.map(m => ({ Material: m.name, Qtd: m.plannedQty, Comprado: m.purchasedQty })));
-        XLSX.utils.book_append_append_sheet(wb, wsMat, "Materiais");
+        XLSX.utils.book_append_sheet(wb, wsMat, "Materiais");
         const wsFin = XLSX.utils.json_to_sheet(expenses.map(e => ({ Descrição: e.description, Valor: e.amount, Categoria: e.category, Data: parseDateNoTimezone(e.date), Etapa: steps.find(s => s.id === e.stepId)?.name || 'N/A' })));
         XLSX.utils.book_append_sheet(wb, wsFin, "Financeiro");
         XLSX.writeFile(wb, `Obra_${work?.name}.xlsx`);
