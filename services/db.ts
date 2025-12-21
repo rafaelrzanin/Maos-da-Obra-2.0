@@ -280,7 +280,10 @@ export const dbService = {
 
   async syncSession() {
     sessionCache = null; // Invalidate cache to force a fresh fetch
-    return this.getCurrentUser();
+    // FIX: ensure getCurrentUser returns a Promise<User | null>
+    const userPromise = this.getCurrentUser();
+    // Wait for the promise to resolve before returning, so AuthContext gets the actual user object.
+    return userPromise; 
   },
 
   onAuthChange(callback: (user: User | null) => void) {
