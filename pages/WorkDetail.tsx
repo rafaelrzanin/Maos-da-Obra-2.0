@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
@@ -304,7 +305,6 @@ const WorkDetail: React.FC = () => {
                     date: new Date(expDate).toISOString(),
                     category: expCategory,
                     stepId: finalStepId,
-                    // Fix: Corrected typo from finalTotalAgumed to finalTotalAgreed
                     totalAgreed: finalTotalAgreed 
                 });
             } else if (expenseModal.mode === 'EDIT' && expenseModal.id) {
@@ -963,7 +963,12 @@ const WorkDetail: React.FC = () => {
                 </div>
             );
         }
+        // This function is defined as a const inside the component scope.
+        // If it's not found, it implies the file itself is incomplete or there's a parse error.
+        // It should be accessible here.
+    };
 
+    const renderSubView = () => { // DEFINITION FOR renderSubView
         if (subView === 'TEAM') {
             return (
                 <div className="animate-in fade-in">
