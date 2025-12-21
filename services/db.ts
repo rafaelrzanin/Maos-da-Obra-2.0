@@ -84,6 +84,7 @@ const parseExpenseFromDB = (data: any): Expense => ({
     stepId: data.step_id,
     relatedMaterialId: data.related_material_id,
     workerId: data.worker_id, // Added workerId parsing
+    supplierId: data.supplier_id, // NEW: Added supplier_id parsing
     totalAgreed: data.total_agreed ? Number(data.total_agreed) : undefined // FIX: Changed from total_agagreed to total_agreed
 });
 
@@ -854,6 +855,7 @@ export const dbService = {
       step_id: expense.stepId, // FIX: Changed to snake_case
       related_material_id: expense.relatedMaterialId, // FIX: Changed to snake_case
       worker_id: expense.workerId, // FIX: Changed to snake_case
+      supplier_id: expense.supplierId, // NEW: Added supplier_id
       total_agreed: expense.totalAgreed // FIX: Changed to snake_case
     }).select().single();
     if (error) {
@@ -879,6 +881,7 @@ export const dbService = {
       step_id: expense.stepId, // This is already snake_case
       related_material_id: expense.relatedMaterialId, // This is already snake_case
       worker_id: expense.workerId, // This is already snake_case
+      supplier_id: expense.supplierId, // NEW: Added supplier_id
       total_agreed: expense.totalAgreed
     }).eq('id', expense.id).select().single();
     if (error) {
