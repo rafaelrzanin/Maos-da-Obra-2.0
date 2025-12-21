@@ -1,10 +1,10 @@
 
 import React, { useState } from 'react';
+import { useAuth } from '../contexts/AuthContext.tsx'; // Use authLoading and isUserAuthFinished
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext.tsx';
 import { dbService } from '../services/db.ts';
-import { WORK_TEMPLATES, ZE_AVATAR, ZE_AVATAR_FALLBACK } from '../services/standards.ts';
 import { WorkStatus } from '../types.ts';
+import { WORK_TEMPLATES, ZE_AVATAR, ZE_AVATAR_FALLBACK } from '../services/standards.ts';
 
 const CreateWork: React.FC = () => {
   const { user, authLoading, isUserAuthFinished } = useAuth(); // Use authLoading and isUserAuthFinished
