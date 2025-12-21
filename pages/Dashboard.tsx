@@ -1197,7 +1197,7 @@ const Dashboard: React.FC = () => {
 
       {showTrialUpsell && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-500">
-          <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] w-full max-w-sm p-0 shadow-2xl border border-slate-800 relative overflow-hidden transform scale-100 animate-in zoom-in-95">
+          <div className="w-full max-w-sm bg-white dark:bg-slate-900 rounded-[2.5rem] p-0 shadow-2xl border border-slate-800 relative overflow-hidden transform scale-100 animate-in zoom-in-95">
             <div className="bg-gradient-premium p-8 relative overflow-hidden text-center">
               <div className="absolute top-0 right-0 w-40 h-40 bg-secondary/20 rounded-full blur-3xl translate-x-10 -translate-y-1/2"></div>
               <div className="w-20 h-20 mx-auto rounded-full bg-red-600 border-4 border-slate-900 flex items-center justify-center text-3xl text-white shadow-xl mb-4 animate-pulse">
@@ -1231,7 +1231,6 @@ const Dashboard: React.FC = () => {
       )}
 
       {/* (não usado, mas mantido por compatibilidade futura) */}
-      {/* eslint-disable-next-line @typescript-eslint/no-unused-vars */}
       {expenses && materials && null}
     </div>
   );
