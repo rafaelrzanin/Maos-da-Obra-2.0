@@ -489,7 +489,7 @@ const WorkDetail: React.FC = () => {
         const wsCrono = XLSX.utils.json_to_sheet(steps.map(s => ({ Etapa: s.name, Inicio: parseDateNoTimezone(s.startDate), Fim: parseDateNoTimezone(s.endDate), Status: s.status })));
         XLSX.utils.book_append_sheet(wb, wsCrono, "Cronograma");
         const wsMat = XLSX.utils.json_to_sheet(materials.map(m => ({ Material: m.name, Qtd: m.plannedQty, Comprado: m.purchasedQty })));
-        XLSX.utils.book_append_sheet(wb, wsMat, "Materiais");
+        XLSX.utils.book_append_append_sheet(wb, wsMat, "Materiais");
         const wsFin = XLSX.utils.json_to_sheet(expenses.map(e => ({ Descrição: e.description, Valor: e.amount, Categoria: e.category, Data: parseDateNoTimezone(e.date), Etapa: steps.find(s => s.id === e.stepId)?.name || 'N/A' })));
         XLSX.utils.book_append_sheet(wb, wsFin, "Financeiro");
         XLSX.writeFile(wb, `Obra_${work?.name}.xlsx`);
@@ -504,6 +504,163 @@ const WorkDetail: React.FC = () => {
     // Show loading if AuthContext is still loading OR if local work details are loading
     if (authLoading || loading) return <div className="h-screen flex items-center justify-center"><i className="fa-solid fa-circle-notch fa-spin text-3xl text-primary"></i></div>;
     if (!work) return null;
+
+    // --- RENDER FUNCTIONS FOR REPORT SECTIONS (REUSABLE) ---
+    const today = new Date().toISOString().split('T')[0]; // Define today once for date comparisons
+
+    const RenderCronogramaReport: React.FC = () => (
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm p-6 print:shadow-none print:border-0 print:rounded-none">
+            <h3 className="text-lg font-bold text-primary dark:text-white mb-4 flex items-center gap-2">
+                <i className="fa-solid fa-calendar-days text-secondary"></i> Cronograma
+            </h3>
+            <div className="space-y-4">
+                {steps.map((s, idx) => {
+                    const isDone = s.status === StepStatus.COMPLETED;
+                    const isInProgress = s.status === StepStatus.IN_PROGRESS;
+                    const isDelayed = s.endDate < today && !isDone;
+
+                    let bgColorClass = 'bg-slate-50 dark:bg-slate-800';
+                    let textColorClass = 'text-slate-600 dark:text-slate-300';
+                    let iconClass = 'fa-clock';
+                    let iconColor = 'text-slate-400';
+
+                    if (isDone) {
+                        bgColorClass = 'bg-green-50 dark:bg-green-900/10';
+                        textColorClass = 'text-green-700 dark:text-green-400';
+                        iconClass = 'fa-check-circle';
+                        iconColor = 'text-green-600';
+                    } else if (isDelayed) {
+                        bgColorClass = 'bg-red-50 dark:bg-red-900/10';
+                        textColorClass = 'text-red-700 dark:text-red-400';
+                        iconClass = 'fa-triangle-exclamation';
+                        iconColor = 'text-red-600';
+                    } else if (isInProgress) {
+                        bgColorClass = 'bg-orange-50 dark:bg-orange-900/10';
+                        textColorClass = 'text-orange-700 dark:text-orange-400';
+                        iconClass = 'fa-hammer';
+                        iconColor = 'text-orange-600';
+                    }
+                    
+                    return (
+                        <div key={s.id} className={`p-3 rounded-xl border ${bgColorClass} border-slate-200 dark:border-slate-700`}>
+                            <div className="flex items-center gap-3 mb-2">
+                                <i className={`fa-solid ${iconClass} ${iconColor} text-lg`}></i>
+                                <p className={`font-bold text-sm ${textColorClass}`}>{String(idx + 1).padStart(2, '0')}. {s.name}</p>
+                            </div>
+                            <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400">
+                                <span>Início: {parseDateNoTimezone(s.startDate)}</span>
+                                <span>Fim: {parseDateNoTimezone(s.endDate)}</span>
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
+
+    const RenderMateriaisReport: React.FC = () => (
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm p-6 print:shadow-none print:border-0 print:rounded-none">
+            <h3 className="text-lg font-bold text-primary dark:text-white mb-4 flex items-center gap-2">
+                <i className="fa-solid fa-boxes-stacked text-secondary"></i> Materiais
+            </h3>
+            <div className="space-y-6">
+                {[...steps, { id: 'general-mat', name: 'Materiais Gerais / Sem Etapa', startDate: '', endDate: '', status: StepStatus.NOT_STARTED, workId: '', isDelayed: false }].map((step) => {
+                    const groupMaterials = materials.filter(m => {
+                        if (step.id === 'general-mat') return !m.stepId;
+                        return m.stepId === step.id;
+                    });
+
+                    if (groupMaterials.length === 0) return null;
+
+                    const isGeneral = step.id === 'general-mat';
+                    const stepLabel = isGeneral ? step.name : `Etapa: ${step.name}`;
+
+                    return (
+                        <div key={step.id} className="bg-slate-50 dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
+                            <h4 className="font-bold text-primary dark:text-white text-sm uppercase tracking-wide mb-3">{stepLabel}</h4>
+                            <ul className="divide-y divide-slate-100 dark:divide-slate-700">
+                                {groupMaterials.map(m => {
+                                    const isFullyPurchased = m.purchasedQty >= m.plannedQty;
+                                    const itemStatusClass = isFullyPurchased ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-400';
+                                    const itemIconClass = isFullyPurchased ? 'fa-check-circle' : 'fa-circle-exclamation';
+
+                                    return (
+                                        <li key={m.id} className="py-3 flex flex-col sm:flex-row justify-between items-start sm:items-center text-xs">
+                                            <p className="font-bold text-primary dark:text-white mb-1 sm:mb-0">{m.name} {m.brand && <span className="text-slate-500 font-normal">({m.brand})</span>}</p>
+                                            <div className="flex items-center gap-2 font-mono text-right">
+                                                <span className="text-slate-700 dark:text-slate-300">Sug.: {m.plannedQty} {m.unit}</span>
+                                                <span className={`font-bold ${itemStatusClass} flex items-center gap-1`}>
+                                                    <i className={`fa-solid ${itemIconClass}`}></i> Compr.: {m.purchasedQty} {m.unit}
+                                                </span>
+                                            </div>
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
+
+    const RenderFinanceiroReport: React.FC = () => (
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm p-6 print:shadow-none print:border-0 print:rounded-none">
+            <h3 className="text-lg font-bold text-primary dark:text-white mb-4 flex items-center gap-2">
+                <i className="fa-solid fa-dollar-sign text-secondary"></i> Financeiro
+            </h3>
+            <div className="space-y-6">
+                {[...steps, { id: 'general-fin', name: 'Despesas Gerais / Sem Etapa', startDate: '', endDate: '', status: StepStatus.NOT_STARTED, workId: '', isDelayed: false }].map((step) => {
+                    const groupExpenses = expenses.filter(e => {
+                        if (step.id === 'general-fin') return !e.stepId;
+                        return e.stepId === step.id;
+                    });
+
+                    if (groupExpenses.length === 0) return null;
+
+                    const isGeneral = step.id === 'general-fin';
+                    const stepLabel = isGeneral ? step.name : `Etapa: ${step.name}`;
+
+                    return (
+                        <div key={step.id} className="bg-slate-50 dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
+                            <h4 className="font-bold text-primary dark:text-white text-sm uppercase tracking-wide mb-3">{stepLabel}</h4>
+                            <ul className="divide-y divide-slate-100 dark:divide-slate-700">
+                                {groupExpenses.map(exp => {
+                                    const relatedMaterial = exp.relatedMaterialId ? materials.find(m => m.id === exp.relatedMaterialId) : null;
+                                    const expenseWorker = exp.workerId ? workers.find(w => w.id === exp.workerId) : null;
+
+                                    let categoryIcon = 'fa-tag';
+                                    let categoryColor = 'text-slate-500';
+                                    if (exp.category === ExpenseCategory.MATERIAL) {
+                                        categoryIcon = 'fa-box';
+                                        categoryColor = 'text-amber-600';
+                                    } else if (exp.category === ExpenseCategory.LABOR) {
+                                        categoryIcon = 'fa-helmet-safety';
+                                        categoryColor = 'text-blue-600';
+                                    }
+
+                                    return (
+                                        <li key={exp.id} className="py-3 flex justify-between items-center text-xs">
+                                            <div>
+                                                <p className="font-bold text-primary dark:text-white">{exp.description}</p>
+                                                <p className="text-slate-500 mt-1 flex items-center gap-2">
+                                                    <span className={`flex items-center gap-1 ${categoryColor}`}><i className={`fa-solid ${categoryIcon}`}></i> {exp.category}</span>
+                                                    <span>• {parseDateNoTimezone(exp.date)}</span>
+                                                    {relatedMaterial && <span className="text-sm font-medium text-slate-400">(Material: {relatedMaterial.name})</span>}
+                                                    {expenseWorker && <span className="text-sm font-medium text-slate-400">(Profissional: {expenseWorker.name})</span>}
+                                                </p>
+                                            </div>
+                                            <span className="font-bold text-primary dark:text-white whitespace-nowrap">R$ {Number(exp.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
 
     // --- RENDER CONTENT ---
 
@@ -850,7 +1007,7 @@ const WorkDetail: React.FC = () => {
     // Fix: Consolidated multiple renderSubViewContent definitions into one.
     // This function is now responsible for rendering all sub-views based on the `subView` state.
     const renderSubViewContent = () => {
-        const today = new Date().toISOString().split('T')[0]; // Define today once for date comparisons
+        const workProgressPercentage = stats?.progress || 0; 
 
         switch(subView) {
             case 'TEAM': return (
@@ -924,8 +1081,6 @@ const WorkDetail: React.FC = () => {
             );
 
             case 'REPORTS': 
-            const workProgressPercentage = stats?.progress || 0; 
-
             return (
                 <div className="space-y-6 animate-in fade-in">
                     {/* Report Dashboard Section */}
@@ -966,8 +1121,7 @@ const WorkDetail: React.FC = () => {
                         </button>
                     </div>
 
-                    {/* Report Content - MOBILE TABBED VIEW / DESKTOP 3-COLUMN */}
-                    {/* NEW: Mobile Tab Navigation */}
+                    {/* Report Content - MOBILE TABBED VIEW */}
                     <div className="lg:hidden no-print">
                         <div className="flex justify-around mb-4 bg-white dark:bg-slate-900 rounded-xl p-1 shadow-sm border border-slate-200 dark:border-slate-800">
                             <button onClick={() => setReportActiveTab('CRONOGRAMA')} className={`flex-1 py-2 px-3 rounded-lg text-sm font-bold transition-colors ${reportActiveTab === 'CRONOGRAMA' ? 'bg-secondary text-white' : 'text-slate-500 dark:text-slate-400'}`}>Cronograma</button>
@@ -976,314 +1130,16 @@ const WorkDetail: React.FC = () => {
                         </div>
                         
                         {/* Conditionally rendered content for mobile */}
-                        {reportActiveTab === 'CRONOGRAMA' && (
-                            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm p-6 print:shadow-none print:border-0 print:rounded-none">
-                                <h3 className="text-lg font-bold text-primary dark:text-white mb-4 flex items-center gap-2">
-                                    <i className="fa-solid fa-calendar-days text-secondary"></i> Cronograma
-                                </h3>
-                                <div className="space-y-4">
-                                    {steps.map((s, idx) => {
-                                        const isDone = s.status === StepStatus.COMPLETED;
-                                        const isInProgress = s.status === StepStatus.IN_PROGRESS;
-                                        const isDelayed = s.endDate < today && !isDone;
-
-                                        let bgColorClass = 'bg-slate-50 dark:bg-slate-800';
-                                        let textColorClass = 'text-slate-600 dark:text-slate-300';
-                                        let iconClass = 'fa-clock';
-                                        let iconColor = 'text-slate-400';
-
-                                        if (isDone) {
-                                            bgColorClass = 'bg-green-50 dark:bg-green-900/10';
-                                            textColorClass = 'text-green-700 dark:text-green-400';
-                                            iconClass = 'fa-check-circle';
-                                            iconColor = 'text-green-600';
-                                        } else if (isDelayed) {
-                                            bgColorClass = 'bg-red-50 dark:bg-red-900/10';
-                                            textColorClass = 'text-red-700 dark:text-red-400';
-                                            iconClass = 'fa-triangle-exclamation';
-                                            iconColor = 'text-red-600';
-                                        } else if (isInProgress) {
-                                            bgColorClass = 'bg-orange-50 dark:bg-orange-900/10';
-                                            textColorClass = 'text-orange-700 dark:text-orange-400';
-                                            iconClass = 'fa-hammer';
-                                            iconColor = 'text-orange-600';
-                                        }
-                                        
-                                        return (
-                                            <div key={s.id} className={`p-3 rounded-xl border ${bgColorClass} border-slate-200 dark:border-slate-700`}>
-                                                <div className="flex items-center gap-3 mb-2">
-                                                    <i className={`fa-solid ${iconClass} ${iconColor} text-lg`}></i>
-                                                    <p className={`font-bold text-sm ${textColorClass}`}>{String(idx + 1).padStart(2, '0')}. {s.name}</p>
-                                                </div>
-                                                <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400">
-                                                    <span>Início: {parseDateNoTimezone(s.startDate)}</span>
-                                                    <span>Fim: {parseDateNoTimezone(s.endDate)}</span>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                        )}
-
-                        {reportActiveTab === 'MATERIAIS' && (
-                            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm p-6 print:shadow-none print:border-0 print:rounded-none">
-                                <h3 className="text-lg font-bold text-primary dark:text-white mb-4 flex items-center gap-2">
-                                    <i className="fa-solid fa-boxes-stacked text-secondary"></i> Materiais
-                                </h3>
-                                <div className="space-y-6">
-                                    {[...steps, { id: 'general-mat', name: 'Materiais Gerais / Sem Etapa', startDate: '', endDate: '', status: StepStatus.NOT_STARTED, workId: '', isDelayed: false }].map((step) => {
-                                        const groupMaterials = materials.filter(m => {
-                                            if (step.id === 'general-mat') return !m.stepId;
-                                            return m.stepId === step.id;
-                                        });
-
-                                        if (groupMaterials.length === 0) return null;
-
-                                        const isGeneral = step.id === 'general-mat';
-                                        const stepLabel = isGeneral ? step.name : `Etapa: ${step.name}`;
-
-                                        return (
-                                            <div key={step.id} className="bg-slate-50 dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
-                                                <h4 className="font-bold text-primary dark:text-white text-sm uppercase tracking-wide mb-3">{stepLabel}</h4>
-                                                <ul className="divide-y divide-slate-100 dark:divide-slate-700">
-                                                    {groupMaterials.map(m => {
-                                                        const isFullyPurchased = m.purchasedQty >= m.plannedQty;
-                                                        const itemStatusClass = isFullyPurchased ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-400';
-                                                        const itemIconClass = isFullyPurchased ? 'fa-check-circle' : 'fa-circle-exclamation';
-
-                                                        return (
-                                                            <li key={m.id} className="py-3 flex flex-col sm:flex-row justify-between items-start sm:items-center text-xs">
-                                                                <p className="font-bold text-primary dark:text-white mb-1 sm:mb-0">{m.name} {m.brand && <span className="text-slate-500 font-normal">({m.brand})</span>}</p>
-                                                                <div className="flex items-center gap-2 font-mono text-right">
-                                                                    <span className="text-slate-700 dark:text-slate-300">Sug.: {m.plannedQty} {m.unit}</span>
-                                                                    <span className={`font-bold ${itemStatusClass} flex items-center gap-1`}>
-                                                                        <i className={`fa-solid ${itemIconClass}`}></i> Compr.: {m.purchasedQty} {m.unit}
-                                                                    </span>
-                                                                </div>
-                                                            </li>
-                                                        );
-                                                    })}
-                                                </ul>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                        )}
-
-                        {reportActiveTab === 'FINANCEIRO' && (
-                            <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm p-6 print:shadow-none print:border-0 print:rounded-none">
-                                <h3 className="text-lg font-bold text-primary dark:text-white mb-4 flex items-center gap-2">
-                                    <i className="fa-solid fa-dollar-sign text-secondary"></i> Financeiro
-                                </h3>
-                                <div className="space-y-6">
-                                    {[...steps, { id: 'general-fin', name: 'Despesas Gerais / Sem Etapa', startDate: '', endDate: '', status: StepStatus.NOT_STARTED, workId: '', isDelayed: false }].map((step) => {
-                                        const groupExpenses = expenses.filter(e => {
-                                            if (step.id === 'general-fin') return !e.stepId;
-                                            return e.stepId === step.id;
-                                        });
-
-                                        if (groupExpenses.length === 0) return null;
-
-                                        const isGeneral = step.id === 'general-fin';
-                                        const stepLabel = isGeneral ? step.name : `Etapa: ${step.name}`;
-
-                                        return (
-                                            <div key={step.id} className="bg-slate-50 dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
-                                                <h4 className="font-bold text-primary dark:text-white text-sm uppercase tracking-wide mb-3">{stepLabel}</h4>
-                                                <ul className="divide-y divide-slate-100 dark:divide-slate-700">
-                                                    {groupExpenses.map(exp => {
-                                                        const relatedMaterial = exp.relatedMaterialId ? materials.find(m => m.id === exp.relatedMaterialId) : null;
-                                                        const expenseWorker = exp.workerId ? workers.find(w => w.id === exp.workerId) : null;
-
-                                                        let categoryIcon = 'fa-tag';
-                                                        let categoryColor = 'text-slate-500';
-                                                        if (exp.category === ExpenseCategory.MATERIAL) {
-                                                            categoryIcon = 'fa-box';
-                                                            categoryColor = 'text-amber-600';
-                                                        } else if (exp.category === ExpenseCategory.LABOR) {
-                                                            categoryIcon = 'fa-helmet-safety';
-                                                            categoryColor = 'text-blue-600';
-                                                        }
-
-                                                        return (
-                                                            <li key={exp.id} className="py-3 flex justify-between items-center text-xs">
-                                                                <div>
-                                                                    <p className="font-bold text-primary dark:text-white">{exp.description}</p>
-                                                                <p className="text-slate-500 mt-1 flex items-center gap-2">
-                                                                        <span className={`flex items-center gap-1 ${categoryColor}`}><i className={`fa-solid ${categoryIcon}`}></i> {exp.category}</span>
-                                                                        <span>• {parseDateNoTimezone(exp.date)}</span>
-                                                                        {relatedMaterial && <span className="text-sm font-medium text-slate-400">(Material: {relatedMaterial.name})</span>}
-                                                                        {expenseWorker && <span className="text-sm font-medium text-slate-400">(Profissional: {expenseWorker.name})</span>}
-                                                                </p>
-                                                            </div>
-                                                            <span className="font-bold text-primary dark:text-white whitespace-nowrap">R$ {Number(exp.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                                                        </li>
-                                                    );
-                                                })}
-                                            </ul>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
-                        )}
+                        {reportActiveTab === 'CRONOGRAMA' && <RenderCronogramaReport />}
+                        {reportActiveTab === 'MATERIAIS' && <RenderMateriaisReport />}
+                        {reportActiveTab === 'FINANCEIRO' && <RenderFinanceiroReport />}
                     </div>
 
-                    {/* Original Report Content - DESKTOP 3-COLUMN */}
-                    <div className="hidden lg:grid grid-cols-3 gap-6 print:grid">
-
-                        {/* Column 1: Cronograma (Schedule) */}
-                        <div className="lg:col-span-1 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm p-6 print:shadow-none print:border-0 print:rounded-none">
-                            <h3 className="text-lg font-bold text-primary dark:text-white mb-4 flex items-center gap-2">
-                                <i className="fa-solid fa-calendar-days text-secondary"></i> Cronograma
-                            </h3>
-                            <div className="space-y-4">
-                                {steps.map((s, idx) => {
-                                    const isDone = s.status === StepStatus.COMPLETED;
-                                    const isInProgress = s.status === StepStatus.IN_PROGRESS;
-                                    const isDelayed = s.endDate < today && !isDone;
-
-                                    let bgColorClass = 'bg-slate-50 dark:bg-slate-800';
-                                    let textColorClass = 'text-slate-600 dark:text-slate-300';
-                                    let iconClass = 'fa-clock';
-                                    let iconColor = 'text-slate-400';
-
-                                    if (isDone) {
-                                        bgColorClass = 'bg-green-50 dark:bg-green-900/10';
-                                        textColorClass = 'text-green-700 dark:text-green-400';
-                                        iconClass = 'fa-check-circle';
-                                        iconColor = 'text-green-600';
-                                    } else if (isDelayed) {
-                                        bgColorClass = 'bg-red-50 dark:bg-red-900/10';
-                                        textColorClass = 'text-red-700 dark:text-red-400';
-                                        iconClass = 'fa-triangle-exclamation';
-                                        iconColor = 'text-red-600';
-                                    } else if (isInProgress) {
-                                        bgColorClass = 'bg-orange-50 dark:bg-orange-900/10';
-                                        textColorClass = 'text-orange-700 dark:text-orange-400';
-                                        iconClass = 'fa-hammer';
-                                        iconColor = 'text-orange-600';
-                                    }
-                                    
-                                    return (
-                                        <div key={s.id} className={`p-3 rounded-xl border ${bgColorClass} border-slate-200 dark:border-slate-700`}>
-                                            <div className="flex items-center gap-3 mb-2">
-                                                <i className={`fa-solid ${iconClass} ${iconColor} text-lg`}></i>
-                                                <p className={`font-bold text-sm ${textColorClass}`}>{String(idx + 1).padStart(2, '0')}. {s.name}</p>
-                                            </div>
-                                            <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400">
-                                                <span>Início: {parseDateNoTimezone(s.startDate)}</span>
-                                                <span>Fim: {parseDateNoTimezone(s.endDate)}</span>
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
-
-                        {/* Column 2: Materiais (Materials) */}
-                        <div className="lg:col-span-1 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm p-6 print:shadow-none print:border-0 print:rounded-none">
-                            <h3 className="text-lg font-bold text-primary dark:text-white mb-4 flex items-center gap-2">
-                                <i className="fa-solid fa-boxes-stacked text-secondary"></i> Materiais
-                            </h3>
-                            <div className="space-y-6">
-                                {[...steps, { id: 'general-mat', name: 'Materiais Gerais / Sem Etapa', startDate: '', endDate: '', status: StepStatus.NOT_STARTED, workId: '', isDelayed: false }].map((step) => {
-                                    const groupMaterials = materials.filter(m => {
-                                        if (step.id === 'general-mat') return !m.stepId;
-                                        return m.stepId === step.id;
-                                    });
-
-                                    if (groupMaterials.length === 0) return null;
-
-                                    const isGeneral = step.id === 'general-mat';
-                                    const stepLabel = isGeneral ? step.name : `Etapa: ${step.name}`;
-
-                                    return (
-                                        <div key={step.id} className="bg-slate-50 dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
-                                            <h4 className="font-bold text-primary dark:text-white text-sm uppercase tracking-wide mb-3">{stepLabel}</h4>
-                                            <ul className="divide-y divide-slate-100 dark:divide-slate-700">
-                                                {groupMaterials.map(m => {
-                                                    const isFullyPurchased = m.purchasedQty >= m.plannedQty;
-                                                    const itemStatusClass = isFullyPurchased ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-400';
-                                                    const itemIconClass = isFullyPurchased ? 'fa-check-circle' : 'fa-circle-exclamation';
-
-                                                    return (
-                                                        <li key={m.id} className="py-3 flex flex-col sm:flex-row justify-between items-start sm:items-center text-xs">
-                                                            <p className="font-bold text-primary dark:text-white mb-1 sm:mb-0">{m.name} {m.brand && <span className="text-slate-500 font-normal">({m.brand})</span>}</p>
-                                                            <div className="flex items-center gap-2 font-mono text-right">
-                                                                <span className="text-slate-700 dark:text-slate-300">Sug.: {m.plannedQty} {m.unit}</span>
-                                                                <span className={`font-bold ${itemStatusClass} flex items-center gap-1`}>
-                                                                    <i className={`fa-solid ${itemIconClass}`}></i> Compr.: {m.purchasedQty} {m.unit}
-                                                                </span>
-                                                            </div>
-                                                        </li>
-                                                    );
-                                                })}
-                                            </ul>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
-
-                        {/* Column 3: Financeiro (Financial) */}
-                        <div className="lg:col-span-1 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm p-6 print:shadow-none print:border-0 print:rounded-none">
-                            <h3 className="text-lg font-bold text-primary dark:text-white mb-4 flex items-center gap-2">
-                                <i className="fa-solid fa-dollar-sign text-secondary"></i> Financeiro
-                            </h3>
-                            <div className="space-y-6">
-                                {[...steps, { id: 'general-fin', name: 'Despesas Gerais / Sem Etapa', startDate: '', endDate: '', status: StepStatus.NOT_STARTED, workId: '', isDelayed: false }].map((step) => {
-                                    const groupExpenses = expenses.filter(e => {
-                                        if (step.id === 'general-fin') return !e.stepId;
-                                        return e.stepId === step.id;
-                                    });
-
-                                    if (groupExpenses.length === 0) return null;
-
-                                    const isGeneral = step.id === 'general-fin';
-                                    const stepLabel = isGeneral ? step.name : `Etapa: ${step.name}`;
-
-                                    return (
-                                        <div key={step.id} className="bg-slate-50 dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
-                                            <h4 className="font-bold text-primary dark:text-white text-sm uppercase tracking-wide mb-3">{stepLabel}</h4>
-                                            <ul className="divide-y divide-slate-100 dark:divide-slate-700">
-                                                {groupExpenses.map(exp => {
-                                                    const relatedMaterial = exp.relatedMaterialId ? materials.find(m => m.id === exp.relatedMaterialId) : null;
-                                                    const expenseWorker = exp.workerId ? workers.find(w => w.id === exp.workerId) : null;
-
-                                                    let categoryIcon = 'fa-tag';
-                                                    let categoryColor = 'text-slate-500';
-                                                    if (exp.category === ExpenseCategory.MATERIAL) {
-                                                        categoryIcon = 'fa-box';
-                                                        categoryColor = 'text-amber-600';
-                                                    } else if (exp.category === ExpenseCategory.LABOR) {
-                                                        categoryIcon = 'fa-helmet-safety';
-                                                        categoryColor = 'text-blue-600';
-                                                    }
-
-                                                    return (
-                                                        <li key={exp.id} className="py-3 flex justify-between items-center text-xs">
-                                                            <div>
-                                                                <p className="font-bold text-primary dark:text-white">{exp.description}</p>
-                                                                <p className="text-slate-500 mt-1 flex items-center gap-2">
-                                                                    <span className={`flex items-center gap-1 ${categoryColor}`}><i className={`fa-solid ${categoryIcon}`}></i> {exp.category}</span>
-                                                                    <span>• {parseDateNoTimezone(exp.date)}</span>
-                                                                    {relatedMaterial && <span className="text-sm font-medium text-slate-400">(Material: {relatedMaterial.name})</span>}
-                                                                    {expenseWorker && <span className="text-sm font-medium text-slate-400">(Profissional: {expenseWorker.name})</span>}
-                                                                </p>
-                                                            </div>
-                                                            <span className="font-bold text-primary dark:text-white whitespace-nowrap">R$ {Number(exp.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                                                        </li>
-                                                    );
-                                                })}
-                                            </ul>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
+                    {/* Report Content - DESKTOP STACKED VIEW */}
+                    <div className="hidden lg:block space-y-6 print:block"> {/* Changed to hidden lg:block for desktop and print */}
+                        <RenderCronogramaReport />
+                        <RenderMateriaisReport />
+                        <RenderFinanceiroReport />
                     </div>
                 </div>
             );
