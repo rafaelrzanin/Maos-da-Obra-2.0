@@ -93,6 +93,7 @@ export interface Expense {
   relatedMaterialId?: string; 
   stepId?: string; 
   workerId?: string;
+  supplierId?: string; // NEW: Added supplierId for financial reports
   totalAgreed?: number; 
 }
 
