@@ -363,7 +363,7 @@ const LiveTimeline = ({
  *  Dashboard
  *  ========================= */
 const Dashboard: React.FC = () => {
-  const { user, trialDaysRemaining, authLoading } = useAuth(); // Use authLoading
+  const { user, trialDaysRemaining, authLoading, isUserAuthFinished } = useAuth(); // Updated authLoading to isUserAuthFinished
   const navigate = useNavigate();
 
   // Data State
@@ -405,10 +405,17 @@ const Dashboard: React.FC = () => {
 
   // 1) Initial Load: obras
   useEffect(() => {
-    if (authLoading) return; // Wait for AuthContext to finish loading
+    // Only attempt to fetch works if initial auth check is done AND user is available
+    if (!isUserAuthFinished || !user) { 
+        if (isUserAuthFinished && !user) { // If auth is done but no user, stop loading works
+            setIsLoadingWorks(false);
+        }
+        return;
+    }
 
     let isMounted = true;
 
+    // Safety timeout is less critical with `isUserAuthFinished`
     const safetyTimeout = setTimeout(() => {
       if (isMounted && isLoadingWorks) {
         console.warn("Dashboard load timed out. Forcing UI.");
@@ -417,11 +424,6 @@ const Dashboard: React.FC = () => {
     }, 4000);
 
     const fetchWorks = async () => {
-      if (!user) {
-        if (isMounted) setIsLoadingWorks(false);
-        return;
-      }
-
       try {
         const data = await dbService.getWorks(user.id);
         if (!isMounted) return;
@@ -434,10 +436,10 @@ const Dashboard: React.FC = () => {
               const exists = data.find(w => w.id === prev.id);
               if (exists) return exists;
             }
-            return data[0];
+            return data[0]; // Set focus to the first work if none previously focused or previous doesn't exist
           });
         } else {
-          setFocusWork(null);
+          setFocusWork(null); // No works available
         }
         setIsLoadingWorks(false);
       } catch (e) {
@@ -451,14 +453,15 @@ const Dashboard: React.FC = () => {
       isMounted = false;
       clearTimeout(safetyTimeout);
     };
-  }, [user, authLoading]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [user, isUserAuthFinished]); // Updated dependency to isUserAuthFinished
 
   // 2) Details Load
   useEffect(() => {
     let isMounted = true;
 
     const fetchDetails = async () => {
-      if (!focusWork || !user) {
+      // Only fetch details if initial auth check is done AND user is available AND a work is focused.
+      if (!isUserAuthFinished || !user || !focusWork) {
         setIsLoadingDetails(false);
         return;
       }
@@ -505,17 +508,16 @@ const Dashboard: React.FC = () => {
       }
     };
 
-    if (focusWork?.id && works.length > 0) { // Only fetch details if works are loaded and focusWork is set
+    // Trigger fetchDetails only when focusWork or user/auth status changes AND isUserAuthFinished is true
+    // `authLoading` (from context) is not needed here as `isUserAuthFinished` already covers initial state.
+    if (isUserAuthFinished && user && focusWork?.id) { 
       fetchDetails();
-    } else if (works.length > 0 && !focusWork) {
-      // This case should ideally be handled by the initial load, but as a safeguard
-      setFocusWork(works[0]);
     } else {
       setIsLoadingDetails(false);
     }
 
     return () => { isMounted = false; };
-  }, [focusWork?.id, user, authLoading, works]); // Added works to dependencies
+  }, [focusWork?.id, user, isUserAuthFinished, works]); // Updated dependencies: user and isUserAuthFinished
 
   useEffect(() => {
     if (user?.plan !== PlanType.VITALICIO && user?.isTrial && trialDaysRemaining !== null && trialDaysRemaining <= 1) {
@@ -540,7 +542,7 @@ const Dashboard: React.FC = () => {
       return;
     }
 
-    setNotificationStatus(window.Notification.permission as 'default' | 'granted' | 'denied'); // Use window.Notification directly
+    setNotificationStatus(window.Notification.permission as 'default' | 'granted' | 'denied' | 'unsupported'); // Use window.Notification directly
 
     if (window.Notification.permission === 'granted' && user) {
       const existingSubscription = await dbService.getPushSubscription(user.id);
@@ -551,7 +553,7 @@ const Dashboard: React.FC = () => {
   }, [user]);
 
   useEffect(() => {
-    if (authLoading || !user) return;
+    if (!isUserAuthFinished || !user) return; // Wait for auth to be fully loaded and user to be present
     
     checkNotificationStatus(); // Call the now more robust check
     
@@ -560,7 +562,7 @@ const Dashboard: React.FC = () => {
     if (typeof window !== 'undefined' && window.Notification && window.Notification.permission === 'default') {
       setShowNotificationPrompt(true);
     }
-  }, [user, authLoading, checkNotificationStatus]);
+  }, [user, isUserAuthFinished, checkNotificationStatus]); // Updated dependencies: isUserAuthFinished
 
 
   const subscribeUserToPush = async () => {
@@ -701,9 +703,10 @@ const Dashboard: React.FC = () => {
         console.log("[DASHBOARD DELETE] Nenhuma obra restante, FocusWork definido como null.");
       }
       // NEW: Force refresh notifications as well to clean up any remaining stale ones
-      setNotifications([]); // Clear instantly for better UX
-      dbService.getNotifications(user.id).then(fetched => {
-        const activeWorkIds = new Set(updatedWorks.map(w => w.id));
+      // This part is already correct as it clears and re-fetches.
+      setNotifications([]); 
+      dbService.getNotifications(user!.id).then(fetched => { // user! is safe here because it's checked above
+        const activeWorkIds = new Set(updatedWorks.map(w => w.id)); // Use the `works` state *after* the deletion and refetch.
         const filteredNotifs = fetched.filter(n => 
           !n.workId || activeWorkIds.has(n.workId)
         );
@@ -741,7 +744,8 @@ const Dashboard: React.FC = () => {
   };
 
   /** ============ Render ============ */
-  if (authLoading || isLoadingWorks) return <DashboardSkeleton />;
+  // Use `isUserAuthFinished` and `authLoading` for the primary loading gate
+  if (!isUserAuthFinished || authLoading || isLoadingWorks) return <DashboardSkeleton />;
 
   if (works.length === 0) {
     return (
