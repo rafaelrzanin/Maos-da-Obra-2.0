@@ -26,8 +26,8 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 // --- Auth Context ---
 interface AuthContextType {
   user: User | null;
-  authLoading: boolean; // Renamed from 'loading'
-  isAuthReady: boolean; // New flag to indicate initial auth check is complete
+  authLoading: boolean; // True if any auth operation (initial check, login, refresh) is in progress
+  isUserAuthFinished: boolean; // NEW: True once the *initial* auth check has completed
   login: (email: string, password?: string) => Promise<boolean>;
   signup: (name: string, email: string, whatsapp: string, password?: string, cpf?: string, planType?: string | null) => Promise<boolean>;
   logout: () => void;
@@ -43,17 +43,15 @@ export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [authLoading, setAuthLoading] = useState(true); // Renamed from 'loading'
-  const [isAuthReady, setIsAuthReady] = useState(false); // New state for initial auth check completion
+  const [authLoading, setAuthLoading] = useState(true); // Initial state: true, as we're loading auth
+  const [isUserAuthFinished, setIsUserAuthFinished] = useState(false); // NEW: Initially false
 
-  console.log("[AuthProvider] Component rendered. Initial authLoading state:", authLoading, "isAuthReady:", isAuthReady);
+  console.log("[AuthProvider] Component rendered. Initial authLoading:", authLoading, "isUserAuthFinished:", isUserAuthFinished);
 
   useEffect(() => {
     let mounted = true;
-    console.log("[AuthContext] useEffect mounted, initAuth called. Mounted:", mounted, "Initial authLoading:", authLoading);
+    console.log("[AuthContext] useEffect mounted, initAuth called. Mounted:", mounted);
 
-    // This function will fetch the current user and set the initial state.
-    // It is called once on mount. Subsequent changes are handled by onAuthChange.
     const initAuth = async () => {
         try {
             console.log("[AuthContext] initAuth: Calling dbService.getCurrentUser()");
@@ -61,39 +59,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             if (mounted) {
                 setUser(currentUser);
                 console.log("[AuthContext] initAuth resolved. User:", currentUser ? currentUser.email : 'null');
-            } else {
-                console.log("[AuthContext] initAuth resolved, but component is unmounted. Skipping state update.");
             }
         } catch (error) {
             console.error("[AuthContext] Erro during initAuth:", error);
             if (mounted) {
-                setUser(null); // Ensure user is null on error
+                setUser(null);
             }
         } finally {
             if (mounted) {
-                setAuthLoading(false); // Ensure authLoading is false after initial check
-                setIsAuthReady(true); // Initial auth check is now complete
-                console.log("[AuthContext] initAuth finally block. Setting authLoading to false and isAuthReady to true.");
+                setAuthLoading(false); // Initial loading is done
+                setIsUserAuthFinished(true); // The initial auth check is now complete
+                console.log("[AuthContext] initAuth finally block. Setting authLoading to false and isUserAuthFinished to true.");
             }
         }
     };
 
     initAuth();
 
-    // Set up the listener for auth state changes
     const unsubscribe = dbService.onAuthChange(async (u) => {
       if (mounted) {
         console.log("[AuthContext] onAuthChange event. User:", u ? u.email : 'null');
-        setAuthLoading(true); // Set loading while we process the new user object
-        // dbService.onAuthChange now passes the raw user object,
-        // we might need to fetch the profile explicitly if not already done.
-        // However, dbService.getCurrentUser (which is used internally by onAuthChange for full user object)
-        // already handles ensureUserProfile, so we just set the user.
-        setUser(u);
-        setAuthLoading(false); // Auth state has been updated
-        setIsAuthReady(true); // Ensure this is true after any auth change
-      } else {
-        console.log("[AuthContext] onAuthChange event, but component is unmounted. Skipping state update.");
+        // onAuthChange updates the user, but we don't set authLoading=true here
+        // as it's a passive listener, not an active operation initiated by the UI.
+        // It signals that the auth state has changed, which is why we update `user`.
+        setUser(u); 
+        // Ensure `isUserAuthFinished` is true, as a change means state is now known.
+        setIsUserAuthFinished(true); 
       }
     });
 
@@ -119,14 +110,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const refreshUser = async () => {
       console.log("[AuthContext] refreshUser called.");
-      setAuthLoading(true); // Set loading while refreshing
-      const currentUser = await dbService.syncSession();
-      if (currentUser) setUser(currentUser);
-      setAuthLoading(false); // Loading complete
+      setAuthLoading(true); // Indicate active loading
+      try {
+          const currentUser = await dbService.syncSession();
+          setUser(currentUser);
+      } finally {
+          setAuthLoading(false); // Loading complete
+          console.log("[AuthContext] refreshUser finished. Setting authLoading to false.");
+      }
   };
 
   const login = async (email: string, password?: string) => {
-    setAuthLoading(true);
+    setAuthLoading(true); // Indicate active loading
     console.log("[AuthContext] login called. Setting authLoading to true.");
     try {
         const u = await dbService.login(email, password);
@@ -144,20 +139,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // The calling component (Login.tsx) will handle the specific error message.
         return false;
     } finally {
-        setAuthLoading(false);
+        setAuthLoading(false); // Loading complete
         console.log("[AuthContext] login finished. Setting authLoading to false.");
     }
   };
 
   async function loginSocial(provider: 'google') {
-    setAuthLoading(true);
+    setAuthLoading(true); // Indicate active loading
     console.log("[AuthContext] loginSocial called. Setting authLoading to true.");
     try {
         const { error } = await dbService.loginSocial(provider);
 
         if (error) {
             console.error("[AuthContext] Error in social login:", error);
-            alert("Erro no login Google. Verifique se o domínio da Vercel está autorizado no Supabase.");
+            // Alert is handled by Login.tsx
             return false;
         } 
         // If successful, Supabase handles the redirect automatically.
@@ -167,15 +162,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.error("[AuthContext] Social login exception:", e);
         return false;
     } finally {
-        // IMPORTANT: DO NOT setAuthLoading(false) here.
-        // The `onAuthChange` listener will be triggered by the redirect from Supabase,
-        // and it is responsible for setting `authLoading(false)` once the new session is processed.
-        console.log("[AuthContext] loginSocial finished. `onAuthChange` will handle final authLoading state.");
+        // We don't setAuthLoading(false) here, as the page redirect
+        // and subsequent onAuthChange will manage the state.
+        console.log("[AuthContext] loginSocial finished. Redirect/onAuthChange will handle final authLoading state.");
     }
   };
 
   const signup = async (name: string, email: string, whatsapp: string, password?: string, cpf?: string, planType?: string | null) => {
-    setAuthLoading(true);
+    setAuthLoading(true); // Indicate active loading
     console.log("[AuthContext] signup called. Setting authLoading to true.");
     try {
         const u = await dbService.signup(name, email, whatsapp, password, cpf, planType);
@@ -190,7 +184,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.error("[AuthContext] Signup exception:", e);
         return false;
     } finally {
-        setAuthLoading(false);
+        setAuthLoading(false); // Loading complete
         console.log("[AuthContext] signup finished. Setting authLoading to false.");
     }
   };
@@ -198,21 +192,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = () => {
     console.log("[AuthContext] logout called.");
     dbService.logout();
-    setUser(null);
+    setUser(null); // Clear user immediately
+    // onAuthChange will also be triggered, confirming the null user state
+    setAuthLoading(false); // Explicitly set to false after logout operation
+    setIsUserAuthFinished(true); // Still ready, just no user.
   };
 
   const updatePlan = async (plan: PlanType) => {
     if (user) {
       console.log("[AuthContext] updatePlan called for user:", user.email, "Plan:", plan);
-      setAuthLoading(true); // Set loading while updating plan
-      await dbService.updatePlan(user.id, plan);
-      await refreshUser();
-      setAuthLoading(false); // Loading complete
+      setAuthLoading(true); // Indicate active loading
+      try {
+          await dbService.updatePlan(user.id, plan);
+          await refreshUser(); // Refresh user to get updated plan details
+      } finally {
+          setAuthLoading(false); // Loading complete
+          console.log("[AuthContext] updatePlan finished. Setting authLoading to false.");
+      }
     }
   };
 
   return (
-    <AuthContext.Provider value={{ user, authLoading, isAuthReady, login, signup, logout, updatePlan, refreshUser, isSubscriptionValid, isNewAccount, trialDaysRemaining }}>
+    <AuthContext.Provider value={{ user, authLoading, isUserAuthFinished, login, signup, logout, updatePlan, refreshUser, isSubscriptionValid, isNewAccount, trialDaysRemaining }}>
       {children}
     </AuthContext.Provider>
   );
