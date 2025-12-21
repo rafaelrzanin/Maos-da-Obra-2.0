@@ -7,7 +7,7 @@ import { WORK_TEMPLATES, ZE_AVATAR, ZE_AVATAR_FALLBACK } from '../services/stand
 import { WorkStatus } from '../types.ts';
 
 const CreateWork: React.FC = () => {
-  const { user, authLoading } = useAuth(); // Use authLoading
+  const { user, authLoading, isUserAuthFinished } = useAuth(); // Use authLoading and isUserAuthFinished
   const navigate = useNavigate();
   
   // Wizard State
@@ -217,7 +217,7 @@ const CreateWork: React.FC = () => {
 
   // If AuthContext is still loading, show a simple spinner.
   // This prevents the CreateWork form from flashing prematurely before auth state is known.
-  if (authLoading) {
+  if (!isUserAuthFinished || authLoading) { // Updated condition
     return (
         <div className="flex items-center justify-center min-h-[80vh] text-primary dark:text-white">
             <i className="fa-solid fa-circle-notch fa-spin text-3xl"></i>
