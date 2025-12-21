@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { PlanType } from './types.ts';
@@ -9,15 +10,17 @@ import Login from './pages/Login.tsx'; // Keep Login static as it's the entry po
 
 // --- Lazy Loading sem tipagem 'as unknown as Promise' e sem extensão .tsx ---
 // Fix: Add '.tsx' extension to dynamic imports for correct TypeScript resolution of default exports.
-const Dashboard = lazy(() => import('./pages/Dashboard.tsx'));
-const CreateWork = lazy(() => import('./pages/CreateWork.tsx'));
-const WorkDetail = lazy(() => import('./pages/WorkDetail.tsx'));
-const Settings = lazy(() => import('./pages/Settings.tsx'));
-const Profile = lazy(() => import('./pages/Profile.tsx'));
-const VideoTutorials = lazy(() => import('./pages/VideoTutorials.tsx'));
-const Checkout = lazy(() => import('./pages/Checkout.tsx'));
-const AiChat = lazy(() => import('./pages/AiChat.tsx')); // NEW: Lazy load AiChat page
-const Register = lazy(() => import('./pages/Register.tsx')); 
+// Fix: Explicitly return the default export for React.lazy to resolve type inference issues.
+// Fix: Applied type assertion (module as any).default to resolve Property 'default' does not exist error.
+const Dashboard = lazy(() => import('./pages/Dashboard.tsx').then(module => ({ default: (module as any).default })));
+const CreateWork = lazy(() => import('./pages/CreateWork.tsx').then(module => ({ default: (module as any).default })));
+const WorkDetail = lazy(() => import('./pages/WorkDetail.tsx').then(module => ({ default: (module as any).default })));
+const Settings = lazy(() => import('./pages/Settings.tsx').then(module => ({ default: (module as any).default })));
+const Profile = lazy(() => import('./pages/Profile.tsx').then(module => ({ default: (module as any).default })));
+const VideoTutorials = lazy(() => import('./pages/VideoTutorials.tsx').then(module => ({ default: (module as any).default })));
+const Checkout = lazy(() => import('./pages/Checkout.tsx').then(module => ({ default: (module as any).default })));
+const AiChat = lazy(() => import('./pages/AiChat.tsx').then(module => ({ default: (module as any).default }))); // NEW: Lazy load AiChat page
+const Register = lazy(() => import('./pages/Register.tsx').then(module => ({ default: (module as any).default }))); 
 
 
 // --- Componente de Carregamento ---
@@ -99,7 +102,7 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
 
 // Layout Component - Only applies to authenticated, subscribed areas of the app
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, authLoading, isAuthReady, logout, isSubscriptionValid, trialDaysRemaining, updatePlan } = useAuth();
+  const { user, authLoading, isUserAuthFinished, logout, isSubscriptionValid, trialDaysRemaining, updatePlan } = useAuth(); // Updated isAuthReady to isUserAuthFinished
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
@@ -108,9 +111,8 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
   // Log Auth State for debugging
   useEffect(() => {
-    console.log(`[Layout] Render - authLoading: ${authLoading}, isAuthReady: ${isAuthReady}, User: ${user ? user.email : 'null'}, Path: ${location.pathname}`);
-  }, [authLoading, isAuthReady, user, location.pathname]);
-
+    console.log(`[Layout] Render - authLoading: ${authLoading}, isUserAuthFinished: ${isUserAuthFinished}, User: ${user ? user.email : 'null'}, Path: ${location.pathname}`);
+  }, [authLoading, isUserAuthFinished, user, location.pathname]); // Updated isAuthReady
 
   // Scroll to top on route change
   useEffect(() => {
@@ -135,10 +137,14 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       }
   }, [location.search, user, updatePlan, navigate, location.pathname]);
 
-  // Use authLoading for the initial loading screen
-  if (authLoading || !isAuthReady) return <LoadingScreen />;
+  // Use isUserAuthFinished for the initial loading screen
+  // If initial auth check is not done, show loading.
+  // We also show loading if `authLoading` is true (meaning an active auth operation is happening).
+  if (!isUserAuthFinished || authLoading) return <LoadingScreen />; 
   
   // If no user, redirect to login. This covers all protected routes
+  // This condition is now safe because isUserAuthFinished is true,
+  // meaning we know definitively there's no user.
   if (!user) return <Navigate to="/login" replace />;
 
   const isSettingsPage = location.pathname === '/settings';
