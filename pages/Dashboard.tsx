@@ -380,12 +380,23 @@ const Dashboard: React.FC = () => {
   // NEW: State for Critical Error Modal
   const [showCriticalErrorModal, setShowCriticalErrorModal] = useState(false);
   const [criticalErrorMessage, setCriticalErrorMessage] = useState('');
+  // NEW: To prevent loadData from running repeatedly if a critical error is active
+  const criticalErrorActiveRef = useRef(false);
 
 
   // Initial data load and refresh mechanism
   const loadData = useCallback(async () => {
-    if (!user?.id || !isUserAuthFinished || authLoading) return;
+    // NEW: If a critical error is active, do not attempt to load data again
+    if (criticalErrorActiveRef.current) {
+        console.log("[NOTIF DEBUG] loadData: Critical error active, skipping data load.");
+        return;
+    }
+    if (!user?.id || !isUserAuthFinished || authLoading) {
+        console.log("[NOTIF DEBUG] loadData: Skipping due to auth/user status.", { user: user?.id, isUserAuthFinished, authLoading });
+        return;
+    }
     
+    console.log("[NOTIF DEBUG] loadData: Starting data load...");
     setLoading(true);
     setShowCriticalErrorModal(false); // Hide any previous error modal
     setCriticalErrorMessage('');
@@ -414,12 +425,15 @@ const Dashboard: React.FC = () => {
         const stepsForFocusWork = await dbService.getSteps(currentActiveWork.id);
         setFocusWorkSteps(stepsForFocusWork);
 
+        // This is still a critical area. Ensure all dbService calls are robust.
+        // The generateSmartNotifications call can fail due to DB issues (like missing work_id).
+        // This part *must* propagate errors correctly.
         await dbService.generateSmartNotifications(
           user.id, 
           currentActiveWork.id,
           stepsForFocusWork,
-          (await dbService.getExpenses(currentActiveWork.id)),
-          materials,
+          (await dbService.getExpenses(currentActiveWork.id)), // Ensure this is awaited
+          materials, // Use the fetched materials
           currentActiveWork
         );
 
@@ -435,41 +449,59 @@ const Dashboard: React.FC = () => {
       const userNotifications = await dbService.getNotifications(user.id);
       setNotifications(userNotifications);
       refreshNotifications();
+      console.log("[NOTIF DEBUG] loadData: Data loaded successfully.");
 
     } catch (error: any) { // Catch all errors from loadData chain
-      console.error("Failed to load dashboard data:", error);
-      setCriticalErrorMessage(`Um erro crítico impediu o carregamento do Dashboard. Causa: ${error.message || "Erro desconhecido."}\n\nPor favor, verifique se seu banco de dados Supabase está configurado corretamente (especialmente a tabela 'notifications' com as colunas 'work_id' e 'tag').`);
+      console.error("[NOTIF DEBUG] loadData: Failed to load dashboard data:", error);
+      let errorMessage = `Um erro crítico impediu o carregamento do Dashboard. Causa: ${error.message || "Erro desconhecido."}`;
+      if (error.message?.includes("PGRST204") || error.message?.includes("Could not find the 'work_id' column")) {
+          errorMessage += "\n\nPor favor, verifique *URGENTEMENTE* se a tabela 'notifications' no seu Supabase tem a coluna 'work_id' do tipo TEXT e se suas RLS policies permitem INSERT/SELECT/UPDATE para ela.";
+      } else if (error.message?.includes("SyntaxError: Unexpected token 'A'") || error.message?.includes("API returned non-JSON")) {
+          errorMessage += "\n\nO servidor de Push Notifications está retornando um erro inesperado. Verifique se as variáveis VAPID_PUBLIC_KEY e VAPID_PRIVATE_KEY estão configuradas no Vercel e se a função /api/send-event-notification.js está funcionando.";
+      }
+      setCriticalErrorMessage(errorMessage);
       setShowCriticalErrorModal(true);
+      criticalErrorActiveRef.current = true; // Mark critical error as active
     } finally {
       setLoading(false);
+      console.log("[NOTIF DEBUG] loadData: Finished loading.");
     }
   }, [user, activeWorkId, isUserAuthFinished, authLoading, refreshNotifications]);
 
 
   // Effect to load data on component mount and when user/auth status changes
   useEffect(() => {
-    if (isUserAuthFinished && !authLoading && user) {
-      loadData();
+    console.log("[NOTIF DEBUG] useEffect [loadData, isUserAuthFinished, authLoading, user] triggered.", { isUserAuthFinished, authLoading, user: user?.id, criticalErrorActive: criticalErrorActiveRef.current });
+    // NEW: Only call loadData if no critical error is active
+    if (!criticalErrorActiveRef.current) {
+        if (isUserAuthFinished && !authLoading && user) {
+            loadData();
+        }
+    } else {
+        console.log("[NOTIF DEBUG] Not calling loadData because criticalErrorActiveRef is true.");
     }
-  }, [loadData, isUserAuthFinished, authLoading, user]);
+  }, [loadData, isUserAuthFinished, authLoading, user]); // Refined dependencies
 
   // Check and setup VAPID public key for push notifications
   useEffect(() => {
     const pubKey = import.meta.env.VITE_VAPID_PUBLIC_KEY;
+    console.log("[NOTIF DEBUG] VAPID Public Key check. Value:", pubKey);
     if (pubKey && pubKey !== 'undefined') {
       setVapidPublicKey(pubKey);
     } else {
       console.error("CRÍTICO: VITE_VAPID_PUBLIC_KEY não está definida nas variáveis de ambiente! As Push Notifications não funcionarão. Por favor, configure-a no Vercel/Ambiente de Deploy.");
-      // Keep setVapidPublicKey(null) to ensure conditional rendering for push modal
       setVapidPublicKey(null); 
+      // If VAPID key is missing, we still want to indicate we've "checked"
+      hasPromptedPushOnceRef.current = true; // Prevents the modal from trying to open repeatedly if key is missing
     }
-  }, []);
+  }, []); // Run once on mount
 
   // --- Push Notification Logic (FIXED FOR FLICKERING) ---
   const requestPushPermission = useCallback(async () => {
     if (!('serviceWorker' in navigator) || !('PushManager' in window) || !vapidPublicKey || !user) {
-      console.warn("Push notifications not supported or VAPID key/user missing.");
+      console.warn("[NOTIF DEBUG] Push notifications not supported or VAPID key/user missing for request.");
       setShowPushPermissionModal(false);
+      hasPromptedPushOnceRef.current = true; // Mark as prompted/dismissed for this session
       return;
     }
 
@@ -485,69 +517,105 @@ const Dashboard: React.FC = () => {
         
         pushSubscriptionRef.current = pushSubscription;
         await dbService.savePushSubscription(user.id, pushSubscription.toJSON());
-        console.log('Push subscription saved:', pushSubscription.toJSON());
+        console.log('[NOTIF DEBUG] Push subscription saved:', pushSubscription.toJSON());
         alert('Notificações ativadas com sucesso!');
       } else {
-        console.warn('Notification permission denied.');
+        console.warn('[NOTIF DEBUG] Notification permission denied by user.');
         alert('Permissão para notificações negada.');
       }
     } catch (error) {
-      console.error('Error subscribing to push notifications:', error);
+      console.error('[NOTIF DEBUG] Error subscribing to push notifications:', error);
       alert('Erro ao ativar notificações. Verifique o console.');
     } finally {
       setShowPushPermissionModal(false);
       // After interaction, ensure the ref is set so we don't re-prompt until a logical reset (e.g., app restart or manual revoke)
       hasPromptedPushOnceRef.current = true;
+      console.log("[NOTIF DEBUG] requestPushPermission finished. hasPromptedPushOnceRef.current set to true.");
     }
   }, [user, vapidPublicKey]);
 
   useEffect(() => {
-    // 1. Exit early if conditions for checking are not met or if already checked/modal is open.
+    console.log("[NOTIF DEBUG] Push permission useEffect triggered.", {
+        isUserAuthFinished, user: user?.id, vapidPublicKey: !!vapidPublicKey,
+        hasPromptedPushOnce: hasPromptedPushOnceRef.current, showPushPermissionModal
+    });
+
+    // 1. Exit early if conditions for checking are not met or if already prompted.
+    // hasPromptedPushOnceRef.current is the most important guard here.
     if (!isUserAuthFinished || !user || !vapidPublicKey || hasPromptedPushOnceRef.current) {
+        console.log("[NOTIF DEBUG] Push useEffect exited early. Conditions:", {
+            isUserAuthFinished, user: user?.id, vapidPublicKey: !!vapidPublicKey, hasPromptedPushOnce: hasPromptedPushOnceRef.current
+        });
         return;
     }
 
     const performPushPermissionCheck = async () => {
-        // If the modal is already open, wait for user interaction to close it.
-        // Do not re-evaluate and open/close it in a loop.
-        if (showPushPermissionModal) return;
+        // Only run check if the modal is NOT currently open.
+        // This prevents re-evaluation during a user's interaction with the modal.
+        if (showPushPermissionModal) {
+            console.log("[NOTIF DEBUG] Push check skipped: Modal already open.");
+            return;
+        }
 
         try {
             const currentPermission = Notification.permission;
             const existingSub = await dbService.getPushSubscription(user.id);
+            console.log("[NOTIF DEBUG] Push permission check results:", { currentPermission, existingSub: !!existingSub });
 
             if (currentPermission === 'granted') {
-                if (existingSub) {
-                    pushSubscriptionRef.current = existingSub.subscription as PushSubscription;
+                if (!existingSub) { // Granted but no subscription in DB. Re-subscribe.
+                    console.log("[NOTIF DEBUG] Permission granted but no sub in DB, attempting to subscribe silently.");
+                    // Attempt to subscribe silently, but don't show modal
+                    const registration = await navigator.serviceWorker.ready;
+                    const subscribeOptions = {
+                        userVisibleOnly: true,
+                        applicationServerKey: urlBase64ToUint8Array(vapidPublicKey!), // vapidPublicKey is guaranteed to exist here
+                    };
+                    const pushSubscription = await registration.pushManager.subscribe(subscribeOptions);
+                    pushSubscriptionRef.current = pushSubscription;
+                    await dbService.savePushSubscription(user.id, pushSubscription.toJSON());
+                    console.log('[NOTIF DEBUG] Push subscription silently saved.');
                 }
-                setShowPushPermissionModal(false);
+                setShowPushPermissionModal(false); // Ensure modal is closed if already granted
             } else if (currentPermission === 'denied') {
-                setShowPushPermissionModal(false);
+                console.log("[NOTIF DEBUG] Notification permission denied.");
+                setShowPushPermissionModal(false); // Ensure modal is closed
             } else { // currentPermission === 'default'
-                if (!existingSub) {
+                if (!existingSub) { // Only prompt if no existing subscription (to prevent re-prompts for user who said no)
+                    console.log("[NOTIF DEBUG] Permission default and no sub in DB, showing modal.");
                     setShowPushPermissionModal(true);
-                } else {
+                } else { // If permission is default but user has a sub (e.g. from another device), no need to prompt.
+                    console.log("[NOTIF DEBUG] Permission default but existing sub, not showing modal.");
                     setShowPushPermissionModal(false);
                 }
             }
         } catch (error) {
-            console.error("Error during push permission check:", error);
+            console.error("[NOTIF DEBUG] Error during push permission check:", error);
             setShowPushPermissionModal(false);
         } finally {
-            // Mark that we've performed the check for this load cycle, even if no modal was shown.
-            // This prevents re-running the heavy check on every Dashboard re-render.
-            hasPromptedPushOnceRef.current = true;
+            // CRUCIAL: Mark that we've performed the check, regardless of outcome.
+            // This prevents this useEffect from re-triggering the check logic unnecessarily.
+            // It only resets when user changes (or if explicitly reset by logout).
+            hasPromptedPushOnceRef.current = true; 
+            console.log("[NOTIF DEBUG] Push permission check finished. hasPromptedPushOnceRef.current set to true.");
         }
     };
 
     // Use a timeout to de-bounce the initial check, giving other renders a chance to settle.
+    // Also, ensures it runs after any immediate renders from other effects.
     const timeoutId = setTimeout(() => {
         performPushPermissionCheck();
     }, 500); 
 
-    return () => clearTimeout(timeoutId); // Cleanup: clear timeout if component unmounts or deps change
-  }, [user, isUserAuthFinished, vapidPublicKey, showPushPermissionModal]); // Re-added showPushPermissionModal to dependencies
-
+    return () => {
+        clearTimeout(timeoutId); // Cleanup: clear timeout if component unmounts or deps change
+        // When user logs out, reset this ref
+        if (!user) {
+            hasPromptedPushOnceRef.current = false;
+            console.log("[NOTIF DEBUG] Push permission useEffect cleanup: User logged out, reset hasPromptedPushOnceRef.");
+        }
+    };
+  }, [user, isUserAuthFinished, vapidPublicKey]); // Removed showPushPermissionModal from deps
 
   const handleDismissNotification = async (notificationId: string) => {
     await dbService.dismissNotification(notificationId);
@@ -577,7 +645,24 @@ const Dashboard: React.FC = () => {
 
   // If AuthContext is still loading or local data is loading
   if (!isUserAuthFinished || authLoading || loading) {
+    console.log("[NOTIF DEBUG] Dashboard: Rendering Skeleton. AuthFinished:", isUserAuthFinished, "AuthLoading:", authLoading, "Local Loading:", loading);
     return <DashboardSkeleton />;
+  }
+
+  // NEW: Render Critical Error Modal if active, *and prevent any other content from rendering*
+  if (showCriticalErrorModal) {
+    console.error("[NOTIF DEBUG] Dashboard: Rendering Critical Error Modal. Message:", criticalErrorMessage);
+    return (
+        <ZeModal
+          isOpen={showCriticalErrorModal}
+          title="Erro Crítico no Dashboard!"
+          message={criticalErrorMessage}
+          confirmText="Recarregar Página"
+          onConfirm={() => window.location.reload()}
+          onCancel={() => window.location.reload()} // Same action to ensure resolution
+          type="ERROR"
+        />
+    );
   }
 
   return (
@@ -756,19 +841,6 @@ const Dashboard: React.FC = () => {
             hasPromptedPushOnceRef.current = true; // Mark as prompted/dismissed for this session
           }}
           type="INFO"
-        />
-      )}
-
-      {/* NEW: Critical Error Modal */}
-      {showCriticalErrorModal && (
-        <ZeModal
-          isOpen={showCriticalErrorModal}
-          title="Erro Crítico no Dashboard!"
-          message={criticalErrorMessage}
-          confirmText="Recarregar Página"
-          onConfirm={() => window.location.reload()}
-          onCancel={() => window.location.reload()} // Same action to ensure resolution
-          type="ERROR"
         />
       )}
     </div>
