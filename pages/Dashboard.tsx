@@ -538,7 +538,8 @@ const Dashboard: React.FC = () => {
                 {user?.name ? (
                     <span className="font-bold">{user.name.charAt(0).toUpperCase()}</span>
                 ) : (
-                    <i className="fa-solid fa-user-tie"></i> {/* Generic worker icon */}
+                    // Generic worker icon if no name is available
+                    <i className="fa-solid fa-user-tie"></i> 
                 )}
             </div>
             <p className="mt-4 text-2xl font-black text-primary dark:text-white">
