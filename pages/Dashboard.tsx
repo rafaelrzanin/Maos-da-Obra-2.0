@@ -225,6 +225,7 @@ const Dashboard: React.FC = () => {
 
   const loadDashboardData = useCallback(async () => {
     if (!user?.id || !isUserAuthFinished || authLoading) return;
+    console.log("[Dashboard] loadDashboardData: Fetching data from DB..."); // Debug log
 
     setLoading(true);
     try {
@@ -258,6 +259,7 @@ const Dashboard: React.FC = () => {
       // Optionally set an error message to display
     } finally {
       setLoading(false);
+      console.log("[Dashboard] loadDashboardData: Data fetched and loading set to false."); // Debug log
     }
   }, [user, isUserAuthFinished, authLoading]);
 
@@ -287,7 +289,7 @@ const Dashboard: React.FC = () => {
           await dbService.deleteWork(workToDelete.id);
           await loadDashboardData(); // Reload dashboard after deletion
           setZeModal(prev => ({ ...prev, isOpen: false })); // Close modal
-        } catch (error) {
+        } catch (error: any) {
           console.error("Erro ao excluir obra:", error);
           setZeModal({
             isOpen: true,

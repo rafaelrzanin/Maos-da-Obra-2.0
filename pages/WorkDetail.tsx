@@ -791,9 +791,10 @@ const WorkDetail: React.FC = () => {
                                                 </div>
                                                 <h3 className={`font-bold text-lg leading-tight ${isDone ? 'text-slate-400 line-through' : 'text-primary dark:text-white'}`}>{step.name}</h3>
                                             </div>
+                                            {/* Ícone de edição, visível mas sem ação direta (a div acima é o target clicável) */}
                                             <div className="text-slate-300 hover:text-secondary p-1" aria-hidden="true"><i className="fa-solid fa-pen-to-square"></i></div>
                                         </div>
-                                        <div className="flex gap-4">
+                                        <div className="flex gap-4 flex-wrap"> {/* Adicionado flex-wrap para mobile */}
                                             <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium bg-slate-50 dark:bg-slate-800 px-2 py-1 rounded-md">
                                                 <i className="fa-regular fa-calendar"></i> <span aria-label={`Data de início: ${parseDateNoTimezone(step.startDate)}`}>{parseDateNoTimezone(step.startDate)}</span>
                                             </div>
@@ -802,7 +803,7 @@ const WorkDetail: React.FC = () => {
                                             </div>
                                         </div>
                                     </div>
-                                    <button onClick={() => handleDeleteStep(step.id)} className="text-red-400 hover:text-red-600 transition-colors p-1 ml-2" aria-label={`Excluir etapa ${step.name}`}> {/* RESTAURADO: Botão de lixeira para exclusão da etapa */}
+                                    <button onClick={() => handleDeleteStep(step.id)} className="text-red-400 hover:text-red-600 transition-colors p-1 ml-2 shrink-0" aria-label={`Excluir etapa ${step.name}`}> {/* RESTAURADO: Botão de lixeira para exclusão da etapa */}
                                       <i className="fa-solid fa-trash"></i>
                                     </button>
                                 </div>
