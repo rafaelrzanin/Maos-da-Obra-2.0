@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import { useAuth } from '../contexts/AuthContext.tsx';
@@ -14,13 +15,17 @@ type ReportSubTab = 'CRONOGRAMA' | 'MATERIAIS' | 'FINANCEIRO'; // Keep for repor
 
 // --- DATE HELPERS ---
 const parseDateNoTimezone = (dateStr: string) => {
-    if (!dateStr) return '';
+    if (!dateStr) return '--/--';
     const cleanDate = dateStr.split('T')[0];
     const parts = cleanDate.split('-');
     if (parts.length === 3) {
         return `${parts[2]}/${parts[1]}/${parts[0]}`; 
     }
-    return dateStr;
+    try {
+        return new Date(dateStr).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+    } catch (e) {
+        return dateStr;
+    }
 };
 
 // --- RENDER FUNCTIONS FOR REPORT SECTIONS (REUSABLE) ---
@@ -170,7 +175,7 @@ const RenderFinanceiroReport: React.FC<ReportProps> = ({ steps, expenses, materi
                                     }
 
                                     return (
-                                        <li key={exp.id} className="py-3 flex justify-between items-center text-xs">
+                                        <li key={exp.id} className="py-3 flex flex-col sm:flex-row justify-between items-start sm:items-center text-xs">
                                             <div>
                                                 <p className="font-bold text-primary dark:text-white">{exp.description}</p>
                                                 <p className="text-slate-500 mt-1 flex items-center gap-2">
@@ -197,7 +202,7 @@ const RenderFinanceiroReport: React.FC<ReportProps> = ({ steps, expenses, materi
 const WorkDetail: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
-    const { user, trialDaysRemaining, authLoading, isUserAuthFinished } = useAuth();
+    const { user, authLoading, isUserAuthFinished } = useAuth(); // Removed unused trialDaysRemaining
     
     // --- CORE DATA STATE ---
     const [work, setWork] = useState<Work | null>(null);
@@ -293,7 +298,7 @@ const WorkDetail: React.FC = () => {
     const isPremium = user?.plan === PlanType.VITALICIO;
 
     // --- LOAD DATA ---
-    const load = async () => {
+    const load = useCallback(async () => {
         // Only proceed if initial auth check is done AND id is available
         if (!id || !isUserAuthFinished) return;
         
@@ -326,9 +331,9 @@ const WorkDetail: React.FC = () => {
             setStats(workStats);
         }
         setLoading(false);
-    };
+    }, [id, authLoading, isUserAuthFinished]); // Dependencies for useCallback
 
-    useEffect(() => { load(); }, [id, authLoading, isUserAuthFinished]);
+    useEffect(() => { load(); }, [load]);
 
     // --- HANDLERS ---
 
@@ -358,6 +363,8 @@ const WorkDetail: React.FC = () => {
         }
         setIsStepModalOpen(false);
         setStepName('');
+        setStepStart(new Date().toISOString().split('T')[0]);
+        setStepEnd(new Date().toISOString().split('T')[0]);
         await load();
     };
 
@@ -470,20 +477,23 @@ const WorkDetail: React.FC = () => {
                     workId: work.id,
                     description: expDesc,
                     amount: inputAmount,
+                    paidAmount: inputAmount, // Ensure paidAmount is set on add
+                    quantity: 1, // Default quantity
                     date: new Date(expDate).toISOString(),
                     category: expCategory,
                     stepId: finalStepId,
                     totalAgreed: finalTotalAgreed 
                 });
             } else if (expenseModal.mode === 'EDIT' && expenseModal.id) {
-                const existing = expenses.find(e => e.id === expenseModal.id);
-                if (existing) {
+                const existingExpense = expenses.find(exp => exp.id === expenseModal.id);
+                if (existingExpense) {
                     const newTotalAmount = expSavedAmount + inputAmount;
 
                     await dbService.updateExpense({
-                        ...existing,
+                        ...existingExpense,
                         description: expDesc,
                         amount: newTotalAmount,
+                        paidAmount: newTotalAmount, // Ensure paidAmount is updated
                         date: new Date(expDate).toISOString(),
                         category: expCategory,
                         stepId: finalStepId,
@@ -599,13 +609,16 @@ const WorkDetail: React.FC = () => {
             isOpen: true,
             title: mode === 'WORKER' ? 'Excluir Profissional' : 'Excluir Fornecedor',
             message: 'Tem certeza? Essa ação não pode ser desfeita. O profissional/fornecedor será removido APENAS desta obra.',
+            confirmText: 'Sim, Excluir', // Added confirm text for clarity
+            cancelText: 'Cancelar', // Added cancel text for clarity
+            type: 'DANGER',
             onConfirm: async () => {
                 if (mode === 'WORKER') await dbService.deleteWorker(idToDelete, workId);
                 else await dbService.deleteSupplier(idToDelete, workId);
                 await load();
-                setZeModal(prev => ({ ...prev, isOpen: false, onCancel: () => {} }));
+                setZeModal(prev => ({ ...prev, isOpen: false }));
             },
-            onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false, onCancel: () => {} }))
+            onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false }))
         });
     };
 
@@ -702,8 +715,8 @@ const WorkDetail: React.FC = () => {
                          const isInProgress = step.status === StepStatus.IN_PROGRESS;
                          
                          // Determine Delay (Late) status
-                         const today = new Date().toISOString().split('T')[0];
-                         const isDelayed = step.endDate < today && !isDone;
+                         const todayDate = new Date().toISOString().split('T')[0]; // Use a different local variable name
+                         const isDelayed = step.endDate < todayDate && !isDone;
 
                          let statusBadgeClass = 'bg-slate-100 text-slate-500';
                          let statusText = 'Pendente';
@@ -807,14 +820,12 @@ const WorkDetail: React.FC = () => {
 
                                         return (
                                             <li key={material.id} onClick={() => { setMaterialModal({isOpen: true, material}); setMatName(material.name); setMatBrand(material.brand || ''); setMatPlannedQty(String(material.plannedQty)); setMatUnit(material.unit); }} className="p-4 flex flex-col md:flex-row justify-between items-start md:items-center hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer">
-                                                <div className="flex items-center gap-3 mb-2 md:mb-0">
-                                                    <div className={`w-9 h-9 rounded-full ${isFullyPurchased ? 'bg-green-100 dark:bg-green-900/30' : 'bg-amber-100 dark:bg-amber-900/30'} flex items-center justify-center shrink-0`}>
+                                                <div className={`w-9 h-9 rounded-full ${isFullyPurchased ? 'bg-green-100 dark:bg-green-900/30' : 'bg-amber-100 dark:bg-amber-900/30'} flex items-center justify-center shrink-0`}>
                                                         <i className={`fa-solid ${statusIcon} ${statusColor}`}></i>
                                                     </div>
-                                                    <div>
-                                                        <p className="font-bold text-primary dark:text-white leading-tight">{material.name}</p>
-                                                        <p className="text-xs text-slate-500 dark:text-slate-400">{material.brand || 'Marca não informada'}</p>
-                                                    </div>
+                                                <div>
+                                                    <p className="font-bold text-primary dark:text-white leading-tight">{material.name}</p>
+                                                    <p className="text-xs text-slate-500 dark:text-slate-400">{material.brand || 'Marca não informada'}</p>
                                                 </div>
                                                 <div className="text-right">
                                                     <p className="font-bold text-primary dark:text-white">{material.purchasedQty} / {material.plannedQty} {material.unit}</p>
@@ -841,14 +852,12 @@ const WorkDetail: React.FC = () => {
 
                                     return (
                                         <li key={material.id} onClick={() => { setMaterialModal({isOpen: true, material}); setMatName(material.name); setMatBrand(material.brand || ''); setMatPlannedQty(String(material.plannedQty)); setMatUnit(material.unit); }} className="p-4 flex flex-col md:flex-row justify-between items-start md:items-center hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer">
-                                            <div className="flex items-center gap-3 mb-2 md:mb-0">
-                                                <div className={`w-9 h-9 rounded-full ${isFullyPurchased ? 'bg-green-100 dark:bg-green-900/30' : 'bg-amber-100 dark:bg-amber-900/30'} flex items-center justify-center shrink-0`}>
+                                            <div className={`w-9 h-9 rounded-full ${isFullyPurchased ? 'bg-green-100 dark:bg-green-900/30' : 'bg-amber-100 dark:bg-amber-900/30'} flex items-center justify-center shrink-0`}>
                                                     <i className={`fa-solid ${statusIcon} ${statusColor}`}></i>
-                                                </div>
-                                                <div>
-                                                    <p className="font-bold text-primary dark:text-white leading-tight">{material.name}</p>
-                                                    <p className="text-xs text-slate-500 dark:text-slate-400">{material.brand || 'Marca não informada'}</p>
-                                                </div>
+                                            </div>
+                                            <div>
+                                                <p className="font-bold text-primary dark:text-white leading-tight">{material.name}</p>
+                                                <p className="text-xs text-slate-500 dark:text-slate-400">{material.brand || 'Marca não informada'}</p>
                                             </div>
                                             <div className="text-right">
                                                 <p className="font-bold text-primary dark:text-white">{material.purchasedQty} / {material.plannedQty} {material.unit}</p>
@@ -991,7 +1000,7 @@ const WorkDetail: React.FC = () => {
                             </div>
                             <i className="fa-solid fa-arrow-right ml-auto text-slate-400 group-hover:text-secondary transition-colors"></i>
                         </button>
-                        <button onClick={() => isPremium ? setSubView('CALCULATORS') : setZeModal({isOpen: true, title: "Acesso Restrito", message: "Calculadoras avançadas estão disponíveis apenas no Plano Vitalício.", confirmText: "Entendido", onCancel: () => setZeModal(prev => ({...prev, isOpen: false}))})} className="group flex items-center gap-4 bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-sm border border-slate-200 dark:border-slate-800 hover:border-premium transition-colors">
+                        <button onClick={() => isPremium ? setSubView('CALCULATORS') : setZeModal({isOpen: true, title: "Acesso Restrito", message: "Calculadoras avançadas estão disponíveis apenas no Plano Vitalício.", confirmText: "Entendido", onConfirm: () => setZeModal(prev => ({...prev, isOpen: false})), onCancel: () => setZeModal(prev => ({...prev, isOpen: false}))})} className="group flex items-center gap-4 bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-sm border border-slate-200 dark:border-slate-800 hover:border-premium transition-colors">
                             <div className="w-12 h-12 rounded-full bg-premium-light/30 dark:bg-premium-dark text-premium flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
                                 <i className="fa-solid fa-calculator text-xl"></i>
                             </div>
@@ -1001,7 +1010,7 @@ const WorkDetail: React.FC = () => {
                             </div>
                             <i className="fa-solid fa-lock ml-auto text-premium transition-colors"></i>
                         </button>
-                        <button onClick={() => isPremium ? setSubView('CONTRACTS') : setZeModal({isOpen: true, title: "Acesso Restrito", message: "Modelos de contratos estão disponíveis apenas no Plano Vitalício.", confirmText: "Entendido", onCancel: () => setZeModal(prev => ({...prev, isOpen: false}))})} className="group flex items-center gap-4 bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-sm border border-slate-200 dark:border-slate-800 hover:border-premium transition-colors">
+                        <button onClick={() => isPremium ? setSubView('CONTRACTS') : setZeModal({isOpen: true, title: "Acesso Restrito", message: "Modelos de contratos estão disponíveis apenas no Plano Vitalício.", confirmText: "Entendido", onConfirm: () => setZeModal(prev => ({...prev, isOpen: false})), onCancel: () => setZeModal(prev => ({...prev, isOpen: false}))})} className="group flex items-center gap-4 bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-sm border border-slate-200 dark:border-slate-800 hover:border-premium transition-colors">
                             <div className="w-12 h-12 rounded-full bg-premium-light/30 dark:bg-premium-dark text-premium flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
                                 <i className="fa-solid fa-file-contract text-xl"></i>
                             </div>
@@ -1011,7 +1020,7 @@ const WorkDetail: React.FC = () => {
                             </div>
                             <i className="fa-solid fa-lock ml-auto text-premium transition-colors"></i>
                         </button>
-                        <button onClick={() => isPremium ? setSubView('CHECKLIST') : setZeModal({isOpen: true, title: "Acesso Restrito", message: "Checklists de qualidade estão disponíveis apenas no Plano Vitalício.", confirmText: "Entendido", onCancel: () => setZeModal(prev => ({...prev, isOpen: false}))})} className="group flex items-center gap-4 bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-sm border border-slate-200 dark:border-slate-800 hover:border-premium transition-colors">
+                        <button onClick={() => isPremium ? setSubView('CHECKLIST') : setZeModal({isOpen: true, title: "Acesso Restrito", message: "Checklists de qualidade estão disponíveis apenas no Plano Vitalício.", confirmText: "Entendido", onConfirm: () => setZeModal(prev => ({...prev, isOpen: false})), onCancel: () => setZeModal(prev => ({...prev, isOpen: false}))})} className="group flex items-center gap-4 bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-sm border border-slate-200 dark:border-slate-800 hover:border-premium transition-colors">
                             <div className="w-12 h-12 rounded-full bg-premium-light/30 dark:bg-premium-dark text-premium flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
                                 <i className="fa-solid fa-list-check text-xl"></i>
                             </div>
@@ -1239,7 +1248,7 @@ const WorkDetail: React.FC = () => {
                                         <i className="fa-solid fa-file-contract text-xl"></i>
                                     </div>
                                     <div>
-                                        <p className="font-bold text-primary dark:text-white">{template.name}</p>
+                                        <p className="font-bold text-primary dark:text-white">{template.title}</p>
                                         <p className="text-xs text-slate-500 dark:text-slate-400">{template.description}</p>
                                     </div>
                                     <i className="fa-solid fa-arrow-right ml-auto text-slate-400 group-hover:text-secondary"></i>
@@ -1257,7 +1266,7 @@ const WorkDetail: React.FC = () => {
                                         {viewContract.content}
                                     </div>
                                     <div className="p-4 border-t border-slate-200 dark:border-slate-800">
-                                        <button onClick={() => navigator.clipboard.writeText(viewContract.content).then(() => alert('Contrato copiado!')).catch(e => console.error(e))} className="w-full py-3 bg-primary text-white font-bold rounded-xl hover:bg-primary-dark transition-colors">Copiar Contrato</button>
+                                        <button onClick={() => navigator.clipboard.writeText(viewContract.content).then(() => alert('Contrato copiado!')).catch(err => console.error(err))} className="w-full py-3 bg-primary text-white font-bold rounded-xl hover:bg-primary-dark transition-colors">Copiar Contrato</button>
                                     </div>
                                 </div>
                             </div>
@@ -1499,7 +1508,7 @@ const WorkDetail: React.FC = () => {
                             )}
                             <div>
                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Valor a Lançar (R$)</label>
-                                <input type="number" value={expAmount} onChange={e => setExpAmount(e.target.value)} required className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/50 transition-all" />
+                                <input type="number" value={expAmount} onChange={e => setExpAmount(e.target.value)} required={expenseModal.mode === 'ADD'} className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/50 transition-all" />
                             </div>
                             <div>
                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Total Acordado (R$ - Opcional)</label>

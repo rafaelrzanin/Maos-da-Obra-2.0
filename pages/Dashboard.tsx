@@ -667,10 +667,10 @@ const Dashboard: React.FC = () => {
           </div>
           <button
             onClick={subscribeToPushNotifications}
-            disabled={isSubscribing} {/* Use the new isSubscribing state here */}
+            disabled={isSubscribing} 
             className="shrink-0 ml-4 px-4 py-2 bg-blue-600 text-white text-xs font-bold rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50"
           >
-            {isSubscribing ? 'Ativando...' : 'Ativar'} {/* Use the new isSubscribing state here */}
+            {isSubscribing ? 'Ativando...' : 'Ativar'} 
           </button>
         </div>
       )}
