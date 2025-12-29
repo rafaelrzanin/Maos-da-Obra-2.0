@@ -32,18 +32,6 @@ const formatDateDisplay = (dateStr: string) => {
   }
 };
 
-// Esta função não será mais usada no Dashboard após a desativação das push notifications
-// function urlBase64ToUint8Array(base64String: string) {
-//   const padding = '='.repeat((4 - base64String.length % 4) % 4);
-//   const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
-//   const rawData = window.atob(base64);
-//   const outputArray = new Uint8Array(rawData.length);
-//   for (let i = 0; i < rawData.length; ++i) {
-//     outputArray[i] = rawData.charCodeAt(i);
-//   }
-//   return outputArray;
-// }
-
 /** =========================
  * Skeleton
  * ========================= */
@@ -108,121 +96,97 @@ const KpiCard = ({ onClick, icon, iconClass, value, label, badge, accent }: {
 }) => {
   const ring = accent === "danger" ? "ring-1 ring-red-500/20" : accent === "warn" ? "ring-1 ring-amber-500/20" : "ring-1 ring-emerald-500/10";
   return (
-    <div onClick={onClick} className={cx(surface, "rounded-3xl p-6 transition-all cursor-pointer hover:-translate-y-0.5 hover:shadow-xl hover:border-secondary/40", ring)} role={onClick ? "button" : undefined}>
+    <div onClick={onClick} className={cx(surface, "rounded-3xl p-4 transition-all cursor-pointer hover:-translate-y-0.5 hover:shadow-xl hover:border-secondary/40", ring)} role={onClick ? "button" : undefined}>
       <div className="flex items-start justify-between mb-3">
-        <div className={cx("w-11 h-11 rounded-2xl grid place-items-center", iconClass)}><i className={icon}></i></div>
+        <div className={cx("w-10 h-10 rounded-xl grid place-items-center text-base", iconClass)}><i className={icon}></i></div>
         {badge}
       </div>
-      <div className="text-3xl font-black text-slate-900 dark:text-white leading-none mb-1">{value}</div>
-      <div className={cx("text-[11px] font-extrabold tracking-widest uppercase", mutedText)}>{label}</div>
+      <div className="text-2xl font-black text-slate-900 dark:text-white leading-none mb-1">{value}</div>
+      <div className={cx("text-[10px] font-extrabold tracking-widest uppercase", mutedText)}>{label}</div>
     </div>
   );
 };
 
-const RiskRadar = ({
+// NEW: NextSteps Component
+const NextSteps = ({
   focusWork,
-  stats,
-  dailySummary,
-  materials, // Not used in this component, but passed for compatibility
+  steps,
   onOpenWork,
 }: {
   focusWork: Work;
-  stats: { totalSpent: number; progress: number; delayedSteps: number };
-  dailySummary: { completedSteps: number; delayedSteps: number; pendingMaterials: number; totalSteps: number };
-  materials: Material[];
+  steps: Step[];
   onOpenWork: () => void;
 }) => {
-  const budgetUsage = focusWork.budgetPlanned > 0 ? (stats.totalSpent / focusWork.budgetPlanned) * 100 : 0;
-  const budgetPct = Math.round(budgetUsage);
-
-  const delayedPct = dailySummary.totalSteps > 0 ? Math.round((dailySummary.delayedSteps / dailySummary.totalSteps) * 100) : 0;
-
-  const budgetTone = budgetPct > 100 ? { label: "Estourado", cls: "bg-red-100 dark:bg-red-900/25 text-red-700 dark:text-red-300", bar: "bg-red-500" } : budgetPct > 85 ? { label: "No limite", cls: "bg-amber-100 dark:bg-amber-900/20 text-amber-800 dark:text-amber-300", bar: "bg-amber-500" } : { label: "Saudável", cls: "bg-emerald-100 dark:bg-emerald-900/20 text-emerald-800 dark:text-emerald-300", bar: "bg-emerald-500" };
-
-  const scheduleTone =
-    delayedPct >= 20
-      ? { label: "Crítico", cls: "bg-red-100 dark:bg-red-900/25 text-red-700 dark:text-red-300" }
-      : delayedPct >= 10
-      ? { label: "Atenção", cls: "bg-amber-100 dark:bg-amber-900/20 text-amber-800 dark:text-amber-300" }
-      : { label: "Ok", cls: "bg-emerald-100 dark:bg-emerald-900/20 text-emerald-800 dark:text-emerald-300" };
+  const today = new Date().toISOString().split('T')[0];
+  const nextThreeSteps = steps
+    .filter(s => s.status !== StepStatus.COMPLETED && s.endDate >= today) // Filter out completed and past due
+    .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
+    .slice(0, 3); // Get next 3
 
   return (
     <div className={cx(surface, "rounded-3xl p-6")}>
       <div className="flex items-center justify-between mb-4">
         <div>
-          <p className="text-sm font-black text-slate-900 dark:text-white">Mapa de Riscos</p>
-          <p className={cx("text-xs font-semibold", mutedText)}>Onde pode “dar ruim” antes de dar ruim</p>
+          <p className="text-lg font-black text-slate-900 dark:text-white">Próximas Etapas</p>
+          <p className={cx("text-xs font-semibold", mutedText)}>Organize os próximos passos da sua obra</p>
         </div>
         <button onClick={onOpenWork} className="text-xs font-extrabold text-secondary hover:opacity-80">
-          Ver detalhes →
+          Ver cronograma →
         </button>
       </div>
 
-      {/* 4 mini-métricas (sem “Compras críticas” como você pediu) */}
-      <div className="grid grid-cols-2 gap-3 mb-4">
-        <div className="rounded-xl p-3 border border-slate-200/60 dark:border-white/10 bg-white/60 dark:bg-slate-950/20">
-          <p className={cx("text-[11px] font-black uppercase tracking-wider", mutedText)}>Ritmo</p>
-          <p className="text-xl font-black text-slate-900 dark:text-white">{stats.progress}%</p>
-          <p className={cx("text-xs font-semibold", mutedText)}>Progresso geral</p>
+      {nextThreeSteps.length === 0 ? (
+        <div className="text-center text-slate-400 py-8 italic text-sm">
+          Todas as etapas futuras concluídas ou sem etapas futuras.
         </div>
+      ) : (
+        <div className="space-y-4">
+          {nextThreeSteps.map((step, idx) => {
+            const daysUntilStart = Math.ceil((new Date(step.startDate).getTime() - new Date(today).getTime()) / (1000 * 60 * 60 * 24));
+            let statusText = '';
+            let statusClass = 'text-slate-500';
+            let iconClass = 'fa-clock';
 
-        <div className="rounded-xl p-3 border border-slate-200/60 dark:border-white/10 bg-white/60 dark:bg-slate-950/20">
-          <p className={cx("text-[11px] font-black uppercase tracking-wider", mutedText)}>Cronograma</p>
-          <div className="flex items-center gap-2">
-            <p className="text-xl font-black text-slate-900 dark:text-white">{delayedPct}%</p>
-            <span className={cx("text-[11px] font-black px-2 py-1 rounded-xl", scheduleTone.cls)}>
-              {scheduleTone.label}
-            </span>
-          </div>
-          <p className={cx("text-xs font-semibold", mutedText)}>{dailySummary.delayedSteps} etapas atrasadas</p>
-        </div>
+            if (step.status === StepStatus.IN_PROGRESS) {
+                statusText = 'Em Andamento';
+                statusClass = 'text-orange-600';
+                iconClass = 'fa-hammer';
+            } else if (daysUntilStart === 0) {
+                statusText = 'Começa Hoje!';
+                statusClass = 'text-green-600';
+                iconClass = 'fa-calendar-day';
+            } else if (daysUntilStart === 1) {
+                statusText = 'Amanhã';
+                statusClass = 'text-blue-600';
+                iconClass = 'fa-calendar-alt';
+            } else if (daysUntilStart > 1) {
+                statusText = `Em ${daysUntilStart} dias`;
+                statusClass = 'text-blue-600';
+                iconClass = 'fa-calendar-alt';
+            } else {
+                statusText = 'Pendente'; // Fallback for other cases
+            }
 
-        <div className="rounded-xl p-3 border border-slate-200/60 dark:border-white/10 bg-white/60 dark:bg-slate-950/20">
-          <p className={cx("text-[11px] font-black uppercase tracking-wider", mutedText)}>Orçamento</p>
-          <div className="flex items-center gap-2">
-            <p className="text-xl font-black text-slate-900 dark:text-white">{budgetPct}%</p>
-            <span className={cx("text-[11px] font-black px-2 py-1 rounded-xl", budgetTone.cls)}>
-              {budgetTone.label}
-            </span>
-          </div>
-          <p className={cx("text-xs font-semibold", mutedText)}>R$ {stats.totalSpent.toLocaleString("pt-BR")}</p>
+            return (
+              <div key={step.id} className="bg-slate-50 dark:bg-slate-800 rounded-xl p-3 border border-slate-200 dark:border-slate-700">
+                <div className="flex items-center justify-between mb-1">
+                  <p className="font-bold text-primary dark:text-white text-sm">{step.name}</p>
+                  <span className={cx("text-xs font-semibold flex items-center gap-1", statusClass)}>
+                    <i className={`fa-solid ${iconClass}`}></i> {statusText}
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  {formatDateDisplay(step.startDate)} - {formatDateDisplay(step.endDate)}
+                </p>
+              </div>
+            );
+          })}
         </div>
-
-        <div className="rounded-xl p-3 border border-slate-200/60 dark:border-white/10 bg-white/60 dark:bg-slate-950/20">
-          <p className={cx("text-[11px] font-black uppercase tracking-wider", mutedText)}>Compras</p>
-          <p className="text-xl font-black text-slate-900 dark:text-white">{dailySummary.pendingMaterials}</p>
-          <p className={cx("text-xs font-semibold", mutedText)}>pendências no checklist</p>
-        </div>
-      </div>
-
-      {/* Barra “zona” do orçamento */}
-      <div className="rounded-xl p-4 border border-slate-200/60 dark:border-white/10 bg-white/60 dark:bg-slate-950/20">
-        <div className="flex items-center justify-between mb-2">
-          <p className="text-xs font-black uppercase tracking-wider text-slate-500 dark:text-slate-400">
-            Zona do orçamento
-          </p>
-          <p className="text-xs font-extrabold text-slate-600 dark:text-slate-300">
-            R$ {focusWork.budgetPlanned.toLocaleString("pt-BR")}</p>
-        </div>
-
-        <div className="relative h-3 rounded-full bg-slate-200 dark:bg-slate-800 overflow-hidden">
-          <div className="absolute inset-y-0 left-[85%] w-[2px] bg-amber-400/80" />
-          <div className="absolute inset-y-0 left-[100%] w-[2px] bg-red-400/80" />
-          <div
-            className={cx("h-full rounded-full transition-all", budgetTone.bar)}
-            style={{ width: `${Math.min(100, Math.max(2, budgetUsage))}%` }}
-          />
-        </div>
-
-        <div className="flex justify-between mt-2 text-[11px] font-bold text-slate-500 dark:text-slate-400">
-          <span>0%</span>
-          <span>85%</span>
-          <span>100%</span>
-        </div>
-      </div>
+      )}
     </div>
   );
 };
+
 
 const EmptyDashboard = ({ onOpenCreateWork }: { onOpenCreateWork: () => void }) => {
   return (
@@ -248,6 +212,7 @@ const Dashboard: React.FC = () => {
   const [stats, setStats] = useState<{ totalSpent: number, progress: number, delayedSteps: number } | null>(null);
   const [dailySummary, setDailySummary] = useState<{ completedSteps: number, delayedSteps: number, pendingMaterials: number, totalSteps: number } | null>(null);
   const [materials, setMaterials] = useState<Material[]>([]);
+  const [steps, setSteps] = useState<Step[]>([]); // NEW: Add steps state to pass to NextSteps component
   const [zeTip, setZeTip] = useState<ZeTip | null>(null);
 
   // General Purpose Modal for Delete Confirmation
@@ -270,19 +235,22 @@ const Dashboard: React.FC = () => {
         const primaryWork = fetchedWorks[0];
         setFocusWork(primaryWork);
 
-        const [workStats, summary, materialsList] = await Promise.all([
+        const [workStats, summary, materialsList, stepsList] = await Promise.all([
           dbService.calculateWorkStats(primaryWork.id),
           dbService.getDailySummary(primaryWork.id),
           dbService.getMaterials(primaryWork.id),
+          dbService.getSteps(primaryWork.id), // NEW: Fetch steps
         ]);
         setStats(workStats);
         setDailySummary(summary);
         setMaterials(materialsList);
+        setSteps(stepsList); // NEW: Set steps
       } else {
         setFocusWork(null);
         setStats(null);
         setDailySummary(null);
         setMaterials([]);
+        setSteps([]); // NEW: Clear steps
       }
       setZeTip(getRandomZeTip()); // Load a random tip
     } catch (error) {
@@ -343,7 +311,7 @@ const Dashboard: React.FC = () => {
   // If no works, show empty state
   if (works.length === 0) {
     return (
-      <div className="max-w-4xl mx-auto pb-6 pt-6 px-4 md:px-0 font-sans">
+      <div className="max-w-4xl mx-auto py-8 px-4 md:px-0 font-sans"> {/* Adjusted padding */}
         <EmptyDashboard onOpenCreateWork={handleOpenCreateWork} />
       </div>
     );
@@ -351,11 +319,11 @@ const Dashboard: React.FC = () => {
 
   // Display dashboard content
   return (
-    <div className="max-w-4xl mx-auto pb-6 pt-6 px-4 md:px-0 font-sans">
+    <div className="max-w-4xl mx-auto py-8 px-4 md:px-0 font-sans"> {/* Adjusted padding */}
       <div className="flex justify-between items-end mb-8">
         <div>
           <p className={cx("text-sm font-bold uppercase tracking-wider", mutedText)}>Dashboard</p>
-          <h1 className="text-3xl font-black text-primary dark:text-white">Minhas Obras</h1>
+          <h1 className="text-3xl font-black text-primary dark:text-white">Olá, {user?.name.split(' ')[0]}!</h1> {/* NEW: Personalized greeting */}
         </div>
         <button onClick={handleOpenCreateWork} className="px-5 py-2 bg-primary text-white font-bold rounded-xl shadow-lg hover:bg-primary-light transition-colors flex items-center gap-2">
           <i className="fa-solid fa-plus-circle"></i> Nova Obra
@@ -364,27 +332,30 @@ const Dashboard: React.FC = () => {
 
       {/* Work Selector & Current Work Overview */}
       {focusWork && (
-        <div className={cx(surface, card, "mb-8")}>
+        <div className={cx(surface, card, "mb-8 p-6 md:p-8")}> {/* Adjusted padding */}
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-lg font-black text-primary dark:text-white">Obra Focada:</h2>
-            <div className="relative">
+            <div className="relative flex items-center"> {/* Group select and delete button */}
               <select
                 value={focusWork.id}
                 onChange={(e) => setFocusWork(works.find(w => w.id === e.target.value) || null)}
-                className="block w-full pl-3 pr-10 py-2 text-base border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white rounded-xl focus:outline-none focus:ring-secondary focus:border-secondary transition-colors cursor-pointer"
+                className="block min-w-[150px] pl-3 pr-10 py-2 text-base border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white rounded-xl focus:outline-none focus:ring-secondary focus:border-secondary transition-colors cursor-pointer"
                 aria-label="Selecionar Obra Focada"
               >
                 {works.map((w) => (
                   <option key={w.id} value={w.id}>{w.name}</option>
                 ))}
               </select>
-              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-700 dark:text-slate-300">
+              <div className="pointer-events-none absolute inset-y-0 right-10 flex items-center px-2 text-slate-700 dark:text-slate-300">
                 <i className="fa-solid fa-chevron-down text-sm"></i>
               </div>
+              <button onClick={() => handleDeleteWork(focusWork)} className="text-red-400 hover:text-red-600 transition-colors p-2 ml-2" aria-label={`Excluir obra ${focusWork.name}`}> {/* Restored delete button */}
+                <i className="fa-solid fa-trash"></i>
+              </button>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 mb-8"> {/* Adjusted gap */}
             <Donut value={stats?.progress || 0} label="Progresso da Obra" />
             <div className="space-y-3">
               <KpiCard
@@ -405,27 +376,24 @@ const Dashboard: React.FC = () => {
               />
             </div>
           </div>
-          <div className="mt-8 flex justify-between items-center pt-4 border-t border-slate-100 dark:border-slate-800">
-            <button onClick={() => handleOpenWorkDetail(focusWork.id)} className="px-5 py-2 bg-secondary text-white font-bold rounded-xl shadow-lg hover:bg-secondary-dark transition-colors flex items-center gap-2">
-              <i className="fa-solid fa-eye"></i> Ver Detalhes
-            </button>
-            <button onClick={() => handleDeleteWork(focusWork)} className="text-red-400 hover:text-red-600 transition-colors">
-              <i className="fa-solid fa-trash mr-2"></i> Excluir Obra
+          <div className="pt-4"> {/* Removed border-t and flex properties from this div */}
+            <button onClick={() => handleOpenWorkDetail(focusWork.id)} className="w-full py-4 bg-secondary text-white font-bold rounded-xl shadow-lg hover:bg-secondary-dark transition-colors flex items-center justify-center gap-2"> {/* NEW: Larger access button */}
+              <i className="fa-solid fa-arrow-right"></i> Acessar Obra
             </button>
           </div>
         </div>
       )}
 
-      {/* Risk Radar */}
-      {focusWork && stats && dailySummary && (
+      {/* NEW: Next Steps Section */}
+      {focusWork && steps && (
         <div className="mb-8">
-          <RiskRadar focusWork={focusWork} stats={stats} dailySummary={dailySummary} materials={materials} onOpenWork={() => handleOpenWorkDetail(focusWork.id)} />
+          <NextSteps focusWork={focusWork} steps={steps} onOpenWork={() => handleOpenWorkDetail(focusWork.id)} />
         </div>
       )}
 
       {/* Zé da Obra Tip */}
       {zeTip && (
-        <div className={cx(surface, card, "mb-8 flex items-start gap-5")}>
+        <div className={cx(surface, card, "mb-8 flex items-start gap-5 p-6 md:p-8")}> {/* Adjusted padding */}
           <div className="w-16 h-16 rounded-full p-1 bg-gradient-to-br from-secondary to-orange-400 shadow-lg shrink-0 animate-float">
             <img src={ZE_AVATAR} className="w-full h-full object-cover rounded-full border-2 border-white dark:border-slate-800" onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK} alt="Zé da Obra Avatar" />
           </div>

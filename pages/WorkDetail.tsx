@@ -205,8 +205,7 @@ const WorkDetail: React.FC = () => {
         await load();
     };
 
-    // REMOVIDO: handleDeleteStep não é mais chamado por um botão no card.
-    // A função é mantida para compatibilidade, caso haja outra forma de acioná-la (e.g. em um modal de edição)
+    // RESTAURADO: handleDeleteStep é agora chamado por um botão no card.
     const handleDeleteStep = async (stepId: string) => {
         if (!work) return; 
         setZeModal({
@@ -803,7 +802,9 @@ const WorkDetail: React.FC = () => {
                                             </div>
                                         </div>
                                     </div>
-                                    {/* REMOVIDO: Botão de lixeira para exclusão da etapa */}
+                                    <button onClick={() => handleDeleteStep(step.id)} className="text-red-400 hover:text-red-600 transition-colors p-1 ml-2" aria-label={`Excluir etapa ${step.name}`}> {/* RESTAURADO: Botão de lixeira para exclusão da etapa */}
+                                      <i className="fa-solid fa-trash"></i>
+                                    </button>
                                 </div>
                             </div>
                          );
@@ -1079,10 +1080,13 @@ const WorkDetail: React.FC = () => {
 
     // --- RENDER SUBVIEW CONTENT ---
     const renderSubView = () => {
+        // Performance fix: No need for pb-24 md:pb-0 on subviews themselves
+        // The main container already has a reasonable pb-12.
+        // If a subview needs more space, it should manage its own padding.
         if (subView === 'TEAM') {
             return (
-                <div className="animate-in fade-in pb-24 md:pb-0"> {/* Adjusted pb-24 for mobile, pb-0 for desktop */}
-                    <div className="flex justify-between items-end mb-2 px-2">
+                <div className="animate-in fade-in">
+                    <div className="flex justify-between items-end mb-4 px-2"> {/* Adjusted mb */}
                         <div>
                             <h2 className="text-2xl font-black text-primary dark:text-white">Equipe</h2>
                             <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Profissionais da Obra</p>
@@ -1114,8 +1118,8 @@ const WorkDetail: React.FC = () => {
         }
         if (subView === 'SUPPLIERS') {
             return (
-                <div className="animate-in fade-in pb-24 md:pb-0"> {/* Adjusted pb-24 for mobile, pb-0 for desktop */}
-                    <div className="flex justify-between items-end mb-2 px-2">
+                <div className="animate-in fade-in">
+                    <div className="flex justify-between items-end mb-4 px-2"> {/* Adjusted mb */}
                         <div>
                             <h2 className="text-2xl font-black text-primary dark:text-white">Fornecedores</h2>
                             <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Parceiros da Obra</p>
@@ -1144,8 +1148,8 @@ const WorkDetail: React.FC = () => {
         }
         if (subView === 'PHOTOS') {
             return (
-                <div className="animate-in fade-in pb-24 md:pb-0"> {/* Adjusted pb-24 for mobile, pb-0 for desktop */}
-                    <div className="flex justify-between items-end mb-2 px-2">
+                <div className="animate-in fade-in">
+                    <div className="flex justify-between items-end mb-4 px-2"> {/* Adjusted mb */}
                         <div>
                             <h2 className="text-2xl font-black text-primary dark:text-white">Fotos</h2>
                             <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Registro Visual</p>
@@ -1184,8 +1188,8 @@ const WorkDetail: React.FC = () => {
         }
         if (subView === 'PROJECTS') {
             return (
-                <div className="animate-in fade-in pb-24 md:pb-0"> {/* Adjusted pb-24 for mobile, pb-0 for desktop */}
-                    <div className="flex justify-between items-end mb-2 px-2">
+                <div className="animate-in fade-in">
+                    <div className="flex justify-between items-end mb-4 px-2"> {/* Adjusted mb */}
                         <div>
                             <h2 className="text-2xl font-black text-primary dark:text-white">Projetos & Docs</h2>
                             <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Arquivos Importantes</p>
@@ -1226,8 +1230,8 @@ const WorkDetail: React.FC = () => {
         }
         if (subView === 'REPORTS') {
             return (
-                <div className="animate-in fade-in pb-24 md:pb-0"> {/* Adjusted pb-24 for mobile, pb-0 for desktop */}
-                    <div className="flex justify-between items-end mb-2 px-2 print:hidden">
+                <div className="animate-in fade-in">
+                    <div className="flex justify-between items-end mb-4 px-2 print:hidden"> {/* Adjusted mb */}
                         <div>
                             <h2 className="text-2xl font-black text-primary dark:text-white">Relatórios</h2>
                             <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Gerar e Imprimir</p>
@@ -1299,8 +1303,8 @@ const WorkDetail: React.FC = () => {
         }
         if (subView === 'CONTRACTS') {
             return (
-                <div className="animate-in fade-in pb-24 md:pb-0"> {/* Adjusted pb-24 for mobile, pb-0 for desktop */}
-                    <div className="flex justify-between items-end mb-2 px-2">
+                <div className="animate-in fade-in">
+                    <div className="flex justify-between items-end mb-4 px-2"> {/* Adjusted mb */}
                         <div>
                             <h2 className="text-2xl font-black text-primary dark:text-white">Contratos</h2>
                             <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Modelos Prontos</p>
@@ -1319,8 +1323,8 @@ const WorkDetail: React.FC = () => {
         }
         if (subView === 'CHECKLIST') {
             return (
-                <div className="animate-in fade-in pb-24 md:pb-0"> {/* Adjusted pb-24 for mobile, pb-0 for desktop */}
-                    <div className="flex justify-between items-end mb-2 px-2">
+                <div className="animate-in fade-in">
+                    <div className="flex justify-between items-end mb-4 px-2"> {/* Adjusted mb */}
                         <div>
                             <h2 className="text-2xl font-black text-primary dark:text-white">Checklists</h2>
                             <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Verificação de Qualidade</p>
@@ -1353,7 +1357,7 @@ const WorkDetail: React.FC = () => {
 
 
     return (
-        <div className="max-w-4xl mx-auto pb-6 pt-6 px-4 md:px-0 font-sans">
+        <div className="max-w-4xl mx-auto py-8 px-4 md:px-0 font-sans"> {/* Adjusted padding */}
             {/* Header with Work Name */}
             <div className="flex items-center justify-between mb-8">
                 {/* Back button logic updated to manage inline views */}
@@ -1377,21 +1381,21 @@ const WorkDetail: React.FC = () => {
                     {/* Main Tabs Navigation (responsive) */}
                     <nav 
                       className="md:static md:mb-6 md:bg-slate-100 dark:md:bg-slate-900 md:rounded-2xl md:p-1 md:flex md:shadow-sm md:border md:border-slate-200 dark:md:border-slate-800 
-                                fixed bottom-0 left-0 w-full bg-white dark:bg-primary-dark border-t border-slate-200 dark:border-slate-800 shadow-lg z-50 p-2 flex justify-around items-center h-16 md:h-auto"
+                                fixed bottom-0 left-0 w-full bg-white dark:bg-primary-dark border-t border-slate-200 dark:border-slate-800 shadow-lg z-50 py-3 md:py-1 flex justify-around items-center h-20 md:h-auto pb-[env(safe-area-inset-bottom)]" /* NEW: Increased height to h-20, added pb-safe-area */
                       role="tablist"
                       aria-label="Navegação por abas da obra"
                     >
-                        <button role="tab" aria-controls="schedule-panel" aria-selected={activeTab === 'SCHEDULE'} onClick={() => setActiveTab('SCHEDULE')} className={`flex flex-col items-center flex-1 py-3 text-sm font-bold rounded-xl transition-all ${activeTab === 'SCHEDULE' ? 'md:bg-white md:text-primary dark:md:bg-slate-800 dark:md:text-white md:shadow-md text-secondary' : 'text-slate-500 hover:text-primary dark:hover:text-white'}`}>
-                            <i className="fa-solid fa-calendar-days text-lg md:mr-2"></i> <span className="md:inline">Cronograma</span>
+                        <button role="tab" aria-controls="schedule-panel" aria-selected={activeTab === 'SCHEDULE'} onClick={() => setActiveTab('SCHEDULE')} className={`flex flex-col items-center flex-1 py-2 text-sm font-bold rounded-xl transition-all ${activeTab === 'SCHEDULE' ? 'md:bg-white md:text-primary dark:md:bg-slate-800 dark:md:text-white md:shadow-md text-secondary' : 'text-slate-500 hover:text-primary dark:hover:text-white'}`}> {/* Adjusted py */}
+                            <i className="fa-solid fa-calendar-days text-lg md:mr-2"></i> <span className="md:inline text-xs md:text-sm">Cronograma</span> {/* Adjusted text size for mobile */}
                         </button>
-                        <button role="tab" aria-controls="materials-panel" aria-selected={activeTab === 'MATERIALS'} onClick={() => setActiveTab('MATERIALS')} className={`flex flex-col items-center flex-1 py-3 text-sm font-bold rounded-xl transition-all ${activeTab === 'MATERIALS' ? 'md:bg-white md:text-primary dark:md:bg-slate-800 dark:md:text-white md:shadow-md text-secondary' : 'text-slate-500 hover:text-primary dark:hover:text-white'}`}>
-                            <i className="fa-solid fa-boxes-stacked text-lg md:mr-2"></i> <span className="md:inline">Materiais</span>
+                        <button role="tab" aria-controls="materials-panel" aria-selected={activeTab === 'MATERIALS'} onClick={() => setActiveTab('MATERIALS')} className={`flex flex-col items-center flex-1 py-2 text-sm font-bold rounded-xl transition-all ${activeTab === 'MATERIALS' ? 'md:bg-white md:text-primary dark:md:bg-slate-800 dark:md:text-white md:shadow-md text-secondary' : 'text-slate-500 hover:text-primary dark:hover:text-white'}`}> {/* Adjusted py */}
+                            <i className="fa-solid fa-boxes-stacked text-lg md:mr-2"></i> <span className="md:inline text-xs md:text-sm">Materiais</span>
                         </button>
-                        <button role="tab" aria-controls="financial-panel" aria-selected={activeTab === 'FINANCIAL'} onClick={() => setActiveTab('FINANCIAL')} className={`flex flex-col items-center flex-1 py-3 text-sm font-bold rounded-xl transition-all ${activeTab === 'FINANCIAL' ? 'md:bg-white md:text-primary dark:md:bg-slate-800 dark:md:text-white md:shadow-md text-secondary' : 'text-slate-500 hover:text-primary dark:hover:text-white'}`}>
-                            <i className="fa-solid fa-dollar-sign text-lg md:mr-2"></i> <span className="md:inline">Financeiro</span>
+                        <button role="tab" aria-controls="financial-panel" aria-selected={activeTab === 'FINANCIAL'} onClick={() => setActiveTab('FINANCIAL')} className={`flex flex-col items-center flex-1 py-2 text-sm font-bold rounded-xl transition-all ${activeTab === 'FINANCIAL' ? 'md:bg-white md:text-primary dark:md:bg-slate-800 dark:md:text-white md:shadow-md text-secondary' : 'text-slate-500 hover:text-primary dark:hover:text-white'}`}> {/* Adjusted py */}
+                            <i className="fa-solid fa-dollar-sign text-lg md:mr-2"></i> <span className="md:inline text-xs md:text-sm">Financeiro</span>
                         </button>
-                        <button role="tab" aria-controls="more-panel" aria-selected={activeTab === 'MORE'} onClick={() => setActiveTab('MORE')} className={`flex flex-col items-center flex-1 py-3 text-sm font-bold rounded-xl transition-all ${activeTab === 'MORE' ? 'md:bg-white md:text-primary dark:md:bg-slate-800 dark:md:text-white md:shadow-md text-secondary' : 'text-slate-500 hover:text-primary dark:hover:text-white'}`}>
-                            <i className="fa-solid fa-ellipsis-h text-lg md:mr-2"></i> <span className="md:inline">Mais</span>
+                        <button role="tab" aria-controls="more-panel" aria-selected={activeTab === 'MORE'} onClick={() => setActiveTab('MORE')} className={`flex flex-col items-center flex-1 py-2 text-sm font-bold rounded-xl transition-all ${activeTab === 'MORE' ? 'md:bg-white md:text-primary dark:md:bg-slate-800 dark:md:text-white md:shadow-md text-secondary' : 'text-slate-500 hover:text-primary dark:hover:text-white'}`}> {/* Adjusted py */}
+                            <i className="fa-solid fa-ellipsis-h text-lg md:mr-2"></i> <span className="md:inline text-xs md:text-sm">Mais</span>
                         </button>
                     </nav>
 

@@ -45,7 +45,7 @@ const parseWorkFromDB = (data: any): Work => ({
     bedrooms: Number(data.bedrooms || 0),
     bathrooms: Number(data.bathrooms || 0),
     kitchens: Number(data.kitchens || 0),
-    livingRooms: Number(data.living_rooms || 0),
+    livingRooms: Number(data.living_rooms || 0), // Corrected to livingRooms
     hasLeisureArea: data.has_leisure_area || false
 });
 
@@ -85,7 +85,6 @@ const parseExpenseFromDB = (data: any): Expense => ({
     relatedMaterialId: data.related_material_id,
     workerId: data.worker_id, // Added workerId parsing
     supplierId: data.supplier_id, // NEW: Added supplierId for financial reports
-    // FIX: Changed from total_agagreed to total_agreed
     totalAgreed: data.total_agreed ? Number(data.total_agreed) : undefined 
 });
 
@@ -464,7 +463,7 @@ export const dbService = {
   async generatePix(_amount: number, _payer: any) {
       // This is a mock function, no actual Supabase interaction required
       return {
-          qr_code_base64: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQyF2NgYGBgAAAABQAEV9D3sgAAAABJRUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQyF2NgYGBgAAAABQAEV9D3sgAAAABJRU5ErkJggg==",
+          qr_code_base64: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQyF2NgYGBgAAAABQAEV9D3sgAAAABJR1pErkJggg==",
           copy_paste_code: "00020126330014BR.GOV.BCB.PIX011155555555555520400005303986540510.005802BR5913Mãos da Obra6008Brasilia62070503***63041234"
       };
   },
@@ -593,7 +592,7 @@ export const dbService = {
         bedrooms: work.bedrooms,
         bathrooms: work.bathrooms,
         kitchens: work.kitchens,
-        living_rooms: work.livingRooms, // FIX: Changed to snake_case for DB column compatibility
+        living_rooms: work.livingRooms, // Corrected to snake_case for DB column compatibility
         has_leisure_area: work.hasLeisureArea 
     };
 
@@ -630,6 +629,7 @@ export const dbService = {
             };
         });
         
+        // Ensure steps are returned with their generated IDs
         const { data: createdStepsData, error: stepsError } = await supabase.from('steps').insert(stepsToInsert).select('*');
         if (stepsError) {
           console.error("Erro ao inserir etapas:", stepsError);
@@ -924,7 +924,7 @@ export const dbService = {
       related_material_id: expense.relatedMaterialId, // FIX: Changed to snake_case
       worker_id: expense.workerId, // FIX: Changed to snake_case
       supplier_id: expense.supplierId, // NEW: Added supplier_id
-      total_agreed: expense.totalAgreed // FIX: Changed to snake_case
+      total_agreed: expense.totalAgreed // Corrected to total_agreed
     }).select().single();
     if (error) {
       console.error("Erro ao adicionar despesa:", error);
@@ -950,7 +950,7 @@ export const dbService = {
       related_material_id: expense.relatedMaterialId, // This is already snake_case
       worker_id: expense.workerId, // This is already snake_case
       supplier_id: expense.supplierId, // NEW: Added supplier_id
-      total_agreed: expense.totalAgreed
+      total_agreed: expense.totalAgreed // Corrected to total_agreed
     }).eq('id', expense.id).select().single();
     if (error) {
       console.error("Erro ao atualizar despesa:", error);
