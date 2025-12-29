@@ -132,53 +132,54 @@ const RenderMateriaisReport: React.FC<ReportProps> = ({ steps, materials, parseD
     </div>
 );
 
-const RenderFinanceiroReport: React.FC<ReportProps> = ({ steps, expenses, materials, workers, suppliers, parseDateNoTimezone }) => (
-    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm p-6 print:shadow-none print:border-0 print:rounded-none">
-        <h3 className="text-lg font-bold text-primary dark:text-white mb-4 flex items-center gap-2">
-            <i className="fa-solid fa-dollar-sign text-secondary"></i> Financeiro
-        </h3>
-        <div className="space-y-6">
-            {[...steps, { id: 'general-fin', name: 'Despesas Gerais / Sem Etapa', startDate: '', endDate: '', status: StepStatus.NOT_STARTED, workId: '', isDelayed: false }].map((step) => {
-                const groupExpenses = expenses.filter(e => {
-                    if (step.id === 'general-fin') return !e.stepId;
-                    return e.stepId === step.id;
-                });
+const RenderFinanceiroReport: React.FC<ReportProps> = ({ steps, expenses, materials, workers, suppliers, parseDateNoTimezone }) => { // Changed to explicit function block
+    return (
+        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm p-6 print:shadow-none print:border-0 print:rounded-none">
+            <h3 className="text-lg font-bold text-primary dark:text-white mb-4 flex items-center gap-2">
+                <i className="fa-solid fa-dollar-sign text-secondary"></i> Financeiro
+            </h3>
+            <div className="space-y-6">
+                {[...steps, { id: 'general-fin', name: 'Despesas Gerais / Sem Etapa', startDate: '', endDate: '', status: StepStatus.NOT_STARTED, workId: '', isDelayed: false }].map((step) => {
+                    const groupExpenses = expenses.filter(e => {
+                        if (step.id === 'general-fin') return !e.stepId;
+                        return e.stepId === step.id;
+                    });
 
-                if (groupExpenses.length === 0) return null;
+                    if (groupExpenses.length === 0) return null;
 
-                const isGeneral = step.id === 'general-fin';
-                const stepLabel = isGeneral ? step.name : `Etapa: ${step.name}`;
+                    const isGeneral = step.id === 'general-fin';
+                    const stepLabel = isGeneral ? step.name : `Etapa: ${step.name}`;
 
-                return (
-                    <div key={step.id} className="bg-slate-50 dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
-                        <h4 className="font-bold text-primary dark:text-white text-sm uppercase tracking-wide mb-3">{stepLabel}</h4>
-                        <ul className="divide-y divide-slate-100 dark:divide-slate-700">
-                            {groupExpenses.map(exp => {
-                                const relatedMaterial = exp.relatedMaterialId ? materials.find(m => m.id === exp.relatedMaterialId) : null;
-                                const expenseWorker = exp.workerId ? workers.find(w => w.id === exp.workerId) : null;
-                                const expenseSupplier = exp.supplierId ? suppliers.find(s => s.id === exp.supplierId) : null; // NEW
+                    return (
+                        <div key={step.id} className="bg-slate-50 dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
+                            <h4 className="font-bold text-primary dark:text-white text-sm uppercase tracking-wide mb-3">{stepLabel}</h4>
+                            <ul className="divide-y divide-slate-100 dark:divide-slate-700">
+                                {groupExpenses.map(exp => {
+                                    const relatedMaterial = exp.relatedMaterialId ? materials.find(m => m.id === exp.relatedMaterialId) : null;
+                                    const expenseWorker = exp.workerId ? workers.find(w => w.id === exp.workerId) : null;
+                                    const expenseSupplier = exp.supplierId ? suppliers.find(s => s.id === exp.supplierId) : null; // NEW
 
-                                let categoryIcon = 'fa-tag';
-                                let categoryColor = 'text-slate-500';
-                                if (exp.category === ExpenseCategory.MATERIAL) {
-                                    categoryIcon = 'fa-box';
-                                    categoryColor = 'text-amber-600';
-                                } else if (exp.category === ExpenseCategory.LABOR) {
-                                    categoryIcon = 'fa-helmet-safety';
-                                    categoryColor = 'text-blue-600';
-                                }
+                                    let categoryIcon = 'fa-tag';
+                                    let categoryColor = 'text-slate-500';
+                                    if (exp.category === ExpenseCategory.MATERIAL) {
+                                        categoryIcon = 'fa-box';
+                                        categoryColor = 'text-amber-600';
+                                    } else if (exp.category === ExpenseCategory.LABOR) {
+                                        categoryIcon = 'fa-helmet-safety';
+                                        categoryColor = 'text-blue-600';
+                                    }
 
-                                return (
-                                    <li key={exp.id} className="py-3 flex justify-between items-center text-xs">
-                                        <div>
-                                            <p className="font-bold text-primary dark:text-white">{exp.description}</p>
-                                            <p className="text-slate-500 mt-1 flex items-center gap-2">
-                                                <span className={`flex items-center gap-1 ${categoryColor}`}><i className={`fa-solid ${categoryIcon}`}></i> {exp.category}</span>
-                                                <span>• {parseDateNoTimezone(exp.date)}</span>
-                                                {relatedMaterial && <span className="text-sm font-medium text-slate-400">(Material: {relatedMaterial.name})</span>}
-                                                {expenseWorker && <span className="text-sm font-medium text-slate-400">(Profissional: {expenseWorker.name})</span>}
-                                                {expenseSupplier && <span className="text-sm font-medium text-slate-400">(Fornecedor: {expenseSupplier.name})</span>}
-                                            </p>
+                                    return (
+                                        <li key={exp.id} className="py-3 flex justify-between items-center text-xs">
+                                            <div>
+                                                <p className="font-bold text-primary dark:text-white">{exp.description}</p>
+                                                <p className="text-slate-500 mt-1 flex items-center gap-2">
+                                                    <span className={`flex items-center gap-1 ${categoryColor}`}><i className={`fa-solid ${categoryIcon}`}></i> {exp.category}</span>
+                                                    <span>• {parseDateNoTimezone(exp.date)}</span>
+                                                    {relatedMaterial && <span className="text-sm font-medium text-slate-400">(Material: {relatedMaterial.name})</span>}
+                                                    {expenseWorker && <span className="text-sm font-medium text-slate-400">(Profissional: {expenseWorker.name})</span>}
+                                                    {expenseSupplier && <span className="text-sm font-medium text-slate-400">(Fornecedor: {expenseSupplier.name})</span>}
+                                                </p>
                                         </div>
                                         <span className="font-bold text-primary dark:text-white whitespace-nowrap">R$ {Number(exp.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                                     </li>
@@ -189,8 +190,8 @@ const RenderFinanceiroReport: React.FC<ReportProps> = ({ steps, expenses, materi
                 );
             })}
         </div>
-    </div>
-);
+    );
+}; // Added the closing brace for the functional component.
 
 
 const WorkDetail: React.FC = () => {
@@ -1238,7 +1239,7 @@ const WorkDetail: React.FC = () => {
                                         <i className="fa-solid fa-file-contract text-xl"></i>
                                     </div>
                                     <div>
-                                        <p className="font-bold text-primary dark:text-white">{template.title}</p>
+                                        <p className="font-bold text-primary dark:text-white">{template.name}</p>
                                         <p className="text-xs text-slate-500 dark:text-slate-400">{template.description}</p>
                                     </div>
                                     <i className="fa-solid fa-arrow-right ml-auto text-slate-400 group-hover:text-secondary"></i>
