@@ -560,7 +560,8 @@ export const dbService = {
             }
         }
         
-        _dashboardCache.notifications = null; // Invalidate notifications cache due to potential material-related alerts
+        // NOTIFICATIONS: Comentado cache de notificações
+        // _dashboardCache.notifications = null; // Invalidate notifications cache due to potential material-related alerts
         console.log(`[REGEN MATERIAL] Materiais para obra ${workId} regenerados com sucesso.`);
 
     } catch (error: any) {
@@ -1234,262 +1235,270 @@ export const dbService = {
     prefetchedMaterials?: Material[], 
     prefetchedWork?: Work
   ): Promise<void> {
+    // =========================================================================
+    // >>> DESATIVADO TEMPORARIAMENTE PARA RESOLVER PROBLEMAS DE LOOP/FLICKERING <<<
+    // Esta função não gerará notificações ou enviará push notifications por enquanto.
+    // Console log para indicar que está desativada.
+    // =========================================================================
+    console.log(`[NOTIF DEBUG] generateSmartNotifications está DESATIVADO. Não serão geradas novas notificações. (User: ${userId}, Work: ${workId})`);
+    return;
+
+
     // Supabase is guaranteed to be initialized now
     
-    try {
-        console.log(`[NOTIF DEBUG START] =================================================`);
-        console.log(`[NOTIF DEBUG START] Generating smart notifications for User: ${userId}, Work: ${workId}`);
+    // try {
+    //     console.log(`[NOTIF DEBUG START] =================================================`);
+    //     console.log(`[NOTIF DEBUG START] Generating smart notifications for User: ${userId}, Work: ${workId}`);
 
-        // Usa dados pré-carregados se disponíveis, senão busca do DB.
-        const currentSteps = prefetchedSteps || await this.getSteps(workId);
-        // FIX: Corrected typo from `prefetfetchedMaterials` to `prefetchedMaterials`.
-        const currentMaterials = prefetchedMaterials || await this.getMaterials(workId);
-        const currentExpenses = prefetchedExpenses || await this.getExpenses(workId); // Added for budget check
-        const currentWork = prefetchedWork || await this.getWorkById(workId);
+    //     // Usa dados pré-carregados se disponíveis, senão busca do DB.
+    //     const currentSteps = prefetchedSteps || await this.getSteps(workId);
+    //     const currentMaterials = prefetchedMaterials || await this.getMaterials(workId);
+    //     const currentExpenses = prefetchedExpenses || await this.getExpenses(workId); // Added for budget check
+    //     const currentWork = prefetchedWork || await this.getWorkById(workId);
 
-        if (!currentWork) {
-            console.warn(`[NOTIF DEBUG] Work ${workId} not found. Skipping notification generation.`);
-            console.log(`[NOTIF DEBUG END] ===================================================`);
-            return;
-        }
+    //     if (!currentWork) {
+    //         console.warn(`[NOTIF DEBUG] Work ${workId} not found. Skipping notification generation.`);
+    //         console.log(`[NOTIF DEBUG END] ===================================================`);
+    //         return;
+    //     }
 
-        console.log(`[NOTIF DEBUG] Processing work "${currentWork.name}" (ID: ${currentWork.id})`);
-        console.log(`[NOTIF DEBUG] Total steps fetched for this work: ${currentSteps.length}`);
-        currentSteps.forEach(s => console.log(`  - Step: ${s.name} (ID: ${s.id}, WorkID: ${s.workId}, Status: ${s.status}, Start: ${s.startDate}, End: ${s.endDate})`));
-        console.log(`[NOTIF DEBUG] Total materials fetched for this work: ${currentMaterials.length}`);
-        currentMaterials.forEach(m => console.log(`  - Material: ${m.name} (ID: ${m.id}, WorkID: ${m.workId}, StepID: ${m.stepId}, Planned: ${m.plannedQty}, Purchased: ${m.purchasedQty})`));
-
-
-        // --- INÍCIO DA CORREÇÃO DA LÓGICA DE DATAS ---
-        const getLocalMidnightDate = (dateString: string) => {
-            const [year, month, day] = dateString.split('-').map(Number);
-            return new Date(year, month - 1, day, 0, 0, 0, 0); // Local midnight
-        };
-
-        const todayLocalMidnight = new Date();
-        todayLocalMidnight.setHours(0, 0, 0, 0); // Local midnight today
-        const todayDateString = todayLocalMidnight.toISOString().split('T')[0]; // For daily tag
-
-        const threeDaysFromNowLocalMidnight = new Date();
-        threeDaysFromNowLocalMidnight.setDate(threeDaysFromNowLocalMidnight.getDate() + 3);
-        threeDaysFromNowLocalMidnight.setHours(0, 0, 0, 0); // Local midnight 3 days from now (inclusive)
-        // --- FIM DA CORREÇÃO DA LÓGICA DE DATAS ---
+    //     console.log(`[NOTIF DEBUG] Processing work "${currentWork.name}" (ID: ${currentWork.id})`);
+    //     console.log(`[NOTIF DEBUG] Total steps fetched for this work: ${currentSteps.length}`);
+    //     currentSteps.forEach(s => console.log(`  - Step: ${s.name} (ID: ${s.id}, WorkID: ${s.workId}, Status: ${s.status}, Start: ${s.startDate}, End: ${s.endDate})`));
+    //     console.log(`[NOTIF DEBUG] Total materials fetched for this work: ${currentMaterials.length}`);
+    //     currentMaterials.forEach(m => console.log(`  - Material: ${m.name} (ID: ${m.id}, WorkID: ${m.workId}, StepID: ${m.stepId}, Planned: ${m.plannedQty}, Purchased: ${m.purchasedQty})`));
 
 
-        // Example: Notification for delayed steps (existing logic, no changes)
-        const delayedSteps = currentSteps.filter(s => {
-            const stepEndDate = getLocalMidnightDate(s.endDate);
-            return s.status !== StepStatus.COMPLETED && stepEndDate < todayLocalMidnight;
-        });
-        console.log(`[NOTIF DEBUG] Delayed steps identified for work "${currentWork.name}": ${delayedSteps.map(s => s.name).join(', ') || 'Nenhum'}`);
+    //     // --- INÍCIO DA CORREÇÃO DA LÓGICA DE DATAS ---
+    //     const getLocalMidnightDate = (dateString: string) => {
+    //         const [year, month, day] = dateString.split('-').map(Number);
+    //         return new Date(year, month - 1, day, 0, 0, 0, 0); // Local midnight
+    //     };
+
+    //     const todayLocalMidnight = new Date();
+    //     todayLocalMidnight.setHours(0, 0, 0, 0); // Local midnight today
+    //     const todayDateString = todayLocalMidnight.toISOString().split('T')[0]; // For daily tag
+
+    //     const threeDaysFromNowLocalMidnight = new Date();
+    //     threeDaysFromNowLocalMidnight.setDate(threeDaysFromNowLocalMidnight.getDate() + 3);
+    //     threeDaysFromNowLocalMidnight.setHours(0, 0, 0, 0); // Local midnight 3 days from now (inclusive)
+    //     // --- FIM DA CORREÇÃO DA LÓGICA DE DATAS ---
 
 
-        for (const step of delayedSteps) {
-            const notificationTag = `work-${workId}-delayed-step-${step.id}`; // Unique tag for this notification
-            const { data: existingNotif } = await supabase
-                .from('notifications')
-                .select('id')
-                .eq('user_id', userId)
-                .eq('work_id', workId) // NEW: Ensure to check for work_id here
-                .eq('tag', notificationTag) // Use tag for unique check
-                .eq('read', false)
-                .maybeSingle();
-
-            if (!existingNotif) {
-                console.log(`[NOTIF GENERATION] Adding delayed step notification: "${step.name}" for work "${currentWork.name}"`); // Debug log
-                await this.addNotification({
-                    userId,
-                    workId, // NEW: Add workId to notification
-                    title: 'Etapa Atrasada!',
-                    message: `A etapa "${step.name}" da obra "${currentWork.name}" está atrasada. Verifique o cronograma!`,
-                    date: new Date().toISOString(),
-                    read: false,
-                    type: 'WARNING',
-                    tag: notificationTag // Save tag
-                });
-                await dbService.sendPushNotification(userId, {
-                    title: 'Etapa Atrasada!',
-                    body: `A etapa "${step.name}" da obra "${currentWork.name}" está atrasada. Verifique o cronograma!`,
-                    url: `${window.location.origin}/work/${workId}`,
-                    tag: notificationTag
-                });
-            }
-        }
-
-        // Example: Notification for upcoming steps (within 3 days, not started - existing logic, no changes)
-        const upcomingSteps = currentSteps.filter(s => {
-            const stepStartDate = getLocalMidnightDate(s.startDate);
-            return (
-                s.status === StepStatus.NOT_STARTED && 
-                stepStartDate >= todayLocalMidnight && // Starts today or in the future
-                stepStartDate <= threeDaysFromNowLocalMidnight // Starts within the next 3 days (inclusive of day 3)
-            );
-        });
-        console.log(`[NOTIF DEBUG] Upcoming steps identified (within 3 days) for work "${currentWork.name}": ${upcomingSteps.map(s => s.name).join(', ') || 'Nenhum'}`);
+    //     // Example: Notification for delayed steps (existing logic, no changes)
+    //     const delayedSteps = currentSteps.filter(s => {
+    //         const stepEndDate = getLocalMidnightDate(s.endDate);
+    //         return s.status !== StepStatus.COMPLETED && stepEndDate < todayLocalMidnight;
+    //     });
+    //     console.log(`[NOTIF DEBUG] Delayed steps identified for work "${currentWork.name}": ${delayedSteps.map(s => s.name).join(', ') || 'Nenhum'}`);
 
 
-        for (const step of upcomingSteps) {
-            // Calculate days until start for more precise message
-            const daysUntilStart = Math.ceil((getLocalMidnightDate(step.startDate).getTime() - todayLocalMidnight.getTime()) / (1000 * 60 * 60 * 24));
+    //     for (const step of delayedSteps) {
+    //         const notificationTag = `work-${workId}-delayed-step-${step.id}`; // Unique tag for this notification
+    //         const { data: existingNotif } = await supabase
+    //             .from('notifications')
+    //             .select('id')
+    //             .eq('user_id', userId)
+    //             .eq('work_id', workId) // NEW: Ensure to check for work_id here
+    //             .eq('tag', notificationTag) // Use tag for unique check
+    //             .eq('read', false)
+    //             .maybeSingle();
 
-            const notificationTag = `work-${workId}-upcoming-step-${step.id}-${todayDateString}`; // NEW: Add daily tag
-            const { data: existingNotif } = await supabase
-                .from('notifications')
-                .select('id')
-                .eq('user_id', userId)
-                .eq('work_id', workId) // NEW: Ensure to check for work_id here
-                .eq('tag', notificationTag) // Use tag for unique check
-                .eq('read', false)
-                .maybeSingle();
+    //         if (!existingNotif) {
+    //             console.log(`[NOTIF GENERATION] Adding delayed step notification: "${step.name}" for work "${currentWork.name}"`); // Debug log
+    //             await this.addNotification({
+    //                 userId,
+    //                 workId, // NEW: Add workId to notification
+    //                 title: 'Etapa Atrasada!',
+    //                 message: `A etapa "${step.name}" da obra "${currentWork.name}" está atrasada. Verifique o cronograma!`,
+    //                 date: new Date().toISOString(),
+    //                 read: false,
+    //                 type: 'WARNING',
+    //                 tag: notificationTag // Save tag
+    //             });
+    //             await dbService.sendPushNotification(userId, {
+    //                 title: 'Etapa Atrasada!',
+    //                 body: `A etapa "${step.name}" da obra "${currentWork.name}" está atrasada. Verifique o cronograma!`,
+    //                 url: `${window.location.origin}/work/${workId}`,
+    //                 tag: notificationTag
+    //             });
+    //         }
+    //     }
 
-            if (!existingNotif) {
-                console.log(`[NOTIF GENERATION] Adding upcoming step notification: "${step.name}" for work "${currentWork.name}"`); // Debug log
-                await this.addNotification({
-                    userId,
-                    workId, // NEW: Add workId to notification
-                    // FIX: Improved phrasing
-                    title: `Próxima Etapa: ${step.name}!`,
-                    message: `A etapa "${step.name}" da obra "${currentWork.name}" inicia em ${daysUntilStart} dia(s). Prepare-se!`,
-                    date: new Date().toISOString(),
-                    read: false,
-                    type: 'INFO',
-                    tag: notificationTag // Save tag
-                });
-                await dbService.sendPushNotification(userId, {
-                    title: `Próxima Etapa: ${step.name}!`,
-                    body: `A etapa "${step.name}" da obra "${currentWork.name}" inicia em ${daysUntilStart} dia(s). Prepare-se!`,
-                    url: `${window.location.origin}/work/${workId}`,
-                    tag: notificationTag
-                });
-            }
-        }
+    //     // Example: Notification for upcoming steps (within 3 days, not started - existing logic, no changes)
+    //     const upcomingSteps = currentSteps.filter(s => {
+    //         const stepStartDate = getLocalMidnightDate(s.startDate);
+    //         return (
+    //             s.status === StepStatus.NOT_STARTED && 
+    //             stepStartDate >= todayLocalMidnight && // Starts today or in the future
+    //             stepStartDate <= threeDaysFromNowLocalMidnight // Starts within the next 3 days (inclusive of day 3)
+    //         );
+    //     });
+    //     console.log(`[NOTIF DEBUG] Upcoming steps identified (within 3 days) for work "${currentWork.name}": ${upcomingSteps.map(s => s.name).join(', ') || 'Nenhum'}`);
 
 
-        // NEW LOGIC: Notification for material running low, specifically for upcoming steps (within 3 days)
-        // FIX: Ensure this logic runs for materials tied to *truly* upcoming steps
-        for (const step of upcomingSteps) { 
-            const materialsForStep = currentMaterials.filter(m => m.stepId === step.id);
-            console.log(`[NOTIF DEBUG] Checking materials for upcoming step "${step.name}". Tag: ${step.id}. Existing unread notif: ${!!materialsForStep}`);
+    //     for (const step of upcomingSteps) {
+    //         // Calculate days until start for more precise message
+    //         const daysUntilStart = Math.ceil((getLocalMidnightDate(step.startDate).getTime() - todayLocalMidnight.getTime()) / (1000 * 60 * 60 * 24));
 
-            for (const material of materialsForStep) {
-                // FIX: Ensure plannedQty is greater than 0 to avoid division by zero and irrelevant notifications
-                if (material.plannedQty > 0 && material.purchasedQty < material.plannedQty) {
-                    // Only notify if still more than 20% to purchase
-                    if ((material.purchasedQty / material.plannedQty) < 0.8) {
-                        // FIX: Add current date to the tag to ensure daily re-notification if not dismissed/resolved
-                        const notificationTag = `work-${workId}-low-material-${material.id}-${step.id}-${todayDateString}`; 
+    //         const notificationTag = `work-${workId}-upcoming-step-${step.id}-${todayDateString}`; // NEW: Add daily tag
+    //         const { data: existingNotif } = await supabase
+    //             .from('notifications')
+    //             .select('id')
+    //             .eq('user_id', userId)
+    //             .eq('work_id', workId) // NEW: Ensure to check for work_id here
+    //             .eq('tag', notificationTag) // Use tag for unique check
+    //             .eq('read', false)
+    //             .maybeSingle();
 
-                        const { data: existingNotif } = await supabase
-                            .from('notifications')
-                            .select('id')
-                            .eq('user_id', userId)
-                            .eq('work_id', workId) // NEW: Ensure to check for work_id here
-                            .eq('tag', notificationTag) 
-                            .eq('read', false)
-                            .maybeSingle();
+    //         if (!existingNotif) {
+    //             console.log(`[NOTIF GENERATION] Adding upcoming step notification: "${step.name}" for work "${currentWork.name}"`); // Debug log
+    //             await this.addNotification({
+    //                 userId,
+    //                 workId, // NEW: Add workId to notification
+    //                 // FIX: Improved phrasing
+    //                 title: `Próxima Etapa: ${step.name}!`,
+    //                 message: `A etapa "${step.name}" da obra "${currentWork.name}" inicia em ${daysUntilStart} dia(s). Prepare-se!`,
+    //                 date: new Date().toISOString(),
+    //                 read: false,
+    //                 type: 'INFO',
+    //                 tag: notificationTag // Save tag
+    //             });
+    //             await dbService.sendPushNotification(userId, {
+    //                 title: `Próxima Etapa: ${step.name}!`,
+    //                 body: `A etapa "${step.name}" da obra "${currentWork.name}" inicia em ${daysUntilStart} dia(s). Prepare-se!`,
+    //                 url: `${window.location.origin}/work/${workId}`,
+    //                 tag: notificationTag
+    //             });
+    //         }
+    //     }
+
+
+    //     // NEW LOGIC: Notification for material running low, specifically for upcoming steps (within 3 days)
+    //     // FIX: Ensure this logic runs for materials tied to *truly* upcoming steps
+    //     for (const step of upcomingSteps) { 
+    //         const materialsForStep = currentMaterials.filter(m => m.stepId === step.id);
+    //         console.log(`[NOTIF DEBUG] Checking materials for upcoming step "${step.name}". Tag: ${step.id}. Existing unread notif: ${!!materialsForStep}`);
+
+    //         for (const material of materialsForStep) {
+    //             // FIX: Ensure plannedQty is greater than 0 to avoid division by zero and irrelevant notifications
+    //             if (material.plannedQty > 0 && material.purchasedQty < material.plannedQty) {
+    //                 // Only notify if still more than 20% to purchase
+    //                 if ((material.purchasedQty / material.plannedQty) < 0.8) {
+    //                     // FIX: Add current date to the tag to ensure daily re-notification if not dismissed/resolved
+    //                     const notificationTag = `work-${workId}-low-material-${material.id}-${step.id}-${todayDateString}`; 
+
+    //                     const { data: existingNotif } = await supabase
+    //                         .from('notifications')
+    //                         .select('id')
+    //                         .eq('user_id', userId)
+    //                         .eq('work_id', workId) // NEW: Ensure to check for work_id here
+    //                         .eq('tag', notificationTag) 
+    //                         .eq('read', false)
+    //                         .maybeSingle();
                         
-                        console.log(`[NOTIF DEBUG] Checking material "${material.name}" for step "${step.name}". Tag: ${notificationTag}. Existing unread notif: ${!!existingNotif}`);
+    //                     console.log(`[NOTIF DEBUG] Checking material "${material.name}" for step "${step.name}". Tag: ${notificationTag}. Existing unread notif: ${!!existingNotif}`);
 
-                        if (!existingNotif) {
-                            console.log(`[NOTIF GENERATION] Adding low material notification: "${material.name}" for step "${step.name}" (Work: "${currentWork.name}")`); // Debug log
-                            await this.addNotification({
-                                userId,
-                                workId, // NEW: Add workId to notification
-                                // FIX: Improved phrasing
-                                title: `Atenção: Material em falta para a etapa ${step.name}!`,
-                                message: `O material "${material.name}" (${material.purchasedQty}/${material.plannedQty} ${material.unit}) para a etapa "${step.name}" da obra "${currentWork.name}" está em falta. Faça a compra!`,
-                                date: new Date().toISOString(),
-                                read: false,
-                                type: 'WARNING',
-                                tag: notificationTag 
-                            });
-                            await dbService.sendPushNotification(userId, {
-                                title: `Atenção: Material em falta para a etapa ${step.name}!`,
-                                body: `O material "${material.name}" (${material.purchasedQty}/${material.plannedQty} ${material.unit}) para a etapa "${step.name}" da obra "${currentWork.name}" está em falta. Faça a compra!`,
-                                url: `${window.location.origin}/work/${workId}/materials`,
-                                tag: notificationTag
-                            });
-                        }
-                    }
-                }
-            }
-        }
+    //                     if (!existingNotif) {
+    //                         console.log(`[NOTIF GENERATION] Adding low material notification: "${material.name}" for step "${step.name}" (Work: "${currentWork.name}")`); // Debug log
+    //                         await this.addNotification({
+    //                             userId,
+    //                             workId, // NEW: Add workId to notification
+    //                             // FIX: Improved phrasing
+    //                             title: `Atenção: Material em falta para a etapa ${step.name}!`,
+    //                             message: `O material "${material.name}" (${material.purchasedQty}/${material.plannedQty} ${material.unit}) para a etapa "${step.name}" da obra "${currentWork.name}" está em falta. Faça a compra!`,
+    //                             date: new Date().toISOString(),
+    //                             read: false,
+    //                             type: 'WARNING',
+    //                             tag: notificationTag 
+    //                         });
+    //                         await dbService.sendPushNotification(userId, {
+    //                             title: `Atenção: Material em falta para a etapa ${step.name}!`,
+    //                             body: `O material "${material.name}" (${material.purchasedQty}/${material.plannedQty} ${material.unit}) para a etapa "${step.name}" da obra "${currentWork.name}" está em falta. Faça a compra!`,
+    //                             url: `${window.location.origin}/work/${workId}/materials`,
+    //                             tag: notificationTag
+    //                         });
+    //                     }
+    //                 }
+    //             }
+    //         }
+    //     }
 
 
-        // Example: Notification for budget usage (existing logic, no changes)
-        if (currentWork && currentWork.budgetPlanned > 0) {
-            const totalSpent = currentExpenses.reduce((sum, e) => sum + e.amount, 0);
-            const budgetUsage = (totalSpent / currentWork.budgetPlanned) * 100;
+    //     // Example: Notification for budget usage (existing logic, no changes)
+    //     if (currentWork && currentWork.budgetPlanned > 0) {
+    //         const totalSpent = currentExpenses.reduce((sum, e) => sum + e.amount, 0);
+    //         const budgetUsage = (totalSpent / currentWork.budgetPlanned) * 100;
 
-            if (budgetUsage > 90 && budgetUsage <= 100) {
-                 const notificationTag = `work-${workId}-budget-warning`; // Unique tag
-                 const { data: existingNotif } = await supabase
-                    .from('notifications')
-                    .select('id')
-                    .eq('user_id', userId)
-                    .eq('work_id', workId) // NEW: Ensure to check for work_id here
-                    .eq('tag', notificationTag) // Use tag for unique check
-                    .eq('read', false)
-                    .maybeSingle();
+    //         if (budgetUsage > 90 && budgetUsage <= 100) {
+    //              const notificationTag = `work-${workId}-budget-warning`; // Unique tag
+    //              const { data: existingNotif } = await supabase
+    //                 .from('notifications')
+    //                 .select('id')
+    //                 .eq('user_id', userId)
+    //                 .eq('work_id', workId) // NEW: Ensure to check for work_id here
+    //                 .eq('tag', notificationTag) // Use tag for unique check
+    //                 .eq('read', false)
+    //                 .maybeSingle();
 
-                if (!existingNotif) {
-                    console.log(`[NOTIF GENERATION] Adding budget warning notification for work "${currentWork.name}"`); // Debug log
-                    await this.addNotification({
-                        userId,
-                        workId, // NEW: Add workId to notification
-                        title: 'Atenção ao Orçamento!',
-                        message: `Você já usou ${Math.round(budgetUsage)}% do orçamento da obra "${currentWork.name}".`,
-                        date: new Date().toISOString(),
-                        read: false,
-                        type: 'WARNING',
-                        tag: notificationTag // Save tag
-                    });
-                    await dbService.sendPushNotification(userId, {
-                        title: 'Atenção ao Orçamento!',
-                        body: `Você já usou ${Math.round(budgetUsage)}% do orçamento da obra "${currentWork.name}".`,
-                        url: `${window.location.origin}/work/${workId}/financial`,
-                        tag: notificationTag
-                    });
-                }
-            } else if (budgetUsage > 100) {
-                 const notificationTag = `work-${workId}-budget-exceeded`; // Unique tag
-                 const { data: existingNotif } = await supabase
-                    .from('notifications')
-                    .select('id')
-                    .eq('user_id', userId)
-                    .eq('work_id', workId) // NEW: Ensure to check for work_id here
-                    .eq('tag', notificationTag) // Use tag for unique check
-                    .eq('read', false)
-                    .maybeSingle();
+    //             if (!existingNotif) {
+    //                 console.log(`[NOTIF GENERATION] Adding budget warning notification for work "${currentWork.name}"`); // Debug log
+    //                 await this.addNotification({
+    //                     userId,
+    //                     workId, // NEW: Add workId to notification
+    //                     title: 'Atenção ao Orçamento!',
+    //                     message: `Você já usou ${Math.round(budgetUsage)}% do orçamento da obra "${currentWork.name}".`,
+    //                     date: new Date().toISOString(),
+    //                     read: false,
+    //                     type: 'WARNING',
+    //                     tag: notificationTag // Save tag
+    //                 });
+    //                 await dbService.sendPushNotification(userId, {
+    //                     title: 'Atenção ao Orçamento!',
+    //                     body: `Você já usou ${Math.round(budgetUsage)}% do orçamento da obra "${currentWork.name}".`,
+    //                     url: `${window.location.origin}/work/${workId}/financial`,
+    //                     tag: notificationTag
+    //                 });
+    //             }
+    //         } else if (budgetUsage > 100) {
+    //              const notificationTag = `work-${workId}-budget-exceeded`; // Unique tag
+    //              const { data: existingNotif } = await supabase
+    //                 .from('notifications')
+    //                 .select('id')
+    //                 .eq('user_id', userId)
+    //                 .eq('work_id', workId) // NEW: Ensure to check for work_id here
+    //                 .eq('tag', notificationTag) // Use tag for unique check
+    //                 .eq('read', false)
+    //                 .maybeSingle();
                 
-                if (!existingNotif) {
-                    console.log(`[NOTIF GENERATION] Adding budget exceeded notification for work "${currentWork.name}"`); // Debug log
-                    await this.addNotification({
-                        userId,
-                        workId, // NEW: Add workId to notification
-                        title: 'Orçamento Estourado!',
-                        message: `O orçamento da obra "${currentWork.name}" foi excedido em ${Math.round(budgetUsage - 100)}%.`,
-                        date: new Date().toISOString(),
-                        read: false,
-                        type: 'ERROR',
-                        tag: notificationTag // Save tag
-                    });
-                    await dbService.sendPushNotification(userId, {
-                        title: 'Orçamento Estourado!',
-                        body: `O orçamento da obra "${currentWork.name}" foi excedido em ${Math.round(budgetUsage - 100)}%.`,
-                        url: `${window.location.origin}/work/${workId}/financial`,
-                        tag: notificationTag
-                    });
-                }
-            }
-        }
-        console.log(`[NOTIF DEBUG END] ===================================================`);
+    //             if (!existingNotif) {
+    //                 console.log(`[NOTIF GENERATION] Adding budget exceeded notification for work "${currentWork.name}"`); // Debug log
+    //                 await this.addNotification({
+    //                     userId,
+    //                     workId, // NEW: Add workId to notification
+    //                     title: 'Orçamento Estourado!',
+    //                     message: `O orçamento da obra "${currentWork.name}" foi excedido em ${Math.round(budgetUsage - 100)}%.`,
+    //                     date: new Date().toISOString(),
+    //                     read: false,
+    //                     type: 'ERROR',
+    //                     tag: notificationTag // Save tag
+    //                 });
+    //                 await dbService.sendPushNotification(userId, {
+    //                     title: 'Orçamento Estourado!',
+    //                     body: `O orçamento da obra "${currentWork.name}" foi excedido em ${Math.round(budgetUsage - 100)}%.`,
+    //                     url: `${window.location.origin}/work/${workId}/financial`,
+    //                     tag: notificationTag
+    //                 });
+    //             }
+    //         }
+    //     }
+    //     console.log(`[NOTIF DEBUG END] ===================================================`);
 
-    } catch (error: any) { // Explicitly type as any to allow .message access
-        console.error(`[NOTIF DEBUG ERROR] Erro ao gerar notificações inteligentes para work ${workId}:`, error);
-        console.log(`[NOTIF DEBUG END] ===================================================`);
+    // } catch (error: any) { // Explicitly type as any to allow .message access
+    //     console.error(`[NOTIF DEBUG ERROR] Erro ao gerar notificações inteligentes para work ${workId}:`, error);
+    //     console.log(`[NOTIF DEBUG END] ===================================================`);
 
-    }
+    // }
   },
 
   // --- NEW: PWA Push Notification Management ---

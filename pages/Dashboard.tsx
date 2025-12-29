@@ -32,16 +32,17 @@ const formatDateDisplay = (dateStr: string) => {
   }
 };
 
-function urlBase64ToUint8Array(base64String: string) {
-  const padding = '='.repeat((4 - base64String.length % 4) % 4);
-  const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
-  const rawData = window.atob(base64);
-  const outputArray = new Uint8Array(rawData.length);
-  for (let i = 0; i < rawData.length; ++i) {
-    outputArray[i] = rawData.charCodeAt(i);
-  }
-  return outputArray;
-}
+// Esta função não será mais usada no Dashboard após a desativação das push notifications
+// function urlBase64ToUint8Array(base64String: string) {
+//   const padding = '='.repeat((4 - base64String.length % 4) % 4);
+//   const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
+//   const rawData = window.atob(base64);
+//   const outputArray = new Uint8Array(rawData.length);
+//   for (let i = 0; i < rawData.length; ++i) {
+//     outputArray[i] = rawData.charCodeAt(i);
+//   }
+//   return outputArray;
+// }
 
 /** =========================
  * Skeleton
@@ -295,7 +296,9 @@ const Dashboard: React.FC = () => {
   const [works, setWorks] = useState<Work[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeWorkId, setActiveWorkId] = useState<string | null>(null);
-  const [notifications, setNotifications] = useState<DBNotification[]>([]); // Changed to DBNotification
+  // NOTIFICATIONS: setNotifications agora apenas para manter a compatibilidade com refreshNotifications
+  // O estado 'notifications' não será mais usado para exibir nada no Dashboard.
+  const [notifications, setNotifications] = useState<DBNotification[]>([]); 
   const [zeTip, setZeTip] = useState<ZeTip>(getRandomZeTip());
 
   const [focusWork, setFocusWork] = useState<Work | null>(null);
@@ -304,23 +307,25 @@ const Dashboard: React.FC = () => {
   const [focusWorkMaterials, setFocusWorkMaterials] = useState<Material[]>([]); 
   const [focusWorkSteps, setFocusWorkSteps] = useState<Step[]>([]);
 
-  const [showNotificationModal, setShowNotificationModal] = useState(false);
-  const [currentNotification, setCurrentNotification] = useState<DBNotification | null>(null); // Changed to DBNotification
-  const [showPushPermissionModal, setShowPushPermissionModal] = useState(false);
-  const [vapidPublicKey, setVapidPublicKey] = useState<string | null>(null);
+  // NOTIFICATIONS: Removidos estados relacionados a modals de notificação
+  // const [showNotificationModal, setShowNotificationModal] = useState(false);
+  // const [currentNotification, setCurrentNotification] = useState<DBNotification | null>(null);
+  // const [showPushPermissionModal, setShowPushPermissionModal] = useState(false);
+  // const [vapidPublicKey, setVapidPublicKey] = useState<string | null>(null);
   
-  // NEW: Use a ref for a more stable check across renders, initialized from localStorage
-  const hasPromptedPushOnceRef = useRef(localStorage.getItem('hasPromptedPushOnce') === 'true');
-  const criticalErrorActiveRef = useRef(false);
-  const [showCriticalErrorModal, setShowCriticalErrorModal] = useState(false);
-  const [criticalErrorMessage, setCriticalErrorMessage] = useState('');
+  // NOTIFICATIONS: Removido ref para controle de prompt de push
+  // const hasPromptedPushOnceRef = useRef(localStorage.getItem('hasPromptedPushOnce') === 'true');
+  // NOTIFICATIONS: Removidos estados de erro crítico (ligados ao loop de notificação)
+  // const criticalErrorActiveRef = useRef(false);
+  // const [showCriticalErrorModal, setShowCriticalErrorModal] = useState(false);
+  // const [criticalErrorMessage, setCriticalErrorMessage] = useState('');
 
   const loadData = useCallback(async () => {
-    // CRITICAL: If a critical error is active, do not attempt to load data again
-    if (criticalErrorActiveRef.current) {
-        console.log("[NOTIF DEBUG] loadData: Critical error active, skipping data load.");
-        return;
-    }
+    // NOTIFICATIONS: Removida a checagem de criticalErrorActiveRef e relacionados
+    // if (criticalErrorActiveRef.current) {
+    //     console.log("[NOTIF DEBUG] loadData: Critical error active, skipping data load.");
+    //     return;
+    // }
     if (!user?.id || !isUserAuthFinished || authLoading) {
         console.log("[NOTIF DEBUG] loadData: Skipping due to auth/user status.", { user: user?.id, isUserAuthFinished, authLoading });
         return;
@@ -328,11 +333,11 @@ const Dashboard: React.FC = () => {
     
     console.log("[NOTIF DEBUG] loadData: Starting data load...");
     setLoading(true);
-    // NEW: Only reset critical error state if we are NOT currently in a critical error
-    if (!criticalErrorActiveRef.current) {
-      setShowCriticalErrorModal(false); 
-      setCriticalErrorMessage('');
-    }
+    // NOTIFICATIONS: Removida a lógica de reset de erro crítico
+    // if (!criticalErrorActiveRef.current) {
+    //   setShowCriticalErrorModal(false); 
+    //   setCriticalErrorMessage('');
+    // }
 
     try {
       const userWorks = await dbService.getWorks(user.id);
@@ -358,23 +363,20 @@ const Dashboard: React.FC = () => {
         setFocusWorkMaterials(materials);
         setFocusWorkSteps(steps);
 
-        // --- CORREÇÃO DO LOOP: Try/Catch isolado para notificações ---
-        // This makes notification generation non-fatal for dashboard load
-        try {
-          const expenses = await dbService.getExpenses(currentActiveWork.id);
-          await dbService.generateSmartNotifications(
-            user.id, 
-            currentActiveWork.id,
-            steps,
-            expenses,
-            materials,
-            currentActiveWork
-          );
-        } catch (notifErr) {
-          console.warn("[NOTIF DEBUG] Erro não-fatal nas notificações Push:", notifErr);
-          // If a non-fatal error occurs here, we log it but don't stop the whole dashboard load.
-          // This allows the dashboard to continue loading even if push notifications fail.
-        }
+        // NOTIFICATIONS: *** LINHA CRÍTICA REMOVIDA PARA DESATIVAR GERAÇÃO DE NOTIFICAÇÕES ***
+        // try {
+        //   const expenses = await dbService.getExpenses(currentActiveWork.id);
+        //   await dbService.generateSmartNotifications(
+        //     user.id, 
+        //     currentActiveWork.id,
+        //     steps,
+        //     expenses,
+        //     materials,
+        //     currentActiveWork
+        //   );
+        // } catch (notifErr) {
+        //   console.warn("[NOTIF DEBUG] Erro não-fatal nas notificações Push (agora desativadas):", notifErr);
+        // }
 
       } else {
         // Clear focus work states if no active work is found
@@ -387,21 +389,22 @@ const Dashboard: React.FC = () => {
       }
       
       const userNotifications = await dbService.getNotifications(user.id);
-      setNotifications(userNotifications);
-      refreshNotifications();
+      setNotifications(userNotifications); // Apenas para manter o estado interno do Dashboard (não exibido)
+      refreshNotifications(); // Apenas para manter a contagem global no AuthContext
       console.log("[NOTIF DEBUG] loadData: Data loaded successfully.");
 
     } catch (error: any) { // Catch all errors from loadData chain
       console.error("[NOTIF DEBUG] loadData: Failed to load dashboard data:", error);
-      let errorMessage = `Um erro crítico impediu o carregamento do Dashboard. Causa: ${error.message || "Erro desconhecido."}`;
-      if (error.message?.includes("PGRST204") || error.message?.includes("Could not find the 'work_id' column")) {
-          errorMessage += "\n\nPor favor, verifique *URGENTEMENTE* se a tabela 'notifications' no seu Supabase tem a coluna 'work_id' do tipo TEXT e se suas RLS policies permitem INSERT/SELECT/UPDATE para ela.";
-      } else if (error.message?.includes("SyntaxError: Unexpected token 'A'") || error.message?.includes("API returned non-JSON")) {
-          errorMessage += "\n\nO servidor de Push Notifications está retornando um erro inesperado. Verifique se as variáveis VAPID_PUBLIC_KEY e VAPID_PRIVATE_KEY estão configuradas no Vercel e se a função /api/send-event-notification.js está funcionando.";
-      }
-      setCriticalErrorMessage(errorMessage);
-      setShowCriticalErrorModal(true);
-      criticalErrorActiveRef.current = true; // Mark critical error as active
+      // NOTIFICATIONS: Removida a lógica de erro crítico
+      // let errorMessage = `Um erro crítico impediu o carregamento do Dashboard. Causa: ${error.message || "Erro desconhecido."}`;
+      // if (error.message?.includes("PGRST204") || error.message?.includes("Could not find the 'work_id' column")) {
+      //     errorMessage += "\n\nPor favor, verifique *URGENTEMENTE* se a tabela 'notifications' no seu Supabase tem a coluna 'work_id' do tipo TEXT e se suas RLS policies permitem INSERT/SELECT/UPDATE para ela.";
+      // } else if (error.message?.includes("SyntaxError: Unexpected token 'A'") || error.message?.includes("API returned non-JSON")) {
+      //     errorMessage += "\n\nO servidor de Push Notifications está retornando um erro inesperado. Verifique se as variáveis VAPID_PUBLIC_KEY e VAPID_PRIVATE_KEY estão configuradas no Vercel e se a função /api/send-event-notification.js está funcionando.";
+      // }
+      // setCriticalErrorMessage(errorMessage);
+      // setShowCriticalErrorModal(true);
+      // criticalErrorActiveRef.current = true; // Mark critical error as active
     } finally {
       setLoading(false);
       console.log("[NOTIF DEBUG] loadData: Finished loading.");
@@ -411,156 +414,146 @@ const Dashboard: React.FC = () => {
 
   // Effect to load data on component mount and when user/auth status changes
   useEffect(() => {
-    console.log("[NOTIF DEBUG] useEffect [loadData, isUserAuthFinished, authLoading, user] triggered.", { isUserAuthFinished, authLoading, user: user?.id, criticalErrorActive: criticalErrorActiveRef.current });
-    // NEW: Only call loadData if no critical error is active
-    if (!criticalErrorActiveRef.current) {
+    // NOTIFICATIONS: Removida a checagem de criticalErrorActiveRef
+    // console.log("[NOTIF DEBUG] useEffect [loadData, isUserAuthFinished, authLoading, user] triggered.", { isUserAuthFinished, authLoading, user: user?.id, criticalErrorActive: criticalErrorActiveRef.current });
+    // if (!criticalErrorActiveRef.current) {
         if (isUserAuthFinished && !authLoading && user) {
             loadData();
         }
-    } else {
-        console.log("[NOTIF DEBUG] Not calling loadData because criticalErrorActiveRef is true.");
-    }
+    // } else {
+    //     console.log("[NOTIF DEBUG] Not calling loadData because criticalErrorActiveRef is true.");
+    // }
   }, [loadData, isUserAuthFinished, authLoading, user]); // Refined dependencies
 
-  // Check and setup VAPID public key for push notifications
-  useEffect(() => {
-    const pubKey = import.meta.env.VITE_VAPID_PUBLIC_KEY;
-    console.log("[NOTIF DEBUG] VAPID Public Key check. Value:", pubKey);
-    if (pubKey && pubKey !== 'undefined' && pubKey !== null) { // Added null check
-      setVapidPublicKey(pubKey);
-    } else {
-      console.error("CRÍTICO: VITE_VAPID_PUBLIC_KEY não está definida nas variáveis de ambiente! As Push Notifications não funcionarão. Por favor, configure-a no Vercel/Ambiente de Deploy.");
-      setVapidPublicKey(null); 
-      // If VAPID key is missing, we still want to indicate we've "checked"
-      hasPromptedPushOnceRef.current = true; // Prevents the modal from trying to open repeatedly if key is missing
-      localStorage.setItem('hasPromptedPushOnce', 'true'); // Persist this state
-    }
-  }, []); // Run once on mount
+  // NOTIFICATIONS: Removido o useEffect de configuração de VAPID public key
+  // useEffect(() => {
+  //   const pubKey = import.meta.env.VITE_VAPID_PUBLIC_KEY;
+  //   console.log("[NOTIF DEBUG] VAPID Public Key check. Value:", pubKey);
+  //   if (pubKey && pubKey !== 'undefined' && pubKey !== null) { // Added null check
+  //     setVapidPublicKey(pubKey);
+  //   } else {
+  //     console.error("CRÍTICO: VITE_VAPID_PUBLIC_KEY não está definida nas variáveis de ambiente! As Push Notifications não funcionarão. Por favor, configure-a no Vercel/Ambiente de Deploy.");
+  //     setVapidPublicKey(null); 
+  //     hasPromptedPushOnceRef.current = true; // Prevents the modal from trying to open repeatedly if key is missing
+  //     localStorage.setItem('hasPromptedPushOnce', 'true'); // Persist this state
+  //   }
+  // }, []); // Run once on mount
 
-  // --- Push Notification Logic (FIXED FOR FLICKERING) ---
-  const requestPushPermission = useCallback(async () => {
-    if (!('serviceWorker' in navigator) || !('PushManager' in window) || !vapidPublicKey || !user) {
-      console.warn("[NOTIF DEBUG] Push notifications not supported or VAPID key/user missing for request.");
-      setShowPushPermissionModal(false);
-      hasPromptedPushOnceRef.current = true; // Mark as prompted/dismissed for this session
-      localStorage.setItem('hasPromptedPushOnce', 'true'); // Persist this state
-      return;
-    }
+  // NOTIFICATIONS: Removido o callback requestPushPermission
+  // const requestPushPermission = useCallback(async () => {
+  //   if (!('serviceWorker' in navigator) || !('PushManager' in window) || !vapidPublicKey || !user) {
+  //     console.warn("[NOTIF DEBUG] Push notifications not supported or VAPID key/user missing for request.");
+  //     setShowPushPermissionModal(false);
+  //     hasPromptedPushOnceRef.current = true; // Mark as prompted/dismissed for this session
+  //     localStorage.setItem('hasPromptedPushOnce', 'true'); // Persist this state
+  //     return;
+  //   }
 
-    try {
-      const permission = await window.Notification.requestPermission(); // Explicitly use window.Notification
-      if (permission === 'granted') {
-        const registration = await navigator.serviceWorker.ready;
-        const subscribeOptions = {
-          userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
-        };
-        const pushSubscription = await registration.pushManager.subscribe(subscribeOptions);
+  //   try {
+  //     const permission = await window.Notification.requestPermission(); // Explicitly use window.Notification
+  //     if (permission === 'granted') {
+  //       const registration = await navigator.serviceWorker.ready;
+  //       const subscribeOptions = {
+  //         userVisibleOnly: true,
+  //         applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
+  //       };
+  //       const pushSubscription = await registration.pushManager.subscribe(subscribeOptions);
         
-        // pushSubscriptionRef.current = pushSubscription; // Not used currently, but keep for future ref
-        await dbService.savePushSubscription(user.id, pushSubscription.toJSON());
-        console.log('[NOTIF DEBUG] Push subscription saved:', pushSubscription.toJSON());
-        alert('Notificações ativadas com sucesso!');
-      } else {
-        console.warn('[NOTIF DEBUG] Notification permission denied by user.');
-        alert('Permissão para notificações negada.');
-      }
-    } catch (error) {
-      console.error('[NOTIF DEBUG] Error subscribing to push notifications:', error);
-      alert('Erro ao ativar notificações. Verifique o console.');
-    } finally {
-      setShowPushPermissionModal(false);
-      // After interaction, ensure the ref is set so we don't re-prompt until a logical reset (e.g., app restart or manual revoke)
-      hasPromptedPushOnceRef.current = true;
-      localStorage.setItem('hasPromptedPushOnce', 'true'); // Persist this state
-      console.log("[NOTIF DEBUG] requestPushPermission finished. hasPromptedPushOnceRef.current set to true.");
-    }
-  }, [user, vapidPublicKey]);
+  //       // pushSubscriptionRef.current = pushSubscription; // Not used currently, but keep for future ref
+  //       await dbService.savePushSubscription(user.id, pushSubscription.toJSON());
+  //       console.log('[NOTIF DEBUG] Push subscription saved:', pushSubscription.toJSON());
+  //       alert('Notificações ativadas com sucesso!');
+  //     } else {
+  //       console.warn('[NOTIF DEBUG] Notification permission denied by user.');
+  //       alert('Permissão para notificações negada.');
+  //     }
+  //   } catch (error) {
+  //     console.error('[NOTIF DEBUG] Error subscribing to push notifications:', error);
+  //     alert('Erro ao ativar notificações. Verifique o console.');
+  //   } finally {
+  //     setShowPushPermissionModal(false);
+  //     hasPromptedPushOnceRef.current = true;
+  //     localStorage.setItem('hasPromptedPushOnce', 'true'); // Persist this state
+  //     console.log("[NOTIF DEBUG] requestPushPermission finished. hasPromptedPushOnceRef.current set to true.");
+  //   }
+  // }, [user, vapidPublicKey]);
 
-  useEffect(() => {
-    console.log("[NOTIF DEBUG] Push permission useEffect triggered.", {
-        isUserAuthFinished, user: user?.id, vapidPublicKey: !!vapidPublicKey,
-        hasPromptedPushOnce: hasPromptedPushOnceRef.current, showPushPermissionModal
-    });
+  // NOTIFICATIONS: Removido o useEffect de checagem de permissão de push
+  // useEffect(() => {
+  //   console.log("[NOTIF DEBUG] Push permission useEffect triggered.", {
+  //       isUserAuthFinished, user: user?.id, vapidPublicKey: !!vapidPublicKey,
+  //       hasPromptedPushOnce: hasPromptedPushOnceRef.current, showPushPermissionModal
+  //   });
 
-    // 1. Exit early if conditions for checking are not met or if already prompted.
-    // hasPromptedPushOnceRef.current is the most important guard here.
-    if (!isUserAuthFinished || !user || !vapidPublicKey || hasPromptedPushOnceRef.current) {
-        console.log("[NOTIF DEBUG] Push useEffect exited early. Conditions:", {
-            isUserAuthFinished, user: user?.id, vapidPublicKey: !!vapidPublicKey, hasPromptedPushOnce: hasPromptedPushOnceRef.current
-        });
-        return;
-    }
+  //   if (!isUserAuthFinished || !user || !vapidPublicKey || hasPromptedPushOnceRef.current) {
+  //       console.log("[NOTIF DEBUG] Push useEffect exited early. Conditions:", {
+  //           isUserAuthFinished, user: user?.id, vapidPublicKey: !!vapidPublicKey, hasPromptedPushOnce: hasPromptedPushOnceRef.current
+  //       });
+  //       return;
+  //   }
 
-    const performPushPermissionCheck = async () => {
-        // CRUCIAL: Mark as checked immediately upon starting the check logic for this cycle.
-        // This prevents re-triggering the check during the async operation or subsequent renders.
-        hasPromptedPushOnceRef.current = true; 
-        localStorage.setItem('hasPromptedPushOnce', 'true'); // Persist this state
-        console.log("[NOTIF DEBUG] Push permission check initiated, hasPromptedPushOnceRef.current set to true.");
+  //   const performPushPermissionCheck = async () => {
+  //       hasPromptedPushOnceRef.current = true; 
+  //       localStorage.setItem('hasPromptedPushOnce', 'true'); // Persist this state
+  //       console.log("[NOTIF DEBUG] Push permission check initiated, hasPromptedPushOnceRef.current set to true.");
 
-        try {
-            const currentPermission = window.Notification.permission; // Explicitly use window.Notification
-            const existingSub = await dbService.getPushSubscription(user.id);
-            console.log("[NOTIF DEBUG] Push permission check results:", { currentPermission, existingSub: !!existingSub });
+  //       try {
+  //           const currentPermission = window.Notification.permission; // Explicitly use window.Notification
+  //           const existingSub = await dbService.getPushSubscription(user.id);
+  //           console.log("[NOTIF DEBUG] Push permission check results:", { currentPermission, existingSub: !!existingSub });
 
-            if (currentPermission === 'granted') {
-                if (!existingSub) { // Granted but no subscription in DB. Re-subscribe.
-                    console.log("[NOTIF DEBUG] Permission granted but no sub in DB, attempting to subscribe silently.");
-                    // Attempt to subscribe silently, but don't show modal
-                    const registration = await navigator.serviceWorker.ready;
-                    const subscribeOptions = {
-                        userVisibleOnly: true,
-                        applicationServerKey: urlBase64ToUint8Array(vapidPublicKey!), // vapidPublicKey is guaranteed to exist here
-                    };
-                    const pushSubscription = await registration.pushManager.subscribe(subscribeOptions);
-                    // pushSubscriptionRef.current = pushSubscription; // Not used currently
-                    await dbService.savePushSubscription(user.id, pushSubscription.toJSON());
-                    console.log('[NOTIF DEBUG] Push subscription silently saved.');
-                }
-                setShowPushPermissionModal(false); // Ensure modal is closed if already granted
-            } else if (currentPermission === 'denied') {
-                console.log("[NOTIF DEBUG] Notification permission denied.");
-                setShowPushPermissionModal(false); // Ensure modal is closed
-            } else { // currentPermission === 'default'
-                if (!existingSub) { // Only prompt if no existing subscription (to prevent re-prompts for user who said no)
-                    console.log("[NOTIF DEBUG] Permission default and no sub in DB, showing modal.");
-                    setShowPushPermissionModal(true);
-                } else { // If permission is default but user has a sub (e.g. from another device), no need to prompt.
-                    console.log("[NOTIF DEBUG] Permission default but existing sub, not showing modal.");
-                    setShowPushPermissionModal(false);
-                }
-            }
-        } catch (error) {
-            console.error("[NOTIF DEBUG] Error during push permission check:", error);
-            setShowPushPermissionModal(false);
-        }
-        // No finally block here, as hasPromptedPushOnceRef.current is set at the very beginning.
-    };
-
-    // Run performPushPermissionCheck directly
-    performPushPermissionCheck();
+  //           if (currentPermission === 'granted') {
+  //               if (!existingSub) { 
+  //                   console.log("[NOTIF DEBUG] Permission granted but no sub in DB, attempting to subscribe silently.");
+  //                   const registration = await navigator.serviceWorker.ready;
+  //                   const subscribeOptions = {
+  //                       userVisibleOnly: true,
+  //                       applicationServerKey: urlBase64ToUint8Array(vapidPublicKey!), 
+  //                   };
+  //                   const pushSubscription = await registration.pushManager.subscribe(subscribeOptions);
+  //                   await dbService.savePushSubscription(user.id, pushSubscription.toJSON());
+  //                   console.log('[NOTIF DEBUG] Push subscription silently saved.');
+  //               }
+  //               setShowPushPermissionModal(false); 
+  //           } else if (currentPermission === 'denied') {
+  //               console.log("[NOTIF DEBUG] Notification permission denied.");
+  //               setShowPushPermissionModal(false); 
+  //           } else { // currentPermission === 'default'
+  //               if (!existingSub) { 
+  //                   console.log("[NOTIF DEBUG] Permission default and no sub in DB, showing modal.");
+  //                   setShowPushPermissionModal(true);
+  //               } else { 
+  //                   console.log("[NOTIF DEBUG] Permission default but existing sub, not showing modal.");
+  //                   setShowPushPermissionModal(false);
+  //               }
+  //           }
+  //       } catch (error) {
+  //           console.error("[NOTIF DEBUG] Error during push permission check:", error);
+  //           setShowPushPermissionModal(false);
+  //       }
+  //   };
+  //   performPushPermissionCheck();
  
+  //   return () => {
+  //       if (!user) {
+  //           hasPromptedPushOnceRef.current = false;
+  //           localStorage.removeItem('hasPromptedPushOnce'); 
+  //           console.log("[NOTIF DEBUG] Push permission useEffect cleanup: User logged out, reset hasPromptedPushOnceRef and localStorage.");
+  //       }
+  //   };
+  // }, [user, isUserAuthFinished, vapidPublicKey]); // Removed showPushPermissionModal from deps
 
-    return () => {
-        // When user logs out, reset this ref AND localStorage
-        if (!user) {
-            hasPromptedPushOnceRef.current = false;
-            localStorage.removeItem('hasPromptedPushOnce'); // Clear from localStorage on logout
-            console.log("[NOTIF DEBUG] Push permission useEffect cleanup: User logged out, reset hasPromptedPushOnceRef and localStorage.");
-        }
-    };
-  }, [user, isUserAuthFinished, vapidPublicKey]); // Removed showPushPermissionModal from deps
-
+  // NOTIFICATIONS: Removido handleDismissNotification
   const handleDismissNotification = async (notificationId: string) => {
     await dbService.dismissNotification(notificationId);
     setNotifications(prev => prev.filter(n => n.id !== notificationId));
-    setCurrentNotification(null); // Close modal if it was open for this notification
+    // setCurrentNotification(null); // Close modal if it was open for this notification
     if (focusWork?.id) {
       // Re-trigger smart notifications for this work to clear related tags
-      await dbService.generateSmartNotifications(user!.id, focusWork.id);
+      // NOTIFICATIONS: Não re-trigger a geração aqui também
+      // await dbService.generateSmartNotifications(user!.id, focusWork.id);
     }
-    refreshNotifications(); // Refresh global count
+    refreshNotifications(); // Refresh global count (AuthContext)
   };
 
   const handleDeleteWork = async (workId: string) => {
@@ -572,19 +565,20 @@ const Dashboard: React.FC = () => {
 
   if (!isUserAuthFinished || authLoading || loading) return <DashboardSkeleton />;
 
-  if (showCriticalErrorModal) {
-    return (
-        <ZeModal
-          isOpen={true}
-          title="Erro Crítico no Dashboard!"
-          message={criticalErrorMessage}
-          confirmText="Recarregar Página"
-          onConfirm={() => window.location.reload()}
-          onCancel={() => window.location.reload()} // Same action to ensure resolution
-          type="ERROR"
-        />
-    );
-  }
+  // NOTIFICATIONS: Removida a exibição do ZeModal de erro crítico
+  // if (showCriticalErrorModal) {
+  //   return (
+  //       <ZeModal
+  //         isOpen={true}
+  //         title="Erro Crítico no Dashboard!"
+  //         message={criticalErrorMessage}
+  //         confirmText="Recarregar Página"
+  //         onConfirm={() => window.location.reload()}
+  //         onCancel={() => window.location.reload()} // Same action to ensure resolution
+  //         type="ERROR"
+  //       />
+  //   );
+  // }
 
   return (
     <div className="max-w-4xl mx-auto pb-28 pt-6 px-4 md:px-0">
@@ -706,22 +700,25 @@ const Dashboard: React.FC = () => {
         <LiveTimeline steps={focusWorkSteps} onClick={() => navigate(`/work/${focusWork.id}`)} />
       )}
 
-      {unreadNotificationsCount > 0 && (
+      {/* NOTIFICATIONS: Removido o botão de notificações ativas */}
+      {/* {unreadNotificationsCount > 0 && (
         <div className="fixed bottom-6 right-6 z-50">
           <button onClick={() => { setCurrentNotification(notifications[0]); setShowNotificationModal(true); }} className="w-14 h-14 bg-red-500 rounded-full text-white shadow-2xl animate-bounce flex items-center justify-center relative">
             <i className="fa-solid fa-bell text-xl"></i>
             <span className="absolute -top-1 -right-1 w-6 h-6 bg-white text-red-500 rounded-full text-[10px] font-black border-2 border-red-500 flex items-center justify-center">{unreadNotificationsCount}</span>
           </button>
         </div>
-      )}
+      )} */}
 
-      {showNotificationModal && currentNotification && (
+      {/* NOTIFICATIONS: Removido o modal de notificação de alerta */}
+      {/* {showNotificationModal && currentNotification && (
         <ZeModal isOpen={true} title={currentNotification.title} message={currentNotification.message} confirmText="Marcar como lida" onConfirm={() => handleDismissNotification(currentNotification.id)} cancelText="Ver Todas" onCancel={() => {setCurrentNotification(null); setShowNotificationModal(false); navigate('/notifications');}} type={currentNotification.type} />
-      )}
+      )} */}
 
-      {showPushPermissionModal && (
+      {/* NOTIFICATIONS: Removido o modal de permissão de push notification */}
+      {/* {showPushPermissionModal && (
         <ZeModal isOpen={true} title="Ativar Notificações?" message="Receba alertas importantes sobre o andamento das suas obras (etapas atrasadas, materiais em falta, etc.) diretamente no seu celular ou computador." confirmText="Sim, ativar!" onConfirm={requestPushPermission} cancelText="Agora não" onCancel={() => { setShowPushPermissionModal(false); hasPromptedPushOnceRef.current = true; localStorage.setItem('hasPromptedPushOnce', 'true'); }} type="INFO" />
-      )}
+      )} */}
     </div>
   );
 };
