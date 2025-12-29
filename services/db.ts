@@ -567,6 +567,7 @@ export const dbService = {
         });
         
         await supabase.from('steps').insert(stepsToInsert);
+        // FIXED: Now calling the correctly defined method
         await this.regenerateMaterials(parsedWork.id, parsedWork.area, templateId);
     }
 
@@ -1070,8 +1071,7 @@ export const dbService = {
       tag: notification.tag // NEW: Save the tag to DB
     }).select().single();
     if (error) {
-      console.error("Erro ao adicionar notificação:", error);
-      console.error("Detalhes do erro Supabase:", error.message, error.details, error.code); // Log more details
+      console.error("Erro ao adicionar notificação:", error.message, error.details, error.code, "Full Error Object:", error); // Log more details
       throw error;
     }
     _dashboardCache.notifications = null; // Invalidate cache
@@ -1167,6 +1167,64 @@ export const dbService = {
     _dashboardCache.summary[workId] = { data: summary, timestamp: now };
     return summary;
   },
+
+  // NEW: Method to regenerate materials based on work template and area
+  async regenerateMaterials(workId: string, area: number, templateId: string): Promise<void> {
+    // Supabase is guaranteed to be initialized now
+    try {
+        // 1. Delete existing materials for this work
+        await supabase.from('materials').delete().eq('work_id', workId);
+
+        // 2. Find the selected work template
+        const template = WORK_TEMPLATES.find(t => t.id === templateId);
+        if (!template) {
+            console.warn(`[REGEN MATERIAL] Template with ID ${templateId} not found.`);
+            return;
+        }
+
+        const materialsToInsert: Omit<Material, 'id'>[] = [];
+        
+        // Iterate through included steps (which map to material categories)
+        for (const stepName of template.includedSteps) {
+            const materialCategory = FULL_MATERIAL_PACKAGES.find(p => p.category === stepName);
+            if (materialCategory) {
+                for (const item of materialCategory.items) {
+                    const multiplier = item.multiplier || 1; // Default multiplier to 1
+                    materialsToInsert.push({
+                        workId: workId,
+                        name: item.name,
+                        brand: undefined, // No brand by default
+                        plannedQty: Math.ceil(area * multiplier), // Calculate based on work area
+                        purchasedQty: 0,
+                        unit: item.unit,
+                        stepId: undefined, // Assign later if linking to a specific step
+                        category: materialCategory.category
+                    });
+                }
+            } else {
+                console.warn(`[REGEN MATERIAL] Material package for category "${stepName}" not found.`);
+            }
+        }
+        
+        // 3. Insert new materials
+        if (materialsToInsert.length > 0) {
+            // Bulk insert
+            const { error } = await supabase.from('materials').insert(materialsToInsert);
+            if (error) {
+                console.error("Erro ao inserir materiais gerados:", error);
+                throw error;
+            }
+        }
+        
+        _dashboardCache.notifications = null; // Invalidate notifications cache due to potential material-related alerts
+        console.log(`[REGEN MATERIAL] Materiais para obra ${workId} regenerados com sucesso.`);
+
+    } catch (error: any) {
+        console.error(`[REGEN MATERIAL ERROR] Erro ao regenerar materiais para work ${workId}:`, error);
+        throw error;
+    }
+  },
+
 
   // Modificado para aceitar dados pré-carregados, evitando buscas redundantes.
   async generateSmartNotifications(

@@ -491,13 +491,17 @@ const Dashboard: React.FC = () => {
   }, [user, vapidPublicKey]);
 
   useEffect(() => {
-    // 1. Exit if not authenticated, VAPID key is missing, or permission check already done for this session.
-    //    Also exit if the modal is currently open and awaiting user interaction.
-    if (!isUserAuthFinished || !user || !vapidPublicKey || hasPromptedPushOnceRef.current || showPushPermissionModal) {
+    // 1. Exit early if conditions for checking are not met or if already checked/modal is open.
+    //    Removing `showPushPermissionModal` from deps, but still respecting its state in the logic.
+    if (!isUserAuthFinished || !user || !vapidPublicKey || hasPromptedPushOnceRef.current) {
         return;
     }
 
     const performPushPermissionCheck = async () => {
+        // If the modal is already open, wait for user interaction to close it.
+        // Do not re-evaluate and open/close it in a loop.
+        if (showPushPermissionModal) return;
+
         try {
             const currentPermission = Notification.permission;
             const existingSub = await dbService.getPushSubscription(user.id);
@@ -506,8 +510,6 @@ const Dashboard: React.FC = () => {
                 if (existingSub) {
                     pushSubscriptionRef.current = existingSub.subscription as PushSubscription;
                 }
-                // Even if sub is missing in DB but permission is granted, we won't prompt.
-                // The `requestPushPermission` flow would handle re-subscription if triggered.
                 setShowPushPermissionModal(false);
             } else if (currentPermission === 'denied') {
                 setShowPushPermissionModal(false);
@@ -523,6 +525,7 @@ const Dashboard: React.FC = () => {
             setShowPushPermissionModal(false);
         } finally {
             // Mark that we've performed the check for this load cycle, even if no modal was shown.
+            // This prevents re-running the heavy check on every Dashboard re-render.
             hasPromptedPushOnceRef.current = true;
         }
     };
@@ -533,7 +536,7 @@ const Dashboard: React.FC = () => {
     }, 500); 
 
     return () => clearTimeout(timeoutId); // Cleanup: clear timeout if component unmounts or deps change
-  }, [user, isUserAuthFinished, vapidPublicKey, showPushPermissionModal]); // IMPORTANT: Keep showPushPermissionModal in deps, but manage hasPromptedPushOnceRef.current to prevent loops.
+  }, [user, isUserAuthFinished, vapidPublicKey, /* Removed showPushPermissionModal from deps */]);
 
 
   const handleDismissNotification = async (notificationId: string) => {
@@ -738,7 +741,10 @@ const Dashboard: React.FC = () => {
           confirmText="Sim, quero notificações!"
           onConfirm={requestPushPermission}
           cancelText="Agora não"
-          onCancel={() => setShowPushPermissionModal(false)}
+          onCancel={() => {
+            setShowPushPermissionModal(false);
+            hasPromptedPushOnceRef.current = true; // Mark as prompted/dismissed for this session
+          }}
           type="INFO"
         />
       )}
