@@ -377,12 +377,19 @@ const Dashboard: React.FC = () => {
   // Ref to store the PushSubscription object
   const pushSubscriptionRef = useRef<PushSubscription | null>(null);
 
+  // NEW: State for Critical Error Modal
+  const [showCriticalErrorModal, setShowCriticalErrorModal] = useState(false);
+  const [criticalErrorMessage, setCriticalErrorMessage] = useState('');
+
 
   // Initial data load and refresh mechanism
   const loadData = useCallback(async () => {
     if (!user?.id || !isUserAuthFinished || authLoading) return;
     
     setLoading(true);
+    setShowCriticalErrorModal(false); // Hide any previous error modal
+    setCriticalErrorMessage('');
+
     try {
       const userWorks = await dbService.getWorks(user.id);
       setWorks(userWorks);
@@ -429,8 +436,10 @@ const Dashboard: React.FC = () => {
       setNotifications(userNotifications);
       refreshNotifications();
 
-    } catch (error) {
+    } catch (error: any) { // Catch all errors from loadData chain
       console.error("Failed to load dashboard data:", error);
+      setCriticalErrorMessage(`Um erro crítico impediu o carregamento do Dashboard. Causa: ${error.message || "Erro desconhecido."}\n\nPor favor, verifique se seu banco de dados Supabase está configurado corretamente (especialmente a tabela 'notifications' com as colunas 'work_id' e 'tag').`);
+      setShowCriticalErrorModal(true);
     } finally {
       setLoading(false);
     }
@@ -450,7 +459,9 @@ const Dashboard: React.FC = () => {
     if (pubKey && pubKey !== 'undefined') {
       setVapidPublicKey(pubKey);
     } else {
-      console.warn("VITE_VAPID_PUBLIC_KEY is not defined in environment variables. Push notifications will not work.");
+      console.error("CRÍTICO: VITE_VAPID_PUBLIC_KEY não está definida nas variáveis de ambiente! As Push Notifications não funcionarão. Por favor, configure-a no Vercel/Ambiente de Deploy.");
+      // Keep setVapidPublicKey(null) to ensure conditional rendering for push modal
+      setVapidPublicKey(null); 
     }
   }, []);
 
@@ -745,6 +756,19 @@ const Dashboard: React.FC = () => {
             hasPromptedPushOnceRef.current = true; // Mark as prompted/dismissed for this session
           }}
           type="INFO"
+        />
+      )}
+
+      {/* NEW: Critical Error Modal */}
+      {showCriticalErrorModal && (
+        <ZeModal
+          isOpen={showCriticalErrorModal}
+          title="Erro Crítico no Dashboard!"
+          message={criticalErrorMessage}
+          confirmText="Recarregar Página"
+          onConfirm={() => window.location.reload()}
+          onCancel={() => window.location.reload()} // Same action to ensure resolution
+          type="ERROR"
         />
       )}
     </div>

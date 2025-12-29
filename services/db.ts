@@ -1,4 +1,5 @@
 
+
 import { PlanType, ExpenseCategory, StepStatus, FileCategory, type User, type Work, type Step, type Material, type Expense, type Worker, type Supplier, type WorkPhoto, type WorkFile, type Notification, type PushSubscriptionInfo } from '../types.ts';
 import { WORK_TEMPLATES, FULL_MATERIAL_PACKAGES } from './standards.ts';
 import { supabase } from './supabase.ts';
@@ -265,7 +266,7 @@ export const dbService = {
 
     // If no valid cache, create a new promise
     const newPromise = (async () => {
-        const { data: { session } } = await client.auth.getSession();
+        const { data: { session } = {} } = await client.auth.getSession(); // Default to empty object for destructuring
         if (!session?.user) {
             // If no user, ensure sessionCache is null before returning
             sessionCache = null; 
@@ -1243,7 +1244,7 @@ export const dbService = {
         // Usa dados pré-carregados se disponíveis, senão busca do DB.
         const currentSteps = prefetchedSteps || await this.getSteps(workId);
         // FIX: Corrected typo from `prefetfetchedMaterials` to `prefetchedMaterials`.
-        const currentMaterials = prefetfetchedMaterials || await this.getMaterials(workId);
+        const currentMaterials = prefetchedMaterials || await this.getMaterials(workId);
         const currentExpenses = prefetchedExpenses || await this.getExpenses(workId); // Added for budget check
         const currentWork = prefetchedWork || await this.getWorkById(workId);
 
@@ -1575,11 +1576,12 @@ export const dbService = {
 
         if (!response.ok) {
             let errorData = { error: 'Unknown error', message: 'Failed to parse error response' };
+            // Adicionado log do rawText para melhor diagnóstico
+            const textResponse = await response.text(); 
             try {
-                errorData = await response.json();
+                errorData = JSON.parse(textResponse); // Tentar parsear o texto se for JSON
             } catch (e) {
-                const textError = await response.text();
-                errorData.message = textError; // Fallback to raw text
+                errorData.message = `API returned non-JSON or unparseable text: "${textResponse}"`; // Fallback to raw text
             }
             throw new Error(errorData.error || errorData.message || 'Falha ao enviar push notification de evento.');
         }
