@@ -1236,7 +1236,15 @@ export const dbService = {
     prefetchedWork?: Work
   ): Promise<void> {
     // Supabase is guaranteed to be initialized now
-    
+
+    // --- TRAVA DE SEGURANÇA CONTRA LOOP ---
+    const sessionKey = `notif_processed_${workId}`;
+    if (sessionStorage.getItem(sessionKey)) {
+        console.log(`[NOTIF DEBUG] Notificações já processadas para a obra ${workId} nesta sessão. Ignorando.`);
+        return;
+    }
+    // ---------------------------------------
+      
     try {
         console.log(`[NOTIF DEBUG START] =================================================`);
         console.log(`[NOTIF DEBUG START] Generating smart notifications for User: ${userId}, Work: ${workId}`);
