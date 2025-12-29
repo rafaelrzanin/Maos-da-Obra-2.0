@@ -21,6 +21,10 @@ const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY;
 const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
 const VAPID_EMAIL = "mailto:seuemail@example.com"; // Replace with your actual email
 
+console.log(`[send-event-notification] VAPID_PUBLIC_KEY presence: ${!!VAPID_PUBLIC_KEY}`);
+console.log(`[send-event-notification] VAPID_PRIVATE_KEY presence: ${!!VAPID_PRIVATE_KEY}`);
+
+
 if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
   console.error("ERRO CRÍTICO: Chaves VAPID (PUBLIC_KEY ou PRIVATE_KEY) faltando para notificações push. Certifique-se de que VAPID_PUBLIC_KEY e VAPID_PRIVATE_KEY estão configuradas no Vercel.");
   // Em ambientes de produção/deploy, é melhor não lançar um erro aqui diretamente
@@ -57,7 +61,7 @@ export default async function handler(req, res) {
 
     // Check if VAPID keys are configured before proceeding to send notifications
     if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
-      console.error("VAPID keys not configured. Cannot send push notifications.");
+      console.error("[send-event-notification] VAPID keys not configured. Cannot send push notifications.");
       return res.status(500).json({ error: 'Server not configured for push notifications. VAPID keys missing.' });
     }
 
@@ -68,7 +72,7 @@ export default async function handler(req, res) {
       .eq('user_id', userId);
 
     if (error) {
-      console.error("Error fetching subscriptions:", error);
+      console.error("[send-event-notification] Error fetching subscriptions:", error);
       return res.status(500).json({ error: error.message });
     }
 
@@ -92,12 +96,12 @@ export default async function handler(req, res) {
           subRecord.subscription,
           notificationPayload
         );
-        console.log(`Notification sent to user ${userId} via endpoint ${subRecord.subscription.endpoint}`);
+        console.log(`[send-event-notification] Notification sent to user ${userId} via endpoint ${subRecord.subscription.endpoint}`);
       } catch (sendError) {
-        console.error(`Error sending notification to ${subRecord.subscription.endpoint}:`, sendError);
+        console.error(`[send-event-notification] Error sending notification to ${subRecord.subscription.endpoint}:`, sendError);
         // If subscription is no longer valid, delete it from our DB
         if (sendError.statusCode === 410 || sendError.statusCode === 404) {
-            console.log(`Subscription for user ${userId} is stale, deleting...`);
+            console.log(`[send-event-notification] Subscription for user ${userId} is stale, deleting...`);
             // Ensure endpoint is extracted safely if subscription.endpoint is not directly accessible
             const endpointToDelete = subRecord.subscription?.endpoint;
             if (endpointToDelete) {
@@ -112,7 +116,7 @@ export default async function handler(req, res) {
     return res.status(200).json({ message: 'Notifications processed.' });
 
   } catch (error) {
-    console.error("Internal Server Error in send-event-notification:", error);
+    console.error("[send-event-notification] Internal Server Error in send-event-notification:", error);
     // Ensure that any unhandled error also returns a JSON response
     return res.status(500).json({ error: 'Internal Server Error', message: error.message });
   }

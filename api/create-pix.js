@@ -26,11 +26,13 @@ export default async function handler(req, res) {
     
     // Verificação de segurança rigorosa
     if (!apiKey) {
-         console.error("ERRO CRÍTICO: NEON_SECRET_KEY está undefined.");
-         throw new Error("A chave NEON_SECRET_KEY não foi encontrada no servidor.");
+         console.error("ERRO CRÍTICO: NEON_SECRET_KEY está undefined no ambiente do servidor.");
+         // Log the process.env keys for more debugging insight if needed (be careful not to expose sensitive info)
+         // console.log("Current process.env keys:", Object.keys(process.env));
+         throw new Error("A chave NEON_SECRET_KEY não foi encontrada no servidor. Verifique suas variáveis de ambiente do Vercel.");
     }
 
-    console.log("Debug: Chave API detectada. Tamanho:", apiKey.length);
+    console.log("Debug: Chave API NEON_SECRET_KEY detectada. Tamanho:", apiKey.length > 0 ? 'CONFIGURADA' : 'VAZIA');
 
     // 3. Parse seguro do Body
     let payload = req.body;

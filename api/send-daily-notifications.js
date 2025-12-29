@@ -8,7 +8,7 @@ const supabaseUrl = process.env.VITE_SUPABASE_URL;
 const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseKey) {
-  console.error("CRITICAL ERROR: Supabase URL or Key missing for daily notifications.");
+  console.error("CRITICAL ERROR: Supabase URL ou Key missing for daily notifications.");
   // throw new Error("Supabase configuration missing."); // Avoid throwing during deployment
 }
 
@@ -18,6 +18,10 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY;
 const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
 const VAPID_EMAIL = "mailto:seuemail@example.com"; // Replace with your actual email
+
+console.log(`[send-daily-notifications] VAPID_PUBLIC_KEY presence: ${!!VAPID_PUBLIC_KEY}`);
+console.log(`[send-daily-notifications] VAPID_PRIVATE_KEY presence: ${!!VAPID_PRIVATE_KEY}`);
+
 
 if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
     console.error("CRITICAL ERROR: VAPID keys missing for daily push notifications.");
@@ -81,12 +85,12 @@ export default async function handler(req, res) {
       .select('*');
 
     if (subsError) {
-      console.error("Error fetching all subscriptions:", subsError);
+      console.error("[send-daily-notifications] Error fetching all subscriptions:", subsError);
       return res.status(500).json({ error: subsError.message });
     }
 
     if (!subscriptions || subscriptions.length === 0) {
-      console.log("No active subscriptions found for daily notifications.");
+      console.log("[send-daily-notifications] No active subscriptions found for daily notifications.");
       return res.status(200).json({ message: 'No active subscriptions to send daily notifications to.' });
     }
 
@@ -100,12 +104,12 @@ export default async function handler(req, res) {
         const works = await serverDbService.getWorks(userId);
         
         let notificationBody = "Bom dia! 👷‍♂️\n";
-        let hasActiveWork = false;
+        // let hasActiveWork = false; // Not used
 
         if (works.length === 0) {
             notificationBody += "Parece que você ainda não tem obras cadastradas. Que tal começar uma nova?\n\nToque para abrir o app e iniciar seu projeto!";
         } else {
-            hasActiveWork = true;
+            // hasActiveWork = true; // Not used
             for (const work of works) {
                 const workId = work.id;
                 const steps = await serverDbService.getSteps(workId);
@@ -142,12 +146,12 @@ export default async function handler(req, res) {
           subRecord.subscription,
           notificationPayload
         );
-        console.log(`Daily notification sent to user ${userId}.`);
+        console.log(`[send-daily-notifications] Daily notification sent to user ${userId}.`);
       } catch (sendError) {
-        console.error(`Error sending daily notification to ${subRecord.endpoint}:`, sendError);
+        console.error(`[send-daily-notifications] Error sending daily notification to ${subRecord.endpoint}:`, sendError);
         // If subscription is no longer valid, delete it from our DB
         if (sendError.statusCode === 410 || sendError.statusCode === 404) {
-            console.log(`Subscription for user ${subRecord.user_id} is stale, deleting...`);
+            console.log(`[send-daily-notifications] Subscription for user ${subRecord.user_id} is stale, deleting...`);
             await supabase.from('user_subscriptions').delete().eq('endpoint', subRecord.subscription.endpoint);
         }
       }
@@ -158,7 +162,7 @@ export default async function handler(req, res) {
     return res.status(200).json({ message: 'Daily notifications processed successfully.' });
 
   } catch (error) {
-    console.error("Internal Server Error in daily-notifications:", error);
+    console.error("[send-daily-notifications] Internal Server Error in daily-notifications:", error);
     return res.status(500).json({ error: 'Internal Server Error', message: error.message });
   }
 }
