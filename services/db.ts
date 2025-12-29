@@ -1,3 +1,4 @@
+
 import { PlanType, ExpenseCategory, StepStatus, FileCategory, type User, type Work, type Step, type Material, type Expense, type Worker, type Supplier, type WorkPhoto, type WorkFile, type Notification, type PushSubscriptionInfo } from '../types.ts';
 import { WORK_TEMPLATES, FULL_MATERIAL_PACKAGES } from './standards.ts';
 import { supabase } from './supabase.ts';
@@ -572,49 +573,6 @@ export const dbService = {
     return parsedWork;
   },
 
-  async regenerateMaterials(workId: string, area: number, templateId: string = 'CONSTRUCAO') {
-      // Supabase is guaranteed to be initialized now
-      if (!workId) return;
-      
-      const safeArea = area && area > 0 ? area : 100;
-      let materialsToInsert: any[] = [];
-
-      const { data: dbSteps } = await supabase.from('steps').select('*').eq('work_id', workId);
-      
-      if (!dbSteps || dbSteps.length === 0) return;
-
-      const template = WORK_TEMPLATES.find(t => t.id === templateId);
-      if (!template) return;
-
-      for (const stepName of template.includedSteps) {
-          const materialCatalog = FULL_MATERIAL_PACKAGES.find(p => p.category === stepName);
-          if (materialCatalog) {
-              const currentStep = dbSteps.find(s => s.name === stepName);
-              if (currentStep) {
-                  for (const item of materialCatalog.items) {
-                      materialsToInsert.push({
-                          work_id: workId,
-                          name: item.name,
-                          planned_qty: Math.ceil(safeArea * (item.multiplier || 0)),
-                          purchased_qty: 0,
-                          unit: item.unit,
-                          step_id: currentStep.id,
-                          category: materialCatalog.category
-                      });
-                  }
-              }
-          }
-      }
-      if (materialsToInsert.length > 0) {
-          // Clear existing materials for this work before inserting new ones
-          await supabase.from('materials').delete().eq('work_id', workId);
-          await supabase.from('materials').insert(materialsToInsert);
-      }
-      // Invalidate cache for materials after regeneration
-      delete _dashboardCache.stats[workId];
-      delete _dashboardCache.summary[workId];
-  },
-
   async deleteWork(workId: string) {
     // Supabase is guaranteed to be initialized now
 
@@ -1113,6 +1071,7 @@ export const dbService = {
     }).select().single();
     if (error) {
       console.error("Erro ao adicionar notificação:", error);
+      console.error("Detalhes do erro Supabase:", error.message, error.details, error.code); // Log more details
       throw error;
     }
     _dashboardCache.notifications = null; // Invalidate cache

@@ -371,7 +371,8 @@ const Dashboard: React.FC = () => {
 
   const [showPushPermissionModal, setShowPushPermissionModal] = useState(false);
   const [vapidPublicKey, setVapidPublicKey] = useState<string | null>(null);
-  const [hasCheckedPushPermission, setHasCheckedPushPermission] = useState(false); // NEW: Flag to indicate check is complete for this load cycle
+  // NEW: Use a ref for a more stable check across renders
+  const hasPromptedPushOnceRef = useRef(false);
   
   // Ref to store the PushSubscription object
   const pushSubscriptionRef = useRef<PushSubscription | null>(null);
@@ -484,69 +485,55 @@ const Dashboard: React.FC = () => {
       alert('Erro ao ativar notificações. Verifique o console.');
     } finally {
       setShowPushPermissionModal(false);
-      // After interaction, reset hasCheckedPushPermission so next load cycle can re-evaluate if permission is still 'default' and no subscription
-      setHasCheckedPushPermission(false);
+      // After interaction, ensure the ref is set so we don't re-prompt until a logical reset (e.g., app restart or manual revoke)
+      hasPromptedPushOnceRef.current = true;
     }
   }, [user, vapidPublicKey]);
 
   useEffect(() => {
-    // 1. Reset logic: If user logs out or auth state changes fundamentally, reset the flag.
-    if (!isUserAuthFinished || !user || !vapidPublicKey) {
-        if (hasCheckedPushPermission) {
-            setHasCheckedPushPermission(false);
-            setShowPushPermissionModal(false);
-        }
-        return;
-    }
-
-    // 2. Prevent re-running the full check if already completed for this session OR modal is already open
-    if (hasCheckedPushPermission || showPushPermissionModal) {
+    // 1. Exit if not authenticated, VAPID key is missing, or permission check already done for this session.
+    //    Also exit if the modal is currently open and awaiting user interaction.
+    if (!isUserAuthFinished || !user || !vapidPublicKey || hasPromptedPushOnceRef.current || showPushPermissionModal) {
         return;
     }
 
     const performPushPermissionCheck = async () => {
-        // Immediately mark that we are performing the check
-        setHasCheckedPushPermission(true); 
-
         try {
             const currentPermission = Notification.permission;
             const existingSub = await dbService.getPushSubscription(user.id);
 
-            // Decision Tree:
             if (currentPermission === 'granted') {
                 if (existingSub) {
                     pushSubscriptionRef.current = existingSub.subscription as PushSubscription;
-                } else {
-                    // Permission granted by user, but no sub in DB. This is a rare edge case.
-                    // If this happens, we assume a previous subscription was deleted from DB.
-                    // We should implicitly try to re-subscribe next time `requestPushPermission` is triggered.
                 }
+                // Even if sub is missing in DB but permission is granted, we won't prompt.
+                // The `requestPushPermission` flow would handle re-subscription if triggered.
                 setShowPushPermissionModal(false);
             } else if (currentPermission === 'denied') {
-                // User has explicitly denied. Do not prompt.
                 setShowPushPermissionModal(false);
             } else { // currentPermission === 'default'
                 if (!existingSub) {
-                    // No existing subscription AND permission is default. Show the modal.
                     setShowPushPermissionModal(true);
                 } else {
-                    // Existing subscription found, so no need to prompt.
                     setShowPushPermissionModal(false);
                 }
             }
         } catch (error) {
             console.error("Error during push permission check:", error);
-            setShowPushPermissionModal(false); // Ensure modal closes on error
+            setShowPushPermissionModal(false);
+        } finally {
+            // Mark that we've performed the check for this load cycle, even if no modal was shown.
+            hasPromptedPushOnceRef.current = true;
         }
     };
 
     // Use a timeout to de-bounce the initial check, giving other renders a chance to settle.
     const timeoutId = setTimeout(() => {
         performPushPermissionCheck();
-    }, 500); // Wait 500ms before doing the check
+    }, 500); 
 
     return () => clearTimeout(timeoutId); // Cleanup: clear timeout if component unmounts or deps change
-  }, [user, isUserAuthFinished, vapidPublicKey, hasCheckedPushPermission, showPushPermissionModal]); // Keep dependencies minimal
+  }, [user, isUserAuthFinished, vapidPublicKey, showPushPermissionModal]); // IMPORTANT: Keep showPushPermissionModal in deps, but manage hasPromptedPushOnceRef.current to prevent loops.
 
 
   const handleDismissNotification = async (notificationId: string) => {
