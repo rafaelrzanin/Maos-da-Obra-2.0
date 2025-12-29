@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx'; // FIX: Corrected import syntax
@@ -75,7 +74,7 @@ const RenderCronogramaReport: React.FC<ReportProps> = ({ steps, today, parseDate
                 }
                 
                 return (
-                    <div key={s.id} className="p-3 rounded-xl border ${bgColorClass} border-slate-200 dark:border-slate-700`}>
+                    <div key={s.id} className={`p-3 rounded-xl border ${bgColorClass} border-slate-200 dark:border-slate-700`}>
                         <div className="flex items-center gap-3 mb-2">
                             <i className={`fa-solid ${iconClass} ${iconColor} text-lg`}></i>
                             <p className={`font-bold text-sm ${textColorClass}`}>{String(idx + 1).padStart(2, '0')}. {s.name}</p>
@@ -182,8 +181,8 @@ const RenderFinanceiroReport: React.FC<ReportProps> = ({ steps, expenses, materi
                                                     {relatedMaterial && <span className="text-sm font-medium text-slate-400">(Material: {relatedMaterial.name})</span>}
                                                     {expenseWorker && <span className="text-sm font-medium text-slate-400">(Profissional: {expenseWorker.name})</span>}
                                                     {expenseSupplier && <span className="text-sm font-medium text-slate-400">(Fornecedor: {expenseSupplier.name})</span>}
-                                                </p>
-                                            </div> {/* FIX: Missing closing </p> tag here. Added it. */}
+                                                </p> {/* FIX: Missing closing </p> tag here. Added it. */}
+                                            </div>
                                         <span className="font-bold text-primary dark:text-white whitespace-nowrap">R$ {Number(exp.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                                     </li>
                                 );
@@ -218,7 +217,7 @@ const WorkDetail: React.FC = () => {
     // --- UI STATE ---
     const [activeTab, setActiveTab] = useState<MainTab>('SCHEDULE');
     const [subView, setSubView] = useState<SubView>('NONE'); 
-    const [uploading, setLoading] = useState(false); // FIX: Changed to setLoading
+    const [uploading, setUploading] = useState(false); // FIX: Renamed state from `loading` to `uploading` to avoid conflict
     const [reportActiveTab, setReportActiveTab] = useState<ReportSubTab>('CRONOGRAMA'); 
     
     // Material Filter (Main Tab)
@@ -276,7 +275,7 @@ const WorkDetail: React.FC = () => {
     const [activeChecklist, setActiveChecklist] = useState<string | null>(null);
 
     // GENERAL MODAL
-    const [zeModal, setZeModal] = useState<ZeModalProps & { id?: string }>({ 
+    const [zeModal, setZeModal] = useState<ZeModalProps>({ 
         isOpen: false, 
         title: '', 
         message: '',
@@ -284,7 +283,7 @@ const WorkDetail: React.FC = () => {
     });
 
     // CALCULATOR STATES (now in a modal)
-    const [isCalculatorModalOpen, setIsCalculatorModalOpen] = useState(false);
+    const [isCalculatorModalOpen, setIsCalculatorModalOpen] = useState(false); // Using isCalculatorModalOpen state
     const [calcType, setCalcType] = useState<'PISO'|'PAREDE'|'PINTURA'>('PISO');
     const [calcArea, setCalcArea] = useState('');
     const [calcResult, setCalcResult] = useState<string[]>([]); // FIX: Initialize with empty array
@@ -926,8 +925,8 @@ const WorkDetail: React.FC = () => {
                                                     </p>
                                                 )}
                                             </div>
-                                            <span className="font-bold text-primary dark:text-white whitespace-nowrap">R$ {Number(expense.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                                        </div>
+                                        </div> {/* FIX: Added missing closing div tag here. */}
+                                        <span className="font-bold text-primary dark:text-white whitespace-nowrap">R$ {Number(expense.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                                     </li>
                                 );
                             })}
@@ -1158,7 +1157,7 @@ const WorkDetail: React.FC = () => {
                             <h2 className="text-2xl font-black text-primary dark:text-white flex-1 text-center">Fotos da Obra</h2>
                             <label htmlFor="photo-upload" className="bg-primary text-white w-10 h-10 rounded-xl shadow-lg flex items-center justify-center hover:scale-105 transition-transform cursor-pointer">
                                 {uploading ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-upload"></i>}
-                                <input id="photo-upload" type="file" accept="image/*" className="hidden" disabled={uploading} onChange={(e) => handleFileUpload(e, 'PHOTO')} />
+                                <input id="photo-upload" type="file" accept="image/*" className="hidden" disabled={uploading} onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleFileUpload(e, 'PHOTO')} />
                             </label>
                         </div>
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
@@ -1182,7 +1181,7 @@ const WorkDetail: React.FC = () => {
                             <h2 className="text-2xl font-black text-primary dark:text-white flex-1 text-center">Projetos & Docs</h2>
                             <label htmlFor="file-upload" className="bg-primary text-white w-10 h-10 rounded-xl shadow-lg flex items-center justify-center hover:scale-105 transition-transform cursor-pointer">
                                 {uploading ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-upload"></i>}
-                                <input id="file-upload" type="file" className="hidden" disabled={uploading} onChange={(e) => handleFileUpload(e, 'FILE')} />
+                                <input id="file-upload" type="file" className="hidden" disabled={uploading} onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleFileUpload(e, 'FILE')} />
                             </label>
                         </div>
                         <div className="space-y-4">
