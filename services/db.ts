@@ -85,7 +85,8 @@ const parseExpenseFromDB = (data: any): Expense => ({
     relatedMaterialId: data.related_material_id,
     workerId: data.worker_id, // Added workerId parsing
     supplierId: data.supplier_id, // NEW: Added supplier_id parsing
-    totalAgreed: data.total_agreed ? Number(data.total_agreed) : undefined // FIX: Changed from total_agagreed to total_agreed
+    // FIX: Changed from total_agagreed to total_agreed
+    totalAgreed: data.total_agreed ? Number(data.total_agreed) : undefined 
 });
 
 const parseWorkerFromDB = (data: any): Worker => ({
@@ -681,8 +682,8 @@ export const dbService = {
     const { data, error } = await supabase.from('steps').insert({
       work_id: step.workId,
       name: step.name,
-      startDate: step.startDate,
-      endDate: step.endDate,
+      start_date: step.startDate, // FIX: Changed to snake_case
+      end_date: step.endDate, // FIX: Changed to snake_case
       status: step.status,
       is_delayed: step.isDelayed
     }).select().single();
@@ -1228,7 +1229,7 @@ export const dbService = {
         const currentSteps = prefetchedSteps || await this.getSteps(workId);
         // FIX: Corrected typo from `prefetfetchedMaterials` to `prefetchedMaterials`.
         const currentMaterials = prefetchedMaterials || await this.getMaterials(workId);
-        const currentExpenses = prefetchedExpenses || await this.getExpenses(workId); // Added for budget check
+        const currentExpenses = prefetfetchedExpenses || await this.getExpenses(workId); // Added for budget check
         const currentWork = prefetchedWork || await this.getWorkById(workId);
 
         if (!currentWork) {
@@ -1353,7 +1354,7 @@ export const dbService = {
         // FIX: Ensure this logic runs for materials tied to *truly* upcoming steps
         for (const step of upcomingSteps) { 
             const materialsForStep = currentMaterials.filter(m => m.stepId === step.id);
-            console.log(`[NOTIF DEBUG] Checking materials for upcoming step "${step.name}" (Work: "${currentWork.name}"): ${materialsForStep.map(m => `${m.name} (Planned: ${m.plannedQty}, Purchased: ${m.purchasedQty})`).join(', ') || 'Nenhum'}`);
+            console.log(`[NOTIF DEBUG] Checking materials for upcoming step "${step.name}". Tag: ${step.id}. Existing unread notif: ${!!materialsForStep}`);
 
             for (const material of materialsForStep) {
                 // FIX: Ensure plannedQty is greater than 0 to avoid division by zero and irrelevant notifications
