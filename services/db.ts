@@ -1,5 +1,4 @@
 
-
 import { PlanType, ExpenseCategory, StepStatus, FileCategory, type User, type Work, type Step, type Material, type Expense, type Worker, type Supplier, type WorkPhoto, type WorkFile, type DBNotification, type PushSubscriptionInfo } from '../types.ts';
 import { WORK_TEMPLATES, FULL_MATERIAL_PACKAGES } from './standards.ts';
 import { supabase } from './supabase.ts';
@@ -464,7 +463,7 @@ export const dbService = {
   async generatePix(_amount: number, _payer: any) {
       // This is a mock function, no actual Supabase interaction required
       return {
-          qr_code_base64: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQyF2NgYGBgAAAABQAEV9D3sgAAAABJRJAA==",
+          qr_code_base64: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQyF2NgYGBgAAAABQAEV9D3sgAAAABJRURJAA==",
           copy_paste_code: "00020126330014BR.GOV.BCB.PIX011155555555555520400005303986540510.005802BR5913Mãos da Obra6008Brasilia62070503***63041234"
       };
   },
