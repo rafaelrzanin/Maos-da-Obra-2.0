@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { PlanType } from './types.ts';
@@ -100,11 +99,11 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
 
 // Layout Component - Only applies to authenticated, subscribed areas of the app
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, authLoading, isUserAuthFinished, logout, isSubscriptionValid, trialDaysRemaining, updatePlan, unreadNotificationsCount } = useAuth(); // NEW: Get unreadNotificationsCount
+  const { user, authLoading, isUserAuthFinished, isSubscriptionValid, trialDaysRemaining, updatePlan, unreadNotificationsCount } = useAuth(); // NEW: Get unreadNotificationsCount
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false); // State for sidebar visibility
+  // const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Removed sidebar state
 
   // Log Auth State for debugging
   useEffect(() => {
@@ -114,7 +113,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // Scroll to top on route change
   useEffect(() => {
     window.scrollTo(0, 0);
-    setIsSidebarOpen(false); // Close sidebar on route change
+    // setIsSidebarOpen(false); // Close sidebar on route change - no longer needed
   }, [location.pathname]);
 
   // Handle plan update from checkout success
@@ -152,88 +151,57 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       return <Navigate to="/settings" replace />;
   }
 
+  // Define navigation items for the bottom bar
+  const navItems = [
+    { path: '/', icon: 'fa-home', label: 'Início' },
+    { path: '/create', icon: 'fa-plus-circle', label: 'Nova Obra' },
+    { path: '/ai-chat', icon: 'fa-robot', label: 'Zé AI' },
+    { path: '/notifications', icon: 'fa-bell', label: 'Alertas' },
+    { path: '/settings', icon: 'fa-gear', label: 'Config' },
+  ];
+
   return (
-    <div className="min-h-screen bg-surface dark:bg-slate-950 transition-colors">
+    <div className="min-h-screen bg-surface dark:bg-slate-950 transition-colors pb-20"> {/* Added pb-20 to main content to prevent overlap with bottom nav */}
       {/* Top Header */}
-      <header className="bg-primary text-white p-4 flex items-center justify-between shadow-md print:hidden">
-        <div className="flex items-center gap-4">
-          <button onClick={() => setIsSidebarOpen(true)} className="text-xl">
-            <i className="fa-solid fa-bars"></i>
-          </button>
-          <h1 className="text-xl font-bold">MÃOS DA OBRA</h1>
-        </div>
-        <div className="flex items-center gap-4">
-          <button onClick={toggleTheme} className="text-xl">
-            {theme === 'dark' ? <i className="fa-solid fa-sun"></i> : <i className="fa-solid fa-moon"></i>}
-          </button>
-          <button onClick={logout} className="text-xl">
-            <i className="fa-solid fa-right-from-bracket"></i>
-          </button>
-        </div>
+      <header className="bg-primary text-white p-4 flex items-center justify-center shadow-md print:hidden">
+        <h1 className="text-xl font-bold">MÃOS DA OBRA</h1>
+        <button onClick={toggleTheme} className="text-xl absolute right-4">
+          {theme === 'dark' ? <i className="fa-solid fa-sun"></i> : <i className="fa-solid fa-moon"></i>}
+        </button>
       </header>
       
-      {/* Sidebar Overlay */}
-      <div 
-        className={`fixed inset-0 bg-black/50 z-40 transition-opacity duration-300 ${isSidebarOpen ? 'opacity-100 visible' : 'opacity-0 invisible'}`}
-        onClick={() => setIsSidebarOpen(false)}
-      ></div>
-
-      {/* Sidebar Content */}
-      <nav className={`fixed top-0 left-0 h-full w-64 bg-white dark:bg-primary-light shadow-lg z-50 transform transition-transform duration-300 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-        <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-          <h2 className="text-xl font-bold text-primary dark:text-white">Menu</h2>
-          <button onClick={() => setIsSidebarOpen(false)} className="text-primary dark:text-white text-xl">
-            <i className="fa-solid fa-times"></i>
-          </button>
-        </div>
-        <ul className="py-4 space-y-2">
-          <li>
-            <button onClick={() => navigate('/')} className="block w-full text-left px-4 py-3 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
-              <i className="fa-solid fa-home mr-3"></i> Dashboard
-            </button>
-          </li>
-          <li>
-            <button onClick={() => navigate('/create')} className="block w-full text-left px-4 py-3 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
-              <i className="fa-solid fa-plus-circle mr-3"></i> Nova Obra
-            </button>
-          </li>
-          <li>
-            <button onClick={() => navigate('/ai-chat')} className="block w-full text-left px-4 py-3 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
-              <i className="fa-solid fa-robot mr-3"></i> Zé da Obra AI
-            </button>
-          </li>
-          <li> {/* NEW: Notifications menu item */}
-            <button onClick={() => navigate('/notifications')} className="block w-full text-left px-4 py-3 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors relative">
-              <i className="fa-solid fa-bell mr-3"></i> Notificações
-              {unreadNotificationsCount > 0 && (
-                <span className="absolute top-1/2 -translate-y-1/2 right-4 bg-red-500 text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center">
-                  {unreadNotificationsCount}
-                </span>
-              )}
-            </button>
-          </li>
-          <li>
-            <button onClick={() => navigate('/settings')} className="block w-full text-left px-4 py-3 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
-              <i className="fa-solid fa-gear mr-3"></i> Configurações
-            </button>
-          </li>
-          <li>
-            <button onClick={() => navigate('/profile')} className="block w-full text-left px-4 py-3 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
-              <i className="fa-solid fa-user mr-3"></i> Meu Perfil
-            </button>
-          </li>
-          <li>
-            <button onClick={() => navigate('/tutorials')} className="block w-full text-left px-4 py-3 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
-              <i className="fa-solid fa-video mr-3"></i> Tutoriais
-            </button>
-          </li>
-        </ul>
-      </nav>
-
       {/* Main Content Area */}
       <main className="p-4 max-w-7xl mx-auto">
         {children}
       </main>
+
+      {/* Bottom Navigation Bar */}
+      <nav className="fixed bottom-0 left-0 w-full bg-white dark:bg-primary-dark border-t border-slate-200 dark:border-slate-800 shadow-lg z-50 p-2 print:hidden">
+        <div className="flex justify-around items-center h-full max-w-md mx-auto">
+          {navItems.map(item => {
+            const isActive = location.pathname === item.path || (item.path === '/' && location.pathname.startsWith('/work/'));
+            return (
+              <button 
+                key={item.path} 
+                onClick={() => navigate(item.path)}
+                className={`flex flex-col items-center justify-center text-xs font-medium px-2 py-1 rounded-lg transition-colors ${
+                  isActive ? 'text-secondary' : 'text-slate-500 dark:text-slate-400 hover:text-primary dark:hover:text-white'
+                }`}
+              >
+                <div className="relative text-lg mb-1">
+                  <i className={`fa-solid ${item.icon}`}></i>
+                  {item.path === '/notifications' && unreadNotificationsCount > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center leading-none">
+                      {unreadNotificationsCount}
+                    </span>
+                  )}
+                </div>
+                {item.label}
+              </button>
+            );
+          })}
+        </div>
+      </nav>
     </div>
   );
 };
@@ -253,6 +221,7 @@ const App: React.FC = () => {
                 {/* Protected Routes - Wrapped by Layout */}
                 <Route path="/" element={<Layout><Dashboard /></Layout>} />
                 <Route path="/create" element={<Layout><CreateWork /></Layout>} />
+                {/* Removed duplicate 'element' attribute */}
                 <Route path="/work/:id" element={<Layout><WorkDetail /></Layout>} />
                 <Route path="/ai-chat" element={<Layout><AiChat /></Layout>} />
                 <Route path="/notifications" element={<Layout><Notifications /></Layout>} /> {/* NEW: Notifications Route */}

@@ -6,7 +6,7 @@ import { PlanType } from '../types.ts';
 import { LIFETIME_BONUSES } from '../services/standards.ts';
 
 const Settings: React.FC = () => {
-  const { user, isSubscriptionValid, isNewAccount } = useAuth();
+  const { user, isSubscriptionValid, isNewAccount, logout } = useAuth(); // Adicionado 'logout'
   const navigate = useNavigate();
   const [showBonusModal, setShowBonusModal] = useState(false);
 
@@ -70,8 +70,8 @@ const Settings: React.FC = () => {
           
           // Estados do Plano
           const isMyOldPlan = !isNewAccount && user.plan === plan.id;
-          const isActiveCurrent = isMyOldPlan && isSubscriptionValid;
-          const isExpiredCurrent = isMyOldPlan && !isSubscriptionValid;
+          const isActiveCurrent = isMyOldPlan && user.plan === PlanType.VITALICIO ? true : isMyOldPlan && isSubscriptionValid;
+          const isExpiredCurrent = isMyOldPlan && !isSubscriptionValid && user.plan !== PlanType.VITALICIO; // Only for non-lifetime plans
 
           // LANDING PAGE STYLE FOR VITALICIO
           if (isVitalicio) {
@@ -201,6 +201,16 @@ const Settings: React.FC = () => {
             </div>
           );
         })}
+      </div>
+
+      {/* NEW: Logout Button */}
+      <div className="mt-12 text-center">
+          <button 
+              onClick={logout} 
+              className="py-3 px-6 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl shadow-lg flex items-center justify-center gap-2 transition-colors mx-auto"
+          >
+              <i className="fa-solid fa-right-from-bracket"></i> Sair da Conta
+          </button>
       </div>
 
       {/* MODAL DE BONUS VITALICIO (Info Trigger) */}

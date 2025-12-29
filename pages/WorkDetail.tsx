@@ -206,7 +206,10 @@ const WorkDetail: React.FC = () => {
     };
 
     const handleDeleteStep = async (stepId: string) => {
-        if (!work) return; // Ensure work context is available
+        // This function is no longer called from the individual step cards.
+        // It's kept here for completeness, in case it's triggered from another place
+        // (e.g., an edit step modal which is not implemented yet with a delete button).
+        if (!work) return; 
         setZeModal({
             isOpen: true,
             title: 'Excluir Etapa?',
@@ -215,7 +218,7 @@ const WorkDetail: React.FC = () => {
             cancelText: 'Cancelar',
             type: 'DANGER',
             onConfirm: async () => {
-                await dbService.deleteStep(stepId, work.id); // Pass work.id
+                await dbService.deleteStep(stepId, work.id);
                 await load();
                 setZeModal(prev => ({ ...prev, isOpen: false, onCancel: () => {} }));
             },
@@ -224,7 +227,9 @@ const WorkDetail: React.FC = () => {
     };
 
     const handleDeleteWork = async () => {
-        if (!work) return; // Ensure work context is available
+        // This function is no longer called from the WorkDetail header.
+        // It's kept here for completeness, as it's used by the Dashboard's focused work deletion.
+        if (!work) return; 
         setZeModal({
             isOpen: true,
             title: 'Excluir Obra?',
@@ -707,7 +712,7 @@ const WorkDetail: React.FC = () => {
                                                     {expenseWorker && <span className="text-sm font-medium text-slate-400">(Profissional: {expenseWorker.name})</span>}
                                                     {expenseSupplier && <span className="text-sm font-medium text-slate-400">(Fornecedor: {expenseSupplier.name})</span>}
                                                 </p>
-                                            </div> {/* FIX: Added missing closing div tag here */}
+                                            </div>
                                             <span className="font-bold text-primary dark:text-white whitespace-nowrap">R$ {Number(exp.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                                         </li>
                                     );
@@ -793,10 +798,7 @@ const WorkDetail: React.FC = () => {
                                             </div>
                                         </div>
                                     </div>
-                                    {/* NEW: Delete Step Button */}
-                                    <button onClick={() => handleDeleteStep(step.id)} className="text-red-400 hover:text-red-600 transition-colors p-1 ml-2">
-                                        <i className="fa-solid fa-trash"></i>
-                                    </button>
+                                    {/* Removed: Delete Step Button */}
                                 </div>
                             </div>
                          );
@@ -1346,10 +1348,7 @@ const WorkDetail: React.FC = () => {
                 {/* Back button logic updated to manage inline views */}
                 <button onClick={() => subView === 'NONE' ? navigate('/') : setSubView('NONE')} className="text-slate-400 hover:text-primary dark:hover:text-white transition-colors"><i className="fa-solid fa-arrow-left text-xl"></i></button>
                 <h1 className="text-2xl font-black text-primary dark:text-white mx-auto">{work.name}</h1>
-                {/* NEW: Delete Work Button */}
-                <button onClick={handleDeleteWork} className="text-red-400 hover:text-red-600 transition-colors">
-                    <i className="fa-solid fa-trash text-xl"></i>
-                </button>
+                {/* Removed: Delete Work Button */}
             </div>
 
             {subView !== 'NONE' && (
