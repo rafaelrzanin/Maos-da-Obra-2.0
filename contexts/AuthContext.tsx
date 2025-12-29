@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, createContext, useContext, useMemo, useCallback } from 'react';
 import { User, PlanType, DBNotification } from '../types.ts';
 import { dbService } from '../services/db.ts';
@@ -52,6 +51,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   console.log("[AuthProvider] Component rendered. Initial authLoading:", authLoading, "isUserAuthFinished:", isUserAuthFinished);
 
   const refreshNotifications = useCallback(async () => {
+    console.log("[AuthContext] refreshNotifications triggered. User:", user?.id);
     if (user?.id) {
       try {
         const notifications = await dbService.getNotifications(user.id);
@@ -63,58 +63,61 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } else {
       setUnreadNotificationsCount(0);
     }
-  }, [user]);
+  }, [user]); // Depends on `user`
 
   useEffect(() => {
     let mounted = true;
-    console.log("[AuthContext] useEffect mounted, initAuth called. Mounted:", mounted);
+    console.log("[AuthContext] Main useEffect for auth setup triggered.");
 
-    const initAuth = async () => {
-        try {
-            console.log("[AuthContext] initAuth: Calling dbService.getCurrentUser()");
-            const currentUser = await dbService.getCurrentUser();
-            if (mounted) {
-                setUser(currentUser);
-                console.log("[AuthContext] initAuth resolved. User:", currentUser ? currentUser.email : 'null');
-                if (currentUser) {
-                  refreshNotifications(); // Refresh notifications after user is set
-                }
-            }
-        } catch (error) {
-            console.error("[AuthContext] Erro during initAuth:", error);
-            if (mounted) {
-                setUser(null);
-            }
-        } finally {
-            if (mounted) {
-                setAuthLoading(false); // Initial loading is done
-                setIsUserAuthFinished(true); // The initial auth check is now complete
-                console.log("[AuthContext] initAuth finally block. Setting authLoading to false and isUserAuthFinished to true.");
-            }
+    // Initial auth check
+    const checkInitialAuth = async () => {
+      setAuthLoading(true); // Começa com loading
+      try {
+        console.log("[AuthContext] checkInitialAuth: Calling dbService.getCurrentUser().");
+        const currentUser = await dbService.getCurrentUser();
+        if (mounted) {
+          setUser(currentUser);
         }
+      } catch (error) {
+        console.error("[AuthContext] Error during initial auth check:", error);
+        if (mounted) setUser(null);
+      } finally {
+        if (mounted) {
+          setAuthLoading(false); // Termina o loading inicial
+          setIsUserAuthFinished(true); // Marca que a checagem inicial foi concluída
+          console.log("[AuthContext] checkInitialAuth: Initial auth check finished.");
+        }
+      }
     };
+    checkInitialAuth();
 
-    initAuth();
 
-    const unsubscribe = dbService.onAuthChange(async (u) => {
+    // Supabase auth state change listener (deve rodar apenas uma vez para registrar o listener)
+    // Fix: The callback for dbService.onAuthChange expects a single 'user: User | null' argument.
+    const unsubscribe = dbService.onAuthChange(async (user: User | null) => {
+      if (!mounted) return;
+
+      console.log("[AuthContext] onAuthChange event received.", { user: user?.id });
+
+      // The `user` argument received here is ALREADY the result of `ensureUserProfile` from `dbService.onAuthChange`.
+      // No need to call `dbService.getUserProfile` again or process `_event` and `session`.
       if (mounted) {
-        console.log("[AuthContext] onAuthChange event. User:", u ? u.email : 'null');
-        setUser(u); 
-        setIsUserAuthFinished(true); 
-        if (u) {
-          refreshNotifications(); // Refresh notifications on auth change
+        setUser(user);
+        if (user) {
+          refreshNotifications(); 
         } else {
-          setUnreadNotificationsCount(0); // Clear notifications on logout
+          setUnreadNotificationsCount(0); // Limpa notificações no logout
         }
+        setIsUserAuthFinished(true); // Garante que auth esteja marcado como finished após qualquer evento
       }
     });
 
     return () => {
       mounted = false;
       unsubscribe();
-      console.log("[AuthContext] useEffect cleanup. Unsubscribed from auth changes.");
+      console.log("[AuthContext] Main useEffect cleanup: Auth listener unsubscribed.");
     };
-  }, [refreshNotifications]); // Add refreshNotifications to dependencies
+  }, []); // <--- CRÍTICO: Array de dependências vazio para garantir que o useEffect rode apenas uma vez.
 
   const isSubscriptionValid = useMemo(() => user ? dbService.isSubscriptionActive(user) : false, [user]);
   const isNewAccount = useMemo(() => user ? !user.subscriptionExpiresAt : true, [user]);
@@ -134,9 +137,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setAuthLoading(true); // Indicate active loading
       try {
           const currentUser = await dbService.syncSession();
-          setUser(currentUser);
           if (currentUser) {
+            setUser(currentUser);
             refreshNotifications(); // Refresh notifications after user data is refreshed
+          } else {
+            setUser(null); // Clear user if session sync fails
+            setUnreadNotificationsCount(0); // Clear notifications
           }
       } finally {
           setAuthLoading(false); // Loading complete
