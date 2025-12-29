@@ -363,7 +363,6 @@ const CreateWork: React.FC = () => {
                         
                         <div>
                             <label className="block text-xs font-black text-slate-700 dark:text-slate-300 uppercase mb-2 tracking-widest pl-1">Data de Início</label>
-                            {/* Fix: Removed duplicate onChange={handleChange} prop */}
                             <input type="date" name="startDate" value={formData.startDate} onChange={handleChange} className="w-full px-5 py-4 text-base font-bold border-2 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white rounded-2xl focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all placeholder:text-slate-300" />
                             {formErrors.startDate && <p className="text-red-500 text-sm mt-1">{formErrors.startDate}</p>}
                         </div>

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
@@ -24,6 +23,176 @@ const parseDateNoTimezone = (dateStr: string) => {
     return dateStr;
 };
 
+// --- RENDER FUNCTIONS FOR REPORT SECTIONS (REUSABLE) ---
+// These are kept as separate render functions for the REPORTS subView
+interface ReportProps {
+    steps: Step[];
+    materials: Material[];
+    expenses: Expense[];
+    workers: Worker[];
+    suppliers: Supplier[];
+    work: Work;
+    today: string; // ISO string 'YYYY-MM-DD'
+    parseDateNoTimezone: (dateStr: string) => string;
+}
+
+const RenderCronogramaReport: React.FC<ReportProps> = ({ steps, today, parseDateNoTimezone }) => (
+    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm p-6 print:shadow-none print:border-0 print:rounded-none">
+        <h3 className="text-lg font-bold text-primary dark:text-white mb-4 flex items-center gap-2">
+            <i className="fa-solid fa-calendar-days text-secondary"></i> Cronograma
+        </h3>
+        <div className="space-y-4">
+            {steps.map((s, idx) => {
+                const isDone = s.status === StepStatus.COMPLETED;
+                const isInProgress = s.status === StepStatus.IN_PROGRESS;
+                const isDelayed = s.endDate < today && !isDone;
+
+                let bgColorClass = 'bg-slate-50 dark:bg-slate-800';
+                let textColorClass = 'text-slate-600 dark:text-slate-300';
+                let iconClass = 'fa-clock';
+                let iconColor = 'text-slate-400';
+
+                if (isDone) {
+                    bgColorClass = 'bg-green-50 dark:bg-green-900/10';
+                    textColorClass = 'text-green-700 dark:text-green-400';
+                    iconClass = 'fa-check-circle';
+                    iconColor = 'text-green-600';
+                } else if (isDelayed) {
+                    bgColorClass = 'bg-red-50 dark:bg-red-900/10';
+                    textColorClass = 'text-red-700 dark:text-red-400';
+                    iconClass = 'fa-triangle-exclamation';
+                    iconColor = 'text-red-600';
+                } else if (isInProgress) {
+                    bgColorClass = 'bg-orange-50 dark:bg-orange-900/10';
+                    textColorClass = 'text-orange-700 dark:text-orange-400';
+                    iconClass = 'fa-hammer';
+                    iconColor = 'text-orange-600';
+                }
+                
+                return (
+                    <div key={s.id} className={`p-3 rounded-xl border ${bgColorClass} border-slate-200 dark:border-slate-700`}>
+                        <div className="flex items-center gap-3 mb-2">
+                            <i className={`fa-solid ${iconClass} ${iconColor} text-lg`}></i>
+                            <p className={`font-bold text-sm ${textColorClass}`}>{String(idx + 1).padStart(2, '0')}. {s.name}</p>
+                        </div>
+                        <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400">
+                            <span>Início: {parseDateNoTimezone(s.startDate)}</span>
+                            <span>Fim: {parseDateNoTimezone(s.endDate)}</span>
+                        </div>
+                    </div>
+                );
+            })}
+        </div>
+    </div>
+);
+
+const RenderMateriaisReport: React.FC<ReportProps> = ({ steps, materials, parseDateNoTimezone }) => (
+    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm p-6 print:shadow-none print:border-0 print:rounded-none">
+        <h3 className="text-lg font-bold text-primary dark:text-white mb-4 flex items-center gap-2">
+            <i className="fa-solid fa-boxes-stacked text-secondary"></i> Materiais
+        </h3>
+        <div className="space-y-6">
+            {[...steps, { id: 'general-mat', name: 'Materiais Gerais / Sem Etapa', startDate: '', endDate: '', status: StepStatus.NOT_STARTED, workId: '', isDelayed: false }].map((step) => {
+                const groupMaterials = materials.filter(m => {
+                    if (step.id === 'general-mat') return !m.stepId;
+                    return m.stepId === step.id;
+                });
+
+                if (groupMaterials.length === 0) return null;
+
+                const isGeneral = step.id === 'general-mat';
+                const stepLabel = isGeneral ? step.name : `Etapa: ${step.name}`;
+
+                return (
+                    <div key={step.id} className="bg-slate-50 dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
+                        <h4 className="font-bold text-primary dark:text-white text-sm uppercase tracking-wide mb-3">{stepLabel}</h4>
+                        <ul className="divide-y divide-slate-100 dark:divide-slate-700">
+                            {groupMaterials.map(m => {
+                                const isFullyPurchased = m.purchasedQty >= m.plannedQty;
+                                const itemStatusClass = isFullyPurchased ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-400';
+                                const itemIconClass = isFullyPurchased ? 'fa-check-circle' : 'fa-circle-exclamation';
+
+                                return (
+                                    <li key={m.id} className="py-3 flex flex-col sm:flex-row justify-between items-start sm:items-center text-xs">
+                                        <p className="font-bold text-primary dark:text-white mb-1 sm:mb-0">{m.name} {m.brand && <span className="text-slate-500 font-normal">({m.brand})</span>}</p>
+                                        <div className="flex items-center gap-2 font-mono text-right">
+                                            <span className="text-slate-700 dark:text-slate-300">Sug.: {m.plannedQty} {m.unit}</span>
+                                            <span className={`font-bold ${itemStatusClass} flex items-center gap-1`}>
+                                                <i className={`fa-solid ${itemIconClass}`}></i> Compr.: {m.purchasedQty} {m.unit}
+                                            </span>
+                                        </div>
+                                    </li>
+                                );
+                            })}
+                        </ul>
+                    </div>
+                );
+            })}
+        </div>
+    </div>
+);
+
+const RenderFinanceiroReport: React.FC<ReportProps> = ({ steps, expenses, materials, workers, suppliers, parseDateNoTimezone }) => (
+    <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm p-6 print:shadow-none print:border-0 print:rounded-none">
+        <h3 className="text-lg font-bold text-primary dark:text-white mb-4 flex items-center gap-2">
+            <i className="fa-solid fa-dollar-sign text-secondary"></i> Financeiro
+        </h3>
+        <div className="space-y-6">
+            {[...steps, { id: 'general-fin', name: 'Despesas Gerais / Sem Etapa', startDate: '', endDate: '', status: StepStatus.NOT_STARTED, workId: '', isDelayed: false }].map((step) => {
+                const groupExpenses = expenses.filter(e => {
+                    if (step.id === 'general-fin') return !e.stepId;
+                    return e.stepId === step.id;
+                });
+
+                if (groupExpenses.length === 0) return null;
+
+                const isGeneral = step.id === 'general-fin';
+                const stepLabel = isGeneral ? step.name : `Etapa: ${step.name}`;
+
+                return (
+                    <div key={step.id} className="bg-slate-50 dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
+                        <h4 className="font-bold text-primary dark:text-white text-sm uppercase tracking-wide mb-3">{stepLabel}</h4>
+                        <ul className="divide-y divide-slate-100 dark:divide-slate-700">
+                            {groupExpenses.map(exp => {
+                                const relatedMaterial = exp.relatedMaterialId ? materials.find(m => m.id === exp.relatedMaterialId) : null;
+                                const expenseWorker = exp.workerId ? workers.find(w => w.id === exp.workerId) : null;
+                                const expenseSupplier = exp.supplierId ? suppliers.find(s => s.id === exp.supplierId) : null; // NEW
+
+                                let categoryIcon = 'fa-tag';
+                                let categoryColor = 'text-slate-500';
+                                if (exp.category === ExpenseCategory.MATERIAL) {
+                                    categoryIcon = 'fa-box';
+                                    categoryColor = 'text-amber-600';
+                                } else if (exp.category === ExpenseCategory.LABOR) {
+                                    categoryIcon = 'fa-helmet-safety';
+                                    categoryColor = 'text-blue-600';
+                                }
+
+                                return (
+                                    <li key={exp.id} className="py-3 flex justify-between items-center text-xs">
+                                        <div>
+                                            <p className="font-bold text-primary dark:text-white">{exp.description}</p>
+                                            <p className="text-slate-500 mt-1 flex items-center gap-2">
+                                                <span className={`flex items-center gap-1 ${categoryColor}`}><i className={`fa-solid ${categoryIcon}`}></i> {exp.category}</span>
+                                                <span>• {parseDateNoTimezone(exp.date)}</span>
+                                                {relatedMaterial && <span className="text-sm font-medium text-slate-400">(Material: {relatedMaterial.name})</span>}
+                                                {expenseWorker && <span className="text-sm font-medium text-slate-400">(Profissional: {expenseWorker.name})</span>}
+                                                {expenseSupplier && <span className="text-sm font-medium text-slate-400">(Fornecedor: {expenseSupplier.name})</span>}
+                                            </p>
+                                        </div>
+                                        <span className="font-bold text-primary dark:text-white whitespace-nowrap">R$ {Number(exp.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                    </li>
+                                );
+                            })}
+                        </ul>
+                    </div>
+                );
+            })}
+        </div>
+    </div>
+);
+
+
 const WorkDetail: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
@@ -47,23 +216,6 @@ const WorkDetail: React.FC = () => {
     const [subView, setSubView] = useState<SubView>('NONE'); // Reverted to using subView
     const [uploading, setUploading] = useState(false);
     const [reportActiveTab, setReportActiveTab] = useState<ReportSubTab>('CRONOGRAMA'); // Keep for reports view
-    
-    // --- AI ACCESS LOGIC ---
-    const isVitalicio = user?.plan === PlanType.VITALICIO;
-    const isAiTrialActive = user?.isTrial && trialDaysRemaining !== null && trialDaysRemaining > 0;
-    const hasAiAccess = isVitalicio || isAiTrialActive;
-
-    // --- PREMIUM TOOLS LOCK ---
-    // isPremium is used for non-AI premium tools (Calculators, Contracts, Checklist)
-    const isPremium = isVitalicio;
-
-    // --- MODALS STATE ---
-    const [stepModalMode, setStepModalMode] = useState<'ADD' | 'EDIT'>('ADD');
-    const [isStepModalOpen, setIsStepModalOpen] = useState(false);
-    const [currentStepId, setCurrentStepId] = useState<string | null>(null);
-    const [stepName, setStepName] = useState('');
-    const [stepStart, setStepStart] = useState('');
-    const [stepEnd, setStepEnd] = useState('');
     
     // Material Filter (Main Tab)
     const [materialFilterStepId, setMaterialFilterStepId] = useState<string>('ALL');
@@ -125,6 +277,8 @@ const WorkDetail: React.FC = () => {
     const [calcArea, setCalcArea] = useState('');
     const [calcResult, setCalcResult] = useState<string[]>([]);
 
+    // Define today once for date comparisons
+    const today = new Date().toISOString().split('T')[0];
 
     // --- LOAD DATA ---
     const load = async () => {
@@ -518,166 +672,6 @@ const WorkDetail: React.FC = () => {
     if (!work) return <div className="text-center text-xl text-red-500 py-10">Obra não encontrada.</div>;
 
 
-    // --- RENDER FUNCTIONS FOR REPORT SECTIONS (REUSABLE) ---
-    // These are kept as separate render functions for the REPORTS subView
-    const today = new Date().toISOString().split('T')[0]; // Define today once for date comparisons
-
-    const RenderCronogramaReport: React.FC = () => (
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm p-6 print:shadow-none print:border-0 print:rounded-none">
-            <h3 className="text-lg font-bold text-primary dark:text-white mb-4 flex items-center gap-2">
-                <i className="fa-solid fa-calendar-days text-secondary"></i> Cronograma
-            </h3>
-            <div className="space-y-4">
-                {steps.map((s, idx) => {
-                    const isDone = s.status === StepStatus.COMPLETED;
-                    const isInProgress = s.status === StepStatus.IN_PROGRESS;
-                    const isDelayed = s.endDate < today && !isDone;
-
-                    let bgColorClass = 'bg-slate-50 dark:bg-slate-800';
-                    let textColorClass = 'text-slate-600 dark:text-slate-300';
-                    let iconClass = 'fa-clock';
-                    let iconColor = 'text-slate-400';
-
-                    if (isDone) {
-                        bgColorClass = 'bg-green-50 dark:bg-green-900/10';
-                        textColorClass = 'text-green-700 dark:text-green-400';
-                        iconClass = 'fa-check-circle';
-                        iconColor = 'text-green-600';
-                    } else if (isDelayed) {
-                        bgColorClass = 'bg-red-50 dark:bg-red-900/10';
-                        textColorClass = 'text-red-700 dark:text-red-400';
-                        iconClass = 'fa-triangle-exclamation';
-                        iconColor = 'text-red-600';
-                    } else if (isInProgress) {
-                        bgColorClass = 'bg-orange-50 dark:bg-orange-900/10';
-                        textColorClass = 'text-orange-700 dark:text-orange-400';
-                        iconClass = 'fa-hammer';
-                        iconColor = 'text-orange-600';
-                    }
-                    
-                    return (
-                        <div key={s.id} className={`p-3 rounded-xl border ${bgColorClass} border-slate-200 dark:border-slate-700`}>
-                            <div className="flex items-center gap-3 mb-2">
-                                <i className={`fa-solid ${iconClass} ${iconColor} text-lg`}></i>
-                                <p className={`font-bold text-sm ${textColorClass}`}>{String(idx + 1).padStart(2, '0')}. {s.name}</p>
-                            </div>
-                            <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400">
-                                <span>Início: {parseDateNoTimezone(s.startDate)}</span>
-                                <span>Fim: {parseDateNoTimezone(s.endDate)}</span>
-                            </div>
-                        </div>
-                    );
-                })}
-            </div>
-        </div>
-    );
-
-    const RenderMateriaisReport: React.FC = () => (
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm p-6 print:shadow-none print:border-0 print:rounded-none">
-            <h3 className="text-lg font-bold text-primary dark:text-white mb-4 flex items-center gap-2">
-                <i className="fa-solid fa-boxes-stacked text-secondary"></i> Materiais
-            </h3>
-            <div className="space-y-6">
-                {[...steps, { id: 'general-mat', name: 'Materiais Gerais / Sem Etapa', startDate: '', endDate: '', status: StepStatus.NOT_STARTED, workId: '', isDelayed: false }].map((step) => {
-                    const groupMaterials = materials.filter(m => {
-                        if (step.id === 'general-mat') return !m.stepId;
-                        return m.stepId === step.id;
-                    });
-
-                    if (groupMaterials.length === 0) return null;
-
-                    const isGeneral = step.id === 'general-mat';
-                    const stepLabel = isGeneral ? step.name : `Etapa: ${step.name}`;
-
-                    return (
-                        <div key={step.id} className="bg-slate-50 dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
-                            <h4 className="font-bold text-primary dark:text-white text-sm uppercase tracking-wide mb-3">{stepLabel}</h4>
-                            <ul className="divide-y divide-slate-100 dark:divide-slate-700">
-                                {groupMaterials.map(m => {
-                                    const isFullyPurchased = m.purchasedQty >= m.plannedQty;
-                                    const itemStatusClass = isFullyPurchased ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-400';
-                                    const itemIconClass = isFullyPurchased ? 'fa-check-circle' : 'fa-circle-exclamation';
-
-                                    return (
-                                        <li key={m.id} className="py-3 flex flex-col sm:flex-row justify-between items-start sm:items-center text-xs">
-                                            <p className="font-bold text-primary dark:text-white mb-1 sm:mb-0">{m.name} {m.brand && <span className="text-slate-500 font-normal">({m.brand})</span>}</p>
-                                            <div className="flex items-center gap-2 font-mono text-right">
-                                                <span className="text-slate-700 dark:text-slate-300">Sug.: {m.plannedQty} {m.unit}</span>
-                                                <span className={`font-bold ${itemStatusClass} flex items-center gap-1`}>
-                                                    <i className={`fa-solid ${itemIconClass}`}></i> Compr.: {m.purchasedQty} {m.unit}
-                                                </span>
-                                            </div>
-                                        </li>
-                                    );
-                                })}
-                            </ul>
-                        </div>
-                    );
-                })}
-            </div>
-        </div>
-    );
-
-    const RenderFinanceiroReport: React.FC = () => (
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm p-6 print:shadow-none print:border-0 print:rounded-none">
-            <h3 className="text-lg font-bold text-primary dark:text-white mb-4 flex items-center gap-2">
-                <i className="fa-solid fa-dollar-sign text-secondary"></i> Financeiro
-            </h3>
-            <div className="space-y-6">
-                {[...steps, { id: 'general-fin', name: 'Despesas Gerais / Sem Etapa', startDate: '', endDate: '', status: StepStatus.NOT_STARTED, workId: '', isDelayed: false }].map((step) => {
-                    const groupExpenses = expenses.filter(e => {
-                        if (step.id === 'general-fin') return !e.stepId;
-                        return e.stepId === step.id;
-                    });
-
-                    if (groupExpenses.length === 0) return null;
-
-                    const isGeneral = step.id === 'general-fin';
-                    const stepLabel = isGeneral ? step.name : `Etapa: ${step.name}`;
-
-                    return (
-                        <div key={step.id} className="bg-slate-50 dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
-                            <h4 className="font-bold text-primary dark:text-white text-sm uppercase tracking-wide mb-3">{stepLabel}</h4>
-                            <ul className="divide-y divide-slate-100 dark:divide-slate-700">
-                                {groupExpenses.map(exp => {
-                                    const relatedMaterial = exp.relatedMaterialId ? materials.find(m => m.id === exp.relatedMaterialId) : null;
-                                    const expenseWorker = exp.workerId ? workers.find(w => w.id === exp.workerId) : null;
-                                    const expenseSupplier = exp.supplierId ? suppliers.find(s => s.id === exp.supplierId) : null; // NEW
-
-                                    let categoryIcon = 'fa-tag';
-                                    let categoryColor = 'text-slate-500';
-                                    if (exp.category === ExpenseCategory.MATERIAL) {
-                                        categoryIcon = 'fa-box';
-                                        categoryColor = 'text-amber-600';
-                                    } else if (exp.category === ExpenseCategory.LABOR) {
-                                        categoryIcon = 'fa-helmet-safety';
-                                        categoryColor = 'text-blue-600';
-                                    }
-
-                                    return (
-                                        <li key={exp.id} className="py-3 flex justify-between items-center text-xs">
-                                            <div>
-                                                <p className="font-bold text-primary dark:text-white">{exp.description}</p>
-                                                <p className="text-slate-500 mt-1 flex items-center gap-2">
-                                                    <span className={`flex items-center gap-1 ${categoryColor}`}><i className={`fa-solid ${categoryIcon}`}></i> {exp.category}</span>
-                                                    <span>• {parseDateNoTimezone(exp.date)}</span>
-                                                    {relatedMaterial && <span className="text-sm font-medium text-slate-400">(Material: {relatedMaterial.name})</span>}
-                                                    {expenseWorker && <span className="text-sm font-medium text-slate-400">(Profissional: {expenseWorker.name})</span>}
-                                                    {expenseSupplier && <span className="text-sm font-medium text-slate-400">(Fornecedor: {expenseSupplier.name})</span>}
-                                                </p>
-                                            </div>
-                                            <span className="font-bold text-primary dark:text-white whitespace-nowrap">R$ {Number(exp.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                                        </li>
-                                    );
-                                })}
-                            </ul>
-                        </div>
-                    );
-                })}
-            </div>
-        </div>
-    );
-
     // --- RENDER MAIN TAB CONTENT ---
     const renderMainTab = () => {
         if (activeTab === 'SCHEDULE') {
@@ -913,3 +907,660 @@ const WorkDetail: React.FC = () => {
                                                     </p>
                                                 )}
                                             </div>
+                                            <span className="font-bold text-primary dark:text-white whitespace-nowrap">R$ {Number(expense.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        if (activeTab === 'MORE') {
+            return (
+                <div className="animate-in fade-in">
+                    <div className="flex justify-between items-end mb-4 px-2">
+                        <div>
+                            <h2 className="text-2xl font-black text-primary dark:text-white">Mais Ferramentas</h2>
+                            <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Recursos Adicionais</p>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <button onClick={() => setSubView('TEAM')} className="group flex items-center gap-4 bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-sm border border-slate-200 dark:border-slate-800 hover:border-secondary transition-colors">
+                            <div className="w-12 h-12 rounded-full bg-blue-100 dark:bg-blue-900/20 text-blue-600 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                                <i className="fa-solid fa-users text-xl"></i>
+                            </div>
+                            <div>
+                                <p className="font-bold text-primary dark:text-white text-lg leading-tight">Equipe</p>
+                                <p className="text-xs text-slate-500 dark:text-slate-400">Gerencie profissionais e mão de obra.</p>
+                            </div>
+                            <i className="fa-solid fa-arrow-right ml-auto text-slate-400 group-hover:text-secondary transition-colors"></i>
+                        </button>
+                        <button onClick={() => setSubView('SUPPLIERS')} className="group flex items-center gap-4 bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-sm border border-slate-200 dark:border-slate-800 hover:border-secondary transition-colors">
+                            <div className="w-12 h-12 rounded-full bg-purple-100 dark:bg-purple-900/20 text-purple-600 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                                <i className="fa-solid fa-truck-fast text-xl"></i>
+                            </div>
+                            <div>
+                                <p className="font-bold text-primary dark:text-white text-lg leading-tight">Fornecedores</p>
+                                <p className="text-xs text-slate-500 dark:text-slate-400">Mantenha seus contatos e orçamentos organizados.</p>
+                            </div>
+                            <i className="fa-solid fa-arrow-right ml-auto text-slate-400 group-hover:text-secondary transition-colors"></i>
+                        </button>
+                        <button onClick={() => setSubView('REPORTS')} className="group flex items-center gap-4 bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-sm border border-slate-200 dark:border-slate-800 hover:border-secondary transition-colors">
+                            <div className="w-12 h-12 rounded-full bg-green-100 dark:bg-green-900/20 text-green-600 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                                <i className="fa-solid fa-chart-pie text-xl"></i>
+                            </div>
+                            <div>
+                                <p className="font-bold text-primary dark:text-white text-lg leading-tight">Relatórios</p>
+                                <p className="text-xs text-slate-500 dark:text-slate-400">Visão geral e exportação de dados da obra.</p>
+                            </div>
+                            <i className="fa-solid fa-arrow-right ml-auto text-slate-400 group-hover:text-secondary transition-colors"></i>
+                        </button>
+                        <button onClick={() => setSubView('PHOTOS')} className="group flex items-center gap-4 bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-sm border border-slate-200 dark:border-slate-800 hover:border-secondary transition-colors">
+                            <div className="w-12 h-12 rounded-full bg-amber-100 dark:bg-amber-900/20 text-amber-600 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                                <i className="fa-solid fa-camera text-xl"></i>
+                            </div>
+                            <div>
+                                <p className="font-bold text-primary dark:text-white text-lg leading-tight">Fotos</p>
+                                <p className="text-xs text-slate-500 dark:text-slate-400">Registre o antes, durante e depois da sua obra.</p>
+                            </div>
+                            <i className="fa-solid fa-arrow-right ml-auto text-slate-400 group-hover:text-secondary transition-colors"></i>
+                        </button>
+                        <button onClick={() => setSubView('PROJECTS')} className="group flex items-center gap-4 bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-sm border border-slate-200 dark:border-slate-800 hover:border-secondary transition-colors">
+                            <div className="w-12 h-12 rounded-full bg-teal-100 dark:bg-teal-900/20 text-teal-600 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                                <i className="fa-solid fa-file-alt text-xl"></i>
+                            </div>
+                            <div>
+                                <p className="font-bold text-primary dark:text-white text-lg leading-tight">Projetos & Docs</p>
+                                <p className="text-xs text-slate-500 dark:text-slate-400">Armazene plantas, licenças e outros documentos.</p>
+                            </div>
+                            <i className="fa-solid fa-arrow-right ml-auto text-slate-400 group-hover:text-secondary transition-colors"></i>
+                        </button>
+                        <button onClick={() => isPremium ? setSubView('CALCULATORS') : setZeModal({isOpen: true, title: "Acesso Restrito", message: "Calculadoras avançadas estão disponíveis apenas no Plano Vitalício.", confirmText: "Entendido", onCancel: () => setZeModal(prev => ({...prev, isOpen: false}))})} className="group flex items-center gap-4 bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-sm border border-slate-200 dark:border-slate-800 hover:border-premium transition-colors">
+                            <div className="w-12 h-12 rounded-full bg-premium-light/30 dark:bg-premium-dark text-premium flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                                <i className="fa-solid fa-calculator text-xl"></i>
+                            </div>
+                            <div>
+                                <p className="font-bold text-primary dark:text-white text-lg leading-tight">Calculadoras <span className="text-[10px] text-premium-dark bg-premium-light/20 px-2 py-0.5 rounded-full ml-1 font-black uppercase">Vitalício</span></p>
+                                <p className="text-xs text-slate-500 dark:text-slate-400">Ferramentas para dimensionamento e orçamento rápido.</p>
+                            </div>
+                            <i className="fa-solid fa-lock ml-auto text-premium transition-colors"></i>
+                        </button>
+                        <button onClick={() => isPremium ? setSubView('CONTRACTS') : setZeModal({isOpen: true, title: "Acesso Restrito", message: "Modelos de contratos estão disponíveis apenas no Plano Vitalício.", confirmText: "Entendido", onCancel: () => setZeModal(prev => ({...prev, isOpen: false}))})} className="group flex items-center gap-4 bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-sm border border-slate-200 dark:border-slate-800 hover:border-premium transition-colors">
+                            <div className="w-12 h-12 rounded-full bg-premium-light/30 dark:bg-premium-dark text-premium flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                                <i className="fa-solid fa-file-contract text-xl"></i>
+                            </div>
+                            <div>
+                                <p className="font-bold text-primary dark:text-white text-lg leading-tight">Contratos <span className="text-[10px] text-premium-dark bg-premium-light/20 px-2 py-0.5 rounded-full ml-1 font-black uppercase">Vitalício</span></p>
+                                <p className="text-xs text-slate-500 dark:text-slate-400">Modelos prontos para sua equipe e fornecedores.</p>
+                            </div>
+                            <i className="fa-solid fa-lock ml-auto text-premium transition-colors"></i>
+                        </button>
+                        <button onClick={() => isPremium ? setSubView('CHECKLIST') : setZeModal({isOpen: true, title: "Acesso Restrito", message: "Checklists de qualidade estão disponíveis apenas no Plano Vitalício.", confirmText: "Entendido", onCancel: () => setZeModal(prev => ({...prev, isOpen: false}))})} className="group flex items-center gap-4 bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-sm border border-slate-200 dark:border-slate-800 hover:border-premium transition-colors">
+                            <div className="w-12 h-12 rounded-full bg-premium-light/30 dark:bg-premium-dark text-premium flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                                <i className="fa-solid fa-list-check text-xl"></i>
+                            </div>
+                            <div>
+                                <p className="font-bold text-primary dark:text-white text-lg leading-tight">Checklists <span className="text-[10px] text-premium-dark bg-premium-light/20 px-2 py-0.5 rounded-full ml-1 font-black uppercase">Vitalício</span></p>
+                                <p className="text-xs text-slate-500 dark:text-slate-400">Verifique cada etapa com listas detalhadas.</p>
+                            </div>
+                            <i className="fa-solid fa-lock ml-auto text-premium transition-colors"></i>
+                        </button>
+                    </div>
+                </div>
+            );
+        }
+        return null;
+    };
+
+    // --- RENDER SUB VIEWS (TEAM, SUPPLIERS, REPORTS, PHOTOS, PROJECTS, CALCULATORS, CONTRACTS, CHECKLIST) ---
+    const renderSubView = () => {
+        if (!work) return null; // Ensure work data is available
+
+        // Reset subView to NONE when clicking on a main tab
+        const handleBackToMore = () => setSubView('NONE');
+
+        switch (subView) {
+            case 'TEAM':
+                return (
+                    <div className="animate-in fade-in">
+                        <div className="flex items-center justify-between mb-6">
+                            <button onClick={handleBackToMore} className="text-slate-400 hover:text-primary dark:hover:text-white transition-colors"><i className="fa-solid fa-arrow-left text-xl"></i></button>
+                            <h2 className="text-2xl font-black text-primary dark:text-white flex-1 text-center">Equipe</h2>
+                            <button onClick={() => openPersonModal('WORKER')} className="bg-primary text-white w-10 h-10 rounded-xl shadow-lg flex items-center justify-center hover:scale-105 transition-transform"><i className="fa-solid fa-plus"></i></button>
+                        </div>
+                        <div className="space-y-4">
+                            {workers.length === 0 && <p className="text-center text-slate-500 dark:text-slate-400 py-8">Nenhum profissional cadastrado.</p>}
+                            {workers.map(worker => (
+                                <div key={worker.id} className="bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-sm border border-slate-200 dark:border-slate-800 flex items-center justify-between">
+                                    <div>
+                                        <p className="font-bold text-primary dark:text-white">{worker.name}</p>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400">{worker.role} • {worker.phone}</p>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <button onClick={() => openPersonModal('WORKER', worker)} className="text-slate-400 hover:text-secondary"><i className="fa-solid fa-pen-to-square"></i></button>
+                                        <button onClick={() => handleDeletePerson(worker.id, work.id, 'WORKER')} className="text-slate-400 hover:text-red-500"><i className="fa-solid fa-trash-alt"></i></button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                );
+            case 'SUPPLIERS':
+                return (
+                    <div className="animate-in fade-in">
+                        <div className="flex items-center justify-between mb-6">
+                            <button onClick={handleBackToMore} className="text-slate-400 hover:text-primary dark:hover:text-white transition-colors"><i className="fa-solid fa-arrow-left text-xl"></i></button>
+                            <h2 className="text-2xl font-black text-primary dark:text-white flex-1 text-center">Fornecedores</h2>
+                            <button onClick={() => openPersonModal('SUPPLIER')} className="bg-primary text-white w-10 h-10 rounded-xl shadow-lg flex items-center justify-center hover:scale-105 transition-transform"><i className="fa-solid fa-plus"></i></button>
+                        </div>
+                        <div className="space-y-4">
+                            {suppliers.length === 0 && <p className="text-center text-slate-500 dark:text-slate-400 py-8">Nenhum fornecedor cadastrado.</p>}
+                            {suppliers.map(supplier => (
+                                <div key={supplier.id} className="bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-sm border border-slate-200 dark:border-slate-800 flex items-center justify-between">
+                                    <div>
+                                        <p className="font-bold text-primary dark:text-white">{supplier.name}</p>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400">{supplier.category} • {supplier.phone}</p>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <button onClick={() => openPersonModal('SUPPLIER', supplier)} className="text-slate-400 hover:text-secondary"><i className="fa-solid fa-pen-to-square"></i></button>
+                                        <button onClick={() => handleDeletePerson(supplier.id, work.id, 'SUPPLIER')} className="text-slate-400 hover:text-red-500"><i className="fa-solid fa-trash-alt"></i></button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                );
+            case 'REPORTS':
+                return (
+                    <div className="animate-in fade-in">
+                        <div className="flex items-center justify-between mb-6 print:hidden">
+                            <button onClick={handleBackToMore} className="text-slate-400 hover:text-primary dark:hover:text-white transition-colors"><i className="fa-solid fa-arrow-left text-xl"></i></button>
+                            <h2 className="text-2xl font-black text-primary dark:text-white flex-1 text-center">Relatórios</h2>
+                            <div className="flex gap-2">
+                                <button onClick={handleExportExcel} className="bg-green-600 text-white w-10 h-10 rounded-xl shadow-lg flex items-center justify-center hover:scale-105 transition-transform"><i className="fa-solid fa-file-excel"></i></button>
+                                <button onClick={handlePrintPDF} className="bg-red-600 text-white w-10 h-10 rounded-xl shadow-lg flex items-center justify-center hover:scale-105 transition-transform"><i className="fa-solid fa-file-pdf"></i></button>
+                            </div>
+                        </div>
+
+                        {/* Title for print */}
+                        <div className="hidden print:block text-center mb-8">
+                            <h1 className="text-3xl font-black text-slate-900">Relatórios da Obra: {work.name}</h1>
+                            <p className="text-lg text-slate-600">Período: {parseDateNoTimezone(work.startDate)} - {parseDateNoTimezone(work.endDate)}</p>
+                            <p className="text-sm text-slate-500">Gerado em: {new Date().toLocaleDateString('pt-BR')} às {new Date().toLocaleTimeString('pt-BR')}</p>
+                        </div>
+
+                        {stats && (
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 print:grid-cols-3 print:gap-2">
+                                <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-sm border border-slate-200 dark:border-slate-800 flex flex-col items-center print:border print:p-2 print:rounded-lg">
+                                    <p className="text-xs font-bold text-slate-500 uppercase mb-1 print:text-[10px]">Progresso</p>
+                                    <p className="text-3xl font-black text-secondary print:text-xl">{stats.progress}%</p>
+                                </div>
+                                <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-sm border border-slate-200 dark:border-slate-800 flex flex-col items-center print:border print:p-2 print:rounded-lg">
+                                    <p className="text-xs font-bold text-slate-500 uppercase mb-1 print:text-[10px]">Orçamento</p>
+                                    <p className="text-3xl font-black text-primary dark:text-white print:text-xl">R$ {work.budgetPlanned.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
+                                </div>
+                                <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-sm border border-slate-200 dark:border-slate-800 flex flex-col items-center print:border print:p-2 print:rounded-lg">
+                                    <p className="text-xs font-bold text-slate-500 uppercase mb-1 print:text-[10px]">Gasto Total</p>
+                                    <p className="text-3xl font-black text-red-600 dark:text-red-400 print:text-xl">R$ {stats.totalSpent.toLocaleString('pt-BR', {minimumFractionDigits: 2})}</p>
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="flex bg-slate-100 dark:bg-slate-800 rounded-xl p-1 mb-6 print:hidden">
+                            <button onClick={() => setReportActiveTab('CRONOGRAMA')} className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${reportActiveTab === 'CRONOGRAMA' ? 'bg-white dark:bg-slate-900 text-primary dark:text-white shadow' : 'text-slate-500 hover:text-primary dark:hover:text-white'}`}>
+                                Cronograma
+                            </button>
+                            <button onClick={() => setReportActiveTab('MATERIAIS')} className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${reportActiveTab === 'MATERIAIS' ? 'bg-white dark:bg-slate-900 text-primary dark:text-white shadow' : 'text-slate-500 hover:text-primary dark:hover:text-white'}`}>
+                                Materiais
+                            </button>
+                            <button onClick={() => setReportActiveTab('FINANCEIRO')} className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${reportActiveTab === 'FINANCEIRO' ? 'bg-white dark:bg-slate-900 text-primary dark:text-white shadow' : 'text-slate-500 hover:text-primary dark:hover:text-white'}`}>
+                                Financeiro
+                            </button>
+                        </div>
+
+                        {reportActiveTab === 'CRONOGRAMA' && <RenderCronogramaReport steps={steps} materials={materials} expenses={expenses} workers={workers} suppliers={suppliers} work={work} today={today} parseDateNoTimezone={parseDateNoTimezone} />}
+                        <div className="hidden print:block"><RenderCronogramaReport steps={steps} materials={materials} expenses={expenses} workers={workers} suppliers={suppliers} work={work} today={today} parseDateNoTimezone={parseDateNoTimezone} /></div> {/* Render for print */}
+                        {reportActiveTab === 'MATERIAIS' && <RenderMateriaisReport steps={steps} materials={materials} expenses={expenses} workers={workers} suppliers={suppliers} work={work} today={today} parseDateNoTimezone={parseDateNoTimezone} />}
+                        <div className="hidden print:block"><RenderMateriaisReport steps={steps} materials={materials} expenses={expenses} workers={workers} suppliers={suppliers} work={work} today={today} parseDateNoTimezone={parseDateNoTimezone} /></div> {/* Render for print */}
+                        {reportActiveTab === 'FINANCEIRO' && <RenderFinanceiroReport steps={steps} materials={materials} expenses={expenses} workers={workers} suppliers={suppliers} work={work} today={today} parseDateNoTimezone={parseDateNoTimezone} />}
+                        <div className="hidden print:block"><RenderFinanceiroReport steps={steps} materials={materials} expenses={expenses} workers={workers} suppliers={suppliers} work={work} today={today} parseDateNoTimezone={parseDateNoTimezone} /></div> {/* Render for print */}
+
+                    </div>
+                );
+            case 'PHOTOS':
+                return (
+                    <div className="animate-in fade-in">
+                        <div className="flex items-center justify-between mb-6">
+                            <button onClick={handleBackToMore} className="text-slate-400 hover:text-primary dark:hover:text-white transition-colors"><i className="fa-solid fa-arrow-left text-xl"></i></button>
+                            <h2 className="text-2xl font-black text-primary dark:text-white flex-1 text-center">Fotos da Obra</h2>
+                            <label htmlFor="photo-upload" className="bg-primary text-white w-10 h-10 rounded-xl shadow-lg flex items-center justify-center hover:scale-105 transition-transform cursor-pointer">
+                                {uploading ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-upload"></i>}
+                                <input id="photo-upload" type="file" accept="image/*" className="hidden" disabled={uploading} onChange={(e) => handleFileUpload(e, 'PHOTO')} />
+                            </label>
+                        </div>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                            {photos.length === 0 && <p className="text-center text-slate-500 dark:text-slate-400 col-span-full py-8">Nenhuma foto adicionada.</p>}
+                            {photos.map(photo => (
+                                <div key={photo.id} className="relative group overflow-hidden rounded-xl shadow-sm border border-slate-200 dark:border-slate-800">
+                                    <img src={photo.url} alt={photo.description} className="w-full h-48 object-cover transition-transform group-hover:scale-105" />
+                                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent flex items-end p-3 text-white text-xs font-bold opacity-0 group-hover:opacity-100 transition-opacity">
+                                        {photo.description} - {parseDateNoTimezone(photo.date)}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                );
+            case 'PROJECTS':
+                return (
+                    <div className="animate-in fade-in">
+                        <div className="flex items-center justify-between mb-6">
+                            <button onClick={handleBackToMore} className="text-slate-400 hover:text-primary dark:hover:text-white transition-colors"><i className="fa-solid fa-arrow-left text-xl"></i></button>
+                            <h2 className="text-2xl font-black text-primary dark:text-white flex-1 text-center">Projetos & Docs</h2>
+                            <label htmlFor="file-upload" className="bg-primary text-white w-10 h-10 rounded-xl shadow-lg flex items-center justify-center hover:scale-105 transition-transform cursor-pointer">
+                                {uploading ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-upload"></i>}
+                                <input id="file-upload" type="file" className="hidden" disabled={uploading} onChange={(e) => handleFileUpload(e, 'FILE')} />
+                            </label>
+                        </div>
+                        <div className="space-y-4">
+                            {files.length === 0 && <p className="text-center text-slate-500 dark:text-slate-400 py-8">Nenhum arquivo adicionado.</p>}
+                            {files.map(file => (
+                                <a key={file.id} href={file.url} target="_blank" rel="noopener noreferrer" className="bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-sm border border-slate-200 dark:border-slate-800 flex items-center gap-4 hover:border-secondary transition-colors group">
+                                    <div className="w-10 h-10 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0 text-slate-500 group-hover:text-secondary">
+                                        <i className="fa-solid fa-file-alt text-xl"></i>
+                                    </div>
+                                    <div>
+                                        <p className="font-bold text-primary dark:text-white">{file.name}</p>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400">{file.category} • {parseDateNoTimezone(file.date)}</p>
+                                    </div>
+                                    <i className="fa-solid fa-download ml-auto text-slate-400 group-hover:text-secondary"></i>
+                                </a>
+                            ))}
+                        </div>
+                    </div>
+                );
+            case 'CALCULATORS':
+                return (
+                    <div className="animate-in fade-in">
+                        <div className="flex items-center justify-between mb-6">
+                            <button onClick={handleBackToMore} className="text-slate-400 hover:text-primary dark:hover:text-white transition-colors"><i className="fa-solid fa-arrow-left text-xl"></i></button>
+                            <h2 className="text-2xl font-black text-primary dark:text-white flex-1 text-center">Calculadoras</h2>
+                            <div className="w-10"></div>{/* Placeholder to balance layout */}
+                        </div>
+                        <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-sm border border-slate-200 dark:border-slate-800">
+                            <div className="flex justify-around items-center mb-6 bg-slate-50 dark:bg-slate-800 rounded-xl p-2">
+                                <button onClick={() => setCalcType('PISO')} className={`flex-1 py-2 text-sm font-bold rounded-lg ${calcType === 'PISO' ? 'bg-secondary text-white shadow' : 'text-slate-500'}`}>Piso</button>
+                                <button onClick={() => setCalcType('PAREDE')} className={`flex-1 py-2 text-sm font-bold rounded-lg ${calcType === 'PAREDE' ? 'bg-secondary text-white shadow' : 'text-slate-500'}`}>Parede</button>
+                                <button onClick={() => setCalcType('PINTURA')} className={`flex-1 py-2 text-sm font-bold rounded-lg ${calcType === 'PINTURA' ? 'bg-secondary text-white shadow' : 'text-slate-500'}`}>Pintura</button>
+                            </div>
+                            <div className="mb-6">
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Área em m²</label>
+                                <input type="number" value={calcArea} onChange={e => setCalcArea(e.target.value)} placeholder="Ex: 15.5" className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/50 transition-all" />
+                            </div>
+                            {calcResult.length > 0 && (
+                                <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-4 border border-slate-200 dark:border-slate-700">
+                                    <h3 className="font-bold text-primary dark:text-white mb-2">Resultado:</h3>
+                                    <ul className="list-disc pl-5 space-y-1 text-sm text-slate-700 dark:text-slate-300">
+                                        {calcResult.map((res, idx) => <li key={idx}>{res}</li>)}
+                                    </ul>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                );
+            case 'CONTRACTS':
+                return (
+                    <div className="animate-in fade-in">
+                        <div className="flex items-center justify-between mb-6">
+                            <button onClick={handleBackToMore} className="text-slate-400 hover:text-primary dark:hover:text-white transition-colors"><i className="fa-solid fa-arrow-left text-xl"></i></button>
+                            <h2 className="text-2xl font-black text-primary dark:text-white flex-1 text-center">Contratos</h2>
+                            <div className="w-10"></div>
+                        </div>
+                        <div className="space-y-4">
+                            {CONTRACT_TEMPLATES.map(template => (
+                                <button key={template.id} onClick={() => setViewContract({title: template.title, content: template.contentTemplate})} className="group bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-sm border border-slate-200 dark:border-slate-800 flex items-center gap-4 hover:border-secondary transition-colors w-full text-left">
+                                    <div className="w-10 h-10 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0 text-slate-500 group-hover:text-secondary">
+                                        <i className="fa-solid fa-file-contract text-xl"></i>
+                                    </div>
+                                    <div>
+                                        <p className="font-bold text-primary dark:text-white">{template.title}</p>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400">{template.description}</p>
+                                    </div>
+                                    <i className="fa-solid fa-arrow-right ml-auto text-slate-400 group-hover:text-secondary"></i>
+                                </button>
+                            ))}
+                        </div>
+                        {viewContract && (
+                            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-300">
+                                <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-2xl h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 border border-slate-200 dark:border-slate-800">
+                                    <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+                                        <h3 className="text-xl font-bold text-primary dark:text-white">{viewContract.title}</h3>
+                                        <button onClick={() => setViewContract(null)} className="text-slate-400 hover:text-primary dark:hover:text-white text-xl"><i className="fa-solid fa-xmark"></i></button>
+                                    </div>
+                                    <div className="flex-1 p-6 overflow-y-auto text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap">
+                                        {viewContract.content}
+                                    </div>
+                                    <div className="p-4 border-t border-slate-200 dark:border-slate-800">
+                                        <button onClick={() => navigator.clipboard.writeText(viewContract.content).then(() => alert('Contrato copiado!')).catch(e => console.error(e))} className="w-full py-3 bg-primary text-white font-bold rounded-xl hover:bg-primary-dark transition-colors">Copiar Contrato</button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                );
+            case 'CHECKLIST':
+                return (
+                    <div className="animate-in fade-in">
+                        <div className="flex items-center justify-between mb-6">
+                            <button onClick={handleBackToMore} className="text-slate-400 hover:text-primary dark:hover:text-white transition-colors"><i className="fa-solid fa-arrow-left text-xl"></i></button>
+                            <h2 className="text-2xl font-black text-primary dark:text-white flex-1 text-center">Checklists</h2>
+                            <div className="w-10"></div>
+                        </div>
+                        <div className="space-y-4">
+                            {STANDARD_CHECKLISTS.map(checklist => (
+                                <button key={checklist.category} onClick={() => setActiveChecklist(checklist.category)} className="group bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-sm border border-slate-200 dark:border-slate-800 flex items-center gap-4 hover:border-secondary transition-colors w-full text-left">
+                                    <div className="w-10 h-10 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center shrink-0 text-slate-500 group-hover:text-secondary">
+                                        <i className="fa-solid fa-list-check text-xl"></i>
+                                    </div>
+                                    <div>
+                                        <p className="font-bold text-primary dark:text-white">{checklist.category}</p>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400">{checklist.items.length} itens</p>
+                                    </div>
+                                    <i className="fa-solid fa-arrow-right ml-auto text-slate-400 group-hover:text-secondary"></i>
+                                </button>
+                            ))}
+                        </div>
+                        {activeChecklist && (
+                            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-300">
+                                <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-xl h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 border border-slate-200 dark:border-slate-800">
+                                    <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between">
+                                        <h3 className="text-xl font-bold text-primary dark:text-white">{activeChecklist}</h3>
+                                        <button onClick={() => setActiveChecklist(null)} className="text-slate-400 hover:text-primary dark:hover:text-white text-xl"><i className="fa-solid fa-xmark"></i></button>
+                                    </div>
+                                    <div className="flex-1 p-6 overflow-y-auto">
+                                        {STANDARD_CHECKLISTS.find(c => c.category === activeChecklist)?.items.map((item, idx) => (
+                                            <div key={idx} className="flex items-center gap-3 py-2 border-b border-slate-100 dark:border-slate-800 last:border-b-0">
+                                                <input type="checkbox" id={`check-item-${idx}`} className="form-checkbox h-5 w-5 text-secondary rounded border-slate-300 focus:ring-secondary" />
+                                                <label htmlFor={`check-item-${idx}`} className="text-sm text-primary dark:text-white flex-1">{item}</label>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <div className="p-4 border-t border-slate-200 dark:border-slate-800">
+                                        <button onClick={() => setActiveChecklist(null)} className="w-full py-3 bg-slate-100 dark:bg-slate-800 text-primary dark:text-white font-bold rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">Fechar</button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                );
+            case 'NONE':
+                return renderMainTab();
+            default:
+                return null;
+        }
+    };
+
+    return (
+        <div className="max-w-4xl mx-auto pb-12 pt-4 px-4">
+            <div className="flex items-center justify-between mb-8 print:hidden">
+                <button onClick={() => navigate('/')} className="text-slate-400 hover:text-primary dark:hover:text-white transition-colors"><i className="fa-solid fa-arrow-left text-xl"></i></button>
+                <div className="flex-1 text-center">
+                    <h1 className="text-2xl font-black text-primary dark:text-white leading-tight">{work.name}</h1>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">{work.address}</p>
+                </div>
+                <div className="w-6"></div> {/* Placeholder for alignment */}
+            </div>
+
+            <div className="print:hidden">
+                <div className="flex bg-slate-100 dark:bg-slate-800 rounded-xl p-1 mb-6">
+                    <button onClick={() => { setActiveTab('SCHEDULE'); setSubView('NONE'); }} className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${activeTab === 'SCHEDULE' ? 'bg-white dark:bg-slate-900 text-primary dark:text-white shadow' : 'text-slate-500 hover:text-primary dark:hover:text-white'}`}>
+                        Cronograma
+                    </button>
+                    <button onClick={() => { setActiveTab('MATERIALS'); setSubView('NONE'); }} className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${activeTab === 'MATERIALS' ? 'bg-white dark:bg-slate-900 text-primary dark:text-white shadow' : 'text-slate-500 hover:text-primary dark:hover:text-white'}`}>
+                        Materiais
+                    </button>
+                    <button onClick={() => { setActiveTab('FINANCIAL'); setSubView('NONE'); }} className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${activeTab === 'FINANCIAL' ? 'bg-white dark:bg-slate-900 text-primary dark:text-white shadow' : 'text-slate-500 hover:text-primary dark:hover:text-white'}`}>
+                        Financeiro
+                    </button>
+                    <button onClick={() => { setActiveTab('MORE'); setSubView('NONE'); }} className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${activeTab === 'MORE' ? 'bg-white dark:bg-slate-900 text-primary dark:text-white shadow' : 'text-slate-500 hover:text-primary dark:hover:text-white'}`}>
+                        Mais
+                    </button>
+                </div>
+            </div>
+            
+            {subView === 'NONE' ? renderMainTab() : renderSubView()}
+
+            {/* Step Modal */}
+            {isStepModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-300">
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-md p-6 shadow-2xl border border-slate-200 dark:border-slate-800 animate-in zoom-in-95 duration-200">
+                        <h3 className="text-xl font-bold text-primary dark:text-white mb-4">{stepModalMode === 'ADD' ? 'Adicionar Etapa' : 'Editar Etapa'}</h3>
+                        <form onSubmit={handleSaveStep} className="space-y-4">
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nome da Etapa</label>
+                                <input type="text" value={stepName} onChange={e => setStepName(e.target.value)} required className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/50 transition-all" />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Data Início</label>
+                                    <input type="date" value={stepStart} onChange={e => setStepStart(e.target.value)} required className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/50 transition-all" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Data Fim</label>
+                                    <input type="date" value={stepEnd} onChange={e => setStepEnd(e.target.value)} required className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/50 transition-all" />
+                                </div>
+                            </div>
+                            <div className="flex gap-3 mt-6">
+                                <button type="button" onClick={() => setIsStepModalOpen(false)} className="flex-1 py-3 rounded-xl bg-slate-100 dark:bg-slate-800 text-primary dark:text-white font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">Cancelar</button>
+                                <button type="submit" className="flex-1 py-3 rounded-xl bg-primary text-white font-bold hover:bg-primary-light transition-colors">Salvar</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Add Material Modal */}
+            {addMatModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-300">
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-md p-6 shadow-2xl border border-slate-200 dark:border-slate-800 animate-in zoom-in-95 duration-200">
+                        <h3 className="text-xl font-bold text-primary dark:text-white mb-4">Adicionar Material</h3>
+                        <form onSubmit={handleAddMaterial} className="space-y-4">
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nome do Material</label>
+                                <input type="text" value={newMatName} onChange={e => setNewMatName(e.target.value)} required className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/50 transition-all" />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Marca (Opcional)</label>
+                                <input type="text" value={newMatBrand} onChange={e => setNewMatBrand(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/50 transition-all" />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Qtd. Planejada</label>
+                                    <input type="number" value={newMatQty} onChange={e => setNewMatQty(e.target.value)} required className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/50 transition-all" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Unidade</label>
+                                    <input type="text" value={newMatUnit} onChange={e => setNewMatUnit(e.target.value)} required className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/50 transition-all" />
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Associar à Etapa (Opcional)</label>
+                                <select value={newMatStepId} onChange={e => setNewMatStepId(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/50 transition-all">
+                                    <option value="">Nenhuma</option>
+                                    {steps.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                                </select>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <input type="checkbox" id="buy-now" checked={newMatBuyNow} onChange={e => setNewMatBuyNow(e.target.checked)} className="form-checkbox h-5 w-5 text-secondary rounded border-slate-300 focus:ring-secondary" />
+                                <label htmlFor="buy-now" className="text-sm text-primary dark:text-white">Registrar compra agora?</label>
+                            </div>
+                            {newMatBuyNow && (
+                                <div className="grid grid-cols-2 gap-4 animate-in fade-in">
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Qtd. Comprada Agora</label>
+                                        <input type="number" value={newMatBuyQty} onChange={e => setNewMatBuyQty(e.target.value)} required={newMatBuyNow} className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/50 transition-all" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Custo Total da Compra (R$)</label>
+                                        <input type="number" value={newMatBuyCost} onChange={e => setNewMatBuyCost(e.target.value)} required={newMatBuyNow} className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/50 transition-all" />
+                                    </div>
+                                </div>
+                            )}
+                            <div className="flex gap-3 mt-6">
+                                <button type="button" onClick={() => setAddMatModal(false)} className="flex-1 py-3 rounded-xl bg-slate-100 dark:bg-slate-800 text-primary dark:text-white font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">Cancelar</button>
+                                <button type="submit" className="flex-1 py-3 rounded-xl bg-primary text-white font-bold hover:bg-primary-light transition-colors">Adicionar</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Material Detail/Update Modal */}
+            {materialModal.isOpen && materialModal.material && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-300">
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-md p-6 shadow-2xl border border-slate-200 dark:border-slate-800 animate-in zoom-in-95 duration-200">
+                        <h3 className="text-xl font-bold text-primary dark:text-white mb-4">Editar Material</h3>
+                        <form onSubmit={handleUpdateMaterial} className="space-y-4">
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nome do Material</label>
+                                <input type="text" value={matName} onChange={e => setMatName(e.target.value)} required className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/50 transition-all" />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Marca (Opcional)</label>
+                                <input type="text" value={matBrand} onChange={e => setMatBrand(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/50 transition-all" />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Qtd. Planejada</label>
+                                    <input type="number" value={matPlannedQty} onChange={e => setMatPlannedQty(e.target.value)} required className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/50 transition-all" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Unidade</label>
+                                    <input type="text" value={matUnit} onChange={e => setMatUnit(e.target.value)} required className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/50 transition-all" />
+                                </div>
+                            </div>
+                            <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
+                                <h4 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">Registrar Nova Compra</h4>
+                                <div className="p-3 mb-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-700 text-xs text-slate-500">
+                                    <i className="fa-solid fa-info-circle mr-2"></i>
+                                    Qtd. Comprada Atual: {materialModal.material.purchasedQty} {materialModal.material.unit}
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Qtd. Comprada Agora</label>
+                                        <input type="number" value={matBuyQty} onChange={e => setMatBuyQty(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/50 transition-all" />
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Custo Total da Compra (R$)</label>
+                                        <input type="number" value={matBuyCost} onChange={e => setMatBuyCost(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/50 transition-all" />
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="flex gap-3 mt-6">
+                                <button type="button" onClick={() => setMaterialModal({isOpen: false, material: null})} className="flex-1 py-3 rounded-xl bg-slate-100 dark:bg-slate-800 text-primary dark:text-white font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">Fechar</button>
+                                <button type="submit" className="flex-1 py-3 rounded-xl bg-primary text-white font-bold hover:bg-primary-light transition-colors">Salvar Alterações</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Expense Modal (Add/Edit) */}
+            {expenseModal.isOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-300">
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-md p-6 shadow-2xl border border-slate-200 dark:border-slate-800 animate-in zoom-in-95 duration-200">
+                        <h3 className="text-xl font-bold text-primary dark:text-white mb-4">{expenseModal.mode === 'ADD' ? 'Adicionar Gasto' : 'Editar Gasto'}</h3>
+                        <form onSubmit={handleSaveExpense} className="space-y-4">
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Descrição</label>
+                                <input type="text" value={expDesc} onChange={e => setExpDesc(e.target.value)} required className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/50 transition-all" />
+                            </div>
+                            {expenseModal.mode === 'EDIT' && (
+                                <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-700 text-xs text-slate-500">
+                                    <i className="fa-solid fa-info-circle mr-2"></i>
+                                    Valor já lançado: R$ {expSavedAmount.toLocaleString('pt-BR', {minimumFractionDigits: 2})}
+                                </div>
+                            )}
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Valor a Lançar (R$)</label>
+                                <input type="number" value={expAmount} onChange={e => setExpAmount(e.target.value)} required className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/50 transition-all" />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Total Acordado (R$ - Opcional)</label>
+                                <input type="number" value={expTotalAgreed} onChange={e => setExpTotalAgreed(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/50 transition-all" />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Categoria</label>
+                                <select value={expCategory} onChange={e => setExpCategory(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/50 transition-all">
+                                    {Object.values(ExpenseCategory).map(cat => (
+                                        <option key={cat} value={cat}>{cat}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Associar à Etapa (Opcional)</label>
+                                <select value={expStepId} onChange={e => setExpStepId(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/50 transition-all">
+                                    <option value="">Nenhuma</option>
+                                    {steps.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Data</label>
+                                <input type="date" value={expDate} onChange={e => setExpDate(e.target.value)} required className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/50 transition-all" />
+                            </div>
+                            <div className="flex gap-3 mt-6">
+                                {expenseModal.mode === 'EDIT' && (
+                                    <button type="button" onClick={handleDeleteExpense} className="flex-1 py-3 rounded-xl bg-red-100 dark:bg-red-900/20 text-red-600 dark:text-red-400 font-bold hover:bg-red-200 dark:hover:bg-red-900/30 transition-colors">Excluir</button>
+                                )}
+                                <button type="button" onClick={() => setExpenseModal({isOpen: false, mode: 'ADD'})} className="flex-1 py-3 rounded-xl bg-slate-100 dark:bg-slate-800 text-primary dark:text-white font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">Cancelar</button>
+                                <button type="submit" className="flex-1 py-3 rounded-xl bg-primary text-white font-bold hover:bg-primary-light transition-colors">Salvar</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Person Modal (Worker/Supplier) */}
+            {isPersonModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-300">
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-md p-6 shadow-2xl border border-slate-200 dark:border-slate-800 animate-in zoom-in-95 duration-200">
+                        <h3 className="text-xl font-bold text-primary dark:text-white mb-4">{personId ? 'Editar ' : 'Adicionar '}{personMode === 'WORKER' ? 'Profissional' : 'Fornecedor'}</h3>
+                        <form onSubmit={handleSavePerson} className="space-y-4">
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nome</label>
+                                <input type="text" value={personName} onChange={e => setPersonName(e.target.value)} required className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/50 transition-all" />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">{personMode === 'WORKER' ? 'Função' : 'Categoria'}</label>
+                                <select value={personRole} onChange={e => setPersonRole(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/50 transition-all">
+                                    {(personMode === 'WORKER' ? STANDARD_JOB_ROLES : STANDARD_SUPPLIER_CATEGORIES).map(role => (
+                                        <option key={role} value={role}>{role}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Telefone</label>
+                                <input type="text" value={personPhone} onChange={e => setPersonPhone(e.target.value)} required className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/50 transition-all" />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Observações (Opcional)</label>
+                                <textarea value={personNotes} onChange={e => setPersonNotes(e.target.value)} rows={3} className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/50 transition-all"></textarea>
+                            </div>
+                            <div className="flex gap-3 mt-6">
+                                <button type="button" onClick={() => setIsPersonModalOpen(false)} className="flex-1 py-3 rounded-xl bg-slate-100 dark:bg-slate-800 text-primary dark:text-white font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">Cancelar</button>
+                                <button type="submit" className="flex-1 py-3 rounded-xl bg-primary text-white font-bold hover:bg-primary-light transition-colors">Salvar</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+            <ZeModal {...zeModal} />
+        </div>
+    );
+};
+
+export default WorkDetail;
