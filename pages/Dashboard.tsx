@@ -351,12 +351,12 @@ const LiveTimeline = ({
 
 
 const Dashboard: React.FC = () => {
-  const { user, isUserAuthFinished, authLoading, refreshNotifications, unreadNotificationsCount } = useAuth(); // Added refreshNotifications and unreadNotificationsCount
+  const { user, isUserAuthFinished, authLoading, refreshNotifications, unreadNotificationsCount } = useAuth();
   const navigate = useNavigate();
   const [works, setWorks] = useState<Work[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeWorkId, setActiveWorkId] = useState<string | null>(null);
-  const [notifications, setNotifications] = useState<Notification[]>([]); // This is for the modal, the count comes from AuthContext
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [zeTip, setZeTip] = useState<ZeTip>(getRandomZeTip());
 
   // Data for the focused work (for HUD, risk radar)
@@ -364,13 +364,14 @@ const Dashboard: React.FC = () => {
   const [focusWorkStats, setFocusWorkStats] = useState<{ totalSpent: number, progress: number, delayedSteps: number } | null>(null);
   const [focusWorkDailySummary, setFocusWorkDailySummary] = useState<{ completedSteps: number, delayedSteps: number, pendingMaterials: number, totalSteps: number } | null>(null);
   const [focusWorkMaterials, setFocusWorkMaterials] = useState<Material[]>([]); 
-  const [focusWorkSteps, setFocusWorkSteps] = useState<Step[]>([]); // NEW: State for focused work's steps
+  const [focusWorkSteps, setFocusWorkSteps] = useState<Step[]>([]);
 
   const [showNotificationModal, setShowNotificationModal] = useState(false);
   const [currentNotification, setCurrentNotification] = useState<Notification | null>(null);
 
-  const [showPushPermissionModal, setShowPushPermissionModal] = useState(false); // NEW: State for Push Permission Modal
-  const [vapidPublicKey, setVapidPublicKey] = useState<string | null>(null); // NEW: VAPID Public Key State
+  const [showPushPermissionModal, setShowPushPermissionModal] = useState(false);
+  const [vapidPublicKey, setVapidPublicKey] = useState<string | null>(null);
+  const [hasCheckedPushPermission, setHasCheckedPushPermission] = useState(false); // NEW: Flag to indicate check is complete for this load cycle
   
   // Ref to store the PushSubscription object
   const pushSubscriptionRef = useRef<PushSubscription | null>(null);
@@ -378,14 +379,13 @@ const Dashboard: React.FC = () => {
 
   // Initial data load and refresh mechanism
   const loadData = useCallback(async () => {
-    if (!user?.id || !isUserAuthFinished || authLoading) return; // Wait for auth to be finished
+    if (!user?.id || !isUserAuthFinished || authLoading) return;
     
     setLoading(true);
     try {
       const userWorks = await dbService.getWorks(user.id);
       setWorks(userWorks);
 
-      // Set initial active work if none is selected or previous is gone
       const currentActiveWork = activeWorkId 
         ? userWorks.find(w => w.id === activeWorkId) 
         : userWorks[0];
@@ -394,7 +394,6 @@ const Dashboard: React.FC = () => {
         setFocusWork(currentActiveWork);
         setActiveWorkId(currentActiveWork.id);
         
-        // Fetch detailed stats and summary for the focused work
         const stats = await dbService.calculateWorkStats(currentActiveWork.id);
         setFocusWorkStats(stats);
         
@@ -404,18 +403,16 @@ const Dashboard: React.FC = () => {
         const materials = await dbService.getMaterials(currentActiveWork.id);
         setFocusWorkMaterials(materials);
 
-        // NEW: Fetch steps for the focused work
         const stepsForFocusWork = await dbService.getSteps(currentActiveWork.id);
         setFocusWorkSteps(stepsForFocusWork);
 
-        // Generate smart notifications for the active work
         await dbService.generateSmartNotifications(
           user.id, 
           currentActiveWork.id,
-          stepsForFocusWork, // Use already fetched steps
-          (await dbService.getExpenses(currentActiveWork.id)), // Prefetch expenses
-          materials, // Use already fetched materials
-          currentActiveWork // Use already fetched work
+          stepsForFocusWork,
+          (await dbService.getExpenses(currentActiveWork.id)),
+          materials,
+          currentActiveWork
         );
 
       } else {
@@ -424,13 +421,12 @@ const Dashboard: React.FC = () => {
         setFocusWorkStats(null);
         setFocusWorkDailySummary(null);
         setFocusWorkMaterials([]);
-        setFocusWorkSteps([]); // Clear steps if no work is focused
+        setFocusWorkSteps([]);
       }
       
-      // Load notifications for the user for the modal display (unread ones)
       const userNotifications = await dbService.getNotifications(user.id);
       setNotifications(userNotifications);
-      refreshNotifications(); // Also refresh the count in AuthContext
+      refreshNotifications();
 
     } catch (error) {
       console.error("Failed to load dashboard data:", error);
@@ -442,37 +438,27 @@ const Dashboard: React.FC = () => {
 
   // Effect to load data on component mount and when user/auth status changes
   useEffect(() => {
-    if (isUserAuthFinished && !authLoading && user) { // Ensure auth is finished and not loading
+    if (isUserAuthFinished && !authLoading && user) {
       loadData();
     }
   }, [loadData, isUserAuthFinished, authLoading, user]);
 
   // Check and setup VAPID public key for push notifications
   useEffect(() => {
-    // Check for VITE_VAPID_PUBLIC_KEY from import.meta.env
     const pubKey = import.meta.env.VITE_VAPID_PUBLIC_KEY;
-    if (pubKey && pubKey !== 'undefined') { // Check for "undefined" string
+    if (pubKey && pubKey !== 'undefined') {
       setVapidPublicKey(pubKey);
     } else {
       console.warn("VITE_VAPID_PUBLIC_KEY is not defined in environment variables. Push notifications will not work.");
     }
   }, []);
 
-  // --- Push Notification Logic ---
+  // --- Push Notification Logic (FIXED FOR FLICKERING) ---
   const requestPushPermission = useCallback(async () => {
     if (!('serviceWorker' in navigator) || !('PushManager' in window) || !vapidPublicKey || !user) {
       console.warn("Push notifications not supported or VAPID key/user missing.");
-      setShowPushPermissionModal(false); // Close the modal if not supported
+      setShowPushPermissionModal(false);
       return;
-    }
-
-    // Check if subscription already exists in DB
-    const existingSubscription = await dbService.getPushSubscription(user.id);
-    if (existingSubscription && Notification.permission === 'granted') {
-        console.log("Existing push subscription found and permission granted.");
-        pushSubscriptionRef.current = existingSubscription.subscription as PushSubscription;
-        setShowPushPermissionModal(false);
-        return;
     }
 
     try {
@@ -498,31 +484,69 @@ const Dashboard: React.FC = () => {
       alert('Erro ao ativar notificações. Verifique o console.');
     } finally {
       setShowPushPermissionModal(false);
+      // After interaction, reset hasCheckedPushPermission so next load cycle can re-evaluate if permission is still 'default' and no subscription
+      setHasCheckedPushPermission(false);
     }
   }, [user, vapidPublicKey]);
 
   useEffect(() => {
-    if (!isUserAuthFinished || !user || !vapidPublicKey) return;
-
-    // Check if the user has explicitly denied notifications
-    if (Notification.permission === 'denied') {
-        console.log("User has permanently denied notification permission.");
-        // We could show a UI to ask them to enable it from browser settings if needed.
+    // 1. Reset logic: If user logs out or auth state changes fundamentally, reset the flag.
+    if (!isUserAuthFinished || !user || !vapidPublicKey) {
+        if (hasCheckedPushPermission) {
+            setHasCheckedPushPermission(false);
+            setShowPushPermissionModal(false);
+        }
         return;
     }
 
-    // If permission is default and no existing subscription is found, prompt.
-    const checkAndPrompt = async () => {
-      const existingSub = await dbService.getPushSubscription(user.id);
-      if (!existingSub && Notification.permission === 'default') {
-        setShowPushPermissionModal(true);
-      } else if (existingSub && Notification.permission === 'granted') {
-        // Ensure the local ref is updated even if we don't prompt
-        pushSubscriptionRef.current = existingSub.subscription as PushSubscription;
-      }
+    // 2. Prevent re-running the full check if already completed for this session OR modal is already open
+    if (hasCheckedPushPermission || showPushPermissionModal) {
+        return;
+    }
+
+    const performPushPermissionCheck = async () => {
+        // Immediately mark that we are performing the check
+        setHasCheckedPushPermission(true); 
+
+        try {
+            const currentPermission = Notification.permission;
+            const existingSub = await dbService.getPushSubscription(user.id);
+
+            // Decision Tree:
+            if (currentPermission === 'granted') {
+                if (existingSub) {
+                    pushSubscriptionRef.current = existingSub.subscription as PushSubscription;
+                } else {
+                    // Permission granted by user, but no sub in DB. This is a rare edge case.
+                    // If this happens, we assume a previous subscription was deleted from DB.
+                    // We should implicitly try to re-subscribe next time `requestPushPermission` is triggered.
+                }
+                setShowPushPermissionModal(false);
+            } else if (currentPermission === 'denied') {
+                // User has explicitly denied. Do not prompt.
+                setShowPushPermissionModal(false);
+            } else { // currentPermission === 'default'
+                if (!existingSub) {
+                    // No existing subscription AND permission is default. Show the modal.
+                    setShowPushPermissionModal(true);
+                } else {
+                    // Existing subscription found, so no need to prompt.
+                    setShowPushPermissionModal(false);
+                }
+            }
+        } catch (error) {
+            console.error("Error during push permission check:", error);
+            setShowPushPermissionModal(false); // Ensure modal closes on error
+        }
     };
-    checkAndPrompt();
-  }, [isUserAuthFinished, user, vapidPublicKey]);
+
+    // Use a timeout to de-bounce the initial check, giving other renders a chance to settle.
+    const timeoutId = setTimeout(() => {
+        performPushPermissionCheck();
+    }, 500); // Wait 500ms before doing the check
+
+    return () => clearTimeout(timeoutId); // Cleanup: clear timeout if component unmounts or deps change
+  }, [user, isUserAuthFinished, vapidPublicKey, hasCheckedPushPermission, showPushPermissionModal]); // Keep dependencies minimal
 
 
   const handleDismissNotification = async (notificationId: string) => {
@@ -541,7 +565,6 @@ const Dashboard: React.FC = () => {
       await dbService.clearAllNotifications(user.id);
       setNotifications([]);
       refreshNotifications(); // Refresh global count
-      // No need to re-trigger smart notifications for all works, just update local state
     }
   };
 
