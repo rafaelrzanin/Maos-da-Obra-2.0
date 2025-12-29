@@ -531,37 +531,29 @@ const Dashboard: React.FC = () => {
         </>
       ) : (
         /* NEW: Empty State UI - RENDERED WHEN NO WORK IS FOCUSED */
-        <>
-          {/* NEW: User Avatar and Greeting */}
-          <div className="flex flex-col items-center justify-center mb-8 animate-in fade-in duration-500">
-            <div className="w-24 h-24 rounded-full bg-gradient-gold p-1 flex items-center justify-center text-white text-5xl shadow-xl shadow-secondary/30">
-                {user?.name ? (
-                    <span className="font-bold">{user.name.charAt(0).toUpperCase()}</span>
-                ) : (
-                    // Generic worker icon if no name is available
-                    <i className="fa-solid fa-user-tie"></i> 
-                )}
-            </div>
-            <p className="mt-4 text-2xl font-black text-primary dark:text-white">
-                Olá, {user?.name.split(' ')[0]}!
-            </p>
+        <div className={cx(surface, "rounded-[2rem] p-6 lg:p-10 mb-8 text-center py-16 animate-in fade-in duration-700")}>
+          {/* Greeting inside the card */}
+          <p className={cx("text-2xl font-black text-primary dark:text-white mb-4")}>
+              Olá, {user?.name.split(' ')[0]}!
+          </p>
+          {/* Zé da Obra Avatar with animation */}
+          <div className="w-28 h-28 mx-auto p-1 rounded-full bg-gradient-gold shadow-xl shadow-secondary/30 flex items-center justify-center mb-6 animate-float">
+              <img
+                  src={ZE_AVATAR}
+                  alt="Zé da Obra AI"
+                  className="w-full h-full object-cover rounded-full border-2 border-white dark:border-slate-800"
+                  onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK}
+              />
           </div>
-
-          <div className={cx(surface, "rounded-[2rem] p-6 lg:p-10 mb-8 text-center py-16 animate-in fade-in duration-700")}>
-            {/* Updated Icon and Styling */}
-            <div className="w-24 h-24 mx-auto bg-gradient-gold rounded-full flex items-center justify-center text-white text-5xl mb-6 shadow-xl shadow-secondary/30 transform rotate-3">
-              <i className="fa-solid fa-hammer-screwdriver -rotate-3"></i>
-            </div>
-            <p className={cx("text-3xl font-black text-primary dark:text-white mb-3 tracking-tight")}>Sua Primeira Obra Começa Aqui!</p>
-            <p className={cx("text-lg max-w-md mx-auto", mutedText)}>Crie seu primeiro projeto e comece a construir seus sonhos com o Zé da Obra!</p>
-            <button 
-              onClick={() => navigate('/create')} 
-              className="mt-10 py-5 px-10 bg-secondary text-white font-black rounded-3xl shadow-xl shadow-secondary/40 flex items-center justify-center gap-3 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 ease-out mx-auto border-2 border-secondary hover:border-orange-600"
-            >
-              <i className="fa-solid fa-plus-circle text-xl"></i> Criar Minha Primeira Obra
-            </button>
-          </div>
-        </>
+          <p className={cx("text-3xl font-black text-primary dark:text-white mb-3 tracking-tight")}>Sua Primeira Obra Começa Aqui!</p>
+          <p className={cx("text-lg max-w-md mx-auto", mutedText)}>Crie seu primeiro projeto e comece a construir seus sonhos com o Zé da Obra!</p>
+          <button 
+            onClick={() => navigate('/create')} 
+            className="mt-10 py-5 px-10 bg-secondary text-white font-black rounded-3xl shadow-xl shadow-secondary/40 flex items-center justify-center gap-3 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 ease-out mx-auto border-2 border-secondary hover:border-orange-600"
+          >
+            <i className="fa-solid fa-plus-circle text-xl"></i> Criar Minha Primeira Obra
+          </button>
+        </div>
       )}
 
       {/* General Purpose Modal (for delete confirmations etc.) */}
