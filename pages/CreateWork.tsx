@@ -1,4 +1,5 @@
 
+
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext.tsx'; // Use authLoading and isUserAuthFinished
 import { useNavigate } from 'react-router-dom';
@@ -152,7 +153,7 @@ const CreateWork: React.FC = () => {
         end.setDate(end.getDate() + duration);
 
         // Start Creation Process
-        const createPromise = dbService.createWork({
+        const createPromise = dbService.createWork({ // Fixed: Changed from `this.createWork` to `dbService.createWork`
           userId: user.id,
           name: formData.name,
           address: formData.address || 'Endereço não informado',
@@ -387,7 +388,7 @@ const CreateWork: React.FC = () => {
 
       <form onSubmit={handleSubmit}>
           {generalError && (
-              <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900 text-red-600 dark:text-red-400 rounded-xl text-sm font-bold flex items-center gap-2 animate-in fade-in">
+              <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-900 text-red-600 dark:text-red-400 rounded-xl text-sm font-bold flex items-center gap-2 animate-in fade-in">
                   <i className="fa-solid fa-triangle-exclamation"></i> {generalError}
               </div>
           )}

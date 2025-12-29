@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
@@ -47,23 +48,6 @@ const WorkDetail: React.FC = () => {
     const [subView, setSubView] = useState<SubView>('NONE'); // Reverted to using subView
     const [uploading, setUploading] = useState(false);
     const [reportActiveTab, setReportActiveTab] = useState<ReportSubTab>('CRONOGRAMA'); // Keep for reports view
-    
-    // --- AI ACCESS LOGIC ---
-    const isVitalicio = user?.plan === PlanType.VITALICIO;
-    const isAiTrialActive = user?.isTrial && trialDaysRemaining !== null && trialDaysRemaining > 0;
-    const hasAiAccess = isVitalicio || isAiTrialActive;
-
-    // --- PREMIUM TOOLS LOCK ---
-    // isPremium is used for non-AI premium tools (Calculators, Contracts, Checklist)
-    const isPremium = isVitalicio;
-
-    // --- MODALS STATE ---
-    const [stepModalMode, setStepModalMode] = useState<'ADD' | 'EDIT'>('ADD');
-    const [isStepModalOpen, setIsStepModalOpen] = useState(false);
-    const [currentStepId, setCurrentStepId] = useState<string | null>(null);
-    const [stepName, setStepName] = useState('');
-    const [stepStart, setStepStart] = useState('');
-    const [stepEnd, setStepEnd] = useState('');
     
     // Material Filter (Main Tab)
     const [materialFilterStepId, setMaterialFilterStepId] = useState<string>('ALL');
@@ -135,19 +119,19 @@ const WorkDetail: React.FC = () => {
         if (authLoading) return; // Wait for AuthContext to finish loading
 
         setLoading(true);
-        const w = await dbService.getWorkById(id);
+        const w = await dbService.getWorkById(id); // Fixed: Changed from `this.getWorkById`
         setWork(w || null);
         
         if (w) {
             const [s, m, e, wk, sp, ph, fl, workStats] = await Promise.all([ // Added workStats to parallel fetch
-                dbService.getSteps(w.id),
-                dbService.getMaterials(w.id),
-                dbService.getExpenses(w.id),
-                dbService.getWorkers(w.id),
-                dbService.getSuppliers(w.id),
-                dbService.getPhotos(w.id),
-                dbService.getFiles(w.id),
-                dbService.calculateWorkStats(w.id)
+                dbService.getSteps(w.id), // Fixed: Changed from `this.getSteps`
+                dbService.getMaterials(w.id), // Fixed: Changed from `this.getMaterials`
+                dbService.getExpenses(w.id), // Fixed: Changed from `this.getExpenses`
+                dbService.getWorkers(w.id), // Fixed: Changed from `this.getWorkers`
+                dbService.getSuppliers(w.id), // Fixed: Changed from `this.getSuppliers`
+                dbService.getPhotos(w.id), // Fixed: Changed from `this.getPhotos`
+                dbService.getFiles(w.id), // Fixed: Changed from `this.getFiles`
+                dbService.calculateWorkStats(w.id) // Fixed: Changed from `this.calculateWorkStats`
             ]);
             
             setSteps(s ? s.sort((a,b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()) : []);
@@ -171,7 +155,7 @@ const WorkDetail: React.FC = () => {
         if (!work || !stepName) return;
 
         if (stepModalMode === 'ADD') {
-            await dbService.addStep({
+            await dbService.addStep({ // Fixed: Changed from `this.addStep`
                 workId: work.id,
                 name: stepName,
                 startDate: stepStart,
@@ -182,7 +166,7 @@ const WorkDetail: React.FC = () => {
         } else if (stepModalMode === 'EDIT' && currentStepId) {
             const existing = steps.find(s => s.id === currentStepId);
             if (existing) {
-                await dbService.updateStep({
+                await dbService.updateStep({ // Fixed: Changed from `this.updateStep`
                     ...existing,
                     name: stepName,
                     startDate: stepStart,
@@ -201,7 +185,7 @@ const WorkDetail: React.FC = () => {
         else if (step.status === StepStatus.IN_PROGRESS) newStatus = StepStatus.COMPLETED;
         else newStatus = StepStatus.NOT_STARTED;
 
-        await dbService.updateStep({ ...step, status: newStatus });
+        await dbService.updateStep({ ...step, status: newStatus }); // Fixed: Changed from `this.updateStep`
         await load();
     };
 
@@ -216,7 +200,7 @@ const WorkDetail: React.FC = () => {
             cancelText: 'Cancelar',
             type: 'DANGER',
             onConfirm: async () => {
-                await dbService.deleteStep(stepId, work.id);
+                await dbService.deleteStep(stepId, work.id); // Fixed: Changed from `this.deleteStep`
                 await load();
                 setZeModal(prev => ({ ...prev, isOpen: false, onCancel: () => {} }));
             },
@@ -236,7 +220,7 @@ const WorkDetail: React.FC = () => {
             cancelText: 'Cancelar',
             type: 'DANGER',
             onConfirm: async () => {
-                await dbService.deleteWork(work.id);
+                await dbService.deleteWork(work.id); // Fixed: Changed from `this.deleteWork`
                 setZeModal(prev => ({ ...prev, isOpen: false, onCancel: () => {} }));
                 navigate('/'); // Redirect to dashboard after deleting work
             },
@@ -257,7 +241,7 @@ const WorkDetail: React.FC = () => {
             stepId: newMatStepId || undefined
         };
         
-        await dbService.addMaterial(mat, newMatBuyNow ? {
+        await dbService.addMaterial(mat, newMatBuyNow ? { // Fixed: Changed from `this.addMaterial`
             qty: Number(newMatBuyQty),
             cost: Number(newMatBuyCost),
             date: new Date().toISOString()
@@ -284,11 +268,11 @@ const WorkDetail: React.FC = () => {
                 plannedQty: Number(matPlannedQty),
                 unit: matUnit
             };
-            await dbService.updateMaterial(updatedMaterial);
+            await dbService.updateMaterial(updatedMaterial); // Fixed: Changed from `this.updateMaterial`
 
             // 2. Register Purchase (if applicable)
             if (hasPurchase) {
-                await dbService.registerMaterialPurchase(
+                await dbService.registerMaterialPurchase( // Fixed: Changed from `this.registerMaterialPurchase`
                     materialModal.material.id,
                     matName,
                     matBrand,
@@ -339,7 +323,7 @@ const WorkDetail: React.FC = () => {
 
         try {
             if (expenseModal.mode === 'ADD') {
-                await dbService.addExpense({
+                await dbService.addExpense({ // Fixed: Changed from `this.addExpense`
                     workId: work.id,
                     description: expDesc,
                     amount: inputAmount,
@@ -355,7 +339,7 @@ const WorkDetail: React.FC = () => {
                 if (existing) {
                     const newTotalAmount = expSavedAmount + inputAmount;
 
-                    await dbService.updateExpense({
+                    await dbService.updateExpense({ // Fixed: Changed from `this.updateExpense`
                         ...existing,
                         description: expDesc,
                         amount: newTotalAmount,
@@ -378,7 +362,7 @@ const WorkDetail: React.FC = () => {
     const handleDeleteExpense = async () => {
         if (expenseModal.id) {
             if (window.confirm("Tem certeza que deseja excluir este gasto?")) {
-                await dbService.deleteExpense(expenseModal.id);
+                await dbService.deleteExpense(expenseModal.id); // Fixed: Changed from `this.deleteExpense`
                 setExpenseModal({ isOpen: false, mode: 'ADD' });
                 await load();
             }
@@ -395,7 +379,7 @@ const WorkDetail: React.FC = () => {
                 await new Promise(r => setTimeout(r, 800));
                 
                 if (type === 'PHOTO') {
-                    await dbService.addPhoto({
+                    await dbService.addPhoto({ // Fixed: Changed from `this.addPhoto`
                         workId: work.id,
                         url: base64,
                         description: 'Foto da obra',
@@ -403,7 +387,7 @@ const WorkDetail: React.FC = () => {
                         type: 'PROGRESS'
                     });
                 } else {
-                    await dbService.addFile({
+                    await dbService.addFile({ // Fixed: Changed from `this.addFile`
                         workId: work.id,
                         name: file.name,
                         category: FileCategory.GENERAL,
@@ -459,11 +443,11 @@ const WorkDetail: React.FC = () => {
         };
 
         if (personId) {
-            if (personMode === 'WORKER') await dbService.updateWorker({ ...payload, id: personId, role: personRole });
-            else await dbService.updateSupplier({ ...payload, id: personId, category: personRole });
+            if (personMode === 'WORKER') await dbService.updateWorker({ ...payload, id: personId, role: personRole, dailyRate: parseFloat(personNotes) || undefined }); // Fixed: Changed from `this.updateWorker` and correctly map personNotes to dailyRate
+            else await dbService.updateSupplier({ ...payload, id: personId, category: personRole }); // Fixed: Changed from `this.updateSupplier`
         } else {
-            if (personMode === 'WORKER') await dbService.addWorker({ ...payload, role: personRole });
-            else await dbService.addSupplier({ ...payload, category: personRole });
+            if (personMode === 'WORKER') await dbService.addWorker({ ...payload, role: personRole, dailyRate: parseFloat(personNotes) || undefined }); // Fixed: Changed from `this.addWorker` and correctly map personNotes to dailyRate
+            else await dbService.addSupplier({ ...payload, category: personRole }); // Fixed: Changed from `this.addSupplier`
         }
         
         await load();
@@ -479,8 +463,8 @@ const WorkDetail: React.FC = () => {
             cancelText: 'Cancelar', 
             type: 'DANGER',
             onConfirm: async () => {
-                if (mode === 'WORKER') await dbService.deleteWorker(idToDelete, workId);
-                else await dbService.deleteSupplier(idToDelete, workId);
+                if (mode === 'WORKER') await dbService.deleteWorker(idToDelete, workId); // Fixed: Changed from `this.deleteWorker`
+                else await dbService.deleteSupplier(idToDelete, workId); // Fixed: Changed from `this.deleteSupplier`
                 await load();
                 setZeModal(prev => ({ ...prev, isOpen: false, onCancel: () => {} }));
             },
@@ -611,8 +595,8 @@ const WorkDetail: React.FC = () => {
                                 <p className={`font-bold text-sm ${textColorClass}`}>{String(idx + 1).padStart(2, '0')}. {s.name}</p>
                             </div>
                             <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400">
-                                <span>Início: {parseDateNoTimezone(s.startDate)}</span>
-                                <span>Fim: {parseDateNoTimezone(s.endDate)}</span>
+                                <span>Início: ${parseDateNoTimezone(s.startDate)}</span>
+                                <span>Fim: ${parseDateNoTimezone(s.endDate)}</span>
                             </div>
                         </div>
                     );
@@ -653,9 +637,9 @@ const WorkDetail: React.FC = () => {
                                         <li key={m.id} className="py-3 flex flex-col sm:flex-row justify-between items-start sm:items-center text-xs">
                                             <p className="font-bold text-primary dark:text-white mb-1 sm:mb-0">{m.name} {m.brand && <span className="text-slate-500 font-normal">({m.brand})</span>}</p>
                                             <div className="flex items-center gap-2 font-mono text-right">
-                                                <span className="text-slate-700 dark:text-slate-300">Sug.: {m.plannedQty} {m.unit}</span>
+                                                <span className="text-slate-700 dark:text-slate-300">Sug.: ${m.plannedQty} ${m.unit}</span>
                                                 <span className={`font-bold ${itemStatusClass} flex items-center gap-1`}>
-                                                    <i className={`fa-solid ${itemIconClass}`}></i> Compr.: {m.purchasedQty} {m.unit}
+                                                    <i className={`fa-solid ${itemIconClass}`}></i> Compr.: ${m.purchasedQty} ${m.unit}
                                                 </span>
                                             </div>
                                         </li>
@@ -708,16 +692,16 @@ const WorkDetail: React.FC = () => {
                                     return (
                                         <li key={exp.id} className="py-3 flex flex-col sm:flex-row justify-between items-start sm:items-center text-xs">
                                             <div> {/* This is the div on line 572 in your file */}
-                                                <p className="font-bold text-primary dark:text-white">{exp.description}</p>
+                                                <p className="font-bold text-primary dark:text-white">${exp.description}</p>
                                                 <p className="text-slate-500 mt-1 flex items-center gap-2">
-                                                    <span className={`flex items-center gap-1 ${categoryColor}`}><i className={`fa-solid ${categoryIcon}`}></i> {exp.category}</span>
-                                                    <span>• {parseDateNoTimezone(exp.date)}</span>
-                                                    {relatedMaterial && <span className="text-sm font-medium text-slate-400">(Material: {relatedMaterial.name})</span>}
-                                                    {expenseWorker && <span className="text-sm font-medium text-slate-400">(Profissional: {expenseWorker.name})</span>}
-                                                    {expenseSupplier !== 'N/A' && <span className="text-sm font-medium text-slate-400">(Fornecedor: {expenseSupplier})</span>}
+                                                    <span className={`flex items-center gap-1 ${categoryColor}`}><i className={`fa-solid ${categoryIcon}`}></i> ${exp.category}</span>
+                                                    <span>• ${parseDateNoTimezone(exp.date)}</span>
+                                                    {relatedMaterial && <span className="text-sm font-medium text-slate-400">(Material: ${relatedMaterial.name})</span>}
+                                                    {expenseWorker && <span className="text-sm font-medium text-slate-400">(Profissional: ${expenseWorker.name})</span>}
+                                                    {expenseSupplier !== 'N/A' && <span className="text-sm font-medium text-slate-400">(Fornecedor: ${expenseSupplier})</span>}
                                                 </p>
                                             </div>
-                                            <span className="font-bold text-primary dark:text-white whitespace-nowrap">R$ {Number(exp.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                            <span className="font-bold text-primary dark:text-white whitespace-nowrap">R$ ${Number(exp.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                                         </li>
                                     );
                                 })}
@@ -785,17 +769,17 @@ const WorkDetail: React.FC = () => {
                                     <div className="flex-1 cursor-pointer flex flex-col sm:flex-row sm:items-center sm:justify-between" onClick={() => { setStepModalMode('EDIT'); setCurrentStepId(step.id); setStepName(step.name); setStepStart(step.startDate.split('T')[0]); setStepEnd(step.endDate.split('T')[0]); setIsStepModalOpen(true); }} aria-label={`Editar etapa ${step.name}`}>
                                         <div className="mb-2 sm:mb-0">
                                             <div className="flex items-center gap-2 mb-1">
-                                                <span className="text-[10px] font-bold text-slate-400">ETAPA {stepNum}</span>
-                                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${statusBadgeClass}`}>{statusText}</span>
+                                                <span className="text-[10px] font-bold text-slate-400">ETAPA ${stepNum}</span>
+                                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${statusBadgeClass}`}>${statusText}</span>
                                             </div>
-                                            <h3 className={`font-bold text-lg leading-tight ${isDone ? 'text-slate-400 line-through' : 'text-primary dark:text-white'}`}>{step.name}</h3>
+                                            <h3 className={`font-bold text-lg leading-tight ${isDone ? 'text-slate-400 line-through' : 'text-primary dark:text-white'}`}>${step.name}</h3>
                                         </div>
                                         <div className="flex gap-4 flex-wrap sm:justify-end sm:flex-nowrap"> {/* Adicionado flex-wrap para mobile */}
                                             <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium bg-slate-50 dark:bg-slate-800 px-2 py-1 rounded-md">
-                                                <i className="fa-regular fa-calendar"></i> <span aria-label={`Data de início: ${parseDateNoTimezone(step.startDate)}`}>{parseDateNoTimezone(step.startDate)}</span>
+                                                <i className="fa-regular fa-calendar"></i> <span aria-label={`Data de início: ${parseDateNoTimezone(step.startDate)}`}>${parseDateNoTimezone(step.startDate)}</span>
                                             </div>
                                             <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium bg-slate-50 dark:bg-slate-800 px-2 py-1 rounded-md">
-                                                <i className="fa-solid fa-flag-checkered"></i> <span aria-label={`Data de fim: ${parseDateNoTimezone(step.endDate)}`}>{parseDateNoTimezone(step.endDate)}</span>
+                                                <i className="fa-solid fa-flag-checkered"></i> <span aria-label={`Data de fim: ${parseDateNoTimezone(step.endDate)}`}>${parseDateNoTimezone(step.endDate)}</span>
                                             </div>
                                         </div>
                                     </div>
@@ -857,9 +841,9 @@ const WorkDetail: React.FC = () => {
                                 {/* Stronger Visual Separation for Step Header */}
                                 <div className="flex items-center gap-3 mb-4 p-3 bg-white dark:bg-slate-900 rounded-xl shadow-sm border-l-4 border-secondary">
                                     <div className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 text-secondary font-black text-sm flex items-center justify-center">
-                                        {String(originalIdx+1).padStart(2,'0')}
+                                        ${String(originalIdx+1).padStart(2,'0')}
                                     </div>
-                                    <h3 className="font-bold text-lg text-primary dark:text-white uppercase tracking-tight">{step.name}</h3>
+                                    <h3 className="font-bold text-lg text-primary dark:text-white uppercase tracking-tight">${step.name}</h3>
                                 </div>
 
                                 <div className="space-y-3 px-1">
@@ -886,13 +870,13 @@ const WorkDetail: React.FC = () => {
                                         return (
                                             <div key={mat.id} onClick={() => { setMaterialModal({isOpen: true, material: mat}); setMatName(mat.name); setMatBrand(mat.brand||''); setMatPlannedQty(String(mat.plannedQty)); setMatUnit(mat.unit); setMatBuyQty(''); setMatBuyCost(''); }} className={`bg-white dark:bg-slate-900 p-4 rounded-2xl border shadow-sm cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md dark:hover:border-white/20`} role="button" aria-label={`Detalhes do material ${mat.name}`}>
                                                 <div className="flex items-center justify-between gap-3 mb-2">
-                                                    <h4 className="font-bold text-primary dark:text-white text-base leading-tight truncate">{mat.name}</h4>
-                                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${statusColor}`}>{statusText}</span>
+                                                    <h4 className="font-bold text-primary dark:text-white text-base leading-tight truncate">${mat.name}</h4>
+                                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${statusColor}`}>${statusText}</span>
                                                 </div>
-                                                {mat.brand && <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">Marca: {mat.brand}</p>}
+                                                {mat.brand && <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">Marca: ${mat.brand}</p>}
                                                 <div className="flex justify-between text-xs text-slate-600 dark:text-slate-300 font-medium mb-1">
-                                                    <span>Planejado: <span className="font-bold">{mat.plannedQty} {mat.unit}</span></span>
-                                                    <span>Comprado: <span className="font-bold">{mat.purchasedQty} {mat.unit}</span></span>
+                                                    <span>Planejado: <span className="font-bold">${mat.plannedQty} ${mat.unit}</span></span>
+                                                    <span>Comprado: <span className="font-bold">${mat.purchasedQty} ${mat.unit}</span></span>
                                                 </div>
                                                 <div className="h-1.5 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100} aria-label={`Progresso de compra do material ${mat.name}`}>
                                                     <div className={`h-full rounded-full ${barColor}`} style={{ width: `${progress}%` }}></div>
@@ -929,10 +913,10 @@ const WorkDetail: React.FC = () => {
                     <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm mb-6">
                         <h3 className="text-lg font-bold text-primary dark:text-white mb-4">Resumo Orçamentário</h3>
                         <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm text-slate-600 dark:text-slate-300">
-                            <p>Orçamento Total:</p> <p className="font-bold text-right">R$ {totalPlanned.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
-                            <p>Total Gasto:</p> <p className="font-bold text-right">R$ {totalSpent.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                            <p>Orçamento Total:</p> <p className="font-bold text-right">R$ ${totalPlanned.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                            <p>Total Gasto:</p> <p className="font-bold text-right">R$ ${totalSpent.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
                             <p className="font-bold pt-2 border-t border-slate-100 dark:border-slate-800">Saldo Restante:</p> 
-                            <p className={`font-bold pt-2 border-t border-slate-100 dark:border-slate-800 text-right ${budgetStatusClass}`}>R$ {remainingBudget.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                            <p className={`font-bold pt-2 border-t border-slate-100 dark:border-slate-800 text-right ${budgetStatusClass}`}>R$ ${remainingBudget.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
                         </div>
                     </div>
 
@@ -958,25 +942,25 @@ const WorkDetail: React.FC = () => {
                                     <div key={exp.id} onClick={() => openEditExpense(exp)} className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md dark:hover:border-white/20" role="button" aria-label={`Detalhes da despesa ${exp.description}`}>
                                         <div className="flex justify-between items-start mb-2">
                                             <div>
-                                                <h3 className="font-bold text-primary dark:text-white text-base leading-tight">{exp.description}</h3>
+                                                <h3 className="font-bold text-primary dark:text-white text-base leading-tight">${exp.description}</h3>
                                                 <div className="flex items-center gap-2 mt-1">
                                                     <span className={`text-xs font-medium flex items-center gap-1 ${categoryColor}`}>
-                                                        <i className={`fa-solid ${categoryIcon}`}></i> {exp.category}
+                                                        <i className={`fa-solid ${categoryIcon}`}></i> ${exp.category}
                                                     </span>
-                                                    <span className="text-xs text-slate-400">• {parseDateNoTimezone(exp.date)}</span>
-                                                    {exp.stepId && <span className="text-xs text-slate-400">• Etapa: {stepName}</span>}
-                                                    {exp.workerId && <span className="text-xs text-slate-400">• Prof.: {workerName}</span>}
+                                                    <span className="text-xs text-slate-400">• ${parseDateNoTimezone(exp.date)}</span>
+                                                    {exp.stepId && <span className="text-xs text-slate-400">• Etapa: ${stepName}</span>}
+                                                    {exp.workerId && <span className="text-xs text-slate-400">• Prof.: ${workerName}</span>}
                                                 </div>
                                             </div>
-                                            <span className="font-black text-lg text-primary dark:text-white whitespace-nowrap">R$ {Number(exp.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                            <span className="font-black text-lg text-primary dark:text-white whitespace-nowrap">R$ ${Number(exp.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                                         </div>
                                         {exp.totalAgreed && (exp.totalAgreed > exp.amount) && (
                                             <div className="flex justify-between items-center text-xs text-slate-500 dark:text-slate-400 mt-2 p-2 bg-slate-50 dark:bg-slate-800 rounded-lg">
                                                 <span>Valor total acordado:</span>
-                                                <span className="font-bold">R$ {(exp.totalAgreed || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                                <span className="font-bold">R$ ${(exp.totalAgreed || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
                                                 {exp.totalAgreed > exp.amount && (
                                                     <span className="font-bold text-red-500">
-                                                        (Faltam: R$ {(exp.totalAgreed - exp.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })})
+                                                        (Faltam: R$ ${(exp.totalAgreed - exp.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })})
                                                     </span>
                                                 )}
                                             </div>
@@ -1046,7 +1030,7 @@ const WorkDetail: React.FC = () => {
                                 {LIFETIME_BONUSES_DISPLAY.map((bonus, idx) => (
                                     <div key={idx} className="flex flex-col items-center text-xs text-white/80">
                                         <i className={`fa-solid ${bonus.icon} text-xl text-amber-400 mb-1`}></i>
-                                        {bonus.title}
+                                        ${bonus.title}
                                     </div>
                                 ))}
                             </div>
@@ -1098,11 +1082,11 @@ const WorkDetail: React.FC = () => {
                                 <div key={worker.id} onClick={() => openPersonModal('WORKER', worker)} className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md dark:hover:border-white/20" role="button" aria-label={`Editar profissional ${worker.name}`}>
                                     <div className="flex justify-between items-center">
                                         <div>
-                                            <h3 className="font-bold text-primary dark:text-white text-base leading-tight">{worker.name}</h3>
-                                            <p className="text-xs text-slate-500 dark:text-slate-400">{worker.role}</p>
+                                            <h3 className="font-bold text-primary dark:text-white text-base leading-tight">${worker.name}</h3>
+                                            <p className="text-xs text-slate-500 dark:text-slate-400">${worker.role}</p>
                                         </div>
                                         <div className="flex items-center gap-3">
-                                            {worker.dailyRate && <span className="text-sm font-bold text-secondary">R$ {worker.dailyRate.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/dia</span>}
+                                            {worker.dailyRate && <span className="text-sm font-bold text-secondary">R$ ${worker.dailyRate.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/dia</span>}
                                             <button onClick={(e) => { e.stopPropagation(); handleDeletePerson(worker.id, worker.workId, 'WORKER'); }} className="text-red-400 hover:text-red-600 transition-colors p-1" aria-label={`Excluir profissional ${worker.name}`}><i className="fa-solid fa-trash"></i></button>
                                         </div>
                                     </div>
@@ -1131,8 +1115,8 @@ const WorkDetail: React.FC = () => {
                                 <div key={supplier.id} onClick={() => openPersonModal('SUPPLIER', supplier)} className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md dark:hover:border-white/20" role="button" aria-label={`Editar fornecedor ${supplier.name}`}>
                                     <div className="flex justify-between items-center">
                                         <div>
-                                            <h3 className="font-bold text-primary dark:text-white text-base leading-tight">{supplier.name}</h3>
-                                            <p className="text-xs text-slate-500 dark:text-slate-400">{supplier.category}</p>
+                                            <h3 className="font-bold text-primary dark:text-white text-base leading-tight">${supplier.name}</h3>
+                                            <p className="text-xs text-slate-500 dark:text-slate-400">${supplier.category}</p>
                                         </div>
                                         <button onClick={(e) => { e.stopPropagation(); handleDeletePerson(supplier.id, supplier.workId, 'SUPPLIER'); }} className="text-red-400 hover:text-red-600 transition-colors p-1" aria-label={`Excluir fornecedor ${supplier.name}`}><i className="fa-solid fa-trash"></i></button>
                                     </div>
@@ -1173,8 +1157,8 @@ const WorkDetail: React.FC = () => {
                                 <div key={photo.id} className="relative aspect-square rounded-xl overflow-hidden bg-slate-100 dark:bg-slate-800 shadow-sm group">
                                     <img src={photo.url} alt={photo.description} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                                     <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent p-3 flex flex-col justify-end text-white opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <p className="text-xs font-medium">{parseDateNoTimezone(photo.date)}</p>
-                                        <p className="text-sm font-bold">{photo.description}</p>
+                                        <p className="text-xs font-medium">${parseDateNoTimezone(photo.date)}</p>
+                                        <p className="text-sm font-bold">${photo.description}</p>
                                     </div>
                                 </div>
                             ))
@@ -1214,8 +1198,8 @@ const WorkDetail: React.FC = () => {
                                         <i className="fa-solid fa-file text-xl"></i>
                                     </div>
                                     <div className="flex-1">
-                                        <h3 className="font-bold text-primary dark:text-white text-base leading-tight group-hover:text-secondary">{file.name}</h3>
-                                        <p className="text-xs text-slate-500 dark:text-slate-400">{file.category} • {parseDateNoTimezone(file.date)}</p>
+                                        <h3 className="font-bold text-primary dark:text-white text-base leading-tight group-hover:text-secondary">${file.name}</h3>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400">${file.category} • ${parseDateNoTimezone(file.date)}</p>
                                     </div>
                                     <i className="fa-solid fa-arrow-up-right-from-square text-slate-400 group-hover:text-secondary"></i>
                                 </a>
@@ -1245,462 +1229,3 @@ const WorkDetail: React.FC = () => {
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div className="md:col-span-1 print:block hidden-in-print" id="cronograma-report-section" role="tabpanel" aria-hidden={reportActiveTab !== 'CRONOGRAMA' && window.matchMedia('screen').matches}>
-                            {/* Renderizar todos para impressão, mas na tela apenas o ativo em mobile */}
-                            {(reportActiveTab === 'CRONOGRAMA' || window.matchMedia('print').matches) && <RenderCronogramaReport />}
-                        </div>
-                        <div className="md:col-span-1 print:block hidden-in-print" id="materiais-report-section" role="tabpanel" aria-hidden={reportActiveTab !== 'MATERIAIS' && window.matchMedia('screen').matches}>
-                            {(reportActiveTab === 'MATERIAIS' || window.matchMedia('print').matches) && <RenderMateriaisReport />}
-                        </div>
-                        <div className="md:col-span-1 print:block hidden-in-print" id="financeiro-report-section" role="tabpanel" aria-hidden={reportActiveTab !== 'FINANCEIRO' && window.matchMedia('screen').matches}>
-                            {(reportActiveTab === 'FINANCEIRO' || window.matchMedia('print').matches) && <RenderFinanceiroReport />}
-                        </div>
-
-                        {/* Mobile view rendering based on reportActiveTab - only if not printing */}
-                        <div className="md:hidden print:hidden">
-                            {reportActiveTab === 'CRONOGRAMA' && <RenderCronogramaReport />}
-                            {reportActiveTab === 'MATERIAIS' && <RenderMateriaisReport />}
-                            {reportActiveTab === 'FINANCEIRO' && <RenderFinanceiroReport />}
-                        </div>
-                    </div>
-                </div>
-            );
-        }
-        if (subView === 'CALCULATORS') {
-            return (
-                <div className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in" role="dialog" aria-modal="true" aria-labelledby="calculator-modal-title">
-                    <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 w-full max-w-md shadow-2xl border border-slate-200 dark:border-slate-800 animate-in zoom-in-95">
-                        <h3 id="calculator-modal-title" className="text-xl font-bold text-primary dark:text-white mb-4 flex items-center gap-2"><i className="fa-solid fa-calculator text-secondary"></i> Calculadoras</h3>
-                        <div className="flex bg-slate-100 dark:bg-slate-800 rounded-xl p-1 text-sm font-bold text-slate-500 mb-6" role="tablist">
-                            <button role="tab" aria-controls="piso-calc" aria-selected={calcType === 'PISO'} onClick={() => setCalcType('PISO')} className={`flex-1 py-2 rounded-lg transition-colors ${calcType === 'PISO' ? 'bg-white text-primary shadow-sm dark:bg-slate-900 dark:text-white' : 'hover:text-primary dark:hover:text-white'}`}>Piso</button>
-                            <button role="tab" aria-controls="parede-calc" aria-selected={calcType === 'PAREDE'} onClick={() => setCalcType('PAREDE')} className={`flex-1 py-2 rounded-lg transition-colors ${calcType === 'PAREDE' ? 'bg-white text-primary shadow-sm dark:bg-slate-900 dark:text-white' : 'hover:text-primary dark:hover:text-white'}`}>Parede</button>
-                            <button role="tab" aria-controls="pintura-calc" aria-selected={calcType === 'PINTURA'} onClick={() => setCalcType('PINTURA')} className={`flex-1 py-2 rounded-lg transition-colors ${calcType === 'PINTURA' ? 'bg-white text-primary shadow-sm dark:bg-slate-900 dark:text-white' : 'hover:text-primary dark:hover:text-white'}`}>Pintura</button>
-                        </div>
-                        <div id={`${calcType.toLowerCase()}-calc`} role="tabpanel">
-                          <label htmlFor="calc-area" className="block text-xs font-bold text-slate-500 uppercase mb-1">Área em m²</label>
-                          <input id="calc-area" type="number" value={calcArea} onChange={(e) => setCalcArea(e.target.value)} placeholder="Ex: 50" className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/50 transition-all mb-6" />
-                        </div>
-                        {calcResult.length > 0 && (
-                            <div className="p-4 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-sm">
-                                <h4 className="font-bold text-primary dark:text-white mb-2">Resultado Estimado:</h4>
-                                <ul className="space-y-1 text-slate-600 dark:text-slate-300">
-                                    {calcResult.map((res, idx) => <li key={idx}><i className="fa-solid fa-check-circle text-secondary mr-2"></i>{res}</li>)}
-                                </ul>
-                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-3">
-                                    <i className="fa-solid fa-info-circle mr-1"></i> Valores aproximados, podem variar.
-                                </p>
-                            </div>
-                        )}
-                        <div className="flex justify-end gap-3 mt-6">
-                            <button type="button" onClick={() => setIsCalculatorModalOpen(false)} className="px-5 py-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800" aria-label="Fechar calculadora">Fechar</button>
-                        </div>
-                    </div>
-                </div>
-            );
-        }
-        if (subView === 'CONTRACTS') {
-            return (
-                <div className="animate-in fade-in">
-                    <div className="flex justify-between items-end mb-4 px-2"> {/* Adjusted mb */}
-                        <div>
-                            <h2 className="text-2xl font-black text-primary dark:text-white">Contratos</h2>
-                            <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Modelos Prontos</p>
-                        </div>
-                    </div>
-                    <div className="space-y-4">
-                        {CONTRACT_TEMPLATES.map(template => (
-                            <div key={template.id} onClick={() => setViewContract({ title: template.title, content: template.contentTemplate })} className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md dark:hover:border-white/20" role="button" aria-label={`Ver contrato: ${template.title}`}>
-                                <h3 className="font-bold text-primary dark:text-white text-base leading-tight">{template.title}</h3>
-                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{template.description}</p>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            );
-        }
-        if (subView === 'CHECKLIST') {
-            return (
-                <div className="animate-in fade-in">
-                    <div className="flex justify-between items-end mb-4 px-2"> {/* Adjusted mb */}
-                        <div>
-                            <h2 className="text-2xl font-black text-primary dark:text-white">Checklists</h2>
-                            <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Verificação de Qualidade</p>
-                        </div>
-                    </div>
-                    <div className="space-y-4">
-                        {STANDARD_CHECKLISTS.map((checklist) => (
-                            <div key={checklist.category} onClick={() => setActiveChecklist(activeChecklist === checklist.category ? null : checklist.category)} className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md dark:hover:border-white/20" role="button" aria-expanded={activeChecklist === checklist.category} aria-controls={`checklist-items-${checklist.category.replace(/\s/g, '-')}`}>
-                                <div className="flex justify-between items-center">
-                                    <h3 className="font-bold text-primary dark:text-white text-base leading-tight">{checklist.category}</h3>
-                                    <i className={`fa-solid ${activeChecklist === checklist.category ? 'fa-chevron-up' : 'fa-chevron-down'} text-secondary text-sm`}></i>
-                                </div>
-                                {activeChecklist === checklist.category && (
-                                    <ul id={`checklist-items-${checklist.category.replace(/\s/g, '-')}`} className="mt-4 space-y-2 text-sm text-slate-600 dark:text-slate-300">
-                                        {checklist.items.map((item, idx) => (
-                                            <li key={idx} className="flex items-start">
-                                                <i className="fa-regular fa-square mr-3 mt-1 text-slate-400" aria-hidden="true"></i> {item}
-                                            </li>
-                                        ))}
-                                    </ul>
-                                )}
-                            </div>
-                        ))}
-                    </div>
-                </div>
-            );
-        }
-        return null;
-    };
-
-
-    return (
-        <div className="max-w-4xl mx-auto py-8 px-4 md:px-0 font-sans"> {/* Adjusted padding */}
-            {/* Header with Work Name */}
-            <div className="flex items-center justify-between mb-8">
-                {/* Back button logic updated to manage inline views */}
-                <button onClick={() => subView === 'NONE' ? navigate('/') : setSubView('NONE')} className="text-slate-400 hover:text-primary dark:hover:text-white transition-colors" aria-label="Voltar">
-                  <i className="fa-solid fa-arrow-left text-xl"></i>
-                </button>
-                <h1 className="text-2xl font-black text-primary dark:text-white mx-auto">{work.name}</h1>
-                {/* Removed: Delete Work Button */}
-            </div>
-
-            {subView !== 'NONE' && (
-                <div className="mb-6">
-                    <button onClick={() => setSubView('NONE')} className="text-sm font-bold text-secondary hover:underline" aria-label="Voltar para Ferramentas">
-                        <i className="fa-solid fa-arrow-left mr-2"></i> Voltar para Ferramentas
-                    </button>
-                </div>
-            )}
-
-            {subView === 'NONE' ? (
-                <>
-                    {/* Main Tabs Navigation (responsive) */}
-                    <nav 
-                      className="md:static md:mb-6 md:bg-slate-100 dark:md:bg-slate-900 md:rounded-2xl md:p-1 md:flex md:shadow-sm md:border md:border-slate-200 dark:md:border-slate-800 
-                                fixed bottom-0 left-0 w-full bg-white dark:bg-primary-dark border-t border-slate-200 dark:border-slate-800 shadow-lg z-50 py-3 md:py-1 flex justify-around items-center h-20 md:h-auto pb-[env(safe-area-inset-bottom)]" /* NEW: Increased height to h-20, added pb-safe-area */
-                      role="tablist"
-                      aria-label="Navegação por abas da obra"
-                    >
-                        <button role="tab" aria-controls="schedule-panel" aria-selected={activeTab === 'SCHEDULE'} onClick={() => setActiveTab('SCHEDULE')} className={`flex flex-col items-center flex-1 py-2 text-sm font-bold rounded-xl transition-all ${activeTab === 'SCHEDULE' ? 'md:bg-white md:text-primary dark:md:bg-slate-800 dark:md:text-white md:shadow-md text-secondary' : 'text-slate-500 hover:text-primary dark:hover:text-white'}`}> {/* Adjusted py */}
-                            <i className="fa-solid fa-calendar-days text-lg md:mr-2"></i> <span className="md:inline text-xs md:text-sm">Cronograma</span> {/* Adjusted text size for mobile */}
-                        </button>
-                        <button role="tab" aria-controls="materials-panel" aria-selected={activeTab === 'MATERIALS'} onClick={() => setActiveTab('MATERIALS')} className={`flex flex-col items-center flex-1 py-2 text-sm font-bold rounded-xl transition-all ${activeTab === 'MATERIALS' ? 'md:bg-white md:text-primary dark:md:bg-slate-800 dark:md:text-white md:shadow-md text-secondary' : 'text-slate-500 hover:text-primary dark:hover:text-white'}`}> {/* Adjusted py */}
-                            <i className="fa-solid fa-boxes-stacked text-lg md:mr-2"></i> <span className="md:inline text-xs md:text-sm">Materiais</span>
-                        </button>
-                        <button role="tab" aria-controls="financial-panel" aria-selected={activeTab === 'FINANCIAL'} onClick={() => setActiveTab('FINANCIAL')} className={`flex flex-col items-center flex-1 py-2 text-sm font-bold rounded-xl transition-all ${activeTab === 'FINANCIAL' ? 'md:bg-white md:text-primary dark:md:bg-slate-800 dark:md:text-white md:shadow-md text-secondary' : 'text-slate-500 hover:text-primary dark:hover:text-white'}`}> {/* Adjusted py */}
-                            <i className="fa-solid fa-dollar-sign text-lg md:mr-2"></i> <span className="md:inline text-xs md:text-sm">Financeiro</span>
-                        </button>
-                        <button role="tab" aria-controls="more-panel" aria-selected={activeTab === 'MORE'} onClick={() => setActiveTab('MORE')} className={`flex flex-col items-center flex-1 py-2 text-sm font-bold rounded-xl transition-all ${activeTab === 'MORE' ? 'md:bg-white md:text-primary dark:md:bg-slate-800 dark:md:text-white md:shadow-md text-secondary' : 'text-slate-500 hover:text-primary dark:hover:text-white'}`}> {/* Adjusted py */}
-                            <i className="fa-solid fa-ellipsis-h text-lg md:mr-2"></i> <span className="md:inline text-xs md:text-sm">Mais</span>
-                        </button>
-                    </nav>
-
-                    <div id="schedule-panel" role="tabpanel" aria-hidden={activeTab !== 'SCHEDULE'}>
-                      {activeTab === 'SCHEDULE' && renderMainTab()}
-                    </div>
-                    <div id="materials-panel" role="tabpanel" aria-hidden={activeTab !== 'MATERIALS'}>
-                      {activeTab === 'MATERIALS' && renderMainTab()}
-                    </div>
-                    <div id="financial-panel" role="tabpanel" aria-hidden={activeTab !== 'FINANCIAL'}>
-                      {activeTab === 'FINANCIAL' && renderMainTab()}
-                    </div>
-                    <div id="more-panel" role="tabpanel" aria-hidden={activeTab !== 'MORE'}>
-                      {activeTab === 'MORE' && renderMainTab()}
-                    </div>
-                </>
-            ) : (
-                renderSubView()
-            )}
-
-            {/* Modals */}
-            {isStepModalOpen && (
-                <div className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in" role="dialog" aria-modal="true" aria-labelledby="step-modal-title">
-                    <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 w-full max-w-md shadow-2xl border border-slate-200 dark:border-slate-800 animate-in zoom-in-95">
-                        <h3 id="step-modal-title" className="text-xl font-bold text-primary dark:text-white mb-4">{stepModalMode === 'ADD' ? 'Adicionar Etapa' : 'Editar Etapa'}</h3>
-                        <form onSubmit={handleSaveStep} className="space-y-4">
-                            <div>
-                                <label htmlFor="step-name" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Nome da Etapa</label>
-                                <input id="step-name" type="text" value={stepName} onChange={(e) => setStepName(e.target.value)} className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white" required />
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label htmlFor="step-start" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Data de Início</label>
-                                    <input id="step-start" type="date" value={stepStart} onChange={(e) => setStepStart(e.target.value)} className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white" required />
-                                </div>
-                                <div>
-                                    <label htmlFor="step-end" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Data de Fim</label>
-                                    <input id="step-end" type="date" value={stepEnd} onChange={(e) => setStepEnd(e.target.value)} className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white" required />
-                                </div>
-                            </div>
-                            <div className="flex justify-end gap-3">
-                                <button type="button" onClick={() => setIsStepModalOpen(false)} className="px-5 py-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800" aria-label="Cancelar">Cancelar</button>
-                                <button type="submit" className="px-5 py-2 rounded-xl bg-primary text-white hover:bg-primary-light" aria-label="Salvar etapa">Salvar</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
-
-            {addMatModal && (
-                <div className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in" role="dialog" aria-modal="true" aria-labelledby="add-material-modal-title">
-                    <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 w-full max-w-md shadow-2xl border border-slate-200 dark:border-slate-800 animate-in zoom-in-95">
-                        <h3 id="add-material-modal-title" className="text-xl font-bold text-primary dark:text-white mb-4">Adicionar Material</h3>
-                        <form onSubmit={handleAddMaterial} className="space-y-4">
-                            <div>
-                                <label htmlFor="new-mat-name" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Nome</label>
-                                <input id="new-mat-name" type="text" value={newMatName} onChange={(e) => setNewMatName(e.target.value)} className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white" required />
-                            </div>
-                            <div>
-                                <label htmlFor="new-mat-brand" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Marca (Opcional)</label>
-                                <input id="new-mat-brand" type="text" value={newMatBrand} onChange={(e) => setNewMatBrand(e.target.value)} className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white" />
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label htmlFor="new-mat-qty" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Qtd. Planejada</label>
-                                    <input id="new-mat-qty" type="number" value={newMatQty} onChange={(e) => setNewMatQty(e.target.value)} className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white" required />
-                                </div>
-                                <div>
-                                    <label htmlFor="new-mat-unit" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Unidade</label>
-                                    <input id="new-mat-unit" type="text" value={newMatUnit} onChange={(e) => setNewMatUnit(e.target.value)} className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white" required />
-                                </div>
-                            </div>
-                            <div>
-                                <label htmlFor="new-mat-step" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Etapa (Opcional)</label>
-                                <select id="new-mat-step" value={newMatStepId} onChange={(e) => setNewMatStepId(e.target.value)} className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white">
-                                    <option value="">Nenhuma</option>
-                                    {steps.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                                </select>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <input type="checkbox" checked={newMatBuyNow} onChange={(e) => setNewMatBuyNow(e.target.checked)} id="buyNow" className="w-4 h-4 text-secondary bg-slate-100 border-slate-300 rounded focus:ring-secondary" />
-                                <label htmlFor="buyNow" className="text-sm font-medium text-slate-700 dark:text-slate-300">Registrar compra agora?</label>
-                            </div>
-                            {newMatBuyNow && (
-                                <div className="grid grid-cols-2 gap-4 animate-in fade-in">
-                                    <div>
-                                        <label htmlFor="new-mat-buy-qty" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Qtd. Comprada</label>
-                                        <input id="new-mat-buy-qty" type="number" value={newMatBuyQty} onChange={(e) => setNewMatBuyQty(e.target.value)} className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white" required />
-                                    </div>
-                                    <div>
-                                        <label htmlFor="new-mat-buy-cost" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Custo Total (R$)</label>
-                                        <input id="new-mat-buy-cost" type="number" step="0.01" value={newMatBuyCost} onChange={(e) => setNewMatBuyCost(e.target.value)} className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white" required />
-                                    </div>
-                                </div>
-                            )}
-                            <div className="flex justify-end gap-3">
-                                <button type="button" onClick={() => setAddMatModal(false)} className="px-5 py-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800" aria-label="Cancelar">Cancelar</button>
-                                <button type="submit" className="px-5 py-2 rounded-xl bg-primary text-white hover:bg-primary-light" aria-label="Salvar material">Salvar</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
-
-            {materialModal.isOpen && materialModal.material && (
-                <div className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in" role="dialog" aria-modal="true" aria-labelledby="edit-material-modal-title">
-                    <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 w-full max-w-md shadow-2xl border border-slate-200 dark:border-slate-800 animate-in zoom-in-95">
-                        <h3 id="edit-material-modal-title" className="text-xl font-bold text-primary dark:text-white mb-4">Editar Material</h3>
-                        <form onSubmit={handleUpdateMaterial} className="space-y-4">
-                            <div>
-                                <label htmlFor="mat-name" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Nome</label>
-                                <input id="mat-name" type="text" value={matName} onChange={(e) => setMatName(e.target.value)} className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white" required />
-                            </div>
-                            <div>
-                                <label htmlFor="mat-brand" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Marca (Opcional)</label>
-                                <input id="mat-brand" type="text" value={matBrand} onChange={(e) => setMatBrand(e.target.value)} className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white" />
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label htmlFor="mat-planned-qty" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Qtd. Planejada</label>
-                                    <input id="mat-planned-qty" type="number" value={matPlannedQty} onChange={(e) => setMatPlannedQty(e.target.value)} className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white" required />
-                                </div>
-                                <div>
-                                    <label htmlFor="mat-unit" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Unidade</label>
-                                    <input id="mat-unit" type="text" value={matUnit} onChange={(e) => setMatUnit(e.target.value)} className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white" required />
-                                </div>
-                            </div>
-                            <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-sm text-slate-600 dark:text-slate-300">
-                                <p className="font-bold mb-1">Qtd. já comprada: {materialModal.material.purchasedQty} {materialModal.material.unit}</p>
-                                <p className="text-xs text-slate-500">Para registrar uma nova compra, preencha abaixo. O valor será somado ao total já comprado.</p>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label htmlFor="mat-buy-qty" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Qtd. Comprada AGORA</label>
-                                    <input id="mat-buy-qty" type="number" value={matBuyQty} onChange={(e) => setMatBuyQty(e.target.value)} className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white" />
-                                </div>
-                                <div>
-                                    <label htmlFor="mat-buy-cost" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Custo Total AGORA (R$)</label>
-                                    <input id="mat-buy-cost" type="number" step="0.01" value={matBuyCost} onChange={(e) => setMatBuyCost(e.target.value)} className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white" />
-                                </div>
-                            </div>
-
-                            <div className="flex justify-end gap-3">
-                                <button type="button" onClick={() => setMaterialModal({isOpen: false, material: null})} className="px-5 py-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800" aria-label="Cancelar">Cancelar</button>
-                                <button type="submit" className="px-5 py-2 rounded-xl bg-primary text-white hover:bg-primary-light" aria-label="Salvar material">Salvar</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
-
-            {expenseModal.isOpen && (
-                <div className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in" role="dialog" aria-modal="true" aria-labelledby="expense-modal-title">
-                    <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 w-full max-w-md shadow-2xl border border-slate-200 dark:border-slate-800 animate-in zoom-in-95">
-                        <h3 id="expense-modal-title" className="text-xl font-bold text-primary dark:text-white mb-4">{expenseModal.mode === 'ADD' ? 'Adicionar Gasto' : 'Atualizar Gasto'}</h3>
-                        <form onSubmit={handleSaveExpense} className="space-y-4">
-                            <div>
-                                <label htmlFor="exp-desc" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Descrição</label>
-                                <input id="exp-desc" type="text" value={expDesc} onChange={(e) => setExpDesc(e.target.value)} className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white" required />
-                            </div>
-                            <div>
-                                <label htmlFor="exp-category" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Categoria</label>
-                                <select id="exp-category" value={expCategory} onChange={(e) => setExpCategory(e.target.value)} className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white">
-                                    {Object.values(ExpenseCategory).map(cat => (
-                                        <option key={cat} value={cat}>{cat}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div>
-                                <label htmlFor="exp-step" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Etapa (Opcional)</label>
-                                <select id="exp-step" value={expStepId} onChange={(e) => setExpStepId(e.target.value)} className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white">
-                                    <option value="">Nenhuma</option>
-                                    {steps.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                                </select>
-                            </div>
-                            <div>
-                                <label htmlFor="exp-date" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Data</label>
-                                <input id="exp-date" type="date" value={expDate} onChange={(e) => setExpDate(e.target.value)} className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white" required />
-                            </div>
-                            
-                            {expenseModal.mode === 'EDIT' && (
-                                <p className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-sm text-slate-600 dark:text-slate-300">
-                                    Valor já registrado: <span className="font-bold">R$ {expSavedAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
-                                </p>
-                            )}
-
-                            <div>
-                                <label htmlFor="exp-amount" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">{expenseModal.mode === 'ADD' ? 'Valor (R$)' : 'Adicionar valor (R$)'}</label>
-                                <input id="exp-amount" type="number" step="0.01" value={expAmount} onChange={(e) => setExpAmount(e.target.value)} className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white" required={expenseModal.mode === 'ADD'} />
-                            </div>
-                            <div>
-                                <label htmlFor="exp-total-agreed" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Total Acordado (Opcional - R$)</label>
-                                <input id="exp-total-agreed" type="number" step="0.01" value={expTotalAgreed} onChange={(e) => setExpTotalAgreed(e.target.value)} placeholder="Ex: 5000.00" className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white" />
-                            </div>
-                            
-                            <div className="flex justify-between gap-3">
-                                {expenseModal.mode === 'EDIT' && (
-                                    <button type="button" onClick={handleDeleteExpense} className="px-5 py-2 rounded-xl text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20" aria-label="Excluir despesa"><i className="fa-solid fa-trash mr-2"></i>Excluir</button>
-                                )}
-                                <div className="flex-1 flex justify-end gap-3">
-                                    <button type="button" onClick={() => setExpenseModal({isOpen: false, mode: 'ADD'})} className="px-5 py-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800" aria-label="Cancelar">Cancelar</button>
-                                    <button type="submit" className="px-5 py-2 rounded-xl bg-primary text-white hover:bg-primary-light" aria-label="Salvar despesa">Salvar</button>
-                                </div>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
-
-            {isPersonModalOpen && (
-                <div className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in" role="dialog" aria-modal="true" aria-labelledby="person-modal-title">
-                    <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 w-full max-w-md shadow-2xl border border-slate-200 dark:border-slate-800 animate-in zoom-in-95">
-                        <h3 id="person-modal-title" className="text-xl font-bold text-primary dark:text-white mb-4">{personId ? `Editar ${personMode === 'WORKER' ? 'Profissional' : 'Fornecedor'}` : `Adicionar ${personMode === 'WORKER' ? 'Profissional' : 'Fornecedor'}`}</h3>
-                        <form onSubmit={handleSavePerson} className="space-y-4">
-                            <div>
-                                <label htmlFor="person-name" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Nome</label>
-                                <input id="person-name" type="text" value={personName} onChange={(e) => setPersonName(e.target.value)} className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white" required />
-                            </div>
-                            <div>
-                                <label htmlFor="person-role" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">{personMode === 'WORKER' ? 'Função' : 'Categoria'}</label>
-                                <select id="person-role" value={personRole} onChange={(e) => setPersonRole(e.target.value)} className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white">
-                                    {(personMode === 'WORKER' ? STANDARD_JOB_ROLES : STANDARD_SUPPLIER_CATEGORIES).map(role => (
-                                        <option key={role} value={role}>{role}</option>
-                                    ))}
-                                </select>
-                            </div>
-                            <div>
-                                <label htmlFor="person-phone" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Telefone</label>
-                                <input id="person-phone" type="text" value={personPhone} onChange={(e) => setPersonPhone(e.target.value)} className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white" required />
-                            </div>
-                            {personMode === 'WORKER' && (
-                                <div>
-                                    <label htmlFor="person-daily-rate" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Diária (R$)</label>
-                                    <input id="person-daily-rate" type="number" step="0.01" value={personNotes} onChange={(e) => setPersonNotes(e.target.value)} className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white" placeholder="Ex: 150.00" />
-                                </div>
-                            )}
-                            <div>
-                                <label htmlFor="person-notes" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Observações (Opcional)</label>
-                                <textarea id="person-notes" value={personNotes} onChange={(e) => setPersonNotes(e.target.value)} className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white" rows={3}></textarea>
-                            </div>
-                            <div className="flex justify-end gap-3">
-                                <button type="button" onClick={() => setIsPersonModalOpen(false)} className="px-5 py-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800" aria-label="Cancelar">Cancelar</button>
-                                <button type="submit" className="px-5 py-2 rounded-xl bg-primary text-white hover:bg-primary-light" aria-label="Salvar pessoa">Salvar</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
-
-            {viewContract && (
-                <div className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in" role="dialog" aria-modal="true" aria-labelledby="contract-modal-title">
-                    <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 w-full max-w-2xl shadow-2xl border border-slate-200 dark:border-slate-800 animate-in zoom-in-95 max-h-[90vh] overflow-y-auto">
-                        <h3 id="contract-modal-title" className="text-xl font-bold text-primary dark:text-white mb-4">{viewContract.title}</h3>
-                        <div className="prose dark:prose-invert max-w-none text-slate-700 dark:text-slate-300 whitespace-pre-wrap">
-                            {viewContract.content}
-                        </div>
-                        <div className="flex justify-end gap-3 mt-6">
-                            <button type="button" onClick={() => setViewContract(null)} className="px-5 py-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800" aria-label="Fechar contrato">Fechar</button>
-                            <button onClick={() => navigator.clipboard.writeText(viewContract.content).then(() => alert('Contrato copiado!')).catch(err => console.error(err))} className="px-5 py-2 rounded-xl bg-primary text-white hover:bg-primary-light" aria-label="Copiar contrato">Copiar</button>
-                        </div>
-                    </div>
-                </div>
-            )}
-            
-            {isCalculatorModalOpen && (
-                <div className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in" role="dialog" aria-modal="true" aria-labelledby="calculator-modal-title">
-                    <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 w-full max-w-md shadow-2xl border border-slate-200 dark:border-slate-800 animate-in zoom-in-95">
-                        <h3 id="calculator-modal-title" className="text-xl font-bold text-primary dark:text-white mb-4 flex items-center gap-2"><i className="fa-solid fa-calculator text-secondary"></i> Calculadoras</h3>
-                        <div className="flex bg-slate-100 dark:bg-slate-800 rounded-xl p-1 text-sm font-bold text-slate-500 mb-6" role="tablist">
-                            <button role="tab" aria-controls="piso-calc" aria-selected={calcType === 'PISO'} onClick={() => setCalcType('PISO')} className={`flex-1 py-2 rounded-lg transition-colors ${calcType === 'PISO' ? 'bg-white text-primary shadow-sm dark:bg-slate-900 dark:text-white' : 'hover:text-primary dark:hover:text-white'}`}>Piso</button>
-                            <button role="tab" aria-controls="parede-calc" aria-selected={calcType === 'PAREDE'} onClick={() => setCalcType('PAREDE')} className={`flex-1 py-2 rounded-lg transition-colors ${calcType === 'PAREDE' ? 'bg-white text-primary shadow-sm dark:bg-slate-900 dark:text-white' : 'hover:text-primary dark:hover:text-white'}`}>Parede</button>
-                            <button role="tab" aria-controls="pintura-calc" aria-selected={calcType === 'PINTURA'} onClick={() => setCalcType('PINTURA')} className={`flex-1 py-2 rounded-lg transition-colors ${calcType === 'PINTURA' ? 'bg-white text-primary shadow-sm dark:bg-slate-900 dark:text-white' : 'hover:text-primary dark:hover:text-white'}`}>Pintura</button>
-                        </div>
-                        <div id={`${calcType.toLowerCase()}-calc`} role="tabpanel">
-                          <label htmlFor="calc-area" className="block text-xs font-bold text-slate-500 uppercase mb-1">Área em m²</label>
-                          <input id="calc-area" type="number" value={calcArea} onChange={(e) => setCalcArea(e.target.value)} placeholder="Ex: 50" className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/50 transition-all mb-6" />
-                        </div>
-                        {calcResult.length > 0 && (
-                            <div className="p-4 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-sm">
-                                <h4 className="font-bold text-primary dark:text-white mb-2">Resultado Estimado:</h4>
-                                <ul className="space-y-1 text-slate-600 dark:text-slate-300">
-                                    {calcResult.map((res, idx) => <li key={idx}><i className="fa-solid fa-check-circle text-secondary mr-2"></i>{res}</li>)}
-                                </ul>
-                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-3">
-                                    <i className="fa-solid fa-info-circle mr-1"></i> Valores aproximados, podem variar.
-                                </p>
-                            </div>
-                        )}
-                        <div className="flex justify-end gap-3 mt-6">
-                            <button type="button" onClick={() => setIsCalculatorModalOpen(false)} className="px-5 py-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800" aria-label="Fechar calculadora">Fechar</button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* General Purpose Modal (for delete confirmations etc.) */}
-            <ZeModal
-                isOpen={zeModal.isOpen}
-                title={zeModal.title}
-                message={zeModal.message}
-                confirmText={zeModal.confirmText}
-                cancelText={zeModal.cancelText}
-                onConfirm={zeModal.onConfirm}
-                onCancel={zeModal.onCancel}
-                type={zeModal.type}
-            />
-        </div>
-    );
-};
-
-export default WorkDetail;

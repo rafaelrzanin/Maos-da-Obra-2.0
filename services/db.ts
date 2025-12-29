@@ -1,4 +1,5 @@
 
+
 import { PlanType, ExpenseCategory, StepStatus, FileCategory, type User, type Work, type Step, type Material, type Expense, type Worker, type Supplier, type WorkPhoto, type WorkFile, type DBNotification, type PushSubscriptionInfo } from '../types.ts';
 import { WORK_TEMPLATES, FULL_MATERIAL_PACKAGES } from './standards.ts';
 import { supabase } from './supabase.ts';
@@ -248,7 +249,7 @@ const ensureUserProfile = async (authUser: any): Promise<User | null> => {
 
 export const dbService = {
   // --- AUTH ---
-  async getCurrentUser() {
+  async getCurrentUser(): Promise<User | null> {
     const client = supabase;
     
     const now = Date.now();
@@ -263,7 +264,7 @@ export const dbService = {
     }
 
     // If no valid cache, create a new promise
-    const newPromise = (async () => {
+    const newPromise = (async (): Promise<User | null> => {
         const { data: { session } = {} } = await client.auth.getSession(); // Default to empty object for destructuring
         if (!session?.user) {
             // If no user, ensure sessionCache is null before returning
@@ -279,10 +280,10 @@ export const dbService = {
     return newPromise;
   },
 
-  async syncSession() {
+  async syncSession(): Promise<User | null> { // Explicitly set return type
     sessionCache = null; // Invalidate cache to force a fresh fetch
     // FIX: ensure getCurrentUser returns a Promise<User | null>
-    const userPromise = this.getCurrentUser();
+    const userPromise = dbService.getCurrentUser(); // Changed from this.getCurrentUser()
     // Wait for the promise to resolve before returning, so AuthContext gets the actual user object.
     return userPromise; 
   },
@@ -308,7 +309,7 @@ export const dbService = {
     return () => subscription.unsubscribe();
   },
 
-  async login(email: string, password?: string) {
+  async login(email: string, password?: string): Promise<User | null> { // Explicitly set return type
     // Supabase is guaranteed to be initialized now
     const { data, error } = await supabase.auth.signInWithPassword({ email, password: password || '' });
     if (error) throw error;
@@ -329,7 +330,7 @@ export const dbService = {
     });
   },
 
-  async signup(name: string, email: string, whatsapp: string, password?: string, cpf?: string, planType?: string | null) {
+  async signup(name: string, email: string, whatsapp: string, password?: string, cpf?: string, planType?: string | null): Promise<User | null> { // Explicitly set return type
     // Supabase is guaranteed to be initialized now
     
     const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -343,7 +344,7 @@ export const dbService = {
     if (authError) throw authError;
     // If user already exists and signed in, just ensure profile and return
     if (!authData.user) { 
-        return this.login(email, password);
+        return dbService.login(email, password); // Changed from this.login
     }
 
     const trialExpires = new Date();
@@ -399,14 +400,14 @@ export const dbService = {
           if (data.plan) updates.plan = data.plan;
 
           if (Object.keys(updates).length > 0) {
-            const { error } = await supabase.from('profiles').update(updates).eq('id', userId);
-            if (error) throw new Error("Erro ao atualizar dados: " + error.message);
+            const { error: updateProfileError } = await supabase.from('profiles').update(updates).eq('id', userId); // Renamed error
+            if (updateProfileError) throw new Error("Erro ao atualizar dados: " + updateProfileError.message);
           }
 
           // 2. Atualiza a senha SE fornecida (AUTH separado)
           if (newPassword && newPassword.trim() !== '') {
-              const { error: passError } = await supabase.auth.updateUser({ password: newPassword });
-              if (passError) throw new Error("Erro ao atualizar senha: " + passError.message);
+              const { error: updatePassError } = await supabase.auth.updateUser({ password: newPassword }); // Renamed error
+              if (updatePassError) throw new Error("Erro ao atualizar senha: " + updatePassError.message);
           }
           
           sessionCache = null; // Invalida cache para forçar refresh
@@ -418,10 +419,10 @@ export const dbService = {
 
   async resetPassword(email: string) {
       // Supabase is guaranteed to be initialized now
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      const { error: resetPassError } = await supabase.auth.resetPasswordForEmail(email, { // Renamed error
           redirectTo: window.location.origin + '/settings'
       });
-      return !error;
+      return !resetPassError;
   },
 
   isSubscriptionActive(user: User): boolean {
@@ -463,7 +464,7 @@ export const dbService = {
   async generatePix(_amount: number, _payer: any) {
       // This is a mock function, no actual Supabase interaction required
       return {
-          qr_code_base64: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQyF2NgYGBgAAAABQAEV9D3sgAAAABJR1pErkJggg==",
+          qr_code_base64: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQyF2NgYGBgAAAABQAEV9D3sgAAAABJRJAA==",
           copy_paste_code: "00020126330014BR.GOV.BCB.PIX011155555555555520400005303986540510.005802BR5913Mãos da Obra6008Brasilia62070503***63041234"
       };
   },
@@ -478,14 +479,14 @@ export const dbService = {
         return _dashboardCache.works.data;
     }
 
-    const { data, error } = await supabase
+    const { data, error: fetchWorksError } = await supabase // Renamed error
         .from('works')
         .select('*')
         .eq('user_id', userId)
         .order('created_at', { ascending: false });
         
-    if (error) {
-        console.error("Erro ao buscar obras:", error);
+    if (fetchWorksError) {
+        console.error("Erro ao buscar obras:", fetchWorksError);
         return []; // Return empty on error
     }
     
@@ -503,9 +504,9 @@ export const dbService = {
         if (cached) return cached;
     }
 
-    const { data, error } = await supabase.from('works').select('*').eq('id', workId).single();
-    if (error) {
-        console.error("Erro ao buscar obra por ID:", error);
+    const { data, error: fetchWorkError } = await supabase.from('works').select('*').eq('id', workId).single(); // Renamed error
+    if (fetchWorkError) {
+        console.error("Erro ao buscar obra por ID:", fetchWorkError);
         return null;
     }
     return data ? parseWorkFromDB(data) : null;
@@ -528,7 +529,7 @@ export const dbService = {
         const materialsToInsert: any[] = []; // Changed to any[] to allow snake_case keys
         
         // Iterate through included steps (which map to material categories)
-        for (const stepName of template.includedSteps) {
+        for (const stepName of template!.includedSteps) { // Added non-null assertion
             const materialCategory = FULL_MATERIAL_PACKAGES.find(p => p.category === stepName);
             if (materialCategory) {
                 // Find the actual created step to get its ID
@@ -558,10 +559,10 @@ export const dbService = {
         // 3. Insert new materials
         if (materialsToInsert.length > 0) {
             // Bulk insert
-            const { error } = await supabase.from('materials').insert(materialsToInsert);
-            if (error) {
-                console.error("Erro ao inserir materiais gerados:", error);
-                throw error;
+            const { error: insertMaterialsError } = await supabase.from('materials').insert(materialsToInsert); // Renamed error
+            if (insertMaterialsError) {
+                console.error("Erro ao inserir materiais gerados:", insertMaterialsError);
+                throw insertMaterialsError;
             }
         }
         
@@ -575,32 +576,32 @@ export const dbService = {
     }
   },
 
-  async createWork(work: Partial<Work>, templateId: string): Promise<Work> {
+  async createWork(workData: Partial<Work>, templateId: string): Promise<Work> { // Renamed 'work' param to 'workData'
     // Supabase is guaranteed to be initialized now
     
     const dbWork = {
-        user_id: work.userId,
-        name: work.name,
-        address: work.address,
-        budget_planned: work.budgetPlanned,
-        start_date: work.startDate,
-        end_date: work.endDate,
-        area: work.area,
-        status: work.status,
-        notes: work.notes,
-        floors: work.floors,
-        bedrooms: work.bedrooms,
-        bathrooms: work.bathrooms,
-        kitchens: work.kitchens,
-        living_rooms: work.livingRooms, // Corrected to snake_case for DB column compatibility
-        has_leisure_area: work.hasLeisureArea 
+        user_id: workData.userId,
+        name: workData.name,
+        address: workData.address,
+        budget_planned: workData.budgetPlanned,
+        start_date: workData.startDate,
+        end_date: workData.endDate,
+        area: workData.area,
+        status: workData.status,
+        notes: workData.notes,
+        floors: workData.floors,
+        bedrooms: workData.bedrooms,
+        bathrooms: workData.bathrooms,
+        kitchens: workData.kitchens,
+        living_rooms: workData.livingRooms, // Corrected to snake_case for DB column compatibility
+        has_leisure_area: workData.hasLeisureArea 
     };
 
-    const { data: savedWork, error } = await supabase.from('works').insert(dbWork).select().single();
+    const { data: savedWork, error: createWorkError } = await supabase.from('works').insert(dbWork).select().single(); // Renamed error
     
-    if (error) {
-        console.error("Erro SQL ao criar obra:", error);
-        throw new Error(`Erro ao criar obra: ${error.message}`);
+    if (createWorkError) {
+        console.error("Erro SQL ao criar obra:", createWorkError);
+        throw new Error(`Erro ao criar obra: ${createWorkError.message}`);
     }
     
     const parsedWork = parseWorkFromDB(savedWork);
@@ -614,7 +615,7 @@ export const dbService = {
     const template = WORK_TEMPLATES.find(t => t.id === templateId);
     if (template) {
         const stepsToInsert = template.includedSteps.map((stepName, idx) => {
-            const start = new Date(work.startDate!);
+            const start = new Date(workData.startDate!); // Used workData.startDate
             start.setDate(start.getDate() + (idx * 5)); 
             const end = new Date(start);
             end.setDate(end.getDate() + 5);
@@ -638,7 +639,7 @@ export const dbService = {
         const createdSteps = (createdStepsData || []).map(parseStepFromDB);
 
         // FIXED: Now calling the correctly defined method with createdSteps
-        await this.regenerateMaterials(parsedWork.id, parsedWork.area, templateId, createdSteps);
+        await dbService.regenerateMaterials(parsedWork.id, parsedWork.area, templateId, createdSteps); // Changed from this.regenerateMaterials
     }
 
     return parsedWork;
@@ -664,11 +665,11 @@ export const dbService = {
 
         for (const op of deleteOperations) {
             console.log(`[DB DELETE] Tentando deletar da tabela '${op.table}' onde ${op.eq[0]} = '${op.eq[1]}'`);
-            const { count, error } = await supabase.from(op.table).delete().eq(op.eq[0], op.eq[1]).select('*');
-            if (error) {
+            const { count, error: deleteOpError } = await supabase.from(op.table).delete().eq(op.eq[0], op.eq[1]).select('*'); // Renamed error
+            if (deleteOpError) {
                 // Logar o erro específico de RLS ou DB.
-                console.error(`[DB DELETE ERROR] Falha ao deletar da tabela '${op.table}' para workId ${workId}:`, error);
-                throw new Error(`Falha de RLS/DB ao deletar ${op.table}: ${error.message}`);
+                console.error(`[DB DELETE ERROR] Falha ao deletar da tabela '${op.table}' para workId ${workId}:`, deleteOpError);
+                throw new Error(`Falha de RLS/DB ao deletar ${op.table}: ${deleteOpError.message}`);
             }
             console.log(`[DB DELETE] Tabela '${op.table}' limpa. Registros afetados: ${count || 'N/A'}`);
         }
@@ -695,9 +696,9 @@ export const dbService = {
   // --- STEPS ---
   async getSteps(workId: string): Promise<Step[]> {
     // Supabase is guaranteed to be initialized now
-    const { data, error } = await supabase.from('steps').select('*').eq('work_id', workId).order('start_date', { ascending: true });
-    if (error) {
-      console.error("Erro ao buscar etapas:", error);
+    const { data, error: fetchStepsError } = await supabase.from('steps').select('*').eq('work_id', workId).order('start_date', { ascending: true }); // Renamed error
+    if (fetchStepsError) {
+      console.error("Erro ao buscar etapas:", fetchStepsError);
       return [];
     }
     return (data || []).map(parseStepFromDB);
@@ -705,7 +706,7 @@ export const dbService = {
 
   async addStep(step: Omit<Step, 'id'>): Promise<Step | null> {
     // Supabase is guaranteed to be initialized now
-    const { data, error } = await supabase.from('steps').insert({
+    const { data: newStepData, error: addStepError } = await supabase.from('steps').insert({ // Renamed data and error
       work_id: step.workId,
       name: step.name,
       start_date: step.startDate, // FIX: Changed to snake_case
@@ -713,20 +714,20 @@ export const dbService = {
       status: step.status,
       is_delayed: step.isDelayed
     }).select().single();
-    if (error) {
-      console.error("Erro ao adicionar etapa:", error);
-      throw error;
+    if (addStepError) {
+      console.error("Erro ao adicionar etapa:", addStepError);
+      throw addStepError;
     }
     // Invalidate cache for work stats/summary
     delete _dashboardCache.stats[step.workId];
     delete _dashboardCache.summary[step.workId];
     _dashboardCache.notifications = null; // NEW: Invalidate notifications cache
-    return parseStepFromDB(data);
+    return parseStepFromDB(newStepData);
   },
 
   async updateStep(step: Step): Promise<Step | null> {
     // Supabase is guaranteed to be initialized now
-    const { data, error } = await supabase.from('steps').update({
+    const { data: updatedStepData, error: updateStepError } = await supabase.from('steps').update({ // Renamed data and error
       name: step.name,
       start_date: step.startDate,
       end_date: step.endDate,
@@ -734,15 +735,15 @@ export const dbService = {
       real_date: step.realDate, // Added real_date parsing
       is_delayed: step.isDelayed
     }).eq('id', step.id).select().single();
-    if (error) {
-      console.error("Erro ao atualizar etapa:", error);
-      throw error;
+    if (updateStepError) {
+      console.error("Erro ao atualizar etapa:", updateStepError);
+      throw updateStepError;
     }
     // Invalidate cache for work stats/summary
     delete _dashboardCache.stats[step.workId];
     delete _dashboardCache.summary[step.workId];
     _dashboardCache.notifications = null; // NEW: Invalidate notifications cache
-    return parseStepFromDB(data);
+    return parseStepFromDB(updatedStepData);
   },
 
   async deleteStep(stepId: string, workId: string): Promise<void> {
@@ -768,8 +769,8 @@ export const dbService = {
       }
       
       // 3. Delete the step itself
-      const { error } = await supabase.from('steps').delete().eq('id', stepId);
-      if (error) throw error;
+      const { error: deleteStepError } = await supabase.from('steps').delete().eq('id', stepId); // Renamed error
+      if (deleteStepError) throw deleteStepError;
       console.log(`[DB DELETE] Etapa ${stepId} deletada com sucesso.`);
 
       // Invalidate caches for the affected work
@@ -787,9 +788,9 @@ export const dbService = {
   // --- MATERIALS ---
   async getMaterials(workId: string): Promise<Material[]> {
     // Supabase is guaranteed to be initialized now
-    const { data, error } = await supabase.from('materials').select('*').eq('work_id', workId).order('category', { ascending: true }).order('name', { ascending: true });
-    if (error) {
-      console.error("Erro ao buscar materiais:", error);
+    const { data, error: fetchMaterialsError } = await supabase.from('materials').select('*').eq('work_id', workId).order('category', { ascending: true }).order('name', { ascending: true }); // Renamed error
+    if (fetchMaterialsError) {
+      console.error("Erro ao buscar materiais:", fetchMaterialsError);
       return [];
     }
     return (data || []).map(parseMaterialFromDB);
@@ -798,7 +799,7 @@ export const dbService = {
   async addMaterial(material: Omit<Material, 'id'>, purchaseInfo?: {qty: number, cost: number, date: string}): Promise<Material | null> {
     // Supabase is guaranteed to be initialized now
     
-    const { data, error } = await supabase.from('materials').insert({
+    const { data: newMaterialData, error: addMaterialError } = await supabase.from('materials').insert({ // Renamed data and error
       work_id: material.workId,
       name: material.name,
       brand: material.brand,
@@ -809,20 +810,20 @@ export const dbService = {
       category: material.category
     }).select().single();
 
-    if (error) {
-      console.error("Erro ao adicionar material:", error);
-      throw error;
+    if (addMaterialError) {
+      console.error("Erro ao adicionar material:", addMaterialError);
+      throw addMaterialError;
     }
 
-    if (purchaseInfo && data) {
+    if (purchaseInfo && newMaterialData) { // Used newMaterialData
       // Also record as an expense
-      await this.addExpense({
+      await dbService.addExpense({ // Changed from this.addExpense
         workId: material.workId,
         description: `Compra de ${material.name}`,
         amount: purchaseInfo.cost,
         date: new Date().toISOString(),
         category: ExpenseCategory.MATERIAL,
-        relatedMaterialId: data.id,
+        relatedMaterialId: newMaterialData.id, // Used newMaterialData
         stepId: material.stepId
       });
     }
@@ -830,12 +831,12 @@ export const dbService = {
     delete _dashboardCache.stats[material.workId];
     delete _dashboardCache.summary[material.workId];
     _dashboardCache.notifications = null; // NEW: Invalidate notifications cache
-    return parseMaterialFromDB(data);
+    return parseMaterialFromDB(newMaterialData);
   },
 
   async updateMaterial(material: Material): Promise<Material | null> {
     // Supabase is guaranteed to be initialized now
-    const { data, error } = await supabase.from('materials').update({
+    const { data: updatedMaterialData, error: updateMaterialError } = await supabase.from('materials').update({ // Renamed data and error
       name: material.name,
       brand: material.brand,
       planned_qty: material.plannedQty,
@@ -844,15 +845,15 @@ export const dbService = {
       step_id: material.stepId, // This is already snake_case
       category: material.category
     }).eq('id', material.id).select().single();
-    if (error) {
-      console.error("Erro ao atualizar material:", error);
-      throw error;
+    if (updateMaterialError) {
+      console.error("Erro ao atualizar material:", updateMaterialError);
+      throw updateMaterialError;
     }
     // Invalidate cache for work stats/summary
     delete _dashboardCache.stats[material.workId];
     delete _dashboardCache.summary[material.workId];
     _dashboardCache.notifications = null; // NEW: Invalidate notifications cache
-    return parseMaterialFromDB(data);
+    return parseMaterialFromDB(updatedMaterialData);
   },
 
   async registerMaterialPurchase(materialId: string, name: string, brand: string | undefined, plannedQty: number, unit: string, qty: number, cost: number): Promise<void> {
@@ -882,7 +883,7 @@ export const dbService = {
     }
 
     // 2. Record as an expense
-    await this.addExpense({
+    await dbService.addExpense({ // Changed from this.addExpense
       workId: existingMaterial.work_id,
       description: `Compra de ${name} (${qty} ${unit})`,
       amount: cost,
@@ -900,9 +901,9 @@ export const dbService = {
   // --- EXPENSES ---
   async getExpenses(workId: string): Promise<Expense[]> {
     // Supabase is guaranteed to be initialized now
-    const { data, error } = await supabase.from('expenses').select('*').eq('work_id', workId).order('date', { ascending: false });
-    if (error) {
-      console.error("Erro ao buscar despesas:", error);
+    const { data, error: fetchExpensesError } = await supabase.from('expenses').select('*').eq('work_id', workId).order('date', { ascending: false }); // Renamed error
+    if (fetchExpensesError) {
+      console.error("Erro ao buscar despesas:", fetchExpensesError);
       return [];
     }
     return (data || []).map(parseExpenseFromDB);
@@ -910,7 +911,7 @@ export const dbService = {
 
   async addExpense(expense: Omit<Expense, 'id'>): Promise<Expense | null> {
     // Supabase is guaranteed to be initialized now
-    const { data, error } = await supabase.from('expenses').insert({
+    const { data: newExpenseData, error: addExpenseError } = await supabase.from('expenses').insert({ // Renamed data and error
       work_id: expense.workId,
       description: expense.description,
       amount: expense.amount,
@@ -924,20 +925,20 @@ export const dbService = {
       supplier_id: expense.supplierId, // NEW: Added supplier_id
       total_agreed: expense.totalAgreed // Corrected to total_agreed
     }).select().single();
-    if (error) {
-      console.error("Erro ao adicionar despesa:", error);
-      throw error;
+    if (addExpenseError) {
+      console.error("Erro ao adicionar despesa:", addExpenseError);
+      throw addExpenseError;
     }
     // Invalidate cache for work stats/summary
     delete _dashboardCache.stats[expense.workId];
     delete _dashboardCache.summary[expense.workId];
     _dashboardCache.notifications = null; // NEW: Invalidate notifications cache
-    return parseExpenseFromDB(data);
+    return parseExpenseFromDB(newExpenseData);
   },
 
   async updateExpense(expense: Expense): Promise<Expense | null> {
     // Supabase is guaranteed to be initialized now
-    const { data, error } = await supabase.from('expenses').update({
+    const { data: updatedExpenseData, error: updateExpenseError } = await supabase.from('expenses').update({ // Renamed data and error
       description: expense.description,
       amount: expense.amount,
       paid_amount: expense.paidAmount || expense.amount,
@@ -950,23 +951,23 @@ export const dbService = {
       supplier_id: expense.supplierId, // NEW: Added supplier_id
       total_agreed: expense.totalAgreed // Corrected to total_agreed
     }).eq('id', expense.id).select().single();
-    if (error) {
-      console.error("Erro ao atualizar despesa:", error);
-      throw error;
+    if (updateExpenseError) {
+      console.error("Erro ao atualizar despesa:", updateExpenseError);
+      throw updateExpenseError;
     }
     // Invalidate cache for work stats/summary
     delete _dashboardCache.stats[expense.workId];
     delete _dashboardCache.summary[expense.workId];
     _dashboardCache.notifications = null; // NEW: Invalidate notifications cache
-    return parseExpenseFromDB(data);
+    return parseExpenseFromDB(updatedExpenseData);
   },
 
   async deleteExpense(expenseId: string): Promise<void> {
     // Supabase is guaranteed to be initialized now
-    const { data: deletedExpense, error: deleteError } = await supabase.from('expenses').delete().eq('id', expenseId).select('work_id').single();
-    if (deleteError) {
-      console.error("Erro ao apagar despesa:", deleteError);
-      throw deleteError;
+    const { data: deletedExpense, error: deleteExpenseError } = await supabase.from('expenses').delete().eq('id', expenseId).select('work_id').single(); // Renamed error
+    if (deleteExpenseError) {
+      console.error("Erro ao apagar despesa:", deleteExpenseError);
+      throw deleteExpenseError;
     }
     if (deletedExpense) {
         // Invalidate cache for work stats/summary of the work where the expense was deleted
@@ -979,9 +980,9 @@ export const dbService = {
   // --- WORKERS ---
   async getWorkers(workId: string): Promise<Worker[]> { // NEW: Accepts workId
     // Supabase is guaranteed to be initialized now
-    const { data, error } = await supabase.from('workers').select('*').eq('work_id', workId).order('name', { ascending: true }); // NEW: Filter by work_id
-    if (error) {
-      console.error("Erro ao buscar profissionais:", error);
+    const { data, error: fetchWorkersError } = await supabase.from('workers').select('*').eq('work_id', workId).order('name', { ascending: true }); // NEW: Filter by work_id // Renamed error
+    if (fetchWorkersError) {
+      console.error("Erro ao buscar profissionais:", fetchWorkersError);
       return [];
     }
     return (data || []).map(parseWorkerFromDB);
@@ -989,7 +990,7 @@ export const dbService = {
 
   async addWorker(worker: Omit<Worker, 'id'>): Promise<Worker | null> {
     // Supabase is guaranteed to be initialized now
-    const { data, error } = await supabase.from('workers').insert({
+    const { data: newWorkerData, error: addWorkerError } = await supabase.from('workers').insert({ // Renamed data and error
       user_id: worker.userId,
       work_id: worker.workId, // NEW: Include work_id
       name: worker.name,
@@ -998,44 +999,44 @@ export const dbService = {
       daily_rate: worker.dailyRate,
       notes: worker.notes
     }).select().single();
-    if (error) {
-      console.error("Erro ao adicionar profissional:", error);
-      throw error;
+    if (addWorkerError) {
+      console.error("Erro ao adicionar profissional:", addWorkerError);
+      throw addWorkerError;
     }
-    return parseWorkerFromDB(data);
+    return parseWorkerFromDB(newWorkerData);
   },
 
   async updateWorker(worker: Worker): Promise<Worker | null> {
     // Supabase is guaranteed to be initialized now
-    const { data, error } = await supabase.from('workers').update({
+    const { data: updatedWorkerData, error: updateWorkerError } = await supabase.from('workers').update({ // Renamed data and error
       name: worker.name,
       role: worker.role,
       phone: worker.phone,
       daily_rate: worker.dailyRate,
       notes: worker.notes
     }).eq('id', worker.id).eq('work_id', worker.workId).select().single(); // NEW: Filter by work_id
-    if (error) {
-      console.error("Erro ao atualizar profissional:", error);
-      throw error;
+    if (updateWorkerError) {
+      console.error("Erro ao atualizar profissional:", updateWorkerError);
+      throw updateWorkerError;
     }
-    return parseWorkerFromDB(data);
+    return parseWorkerFromDB(updatedWorkerData);
   },
 
   async deleteWorker(workerId: string, workId: string): Promise<void> { // NEW: Accepts workId
     // Supabase is guaranteed to be initialized now
-    const { error } = await supabase.from('workers').delete().eq('id', workerId).eq('work_id', workId); // NEW: Filter by work_id
-    if (error) {
-      console.error("Erro ao apagar profissional:", error);
-      throw error;
+    const { error: deleteWorkerError } = await supabase.from('workers').delete().eq('id', workerId).eq('work_id', workId); // NEW: Filter by work_id // Renamed error
+    if (deleteWorkerError) {
+      console.error("Erro ao apagar profissional:", deleteWorkerError);
+      throw deleteWorkerError;
     }
   },
 
   // --- SUPPLIERS ---
   async getSuppliers(workId: string): Promise<Supplier[]> { // NEW: Accepts workId
     // Supabase is guaranteed to be initialized now
-    const { data, error } = await supabase.from('suppliers').select('*').eq('work_id', workId).order('name', { ascending: true }); // NEW: Filter by work_id
-    if (error) {
-      console.error("Erro ao buscar fornecedores:", error);
+    const { data, error: fetchSuppliersError } = await supabase.from('suppliers').select('*').eq('work_id', workId).order('name', { ascending: true }); // NEW: Filter by work_id // Renamed error
+    if (fetchSuppliersError) {
+      console.error("Erro ao buscar fornecedores:", fetchSuppliersError);
       return [];
     }
     return (data || []).map(parseSupplierFromDB);
@@ -1043,7 +1044,7 @@ export const dbService = {
 
   async addSupplier(supplier: Omit<Supplier, 'id'>): Promise<Supplier | null> {
     // Supabase is guaranteed to be initialized now
-    const { data, error } = await supabase.from('suppliers').insert({
+    const { data: newSupplierData, error: addSupplierError } = await supabase.from('suppliers').insert({ // Renamed data and error
       user_id: supplier.userId,
       work_id: supplier.workId, // NEW: Include work_id
       name: supplier.name,
@@ -1053,16 +1054,16 @@ export const dbService = {
       address: supplier.address,
       notes: supplier.notes
     }).select().single();
-    if (error) {
-      console.error("Erro ao adicionar fornecedor:", error);
-      throw error;
+    if (addSupplierError) {
+      console.error("Erro ao adicionar fornecedor:", addSupplierError);
+      throw addSupplierError;
     }
-    return parseSupplierFromDB(data);
+    return parseSupplierFromDB(newSupplierData);
   },
 
   async updateSupplier(supplier: Supplier): Promise<Supplier | null> {
     // Supabase is guaranteed to be initialized now
-    const { data, error } = await supabase.from('suppliers').update({
+    const { data: updatedSupplierData, error: updateSupplierError } = await supabase.from('suppliers').update({ // Renamed data and error
       name: supplier.name,
       category: supplier.category,
       phone: supplier.phone,
@@ -1070,28 +1071,28 @@ export const dbService = {
       address: supplier.address,
       notes: supplier.notes
     }).eq('id', supplier.id).eq('work_id', supplier.workId).select().single(); // NEW: Filter by work_id
-    if (error) {
-      console.error("Erro ao atualizar fornecedor:", error);
-      throw error;
+    if (updateSupplierError) {
+      console.error("Erro ao atualizar fornecedor:", updateSupplierError);
+      throw updateSupplierError;
     }
-    return parseSupplierFromDB(data);
+    return parseSupplierFromDB(updatedSupplierData);
   },
 
   async deleteSupplier(supplierId: string, workId: string): Promise<void> { // NEW: Accepts workId
     // Supabase is guaranteed to be initialized now
-    const { error } = await supabase.from('suppliers').delete().eq('id', supplierId).eq('work_id', workId); // NEW: Filter by work_id
-    if (error) {
-      console.error("Erro ao apagar fornecedor:", error);
-      throw error;
+    const { error: deleteSupplierError } = await supabase.from('suppliers').delete().eq('id', supplierId).eq('work_id', workId); // NEW: Filter by work_id // Renamed error
+    if (deleteSupplierError) {
+      console.error("Erro ao apagar fornecedor:", deleteSupplierError);
+      throw deleteSupplierError;
     }
   },
 
   // --- WORK PHOTOS ---
   async getPhotos(workId: string): Promise<WorkPhoto[]> {
     // Supabase is guaranteed to be initialized now
-    const { data, error } = await supabase.from('work_photos').select('*').eq('work_id', workId).order('date', { ascending: false });
-    if (error) {
-      console.error("Erro ao buscar fotos:", error);
+    const { data, error: fetchPhotosError } = await supabase.from('work_photos').select('*').eq('work_id', workId).order('date', { ascending: false }); // Renamed error
+    if (fetchPhotosError) {
+      console.error("Erro ao buscar fotos:", fetchPhotosError);
       return [];
     }
     return (data || []).map(parsePhotoFromDB);
@@ -1099,26 +1100,26 @@ export const dbService = {
 
   async addPhoto(photo: Omit<WorkPhoto, 'id'>): Promise<WorkPhoto | null> {
     // Supabase is guaranteed to be initialized now
-    const { data, error } = await supabase.from('work_photos').insert({
+    const { data: newPhotoData, error: addPhotoError } = await supabase.from('work_photos').insert({ // Renamed data and error
       work_id: photo.workId,
       url: photo.url,
       description: photo.description,
       date: photo.date,
       type: photo.type
     }).select().single();
-    if (error) {
-      console.error("Erro ao adicionar foto:", error);
-      throw error;
+    if (addPhotoError) {
+      console.error("Erro ao adicionar foto:", addPhotoError);
+      throw addPhotoError;
     }
-    return parsePhotoFromDB(data);
+    return parsePhotoFromDB(newPhotoData);
   },
 
   // --- WORK FILES ---
   async getFiles(workId: string): Promise<WorkFile[]> {
     // Supabase is guaranteed to be initialized now
-    const { data, error } = await supabase.from('work_files').select('*').eq('work_id', workId).order('date', { ascending: false });
-    if (error) {
-      console.error("Erro ao buscar arquivos:", error);
+    const { data, error: fetchFilesError } = await supabase.from('work_files').select('*').eq('work_id', workId).order('date', { ascending: false }); // Renamed error
+    if (fetchFilesError) {
+      console.error("Erro ao buscar arquivos:", fetchFilesError);
       return [];
     }
     return (data || []).map(parseFileFromDB);
@@ -1126,7 +1127,7 @@ export const dbService = {
 
   async addFile(file: Omit<WorkFile, 'id'>): Promise<WorkFile | null> {
     // Supabase is guaranteed to be initialized now
-    const { data, error } = await supabase.from('work_files').insert({
+    const { data: newFileData, error: addFileError } = await supabase.from('work_files').insert({ // Renamed data and error
       work_id: file.workId,
       name: file.name,
       category: file.category,
@@ -1134,11 +1135,11 @@ export const dbService = {
       type: file.type,
       date: file.date
     }).select().single();
-    if (error) {
-      console.error("Erro ao adicionar arquivo:", error);
-      throw error;
+    if (addFileError) {
+      console.error("Erro ao adicionar arquivo:", addFileError);
+      throw addFileError;
     }
-    return parseFileFromDB(data);
+    return parseFileFromDB(newFileData);
   },
 
   // --- NOTIFICATIONS ---
@@ -1150,14 +1151,14 @@ export const dbService = {
         return _dashboardCache.notifications.data;
     }
 
-    const { data, error } = await supabase.from('notifications')
+    const { data, error: fetchNotificationsError } = await supabase.from('notifications') // Renamed error
       .select('*')
       .eq('user_id', userId)
       .eq('read', false)
       .order('date', { ascending: false });
 
-    if (error) {
-      console.error("Erro ao buscar notificações:", error);
+    if (fetchNotificationsError) {
+      console.error("Erro ao buscar notificações:", fetchNotificationsError);
       return [];
     }
     const parsed = (data || []).map(parseNotificationFromDB);
@@ -1167,7 +1168,7 @@ export const dbService = {
 
   async addNotification(notification: Omit<DBNotification, 'id'>): Promise<DBNotification | null> {
     // Supabase is guaranteed to be initialized now
-    const { data, error } = await supabase.from('notifications').insert({
+    const { data: newNotificationData, error: addNotificationError } = await supabase.from('notifications').insert({ // Renamed data and error
       user_id: notification.userId,
       work_id: notification.workId, // NEW: Include work_id
       title: notification.title,
@@ -1177,34 +1178,34 @@ export const dbService = {
       type: notification.type,
       tag: notification.tag // NEW: Save the tag to DB
     }).select().single();
-    if (error) {
-      console.error("Erro ao adicionar notificação:", error.message, error.details, error.code, "Full Error Object:", error); // Log more details
-      throw error;
+    if (addNotificationError) {
+      console.error("Erro ao adicionar notificação:", addNotificationError.message, addNotificationError.details, addNotificationError.code, "Full Error Object:", addNotificationError); // Log more details
+      throw addNotificationError;
     }
     _dashboardCache.notifications = null; // Invalidate cache
-    return parseNotificationFromDB(data);
+    return parseNotificationFromDB(newNotificationData);
   },
 
   async dismissNotification(notificationId: string): Promise<void> {
     // Supabase is guaranteed to be initialized now
-    const { error } = await supabase.from('notifications')
+    const { error: dismissNotificationError } = await supabase.from('notifications') // Renamed error
       .update({ read: true })
       .eq('id', notificationId);
-    if (error) {
-      console.error("Erro ao dispensar notificação:", error);
-      throw error;
+    if (dismissNotificationError) {
+      console.error("Erro ao dispensar notificação:", dismissNotificationError);
+      throw dismissNotificationError;
     }
     _dashboardCache.notifications = null; // Invalidate cache
   },
 
   async clearAllNotifications(userId: string): Promise<void> {
     // Supabase is guaranteed to be initialized now
-    const { error } = await supabase.from('notifications')
+    const { error: clearNotificationsError } = await supabase.from('notifications') // Renamed error
       .update({ read: true })
       .eq('user_id', userId);
-    if (error) {
-      console.error("Erro ao limpar notificações:", error);
-      throw error;
+    if (clearNotificationsError) {
+      console.error("Erro ao limpar notificações:", clearNotificationsError);
+      throw clearNotificationsError;
     }
     _dashboardCache.notifications = null; // Invalidate cache
   },
@@ -1218,23 +1219,23 @@ export const dbService = {
         return _dashboardCache.stats[workId].data;
     }
 
-    const [expensesData, stepsData, workData] = await Promise.all([
+    const [expensesResult, stepsResult, workResult] = await Promise.all([
       supabase.from('expenses').select('amount').eq('work_id', workId),
       supabase.from('steps').select('id, status, end_date').eq('work_id', workId),
       supabase.from('works').select('budget_planned').eq('id', workId).single()
     ]);
 
-    if (expensesData.error || stepsData.error || workData.error) {
-      console.error("Erro ao calcular stats da obra:", expensesData.error || stepsData.error || workData.error);
+    if (expensesResult.error || stepsResult.error || workResult.error) {
+      console.error("Erro ao calcular stats da obra:", expensesResult.error || stepsResult.error || workResult.error);
       return { totalSpent: 0, progress: 0, delayedSteps: 0 };
     }
 
-    const totalSpent = expensesData.data.reduce((sum, e) => sum + Number(e.amount), 0);
-    const totalSteps = stepsData.data.length;
-    const completedSteps = stepsData.data.filter(s => s.status === StepStatus.COMPLETED).length;
+    const totalSpent = expensesResult.data.reduce((sum, e) => sum + Number(e.amount), 0);
+    const totalSteps = stepsResult.data.length;
+    const completedSteps = stepsResult.data.filter(s => s.status === StepStatus.COMPLETED).length;
     
     const today = new Date().toISOString().split('T')[0];
-    const delayedSteps = stepsData.data.filter(s => s.status !== StepStatus.COMPLETED && s.end_date < today).length;
+    const delayedSteps = stepsResult.data.filter(s => s.status !== StepStatus.COMPLETED && s.end_date < today).length;
 
     const progress = totalSteps > 0 ? Math.round((completedSteps / totalSteps) * 100) : 0;
 
@@ -1246,30 +1247,29 @@ export const dbService = {
   async getDailySummary(workId: string): Promise<{ completedSteps: number, delayedSteps: number, pendingMaterials: number, totalSteps: number }> {
     // Supabase is guaranteed to be initialized now
 
-    // Corrected `Date.Now()` to `Date.now()`
     const now = Date.now();
     if (_dashboardCache.summary[workId] && (now - _dashboardCache.summary[workId].timestamp < CACHE_TTL)) {
         return _dashboardCache.summary[workId].data;
     }
 
-    const [stepsData, materialsData] = await Promise.all([
+    const [stepsResult, materialsResult] = await Promise.all([
       supabase.from('steps').select('id, status, end_date').eq('work_id', workId),
       supabase.from('materials').select('id, planned_qty, purchased_qty, step_id, name').eq('work_id', workId) // Fetch name and step_id
     ]);
 
-    if (stepsData.error || materialsData.error) {
-      console.error("Erro ao buscar summary da obra:", stepsData.error || materialsData.error);
+    if (stepsResult.error || materialsResult.error) {
+      console.error("Erro ao buscar summary da obra:", stepsResult.error || materialsResult.error);
       return { completedSteps: 0, delayedSteps: 0, pendingMaterials: 0, totalSteps: 0 };
     }
 
-    const totalSteps = stepsData.data.length;
-    const completedSteps = stepsData.data.filter(s => s.status === 'CONCLUIDO').length;
+    const totalSteps = stepsResult.data.length;
+    const completedSteps = stepsResult.data.filter(s => s.status === 'CONCLUIDO').length;
     
     const today = new Date().toISOString().split('T')[0];
     // FIX: Changed 's.endDate' to 's.end_date' to match the database column name and resolve type errors.
-    const delayedSteps = stepsData.data.filter(s => s.status !== 'CONCLUIDO' && s.end_date < today).length;
+    const delayedSteps = stepsResult.data.filter(s => s.status !== 'CONCLUIDO' && s.end_date < today).length;
 
-    const pendingMaterials = materialsData.data.filter(m => m.purchased_qty < m.planned_qty).length;
+    const pendingMaterials = materialsResult.data.filter(m => m.purchased_qty < m.planned_qty).length;
 
     const summary = { completedSteps, delayedSteps, pendingMaterials, totalSteps };
     _dashboardCache.summary[workId] = { data: summary, timestamp: now };
@@ -1301,10 +1301,10 @@ export const dbService = {
     //     console.log(`[NOTIF DEBUG START] Generating smart notifications for User: ${userId}, Work: ${workId}`);
 
     //     // Usa dados pré-carregados se disponíveis, senão busca do DB.
-    //     const currentSteps = prefetchedSteps || await this.getSteps(workId);
-    //     const currentMaterials = prefetchedMaterials || await this.getMaterials(workId);
-    //     const currentExpenses = prefetchedExpenses || await this.getExpenses(workId); // Added for budget check
-    //     const currentWork = prefetchedWork || await this.getWorkById(workId);
+    //     const currentSteps = prefetchedSteps || await dbService.getSteps(workId);
+    //     const currentMaterials = prefetchedMaterials || await dbService.getMaterials(workId);
+    //     const currentExpenses = prefetchedExpenses || await dbService.getExpenses(workId); // Added for budget check
+    //     const currentWork = prefetchedWork || await dbService.getWorkById(workId);
 
     //     if (!currentWork) {
     //         console.warn(`[NOTIF DEBUG] Work ${workId} not found. Skipping notification generation.`);
@@ -1356,7 +1356,7 @@ export const dbService = {
 
     //         if (!existingNotif) {
     //             console.log(`[NOTIF GENERATION] Adding delayed step notification: "${step.name}" for work "${currentWork.name}"`); // Debug log
-    //             await this.addNotification({
+    //             await dbService.addNotification({ // Changed from this.addNotification
     //                 userId,
     //                 workId, // NEW: Add workId to notification
     //                 title: 'Etapa Atrasada!',
@@ -1366,7 +1366,7 @@ export const dbService = {
     //                 type: 'WARNING',
     //                 tag: notificationTag // Save tag
     //             });
-    //             await dbService.sendPushNotification(userId, {
+    //             await dbService.sendPushNotification(userId, { // Changed from dbService.sendPushNotification
     //                 title: 'Etapa Atrasada!',
     //                 body: `A etapa "${step.name}" da obra "${currentWork.name}" está atrasada. Verifique o cronograma!`,
     //                 url: `${window.location.origin}/work/${workId}`,
@@ -1403,7 +1403,7 @@ export const dbService = {
 
     //         if (!existingNotif) {
     //             console.log(`[NOTIF GENERATION] Adding upcoming step notification: "${step.name}" for work "${currentWork.name}"`); // Debug log
-    //             await this.addNotification({
+    //             await dbService.addNotification({ // Changed from this.addNotification
     //                 userId,
     //                 workId, // NEW: Add workId to notification
     //                 // FIX: Improved phrasing
@@ -1414,7 +1414,7 @@ export const dbService = {
     //                 type: 'INFO',
     //                 tag: notificationTag // Save tag
     //             });
-    //             await dbService.sendPushNotification(userId, {
+    //             await dbService.sendPushNotification(userId, { // Changed from dbService.sendPushNotification
     //                 title: `Próxima Etapa: ${step.name}!`,
     //                 body: `A etapa "${step.name}" da obra "${currentWork.name}" inicia em ${daysUntilStart} dia(s). Prepare-se!`,
     //                 url: `${window.location.origin}/work/${workId}`,
@@ -1451,7 +1451,7 @@ export const dbService = {
 
     //                     if (!existingNotif) {
     //                         console.log(`[NOTIF GENERATION] Adding low material notification: "${material.name}" for step "${step.name}" (Work: "${currentWork.name}")`); // Debug log
-    //                         await this.addNotification({
+    //                         await dbService.addNotification({ // Changed from this.addNotification
     //                             userId,
     //                             workId, // NEW: Add workId to notification
     //                             // FIX: Improved phrasing
@@ -1462,7 +1462,7 @@ export const dbService = {
     //                             type: 'WARNING',
     //                             tag: notificationTag 
     //                         });
-    //                         await dbService.sendPushNotification(userId, {
+    //                         await dbService.sendPushNotification(userId, { // Changed from dbService.sendPushNotification
     //                             title: `Atenção: Material em falta para a etapa ${step.name}!`,
     //                             body: `O material "${material.name}" (${material.purchasedQty}/${material.plannedQty} ${material.unit}) para a etapa "${step.name}" da obra "${currentWork.name}" está em falta. Faça a compra!`,
     //                             url: `${window.location.origin}/work/${workId}/materials`,
@@ -1493,7 +1493,7 @@ export const dbService = {
 
     //             if (!existingNotif) {
     //                 console.log(`[NOTIF GENERATION] Adding budget warning notification for work "${currentWork.name}"`); // Debug log
-    //                 await this.addNotification({
+    //                 await dbService.addNotification({ // Changed from this.addNotification
     //                     userId,
     //                     workId, // NEW: Add workId to notification
     //                     title: 'Atenção ao Orçamento!',
@@ -1503,7 +1503,7 @@ export const dbService = {
     //                     type: 'WARNING',
     //                     tag: notificationTag // Save tag
     //                 });
-    //                 await dbService.sendPushNotification(userId, {
+    //                 await dbService.sendPushNotification(userId, { // Changed from dbService.sendPushNotification
     //                     title: 'Atenção ao Orçamento!',
     //                     body: `Você já usou ${Math.round(budgetUsage)}% do orçamento da obra "${currentWork.name}".`,
     //                     url: `${window.location.origin}/work/${workId}/financial`,
@@ -1523,7 +1523,7 @@ export const dbService = {
                 
     //             if (!existingNotif) {
     //                 console.log(`[NOTIF GENERATION] Adding budget exceeded notification for work "${currentWork.name}"`); // Debug log
-    //                 await this.addNotification({
+    //                 await dbService.addNotification({ // Changed from this.addNotification
     //                     userId,
     //                     workId, // NEW: Add workId to notification
     //                     title: 'Orçamento Estourado!',
@@ -1533,7 +1533,7 @@ export const dbService = {
     //                     type: 'ERROR',
     //                     tag: notificationTag // Save tag
     //                 });
-    //                 await dbService.sendPushNotification(userId, {
+    //                 await dbService.sendPushNotification(userId, { // Changed from dbService.sendPushNotification
     //                     title: 'Orçamento Estourado!',
     //                     body: `O orçamento da obra "${currentWork.name}" foi excedido em ${Math.round(budgetUsage - 100)}%.`,
     //                     url: `${window.location.origin}/work/${workId}/financial`,
@@ -1553,17 +1553,17 @@ export const dbService = {
 
   // --- NEW: PWA Push Notification Management ---
   async getPushSubscription(userId: string): Promise<PushSubscriptionInfo | null> {
-    const { data, error } = await supabase
+    const { data: subscriptionData, error: fetchSubscriptionError } = await supabase // Renamed data and error
       .from('user_subscriptions')
       .select('*')
       .eq('user_id', userId)
       .single();
 
-    if (error && error.code !== 'PGRST116') { // PGRST116 = no rows found
-      console.error("Erro ao buscar PushSubscription:", error);
+    if (fetchSubscriptionError && fetchSubscriptionError.code !== 'PGRST116') { // PGRST116 = no rows found
+      console.error("Erro ao buscar PushSubscription:", fetchSubscriptionError);
       return null;
     }
-    return data ? mapPushSubscriptionFromDB(data) : null;
+    return subscriptionData ? mapPushSubscriptionFromDB(subscriptionData) : null;
   },
 
   async savePushSubscription(userId: string, subscription: PushSubscriptionJSON): Promise<void> {
@@ -1576,13 +1576,13 @@ export const dbService = {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({ userId, subscription }),
-        );
+        });
 
         if (!response.ok) {
             let errorData = { error: 'Unknown error', message: 'Failed to parse error response' };
             try {
                 errorData = await response.json();
-            } catch (e) {
+            } catch (e: any) { // Explicitly type e as any
                 const textError = await response.text();
                 errorData.message = textError; // Fallback to raw text
             }
@@ -1603,13 +1603,13 @@ export const dbService = {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({ userId, endpoint }),
-        );
+        });
 
         if (!response.ok) {
             let errorData = { error: 'Unknown error', message: 'Failed to parse error response' };
             try {
                 errorData = await response.json();
-            } catch (e) {
+            } catch (e: any) { // Explicitly type e as any
                 const textError = await response.text();
                 errorData.message = textError; // Fallback to raw text
             }
@@ -1630,7 +1630,7 @@ export const dbService = {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({ userId, ...notificationPayload }),
-        );
+        });
 
         if (!response.ok) {
             let errorData = { error: 'Unknown error', message: 'Failed to parse error response' };
@@ -1638,7 +1638,7 @@ export const dbService = {
             const textResponse = await response.text(); 
             try {
                 errorData = JSON.parse(textResponse); // Tentar parsear o texto se for JSON
-            } catch (e) {
+            } catch (e: any) { // Explicitly type e as any
                 errorData.message = `API returned non-JSON or unparseable text: "${textResponse}"`; // Fallback to raw text
             }
             throw new Error(errorData.error || errorData.message || 'Falha ao enviar push notification de evento.');

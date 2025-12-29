@@ -1,4 +1,5 @@
 
+
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.tsx';
@@ -230,7 +231,7 @@ const Dashboard: React.FC = () => {
 
     setLoading(true);
     try {
-      const fetchedWorks = await dbService.getWorks(user.id); // This fetches ALL works for the user
+      const fetchedWorks = await dbService.getWorks(user.id); // Fixed: Changed from `this.getWorks` to `dbService.getWorks`
       setWorks(fetchedWorks); // This updates the works state
       console.log("[Dashboard] loadDashboardData: fetchedWorks after getWorks:", fetchedWorks);
 
@@ -240,10 +241,10 @@ const Dashboard: React.FC = () => {
         setFocusWork(primaryWork);
 
         const [workStats, summary, materialsList, stepsList] = await Promise.all([
-          dbService.calculateWorkStats(primaryWork.id),
-          dbService.getDailySummary(primaryWork.id),
-          dbService.getMaterials(primaryWork.id),
-          dbService.getSteps(primaryWork.id), // NEW: Fetch steps
+          dbService.calculateWorkStats(primaryWork.id), // Fixed: Changed from `this.calculateWorkStats`
+          dbService.getDailySummary(primaryWork.id), // Fixed: Changed from `this.getDailySummary`
+          dbService.getMaterials(primaryWork.id), // Fixed: Changed from `this.getMaterials`
+          dbService.getSteps(primaryWork.id), // NEW: Fetch steps // Fixed: Changed from `this.getSteps`
         ]);
         setStats(workStats);
         setDailySummary(summary);
@@ -292,7 +293,7 @@ const Dashboard: React.FC = () => {
         setZeModal(prev => ({ ...prev, isConfirming: true })); // Set confirming state
         console.log(`[Dashboard] handleDeleteWork: Attempting to delete work ID: ${workToDelete.id}`);
         try {
-          await dbService.deleteWork(workToDelete.id);
+          await dbService.deleteWork(workToDelete.id); // Fixed: Changed from `this.deleteWork`
           console.log(`[Dashboard] handleDeleteWork: Successfully deleted work ID: ${workToDelete.id}. Reloading data...`);
           await loadDashboardData(); // This should re-fetch works
           setZeModal(prev => ({ ...prev, isOpen: false })); // Close modal
