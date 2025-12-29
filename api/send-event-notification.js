@@ -8,8 +8,9 @@ const supabaseUrl = process.env.VITE_SUPABASE_URL;
 const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseKey) {
-  console.error("ERRO CRÍTICO: Supabase URL ou Key faltando para send-event-notification.");
-  throw new Error("Configuração do Supabase ausente.");
+  console.error("ERRO CRÍTICO: Supabase URL ou Key faltando para send-event-notification. Certifique-se de que VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY estão configuradas no Vercel.");
+  // Em ambientes de produção/deploy, é melhor não lançar um erro aqui diretamente
+  // para que a função possa retornar um erro 500 JSON, em vez de um erro Vercel padrão.
 }
 
 const supabase = createClient(supabaseUrl, supabaseKey);
@@ -21,9 +22,9 @@ const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
 const VAPID_EMAIL = "mailto:seuemail@example.com"; // Replace with your actual email
 
 if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
-  console.error("ERRO CRÍTICO: Chaves VAPID (PUBLIC_KEY ou PRIVATE_KEY) faltando para notificações push.");
-  // Não lançar erro diretamente no deploy, mas registrar.
-  // Para desenvolvimento, pode ser útil lançar: throw new Error("Chaves VAPID ausentes.");
+  console.error("ERRO CRÍTICO: Chaves VAPID (PUBLIC_KEY ou PRIVATE_KEY) faltando para notificações push. Certifique-se de que VAPID_PUBLIC_KEY e VAPID_PRIVATE_KEY estão configuradas no Vercel.");
+  // Em ambientes de produção/deploy, é melhor não lançar um erro aqui diretamente
+  // para que a função possa retornar um erro 500 JSON, em vez de um erro Vercel padrão.
 } else {
   webpush.setVapidDetails(
     VAPID_EMAIL,
@@ -47,13 +48,19 @@ export default async function handler(req, res) {
     return res.status(405).end(`Method ${req.method} Not Allowed`);
   }
 
-  const { userId, title, body, url, tag } = req.body;
+  try { // Start of broad try-catch for consistent JSON error responses
+    const { userId, title, body, url, tag } = req.body;
 
-  if (!userId || !title || !body) {
-    return res.status(400).json({ error: 'userId, title, and body are required.' });
-  }
+    if (!userId || !title || !body) {
+      return res.status(400).json({ error: 'userId, title, and body are required.' });
+    }
 
-  try {
+    // Check if VAPID keys are configured before proceeding to send notifications
+    if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
+      console.error("VAPID keys not configured. Cannot send push notifications.");
+      return res.status(500).json({ error: 'Server not configured for push notifications. VAPID keys missing.' });
+    }
+
     // 1. Fetch user's push subscription from Supabase
     const { data: subscriptions, error } = await supabase
       .from('user_subscriptions')
@@ -91,7 +98,11 @@ export default async function handler(req, res) {
         // If subscription is no longer valid, delete it from our DB
         if (sendError.statusCode === 410 || sendError.statusCode === 404) {
             console.log(`Subscription for user ${userId} is stale, deleting...`);
-            await supabase.from('user_subscriptions').delete().eq('endpoint', subRecord.subscription.endpoint);
+            // Ensure endpoint is extracted safely if subscription.endpoint is not directly accessible
+            const endpointToDelete = subRecord.subscription?.endpoint;
+            if (endpointToDelete) {
+                await supabase.from('user_subscriptions').delete().eq('endpoint', endpointToDelete);
+            }
         }
       }
     });
@@ -102,6 +113,7 @@ export default async function handler(req, res) {
 
   } catch (error) {
     console.error("Internal Server Error in send-event-notification:", error);
+    // Ensure that any unhandled error also returns a JSON response
     return res.status(500).json({ error: 'Internal Server Error', message: error.message });
   }
 }

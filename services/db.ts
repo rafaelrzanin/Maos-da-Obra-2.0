@@ -1243,7 +1243,7 @@ export const dbService = {
         // Usa dados pré-carregados se disponíveis, senão busca do DB.
         const currentSteps = prefetchedSteps || await this.getSteps(workId);
         // FIX: Corrected typo from `prefetfetchedMaterials` to `prefetchedMaterials`.
-        const currentMaterials = prefetchedMaterials || await this.getMaterials(workId);
+        const currentMaterials = prefetfetchedMaterials || await this.getMaterials(workId);
         const currentExpenses = prefetchedExpenses || await this.getExpenses(workId); // Added for budget check
         const currentWork = prefetchedWork || await this.getWorkById(workId);
 
@@ -1520,8 +1520,14 @@ export const dbService = {
         });
 
         if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || 'Falha ao salvar a assinatura de push.');
+            let errorData = { error: 'Unknown error', message: 'Failed to parse error response' };
+            try {
+                errorData = await response.json();
+            } catch (e) {
+                const textError = await response.text();
+                errorData.message = textError; // Fallback to raw text
+            }
+            throw new Error(errorData.error || errorData.message || 'Falha ao salvar a assinatura de push.');
         }
         console.log("PushSubscription salva com sucesso!");
     } catch (error: any) {
@@ -1541,8 +1547,14 @@ export const dbService = {
         });
 
         if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || 'Falha ao remover a assinatura de push.');
+            let errorData = { error: 'Unknown error', message: 'Failed to parse error response' };
+            try {
+                errorData = await response.json();
+            } catch (e) {
+                const textError = await response.text();
+                errorData.message = textError; // Fallback to raw text
+            }
+            throw new Error(errorData.error || errorData.message || 'Falha ao remover a assinatura de push.');
         }
         console.log("PushSubscription removida com sucesso!");
     } catch (error: any) {
@@ -1562,8 +1574,14 @@ export const dbService = {
         });
 
         if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.error || 'Falha ao enviar push notification de evento.');
+            let errorData = { error: 'Unknown error', message: 'Failed to parse error response' };
+            try {
+                errorData = await response.json();
+            } catch (e) {
+                const textError = await response.text();
+                errorData.message = textError; // Fallback to raw text
+            }
+            throw new Error(errorData.error || errorData.message || 'Falha ao enviar push notification de evento.');
         }
         console.log("Push notification de evento enviada para o usuário:", userId);
     } catch (error: any) {
