@@ -1,8 +1,9 @@
-import React, { useEffect, useState, useCallback } from 'react';
+
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.tsx';
 import { dbService } from '../services/db.ts';
-import { StepStatus, PlanType, type Work, type Notification, type Step, type Expense, type Material } from '../types.ts';
+import { StepStatus, PlanType, WorkStatus, type Work, type Notification, type Step, type Expense, type Material } from '../types.ts';
 import { ZE_AVATAR, ZE_AVATAR_FALLBACK, getRandomZeTip, ZeTip } from '../services/standards.ts';
 import { ZeModal, ZeModalProps } from '../components/ZeModal.tsx'; // Importa ZeModalProps
 
@@ -256,8 +257,7 @@ const RiskRadar = ({
             Zona do orçamento
           </p>
           <p className="text-xs font-extrabold text-slate-600 dark:text-slate-300">
-            R$ {focusWork.budgetPlanned.toLocaleString("pt-BR")}/p&gt;
-          </p>
+            R$ {focusWork.budgetPlanned.toLocaleString("pt-BR")}</p>
         </div>
 
         <div className="relative h-3 rounded-full bg-slate-200/70 dark:bg-slate-800 overflow-hidden">
@@ -324,7 +324,7 @@ const LiveTimeline = ({
           {upcomingSteps.slice(0, 3).map((step, idx) => { // Show up to 3 upcoming steps
             const daysDiff = getDiffDays(step.startDate);
             const isSoon = daysDiff <= 7 && daysDiff >= 0;
-            const statusClass = isSoon ? "bg-amber-100 dark:bg-amber-900/20 text-amber-800 dark:text-amber-300" : "bg-slate-100 dark:bg-slate-800/50 text-slate-600 dark:text-slate-300"; // FIX: Added content and closed the span here.
+            const statusClass = isSoon ? "bg-amber-100 dark:bg-amber-900/20 text-amber-800 dark:text-amber-300" : "bg-slate-100 dark:bg-slate-800/50 text-slate-600 dark:text-slate-300";
 
             return (
               <div key={step.id} className="bg-white dark:bg-slate-900 p-4 rounded-xl border border-slate-200 dark:border-slate-800 flex items-center gap-4">
@@ -363,7 +363,9 @@ const Dashboard: React.FC = () => {
   const [focusWork, setFocusWork] = useState<Work | null>(null);
   const [focusWorkStats, setFocusWorkStats] = useState<{ totalSpent: number, progress: number, delayedSteps: number } | null>(null);
   const [focusWorkDailySummary, setFocusWorkDailySummary] = useState<{ completedSteps: number, delayedSteps: number, pendingMaterials: number, totalSteps: number } | null>(null);
-  const [focusWorkMaterials, setFocusWorkMaterials] = useState<Material[]>([]); // Added for RiskRadar compatibility
+  const [focusWorkMaterials, setFocusWorkMaterials] = useState<Material[]>([]); 
+  // NEW: Add state for focused work's steps for LiveTimeline component
+  const [focusWorkSteps, setFocusWorkSteps] = useState<Step[]>([]);
 
   const [showNotificationModal, setShowNotificationModal] = useState(false);
   const [currentNotification, setCurrentNotification] = useState<Notification | null>(null);
@@ -403,11 +405,15 @@ const Dashboard: React.FC = () => {
         const materials = await dbService.getMaterials(currentActiveWork.id);
         setFocusWorkMaterials(materials);
 
+        // NEW: Fetch steps for the focused work
+        const stepsForFocusWork = await dbService.getSteps(currentActiveWork.id);
+        setFocusWorkSteps(stepsForFocusWork);
+
         // Generate smart notifications for the active work
         await dbService.generateSmartNotifications(
           user.id, 
           currentActiveWork.id,
-          (await dbService.getSteps(currentActiveWork.id)), // Prefetch steps
+          stepsForFocusWork, // Use already fetched steps
           (await dbService.getExpenses(currentActiveWork.id)), // Prefetch expenses
           materials, // Use already fetched materials
           currentActiveWork // Use already fetched work
@@ -419,6 +425,7 @@ const Dashboard: React.FC = () => {
         setFocusWorkStats(null);
         setFocusWorkDailySummary(null);
         setFocusWorkMaterials([]);
+        setFocusWorkSteps([]); // Clear steps if no work is focused
       }
       
       // Load notifications for the user
@@ -659,7 +666,8 @@ const Dashboard: React.FC = () => {
 
       {/* Upcoming Steps */}
       {focusWork && focusWorkDailySummary && (
-        <LiveTimeline steps={works.find(w => w.id === focusWork.id)?.steps || []} onClick={() => navigate(`/work/${focusWork.id}`)} />
+        // FIX: Pass focusWorkSteps directly to LiveTimeline
+        <LiveTimeline steps={focusWorkSteps} onClick={() => navigate(`/work/${focusWork.id}`)} />
       )}
       
       {/* Works List */}
@@ -682,7 +690,8 @@ const Dashboard: React.FC = () => {
             works.map((work) => {
               const startDate = formatDateDisplay(work.startDate);
               const endDate = formatDateDisplay(work.endDate);
-              const isOverdue = work.endDate < new Date().toISOString().split('T')[0] && work.status !== StepStatus.COMPLETED;
+              // FIX: Compare work.status with WorkStatus.COMPLETED
+              const isOverdue = work.endDate < new Date().toISOString().split('T')[0] && work.status !== WorkStatus.COMPLETED;
 
               return (
                 <div
