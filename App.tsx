@@ -167,11 +167,11 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     <div className="min-h-screen bg-surface dark:bg-slate-950 transition-colors"> {/* Removed pb-20 */}
       {/* Top Header */}
       <header className="bg-primary text-white p-4 flex items-center justify-between shadow-md print:hidden">
-        <button onClick={() => setIsSidebarOpen(true)} className="text-xl p-2 -ml-2">
+        <button onClick={() => setIsSidebarOpen(true)} className="text-xl p-2 -ml-2" aria-label="Abrir menu principal">
           <i className="fa-solid fa-bars"></i>
         </button>
         <h1 className="text-xl font-bold absolute left-1/2 -translate-x-1/2">MÃOS DA OBRA</h1>
-        <button onClick={toggleTheme} className="text-xl p-2 -mr-2">
+        <button onClick={toggleTheme} className="text-xl p-2 -mr-2" aria-label="Alternar tema">
           {theme === 'dark' ? <i className="fa-solid fa-sun"></i> : <i className="fa-solid fa-moon"></i>}
         </button>
       </header>
@@ -180,11 +180,13 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       <div 
         className={`fixed top-0 left-0 h-full w-full max-w-[300px] bg-white dark:bg-slate-900 shadow-2xl z-[1000] transform transition-transform duration-300 ease-in-out
           ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
+        role="navigation"
+        aria-label="Menu principal"
       >
         <div className="p-6 h-full flex flex-col">
           <div className="flex items-center justify-between mb-8 pb-4 border-b border-slate-200 dark:border-slate-800">
             <h2 className="text-2xl font-black text-primary dark:text-white">Menu</h2>
-            <button onClick={() => setIsSidebarOpen(false)} className="text-slate-400 hover:text-primary dark:hover:text-white text-xl">
+            <button onClick={() => setIsSidebarOpen(false)} className="text-slate-400 hover:text-primary dark:hover:text-white text-xl" aria-label="Fechar menu principal">
               <i className="fa-solid fa-xmark"></i>
             </button>
           </div>
@@ -195,11 +197,12 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 onClick={() => { navigate(item.path); setIsSidebarOpen(false); }}
                 className={`flex items-center gap-4 w-full py-3 px-4 rounded-xl text-left font-bold transition-colors 
                   ${location.pathname === item.path ? 'bg-secondary/10 text-secondary' : 'text-primary dark:text-white hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+                aria-current={location.pathname === item.path ? 'page' : undefined}
               >
                 <div className="relative text-lg w-6 flex justify-center">
                   <i className={`fa-solid ${item.icon}`}></i>
                   {item.badge && item.badge > 0 && item.path === '/notifications' && (
-                    <span className="absolute -top-1 -right-2 bg-red-500 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center leading-none">
+                    <span className="absolute -top-1 -right-2 bg-red-500 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center leading-none" aria-label={`${item.badge} notificações não lidas`}>
                       {item.badge}
                     </span>
                   )}
@@ -212,6 +215,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             <button 
                 onClick={() => { logout(); setIsSidebarOpen(false); }}
                 className="flex items-center gap-4 w-full py-3 px-4 rounded-xl text-left font-bold transition-colors text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
+                aria-label="Sair da conta"
             >
                 <i className="fa-solid fa-right-from-bracket text-lg w-6 flex justify-center"></i> Sair da Conta
             </button>
@@ -224,6 +228,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         <div 
           className="fixed inset-0 bg-black/50 z-[999] animate-in fade-in cursor-pointer" 
           onClick={() => setIsSidebarOpen(false)}
+          aria-hidden="true"
         ></div>
       )}
 
@@ -254,8 +259,8 @@ const App: React.FC = () => {
                 <Route path="/ai-chat" element={<Layout><AiChat /></Layout>} />
                 <Route path="/notifications" element={<Layout><Notifications /></Layout>} />
                 <Route path="/settings" element={<Layout><Settings /></Layout>} />
-                <Route path="/profile" element={<Layout><Profile /></Layout>} /> {/* Added Profile Route */}
-                <Route path="/tutorials" element={<Layout><VideoTutorials /></Layout>} /> {/* Added Tutorials Route */}
+                <Route path="/profile" element={<Layout><Profile /></Layout>} />
+                <Route path="/tutorials" element={<Layout><VideoTutorials /></Layout>} />
                 <Route path="/checkout" element={<Layout><Checkout /></Layout>} /> 
                 
                 <Route path="*" element={<Navigate to="/" replace />} />
