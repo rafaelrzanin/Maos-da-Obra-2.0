@@ -118,8 +118,7 @@ export interface Material {
 
 export interface StandardMaterial {
   category: string;
-  name: string;
-  unit: string;
+  items: {name: string, unit: string, multiplier?: number}[];
 }
 
 export interface WorkPhoto {

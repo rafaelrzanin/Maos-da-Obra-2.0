@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { PlanType } from './types.ts';
@@ -99,21 +100,21 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
 
 // Layout Component - Only applies to authenticated, subscribed areas of the app
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, authLoading, isUserAuthFinished, isSubscriptionValid, trialDaysRemaining, updatePlan, unreadNotificationsCount } = useAuth(); // NEW: Get unreadNotificationsCount
+  const { user, authLoading, isUserAuthFinished, isSubscriptionValid, trialDaysRemaining, updatePlan, unreadNotificationsCount, logout } = useAuth(); // NEW: Get unreadNotificationsCount, logout
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
-  // const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Removed sidebar state
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Sidebar state
 
   // Log Auth State for debugging
   useEffect(() => {
     console.log(`[Layout] Render - authLoading: ${authLoading}, isUserAuthFinished: ${isUserAuthFinished}, User: ${user ? user.email : 'null'}, Path: ${location.pathname}`);
   }, [authLoading, isUserAuthFinished, user, location.pathname]);
 
-  // Scroll to top on route change
+  // Scroll to top on route change & close sidebar
   useEffect(() => {
     window.scrollTo(0, 0);
-    // setIsSidebarOpen(false); // Close sidebar on route change - no longer needed
+    setIsSidebarOpen(false); // Close sidebar on route change
   }, [location.pathname]);
 
   // Handle plan update from checkout success
@@ -151,57 +152,85 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       return <Navigate to="/settings" replace />;
   }
 
-  // Define navigation items for the bottom bar
+  // Define navigation items for the sidebar
   const navItems = [
-    { path: '/', icon: 'fa-home', label: 'Início' },
+    { path: '/', icon: 'fa-home', label: 'Dashboard' },
     { path: '/create', icon: 'fa-plus-circle', label: 'Nova Obra' },
-    { path: '/ai-chat', icon: 'fa-robot', label: 'Zé AI' },
-    { path: '/notifications', icon: 'fa-bell', label: 'Alertas' },
-    { path: '/settings', icon: 'fa-gear', label: 'Config' },
+    { path: '/ai-chat', icon: 'fa-robot', label: 'Zé da Obra AI' },
+    { path: '/notifications', icon: 'fa-bell', label: 'Alertas', badge: unreadNotificationsCount },
+    { path: '/profile', icon: 'fa-user', label: 'Meu Perfil' }, // Added Profile
+    { path: '/tutorials', icon: 'fa-video', label: 'Tutoriais em Vídeo' }, // Added Tutorials
+    { path: '/settings', icon: 'fa-gear', label: 'Configurações' },
   ];
 
   return (
-    <div className="min-h-screen bg-surface dark:bg-slate-950 transition-colors pb-20"> {/* Added pb-20 to main content to prevent overlap with bottom nav */}
+    <div className="min-h-screen bg-surface dark:bg-slate-950 transition-colors"> {/* Removed pb-20 */}
       {/* Top Header */}
-      <header className="bg-primary text-white p-4 flex items-center justify-center shadow-md print:hidden">
-        <h1 className="text-xl font-bold">MÃOS DA OBRA</h1>
-        <button onClick={toggleTheme} className="text-xl absolute right-4">
+      <header className="bg-primary text-white p-4 flex items-center justify-between shadow-md print:hidden">
+        <button onClick={() => setIsSidebarOpen(true)} className="text-xl p-2 -ml-2">
+          <i className="fa-solid fa-bars"></i>
+        </button>
+        <h1 className="text-xl font-bold absolute left-1/2 -translate-x-1/2">MÃOS DA OBRA</h1>
+        <button onClick={toggleTheme} className="text-xl p-2 -mr-2">
           {theme === 'dark' ? <i className="fa-solid fa-sun"></i> : <i className="fa-solid fa-moon"></i>}
         </button>
       </header>
       
+      {/* Sidebar */}
+      <div 
+        className={`fixed top-0 left-0 h-full w-full max-w-[300px] bg-white dark:bg-slate-900 shadow-2xl z-[1000] transform transition-transform duration-300 ease-in-out
+          ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
+      >
+        <div className="p-6 h-full flex flex-col">
+          <div className="flex items-center justify-between mb-8 pb-4 border-b border-slate-200 dark:border-slate-800">
+            <h2 className="text-2xl font-black text-primary dark:text-white">Menu</h2>
+            <button onClick={() => setIsSidebarOpen(false)} className="text-slate-400 hover:text-primary dark:hover:text-white text-xl">
+              <i className="fa-solid fa-xmark"></i>
+            </button>
+          </div>
+          <nav className="flex-1 space-y-2">
+            {navItems.map(item => (
+              <button 
+                key={item.path} 
+                onClick={() => { navigate(item.path); setIsSidebarOpen(false); }}
+                className={`flex items-center gap-4 w-full py-3 px-4 rounded-xl text-left font-bold transition-colors 
+                  ${location.pathname === item.path ? 'bg-secondary/10 text-secondary' : 'text-primary dark:text-white hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+              >
+                <div className="relative text-lg w-6 flex justify-center">
+                  <i className={`fa-solid ${item.icon}`}></i>
+                  {item.badge && item.badge > 0 && item.path === '/notifications' && (
+                    <span className="absolute -top-1 -right-2 bg-red-500 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center leading-none">
+                      {item.badge}
+                    </span>
+                  )}
+                </div>
+                <span>{item.label}</span>
+              </button>
+            ))}
+          </nav>
+          <div className="mt-8 pt-4 border-t border-slate-200 dark:border-slate-800">
+            <button 
+                onClick={() => { logout(); setIsSidebarOpen(false); }}
+                className="flex items-center gap-4 w-full py-3 px-4 rounded-xl text-left font-bold transition-colors text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
+            >
+                <i className="fa-solid fa-right-from-bracket text-lg w-6 flex justify-center"></i> Sair da Conta
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Overlay for sidebar */}
+      {isSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-[999] animate-in fade-in cursor-pointer" 
+          onClick={() => setIsSidebarOpen(false)}
+        ></div>
+      )}
+
       {/* Main Content Area */}
       <main className="p-4 max-w-7xl mx-auto">
         {children}
       </main>
-
-      {/* Bottom Navigation Bar */}
-      <nav className="fixed bottom-0 left-0 w-full bg-white dark:bg-primary-dark border-t border-slate-200 dark:border-slate-800 shadow-lg z-50 p-2 print:hidden">
-        <div className="flex justify-around items-center h-full max-w-md mx-auto">
-          {navItems.map(item => {
-            const isActive = location.pathname === item.path || (item.path === '/' && location.pathname.startsWith('/work/'));
-            return (
-              <button 
-                key={item.path} 
-                onClick={() => navigate(item.path)}
-                className={`flex flex-col items-center justify-center text-xs font-medium px-2 py-1 rounded-lg transition-colors ${
-                  isActive ? 'text-secondary' : 'text-slate-500 dark:text-slate-400 hover:text-primary dark:hover:text-white'
-                }`}
-              >
-                <div className="relative text-lg mb-1">
-                  <i className={`fa-solid ${item.icon}`}></i>
-                  {item.path === '/notifications' && unreadNotificationsCount > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center leading-none">
-                      {unreadNotificationsCount}
-                    </span>
-                  )}
-                </div>
-                {item.label}
-              </button>
-            );
-          })}
-        </div>
-      </nav>
     </div>
   );
 };
@@ -221,13 +250,12 @@ const App: React.FC = () => {
                 {/* Protected Routes - Wrapped by Layout */}
                 <Route path="/" element={<Layout><Dashboard /></Layout>} />
                 <Route path="/create" element={<Layout><CreateWork /></Layout>} />
-                {/* Removed duplicate 'element' attribute */}
                 <Route path="/work/:id" element={<Layout><WorkDetail /></Layout>} />
                 <Route path="/ai-chat" element={<Layout><AiChat /></Layout>} />
-                <Route path="/notifications" element={<Layout><Notifications /></Layout>} /> {/* NEW: Notifications Route */}
+                <Route path="/notifications" element={<Layout><Notifications /></Layout>} />
                 <Route path="/settings" element={<Layout><Settings /></Layout>} />
-                <Route path="/profile" element={<Layout><Profile /></Layout>} />
-                <Route path="/tutorials" element={<Layout><VideoTutorials /></Layout>} />
+                <Route path="/profile" element={<Layout><Profile /></Layout>} /> {/* Added Profile Route */}
+                <Route path="/tutorials" element={<Layout><VideoTutorials /></Layout>} /> {/* Added Tutorials Route */}
                 <Route path="/checkout" element={<Layout><Checkout /></Layout>} /> 
                 
                 <Route path="*" element={<Navigate to="/" replace />} />

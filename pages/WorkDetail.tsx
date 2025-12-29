@@ -205,10 +205,9 @@ const WorkDetail: React.FC = () => {
         await load();
     };
 
+    // REMOVIDO: handleDeleteStep não é mais chamado por um botão no card.
+    // A função é mantida para compatibilidade, caso haja outra forma de acioná-la (e.g. em um modal de edição)
     const handleDeleteStep = async (stepId: string) => {
-        // This function is no longer called from the individual step cards.
-        // It's kept here for completeness, in case it's triggered from another place
-        // (e.g., an edit step modal which is not implemented yet with a delete button).
         if (!work) return; 
         setZeModal({
             isOpen: true,
@@ -729,7 +728,7 @@ const WorkDetail: React.FC = () => {
     const renderMainTab = () => {
         if (activeTab === 'SCHEDULE') {
             return (
-                <div className="space-y-4 animate-in fade-in">
+                <div className="space-y-4 animate-in fade-in pb-20 md:pb-0"> {/* Added pb-20 for mobile */}
                     <div className="flex justify-between items-end mb-2 px-2">
                         <div>
                             <h2 className="text-2xl font-black text-primary dark:text-white">Cronograma</h2>
@@ -798,7 +797,7 @@ const WorkDetail: React.FC = () => {
                                             </div>
                                         </div>
                                     </div>
-                                    {/* Removed: Delete Step Button */}
+                                    {/* REMOVIDO: Botão de lixeira para exclusão da etapa */}
                                 </div>
                             </div>
                          );
@@ -814,7 +813,7 @@ const WorkDetail: React.FC = () => {
                 : steps.filter(s => s.id === materialFilterStepId);
 
              return (
-                <div className="space-y-6 animate-in fade-in">
+                <div className="space-y-6 animate-in fade-in pb-20 md:pb-0"> {/* Added pb-20 for mobile */}
                     <div className="sticky top-0 z-20 bg-slate-50 dark:bg-slate-950 pb-2">
                         <div className="flex justify-between items-end mb-2 px-2">
                             <div>
@@ -911,7 +910,7 @@ const WorkDetail: React.FC = () => {
             const budgetStatusClass = remainingBudget < 0 ? 'text-red-500' : 'text-green-500';
 
             return (
-                <div className="space-y-6 animate-in fade-in">
+                <div className="space-y-6 animate-in fade-in pb-20 md:pb-0"> {/* Added pb-20 for mobile */}
                     <div className="sticky top-0 z-20 bg-slate-50 dark:bg-slate-950 pb-2">
                         <div className="flex justify-between items-end mb-2 px-2">
                             <div>
@@ -989,7 +988,7 @@ const WorkDetail: React.FC = () => {
         if (activeTab === 'MORE') {
             // Main menu for 'MORE' tab
             return (
-                <div className="animate-in fade-in">
+                <div className="animate-in fade-in pb-20 md:pb-0"> {/* Added pb-20 for mobile */}
                     <div className="flex justify-between items-end mb-2 px-2">
                         <div>
                             <h2 className="text-2xl font-black text-primary dark:text-white">Mais Ferramentas</h2>
@@ -1074,7 +1073,7 @@ const WorkDetail: React.FC = () => {
     const renderSubView = () => {
         if (subView === 'TEAM') {
             return (
-                <div className="animate-in fade-in">
+                <div className="animate-in fade-in pb-20 md:pb-0"> {/* Added pb-20 for mobile */}
                     <div className="flex justify-between items-end mb-2 px-2">
                         <div>
                             <h2 className="text-2xl font-black text-primary dark:text-white">Equipe</h2>
@@ -1107,7 +1106,7 @@ const WorkDetail: React.FC = () => {
         }
         if (subView === 'SUPPLIERS') {
             return (
-                <div className="animate-in fade-in">
+                <div className="animate-in fade-in pb-20 md:pb-0"> {/* Added pb-20 for mobile */}
                     <div className="flex justify-between items-end mb-2 px-2">
                         <div>
                             <h2 className="text-2xl font-black text-primary dark:text-white">Fornecedores</h2>
@@ -1137,7 +1136,7 @@ const WorkDetail: React.FC = () => {
         }
         if (subView === 'PHOTOS') {
             return (
-                <div className="animate-in fade-in">
+                <div className="animate-in fade-in pb-20 md:pb-0"> {/* Added pb-20 for mobile */}
                     <div className="flex justify-between items-end mb-2 px-2">
                         <div>
                             <h2 className="text-2xl font-black text-primary dark:text-white">Fotos</h2>
@@ -1176,7 +1175,7 @@ const WorkDetail: React.FC = () => {
         }
         if (subView === 'PROJECTS') {
             return (
-                <div className="animate-in fade-in">
+                <div className="animate-in fade-in pb-20 md:pb-0"> {/* Added pb-20 for mobile */}
                     <div className="flex justify-between items-end mb-2 px-2">
                         <div>
                             <h2 className="text-2xl font-black text-primary dark:text-white">Projetos & Docs</h2>
@@ -1217,7 +1216,7 @@ const WorkDetail: React.FC = () => {
         }
         if (subView === 'REPORTS') {
             return (
-                <div className="animate-in fade-in">
+                <div className="animate-in fade-in pb-20 md:pb-0"> {/* Added pb-20 for mobile */}
                     <div className="flex justify-between items-end mb-2 px-2 print:hidden">
                         <div>
                             <h2 className="text-2xl font-black text-primary dark:text-white">Relatórios</h2>
@@ -1288,7 +1287,7 @@ const WorkDetail: React.FC = () => {
         }
         if (subView === 'CONTRACTS') {
             return (
-                <div className="animate-in fade-in">
+                <div className="animate-in fade-in pb-20 md:pb-0"> {/* Added pb-20 for mobile */}
                     <div className="flex justify-between items-end mb-2 px-2">
                         <div>
                             <h2 className="text-2xl font-black text-primary dark:text-white">Contratos</h2>
@@ -1308,7 +1307,7 @@ const WorkDetail: React.FC = () => {
         }
         if (subView === 'CHECKLIST') {
             return (
-                <div className="animate-in fade-in">
+                <div className="animate-in fade-in pb-20 md:pb-0"> {/* Added pb-20 for mobile */}
                     <div className="flex justify-between items-end mb-2 px-2">
                         <div>
                             <h2 className="text-2xl font-black text-primary dark:text-white">Checklists</h2>
@@ -1342,7 +1341,7 @@ const WorkDetail: React.FC = () => {
 
 
     return (
-        <div className="max-w-4xl mx-auto pb-28 pt-6 px-4 md:px-0 font-sans">
+        <div className="max-w-4xl mx-auto pb-6 pt-6 px-4 md:px-0 font-sans">
             {/* Header with Work Name */}
             <div className="flex items-center justify-between mb-8">
                 {/* Back button logic updated to manage inline views */}
@@ -1361,19 +1360,20 @@ const WorkDetail: React.FC = () => {
 
             {subView === 'NONE' ? (
                 <>
-                    {/* Main Tabs Navigation */}
-                    <nav className="mb-6 bg-slate-100 dark:bg-slate-900 rounded-2xl p-1 flex shadow-sm border border-slate-200 dark:border-slate-800">
-                        <button onClick={() => setActiveTab('SCHEDULE')} className={`flex-1 py-3 text-sm font-bold rounded-xl transition-all ${activeTab === 'SCHEDULE' ? 'bg-white text-primary dark:bg-slate-800 dark:text-white shadow-md' : 'text-slate-500 hover:text-primary dark:hover:text-white'}`}>
-                            <i className="fa-solid fa-calendar-days mr-2"></i> Cronograma
+                    {/* Main Tabs Navigation (responsive) */}
+                    <nav className="md:static md:mb-6 md:bg-slate-100 dark:md:bg-slate-900 md:rounded-2xl md:p-1 md:flex md:shadow-sm md:border md:border-slate-200 dark:md:border-slate-800 
+                                fixed bottom-0 left-0 w-full bg-white dark:bg-primary-dark border-t border-slate-200 dark:border-slate-800 shadow-lg z-50 p-2 flex justify-around items-center h-16 md:h-auto">
+                        <button onClick={() => setActiveTab('SCHEDULE')} className={`flex flex-col items-center flex-1 py-3 text-sm font-bold rounded-xl transition-all ${activeTab === 'SCHEDULE' ? 'md:bg-white md:text-primary dark:md:bg-slate-800 dark:md:text-white md:shadow-md text-secondary' : 'text-slate-500 hover:text-primary dark:hover:text-white'}`}>
+                            <i className="fa-solid fa-calendar-days text-lg md:mr-2"></i> <span className="md:inline hidden">Cronograma</span>
                         </button>
-                        <button onClick={() => setActiveTab('MATERIALS')} className={`flex-1 py-3 text-sm font-bold rounded-xl transition-all ${activeTab === 'MATERIALS' ? 'bg-white text-primary dark:bg-slate-800 dark:text-white shadow-md' : 'text-slate-500 hover:text-primary dark:hover:text-white'}`}>
-                            <i className="fa-solid fa-boxes-stacked mr-2"></i> Materiais
+                        <button onClick={() => setActiveTab('MATERIALS')} className={`flex flex-col items-center flex-1 py-3 text-sm font-bold rounded-xl transition-all ${activeTab === 'MATERIALS' ? 'md:bg-white md:text-primary dark:md:bg-slate-800 dark:md:text-white md:shadow-md text-secondary' : 'text-slate-500 hover:text-primary dark:hover:text-white'}`}>
+                            <i className="fa-solid fa-boxes-stacked text-lg md:mr-2"></i> <span className="md:inline hidden">Materiais</span>
                         </button>
-                        <button onClick={() => setActiveTab('FINANCIAL')} className={`flex-1 py-3 text-sm font-bold rounded-xl transition-all ${activeTab === 'FINANCIAL' ? 'bg-white text-primary dark:bg-slate-800 dark:text-white shadow-md' : 'text-slate-500 hover:text-primary dark:hover:text-white'}`}>
-                            <i className="fa-solid fa-dollar-sign mr-2"></i> Financeiro
+                        <button onClick={() => setActiveTab('FINANCIAL')} className={`flex flex-col items-center flex-1 py-3 text-sm font-bold rounded-xl transition-all ${activeTab === 'FINANCIAL' ? 'md:bg-white md:text-primary dark:md:bg-slate-800 dark:md:text-white md:shadow-md text-secondary' : 'text-slate-500 hover:text-primary dark:hover:text-white'}`}>
+                            <i className="fa-solid fa-dollar-sign text-lg md:mr-2"></i> <span className="md:inline hidden">Financeiro</span>
                         </button>
-                        <button onClick={() => setActiveTab('MORE')} className={`flex-1 py-3 text-sm font-bold rounded-xl transition-all ${activeTab === 'MORE' ? 'bg-white text-primary dark:bg-slate-800 dark:text-white shadow-md' : 'text-slate-500 hover:text-primary dark:hover:text-white'}`}>
-                            <i className="fa-solid fa-ellipsis-h mr-2"></i> Mais
+                        <button onClick={() => setActiveTab('MORE')} className={`flex flex-col items-center flex-1 py-3 text-sm font-bold rounded-xl transition-all ${activeTab === 'MORE' ? 'md:bg-white md:text-primary dark:md:bg-slate-800 dark:md:text-white md:shadow-md text-secondary' : 'text-slate-500 hover:text-primary dark:hover:text-white'}`}>
+                            <i className="fa-solid fa-ellipsis-h text-lg md:mr-2"></i> <span className="md:inline hidden">Mais</span>
                         </button>
                     </nav>
 
