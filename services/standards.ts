@@ -1,4 +1,5 @@
 
+
 // Standard Libraries for Construction Management
 
 // --- AVATAR CONFIG ---
@@ -20,7 +21,7 @@ export const ZE_TIPS: ZeTip[] = [
   { tag: 'Instalações', text: 'Tire fotos das paredes com a tubulação hidráulica e elétrica antes de rebocar. Isso é um mapa do tesouro para evitar furar canos no futuro.' },
   { tag: 'Impermeabilização', text: 'Não economize na impermeabilização dos baldrames e áreas molhadas. Resolver infiltração depois de pronto custa 5x mais caro.' },
   { tag: 'Elétrica', text: 'Nunca use fio mais fino que o especificado para o chuveiro (geralmente 6mm ou 10mm). Fio fino esquenta, gasta mais energia e pode causar incêndio.' },
-  { tag: 'Acabamento', text: 'Proteja o piso recém-instalado com papelão ondulado ou gesso. O tráfego de obra arranha porcelanato com muita facilidade.' },
+  { tag: 'Acabamento', text: 'Tinta boa em parede mal lixada não faz milagre. O segredo da pintura perfeita é 80% preparação (lixa/massa) e 20% tinta.' },
   { tag: 'Pintura', text: 'Tinta boa em parede mal lixada não faz milagre. O segredo da pintura perfeita é 80% preparação (lixa/massa) e 20% tinta.' },
   { tag: 'Caimento', text: 'Antes de pagar o azulejista, jogue um balde de água no banheiro e na sacada. A água tem que correr sozinha para o ralo, sem empoçar.' },
   { tag: 'Entulho', text: 'Mantenha a obra limpa. Entulho acumulado esconde ferramentas, causa acidentes e passa a impressão de desorganização para a equipe.' }
@@ -590,7 +591,7 @@ export const STANDARD_CHECKLISTS = [
     ]
   },
   {
-    category: '02. Infraestrutura (Fundação)',
+    category: '02. Infraestrutura (Fundaçaõ)',
     items: [
       'Escavação das estacas/sapatas na profundidade do projeto',
       'Fundo das valas compactado e limpo',
@@ -698,5 +699,30 @@ export const LIFETIME_BONUSES = [
     icon: 'fa-list-check',
     title: 'Checklists de Qualidade',
     desc: 'Listas de verificação passo-a-passo para não deixar passar nada.'
+  },
+  {
+    icon: 'fa-layer-group',
+    title: 'Gestão de Obras Ilimitadas',
+    desc: 'Crie e gerencie quantos projetos quiser, sem limites.'
+  }
+];
+
+// NEW: Simplified list for display in the bonus card
+export const LIFETIME_BONUSES_DISPLAY = [
+  {
+    icon: 'fa-calculator',
+    title: 'Calculadoras',
+  },
+  {
+    icon: 'fa-file-contract',
+    title: 'Contratos',
+  },
+  {
+    icon: 'fa-list-check',
+    title: 'Checklists',
+  },
+  {
+    icon: 'fa-layer-group',
+    title: 'Obras Ilimitadas',
   }
 ];

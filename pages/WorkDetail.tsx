@@ -6,7 +6,7 @@ import { useAuth } from '../contexts/AuthContext.tsx';
 import { dbService } from '../services/db.ts';
 import { StepStatus, FileCategory, ExpenseCategory, PlanType, type Work, type Worker, type Supplier, type Material, type Step, type Expense, type WorkPhoto, type WorkFile } from '../types.ts';
 import { ZeModal, ZeModalProps } from '../components/ZeModal.tsx';
-import { STANDARD_CHECKLISTS, CONTRACT_TEMPLATES, STANDARD_JOB_ROLES, STANDARD_SUPPLIER_CATEGORIES, ZE_AVATAR, ZE_AVATAR_FALLBACK } from '../services/standards.ts';
+import { STANDARD_CHECKLISTS, CONTRACT_TEMPLATES, STANDARD_JOB_ROLES, STANDARD_SUPPLIER_CATEGORIES, ZE_AVATAR, ZE_AVATAR_FALLBACK, LIFETIME_BONUSES_DISPLAY } from '../services/standards.ts';
 
 // --- TYPES FOR VIEW STATE ---
 type MainTab = 'SCHEDULE' | 'MATERIALS' | 'FINANCIAL' | 'MORE';
@@ -15,7 +15,7 @@ type ReportSubTab = 'CRONOGRAMA' | 'MATERIAIS' | 'FINANCEIRO'; // Keep for repor
 
 // --- DATE HELPERS ---
 const parseDateNoTimezone = (dateStr: string) => {
-    if (!dateStr) return '';
+    if (!dateStr) return '--/--';
     const cleanDate = dateStr.split('T')[0];
     const parts = cleanDate.split('-');
     if (parts.length === 3) {
@@ -127,7 +127,7 @@ const WorkDetail: React.FC = () => {
 
 
     // --- LOAD DATA ---
-    const load = async () => {
+    const load = useCallback(async () => {
         // Only proceed if initial auth check is done AND id is available
         if (!id || !isUserAuthFinished) return;
         
@@ -160,9 +160,9 @@ const WorkDetail: React.FC = () => {
             setStats(workStats);
         }
         setLoading(false);
-    };
+    }, [id, authLoading, isUserAuthFinished]); // Dependencies for useCallback
 
-    useEffect(() => { load(); }, [id, authLoading, isUserAuthFinished]);
+    useEffect(() => { load(); }, [load]); // Depend on load memoized function
 
     // --- HANDLERS ---
 
@@ -203,6 +203,42 @@ const WorkDetail: React.FC = () => {
 
         await dbService.updateStep({ ...step, status: newStatus });
         await load();
+    };
+
+    const handleDeleteStep = async (stepId: string) => {
+        if (!work) return; // Ensure work context is available
+        setZeModal({
+            isOpen: true,
+            title: 'Excluir Etapa?',
+            message: 'Tem certeza que deseja excluir esta etapa? Todos os materiais e despesas vinculados a ela também serão removidos.',
+            confirmText: 'Sim, Excluir',
+            cancelText: 'Cancelar',
+            type: 'DANGER',
+            onConfirm: async () => {
+                await dbService.deleteStep(stepId, work.id); // Pass work.id
+                await load();
+                setZeModal(prev => ({ ...prev, isOpen: false, onCancel: () => {} }));
+            },
+            onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false, onCancel: () => {} }))
+        });
+    };
+
+    const handleDeleteWork = async () => {
+        if (!work) return; // Ensure work context is available
+        setZeModal({
+            isOpen: true,
+            title: 'Excluir Obra?',
+            message: 'Tem certeza que deseja excluir esta obra e TODOS os seus dados relacionados? Esta ação é irreversível.',
+            confirmText: 'Sim, Excluir Obra',
+            cancelText: 'Cancelar',
+            type: 'DANGER',
+            onConfirm: async () => {
+                await dbService.deleteWork(work.id);
+                setZeModal(prev => ({ ...prev, isOpen: false, onCancel: () => {} }));
+                navigate('/'); // Redirect to dashboard after deleting work
+            },
+            onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false, onCancel: () => {} }))
+        });
     };
 
     const handleAddMaterial = async (e: React.FormEvent) => {
@@ -757,6 +793,10 @@ const WorkDetail: React.FC = () => {
                                             </div>
                                         </div>
                                     </div>
+                                    {/* NEW: Delete Step Button */}
+                                    <button onClick={() => handleDeleteStep(step.id)} className="text-red-400 hover:text-red-600 transition-colors p-1 ml-2">
+                                        <i className="fa-solid fa-trash"></i>
+                                    </button>
                                 </div>
                             </div>
                          );
@@ -969,28 +1009,54 @@ const WorkDetail: React.FC = () => {
                             <i className="fa-solid fa-folder-open text-2xl mb-2 text-secondary"></i> Projetos e Docs
                         </button>
                         
-                        {isPremium ? (
-                            <>
-                            <button onClick={() => setIsCalculatorModalOpen(true)} className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800 hover:bg-secondary/10 dark:hover:bg-secondary/20 transition-colors flex flex-col items-center justify-center text-sm font-medium text-secondary border border-secondary/20">
-                                <i className="fa-solid fa-calculator text-2xl mb-2 text-secondary"></i> Calculadoras
-                            </button>
-                            <button onClick={() => setSubView('CONTRACTS')} className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800 hover:bg-secondary/10 dark:hover:bg-secondary/20 transition-colors flex flex-col items-center justify-center text-sm font-medium text-secondary border border-secondary/20">
-                                <i className="fa-solid fa-file-contract text-2xl mb-2 text-secondary"></i> Contratos
-                            </button>
-                            <button onClick={() => setSubView('CHECKLIST')} className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800 hover:bg-secondary/10 dark:hover:bg-secondary/20 transition-colors flex flex-col items-center justify-center text-sm font-medium text-secondary border border-secondary/20">
-                                <i className="fa-solid fa-list-check text-2xl mb-2 text-secondary"></i> Checklists
-                            </button>
-                            </>
-                        ) : (
-                            <div className="p-4 rounded-xl bg-gradient-to-tr from-slate-700 to-slate-900 text-white flex flex-col items-center justify-center text-sm font-medium relative overflow-hidden">
-                                <div className="absolute inset-0 bg-gradient-gold opacity-10"></div>
-                                <i className="fa-solid fa-lock text-3xl mb-2 text-amber-300 relative z-10"></i>
-                                <span className="font-bold text-amber-200 text-xs text-center relative z-10">Recursos Premium</span>
-                                <button onClick={() => navigate('/settings')} className="absolute inset-0 text-xs font-bold bg-black/60 hover:bg-black/80 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
-                                    <i className="fa-solid fa-arrow-up-right-from-square mr-2 text-white/80"></i> <span className="text-white">Desbloquear</span>
-                                </button>
+                        {/* NEW: Premium Features Callout Card */}
+                        <div className="relative col-span-full rounded-3xl p-8 bg-gradient-premium shadow-xl overflow-hidden flex flex-col items-center justify-center text-center mt-6">
+                            <div className="absolute inset-0 bg-gradient-gold opacity-10"></div>
+                            <i className="fa-solid fa-crown text-4xl text-amber-300 mb-4 relative z-10"></i>
+                            <h3 className="text-2xl font-black text-white relative z-10 mb-2">Acesso Vitalício: Seu Melhor Investimento!</h3>
+                            <p className="text-amber-200 text-sm font-medium relative z-10 max-w-md">
+                                {isPremium ? (
+                                    'Todos os recursos premium abaixo estão ativos e prontos para uso!'
+                                ) : (
+                                    'Desbloqueie ferramentas exclusivas para **Gestão Ilimitada**, **Calculadoras Avançadas**, **Contratos Blindados** e **Checklists de Qualidade**.'
+                                )}
+                            </p>
+                            <div className="mt-6 flex flex-col gap-3 w-full max-w-xs relative z-10">
+                                {isPremium ? (
+                                    <span className="py-3 px-6 bg-green-500/20 text-green-300 font-bold rounded-xl border border-green-500/50">
+                                        Recursos Premium ATIVOS!
+                                    </span>
+                                ) : (
+                                    <button
+                                        onClick={() => navigate('/settings')}
+                                        className="w-full py-4 bg-gradient-gold text-white font-black rounded-2xl shadow-lg hover:shadow-orange-500/30 hover:scale-105 transition-all"
+                                    >
+                                        Liberar Acesso AGORA <i className="fa-solid fa-arrow-right ml-2"></i>
+                                    </button>
+                                )}
                             </div>
-                        )}
+                            <div className="mt-6 flex flex-wrap justify-center gap-4 relative z-10">
+                                {LIFETIME_BONUSES_DISPLAY.map((bonus, idx) => (
+                                    <div key={idx} className="flex flex-col items-center text-xs text-white/80">
+                                        <i className={`fa-solid ${bonus.icon} text-xl text-amber-400 mb-1`}></i>
+                                        {bonus.title}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+
+                        {/* Individual Premium Buttons, now below the CTA card */}
+                        <button onClick={() => setIsCalculatorModalOpen(true)} className={`p-4 rounded-xl flex flex-col items-center justify-center text-sm font-medium transition-colors ${isPremium ? 'bg-slate-50 dark:bg-slate-800 hover:bg-secondary/10 dark:hover:bg-secondary/20 text-secondary border border-secondary/20' : 'bg-slate-200 dark:bg-slate-700 text-slate-400 cursor-not-allowed opacity-70 border border-slate-300 dark:border-slate-600'}`} disabled={!isPremium}>
+                            <i className="fa-solid fa-calculator text-2xl mb-2"></i> Calculadoras
+                        </button>
+                        <button onClick={() => setSubView('CONTRACTS')} className={`p-4 rounded-xl flex flex-col items-center justify-center text-sm font-medium transition-colors ${isPremium ? 'bg-slate-50 dark:bg-slate-800 hover:bg-secondary/10 dark:hover:bg-secondary/20 text-secondary border border-secondary/20' : 'bg-slate-200 dark:bg-slate-700 text-slate-400 cursor-not-allowed opacity-70 border border-slate-300 dark:border-slate-600'}`} disabled={!isPremium}>
+                            <i className="fa-solid fa-file-contract text-2xl mb-2"></i> Contratos
+                        </button>
+                        <button onClick={() => setSubView('CHECKLIST')} className={`p-4 rounded-xl flex flex-col items-center justify-center text-sm font-medium transition-colors ${isPremium ? 'bg-slate-50 dark:bg-slate-800 hover:bg-secondary/10 dark:hover:bg-secondary/20 text-secondary border border-secondary/20' : 'bg-slate-200 dark:bg-slate-700 text-slate-400 cursor-not-allowed opacity-70 border border-slate-300 dark:border-slate-600'}`} disabled={!isPremium}>
+                            <i className="fa-solid fa-list-check text-2xl mb-2"></i> Checklists
+                        </button>
+                        
                         <button onClick={() => setSubView('REPORTS')} className="p-4 rounded-xl bg-blue-50 dark:bg-blue-900/10 text-blue-700 dark:text-blue-400 border border-blue-200 dark:border-blue-900 hover:bg-blue-100 dark:hover:bg-blue-900/20 transition-colors flex flex-col items-center justify-center text-sm font-medium">
                             <i className="fa-solid fa-file-pdf text-2xl mb-2"></i> Relatórios
                         </button>
@@ -1168,17 +1234,18 @@ const WorkDetail: React.FC = () => {
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <div className="md:col-span-1 print:block hidden-in-print">
-                            <RenderCronogramaReport />
+                            {/* Renderizar todos para impressão, mas na tela apenas o ativo em mobile */}
+                            {(reportActiveTab === 'CRONOGRAMA' || window.matchMedia('print').matches) && <RenderCronogramaReport />}
                         </div>
                         <div className="md:col-span-1 print:block hidden-in-print">
-                            <RenderMateriaisReport />
+                            {(reportActiveTab === 'MATERIAIS' || window.matchMedia('print').matches) && <RenderMateriaisReport />}
                         </div>
                         <div className="md:col-span-1 print:block hidden-in-print">
-                            <RenderFinanceiroReport />
+                            {(reportActiveTab === 'FINANCEIRO' || window.matchMedia('print').matches) && <RenderFinanceiroReport />}
                         </div>
 
-                        {/* Mobile view rendering based on reportActiveTab */}
-                        <div className="md:hidden">
+                        {/* Mobile view rendering based on reportActiveTab - only if not printing */}
+                        <div className="md:hidden print:hidden">
                             {reportActiveTab === 'CRONOGRAMA' && <RenderCronogramaReport />}
                             {reportActiveTab === 'MATERIAIS' && <RenderMateriaisReport />}
                             {reportActiveTab === 'FINANCEIRO' && <RenderFinanceiroReport />}
@@ -1211,7 +1278,7 @@ const WorkDetail: React.FC = () => {
                             </div>
                         )}
                         <div className="flex justify-end gap-3 mt-6">
-                            <button type="button" onClick={() => setSubView('NONE')} className="px-5 py-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800">Fechar</button>
+                            <button type="button" onClick={() => setIsCalculatorModalOpen(false)} className="px-5 py-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800">Fechar</button>
                         </div>
                     </div>
                 </div>
@@ -1279,7 +1346,10 @@ const WorkDetail: React.FC = () => {
                 {/* Back button logic updated to manage inline views */}
                 <button onClick={() => subView === 'NONE' ? navigate('/') : setSubView('NONE')} className="text-slate-400 hover:text-primary dark:hover:text-white transition-colors"><i className="fa-solid fa-arrow-left text-xl"></i></button>
                 <h1 className="text-2xl font-black text-primary dark:text-white mx-auto">{work.name}</h1>
-                <div className="w-6"></div> {/* Spacer */}
+                {/* NEW: Delete Work Button */}
+                <button onClick={handleDeleteWork} className="text-red-400 hover:text-red-600 transition-colors">
+                    <i className="fa-solid fa-trash text-xl"></i>
+                </button>
             </div>
 
             {subView !== 'NONE' && (
@@ -1581,7 +1651,7 @@ const WorkDetail: React.FC = () => {
                             </div>
                         )}
                         <div className="flex justify-end gap-3 mt-6">
-                            <button type="button" onClick={() => setSubView('NONE')} className="px-5 py-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800">Fechar</button>
+                            <button type="button" onClick={() => setIsCalculatorModalOpen(false)} className="px-5 py-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800">Fechar</button>
                         </div>
                     </div>
                 </div>

@@ -735,6 +735,45 @@ export const dbService = {
     return parseStepFromDB(data);
   },
 
+  async deleteStep(stepId: string, workId: string): Promise<void> {
+    // Supabase is guaranteed to be initialized now
+    try {
+      console.log(`[DB DELETE] Iniciando exclusão para stepId: ${stepId} na workId: ${workId}`);
+      // 1. Delete associated materials
+      const { error: matError } = await supabase.from('materials').delete().eq('step_id', stepId);
+      if (matError) {
+        console.error(`[DB DELETE] Erro ao deletar materiais para stepId ${stepId}:`, matError);
+        // Do not throw, continue to delete other related data and the step itself
+      } else {
+        console.log(`[DB DELETE] Materiais para stepId ${stepId} deletados.`);
+      }
+
+      // 2. Delete associated expenses
+      const { error: expError } = await supabase.from('expenses').delete().eq('step_id', stepId);
+      if (expError) {
+        console.error(`[DB DELETE] Erro ao deletar despesas para stepId ${stepId}:`, expError);
+        // Do not throw, continue to delete the step itself
+      } else {
+        console.log(`[DB DELETE] Despesas para stepId ${stepId} deletadas.`);
+      }
+      
+      // 3. Delete the step itself
+      const { error } = await supabase.from('steps').delete().eq('id', stepId);
+      if (error) throw error;
+      console.log(`[DB DELETE] Etapa ${stepId} deletada com sucesso.`);
+
+      // Invalidate caches for the affected work
+      delete _dashboardCache.stats[workId];
+      delete _dashboardCache.summary[workId];
+      _dashboardCache.notifications = null; // Notifications might be tied to steps, invalidate global cache
+      console.log(`[DB DELETE] Caches para workId ${workId} invalidados após exclusão da etapa.`);
+
+    } catch (error: any) {
+      console.error(`[DB DELETE ERROR] Erro ao apagar etapa ${stepId} e dados relacionados:`, error);
+      throw new Error(`Falha ao apagar etapa: ${error.message}`);
+    }
+  },
+
   // --- MATERIALS ---
   async getMaterials(workId: string): Promise<Material[]> {
     // Supabase is guaranteed to be initialized now
