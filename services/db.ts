@@ -1,6 +1,5 @@
 
-
-import { PlanType, ExpenseCategory, StepStatus, FileCategory, type User, type Work, type Step, type Material, type Expense, type Worker, type Supplier, type WorkPhoto, type WorkFile, type Notification, type PushSubscriptionInfo } from '../types.ts';
+import { PlanType, ExpenseCategory, StepStatus, FileCategory, type User, type Work, type Step, type Material, type Expense, type Worker, type Supplier, type WorkPhoto, type WorkFile, type DBNotification, type PushSubscriptionInfo } from '../types.ts';
 import { WORK_TEMPLATES, FULL_MATERIAL_PACKAGES } from './standards.ts';
 import { supabase } from './supabase.ts';
 
@@ -10,7 +9,7 @@ const _dashboardCache: {
     works: { data: Work[], timestamp: number } | null;
     stats: Record<string, { data: any, timestamp: number }>;
     summary: Record<string, { data: any, timestamp: number }>;
-    notifications: { data: Notification[], timestamp: number } | null;
+    notifications: { data: DBNotification[], timestamp: number } | null;
 } = {
     works: null,
     stats: {},
@@ -132,7 +131,7 @@ const parseFileFromDB = (data: any): WorkFile => ({
     date: data.date
 });
 
-const parseNotificationFromDB = (data: any): Notification => ({
+const parseNotificationFromDB = (data: any): DBNotification => ({
     id: data.id,
     userId: data.user_id,
     workId: data.work_id, // NEW: Parse work_id
@@ -1093,7 +1092,7 @@ export const dbService = {
   },
 
   // --- NOTIFICATIONS ---
-  async getNotifications(userId: string): Promise<Notification[]> {
+  async getNotifications(userId: string): Promise<DBNotification[]> {
     // Supabase is guaranteed to be initialized now
     
     const now = Date.now();
@@ -1116,7 +1115,7 @@ export const dbService = {
     return parsed;
   },
 
-  async addNotification(notification: Omit<Notification, 'id'>): Promise<Notification | null> {
+  async addNotification(notification: Omit<DBNotification, 'id'>): Promise<DBNotification | null> {
     // Supabase is guaranteed to be initialized now
     const { data, error } = await supabase.from('notifications').insert({
       user_id: notification.userId,
@@ -1236,15 +1235,7 @@ export const dbService = {
     prefetchedWork?: Work
   ): Promise<void> {
     // Supabase is guaranteed to be initialized now
-
-    // --- TRAVA DE SEGURANÇA CONTRA LOOP ---
-    const sessionKey = `notif_processed_${workId}`;
-    if (sessionStorage.getItem(sessionKey)) {
-        console.log(`[NOTIF DEBUG] Notificações já processadas para a obra ${workId} nesta sessão. Ignorando.`);
-        return;
-    }
-    // ---------------------------------------
-      
+    
     try {
         console.log(`[NOTIF DEBUG START] =================================================`);
         console.log(`[NOTIF DEBUG START] Generating smart notifications for User: ${userId}, Work: ${workId}`);

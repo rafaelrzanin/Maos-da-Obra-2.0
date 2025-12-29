@@ -1,12 +1,14 @@
+
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext.tsx';
 import { dbService } from '../services/db.ts';
 import { supabase } from '../services/supabase.ts'; // Import supabase directly
-import { type Notification } from '../types.ts';
+import { type DBNotification } from '../types.ts';
 
 const Notifications: React.FC = () => {
   const { user, authLoading, isUserAuthFinished, refreshNotifications } = useAuth();
-  const [allNotifications, setAllNotifications] = useState<Notification[]>([]);
+  const [allNotifications, setAllNotifications] = useState<DBNotification[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterRead, setFilterRead] = useState<'all' | 'unread'>('unread');
 

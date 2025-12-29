@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect, createContext, useContext, useMemo, useCallback } from 'react';
-import { User, PlanType } from '../types.ts';
+import { User, PlanType, DBNotification } from '../types.ts';
 import { dbService } from '../services/db.ts';
 
 // --- Theme Context ---
@@ -212,6 +213,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     dbService.logout();
     setUser(null); // Clear user immediately
     setUnreadNotificationsCount(0); // Clear notifications on logout
+    localStorage.removeItem('hasPromptedPushOnce'); // NEW: Clear push notification prompt status on logout
     setAuthLoading(false); // Explicitly set to false after logout operation
     setIsUserAuthFinished(true); // Still ready, just no user.
   };

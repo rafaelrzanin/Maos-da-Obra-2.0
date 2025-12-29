@@ -1,4 +1,5 @@
 
+
 export enum PlanType {
   MENSAL = 'MENSAL',
   SEMESTRAL = 'SEMESTRAL',
@@ -19,7 +20,7 @@ export interface User {
 // NEW: Interface para armazenar a PushSubscription de um usuário
 export interface PushSubscriptionInfo {
   id: string; // UUID do Supabase
-  userId: string;
+  userId: string; // Added userId to match database mapping
   // O objeto PushSubscription é o que o navegador retorna e é necessário para enviar notificações
   subscription: PushSubscriptionJSON; 
   endpoint: string; // Para facilitar a busca
@@ -150,7 +151,8 @@ export interface WorkFile {
   date: string;
 }
 
-export interface Notification {
+// RENOMEADO para evitar conflito com o objeto global 'Notification' do navegador
+export interface DBNotification { 
   id: string;
   userId: string;
   workId?: string; // NEW: Added workId to link notification to a specific work
