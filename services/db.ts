@@ -681,8 +681,8 @@ export const dbService = {
     const { data, error } = await supabase.from('steps').insert({
       work_id: step.workId,
       name: step.name,
-      start_date: step.startDate,
-      end_date: step.endDate,
+      startDate: step.startDate,
+      endDate: step.endDate,
       status: step.status,
       is_delayed: step.isDelayed
     }).select().single();

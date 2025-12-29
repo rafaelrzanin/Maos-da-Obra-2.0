@@ -8,72 +8,76 @@ const VideoTutorials: React.FC = () => {
     {
       id: 'video1',
       title: 'Primeiros Passos no App',
-      desc: 'Aprenda a criar sua primeira obra e configurar o perfil.',
-      thumb: 'https://images.unsplash.com/photo-1541888946425-d81bb19240f5?q=80&w=600&auto=format&fit=crop',
-      duration: '5:20'
+      url: 'https://www.youtube.com/embed/dQw4w9WgXcQ', // Placeholder YouTube embed URL
+      description: 'Aprenda a configurar sua primeira obra, adicionar etapas e materiais.',
     },
     {
       id: 'video2',
-      title: 'Criando um Cronograma',
-      desc: 'Como definir datas e acompanhar o progresso das etapas.',
-      thumb: 'https://images.unsplash.com/photo-1503387762-592deb58ef4e?q=80&w=600&auto=format&fit=crop',
-      duration: '8:45'
+      title: 'Gerenciando Gastos e Financeiro',
+      url: 'https://www.youtube.com/embed/dQw4w9WgXcQ', // Placeholder YouTube embed URL
+      description: 'Como registrar despesas, acompanhar o orçamento e gerar relatórios financeiros.',
     },
     {
       id: 'video3',
-      title: 'Controle Financeiro',
-      desc: 'Lance gastos, anexe comprovantes e evite estourar o orçamento.',
-      thumb: 'https://images.unsplash.com/photo-1554224155-6726b3ff858f?q=80&w=600&auto=format&fit=crop',
-      duration: '6:10'
+      title: 'Funcionalidades da IA Zé da Obra',
+      url: 'https://www.youtube.com/embed/dQw4w9WgXcQ', // Placeholder YouTube embed URL
+      description: 'Explore como o Zé da Obra AI pode te ajudar com dicas, cálculos e conselhos inteligentes.',
     },
-    {
-      id: 'video4',
-      title: 'Usando a IA Zé da Obra',
-      desc: 'Tire dúvidas técnicas e peça ajuda ao nosso assistente virtual.',
-      thumb: 'https://images.unsplash.com/photo-1531403009284-440f080d1e12?q=80&w=600&auto=format&fit=crop',
-      duration: '4:30'
-    }
+    // Add more videos as needed
   ];
 
   return (
-    <div className="max-w-5xl mx-auto pb-12 pt-4 px-4 font-sans">
-      <div className="flex items-center gap-3 mb-2">
-        <div className="w-10 h-10 rounded-xl bg-red-100 text-red-600 flex items-center justify-center text-xl">
-            <i className="fa-brands fa-youtube"></i>
-        </div>
-        <h1 className="text-2xl font-bold text-text-main dark:text-white">Tutoriais em Vídeo</h1>
-      </div>
-      <p className="text-text-muted dark:text-slate-400 mb-8 ml-14">Aprenda a usar todas as ferramentas do Mãos da Obra.</p>
+    <div className="max-w-4xl mx-auto pb-12 pt-4 px-4 font-sans animate-in fade-in">
+      <h1 className="text-3xl font-black text-primary dark:text-white mb-6 tracking-tight">Tutoriais em Vídeo</h1>
+      <p className="text-slate-500 dark:text-slate-400 max-w-2xl mb-8">
+        Aprenda a usar todas as funcionalidades do Mãos da Obra com nossos guias em vídeo.
+      </p>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {videos.map((vid, idx) => (
-          <div key={idx} className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all group cursor-pointer">
-            <div className="relative aspect-video bg-slate-100 dark:bg-slate-800 overflow-hidden">
-                <img src={vid.thumb} alt={vid.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" />
-                <div className="absolute inset-0 bg-black/20 group-hover:bg-black/40 transition-colors flex items-center justify-center">
-                    <div className="w-14 h-14 bg-white/90 rounded-full flex items-center justify-center text-red-600 shadow-lg scale-90 group-hover:scale-110 transition-transform">
-                        <i className="fa-solid fa-play ml-1 text-xl"></i>
-                    </div>
-                </div>
-                <div className="absolute bottom-3 right-3 bg-black/70 text-white text-xs font-bold px-2 py-1 rounded-md">
-                    {vid.duration}
-                </div>
+        {videos.map(video => (
+          <div key={video.id} className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-sm border border-slate-200 dark:border-slate-800">
+            <h2 className="text-xl font-bold text-primary dark:text-white mb-3">{video.title}</h2>
+            <p className="text-slate-500 dark:text-slate-400 text-sm mb-4">{video.description}</p>
+            <div className="relative w-full aspect-video rounded-xl overflow-hidden mb-4">
+              <iframe
+                className="absolute inset-0 w-full h-full"
+                src={video.url}
+                title={video.title}
+                frameBorder="0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+              ></iframe>
             </div>
-            <div className="p-5">
-                <h3 className="text-lg font-bold text-primary dark:text-white mb-2 leading-tight group-hover:text-secondary transition-colors">{vid.title}</h3>
-                <p className="text-sm text-slate-500 dark:text-slate-400">{vid.desc}</p>
-            </div>
+            <a 
+              href={video.url} 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="inline-flex items-center justify-center px-4 py-2 bg-secondary text-white text-sm font-bold rounded-xl hover:bg-secondary-dark transition-colors"
+            >
+              <i className="fa-solid fa-play-circle mr-2"></i> Assistir no YouTube
+            </a>
           </div>
         ))}
       </div>
 
-      <div className="mt-12 p-8 bg-gradient-premium rounded-3xl text-white text-center">
-          <i className="fa-solid fa-headset text-4xl mb-4 text-secondary"></i>
-          <h2 className="text-2xl font-bold mb-2">Ainda com dúvidas?</h2>
-          <p className="text-slate-300 mb-6 max-w-lg mx-auto">Nossa equipe de suporte está pronta para te ajudar. Se você é assinante Vitalício, acesse o grupo VIP.</p>
-          <button className="bg-secondary hover:bg-amber-600 text-white font-bold py-3 px-8 rounded-xl shadow-lg transition-transform hover:scale-105 active:scale-95">
-              Falar com Suporte
-          </button>
+      <div className="mt-12">
+        <h2 className="text-2xl font-black text-primary dark:text-white mb-4 tracking-tight">Bônus Vitalícios</h2>
+        <p className="text-slate-500 dark:text-slate-400 max-w-2xl mb-6">
+          Conheça as ferramentas exclusivas disponíveis apenas no plano Vitalício.
+        </p>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {LIFETIME_BONUSES.map((bonus, idx) => (
+                <div key={idx} className="flex items-start gap-4 p-4 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                    <div className="w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-500 flex items-center justify-center shrink-0">
+                        <i className={`fa-solid ${bonus.icon}`}></i>
+                    </div>
+                    <div>
+                        <h4 className="font-bold text-primary dark:text-white text-base">{bonus.title}</h4>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">{bonus.desc}</p>
+                    </div>
+                </div>
+            ))}
+        </div>
       </div>
     </div>
   );

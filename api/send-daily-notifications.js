@@ -17,7 +17,7 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 // Web-push VAPID key configuration (same as send-event-notification)
 const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY;
 const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
-const VAPID_EMAIL = "appmaosdaobra@gmail.com"; // Replace with your actual email
+const VAPID_EMAIL = "mailto:seuemail@example.com"; // Replace with your actual email
 
 if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
     console.error("CRITICAL ERROR: VAPID keys missing for daily push notifications.");
