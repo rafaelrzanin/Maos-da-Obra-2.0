@@ -411,15 +411,21 @@ const Dashboard: React.FC = () => {
 
   return (
     <div className="max-w-4xl mx-auto pb-28 pt-6 px-4 md:px-0">
-      <div className="flex justify-between items-end mb-8">
-        <div>
-          <p className={cx("text-sm font-extrabold", mutedText)}>Olá, {user?.name.split(' ')[0]}!</p>
-          <h1 className="text-3xl font-black text-primary dark:text-white">Seu Dashboard</h1>
+      {focusWork ? ( // RENDER HEADER AND "NOVA OBRA" BUTTON ONLY IF THERE IS A FOCUSED WORK
+        <div className="flex justify-between items-end mb-8">
+          <div>
+            <p className={cx("text-sm font-extrabold", mutedText)}>Olá, {user?.name.split(' ')[0]}!</p>
+            <h1 className="text-3xl font-black text-primary dark:text-white">Seu Dashboard</h1>
+          </div>
+          <button onClick={() => navigate('/create')} className="bg-primary text-white font-bold py-3 px-6 rounded-xl shadow-lg flex items-center gap-2 hover:scale-105 transition-transform">
+            <i className="fa-solid fa-plus-circle"></i> Nova Obra
+          </button>
         </div>
-        <button onClick={() => navigate('/create')} className="bg-primary text-white font-bold py-3 px-6 rounded-xl shadow-lg flex items-center gap-2 hover:scale-105 transition-transform">
-          <i className="fa-solid fa-plus-circle"></i> Nova Obra
-        </button>
-      </div>
+      ) : (
+        // Keep some top padding/margin for consistency when header is not present
+        <div className="mb-8"></div> 
+      )}
+
 
       {focusWork && focusWorkStats && focusWorkDailySummary ? (
         <>
@@ -525,15 +531,22 @@ const Dashboard: React.FC = () => {
         </>
       ) : (
         /* NEW: Empty State UI - RENDERED WHEN NO WORK IS FOCUSED */
-        <div className={cx(surface, "rounded-[1.6rem] p-6 lg:p-8 mb-8 text-center py-16")}>
-          <i className="fa-solid fa-hammer-screwdriver text-7xl text-slate-300 dark:text-slate-700 mb-6"></i>
-          <p className={cx("text-2xl font-black text-primary dark:text-white mb-3")}>Sua Primeira Obra Começa Aqui!</p>
-          <p className={cx("text-base max-w-md mx-auto", mutedText)}>Crie seu primeiro projeto e comece a construir seus sonhos com o Zé da Obra!</p>
+        <div className={cx(surface, "rounded-[2rem] p-6 lg:p-10 mb-8 text-center py-16 animate-in fade-in duration-700")}>
+          {/* Greeting inside the card */}
+          <p className={cx("text-base font-extrabold text-slate-700 dark:text-slate-300 mb-4")}>
+            Olá, {user?.name.split(' ')[0]}!
+          </p>
+          {/* Updated Icon and Styling */}
+          <div className="w-24 h-24 mx-auto bg-gradient-gold rounded-full flex items-center justify-center text-white text-5xl mb-6 shadow-xl shadow-secondary/30 transform rotate-3">
+            <i className="fa-solid fa-hammer-screwdriver -rotate-3"></i>
+          </div>
+          <p className={cx("text-3xl font-black text-primary dark:text-white mb-3 tracking-tight")}>Sua Primeira Obra Começa Aqui!</p>
+          <p className={cx("text-lg max-w-md mx-auto", mutedText)}>Crie seu primeiro projeto e comece a construir seus sonhos com o Zé da Obra!</p>
           <button 
             onClick={() => navigate('/create')} 
-            className="mt-8 py-4 px-8 bg-primary text-white font-bold rounded-2xl shadow-lg flex items-center justify-center gap-3 hover:scale-105 transition-transform mx-auto"
+            className="mt-10 py-5 px-10 bg-secondary text-white font-black rounded-3xl shadow-xl shadow-secondary/40 flex items-center justify-center gap-3 hover:scale-[1.02] active:scale-[0.98] transition-all duration-300 ease-out mx-auto border-2 border-secondary hover:border-orange-600"
           >
-            <i className="fa-solid fa-plus-circle"></i> Criar Minha Primeira Obra
+            <i className="fa-solid fa-plus-circle text-xl"></i> Criar Minha Primeira Obra
           </button>
         </div>
       )}
