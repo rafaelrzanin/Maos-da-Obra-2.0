@@ -1,5 +1,4 @@
 
-
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext.tsx'; // Use authLoading and isUserAuthFinished
 import { useNavigate } from 'react-router-dom';
@@ -153,7 +152,7 @@ const CreateWork: React.FC = () => {
         end.setDate(end.getDate() + duration);
 
         // Start Creation Process
-        const createPromise = dbService.createWork({ // Fixed: Changed from `this.createWork` to `dbService.createWork`
+        const createPromise = dbService.createWork({
           userId: user.id,
           name: formData.name,
           address: formData.address || 'Endereço não informado',

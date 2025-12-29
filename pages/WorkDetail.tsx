@@ -24,6 +24,19 @@ const parseDateNoTimezone = (dateStr: string) => {
     return dateStr;
 };
 
+// Helper para formatar valores monetários
+const formatCurrency = (value: number | string | undefined): string => {
+  if (value === undefined || value === null || isNaN(Number(value))) {
+    return 'R$ 0,00';
+  }
+  return Number(value).toLocaleString('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+};
+
 const WorkDetail: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
@@ -128,19 +141,19 @@ const WorkDetail: React.FC = () => {
         if (authLoading) return; // Wait for AuthContext to finish loading
 
         setLoading(true);
-        const w = await dbService.getWorkById(id); // Fixed: Changed from `this.getWorkById`
+        const w = await dbService.getWorkById(id);
         setWork(w || null);
         
         if (w) {
-            const [s, m, e, wk, sp, ph, fl, workStats] = await Promise.all([ // Added workStats to parallel fetch
-                dbService.getSteps(w.id), // Fixed: Changed from `this.getSteps`
-                dbService.getMaterials(w.id), // Fixed: Changed from `this.getMaterials`
-                dbService.getExpenses(w.id), // Fixed: Changed from `this.getExpenses`
-                dbService.getWorkers(w.id), // Fixed: Changed from `this.getWorkers`
-                dbService.getSuppliers(w.id), // Fixed: Changed from `this.getSuppliers`
-                dbService.getPhotos(w.id), // Fixed: Changed from `this.getPhotos`
-                dbService.getFiles(w.id), // Fixed: Changed from `this.getFiles`
-                dbService.calculateWorkStats(w.id) // Fixed: Changed from `this.calculateWorkStats`
+            const [s, m, e, wk, sp, ph, fl, workStats] = await Promise.all([
+                dbService.getSteps(w.id),
+                dbService.getMaterials(w.id),
+                dbService.getExpenses(w.id),
+                dbService.getWorkers(w.id),
+                dbService.getSuppliers(w.id),
+                dbService.getPhotos(w.id),
+                dbService.getFiles(w.id),
+                dbService.calculateWorkStats(w.id)
             ]);
             
             setSteps(s ? s.sort((a,b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()) : []);
@@ -164,7 +177,7 @@ const WorkDetail: React.FC = () => {
         if (!work || !stepName) return;
 
         if (stepModalMode === 'ADD') {
-            await dbService.addStep({ // Fixed: Changed from `this.addStep`
+            await dbService.addStep({
                 workId: work.id,
                 name: stepName,
                 startDate: stepStart,
@@ -175,7 +188,7 @@ const WorkDetail: React.FC = () => {
         } else if (stepModalMode === 'EDIT' && currentStepId) {
             const existing = steps.find(s => s.id === currentStepId);
             if (existing) {
-                await dbService.updateStep({ // Fixed: Changed from `this.updateStep`
+                await dbService.updateStep({
                     ...existing,
                     name: stepName,
                     startDate: stepStart,
@@ -197,7 +210,7 @@ const WorkDetail: React.FC = () => {
         else if (step.status === StepStatus.IN_PROGRESS) newStatus = StepStatus.COMPLETED;
         else newStatus = StepStatus.NOT_STARTED;
 
-        await dbService.updateStep({ ...step, status: newStatus }); // Fixed: Changed from `this.updateStep`
+        await dbService.updateStep({ ...step, status: newStatus });
         await load();
     };
 
@@ -212,7 +225,7 @@ const WorkDetail: React.FC = () => {
             cancelText: 'Cancelar',
             type: 'DANGER',
             onConfirm: async () => {
-                await dbService.deleteStep(stepId, work.id); // Fixed: Changed from `this.deleteStep`
+                await dbService.deleteStep(stepId, work.id);
                 await load();
                 setZeModal(prev => ({ ...prev, isOpen: false, onCancel: () => {} }));
             },
@@ -232,7 +245,7 @@ const WorkDetail: React.FC = () => {
             cancelText: 'Cancelar',
             type: 'DANGER',
             onConfirm: async () => {
-                await dbService.deleteWork(work.id); // Fixed: Changed from `this.deleteWork`
+                await dbService.deleteWork(work.id);
                 setZeModal(prev => ({ ...prev, isOpen: false, onCancel: () => {} }));
                 navigate('/'); // Redirect to dashboard after deleting work
             },
@@ -253,7 +266,7 @@ const WorkDetail: React.FC = () => {
             stepId: newMatStepId || undefined
         };
         
-        await dbService.addMaterial(mat, newMatBuyNow ? { // Fixed: Changed from `this.addMaterial`
+        await dbService.addMaterial(mat, newMatBuyNow ? {
             qty: Number(newMatBuyQty),
             cost: Number(newMatBuyCost),
             date: new Date().toISOString()
@@ -280,11 +293,11 @@ const WorkDetail: React.FC = () => {
                 plannedQty: Number(matPlannedQty),
                 unit: matUnit
             };
-            await dbService.updateMaterial(updatedMaterial); // Fixed: Changed from `this.updateMaterial`
+            await dbService.updateMaterial(updatedMaterial);
 
             // 2. Register Purchase (if applicable)
             if (hasPurchase) {
-                await dbService.registerMaterialPurchase( // Fixed: Changed from `this.registerMaterialPurchase`
+                await dbService.registerMaterialPurchase(
                     materialModal.material.id,
                     matName,
                     matBrand,
@@ -335,11 +348,11 @@ const WorkDetail: React.FC = () => {
 
         try {
             if (expenseModal.mode === 'ADD') {
-                await dbService.addExpense({ // Fixed: Changed from `this.addExpense`
+                await dbService.addExpense({
                     workId: work.id,
                     description: expDesc,
                     amount: inputAmount,
-                    paidAmount: inputAmount, // Ensure paidAmount is set on add
+                    paidAmount: inputAmount, // Ensure paid_amount is set on add
                     quantity: 1, // Default quantity
                     date: new Date(expDate).toISOString(),
                     category: expCategory,
@@ -351,11 +364,11 @@ const WorkDetail: React.FC = () => {
                 if (existing) {
                     const newTotalAmount = expSavedAmount + inputAmount;
 
-                    await dbService.updateExpense({ // Fixed: Changed from `this.updateExpense`
+                    await dbService.updateExpense({
                         ...existing,
                         description: expDesc,
                         amount: newTotalAmount,
-                        paidAmount: newTotalAmount, // Ensure paidAmount is updated
+                        paidAmount: newTotalAmount, // Ensure paid_amount is updated
                         date: new Date(expDate).toISOString(),
                         category: expCategory,
                         stepId: finalStepId,
@@ -374,7 +387,7 @@ const WorkDetail: React.FC = () => {
     const handleDeleteExpense = async () => {
         if (expenseModal.id) {
             if (window.confirm("Tem certeza que deseja excluir este gasto?")) {
-                await dbService.deleteExpense(expenseModal.id); // Fixed: Changed from `this.deleteExpense`
+                await dbService.deleteExpense(expenseModal.id);
                 setExpenseModal({ isOpen: false, mode: 'ADD' });
                 await load();
             }
@@ -391,7 +404,7 @@ const WorkDetail: React.FC = () => {
                 await new Promise(r => setTimeout(r, 800));
                 
                 if (type === 'PHOTO') {
-                    await dbService.addPhoto({ // Fixed: Changed from `this.addPhoto`
+                    await dbService.addPhoto({
                         workId: work.id,
                         url: base64,
                         description: 'Foto da obra',
@@ -399,7 +412,7 @@ const WorkDetail: React.FC = () => {
                         type: 'PROGRESS'
                     });
                 } else {
-                    await dbService.addFile({ // Fixed: Changed from `this.addFile`
+                    await dbService.addFile({
                         workId: work.id,
                         name: file.name,
                         category: FileCategory.GENERAL,
@@ -455,11 +468,11 @@ const WorkDetail: React.FC = () => {
         };
 
         if (personId) {
-            if (personMode === 'WORKER') await dbService.updateWorker({ ...payload, id: personId, role: personRole, dailyRate: parseFloat(personNotes) || undefined }); // Fixed: Changed from `this.updateWorker` and correctly map personNotes to dailyRate
-            else await dbService.updateSupplier({ ...payload, id: personId, category: personRole }); // Fixed: Changed from `this.updateSupplier`
+            if (personMode === 'WORKER') await dbService.updateWorker({ ...payload, id: personId, role: personRole, dailyRate: parseFloat(personNotes) || undefined });
+            else await dbService.updateSupplier({ ...payload, id: personId, category: personRole });
         } else {
-            if (personMode === 'WORKER') await dbService.addWorker({ ...payload, role: personRole, dailyRate: parseFloat(personNotes) || undefined }); // Fixed: Changed from `this.addWorker` and correctly map personNotes to dailyRate
-            else await dbService.addSupplier({ ...payload, category: personRole }); // Fixed: Changed from `this.addSupplier`
+            if (personMode === 'WORKER') await dbService.addWorker({ ...payload, role: personRole, dailyRate: parseFloat(personNotes) || undefined });
+            else await dbService.addSupplier({ ...payload, category: personRole });
         }
         
         await load();
@@ -475,8 +488,8 @@ const WorkDetail: React.FC = () => {
             cancelText: 'Cancelar', 
             type: 'DANGER',
             onConfirm: async () => {
-                if (mode === 'WORKER') await dbService.deleteWorker(idToDelete, workId); // Fixed: Changed from `this.deleteWorker`
-                else await dbService.deleteSupplier(idToDelete, workId); // Fixed: Changed from `this.deleteSupplier`
+                if (mode === 'WORKER') await dbService.deleteWorker(idToDelete, workId);
+                else await dbService.deleteSupplier(idToDelete, workId);
                 await load();
                 setZeModal(prev => ({ ...prev, isOpen: false, onCancel: () => {} }));
             },
@@ -536,9 +549,9 @@ const WorkDetail: React.FC = () => {
 
             return {
                 'Descrição': e.description,
-                'Valor Lançado': Number(e.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 }),
-                'Total Acordado': Number(totalAgreedValue).toLocaleString('pt-BR', { minimumFractionDigits: 2 }),
-                'Diferença (Saldo)': Number(saldoAPagar).toLocaleString('pt-BR', { minimumFractionDigits: 2 }),
+                'Valor Lançado': formatCurrency(e.amount), // Formatted
+                'Total Acordado': formatCurrency(totalAgreedValue), // Formatted
+                'Diferença (Saldo)': formatCurrency(saldoAPagar), // Formatted
                 'Categoria': e.category,
                 'Data': parseDateNoTimezone(e.date),
                 'Etapa Associada': stepName,
@@ -713,7 +726,7 @@ const WorkDetail: React.FC = () => {
                                                     {expenseSupplier !== 'N/A' && <span className="text-sm font-medium text-slate-400">(Fornecedor: {expenseSupplier})</span>}
                                                 </p>
                                             </div>
-                                            <span className="font-bold text-primary dark:text-white whitespace-nowrap">R$ {Number(exp.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                            <span className="font-bold text-primary dark:text-white whitespace-nowrap">{formatCurrency(exp.amount)}</span>
                                         </li>
                                     );
                                 })}
@@ -790,7 +803,7 @@ const WorkDetail: React.FC = () => {
                                             </div>
                                             <h3 className={`font-bold text-lg leading-tight ${isDone ? 'text-slate-400 line-through' : 'text-primary dark:text-white'}`}>{step.name}</h3>
                                         </div>
-                                        <div className="flex gap-4 flex-wrap sm:justify-end sm:flex-nowrap"> {/* Adicionado flex-wrap para mobile */}
+                                        <div className="flex gap-4 flex-wrap sm:justify-end sm:flex-nowrap">
                                             <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium bg-slate-50 dark:bg-slate-800 px-2 py-1 rounded-md">
                                                 <i className="fa-regular fa-calendar"></i> <span aria-label={`Data de início: ${parseDateNoTimezone(step.startDate)}`}>{parseDateNoTimezone(step.startDate)}</span>
                                             </div>
@@ -799,7 +812,7 @@ const WorkDetail: React.FC = () => {
                                             </div>
                                         </div>
                                     </div>
-                                    <button onClick={() => handleDeleteStep(step.id)} className="text-red-400 hover:text-red-600 transition-colors p-1 ml-2 shrink-0 self-start sm:self-center" aria-label={`Excluir etapa ${step.name}`}> {/* RESTAURADO: Botão de lixeira para exclusão da etapa */}
+                                    <button onClick={() => handleDeleteStep(step.id)} className="text-red-400 hover:text-red-600 transition-colors p-1 ml-2 shrink-0 self-start sm:self-center" aria-label={`Excluir etapa ${step.name}`}>
                                       <i className="fa-solid fa-trash"></i>
                                     </button>
                                 </div>
@@ -818,7 +831,7 @@ const WorkDetail: React.FC = () => {
 
              return (
                 <div className="space-y-6 animate-in fade-in pb-24 md:pb-0"> {/* Adjusted pb-24 for mobile, pb-0 for desktop */}
-                    <div className="sticky top-0 z-20 bg-surface dark:bg-slate-950 pb-2"> {/* Changed bg-slate-50 to bg-surface */}
+                    <div className="sticky top-0 z-20 bg-surface dark:bg-slate-950 pb-2">
                         <div className="flex justify-between items-end mb-2 px-2">
                             <div>
                                 <h2 className="text-2xl font-black text-primary dark:text-white">Materiais</h2>
@@ -915,8 +928,8 @@ const WorkDetail: React.FC = () => {
             const budgetStatusClass = remainingBudget < 0 ? 'text-red-500' : 'text-green-500';
 
             return (
-                <div className="space-y-6 animate-in fade-in pb-24 md:pb-0"> {/* Adjusted pb-24 for mobile, pb-0 for desktop */}
-                    <div className="sticky top-0 z-20 bg-surface dark:bg-slate-950 pb-2"> {/* Changed bg-slate-50 to bg-surface */}
+                <div className="space-y-6 animate-in fade-in pb-24 md:pb-0">
+                    <div className="sticky top-0 z-20 bg-surface dark:bg-slate-950 pb-2">
                         <div className="flex justify-between items-end mb-2 px-2">
                             <div>
                                 <h2 className="text-2xl font-black text-primary dark:text-white">Financeiro</h2>
@@ -929,10 +942,10 @@ const WorkDetail: React.FC = () => {
                     <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm mb-6">
                         <h3 className="text-lg font-bold text-primary dark:text-white mb-4">Resumo Orçamentário</h3>
                         <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm text-slate-600 dark:text-slate-300">
-                            <p>Orçamento Total:</p> <p className="font-bold text-right">R$ {totalPlanned.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
-                            <p>Total Gasto:</p> <p className="font-bold text-right">R$ {totalSpent.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                            <p>Orçamento Total:</p> <p className="font-bold text-right">{formatCurrency(totalPlanned)}</p>
+                            <p>Total Gasto:</p> <p className="font-bold text-right">{formatCurrency(totalSpent)}</p>
                             <p className="font-bold pt-2 border-t border-slate-100 dark:border-slate-800">Saldo Restante:</p> 
-                            <p className={`font-bold pt-2 border-t border-slate-100 dark:border-slate-800 text-right ${budgetStatusClass}`}>R$ {remainingBudget.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</p>
+                            <p className={`font-bold pt-2 border-t border-slate-100 dark:border-slate-800 text-right ${budgetStatusClass}`}>{formatCurrency(remainingBudget)}</p>
                         </div>
                     </div>
 
@@ -968,15 +981,15 @@ const WorkDetail: React.FC = () => {
                                                     {exp.workerId && <span className="text-xs text-slate-400">• Prof.: {workerName}</span>}
                                                 </div>
                                             </div>
-                                            <span className="font-black text-lg text-primary dark:text-white whitespace-nowrap">R$ {Number(exp.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                            <span className="font-black text-lg text-primary dark:text-white whitespace-nowrap">{formatCurrency(exp.amount)}</span>
                                         </div>
                                         {exp.totalAgreed && (exp.totalAgreed > exp.amount) && (
                                             <div className="flex justify-between items-center text-xs text-slate-500 dark:text-slate-400 mt-2 p-2 bg-slate-50 dark:bg-slate-800 rounded-lg">
                                                 <span>Valor total acordado:</span>
-                                                <span className="font-bold">R$ {(exp.totalAgreed || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                                <span className="font-bold">{formatCurrency(exp.totalAgreed)}</span>
                                                 {exp.totalAgreed > exp.amount && (
                                                     <span className="font-bold text-red-500">
-                                                        (Faltam: R$ {(exp.totalAgreed - exp.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })})
+                                                        (Faltam: {formatCurrency(exp.totalAgreed - exp.amount)})
                                                     </span>
                                                 )}
                                             </div>
@@ -993,7 +1006,7 @@ const WorkDetail: React.FC = () => {
         if (activeTab === 'MORE') {
             // Main menu for 'MORE' tab
             return (
-                <div className="animate-in fade-in pb-24 md:pb-0"> {/* Adjusted pb-24 for mobile, pb-0 for desktop */}
+                <div className="animate-in fade-in pb-24 md:pb-0">
                     <div className="flex justify-between items-end mb-2 px-2">
                         <div>
                             <h2 className="text-2xl font-black text-primary dark:text-white">Mais Ferramentas</h2>
@@ -1083,7 +1096,7 @@ const WorkDetail: React.FC = () => {
         if (subView === 'TEAM') {
             return (
                 <div className="animate-in fade-in">
-                    <div className="flex justify-between items-end mb-4 px-2"> {/* Adjusted mb */}
+                    <div className="flex justify-between items-end mb-4 px-2">
                         <div>
                             <h2 className="text-2xl font-black text-primary dark:text-white">Equipe</h2>
                             <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Profissionais da Obra</p>
@@ -1102,7 +1115,7 @@ const WorkDetail: React.FC = () => {
                                             <p className="text-xs text-slate-500 dark:text-slate-400">{worker.role}</p>
                                         </div>
                                         <div className="flex items-center gap-3">
-                                            {worker.dailyRate && <span className="text-sm font-bold text-secondary">R$ {worker.dailyRate.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}/dia</span>}
+                                            {worker.dailyRate && <span className="text-sm font-bold text-secondary">{formatCurrency(worker.dailyRate)}/dia</span>}
                                             <button onClick={(e) => { e.stopPropagation(); handleDeletePerson(worker.id, worker.workId, 'WORKER'); }} className="text-red-400 hover:text-red-600 transition-colors p-1" aria-label={`Excluir profissional ${worker.name}`}><i className="fa-solid fa-trash"></i></button>
                                         </div>
                                     </div>
@@ -1116,7 +1129,7 @@ const WorkDetail: React.FC = () => {
         if (subView === 'SUPPLIERS') {
             return (
                 <div className="animate-in fade-in">
-                    <div className="flex justify-between items-end mb-4 px-2"> {/* Adjusted mb */}
+                    <div className="flex justify-between items-end mb-4 px-2">
                         <div>
                             <h2 className="text-2xl font-black text-primary dark:text-white">Fornecedores</h2>
                             <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Parceiros da Obra</p>
@@ -1146,7 +1159,7 @@ const WorkDetail: React.FC = () => {
         if (subView === 'PHOTOS') {
             return (
                 <div className="animate-in fade-in">
-                    <div className="flex justify-between items-end mb-4 px-2"> {/* Adjusted mb */}
+                    <div className="flex justify-between items-end mb-4 px-2">
                         <div>
                             <h2 className="text-2xl font-black text-primary dark:text-white">Fotos</h2>
                             <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Registro Visual</p>
@@ -1186,7 +1199,7 @@ const WorkDetail: React.FC = () => {
         if (subView === 'PROJECTS') {
             return (
                 <div className="animate-in fade-in">
-                    <div className="flex justify-between items-end mb-4 px-2"> {/* Adjusted mb */}
+                    <div className="flex justify-between items-end mb-4 px-2">
                         <div>
                             <h2 className="text-2xl font-black text-primary dark:text-white">Projetos & Docs</h2>
                             <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Arquivos Importantes</p>
@@ -1228,7 +1241,7 @@ const WorkDetail: React.FC = () => {
         if (subView === 'REPORTS') {
             return (
                 <div className="animate-in fade-in">
-                    <div className="flex justify-between items-end mb-4 px-2 print:hidden"> {/* Adjusted mb */}
+                    <div className="flex justify-between items-end mb-4 px-2 print:hidden">
                         <div>
                             <h2 className="text-2xl font-black text-primary dark:text-white">Relatórios</h2>
                             <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Gerar e Imprimir</p>
@@ -1301,7 +1314,7 @@ const WorkDetail: React.FC = () => {
         if (subView === 'CONTRACTS') {
             return (
                 <div className="animate-in fade-in">
-                    <div className="flex justify-between items-end mb-4 px-2"> {/* Adjusted mb */}
+                    <div className="flex justify-between items-end mb-4 px-2">
                         <div>
                             <h2 className="text-2xl font-black text-primary dark:text-white">Contratos</h2>
                             <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Modelos Prontos</p>
@@ -1321,7 +1334,7 @@ const WorkDetail: React.FC = () => {
         if (subView === 'CHECKLIST') {
             return (
                 <div className="animate-in fade-in">
-                    <div className="flex justify-between items-end mb-4 px-2"> {/* Adjusted mb */}
+                    <div className="flex justify-between items-end mb-4 px-2">
                         <div>
                             <h2 className="text-2xl font-black text-primary dark:text-white">Checklists</h2>
                             <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Verificação de Qualidade</p>
@@ -1354,7 +1367,7 @@ const WorkDetail: React.FC = () => {
 
 
     return (
-        <div className="max-w-4xl mx-auto py-8 px-4 md:px-0 font-sans"> {/* Adjusted padding */}
+        <div className="max-w-4xl mx-auto py-8 px-4 md:px-0 font-sans">
             {/* Header with Work Name */}
             <div className="flex items-center justify-between mb-8">
                 {/* Back button logic updated to manage inline views */}
@@ -1378,20 +1391,20 @@ const WorkDetail: React.FC = () => {
                     {/* Main Tabs Navigation (responsive) */}
                     <nav 
                       className="md:static md:mb-6 md:bg-slate-100 dark:md:bg-slate-900 md:rounded-2xl md:p-1 md:flex md:shadow-sm md:border md:border-slate-200 dark:md:border-slate-800 
-                                fixed bottom-0 left-0 w-full bg-white dark:bg-primary-dark border-t border-slate-200 dark:border-slate-800 shadow-lg z-50 py-3 md:py-1 flex justify-around items-center h-20 md:h-auto pb-[env(safe-area-inset-bottom)]" /* NEW: Increased height to h-20, added pb-safe-area */
+                                fixed bottom-0 left-0 w-full bg-white dark:bg-primary-dark border-t border-slate-200 dark:border-slate-800 shadow-lg z-50 py-3 md:py-1 flex justify-around items-center h-20 md:h-auto pb-[env(safe-area-inset-bottom)]"
                       role="tablist"
                       aria-label="Navegação por abas da obra"
                     >
-                        <button role="tab" aria-controls="schedule-panel" aria-selected={activeTab === 'SCHEDULE'} onClick={() => setActiveTab('SCHEDULE')} className={`flex flex-col items-center flex-1 py-2 text-sm font-bold rounded-xl transition-all ${activeTab === 'SCHEDULE' ? 'md:bg-white md:text-primary dark:md:bg-slate-800 dark:md:text-white md:shadow-md text-secondary' : 'text-slate-500 hover:text-primary dark:hover:text-white'}`}> {/* Adjusted py */}
-                            <i className="fa-solid fa-calendar-days text-lg md:mr-2"></i> <span className="md:inline text-xs md:text-sm">Cronograma</span> {/* Adjusted text size for mobile */}
+                        <button role="tab" aria-controls="schedule-panel" aria-selected={activeTab === 'SCHEDULE'} onClick={() => setActiveTab('SCHEDULE')} className={`flex flex-col items-center flex-1 py-2 text-sm font-bold rounded-xl transition-all ${activeTab === 'SCHEDULE' ? 'md:bg-white md:text-primary dark:md:bg-slate-800 dark:md:text-white md:shadow-md text-secondary' : 'text-slate-500 hover:text-primary dark:hover:text-white'}`}>
+                            <i className="fa-solid fa-calendar-days text-lg md:mr-2"></i> <span className="md:inline text-xs md:text-sm">Cronograma</span>
                         </button>
-                        <button role="tab" aria-controls="materials-panel" aria-selected={activeTab === 'MATERIALS'} onClick={() => setActiveTab('MATERIALS')} className={`flex flex-col items-center flex-1 py-2 text-sm font-bold rounded-xl transition-all ${activeTab === 'MATERIALS' ? 'md:bg-white md:text-primary dark:md:bg-slate-800 dark:md:text-white md:shadow-md text-secondary' : 'text-slate-500 hover:text-primary dark:hover:text-white'}`}> {/* Adjusted py */}
+                        <button role="tab" aria-controls="materials-panel" aria-selected={activeTab === 'MATERIALS'} onClick={() => setActiveTab('MATERIALS')} className={`flex flex-col items-center flex-1 py-2 text-sm font-bold rounded-xl transition-all ${activeTab === 'MATERIALS' ? 'md:bg-white md:text-primary dark:md:bg-slate-800 dark:md:text-white md:shadow-md text-secondary' : 'text-slate-500 hover:text-primary dark:hover:text-white'}`}>
                             <i className="fa-solid fa-boxes-stacked text-lg md:mr-2"></i> <span className="md:inline text-xs md:text-sm">Materiais</span>
                         </button>
-                        <button role="tab" aria-controls="financial-panel" aria-selected={activeTab === 'FINANCIAL'} onClick={() => setActiveTab('FINANCIAL')} className={`flex flex-col items-center flex-1 py-2 text-sm font-bold rounded-xl transition-all ${activeTab === 'FINANCIAL' ? 'md:bg-white md:text-primary dark:md:bg-slate-800 dark:md:text-white md:shadow-md text-secondary' : 'text-slate-500 hover:text-primary dark:hover:text-white'}`}> {/* Adjusted py */}
+                        <button role="tab" aria-controls="financial-panel" aria-selected={activeTab === 'FINANCIAL'} onClick={() => setActiveTab('FINANCIAL')} className={`flex flex-col items-center flex-1 py-2 text-sm font-bold rounded-xl transition-all ${activeTab === 'FINANCIAL' ? 'md:bg-white md:text-primary dark:md:bg-slate-800 dark:md:text-white md:shadow-md text-secondary' : 'text-slate-500 hover:text-primary dark:hover:text-white'}`}>
                             <i className="fa-solid fa-dollar-sign text-lg md:mr-2"></i> <span className="md:inline text-xs md:text-sm">Financeiro</span>
                         </button>
-                        <button role="tab" aria-controls="more-panel" aria-selected={activeTab === 'MORE'} onClick={() => setActiveTab('MORE')} className={`flex flex-col items-center flex-1 py-2 text-sm font-bold rounded-xl transition-all ${activeTab === 'MORE' ? 'md:bg-white md:text-primary dark:md:bg-slate-800 dark:md:text-white md:shadow-md text-secondary' : 'text-slate-500 hover:text-primary dark:hover:text-white'}`}> {/* Adjusted py */}
+                        <button role="tab" aria-controls="more-panel" aria-selected={activeTab === 'MORE'} onClick={() => setActiveTab('MORE')} className={`flex flex-col items-center flex-1 py-2 text-sm font-bold rounded-xl transition-all ${activeTab === 'MORE' ? 'md:bg-white md:text-primary dark:md:bg-slate-800 dark:md:text-white md:shadow-md text-secondary' : 'text-slate-500 hover:text-primary dark:hover:text-white'}`}>
                             <i className="fa-solid fa-ellipsis-h text-lg md:mr-2"></i> <span className="md:inline text-xs md:text-sm">Mais</span>
                         </button>
                     </nav>
@@ -1575,7 +1588,7 @@ const WorkDetail: React.FC = () => {
                             
                             {expenseModal.mode === 'EDIT' && (
                                 <p className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-sm text-slate-600 dark:text-slate-300">
-                                    Valor já registrado: <span className="font-bold">R$ {expSavedAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
+                                    Valor já registrado: <span className="font-bold">{formatCurrency(expSavedAmount)}</span>
                                 </p>
                             )}
 

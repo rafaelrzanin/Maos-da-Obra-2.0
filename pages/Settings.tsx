@@ -6,7 +6,7 @@ import { PlanType } from '../types.ts';
 import { LIFETIME_BONUSES } from '../services/standards.ts';
 
 const Settings: React.FC = () => {
-  const { user, isSubscriptionValid, isNewAccount, logout } = useAuth(); // Adicionado 'logout'
+  const { user, isSubscriptionValid, isNewAccount, logout } = useAuth();
   const navigate = useNavigate();
   const [showBonusModal, setShowBonusModal] = useState(false);
 
@@ -18,25 +18,37 @@ const Settings: React.FC = () => {
     'Relatórios PDF e Excel'
   ];
 
+  const formatCurrency = (value: number | string | undefined): string => {
+    if (value === undefined || value === null || isNaN(Number(value))) {
+      return 'R$ 0,00';
+    }
+    return Number(value).toLocaleString('pt-BR', {
+      style: 'currency',
+      currency: 'BRL',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  };
+
   const plans = [
     {
       id: PlanType.MENSAL,
       name: 'Mensal',
-      price: 'R$ 29,90',
+      price: 29.90, // Changed to number
       period: '/mês',
       savings: null,
     },
     {
       id: PlanType.SEMESTRAL,
       name: 'Semestral',
-      price: 'R$ 97,00',
+      price: 97.00, // Changed to number
       period: '/semestre',
       savings: 'Economia de 46%',
     },
     {
       id: PlanType.VITALICIO,
       name: 'VITALÍCIO',
-      price: 'R$ 247,00',
+      price: 247.00, // Changed to number
       period: 'PAGAMENTO ÚNICO',
       savings: 'OFERTA ESPECIAL',
     }
@@ -71,7 +83,7 @@ const Settings: React.FC = () => {
           // Estados do Plano
           const isMyOldPlan = !isNewAccount && user.plan === plan.id;
           const isActiveCurrent = isMyOldPlan && user.plan === PlanType.VITALICIO ? true : isMyOldPlan && isSubscriptionValid;
-          const isExpiredCurrent = isMyOldPlan && !isSubscriptionValid && user.plan !== PlanType.VITALICIO; // Only for non-lifetime plans
+          const isExpiredCurrent = isMyOldPlan && !isSubscriptionValid && user.plan !== PlanType.VITALICIO;
 
           // LANDING PAGE STYLE FOR VITALICIO
           if (isVitalicio) {
@@ -99,8 +111,8 @@ const Settings: React.FC = () => {
 
                             <div className="text-center mb-8">
                                 <div className="flex items-center justify-center gap-1">
-                                    <span className="text-sm text-slate-400 font-medium line-through">R$ 497</span>
-                                    <span className="text-5xl font-black text-white tracking-tighter">{plan.price}</span>
+                                    <span className="text-sm text-slate-400 font-medium line-through">{formatCurrency(497)}</span>
+                                    <span className="text-5xl font-black text-white tracking-tighter">{formatCurrency(plan.price)}</span>
                                 </div>
                                 <p className="text-xs text-slate-400 mt-2">Parcelamento em até 12x no cartão</p>
                             </div>
@@ -164,7 +176,7 @@ const Settings: React.FC = () => {
               <div className="mb-6">
                  <h3 className="text-lg font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-2">{plan.name}</h3>
                  <div className="flex items-baseline gap-1">
-                    <span className="text-3xl font-bold text-primary dark:text-white">{plan.price}</span>
+                    <span className="text-3xl font-bold text-primary dark:text-white">{formatCurrency(plan.price)}</span>
                     <span className="text-sm text-slate-400">{plan.period}</span>
                  </div>
                  {plan.savings && <span className="inline-block mt-2 text-xs font-bold text-green-600 bg-green-100 dark:bg-green-900/30 px-2 py-1 rounded-md">{plan.savings}</span>}

@@ -4,12 +4,12 @@ import { useAuth } from '../contexts/AuthContext.tsx';
 import { dbService } from '../services/db.ts';
 
 const Profile: React.FC = () => {
-  const { user, refreshUser, authLoading } = useAuth(); // Use authLoading
+  const { user, refreshUser, authLoading } = useAuth();
   const [name, setName] = useState('');
   const [whatsapp, setWhatsapp] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [loading, setLoading] = useState(false); // Local loading for form submission
+  const [loading, setLoading] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
@@ -37,7 +37,6 @@ const Profile: React.FC = () => {
     try {
         if (!user) throw new Error("Usuário não identificado.");
         
-        // Timeout para evitar travamento eterno
         const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 10000));
         
         await Promise.race([

@@ -1,19 +1,17 @@
 
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext.tsx';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { dbService } from '../services/db.ts';
 
 const Login: React.FC = () => {
-  const { login, user, authLoading, isUserAuthFinished, isSubscriptionValid } = useAuth(); // Updated isAuthReady
+  const { login, user, authLoading, isUserAuthFinished, isSubscriptionValid } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   
-  // Removed isLogin state, name, whatsapp, cpf states and handlers
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false); // Local loading for form submission, not global auth loading
+  const [loading, setLoading] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
 
   // Password Recovery State
@@ -21,7 +19,7 @@ const Login: React.FC = () => {
   const [forgotEmail, setForgotEmail] = useState('');
   const [forgotStatus, setForgotStatus] = useState<'IDLE' | 'SENDING' | 'SENT' | 'ERROR'>('IDLE');
 
-  console.log("[Login] Component rendered. Current user from AuthContext:", user ? user.email : 'null', "Auth Loading:", authLoading, "isUserAuthFinished:", isUserAuthFinished); // Updated isAuthReady
+  console.log("[Login] Component rendered. Current user from AuthContext:", user ? user.email : 'null', "Auth Loading:", authLoading, "isUserAuthFinished:", isUserAuthFinished);
 
 
   // Detect plan from URL (for immediate redirect after social login/signup)
@@ -35,34 +33,28 @@ const Login: React.FC = () => {
 
   // Main redirect logic
   useEffect(() => {
-    console.log("[Login] useEffect trigger. AuthState:", { user: user ? user.email : 'null', authLoading, isUserAuthFinished, isSubscriptionValid, selectedPlan, currentPath: location.pathname }); // Updated isAuthReady
+    console.log("[Login] useEffect trigger. AuthState:", { user: user ? user.email : 'null', authLoading, isUserAuthFinished, isSubscriptionValid, selectedPlan, currentPath: location.pathname });
 
-    // Only redirect if auth is ready (initial check done) AND user exists
-    // The `authLoading` here primarily catches *explicit* login/signup operations.
-    if (isUserAuthFinished && user && !authLoading) { // Updated isAuthReady
+    if (isUserAuthFinished && user && !authLoading) {
         console.log("[Login] Auth Finished, User exists, and Auth not loading. Checking redirect conditions...");
-        // 1. Se tem um plano selecionado na URL (fluxo de compra), vai pro Checkout
         if (selectedPlan) {
             console.log("[Login] Redirecting to /checkout due to selectedPlan:", selectedPlan);
             navigate('/checkout', { replace: true });
         } 
-        // 2. Se já tem assinatura válida (Vitalício ou Ativo), vai pro Dashboard
         else if (isSubscriptionValid) {
             console.log("[Login] Redirecting to / (Dashboard) due to valid subscription.");
             navigate('/', { replace: true });
         } 
-        // 3. Se é conta nova ou expirada sem plano selecionado, vai para Configurações escolher
         else {
             console.log("[Login] Redirecting to /settings (Subscription management).");
             navigate('/settings', { replace: true });
         }
-    } else if (!user && isUserAuthFinished && !authLoading) { // Updated isAuthReady
+    } else if (!user && isUserAuthFinished && !authLoading) {
         console.log("[Login] No user found, Auth Finished, and Auth not loading. Displaying login form.");
-        // This is the state where the login form should actually be visible.
-    } else if (!isUserAuthFinished || authLoading) { // Updated isAuthReady
+    } else if (!isUserAuthFinished || authLoading) {
         console.log("[Login] Auth is still loading or not finished. Waiting...");
     }
-  }, [user, navigate, selectedPlan, authLoading, isUserAuthFinished, isSubscriptionValid, location.pathname]); // Updated isAuthReady
+  }, [user, navigate, selectedPlan, authLoading, isUserAuthFinished, isSubscriptionValid, location.pathname]);
 
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -75,7 +67,6 @@ const Login: React.FC = () => {
         if (!success) {
             alert('E-mail ou senha incorretos.');
         } 
-        // If success, useEffect will handle redirect.
     } catch (error: any) {
         console.error(error);
         
@@ -100,8 +91,7 @@ const Login: React.FC = () => {
         console.error(error);
         alert("Erro no login Google. Verifique se o domínio da Vercel está autorizado no Supabase.");
     } 
-    // If successful, Supabase handles the redirect automatically.
-    setLoading(false); // Ensure loading is reset even if redirect happens
+    setLoading(false);
   };
 
   const handleForgotPassword = async (e: React.FormEvent) => {
@@ -120,8 +110,7 @@ const Login: React.FC = () => {
       }
   };
 
-  // Only show loading screen if initial auth check is not done OR an active auth operation is in progress
-  if (!isUserAuthFinished || authLoading) { // Updated isAuthReady
+  if (!isUserAuthFinished || authLoading) {
     return (
         <div className="relative min-h-screen w-full flex items-center justify-center p-4 bg-slate-900 font-sans">
             <div className="absolute inset-0 z-0">
