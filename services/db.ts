@@ -526,7 +526,7 @@ export const dbService = {
             return;
         }
 
-        const materialsToInsert: Omit<Material, 'id'>[] = [];
+        const materialsToInsert: any[] = []; // Changed to any[] to allow snake_case keys
         
         // Iterate through included steps (which map to material categories)
         for (const stepName of template.includedSteps) {
@@ -535,13 +535,13 @@ export const dbService = {
                 for (const item of materialCategory.items) {
                     const multiplier = item.multiplier || 1; // Default multiplier to 1
                     materialsToInsert.push({
-                        workId: workId,
+                        work_id: workId, // Use snake_case
                         name: item.name,
                         brand: undefined, // No brand by default
-                        plannedQty: Math.ceil(area * multiplier), // Calculate based on work area
-                        purchasedQty: 0,
+                        planned_qty: Math.ceil(area * multiplier), // Use snake_case
+                        purchased_qty: 0, // Use snake_case
                         unit: item.unit,
-                        stepId: undefined, // Assign later if linking to a specific step
+                        step_id: undefined, // Assign later if linking to a specific step
                         category: materialCategory.category
                     });
                 }
@@ -1253,10 +1253,11 @@ export const dbService = {
     }
 
     const totalSteps = stepsData.data.length;
-    const completedSteps = stepsData.data.filter(s => s.status === StepStatus.COMPLETED).length;
+    const completedSteps = stepsData.data.filter(s => s.status === 'CONCLUIDO').length;
     
     const today = new Date().toISOString().split('T')[0];
-    const delayedSteps = stepsData.data.filter(s => s.status !== StepStatus.COMPLETED && s.end_date < today).length;
+    // FIX: Changed 's.endDate' to 's.end_date' to match the database column name and resolve type errors.
+    const delayedSteps = stepsData.data.filter(s => s.status !== 'CONCLUIDO' && s.end_date < today).length;
 
     const pendingMaterials = materialsData.data.filter(m => m.purchased_qty < m.planned_qty).length;
 
