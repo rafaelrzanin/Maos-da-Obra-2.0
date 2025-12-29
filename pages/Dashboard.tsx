@@ -307,25 +307,16 @@ const Dashboard: React.FC = () => {
   const [focusWorkMaterials, setFocusWorkMaterials] = useState<Material[]>([]); 
   const [focusWorkSteps, setFocusWorkSteps] = useState<Step[]>([]);
 
-  // NOTIFICATIONS: Removidos estados relacionados a modals de notificação
-  // const [showNotificationModal, setShowNotificationModal] = useState(false);
-  // const [currentNotification, setCurrentNotification] = useState<DBNotification | null>(null);
-  // const [showPushPermissionModal, setShowPushPermissionModal] = useState(false);
-  // const [vapidPublicKey, setVapidPublicKey] = useState<string | null>(null);
-  
-  // NOTIFICATIONS: Removido ref para controle de prompt de push
-  // const hasPromptedPushOnceRef = useRef(localStorage.getItem('hasPromptedPushOnce') === 'true');
-  // NOTIFICATIONS: Removidos estados de erro crítico (ligados ao loop de notificação)
-  // const criticalErrorActiveRef = useRef(false);
-  // const [showCriticalErrorModal, setShowCriticalErrorModal] = useState(false);
-  // const [criticalErrorMessage, setCriticalErrorMessage] = useState('');
+  // GENERAL MODAL for delete confirmations
+  const [zeModal, setZeModal] = useState<ZeModalProps & { id?: string }>({ 
+    isOpen: false, 
+    title: '', 
+    message: '',
+    onCancel: () => {}, 
+  });
+
 
   const loadData = useCallback(async () => {
-    // NOTIFICATIONS: Removida a checagem de criticalErrorActiveRef e relacionados
-    // if (criticalErrorActiveRef.current) {
-    //     console.log("[NOTIF DEBUG] loadData: Critical error active, skipping data load.");
-    //     return;
-    // }
     if (!user?.id || !isUserAuthFinished || authLoading) {
         console.log("[NOTIF DEBUG] loadData: Skipping due to auth/user status.", { user: user?.id, isUserAuthFinished, authLoading });
         return;
@@ -333,11 +324,6 @@ const Dashboard: React.FC = () => {
     
     console.log("[NOTIF DEBUG] loadData: Starting data load...");
     setLoading(true);
-    // NOTIFICATIONS: Removida a lógica de reset de erro crítico
-    // if (!criticalErrorActiveRef.current) {
-    //   setShowCriticalErrorModal(false); 
-    //   setCriticalErrorMessage('');
-    // }
 
     try {
       const userWorks = await dbService.getWorks(user.id);
@@ -345,9 +331,9 @@ const Dashboard: React.FC = () => {
 
       const currentActiveWork = activeWorkId 
         ? userWorks.find(w => w.id === activeWorkId) 
-        : userWorks[0];
-      
-      if (currentActiveWork) {
+        : userWorks[0]; // If no active work, default to the first one
+
+      if (userWorks.length > 0 && currentActiveWork) { // Only fetch detailed data if there are works
         setFocusWork(currentActiveWork);
         setActiveWorkId(currentActiveWork.id);
         
@@ -362,24 +348,7 @@ const Dashboard: React.FC = () => {
         setFocusWorkDailySummary(summary);
         setFocusWorkMaterials(materials);
         setFocusWorkSteps(steps);
-
-        // NOTIFICATIONS: *** LINHA CRÍTICA REMOVIDA PARA DESATIVAR GERAÇÃO DE NOTIFICAÇÕES ***
-        // try {
-        //   const expenses = await dbService.getExpenses(currentActiveWork.id);
-        //   await dbService.generateSmartNotifications(
-        //     user.id, 
-        //     currentActiveWork.id,
-        //     steps,
-        //     expenses,
-        //     materials,
-        //     currentActiveWork
-        //   );
-        // } catch (notifErr) {
-        //   console.warn("[NOTIF DEBUG] Erro não-fatal nas notificações Push (agora desativadas):", notifErr);
-        // }
-
-      } else {
-        // Clear focus work states if no active work is found
+      } else { // No works found or all deleted
         setFocusWork(null);
         setActiveWorkId(null);
         setFocusWorkStats(null);
@@ -395,16 +364,6 @@ const Dashboard: React.FC = () => {
 
     } catch (error: any) { // Catch all errors from loadData chain
       console.error("[NOTIF DEBUG] loadData: Failed to load dashboard data:", error);
-      // NOTIFICATIONS: Removida a lógica de erro crítico
-      // let errorMessage = `Um erro crítico impediu o carregamento do Dashboard. Causa: ${error.message || "Erro desconhecido."}`;
-      // if (error.message?.includes("PGRST204") || error.message?.includes("Could not find the 'work_id' column")) {
-      //     errorMessage += "\n\nPor favor, verifique *URGENTEMENTE* se a tabela 'notifications' no seu Supabase tem a coluna 'work_id' do tipo TEXT e se suas RLS policies permitem INSERT/SELECT/UPDATE para ela.";
-      // } else if (error.message?.includes("SyntaxError: Unexpected token 'A'") || error.message?.includes("API returned non-JSON")) {
-      //     errorMessage += "\n\nO servidor de Push Notifications está retornando um erro inesperado. Verifique se as variáveis VAPID_PUBLIC_KEY e VAPID_PRIVATE_KEY estão configuradas no Vercel e se a função /api/send-event-notification.js está funcionando.";
-      // }
-      // setCriticalErrorMessage(errorMessage);
-      // setShowCriticalErrorModal(true);
-      // criticalErrorActiveRef.current = true; // Mark critical error as active
     } finally {
       setLoading(false);
       console.log("[NOTIF DEBUG] loadData: Finished loading.");
@@ -414,171 +373,41 @@ const Dashboard: React.FC = () => {
 
   // Effect to load data on component mount and when user/auth status changes
   useEffect(() => {
-    // NOTIFICATIONS: Removida a checagem de criticalErrorActiveRef
-    // console.log("[NOTIF DEBUG] useEffect [loadData, isUserAuthFinished, authLoading, user] triggered.", { isUserAuthFinished, authLoading, user: user?.id, criticalErrorActive: criticalErrorActiveRef.current });
-    // if (!criticalErrorActiveRef.current) {
-        if (isUserAuthFinished && !authLoading && user) {
-            loadData();
-        }
-    // } else {
-    //     console.log("[NOTIF DEBUG] Not calling loadData because criticalErrorActiveRef is true.");
-    // }
+    if (isUserAuthFinished && !authLoading && user) {
+        loadData();
+    }
   }, [loadData, isUserAuthFinished, authLoading, user]); // Refined dependencies
 
-  // NOTIFICATIONS: Removido o useEffect de configuração de VAPID public key
-  // useEffect(() => {
-  //   const pubKey = import.meta.env.VITE_VAPID_PUBLIC_KEY;
-  //   console.log("[NOTIF DEBUG] VAPID Public Key check. Value:", pubKey);
-  //   if (pubKey && pubKey !== 'undefined' && pubKey !== null) { // Added null check
-  //     setVapidPublicKey(pubKey);
-  //   } else {
-  //     console.error("CRÍTICO: VITE_VAPID_PUBLIC_KEY não está definida nas variáveis de ambiente! As Push Notifications não funcionarão. Por favor, configure-a no Vercel/Ambiente de Deploy.");
-  //     setVapidPublicKey(null); 
-  //     hasPromptedPushOnceRef.current = true; // Prevents the modal from trying to open repeatedly if key is missing
-  //     localStorage.setItem('hasPromptedPushOnce', 'true'); // Persist this state
-  //   }
-  // }, []); // Run once on mount
 
-  // NOTIFICATIONS: Removido o callback requestPushPermission
-  // const requestPushPermission = useCallback(async () => {
-  //   if (!('serviceWorker' in navigator) || !('PushManager' in window) || !vapidPublicKey || !user) {
-  //     console.warn("[NOTIF DEBUG] Push notifications not supported or VAPID key/user missing for request.");
-  //     setShowPushPermissionModal(false);
-  //     hasPromptedPushOnceRef.current = true; // Mark as prompted/dismissed for this session
-  //     localStorage.setItem('hasPromptedPushOnce', 'true'); // Persist this state
-  //     return;
-  //   }
-
-  //   try {
-  //     const permission = await window.Notification.requestPermission(); // Explicitly use window.Notification
-  //     if (permission === 'granted') {
-  //       const registration = await navigator.serviceWorker.ready;
-  //       const subscribeOptions = {
-  //         userVisibleOnly: true,
-  //         applicationServerKey: urlBase64ToUint8Array(vapidPublicKey),
-  //       };
-  //       const pushSubscription = await registration.pushManager.subscribe(subscribeOptions);
-        
-  //       // pushSubscriptionRef.current = pushSubscription; // Not used currently, but keep for future ref
-  //       await dbService.savePushSubscription(user.id, pushSubscription.toJSON());
-  //       console.log('[NOTIF DEBUG] Push subscription saved:', pushSubscription.toJSON());
-  //       alert('Notificações ativadas com sucesso!');
-  //     } else {
-  //       console.warn('[NOTIF DEBUG] Notification permission denied by user.');
-  //       alert('Permissão para notificações negada.');
-  //     }
-  //   } catch (error) {
-  //     console.error('[NOTIF DEBUG] Error subscribing to push notifications:', error);
-  //     alert('Erro ao ativar notificações. Verifique o console.');
-  //   } finally {
-  //     setShowPushPermissionModal(false);
-  //     hasPromptedPushOnceRef.current = true;
-  //     localStorage.setItem('hasPromptedPushOnce', 'true'); // Persist this state
-  //     console.log("[NOTIF DEBUG] requestPushPermission finished. hasPromptedPushOnceRef.current set to true.");
-  //   }
-  // }, [user, vapidPublicKey]);
-
-  // NOTIFICATIONS: Removido o useEffect de checagem de permissão de push
-  // useEffect(() => {
-  //   console.log("[NOTIF DEBUG] Push permission useEffect triggered.", {
-  //       isUserAuthFinished, user: user?.id, vapidPublicKey: !!vapidPublicKey,
-  //       hasPromptedPushOnce: hasPromptedPushOnceRef.current, showPushPermissionModal
-  //   });
-
-  //   if (!isUserAuthFinished || !user || !vapidPublicKey || hasPromptedPushOnceRef.current) {
-  //       console.log("[NOTIF DEBUG] Push useEffect exited early. Conditions:", {
-  //           isUserAuthFinished, user: user?.id, vapidPublicKey: !!vapidPublicKey, hasPromptedPushOnce: hasPromptedPushOnceRef.current
-  //       });
-  //       return;
-  //   }
-
-  //   const performPushPermissionCheck = async () => {
-  //       hasPromptedPushOnceRef.current = true; 
-  //       localStorage.setItem('hasPromptedPushOnce', 'true'); // Persist this state
-  //       console.log("[NOTIF DEBUG] Push permission check initiated, hasPromptedPushOnceRef.current set to true.");
-
-  //       try {
-  //           const currentPermission = window.Notification.permission; // Explicitly use window.Notification
-  //           const existingSub = await dbService.getPushSubscription(user.id);
-  //           console.log("[NOTIF DEBUG] Push permission check results:", { currentPermission, existingSub: !!existingSub });
-
-  //           if (currentPermission === 'granted') {
-  //               if (!existingSub) { 
-  //                   console.log("[NOTIF DEBUG] Permission granted but no sub in DB, attempting to subscribe silently.");
-  //                   const registration = await navigator.serviceWorker.ready;
-  //                   const subscribeOptions = {
-  //                       userVisibleOnly: true,
-  //                       applicationServerKey: urlBase64ToUint8Array(vapidPublicKey!), 
-  //                   };
-  //                   const pushSubscription = await registration.pushManager.subscribe(subscribeOptions);
-  //                   await dbService.savePushSubscription(user.id, pushSubscription.toJSON());
-  //                   console.log('[NOTIF DEBUG] Push subscription silently saved.');
-  //               }
-  //               setShowPushPermissionModal(false); 
-  //           } else if (currentPermission === 'denied') {
-  //               console.log("[NOTIF DEBUG] Notification permission denied.");
-  //               setShowPushPermissionModal(false); 
-  //           } else { // currentPermission === 'default'
-  //               if (!existingSub) { 
-  //                   console.log("[NOTIF DEBUG] Permission default and no sub in DB, showing modal.");
-  //                   setShowPushPermissionModal(true);
-  //               } else { 
-  //                   console.log("[NOTIF DEBUG] Permission default but existing sub, not showing modal.");
-  //                   setShowPushPermissionModal(false);
-  //               }
-  //           }
-  //       } catch (error) {
-  //           console.error("[NOTIF DEBUG] Error during push permission check:", error);
-  //           setShowPushPermissionModal(false);
-  //       }
-  //   };
-  //   performPushPermissionCheck();
- 
-  //   return () => {
-  //       if (!user) {
-  //           hasPromptedPushOnceRef.current = false;
-  //           localStorage.removeItem('hasPromptedPushOnce'); 
-  //           console.log("[NOTIF DEBUG] Push permission useEffect cleanup: User logged out, reset hasPromptedPushOnceRef and localStorage.");
-  //       }
-  //   };
-  // }, [user, isUserAuthFinished, vapidPublicKey]); // Removed showPushPermissionModal from deps
-
-  // NOTIFICATIONS: Removido handleDismissNotification
   const handleDismissNotification = async (notificationId: string) => {
     await dbService.dismissNotification(notificationId);
     setNotifications(prev => prev.filter(n => n.id !== notificationId));
-    // setCurrentNotification(null); // Close modal if it was open for this notification
-    if (focusWork?.id) {
-      // Re-trigger smart notifications for this work to clear related tags
-      // NOTIFICATIONS: Não re-trigger a geração aqui também
-      // await dbService.generateSmartNotifications(user!.id, focusWork.id);
-    }
     refreshNotifications(); // Refresh global count (AuthContext)
   };
 
-  const handleDeleteWork = async (workId: string) => {
-    if (window.confirm("Tem certeza que deseja apagar esta obra e TODOS os seus dados relacionados? Esta ação é irreversível.")) {
-      await dbService.deleteWork(workId);
-      loadData(); // Reload all data after deletion
-    }
+  const handleDeleteFocusedWork = async () => {
+    if (!focusWork) return; // Ensure there's a work to delete
+    setZeModal({
+        isOpen: true,
+        title: 'Excluir Obra?',
+        message: `Tem certeza que deseja excluir a obra "${focusWork.name}" e TODOS os seus dados relacionados? Esta ação é irreversível.`,
+        confirmText: 'Sim, Excluir Obra',
+        cancelText: 'Cancelar',
+        type: 'DANGER',
+        onConfirm: async () => {
+            if (focusWork) { // Re-check focusWork exists
+                await dbService.deleteWork(focusWork.id);
+            }
+            setZeModal(prev => ({ ...prev, isOpen: false, onCancel: () => {} }));
+            setActiveWorkId(null); // Clear active work to trigger new focus or empty state
+            await loadData(); // Reload all data after deletion
+        },
+        onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false, onCancel: () => {} }))
+    });
   };
 
   if (!isUserAuthFinished || authLoading || loading) return <DashboardSkeleton />;
 
-  // NOTIFICATIONS: Removida a exibição do ZeModal de erro crítico
-  // if (showCriticalErrorModal) {
-  //   return (
-  //       <ZeModal
-  //         isOpen={true}
-  //         title="Erro Crítico no Dashboard!"
-  //         message={criticalErrorMessage}
-  //         confirmText="Recarregar Página"
-  //         onConfirm={() => window.location.reload()}
-  //         onCancel={() => window.location.reload()} // Same action to ensure resolution
-  //         type="ERROR"
-  //       />
-  //   );
-  // }
 
   return (
     <div className="max-w-4xl mx-auto pb-28 pt-6 px-4 md:px-0">
@@ -615,110 +444,110 @@ const Dashboard: React.FC = () => {
         </button>
       </div>
 
-      <div className={cx(surface, "rounded-[1.6rem] p-6 lg:p-8 mb-8")}>
-        <div className="flex justify-between items-start mb-6">
-          <div>
-            <p className="text-sm font-black text-slate-900 dark:text-white leading-tight">Obra Focada</p>
-            {focusWork ? (
-              <p className={cx("text-xs font-semibold", mutedText)}>{focusWork.name}</p>
-            ) : (
-              <p className={cx("text-xs font-semibold text-red-500")}>Nenhuma obra ativa. Crie uma!</p>
-            )}
-          </div>
-          {works.length > 0 && (
-            <select
-              value={activeWorkId || ''}
-              onChange={(e) => setActiveWorkId(e.target.value)}
-              className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm px-3 py-2 text-primary dark:text-white focus:ring-secondary focus:border-secondary transition-all"
-            >
-              {works.map((work) => (
-                <option key={work.id} value={work.id}>
-                  {work.name}
-                </option>
-              ))}
-            </select>
-          )}
-        </div>
+      {focusWork && focusWorkStats && focusWorkDailySummary ? (
+        <>
+          <div className={cx(surface, "rounded-[1.6rem] p-6 lg:p-8 mb-8")}>
+            <div className="flex justify-between items-start mb-6">
+              <div>
+                <p className="text-sm font-black text-slate-900 dark:text-white leading-tight">Obra Focada</p>
+                <p className={cx("text-xs font-semibold", mutedText)}>{focusWork.name}</p>
+              </div>
+              <div className="flex items-center gap-3"> {/* Container for select and delete button */}
+                {works.length > 0 && (
+                  <select
+                    value={activeWorkId || ''}
+                    onChange={(e) => setActiveWorkId(e.target.value)}
+                    className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm px-3 py-2 text-primary dark:text-white focus:ring-secondary focus:border-secondary transition-all"
+                  >
+                    {works.map((work) => (
+                      <option key={work.id} value={work.id}>
+                        {work.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                {/* NEW: Delete Focused Work Button */}
+                {focusWork && (
+                    <button onClick={handleDeleteFocusedWork} className="text-red-400 hover:text-red-600 transition-colors p-2">
+                        <i className="fa-solid fa-trash text-xl"></i>
+                    </button>
+                )}
+              </div>
+            </div>
 
-        {focusWork && focusWorkStats && focusWorkDailySummary ? (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="flex flex-col gap-6">
-              {/* Donut Chart and KPIs */}
-              <Donut value={focusWorkStats.progress} label="Obra Completa" />
-              <KpiCard
-                icon="fa-dollar-sign"
-                iconClass="bg-red-100 dark:bg-red-900/20 text-red-600"
-                label="Orçamento Gasto"
-                value={<span>R$ {focusWorkStats.totalSpent.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</span>}
-                accent={
-                  focusWorkStats.totalSpent > focusWork.budgetPlanned * 1.05
-                    ? "danger"
-                    : focusWorkStats.totalSpent > focusWork.budgetPlanned * 0.9
-                    ? "warn"
-                    : undefined
-                }
-              />
-              <KpiCard
-                icon="fa-calendar-alt"
-                iconClass="bg-amber-100 dark:bg-amber-900/20 text-amber-600"
-                label="Etapas Atrasadas"
-                value={focusWorkStats.delayedSteps}
-                accent={focusWorkStats.delayedSteps > 0 ? "warn" : undefined}
-                onClick={() => navigate(`/work/${focusWork.id}`)}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="flex flex-col gap-6">
+                {/* Donut Chart and KPIs */}
+                <Donut value={focusWorkStats.progress} label="Obra Completa" />
+                <KpiCard
+                  icon="fa-dollar-sign"
+                  iconClass="bg-red-100 dark:bg-red-900/20 text-red-600"
+                  label="Orçamento Gasto"
+                  value={<span>R$ {focusWorkStats.totalSpent.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</span>}
+                  accent={
+                    focusWorkStats.totalSpent > focusWork.budgetPlanned * 1.05
+                      ? "danger"
+                      : focusWorkStats.totalSpent > focusWork.budgetPlanned * 0.9
+                      ? "warn"
+                      : undefined
+                  }
+                />
+                <KpiCard
+                  icon="fa-calendar-alt"
+                  iconClass="bg-amber-100 dark:bg-amber-900/20 text-amber-600"
+                  label="Etapas Atrasadas"
+                  value={focusWorkStats.delayedSteps}
+                  accent={focusWorkStats.delayedSteps > 0 ? "warn" : undefined}
+                  onClick={() => navigate(`/work/${focusWork.id}`)}
+                />
+              </div>
+              {/* Risk Radar */}
+              <RiskRadar
+                focusWork={focusWork}
+                stats={focusWorkStats}
+                dailySummary={focusWorkDailySummary}
+                materials={focusWorkMaterials}
+                onOpenWork={() => navigate(`/work/${focusWork.id}/more?tab=REPORTS`)}
               />
             </div>
-            {/* Risk Radar */}
-            <RiskRadar
-              focusWork={focusWork}
-              stats={focusWorkStats}
-              dailySummary={focusWorkDailySummary}
-              materials={focusWorkMaterials}
-              onOpenWork={() => navigate(`/work/${focusWork.id}/more?tab=REPORTS`)}
-            />
+            {/* NEW: Access My Work Button */}
+            <div className="mt-8">
+                <button 
+                    onClick={() => navigate(`/work/${focusWork.id}`)}
+                    className="w-full py-4 bg-secondary text-white font-bold rounded-2xl shadow-lg hover:bg-orange-600 transition-all flex items-center justify-center gap-3"
+                >
+                    Acessar Obra <span className="font-medium">"{focusWork.name}"</span> <i className="fa-solid fa-arrow-right ml-2"></i>
+                </button>
+            </div>
           </div>
-        ) : (
-          <div className="text-center py-10">
-            <i className="fa-solid fa-house-chimney-medical text-6xl text-slate-300 dark:text-slate-700 mb-4"></i>
-            <p className={cx("text-lg font-bold", mutedText)}>Crie sua primeira obra!</p>
-            <p className={cx("text-sm", mutedText)}>Comece a gerenciar seus projetos com facilidade.</p>
-          </div>
-        )}
-        {/* NEW: Access My Work Button */}
-        {focusWork && (
-          <div className="mt-8">
-              <button 
-                  onClick={() => navigate(`/work/${focusWork.id}`)}
-                  className="w-full py-4 bg-secondary text-white font-bold rounded-2xl shadow-lg hover:bg-orange-600 transition-all flex items-center justify-center gap-3"
-              >
-                  Acessar Obra <span className="font-medium">"{focusWork.name}"</span> <i className="fa-solid fa-arrow-right ml-2"></i>
-              </button>
-          </div>
-        )}
-      </div>
-
-      {focusWork && focusWorkDailySummary && (
-        <LiveTimeline steps={focusWorkSteps} onClick={() => navigate(`/work/${focusWork.id}`)} />
-      )}
-
-      {/* NOTIFICATIONS: Removido o botão de notificações ativas */}
-      {/* {unreadNotificationsCount > 0 && (
-        <div className="fixed bottom-6 right-6 z-50">
-          <button onClick={() => { setCurrentNotification(notifications[0]); setShowNotificationModal(true); }} className="w-14 h-14 bg-red-500 rounded-full text-white shadow-2xl animate-bounce flex items-center justify-center relative">
-            <i className="fa-solid fa-bell text-xl"></i>
-            <span className="absolute -top-1 -right-1 w-6 h-6 bg-white text-red-500 rounded-full text-[10px] font-black border-2 border-red-500 flex items-center justify-center">{unreadNotificationsCount}</span>
+          <LiveTimeline steps={focusWorkSteps} onClick={() => navigate(`/work/${focusWork.id}`)} />
+        </>
+      ) : (
+        /* NEW: Empty State UI */
+        <div className={cx(surface, "rounded-[1.6rem] p-6 lg:p-8 mb-8 text-center py-16")}>
+          <i className="fa-solid fa-hammer-screwdriver text-7xl text-slate-300 dark:text-slate-700 mb-6"></i>
+          <p className={cx("text-2xl font-black text-primary dark:text-white mb-3")}>Sua Primeira Obra Começa Aqui!</p>
+          <p className={cx("text-base max-w-md mx-auto", mutedText)}>Crie seu primeiro projeto e comece a construir seus sonhos com o Zé da Obra!</p>
+          <button 
+            onClick={() => navigate('/create')} 
+            className="mt-8 py-4 px-8 bg-primary text-white font-bold rounded-2xl shadow-lg flex items-center justify-center gap-3 hover:scale-105 transition-transform mx-auto"
+          >
+            <i className="fa-solid fa-plus-circle"></i> Criar Minha Primeira Obra
           </button>
         </div>
-      )} */}
+      )}
 
-      {/* NOTIFICATIONS: Removido o modal de notificação de alerta */}
-      {/* {showNotificationModal && currentNotification && (
-        <ZeModal isOpen={true} title={currentNotification.title} message={currentNotification.message} confirmText="Marcar como lida" onConfirm={() => handleDismissNotification(currentNotification.id)} cancelText="Ver Todas" onCancel={() => {setCurrentNotification(null); setShowNotificationModal(false); navigate('/notifications');}} type={currentNotification.type} />
-      )} */}
-
-      {/* NOTIFICATIONS: Removido o modal de permissão de push notification */}
-      {/* {showPushPermissionModal && (
-        <ZeModal isOpen={true} title="Ativar Notificações?" message="Receba alertas importantes sobre o andamento das suas obras (etapas atrasadas, materiais em falta, etc.) diretamente no seu celular ou computador." confirmText="Sim, ativar!" onConfirm={requestPushPermission} cancelText="Agora não" onCancel={() => { setShowPushPermissionModal(false); hasPromptedPushOnceRef.current = true; localStorage.setItem('hasPromptedPushOnce', 'true'); }} type="INFO" />
-      )} */}
+      {/* General Purpose Modal (for delete confirmations etc.) */}
+      <ZeModal
+          isOpen={zeModal.isOpen}
+          title={zeModal.title}
+          message={zeModal.message}
+          confirmText={zeModal.confirmText}
+          cancelText={zeModal.cancelText}
+          onConfirm={zeModal.onConfirm}
+          onCancel={zeModal.onCancel}
+          type={zeModal.type}
+      />
     </div>
   );
 };
