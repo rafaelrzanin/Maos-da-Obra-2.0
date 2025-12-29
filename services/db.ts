@@ -646,48 +646,46 @@ export const dbService = {
 
   async deleteWork(workId: string) {
     // Supabase is guaranteed to be initialized now
+    console.log(`[DB DELETE] Iniciando exclusão transacional para workId: ${workId}`);
 
-    // Start a transaction (Supabase does not have explicit transactions, but we can do multiple operations)
     try {
-        console.log(`[DB DELETE] Iniciando exclusão para workId: ${workId}`);
-        await supabase.from('steps').delete().eq('work_id', workId);
-        console.log(`[DB DELETE] Etapas para ${workId} deletadas.`);
-        await supabase.from('materials').delete().eq('work_id', workId);
-        console.log(`[DB DELETE] Materiais para ${workId} deletados.`);
-        await supabase.from('expenses').delete().eq('work_id', workId);
-        console.log(`[DB DELETE] Despesas para ${workId} deletadas.`);
-        await supabase.from('work_photos').delete().eq('work_id', workId);
-        console.log(`[DB DELETE] Fotos para ${workId} deletadas.`);
-        await supabase.from('work_files').delete().eq('work_id', workId);
-        console.log(`[DB DELETE] Arquivos para ${workId} deletados.`);
-        // NEW: Delete workers and suppliers tied to this work
-        await supabase.from('workers').delete().eq('work_id', workId);
-        console.log(`[DB DELETE] Profissionais para ${workId} deletados.`);
-        await supabase.from('suppliers').delete().eq('work_id', workId);
-        console.log(`[DB DELETE] Fornecedores para ${workId} deletados.`);
-        // NEW: Delete notifications tied to this work
-        // FIX: Corrected syntax for deleting notifications to avoid TS2554 error
-        const { count: deletedNotifsCount, error: notifDeleteError } = await supabase.from('notifications').delete().eq('work_id', workId);
-        if (notifDeleteError) {
-            console.error(`[DB DELETE] Erro ao deletar notificações para ${workId}:`, notifDeleteError);
-        } else {
-            console.log(`[DB DELETE] ${deletedNotifsCount || 0} notificações deletadas para ${workId}.`); // Use || 0 as count can be null
+        // Sequência de deleções para evitar erros de chave estrangeira
+        const deleteOperations = [
+            { table: 'work_files', eq: ['work_id', workId] },
+            { table: 'work_photos', eq: ['work_id', workId] },
+            { table: 'expenses', eq: ['work_id', workId] },
+            { table: 'materials', eq: ['work_id', workId] },
+            { table: 'steps', eq: ['work_id', workId] },
+            { table: 'workers', eq: ['work_id', workId] },
+            { table: 'suppliers', eq: ['work_id', workId] },
+            { table: 'notifications', eq: ['work_id', workId] },
+            { table: 'works', eq: ['id', workId] } // Por último, a obra principal
+        ];
+
+        for (const op of deleteOperations) {
+            console.log(`[DB DELETE] Tentando deletar da tabela '${op.table}' onde ${op.eq[0]} = '${op.eq[1]}'`);
+            const { count, error } = await supabase.from(op.table).delete().eq(op.eq[0], op.eq[1]).select('*');
+            if (error) {
+                // Logar o erro específico de RLS ou DB.
+                console.error(`[DB DELETE ERROR] Falha ao deletar da tabela '${op.table}' para workId ${workId}:`, error);
+                throw new Error(`Falha de RLS/DB ao deletar ${op.table}: ${error.message}`);
+            }
+            console.log(`[DB DELETE] Tabela '${op.table}' limpa. Registros afetados: ${count || 'N/A'}`);
         }
         
-        const { error } = await supabase.from('works').delete().eq('id', workId);
-        if (error) throw error;
-        console.log(`[DB DELETE] Obra ${workId} deletada com sucesso.`);
+        console.log(`[DB DELETE] Obra ${workId} e dados relacionados deletados com sucesso.`);
         
         _dashboardCache.works = null; // Invalidate cache
         delete _dashboardCache.stats[workId]; // Invalidate specific stats for deleted work
         delete _dashboardCache.summary[workId]; // Invalidate specific summary for deleted work
-        _dashboardCache.notifications = null; // NEW: Invalidate global notification cache
+        _dashboardCache.notifications = null; // Invalidate global notification cache
         console.log(`[DB DELETE] Caches para workId ${workId} invalidados.`);
 
-    } catch (error: unknown) { // Fix TS18046: Explicitly type as unknown
-        console.error(`[DB DELETE] Erro ao apagar obra e dados relacionados para ${workId}:`, error);
+    } catch (error: unknown) { // Explicitly type as unknown
+        console.error(`[DB DELETE CRITICAL] Erro fatal ao apagar obra e dados relacionados para ${workId}:`, error);
         if (error instanceof Error) {
-            throw new Error(`Falha ao apagar obra: ${error.message}`);
+            // Relança um erro mais claro para o frontend
+            throw new Error(`Falha ao apagar obra: ${error.message}. Verifique suas permissões de RLS ou logs do servidor.`);
         } else {
             throw new Error(`Falha ao apagar obra: Um erro desconhecido ocorreu.`);
         }
@@ -1578,7 +1576,7 @@ export const dbService = {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({ userId, subscription }),
-        });
+        );
 
         if (!response.ok) {
             let errorData = { error: 'Unknown error', message: 'Failed to parse error response' };
@@ -1605,7 +1603,7 @@ export const dbService = {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({ userId, endpoint }),
-        });
+        );
 
         if (!response.ok) {
             let errorData = { error: 'Unknown error', message: 'Failed to parse error response' };
@@ -1632,7 +1630,7 @@ export const dbService = {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({ userId, ...notificationPayload }),
-        });
+        );
 
         if (!response.ok) {
             let errorData = { error: 'Unknown error', message: 'Failed to parse error response' };

@@ -782,19 +782,15 @@ const WorkDetail: React.FC = () => {
                                     <button onClick={() => handleStepStatusClick(step)} className={`w-10 h-10 rounded-xl border-2 flex items-center justify-center shrink-0 transition-all ${iconColor}`} aria-label={`Mudar status da etapa ${step.name}`}>
                                         <i className={`fa-solid ${iconClass}`}></i>
                                     </button>
-                                    <div className="flex-1 cursor-pointer" onClick={() => { setStepModalMode('EDIT'); setCurrentStepId(step.id); setStepName(step.name); setStepStart(step.startDate.split('T')[0]); setStepEnd(step.endDate.split('T')[0]); setIsStepModalOpen(true); }} aria-label={`Editar etapa ${step.name}`}>
-                                        <div className="flex justify-between items-start mb-2">
-                                            <div>
-                                                <div className="flex items-center gap-2 mb-1">
-                                                    <span className="text-[10px] font-bold text-slate-400">ETAPA {stepNum}</span>
-                                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${statusBadgeClass}`}>{statusText}</span>
-                                                </div>
-                                                <h3 className={`font-bold text-lg leading-tight ${isDone ? 'text-slate-400 line-through' : 'text-primary dark:text-white'}`}>{step.name}</h3>
+                                    <div className="flex-1 cursor-pointer flex flex-col sm:flex-row sm:items-center sm:justify-between" onClick={() => { setStepModalMode('EDIT'); setCurrentStepId(step.id); setStepName(step.name); setStepStart(step.startDate.split('T')[0]); setStepEnd(step.endDate.split('T')[0]); setIsStepModalOpen(true); }} aria-label={`Editar etapa ${step.name}`}>
+                                        <div className="mb-2 sm:mb-0">
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <span className="text-[10px] font-bold text-slate-400">ETAPA {stepNum}</span>
+                                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded uppercase ${statusBadgeClass}`}>{statusText}</span>
                                             </div>
-                                            {/* Ícone de edição, visível mas sem ação direta (a div acima é o target clicável) */}
-                                            <div className="text-slate-300 hover:text-secondary p-1" aria-hidden="true"><i className="fa-solid fa-pen-to-square"></i></div>
+                                            <h3 className={`font-bold text-lg leading-tight ${isDone ? 'text-slate-400 line-through' : 'text-primary dark:text-white'}`}>{step.name}</h3>
                                         </div>
-                                        <div className="flex gap-4 flex-wrap"> {/* Adicionado flex-wrap para mobile */}
+                                        <div className="flex gap-4 flex-wrap sm:justify-end sm:flex-nowrap"> {/* Adicionado flex-wrap para mobile */}
                                             <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium bg-slate-50 dark:bg-slate-800 px-2 py-1 rounded-md">
                                                 <i className="fa-regular fa-calendar"></i> <span aria-label={`Data de início: ${parseDateNoTimezone(step.startDate)}`}>{parseDateNoTimezone(step.startDate)}</span>
                                             </div>
@@ -803,7 +799,7 @@ const WorkDetail: React.FC = () => {
                                             </div>
                                         </div>
                                     </div>
-                                    <button onClick={() => handleDeleteStep(step.id)} className="text-red-400 hover:text-red-600 transition-colors p-1 ml-2 shrink-0" aria-label={`Excluir etapa ${step.name}`}> {/* RESTAURADO: Botão de lixeira para exclusão da etapa */}
+                                    <button onClick={() => handleDeleteStep(step.id)} className="text-red-400 hover:text-red-600 transition-colors p-1 ml-2 shrink-0 self-start sm:self-center" aria-label={`Excluir etapa ${step.name}`}> {/* RESTAURADO: Botão de lixeira para exclusão da etapa */}
                                       <i className="fa-solid fa-trash"></i>
                                     </button>
                                 </div>

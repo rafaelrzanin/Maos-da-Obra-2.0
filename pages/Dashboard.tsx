@@ -216,11 +216,12 @@ const Dashboard: React.FC = () => {
   const [zeTip, setZeTip] = useState<ZeTip | null>(null);
 
   // General Purpose Modal for Delete Confirmation
-  const [zeModal, setZeModal] = useState<ZeModalProps & { id?: string }>({
+  const [zeModal, setZeModal] = useState<ZeModalProps & { id?: string, isConfirming?: boolean }>({
     isOpen: false,
     title: '',
     message: '',
     onCancel: () => { },
+    isConfirming: false
   });
 
   const loadDashboardData = useCallback(async () => {
@@ -229,8 +230,10 @@ const Dashboard: React.FC = () => {
 
     setLoading(true);
     try {
-      const fetchedWorks = await dbService.getWorks(user.id);
-      setWorks(fetchedWorks);
+      const fetchedWorks = await dbService.getWorks(user.id); // This fetches ALL works for the user
+      setWorks(fetchedWorks); // This updates the works state
+      console.log("[Dashboard] loadDashboardData: fetchedWorks after getWorks:", fetchedWorks);
+
 
       if (fetchedWorks.length > 0) {
         const primaryWork = fetchedWorks[0];
@@ -254,7 +257,7 @@ const Dashboard: React.FC = () => {
         setSteps([]); // NEW: Clear steps
       }
       setZeTip(getRandomZeTip()); // Load a random tip
-    } catch (error) {
+    } catch (error: any) { // Explicitly type error as any for message property
       console.error("Erro ao carregar dados do dashboard:", error);
       // Optionally set an error message to display
     } finally {
@@ -284,21 +287,28 @@ const Dashboard: React.FC = () => {
       confirmText: 'Sim, Excluir Obra',
       cancelText: 'Cancelar',
       type: 'DANGER',
+      isConfirming: false, // Ensure this is false initially
       onConfirm: async () => {
+        setZeModal(prev => ({ ...prev, isConfirming: true })); // Set confirming state
+        console.log(`[Dashboard] handleDeleteWork: Attempting to delete work ID: ${workToDelete.id}`);
         try {
           await dbService.deleteWork(workToDelete.id);
-          await loadDashboardData(); // Reload dashboard after deletion
+          console.log(`[Dashboard] handleDeleteWork: Successfully deleted work ID: ${workToDelete.id}. Reloading data...`);
+          await loadDashboardData(); // This should re-fetch works
           setZeModal(prev => ({ ...prev, isOpen: false })); // Close modal
+          console.log(`[Dashboard] handleDeleteWork: Modal closed and data reloaded.`);
         } catch (error: any) {
-          console.error("Erro ao excluir obra:", error);
+          console.error("[Dashboard] Erro ao excluir obra no frontend:", error);
           setZeModal({
             isOpen: true,
             title: 'Erro!',
-            message: `Falha ao excluir obra: ${error.message || 'Um erro desconhecido ocorreu.'}`,
+            message: `Falha ao excluir obra: ${error.message || 'Um erro desconhecido ocorreu.'}\nPor favor, verifique suas permissões de RLS no Supabase.`, // Added RLS hint
             confirmText: 'Entendido',
             onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
             type: 'ERROR'
           });
+        } finally {
+          setZeModal(prev => ({ ...prev, isConfirming: false })); // Reset confirming state
         }
       },
       onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false }))
@@ -435,6 +445,7 @@ const Dashboard: React.FC = () => {
         onConfirm={zeModal.onConfirm}
         onCancel={zeModal.onCancel}
         type={zeModal.type}
+        isConfirming={zeModal.isConfirming}
       />
     </div>
   );
