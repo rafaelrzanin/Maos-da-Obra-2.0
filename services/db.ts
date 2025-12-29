@@ -513,7 +513,7 @@ export const dbService = {
   },
 
   // NEW: Method to regenerate materials based on work template and area
-  async regenerateMaterials(workId: string, area: number, templateId: string): Promise<void> {
+  async regenerateMaterials(workId: string, area: number, templateId: string, createdSteps: Step[]): Promise<void> {
     // Supabase is guaranteed to be initialized now
     try {
         // 1. Delete existing materials for this work
@@ -532,6 +532,12 @@ export const dbService = {
         for (const stepName of template.includedSteps) {
             const materialCategory = FULL_MATERIAL_PACKAGES.find(p => p.category === stepName);
             if (materialCategory) {
+                // Find the actual created step to get its ID
+                const step = createdSteps.find(s => s.name === stepName);
+                if (!step) {
+                    console.warn(`[REGEN MATERIAL] Step "${stepName}" not found in createdSteps. Materials for this category will not be linked to a step.`);
+                }
+
                 for (const item of materialCategory.items) {
                     const multiplier = item.multiplier || 1; // Default multiplier to 1
                     materialsToInsert.push({
@@ -541,7 +547,7 @@ export const dbService = {
                         planned_qty: Math.ceil(area * multiplier), // Use snake_case
                         purchased_qty: 0, // Use snake_case
                         unit: item.unit,
-                        step_id: undefined, // Assign later if linking to a specific step
+                        step_id: step?.id || undefined, // Assign the actual step ID
                         category: materialCategory.category
                     });
                 }
@@ -624,9 +630,15 @@ export const dbService = {
             };
         });
         
-        await supabase.from('steps').insert(stepsToInsert);
-        // FIXED: Now calling the correctly defined method
-        await this.regenerateMaterials(parsedWork.id, parsedWork.area, templateId);
+        const { data: createdStepsData, error: stepsError } = await supabase.from('steps').insert(stepsToInsert).select('*');
+        if (stepsError) {
+          console.error("Erro ao inserir etapas:", stepsError);
+          // Don't throw, continue to create materials even if steps insertion partially failed
+        }
+        const createdSteps = (createdStepsData || []).map(parseStepFromDB);
+
+        // FIXED: Now calling the correctly defined method with createdSteps
+        await this.regenerateMaterials(parsedWork.id, parsedWork.area, templateId, createdSteps);
     }
 
     return parsedWork;

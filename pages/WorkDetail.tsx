@@ -560,7 +560,11 @@ const WorkDetail: React.FC = () => {
     };
 
     // Show loading if AuthContext is still loading OR if initial auth check is not done OR if local work details are loading
-    if (authLoading || !isUserAuthFinished || loading) return <div className="h-screen flex items-center justify-center"><i className="fa-solid fa-circle-notch fa-spin text-3xl text-primary"></i></div>;
+    if (authLoading || !isUserAuthFinished || loading) return (
+      <div className="h-screen flex items-center justify-center">
+        <i className="fa-solid fa-circle-notch fa-spin text-3xl text-primary"></i>
+      </div>
+    );
     if (!work) return <div className="text-center text-xl text-red-500 py-10">Obra não encontrada.</div>;
 
 
@@ -640,7 +644,9 @@ const WorkDetail: React.FC = () => {
                             <h4 className="font-bold text-primary dark:text-white text-sm uppercase tracking-wide mb-3">{stepLabel}</h4>
                             <ul className="divide-y divide-slate-100 dark:divide-slate-700">
                                 {groupMaterials.map(m => {
-                                    const isFullyPurchased = m.purchasedQty >= m.plannedQty;
+                                    const hasPlanned = m.plannedQty > 0;
+                                    const purchased = m.purchasedQty;
+                                    const isFullyPurchased = purchased >= m.plannedQty;
                                     const itemStatusClass = isFullyPurchased ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-400';
                                     const itemIconClass = isFullyPurchased ? 'fa-check-circle' : 'fa-circle-exclamation';
 
@@ -688,7 +694,7 @@ const WorkDetail: React.FC = () => {
                                 {groupExpenses.map(exp => {
                                     const relatedMaterial = exp.relatedMaterialId ? materials.find(m => m.id === exp.relatedMaterialId) : null;
                                     const expenseWorker = exp.workerId ? workers.find(w => w.id === exp.workerId) : null;
-                                    const expenseSupplier = exp.supplierId ? suppliers.find(s => s.id === exp.supplierId) : null; // NEW
+                                    const expenseSupplier = exp.supplierId ? suppliers.find(s => s.id === exp.supplierId)?.name || 'N/A' : 'N/A'; // NEW
 
                                     let categoryIcon = 'fa-tag';
                                     let categoryColor = 'text-slate-500';
@@ -709,7 +715,7 @@ const WorkDetail: React.FC = () => {
                                                     <span>• {parseDateNoTimezone(exp.date)}</span>
                                                     {relatedMaterial && <span className="text-sm font-medium text-slate-400">(Material: {relatedMaterial.name})</span>}
                                                     {expenseWorker && <span className="text-sm font-medium text-slate-400">(Profissional: {expenseWorker.name})</span>}
-                                                    {expenseSupplier && <span className="text-sm font-medium text-slate-400">(Fornecedor: {expenseSupplier.name})</span>}
+                                                    {expenseSupplier !== 'N/A' && <span className="text-sm font-medium text-slate-400">(Fornecedor: {expenseSupplier})</span>}
                                                 </p>
                                             </div>
                                             <span className="font-bold text-primary dark:text-white whitespace-nowrap">R$ {Number(exp.amount).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>
