@@ -220,6 +220,14 @@ const WorkDetail: React.FC = () => {
     // Material Filter (Main Tab)
     const [materialFilterStepId, setMaterialFilterStepId] = useState<string>('ALL');
     
+    // Step Modals & Forms
+    const [isStepModalOpen, setIsStepModalOpen] = useState(false);
+    const [stepModalMode, setStepModalMode] = useState<'ADD' | 'EDIT'>('ADD');
+    const [currentStepId, setCurrentStepId] = useState<string | null>(null);
+    const [stepName, setStepName] = useState('');
+    const [stepStart, setStepStart] = useState(new Date().toISOString().split('T')[0]);
+    const [stepEnd, setStepEnd] = useState(new Date().toISOString().split('T')[0]);
+
     // Material Modals & Forms
     const [materialModal, setMaterialModal] = useState<{ isOpen: boolean, material: Material | null }>({ isOpen: false, material: null });
     const [matName, setMatName] = useState('');
@@ -279,6 +287,9 @@ const WorkDetail: React.FC = () => {
 
     // Define today once for date comparisons
     const today = new Date().toISOString().split('T')[0];
+
+    // Derived state for premium access
+    const isPremium = user?.plan === PlanType.VITALICIO;
 
     // --- LOAD DATA ---
     const load = async () => {
@@ -1193,9 +1204,9 @@ const WorkDetail: React.FC = () => {
                         </div>
                         <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-sm border border-slate-200 dark:border-slate-800">
                             <div className="flex justify-around items-center mb-6 bg-slate-50 dark:bg-slate-800 rounded-xl p-2">
-                                <button onClick={() => setCalcType('PISO')} className={`flex-1 py-2 text-sm font-bold rounded-lg ${calcType === 'PISO' ? 'bg-secondary text-white shadow' : 'text-slate-500'}`}>Piso</button>
-                                <button onClick={() => setCalcType('PAREDE')} className={`flex-1 py-2 text-sm font-bold rounded-lg ${calcType === 'PAREDE' ? 'bg-secondary text-white shadow' : 'text-slate-500'}`}>Parede</button>
-                                <button onClick={() => setCalcType('PINTURA')} className={`flex-1 py-2 text-sm font-bold rounded-lg ${calcType === 'PINTURA' ? 'bg-secondary text-white shadow' : 'text-slate-500'}`}>Pintura</button>
+                                <button onClick={() => setCalcType('PISO')} className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${calcType === 'PISO' ? 'bg-secondary text-white shadow' : 'text-slate-500'}`}>Piso</button>
+                                <button onClick={() => setCalcType('PAREDE')} className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${calcType === 'PAREDE' ? 'bg-secondary text-white shadow' : 'text-slate-500'}`}>Parede</button>
+                                <button onClick={() => setCalcType('PINTURA')} className={`flex-1 py-2 text-sm font-bold rounded-lg transition-all ${calcType === 'PINTURA' ? 'bg-secondary text-white shadow' : 'text-slate-500'}`}>Pintura</button>
                             </div>
                             <div className="mb-6">
                                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Área em m²</label>

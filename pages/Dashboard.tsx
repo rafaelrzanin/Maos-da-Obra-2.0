@@ -429,6 +429,8 @@ const Dashboard: React.FC = () => {
   const [showPushNotificationPrompt, setShowPushNotificationPrompt] = useState(false);
   // NEW: Added 'ERROR' to the possible states for pushNotificationStatus
   const [pushNotificationStatus, setPushNotificationStatus] = useState<'IDLE' | 'REQUESTING' | 'GRANTED' | 'DENIED' | 'UNSUPPORTED' | 'CHECKING_SUBSCRIPTION' | 'ERROR'>('IDLE');
+  // NEW: State to manage the loading/requesting status of push notification subscription
+  const [isSubscribing, setIsSubscribing] = useState(false); 
   const [zeModalConfig, setZeModalConfig] = useState<ZeModalProps & { id?: string }>({ 
     isOpen: false, 
     title: '', 
@@ -530,6 +532,7 @@ const Dashboard: React.FC = () => {
   const subscribeToPushNotifications = async () => {
     if (pushNotificationStatus === 'UNSUPPORTED' || !user) return;
 
+    setIsSubscribing(true); // Set subscribing state to true
     setPushNotificationStatus('REQUESTING');
     try {
       const registration = await navigator.serviceWorker.ready;
@@ -577,6 +580,8 @@ const Dashboard: React.FC = () => {
         type: 'ERROR',
         onCancel: () => setZeModalConfig(prev => ({ ...prev, isOpen: false }))
       });
+    } finally {
+      setIsSubscribing(false); // Reset subscribing state
     }
   };
 
@@ -662,10 +667,10 @@ const Dashboard: React.FC = () => {
           </div>
           <button
             onClick={subscribeToPushNotifications}
-            disabled={pushNotificationStatus === 'REQUESTING'}
+            disabled={isSubscribing} {/* Use the new isSubscribing state here */}
             className="shrink-0 ml-4 px-4 py-2 bg-blue-600 text-white text-xs font-bold rounded-xl hover:bg-blue-700 transition-colors disabled:opacity-50"
           >
-            {pushNotificationStatus === 'REQUESTING' ? 'Ativando...' : 'Ativar'}
+            {isSubscribing ? 'Ativando...' : 'Ativar'} {/* Use the new isSubscribing state here */}
           </button>
         </div>
       )}
