@@ -351,12 +351,12 @@ const LiveTimeline = ({
 
 
 const Dashboard: React.FC = () => {
-  const { user, isUserAuthFinished, authLoading } = useAuth(); // Added authLoading
+  const { user, isUserAuthFinished, authLoading, refreshNotifications, unreadNotificationsCount } = useAuth(); // Added refreshNotifications and unreadNotificationsCount
   const navigate = useNavigate();
   const [works, setWorks] = useState<Work[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeWorkId, setActiveWorkId] = useState<string | null>(null);
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]); // This is for the modal, the count comes from AuthContext
   const [zeTip, setZeTip] = useState<ZeTip>(getRandomZeTip());
 
   // Data for the focused work (for HUD, risk radar)
@@ -364,8 +364,7 @@ const Dashboard: React.FC = () => {
   const [focusWorkStats, setFocusWorkStats] = useState<{ totalSpent: number, progress: number, delayedSteps: number } | null>(null);
   const [focusWorkDailySummary, setFocusWorkDailySummary] = useState<{ completedSteps: number, delayedSteps: number, pendingMaterials: number, totalSteps: number } | null>(null);
   const [focusWorkMaterials, setFocusWorkMaterials] = useState<Material[]>([]); 
-  // NEW: Add state for focused work's steps for LiveTimeline component
-  const [focusWorkSteps, setFocusWorkSteps] = useState<Step[]>([]);
+  const [focusWorkSteps, setFocusWorkSteps] = useState<Step[]>([]); // NEW: State for focused work's steps
 
   const [showNotificationModal, setShowNotificationModal] = useState(false);
   const [currentNotification, setCurrentNotification] = useState<Notification | null>(null);
@@ -428,16 +427,17 @@ const Dashboard: React.FC = () => {
         setFocusWorkSteps([]); // Clear steps if no work is focused
       }
       
-      // Load notifications for the user
+      // Load notifications for the user for the modal display (unread ones)
       const userNotifications = await dbService.getNotifications(user.id);
       setNotifications(userNotifications);
+      refreshNotifications(); // Also refresh the count in AuthContext
 
     } catch (error) {
       console.error("Failed to load dashboard data:", error);
     } finally {
       setLoading(false);
     }
-  }, [user, activeWorkId, isUserAuthFinished, authLoading]); // Added authLoading to dependencies
+  }, [user, activeWorkId, isUserAuthFinished, authLoading, refreshNotifications]);
 
 
   // Effect to load data on component mount and when user/auth status changes
@@ -445,7 +445,7 @@ const Dashboard: React.FC = () => {
     if (isUserAuthFinished && !authLoading && user) { // Ensure auth is finished and not loading
       loadData();
     }
-  }, [loadData, isUserAuthFinished, authLoading, user]); // Added authLoading and user to dependencies
+  }, [loadData, isUserAuthFinished, authLoading, user]);
 
   // Check and setup VAPID public key for push notifications
   useEffect(() => {
@@ -533,14 +533,15 @@ const Dashboard: React.FC = () => {
       // Re-trigger smart notifications for this work to clear related tags
       await dbService.generateSmartNotifications(user!.id, focusWork.id);
     }
+    refreshNotifications(); // Refresh global count
   };
 
   const handleClearAllNotifications = async () => {
     if (user?.id) {
       await dbService.clearAllNotifications(user.id);
       setNotifications([]);
-      // Re-trigger smart notifications for all works if needed or update works to clear related tags
-      await loadData();
+      refreshNotifications(); // Refresh global count
+      // No need to re-trigger smart notifications for all works, just update local state
     }
   };
 
@@ -662,92 +663,26 @@ const Dashboard: React.FC = () => {
             <p className={cx("text-sm", mutedText)}>Comece a gerenciar seus projetos com facilidade.</p>
           </div>
         )}
+        {/* NEW: Access My Work Button */}
+        {focusWork && (
+          <div className="mt-8">
+              <button 
+                  onClick={() => navigate(`/work/${focusWork.id}`)}
+                  className="w-full py-4 bg-secondary text-white font-bold rounded-2xl shadow-lg hover:bg-orange-600 transition-all flex items-center justify-center gap-3"
+              >
+                  Acessar Obra <span className="font-medium">"{focusWork.name}"</span> <i className="fa-solid fa-arrow-right ml-2"></i>
+              </button>
+          </div>
+        )}
       </div>
 
       {/* Upcoming Steps */}
       {focusWork && focusWorkDailySummary && (
-        // FIX: Pass focusWorkSteps directly to LiveTimeline
         <LiveTimeline steps={focusWorkSteps} onClick={() => navigate(`/work/${focusWork.id}`)} />
       )}
       
-      {/* Works List */}
-      <div className="mt-8">
-        <div className="flex justify-between items-end mb-4">
-          <p className="text-lg font-black text-primary dark:text-white">Todas as suas Obras</p>
-          <button onClick={loadData} className={cx("text-sm", mutedText, "hover:text-primary transition-colors")}>
-            Atualizar <i className="fa-solid fa-sync-alt ml-1"></i>
-          </button>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {works.length === 0 ? (
-            <div className={cx(surface, card, "col-span-full text-center py-10")}>
-              <i className="fa-solid fa-briefcase text-5xl text-slate-300 dark:text-slate-700 mb-4"></i>
-              <p className={cx("text-lg font-bold", mutedText)}>Nenhuma obra cadastrada ainda.</p>
-              <p className={cx("text-sm", mutedText)}>Clique em "+ Nova Obra" para começar.</p>
-            </div>
-          ) : (
-            works.map((work) => {
-              const startDate = formatDateDisplay(work.startDate);
-              const endDate = formatDateDisplay(work.endDate);
-              // FIX: Compare work.status with WorkStatus.COMPLETED
-              const isOverdue = work.endDate < new Date().toISOString().split('T')[0] && work.status !== WorkStatus.COMPLETED;
-
-              return (
-                <div
-                  key={work.id}
-                  className={cx(
-                    surface,
-                    "rounded-2xl p-5 flex flex-col justify-between transition-all group",
-                    "hover:border-secondary/40 hover:shadow-lg hover:-translate-y-1"
-                  )}
-                >
-                  <div>
-                    <h3 className="text-lg font-black text-primary dark:text-white mb-2 leading-tight">
-                      {work.name}
-                    </h3>
-                    <p className={cx("text-xs font-bold uppercase tracking-wider mb-3", mutedText)}>
-                      {work.address || "Endereço não informado"}
-                    </p>
-                    <div className="flex items-center gap-4 text-xs mb-4">
-                      <div className="bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-lg flex items-center gap-2">
-                        <i className="fa-regular fa-calendar text-slate-400"></i>
-                        <span className="font-bold text-slate-700 dark:text-slate-300">{startDate}</span>
-                      </div>
-                      <div className="bg-slate-100 dark:bg-slate-800 px-3 py-1.5 rounded-lg flex items-center gap-2">
-                        <i className="fa-solid fa-flag-checkered text-slate-400"></i>
-                        <span className="font-bold text-slate-700 dark:text-slate-300">{endDate}</span>
-                      </div>
-                      {isOverdue && (
-                        <span className="bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400 px-2 py-1 rounded-md text-[10px] font-bold uppercase">
-                          Atrasada
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex gap-2 mt-4">
-                    <button
-                      onClick={() => navigate(`/work/${work.id}`)}
-                      className="flex-1 py-2 bg-secondary text-white font-bold rounded-lg hover:bg-orange-600 transition-colors shadow-md"
-                    >
-                      Ver Detalhes
-                    </button>
-                    <button
-                      onClick={() => handleDeleteWork(work.id)}
-                      className="w-10 h-10 rounded-lg bg-red-500 text-white flex items-center justify-center text-sm hover:bg-red-600 transition-colors"
-                    >
-                      <i className="fa-solid fa-trash-alt"></i>
-                    </button>
-                  </div>
-                </div>
-              );
-            })
-          )}
-        </div>
-      </div>
-
       {/* Notifications Area */}
-      {notifications.length > 0 && (
+      {unreadNotificationsCount > 0 && (
         <div className="fixed bottom-6 right-6 z-30">
           <button
             onClick={() => {
@@ -760,7 +695,7 @@ const Dashboard: React.FC = () => {
           >
             <i className="fa-solid fa-bell"></i>
             <span className="absolute -top-1 -right-1 w-5 h-5 bg-white text-red-500 rounded-full text-xs font-bold flex items-center justify-center border-2 border-red-500">
-              {notifications.length}
+              {unreadNotificationsCount}
             </span>
           </button>
         </div>
@@ -778,7 +713,7 @@ const Dashboard: React.FC = () => {
           onCancel={() => {
             setCurrentNotification(null);
             setShowNotificationModal(false);
-            alert('Funcionalidade de "Ver todas" em breve!'); // Placeholder for a dedicated notification list page
+            navigate('/notifications'); // Navigate to the new notifications page
           }}
           type={currentNotification.type}
         />

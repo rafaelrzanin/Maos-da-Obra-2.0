@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect, createContext, useContext, useMemo } from 'react';
+import React, { useState, useEffect, createContext, useContext, useMemo, useCallback } from 'react';
 import { User, PlanType } from '../types.ts';
 import { dbService } from '../services/db.ts';
 
@@ -36,6 +35,8 @@ interface AuthContextType {
   isSubscriptionValid: boolean;
   isNewAccount: boolean;
   trialDaysRemaining: number | null;
+  unreadNotificationsCount: number; // NEW: Unread notifications count
+  refreshNotifications: () => Promise<void>; // NEW: Function to refresh notification count
 }
 
 const AuthContext = createContext<AuthContextType>(null!);
@@ -45,8 +46,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [authLoading, setAuthLoading] = useState(true); // Initial state: true, as we're loading auth
   const [isUserAuthFinished, setIsUserAuthFinished] = useState(false); // NEW: Initially false
+  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0); // NEW
 
   console.log("[AuthProvider] Component rendered. Initial authLoading:", authLoading, "isUserAuthFinished:", isUserAuthFinished);
+
+  const refreshNotifications = useCallback(async () => {
+    if (user?.id) {
+      try {
+        const notifications = await dbService.getNotifications(user.id);
+        setUnreadNotificationsCount(notifications.length);
+      } catch (error) {
+        console.error("Error refreshing notifications:", error);
+        setUnreadNotificationsCount(0);
+      }
+    } else {
+      setUnreadNotificationsCount(0);
+    }
+  }, [user]);
 
   useEffect(() => {
     let mounted = true;
@@ -59,6 +75,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             if (mounted) {
                 setUser(currentUser);
                 console.log("[AuthContext] initAuth resolved. User:", currentUser ? currentUser.email : 'null');
+                if (currentUser) {
+                  refreshNotifications(); // Refresh notifications after user is set
+                }
             }
         } catch (error) {
             console.error("[AuthContext] Erro during initAuth:", error);
@@ -79,12 +98,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const unsubscribe = dbService.onAuthChange(async (u) => {
       if (mounted) {
         console.log("[AuthContext] onAuthChange event. User:", u ? u.email : 'null');
-        // onAuthChange updates the user, but we don't set authLoading=true here
-        // as it's a passive listener, not an active operation initiated by the UI.
-        // It signals that the auth state has changed, which is why we update `user`.
         setUser(u); 
-        // Ensure `isUserAuthFinished` is true, as a change means state is now known.
         setIsUserAuthFinished(true); 
+        if (u) {
+          refreshNotifications(); // Refresh notifications on auth change
+        } else {
+          setUnreadNotificationsCount(0); // Clear notifications on logout
+        }
       }
     });
 
@@ -93,7 +113,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       unsubscribe();
       console.log("[AuthContext] useEffect cleanup. Unsubscribed from auth changes.");
     };
-  }, []);
+  }, [refreshNotifications]); // Add refreshNotifications to dependencies
 
   const isSubscriptionValid = useMemo(() => user ? dbService.isSubscriptionActive(user) : false, [user]);
   const isNewAccount = useMemo(() => user ? !user.subscriptionExpiresAt : true, [user]);
@@ -114,6 +134,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
           const currentUser = await dbService.syncSession();
           setUser(currentUser);
+          if (currentUser) {
+            refreshNotifications(); // Refresh notifications after user data is refreshed
+          }
       } finally {
           setAuthLoading(false); // Loading complete
           console.log("[AuthContext] refreshUser finished. Setting authLoading to false.");
@@ -128,6 +151,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         if (u) {
             setUser(u);
+            refreshNotifications(); // Refresh notifications on successful login
             console.log("[AuthContext] login successful. User:", u ? u.email : 'null');
             return true;
         }
@@ -135,8 +159,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return false;
     } catch (e: any) {
         console.error("[AuthContext] Login exception:", e);
-        // dbService.login already throws, catch and return false to indicate failure.
-        // The calling component (Login.tsx) will handle the specific error message.
         return false;
     } finally {
         setAuthLoading(false); // Loading complete
@@ -152,18 +174,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         if (error) {
             console.error("[AuthContext] Error in social login:", error);
-            // Alert is handled by Login.tsx
             return false;
         } 
-        // If successful, Supabase handles the redirect automatically.
-        // The onAuthChange listener should pick it up and set user/authLoading.
         return true;
     } catch (e) {
         console.error("[AuthContext] Social login exception:", e);
         return false;
     } finally {
-        // We don't setAuthLoading(false) here, as the page redirect
-        // and subsequent onAuthChange will manage the state.
         console.log("[AuthContext] loginSocial finished. Redirect/onAuthChange will handle final authLoading state.");
     }
   };
@@ -175,6 +192,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const u = await dbService.signup(name, email, whatsapp, password, cpf, planType);
         if (u) {
             setUser(u);
+            refreshNotifications(); // Refresh notifications on successful signup
             console.log("[AuthContext] signup successful. User:", u ? u.email : 'null');
             return true;
         }
@@ -193,7 +211,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     console.log("[AuthContext] logout called.");
     dbService.logout();
     setUser(null); // Clear user immediately
-    // onAuthChange will also be triggered, confirming the null user state
+    setUnreadNotificationsCount(0); // Clear notifications on logout
     setAuthLoading(false); // Explicitly set to false after logout operation
     setIsUserAuthFinished(true); // Still ready, just no user.
   };
@@ -213,7 +231,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, authLoading, isUserAuthFinished, login, signup, logout, updatePlan, refreshUser, isSubscriptionValid, isNewAccount, trialDaysRemaining }}>
+    <AuthContext.Provider value={{ user, authLoading, isUserAuthFinished, login, signup, logout, updatePlan, refreshUser, isSubscriptionValid, isNewAccount, trialDaysRemaining, unreadNotificationsCount, refreshNotifications }}>
       {children}
     </AuthContext.Provider>
   );

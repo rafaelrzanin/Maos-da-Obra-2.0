@@ -18,6 +18,7 @@ const VideoTutorials = lazy(() => import('./pages/VideoTutorials.tsx').then(modu
 const Checkout = lazy(() => import('./pages/Checkout.tsx').then(module => ({ default: (module as any).default })));
 const AiChat = lazy(() => import('./pages/AiChat.tsx').then(module => ({ default: (module as any).default }))); // Lazy load AiChat page
 const Register = lazy(() => import('./pages/Register.tsx').then(module => ({ default: (module as any).default }))); 
+const Notifications = lazy(() => import('./pages/Notifications.tsx')); // NEW: Lazy load Notifications page
 
 
 // --- Componente de Carregamento ---
@@ -99,7 +100,7 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
 
 // Layout Component - Only applies to authenticated, subscribed areas of the app
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, authLoading, isUserAuthFinished, logout, isSubscriptionValid, trialDaysRemaining, updatePlan } = useAuth();
+  const { user, authLoading, isUserAuthFinished, logout, isSubscriptionValid, trialDaysRemaining, updatePlan, unreadNotificationsCount } = useAuth(); // NEW: Get unreadNotificationsCount
   const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
@@ -201,6 +202,16 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               <i className="fa-solid fa-robot mr-3"></i> Zé da Obra AI
             </button>
           </li>
+          <li> {/* NEW: Notifications menu item */}
+            <button onClick={() => navigate('/notifications')} className="block w-full text-left px-4 py-3 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors relative">
+              <i className="fa-solid fa-bell mr-3"></i> Notificações
+              {unreadNotificationsCount > 0 && (
+                <span className="absolute top-1/2 -translate-y-1/2 right-4 bg-red-500 text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center">
+                  {unreadNotificationsCount}
+                </span>
+              )}
+            </button>
+          </li>
           <li>
             <button onClick={() => navigate('/settings')} className="block w-full text-left px-4 py-3 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">
               <i className="fa-solid fa-gear mr-3"></i> Configurações
@@ -244,6 +255,7 @@ const App: React.FC = () => {
                 <Route path="/create" element={<Layout><CreateWork /></Layout>} />
                 <Route path="/work/:id" element={<Layout><WorkDetail /></Layout>} />
                 <Route path="/ai-chat" element={<Layout><AiChat /></Layout>} />
+                <Route path="/notifications" element={<Layout><Notifications /></Layout>} /> {/* NEW: Notifications Route */}
                 <Route path="/settings" element={<Layout><Settings /></Layout>} />
                 <Route path="/profile" element={<Layout><Profile /></Layout>} />
                 <Route path="/tutorials" element={<Layout><VideoTutorials /></Layout>} />
