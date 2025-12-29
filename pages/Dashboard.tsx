@@ -421,31 +421,32 @@ const Dashboard: React.FC = () => {
         </button>
       </div>
 
-      <div className={cx(surface, card, "flex items-center gap-5 mb-8")}>
-        <div className="w-16 h-16 rounded-full p-1 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-800 shadow-lg shrink-0">
-          <img
-            src={ZE_AVATAR}
-            alt="Zé da Obra"
-            className="w-full h-full object-cover rounded-full border-2 border-white dark:border-slate-800"
-            onError={(e) => {
-              const target = e.currentTarget;
-              if (target.src !== ZE_AVATAR_FALLBACK) {
-                target.src = ZE_AVATAR_FALLBACK;
-              }
-            }}
-          />
-        </div>
-        <div className="flex-1">
-          <p className={cx("text-xs font-black uppercase tracking-wider", mutedText)}>Dica do Zé da Obra</p>
-          <p className="text-sm font-bold text-slate-700 dark:text-white leading-snug">{zeTip.text}</p>
-        </div>
-        <button onClick={() => setZeTip(getRandomZeTip())} className={cx("text-lg", mutedText, "hover:text-primary transition-colors")}>
-          <i className="fa-solid fa-sync-alt"></i>
-        </button>
-      </div>
-
       {focusWork && focusWorkStats && focusWorkDailySummary ? (
         <>
+          {/* Zé da Obra Tip - RENDERED ONLY WHEN A WORK IS FOCUSED */}
+          <div className={cx(surface, card, "flex items-center gap-5 mb-8")}>
+            <div className="w-16 h-16 rounded-full p-1 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-800 shadow-lg shrink-0">
+              <img
+                src={ZE_AVATAR}
+                alt="Zé da Obra"
+                className="w-full h-full object-cover rounded-full border-2 border-white dark:border-slate-800"
+                onError={(e) => {
+                  const target = e.currentTarget;
+                  if (target.src !== ZE_AVATAR_FALLBACK) {
+                    target.src = ZE_AVATAR_FALLBACK;
+                  }
+                }}
+              />
+            </div>
+            <div className="flex-1">
+              <p className={cx("text-xs font-black uppercase tracking-wider", mutedText)}>Dica do Zé da Obra</p>
+              <p className="text-sm font-bold text-slate-700 dark:text-white leading-snug">{zeTip.text}</p>
+            </div>
+            <button onClick={() => setZeTip(getRandomZeTip())} className={cx("text-lg", mutedText, "hover:text-primary transition-colors")}>
+              <i className="fa-solid fa-sync-alt"></i>
+            </button>
+          </div>
+
           <div className={cx(surface, "rounded-[1.6rem] p-6 lg:p-8 mb-8")}>
             <div className="flex justify-between items-start mb-6">
               <div>
@@ -523,7 +524,7 @@ const Dashboard: React.FC = () => {
           <LiveTimeline steps={focusWorkSteps} onClick={() => navigate(`/work/${focusWork.id}`)} />
         </>
       ) : (
-        /* NEW: Empty State UI */
+        /* NEW: Empty State UI - RENDERED WHEN NO WORK IS FOCUSED */
         <div className={cx(surface, "rounded-[1.6rem] p-6 lg:p-8 mb-8 text-center py-16")}>
           <i className="fa-solid fa-hammer-screwdriver text-7xl text-slate-300 dark:text-slate-700 mb-6"></i>
           <p className={cx("text-2xl font-black text-primary dark:text-white mb-3")}>Sua Primeira Obra Começa Aqui!</p>
