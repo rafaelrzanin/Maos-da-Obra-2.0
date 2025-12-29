@@ -492,7 +492,6 @@ const Dashboard: React.FC = () => {
 
   useEffect(() => {
     // 1. Exit early if conditions for checking are not met or if already checked/modal is open.
-    //    Removing `showPushPermissionModal` from deps, but still respecting its state in the logic.
     if (!isUserAuthFinished || !user || !vapidPublicKey || hasPromptedPushOnceRef.current) {
         return;
     }
@@ -536,7 +535,7 @@ const Dashboard: React.FC = () => {
     }, 500); 
 
     return () => clearTimeout(timeoutId); // Cleanup: clear timeout if component unmounts or deps change
-  }, [user, isUserAuthFinished, vapidPublicKey, /* Removed showPushPermissionModal from deps */]);
+  }, [user, isUserAuthFinished, vapidPublicKey, showPushPermissionModal]); // Re-added showPushPermissionModal to dependencies
 
 
   const handleDismissNotification = async (notificationId: string) => {
