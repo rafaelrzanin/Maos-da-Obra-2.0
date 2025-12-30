@@ -650,272 +650,270 @@ const WorkDetail: React.FC = () => {
     const hasLifetimeAccess = user?.plan === PlanType.VITALICIO;
 
     return (
-        // FIX: Wrapped the main content in React.Fragment to ensure a single, explicit root element.
-        // This is a benign structural change that can sometimes help compilers with JSX parsing issues.
-        <React.Fragment>
-            <div className="max-w-4xl mx-auto py-8 px-4 md:px-0 pb-24">
-                <div className="flex items-center justify-between mb-8">
-                    <button onClick={() => subView === 'NONE' ? navigate('/') : setSubView('NONE')} className="text-slate-400 hover:text-primary" aria-label="Voltar"><i className="fa-solid fa-arrow-left text-xl"></i></button>
-                    <h1 className="text-2xl font-black text-primary dark:text-white">{work.name}</h1>
-                    <div className="w-10"></div>
-                </div>
+        // NEW: The root element is now a single <div> that contains all content and modals.
+        <div className="max-w-4xl mx-auto py-8 px-4 md:px-0 pb-24">
+            <div className="flex items-center justify-between mb-8">
+                <button onClick={() => subView === 'NONE' ? navigate('/') : setSubView('NONE')} className="text-slate-400 hover:text-primary" aria-label="Voltar"><i className="fa-solid fa-arrow-left text-xl"></i></button>
+                <h1 className="text-2xl font-black text-primary dark:text-white">{work.name}</h1>
+                <div className="w-10"></div>
+            </div>
 
-                {subView === 'NONE' ? (
-                    <>
-                        <nav className="fixed bottom-0 left-0 w-full bg-white dark:bg-slate-900 border-t z-50 flex justify-around p-2 md:static md:bg-slate-100 md:rounded-2xl md:mb-6 shadow-lg md:shadow-none">
-                            {(['ETAPAS', 'MATERIAIS', 'FINANCEIRO', 'FERRAMENTAS'] as MainTab[]).map(tab => (
-                                <button key={tab} onClick={() => setActiveTab(tab)} className={`flex flex-col items-center flex-1 py-2 text-[10px] font-bold md:text-sm md:rounded-xl transition-colors ${activeTab === tab ? 'text-secondary md:bg-white md:shadow-sm' : 'text-slate-400 hover:text-primary dark:hover:text-white'}`} aria-label={`Abrir aba ${tab}`}>
-                                    <i className={`fa-solid ${tab === 'ETAPAS' ? 'fa-calendar' : tab === 'MATERIAIS' ? 'fa-box' : tab === 'FINANCEIRO' ? 'fa-dollar-sign' : 'fa-ellipsis'} text-lg mb-1`}></i>
-                                    {tab}
-                                </button>
-                            ))}
-                        </nav>
+            {subView === 'NONE' ? (
+                <>
+                    <nav className="fixed bottom-0 left-0 w-full bg-white dark:bg-slate-900 border-t z-50 flex justify-around p-2 md:static md:bg-slate-100 md:rounded-2xl md:mb-6 shadow-lg md:shadow-none">
+                        {(['ETAPAS', 'MATERIAIS', 'FINANCEIRO', 'FERRAMENTAS'] as MainTab[]).map(tab => (
+                            <button key={tab} onClick={() => setActiveTab(tab)} className={`flex flex-col items-center flex-1 py-2 text-[10px] font-bold md:text-sm md:rounded-xl transition-colors ${activeTab === tab ? 'text-secondary md:bg-white md:shadow-sm' : 'text-slate-400 hover:text-primary dark:hover:text-white'}`} aria-label={`Abrir aba ${tab}`}>
+                                <i className={`fa-solid ${tab === 'ETAPAS' ? 'fa-calendar' : tab === 'MATERIAIS' ? 'fa-box' : tab === 'FINANCEIRO' ? 'fa-dollar-sign' : 'fa-ellipsis'} text-lg mb-1`}></i>
+                                {tab}
+                            </button>
+                        ))}
+                    </nav>
 
-                        {activeTab === 'ETAPAS' && (
-                            <div className="space-y-4 animate-in fade-in">
-                                <div className="flex justify-between items-center px-2">
-                                    <h2 className="text-xl font-bold text-primary dark:text-white">Cronograma</h2>
-                                    <button onClick={() => { setStepModalMode('ADD'); setIsStepModalOpen(true); }} className="bg-primary text-white p-2 rounded-xl shadow-md hover:bg-primary-light transition-colors" aria-label="Adicionar etapa"><i className="fa-solid fa-plus"></i></button>
-                                </div>
-                                {steps.length === 0 ? (
-                                    <p className="text-center text-slate-400 py-8 italic text-sm">Nenhuma etapa cadastrada. Adicione para começar!</p>
-                                ) : (
-                                    steps.map((s, index) => {
-                                        const isDelayed = s.status !== StepStatus.COMPLETED && s.endDate < todayString;
-                                        return (
-                                            <div key={s.id} className={`bg-white dark:bg-slate-900 p-4 rounded-2xl border flex items-center gap-4 shadow-sm ${isDelayed ? 'border-red-500 ring-1 ring-red-200' : 'border-slate-200 dark:border-slate-800'}`}>
-                                                <button 
-                                                    onClick={() => handleStepStatusClick(s)} 
-                                                    className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-white transition-colors duration-200
-                                                        ${s.status === StepStatus.COMPLETED ? 'bg-green-500 border-green-500' : 
-                                                        s.status === StepStatus.IN_PROGRESS ? 'bg-orange-500 border-orange-500' : 
-                                                        'bg-slate-300 border-slate-300 hover:bg-slate-400 hover:border-slate-400'}`}
-                                                    aria-label={`Mudar status da etapa ${s.name}`}
-                                                >
-                                                    <i className="fa-solid fa-check"></i>
-                                                </button>
-                                                <div className="flex-1 cursor-pointer" onClick={() => { setStepModalMode('EDIT'); setCurrentStepId(s.id); setStepName(s.name); setStepStart(s.startDate); setStepEnd(s.endDate); setIsStepModalOpen(true); }} aria-label={`Editar etapa ${s.name}`}>
-                                                    <p className="font-bold text-primary dark:text-white">{index + 1}. {s.name} {isDelayed && <span className="ml-2 text-xs font-semibold text-red-500">Atrasada!</span>}</p>
-                                                    <p className="text-xs text-slate-500 dark:text-slate-400">{parseDateNoTimezone(s.startDate)} - {parseDateNoTimezone(s.endDate)}</p>
-                                                </div>
-                                                <button onClick={() => handleDeleteStep(s.id)} className="text-red-400 hover:text-red-600 transition-colors p-2" aria-label={`Excluir etapa ${s.name}`}><i className="fa-solid fa-trash"></i></button>
-                                            </div>
-                                        );
-                                    })
-                                )}
+                    {activeTab === 'ETAPAS' && (
+                        <div className="space-y-4 animate-in fade-in">
+                            <div className="flex justify-between items-center px-2">
+                                <h2 className="text-xl font-bold text-primary dark:text-white">Cronograma</h2>
+                                <button onClick={() => { setStepModalMode('ADD'); setIsStepModalOpen(true); }} className="bg-primary text-white p-2 rounded-xl shadow-md hover:bg-primary-light transition-colors" aria-label="Adicionar etapa"><i className="fa-solid fa-plus"></i></button>
                             </div>
-                        )}
-
-                        {activeTab === 'MATERIAIS' && (
-                            <div className="space-y-6 animate-in fade-in">
-                                <div className="flex justify-between items-center px-2">
-                                    <h2 className="text-xl font-bold text-primary dark:text-white">Materiais</h2>
-                                    <button onClick={() => setAddMatModal(true)} className="bg-primary text-white p-2 rounded-xl shadow-md hover:bg-primary-light transition-colors" aria-label="Adicionar material"><i className="fa-solid fa-plus"></i></button>
-                                </div>
-                                {steps.length === 0 && materials.length === 0 ? (
-                                    <p className="text-center text-slate-400 py-8 italic text-sm">Nenhuma etapa ou material cadastrado.</p>
-                                ) : (
-                                    steps.map((step, index) => {
-                                        const stepMats = materials.filter(m => m.stepId === step.id);
-                                        
-                                        const isStepDelayed = step.status !== StepStatus.COMPLETED && step.endDate < todayString;
-                                        const stepStatusBgClass = 
-                                            step.status === StepStatus.COMPLETED ? 'bg-green-500/10' : 
-                                            step.status === StepStatus.IN_PROGRESS ? 'bg-orange-500/10' : 
-                                            isStepDelayed ? 'bg-red-500/10' : 
-                                            'bg-slate-300/10';
-                                        const stepStatusTextColorClass =
-                                            step.status === StepStatus.COMPLETED ? 'text-green-600 dark:text-green-300' :
-                                            step.status === StepStatus.IN_PROGRESS ? 'text-orange-600 dark:text-orange-300' :
-                                            isStepDelayed ? 'text-red-600 dark:text-red-300' :
-                                            'text-slate-500 dark:text-slate-400';
-                                        const stepStatusIcon = 
-                                            step.status === StepStatus.COMPLETED ? 'fa-check-circle' :
-                                            step.status === StepStatus.IN_PROGRESS ? 'fa-hammer' :
-                                            isStepDelayed ? 'fa-triangle-exclamation' :
-                                        'fa-clock';
-
-                                        return (
-                                            <div key={step.id} className="mb-6 first:mt-0 mt-8">
-                                                <div className={`bg-white dark:bg-slate-900 rounded-2xl p-4 mb-4 border border-slate-200 dark:border-slate-800 shadow-lg ${stepStatusBgClass} ${stepStatusTextColorClass}`}>
-                                                    <div className="flex items-center justify-between">
-                                                        <h3 className="font-black text-xl text-primary dark:text-white flex items-center gap-2 pl-0">
-                                                            <span className={`w-8 h-8 rounded-full flex items-center justify-center text-base ${stepStatusBgClass.replace('/10', '/20').replace('bg-', 'bg-').replace('dark:bg-green-900/20', 'dark:bg-green-800').replace('dark:text-green-300', 'dark:text-white')}`}>
-                                                                <i className={`fa-solid ${stepStatusIcon} ${stepStatusTextColorClass}`}></i>
-                                                            </span>
-                                                            <span className="text-primary dark:text-white">{index + 1}. {step.name}</span>
-                                                        </h3>
-                                                        <span className={`text-sm font-semibold ${stepStatusTextColorClass}`}>
-                                                            {isStepDelayed ? 'Atrasada' : step.status === StepStatus.COMPLETED ? 'Concluída' : step.status === StepStatus.IN_PROGRESS ? 'Em Andamento' : 'Pendente'}
-                                                        </span>
-                                                    </div>
-                                                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 pl-9">{parseDateNoTimezone(step.startDate)} - {parseDateNoTimezone(step.endDate)}</p>
-                                                </div>
-
-                                                <div className="space-y-3 pl-3 border-l-2 border-slate-100 dark:border-slate-800">
-                                                    {stepMats.length === 0 ? (
-                                                        <p className="text-center text-slate-400 py-4 italic text-sm">Nenhum material associado a esta etapa.</p>
-                                                    ) : (
-                                                        stepMats.map(m => (
-                                                            <div key={m.id} onClick={() => { setMaterialModal({isOpen: true, material: m}); setMatName(m.name); setMatBrand(m.brand||''); setMatPlannedQty(String(m.plannedQty)); setMatUnit(m.unit); }} className="bg-white dark:bg-slate-900 p-2 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs cursor-pointer hover:shadow-sm transition-shadow">
-                                                                <div className="flex justify-between items-center mb-1">
-                                                                    <p className="font-bold text-sm text-primary dark:text-white">{m.name}</p>
-                                                                    <span className="text-xs font-black text-green-600 dark:text-green-400">{m.purchasedQty} {m.unit}</span>
-                                                                </div>
-                                                                <div className="h-1 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
-                                                                    <div className="h-full bg-secondary" style={{ width: `${(m.purchasedQty/m.plannedQty)*100}%` }}></div>
-                                                                </div>
-                                                                <p className="text-[10px] text-right text-slate-500 dark:text-slate-400 mt-1">Planejado: {m.plannedQty} {m.unit}</p>
-                                                            </div>
-                                                        ))
-                                                    )}
-                                                </div>
+                            {steps.length === 0 ? (
+                                <p className="text-center text-slate-400 py-8 italic text-sm">Nenhuma etapa cadastrada. Adicione para começar!</p>
+                            ) : (
+                                steps.map((s, index) => {
+                                    const isDelayed = s.status !== StepStatus.COMPLETED && s.endDate < todayString;
+                                    return (
+                                        <div key={s.id} className={`bg-white dark:bg-slate-900 p-4 rounded-2xl border flex items-center gap-4 shadow-sm ${isDelayed ? 'border-red-500 ring-1 ring-red-200' : 'border-slate-200 dark:border-slate-800'}`}>
+                                            <button 
+                                                onClick={() => handleStepStatusClick(s)} 
+                                                className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-white transition-colors duration-200
+                                                    ${s.status === StepStatus.COMPLETED ? 'bg-green-500 border-green-500' : 
+                                                    s.status === StepStatus.IN_PROGRESS ? 'bg-orange-500 border-orange-500' : 
+                                                    'bg-slate-300 border-slate-300 hover:bg-slate-400 hover:border-slate-400'}`}
+                                                aria-label={`Mudar status da etapa ${s.name}`}
+                                            >
+                                                <i className="fa-solid fa-check"></i>
+                                            </button>
+                                            <div className="flex-1 cursor-pointer" onClick={() => { setStepModalMode('EDIT'); setCurrentStepId(s.id); setStepName(s.name); setStepStart(s.startDate); setStepEnd(s.endDate); setIsStepModalOpen(true); }} aria-label={`Editar etapa ${s.name}`}>
+                                                <p className="font-bold text-primary dark:text-white">{index + 1}. {s.name} {isDelayed && <span className="ml-2 text-xs font-semibold text-red-500">Atrasada!</span>}</p>
+                                                <p className="text-xs text-slate-500 dark:text-slate-400">{parseDateNoTimezone(s.startDate)} - {parseDateNoTimezone(s.endDate)}</p>
                                             </div>
-                                        );
-                                    })
-                                )}
-                            </div>
-                        )}
+                                            <button onClick={() => handleDeleteStep(s.id)} className="text-red-400 hover:text-red-600 transition-colors p-2" aria-label={`Excluir etapa ${s.name}`}><i className="fa-solid fa-trash"></i></button>
+                                        </div>
+                                    );
+                                })
+                            )}
+                        </div>
+                    )}
 
-                        {activeTab === 'FINANCEIRO' && (
-                            <div className="space-y-6 animate-in fade-in">
-                                {/* Budget Summary Card */}
-                                <div className={`bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-lg border ${budgetStatusAccent}`}>
-                                    {/* Gasto Total Block */}
-                                    <div className="flex items-center gap-3 mb-4">
-                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white text-lg shrink-0 ${budgetStatusColor}`}>
-                                            <i className={`fa-solid ${budgetStatusIcon}`}></i>
-                                        </div>
-                                        <div>
-                                            <p className="text-xs font-bold uppercase text-slate-500 dark:text-slate-400 mb-1">Gasto Total</p>
-                                            <h3 className="text-2xl font-black text-primary dark:text-white">{formatCurrency(totalSpent)}</h3>
-                                        </div>
-                                    </div>
+                    {activeTab === 'MATERIAIS' && (
+                        <div className="space-y-6 animate-in fade-in">
+                            <div className="flex justify-between items-center px-2">
+                                <h2 className="text-xl font-bold text-primary dark:text-white">Materiais</h2>
+                                <button onClick={() => setAddMatModal(true)} className="bg-primary text-white p-2 rounded-xl shadow-md hover:bg-primary-light transition-colors" aria-label="Adicionar material"><i className="fa-solid fa-plus"></i></button>
+                            </div>
+                            {steps.length === 0 && materials.length === 0 ? (
+                                <p className="text-center text-slate-400 py-8 italic text-sm">Nenhuma etapa ou material cadastrado.</p>
+                            ) : (
+                                steps.map((step, index) => {
+                                    const stepMats = materials.filter(m => m.stepId === step.id);
                                     
-                                    {/* Orçamento Planejado Block (moved below Gasto Total) */}
-                                    {work.budgetPlanned > 0 && (
-                                        <div className="flex justify-between items-center text-lg font-bold text-slate-700 dark:text-slate-300 mb-4 border-t border-slate-100 dark:border-slate-800 pt-4 mt-4">
-                                            <span className="text-xs font-bold uppercase text-slate-500 dark:text-slate-400">Orçamento Planejado</span>
-                                            <span className="text-lg font-black text-primary dark:text-white">{formatCurrency(work.budgetPlanned)}</span>
-                                        </div>
-                                    )}
+                                    const isStepDelayed = step.status !== StepStatus.COMPLETED && step.endDate < todayString;
+                                    const stepStatusBgClass = 
+                                        step.status === StepStatus.COMPLETED ? 'bg-green-500/10' : 
+                                        step.status === StepStatus.IN_PROGRESS ? 'bg-orange-500/10' : 
+                                        isStepDelayed ? 'bg-red-500/10' : 
+                                        'bg-slate-300/10';
+                                    const stepStatusTextColorClass =
+                                        step.status === StepStatus.COMPLETED ? 'text-green-600 dark:text-green-300' :
+                                        step.status === StepStatus.IN_PROGRESS ? 'text-orange-600 dark:text-orange-300' :
+                                        isStepDelayed ? 'text-red-600 dark:text-red-300' :
+                                        'text-slate-500 dark:text-slate-400';
+                                    const stepStatusIcon = 
+                                        step.status === StepStatus.COMPLETED ? 'fa-check-circle' :
+                                        step.status === StepStatus.IN_PROGRESS ? 'fa-hammer' :
+                                        isStepDelayed ? 'fa-triangle-exclamation' :
+                                    'fa-clock';
 
-                                    {/* Budget Progress Bar */}
-                                    {work.budgetPlanned > 0 && (
-                                        <div className="mt-3"> {/* Replaced <> fragment with <div> */}
-                                            <div className="h-2 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden mb-1">
-                                                <div className="h-full" style={{ width: `${Math.min(100, budgetUsage)}%`, backgroundColor: budgetStatusColor }}></div>
+                                    return (
+                                        <div key={step.id} className="mb-6 first:mt-0 mt-8">
+                                            <div className={`bg-white dark:bg-slate-900 rounded-2xl p-4 mb-4 border border-slate-200 dark:border-slate-800 shadow-lg ${stepStatusBgClass} ${stepStatusTextColorClass}`}>
+                                                <div className="flex items-center justify-between">
+                                                    <h3 className="font-black text-xl text-primary dark:text-white flex items-center gap-2 pl-0">
+                                                        <span className={`w-8 h-8 rounded-full flex items-center justify-center text-base ${stepStatusBgClass.replace('/10', '/20').replace('bg-', 'bg-').replace('dark:bg-green-900/20', 'dark:bg-green-800').replace('dark:text-green-300', 'dark:text-white')}`}>
+                                                            <i className={`fa-solid ${stepStatusIcon} ${stepStatusTextColorClass}`}></i>
+                                                        </span>
+                                                        <span className="text-primary dark:text-white">{index + 1}. {step.name}</span>
+                                                    </h3>
+                                                    <span className={`text-sm font-semibold ${stepStatusTextColorClass}`}>
+                                                        {isStepDelayed ? 'Atrasada' : step.status === StepStatus.COMPLETED ? 'Concluída' : step.status === StepStatus.IN_PROGRESS ? 'Em Andamento' : 'Pendente'}
+                                                    </span>
+                                                </div>
+                                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 pl-9">{parseDateNoTimezone(step.startDate)} - {parseDateNoTimezone(step.endDate)}</p>
                                             </div>
-                                            <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400">
-                                                <span>{Math.round(budgetUsage)}% Usado</span>
-                                                {budgetUsage > 100 ? (
-                                                    <span className="text-red-500">Excedido em {formatCurrency(Math.abs(budgetRemaining))}</span>
+
+                                            <div className="space-y-3 pl-3 border-l-2 border-slate-100 dark:border-slate-800">
+                                                {stepMats.length === 0 ? (
+                                                    <p className="text-center text-slate-400 py-4 italic text-sm">Nenhum material associado a esta etapa.</p>
                                                 ) : (
-                                                    <span>Restante: {formatCurrency(budgetRemaining)}</span>
+                                                    stepMats.map(m => (
+                                                        <div key={m.id} onClick={() => { setMaterialModal({isOpen: true, material: m}); setMatName(m.name); setMatBrand(m.brand||''); setMatPlannedQty(String(m.plannedQty)); setMatUnit(m.unit); }} className="bg-white dark:bg-slate-900 p-2 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs cursor-pointer hover:shadow-sm transition-shadow">
+                                                            <div className="flex justify-between items-center mb-1">
+                                                                <p className="font-bold text-sm text-primary dark:text-white">{m.name}</p>
+                                                                <span className="text-xs font-black text-green-600 dark:text-green-400">{m.purchasedQty} {m.unit}</span>
+                                                            </div>
+                                                            <div className="h-1 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                                                                <div className="h-full bg-secondary" style={{ width: `${(m.purchasedQty/m.plannedQty)*100}%` }}></div>
+                                                            </div>
+                                                            <p className="text-[10px] text-right text-slate-500 dark:text-slate-400 mt-1">Planejado: {m.plannedQty} {m.unit}</p>
+                                                        </div>
+                                                    ))
                                                 )}
                                             </div>
                                         </div>
-                                    )}
-                                </div>
+                                    );
+                                })
+                            )}
+                        </div>
+                    )}
 
-                                <div className="flex justify-between items-center px-2 pt-4">
-                                    <h2 className="text-xl font-bold text-primary dark:text-white">Lançamentos</h2>
-                                    <button onClick={openAddExpense} className="bg-primary text-white p-2 rounded-xl shadow-md hover:bg-primary-light transition-colors" aria-label="Adicionar novo gasto"><i className="fa-solid fa-plus"></i></button>
+                    {activeTab === 'FINANCEIRO' && (
+                        <div className="space-y-6 animate-in fade-in">
+                            {/* Budget Summary Card */}
+                            <div className={`bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-lg border ${budgetStatusAccent}`}>
+                                {/* Gasto Total Block */}
+                                <div className="flex items-center gap-3 mb-4">
+                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white text-lg shrink-0 ${budgetStatusColor}`}>
+                                        <i className={`fa-solid ${budgetStatusIcon}`}></i>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs font-bold uppercase text-slate-500 dark:text-slate-400 mb-1">Gasto Total</p>
+                                        <h3 className="text-2xl font-black text-primary dark:text-white">{formatCurrency(totalSpent)}</h3>
+                                    </div>
                                 </div>
                                 
-                                {expenses.length === 0 ? (
-                                    <p className="text-center text-slate-400 py-8 italic text-sm">Nenhum gasto registrado.</p>
-                                ) : (
-                                    Object.values(ExpenseCategory).map(category => {
-                                        const expensesInCategory = Object.values(groupedExpenses[category].steps).flatMap(stepGroup => stepGroup.expenses).concat(groupedExpenses[category].unlinkedExpenses);
-                                        if (expensesInCategory.length === 0) return null; // Only show category if it has expenses
+                                {/* Orçamento Planejado Block (moved below Gasto Total) */}
+                                {work.budgetPlanned > 0 && (
+                                    <div className="flex justify-between items-center text-lg font-bold text-slate-700 dark:text-slate-300 mb-4 border-t border-slate-100 dark:border-slate-800 pt-4 mt-4">
+                                        <span className="text-xs font-bold uppercase text-slate-500 dark:text-slate-400">Orçamento Planejado</span>
+                                        <span className="text-lg font-black text-primary dark:text-white">{formatCurrency(work.budgetPlanned)}</span>
+                                    </div>
+                                )}
 
-                                        return (
-                                            <div key={category} className="mb-6 first:mt-0 mt-8">
-                                                {/* Category "Root" Card */}
-                                                <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 mb-4 border border-slate-200 dark:border-slate-800 shadow-lg">
-                                                    <h3 className="font-black text-xl text-primary dark:text-white flex items-center gap-2 pl-0">
-                                                        <span className="w-8 h-8 rounded-full bg-secondary/10 text-secondary dark:bg-secondary-dark/20 dark:text-secondary-light flex items-center justify-center text-base">
-                                                            {category === ExpenseCategory.MATERIAL ? <i className="fa-solid fa-box"></i> :
-                                                            category === ExpenseCategory.LABOR ? <i className="fa-solid fa-hard-hat"></i> :
-                                                            category === ExpenseCategory.PERMITS ? <i className="fa-solid fa-file-invoice-dollar"></i> : 
-                                                            <i className="fa-solid fa-ellipsis"></i>}
-                                                        </span>
-                                                        <span className="text-primary dark:text-white">{category}</span>
-                                                    </h3>
-                                                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 pl-10">Total: {formatCurrency(groupedExpenses[category].totalCategoryAmount)}</p>
-                                                </div>
+                                {/* Budget Progress Bar */}
+                                {work.budgetPlanned > 0 && (
+                                    <div className="mt-3"> {/* Replaced <> fragment with <div> */}
+                                        <div className="h-2 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden mb-1">
+                                            <div className="h-full" style={{ width: `${Math.min(100, budgetUsage)}%`, backgroundColor: budgetStatusColor }}></div>
+                                        </div>
+                                        <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400">
+                                            <span>{Math.round(budgetUsage)}% Usado</span>
+                                            {budgetUsage > 100 ? (
+                                                <span className="text-red-500">Excedido em {formatCurrency(Math.abs(budgetRemaining))}</span>
+                                            ) : (
+                                                <span>Restante: {formatCurrency(budgetRemaining)}</span>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
 
-                                                {/* Expenses linked to steps */}
-                                                {Object.keys(groupedExpenses[category].steps)
-                                                    .filter(stepId => groupedExpenses[category].steps[stepId].expenses.length > 0) // Only show step card if it has expenses
-                                                    .map(stepId => {
-                                                    const stepGroup = groupedExpenses[category].steps[stepId];
-                                                    const step = steps.find(s => s.id === stepId); 
-                                                    if (!step) return null;
-                                                    
-                                                    const isStepDelayed = step.status !== StepStatus.COMPLETED && step.endDate < todayString;
-                                                    const stepStatusBgClass = 
-                                                        step.status === StepStatus.COMPLETED ? 'bg-green-500/10' : 
-                                                        step.status === StepStatus.IN_PROGRESS ? 'bg-orange-500/10' : 
-                                                        isStepDelayed ? 'bg-red-500/10' : 
-                                                        'bg-slate-300/10';
-                                                    const stepStatusTextColorClass =
-                                                        step.status === StepStatus.COMPLETED ? 'text-green-600 dark:text-green-300' :
-                                                        step.status === StepStatus.IN_PROGRESS ? 'text-orange-600 dark:text-orange-300' :
-                                                        isStepDelayed ? 'text-red-600 dark:text-red-300' :
-                                                        'text-slate-500 dark:text-slate-400';
-                                                    const stepStatusIcon = 
-                                                        step.status === StepStatus.COMPLETED ? 'fa-check-circle' :
-                                                        step.status === StepStatus.IN_PROGRESS ? 'fa-hammer' : 
-                                                        isStepDelayed ? 'fa-triangle-exclamation' :
-                                                        'fa-clock';
+                            <div className="flex justify-between items-center px-2 pt-4">
+                                <h2 className="text-xl font-bold text-primary dark:text-white">Lançamentos</h2>
+                                <button onClick={openAddExpense} className="bg-primary text-white p-2 rounded-xl shadow-md hover:bg-primary-light transition-colors" aria-label="Adicionar novo gasto"><i className="fa-solid fa-plus"></i></button>
+                            </div>
+                            
+                            {expenses.length === 0 ? (
+                                <p className="text-center text-slate-400 py-8 italic text-sm">Nenhum gasto registrado.</p>
+                            ) : (
+                                Object.values(ExpenseCategory).map(category => {
+                                    const expensesInCategory = Object.values(groupedExpenses[category].steps).flatMap(stepGroup => stepGroup.expenses).concat(groupedExpenses[category].unlinkedExpenses);
+                                    if (expensesInCategory.length === 0) return null; // Only show category if it has expenses
 
-                                                    return (
-                                                        <div key={stepId} className="mb-4 pl-3 border-l-2 border-slate-100 dark:border-slate-800 ml-2">
-                                                            {/* Step "Chapter" Card for Financeiro */}
-                                                            <div className={`bg-white dark:bg-slate-900 rounded-2xl p-2 mb-3 border border-slate-200 dark:border-slate-800 shadow-lg ${stepStatusBgClass} ${stepStatusTextColorClass}`}>
-                                                                <div className="flex items-center justify-between">
-                                                                    <h3 className="font-black text-lg text-primary dark:text-white flex items-center gap-2 pl-0"> 
-                                                                        <span className={`w-7 h-7 rounded-full flex items-center justify-center text-sm ${stepStatusBgClass.replace('/10', '/20').replace('bg-', 'bg-').replace('dark:bg-green-900/20', 'dark:bg-green-800').replace('dark:text-green-300', 'dark:text-white')}`}> 
-                                                                            <i className={`fa-solid ${stepStatusIcon} ${stepStatusTextColorClass}`}></i>
-                                                                        </span>
-                                                                        <span className="text-primary dark:text-white">{step.name}</span>
-                                                                    </h3>
-                                                                    <span className={`text-xs font-semibold ${stepStatusTextColorClass}`}>
-                                                                        {formatCurrency(stepGroup.totalStepAmount)}
+                                    return (
+                                        <div key={category} className="mb-6 first:mt-0 mt-8">
+                                            {/* Category "Root" Card */}
+                                            <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 mb-4 border border-slate-200 dark:border-slate-800 shadow-lg">
+                                                <h3 className="font-black text-xl text-primary dark:text-white flex items-center gap-2 pl-0">
+                                                    <span className="w-8 h-8 rounded-full bg-secondary/10 text-secondary dark:bg-secondary-dark/20 dark:text-secondary-light flex items-center justify-center text-base">
+                                                        {category === ExpenseCategory.MATERIAL ? <i className="fa-solid fa-box"></i> :
+                                                        category === ExpenseCategory.LABOR ? <i className="fa-solid fa-hard-hat"></i> :
+                                                        category === ExpenseCategory.PERMITS ? <i className="fa-solid fa-file-invoice-dollar"></i> : 
+                                                        <i className="fa-solid fa-ellipsis"></i>}
+                                                    </span>
+                                                    <span className="text-primary dark:text-white">{category}</span>
+                                                </h3>
+                                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 pl-10">Total: {formatCurrency(groupedExpenses[category].totalCategoryAmount)}</p>
+                                            </div>
+
+                                            {/* Expenses linked to steps */}
+                                            {Object.keys(groupedExpenses[category].steps)
+                                                .filter(stepId => groupedExpenses[category].steps[stepId].expenses.length > 0) // Only show step card if it has expenses
+                                                .map(stepId => {
+                                                const stepGroup = groupedExpenses[category].steps[stepId];
+                                                const step = steps.find(s => s.id === stepId); 
+                                                if (!step) return null;
+                                                
+                                                const isStepDelayed = step.status !== StepStatus.COMPLETED && step.endDate < todayString;
+                                                const stepStatusBgClass = 
+                                                    step.status === StepStatus.COMPLETED ? 'bg-green-500/10' : 
+                                                    step.status === StepStatus.IN_PROGRESS ? 'bg-orange-500/10' : 
+                                                    isStepDelayed ? 'bg-red-500/10' : 
+                                                    'bg-slate-300/10';
+                                                const stepStatusTextColorClass =
+                                                    step.status === StepStatus.COMPLETED ? 'text-green-600 dark:text-green-300' :
+                                                    step.status === StepStatus.IN_PROGRESS ? 'text-orange-600 dark:text-orange-300' :
+                                                    isStepDelayed ? 'text-red-600 dark:text-red-300' :
+                                                    'text-slate-500 dark:text-slate-400';
+                                                const stepStatusIcon = 
+                                                    step.status === StepStatus.COMPLETED ? 'fa-check-circle' :
+                                                    step.status === StepStatus.IN_PROGRESS ? 'fa-hammer' : 
+                                                    isStepDelayed ? 'fa-triangle-exclamation' :
+                                                    'fa-clock';
+
+                                                return (
+                                                    <div key={stepId} className="mb-4 pl-3 border-l-2 border-slate-100 dark:border-slate-800 ml-2">
+                                                        {/* Step "Chapter" Card for Financeiro */}
+                                                        <div className={`bg-white dark:bg-slate-900 rounded-2xl p-2 mb-3 border border-slate-200 dark:border-slate-800 shadow-lg ${stepStatusBgClass} ${stepStatusTextColorClass}`}>
+                                                            <div className="flex items-center justify-between">
+                                                                <h3 className="font-black text-lg text-primary dark:text-white flex items-center gap-2 pl-0"> 
+                                                                    <span className={`w-7 h-7 rounded-full flex items-center justify-center text-sm ${stepStatusBgClass.replace('/10', '/20').replace('bg-', 'bg-').replace('dark:bg-green-900/20', 'dark:bg-green-800').replace('dark:text-green-300', 'dark:text-white')}`}> 
+                                                                        <i className={`fa-solid ${stepStatusIcon} ${stepStatusTextColorClass}`}></i>
                                                                     </span>
-                                                                </div>
-                                                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 pl-8">{parseDateNoTimezone(step.startDate)} - {parseDateNoTimezone(step.endDate)}</p>
+                                                                    <span className="text-primary dark:text-white">{step.name}</span>
+                                                                </h3>
+                                                                <span className={`text-xs font-semibold ${stepStatusTextColorClass}`}>
+                                                                    {formatCurrency(stepGroup.totalStepAmount)}
+                                                                </span>
                                                             </div>
+                                                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 pl-8">{parseDateNoTimezone(step.startDate)} - {parseDateNoTimezone(step.endDate)}</p>
+                                                        </div>
 
-                                                            <div className="space-y-2 pl-3 border-l-2 border-slate-100 dark:border-slate-800 ml-3">
-                                                                {stepGroup.expenses.map(e => {
-                                                                    const isEmpreita = e.totalAgreed && e.totalAgreed > 0;
-                                                                    let statusText = '';
-                                                                    let progress = 0;
-                                                                    let progressBarColor = '';
+                                                        <div className="space-y-2 pl-3 border-l-2 border-slate-100 dark:border-slate-800 ml-3">
+                                                            {stepGroup.expenses.map(e => {
+                                                                const isEmpreita = e.totalAgreed && e.totalAgreed > 0;
+                                                                let statusText = '';
+                                                                let progress = 0;
+                                                                let progressBarColor = '';
 
-                                                                    if (isEmpreita) {
-                                                                        progress = (e.amount / e.totalAgreed!) * 100;
-                                                                        if (progress >= 100) { statusText = 'Concluído'; progressBarColor = 'bg-green-500'; }
-                                                                        else if (e.amount > 0) { statusText = 'Parcial'; progressBarColor = 'bg-orange-500'; }
-                                                                        else { statusText = 'Pendente'; progressBarColor = 'bg-slate-300'; }
-                                                                    }
+                                                                if (isEmpreita) {
+                                                                    progress = (e.amount / e.totalAgreed!) * 100;
+                                                                    if (progress >= 100) { statusText = 'Concluído'; progressBarColor = 'bg-green-500'; }
+                                                                    else if (e.amount > 0) { statusText = 'Parcial'; progressBarColor = 'bg-orange-500'; }
+                                                                    else { statusText = 'Pendente'; progressBarColor = 'bg-slate-300'; }
+                                                                }
 
-                                                                    return (
-                                                                        <div key={e.id} onClick={() => openEditExpense(e)} className="bg-white dark:bg-slate-900 p-2 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs cursor-pointer hover:shadow-sm transition-shadow">
-                                                                            <div className="flex justify-between items-center mb-1">
-                                                                                <p className="font-bold text-sm text-primary dark:text-white">{e.description}</p>
-                                                                                <p className="font-black text-sm text-primary dark:text-white">{formatCurrency(e.amount)}</p>
-                                                                            </div>
-                                                                            <p className="text-xs text-slate-500 dark:text-slate-400">{parseDateNoTimezone(e.date)}</p>
-                                                                            {isEmpreita && (
-                                                                                <div className="mt-2"> {/* Replaced <> fragment with <div> */}
-                                                                                    <div className="h-1 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden mb-1">
-                                                                                        <div className="h-full" style={{ width: `${Math.min(100, progress)}%`, backgroundColor: progressBarColor }}></div>
-                                                                                    </div>
-                                                                                    <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400">
+                                                                return (
+                                                                    <div key={e.id} onClick={() => openEditExpense(e)} className="bg-white dark:bg-slate-900 p-2 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs cursor-pointer hover:shadow-sm transition-shadow">
+                                                                        <div className="flex justify-between items-center mb-1">
+                                                                            <p className="font-bold text-sm text-primary dark:text-white">{e.description}</p>
+                                                                            <p className="font-black text-sm text-primary dark:text-white">{formatCurrency(e.amount)}</p>
+                                                                        </div>
+                                                                        <p className="text-xs text-slate-500 dark:text-slate-400">{parseDateNoTimezone(e.date)}</p>
+                                                                        {isEmpreita && (
+                                                                            <div className="mt-2"> {/* Replaced <> fragment with <div> */}
+                                                                                <div className="h-1 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden mb-1">
+                                                                                    <div className="h-full" style={{ width: `${Math.min(100, progress)}%`, backgroundColor: progressBarColor }}></div>
+                                                                                </div>
+                                                                                <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400">
                                                                                         <span>{statusText}</span>
                                                                                         <span>{formatCurrency(e.amount)} / {formatCurrency(e.totalAgreed)}</span>
                                                                                     </div>
@@ -1527,7 +1525,7 @@ const WorkDetail: React.FC = () => {
                 type={zeModal.type}
                 isConfirming={zeModal.isConfirming}
             />
-        </React.Fragment>
+        </div>
     );
 };
 
