@@ -1,6 +1,4 @@
 
-
-
 import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { PlanType } from './types.ts';
@@ -179,7 +177,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       
       {/* Sidebar */}
       <div 
-        className={`fixed top-0 left-0 h-full w-full max-w-[300px] bg-gradient-to-b from-primary-dark to-primary shadow-2xl z-[1000] transform transition-transform duration-300 ease-in-out
+        className={`fixed top-0 left-0 h-full w-full max-w-[300px] bg-gradient-to-b from-primary-darker to-primary-dark shadow-2xl z-[1000] transform transition-transform duration-300 ease-in-out
           ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
         role="navigation"
         aria-label="Menu principal"
@@ -198,8 +196,11 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               <button 
                 key={item.path} 
                 onClick={() => { navigate(item.path); setIsSidebarOpen(false); }}
-                className={`flex items-center gap-4 w-full py-3 px-4 rounded-xl text-left font-bold transition-colors 
-                  ${location.pathname === item.path ? 'bg-secondary/20 text-secondary' : 'text-slate-200 hover:bg-slate-800'}`} {/* Adjusted colors */}
+                // Fix for Vercel build error: concatenate string and dynamic part
+                className={
+                  "flex items-center gap-4 w-full py-3 px-4 rounded-xl text-left font-bold transition-colors " +
+                  (location.pathname === item.path ? 'bg-secondary/20 text-secondary' : 'text-slate-200 hover:bg-slate-800')
+                }
                 aria-current={location.pathname === item.path ? 'page' : undefined}
               >
                 <div className="relative text-lg w-6 flex justify-center">

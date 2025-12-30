@@ -1062,7 +1062,7 @@ const WorkDetail: React.FC = () => {
 
                             {/* --- BÔNUS VITALÍCIO - GRANDE CARD CONSOLIDADO --- */}
                             <div className={`relative col-span-full rounded-3xl shadow-lg border p-6 md:p-8 flex flex-col justify-between 
-                                ${hasLifetimeAccess ? 'bg-gradient-to-br from-primary-dark to-primary border-secondary/50' : 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700'}`}>
+                                ${hasLifetimeAccess ? 'bg-gradient-to-br from-primary-darker to-primary-dark border-secondary/50' : 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700'}`}>
                                 {!hasLifetimeAccess && (
                                     <div className="absolute inset-0 bg-black/70 rounded-3xl flex flex-col items-center justify-center z-10 p-4 text-center">
                                         <i className="fa-solid fa-lock text-white text-5xl mb-4 opacity-80"></i>
