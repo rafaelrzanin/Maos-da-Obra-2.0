@@ -137,17 +137,17 @@ const KpiCard = ({ onClick, icon, iconClass, value, label, badge, accent, childr
   return (
     <div 
       onClick={onClick} 
-      className={cx(surface, "rounded-3xl p-4 transition-all cursor-pointer hover:-translate-y-0.5 hover:shadow-xl hover:border-secondary/40", ring)} 
+      className={cx(surface, "rounded-3xl p-3 transition-all cursor-pointer hover:-translate-y-0.5 hover:shadow-xl hover:border-secondary/40", ring)} 
       role={onClick ? "button" : undefined}
       tabIndex={onClick ? 0 : -1} // Make clickable elements focusable
       onKeyDown={(e) => { if (onClick && (e.key === 'Enter' || e.key === ' ')) onClick(); }} // Keyboard accessibility
     >
-      <div className="flex items-start justify-between mb-3">
-        <div className={cx("w-10 h-10 rounded-xl grid place-items-center text-base", iconClass)}><i className={icon}></i></div>
+      <div className="flex items-start justify-between mb-2"> {/* Reduced mb-3 to mb-2 */}
+        <div className={cx("w-9 h-9 rounded-xl grid place-items-center text-base", iconClass)}><i className={icon}></i></div> {/* Reduced w-10 h-10 to w-9 h-9 */}
         {badge}
       </div>
-      <div className="text-2xl font-black text-slate-900 dark:text-white leading-none mb-1">{value}</div>
-      <div className={cx("text-[10px] font-extrabold tracking-widest uppercase", mutedText)}>{label}</div>
+      <div className="text-xl font-black text-slate-900 dark:text-white leading-none mb-0.5">{value}</div> {/* Reduced text-2xl to text-xl, mb-1 to mb-0.5 */}
+      <div className={cx("text-[9px] font-extrabold tracking-widest uppercase", mutedText)}>{label}</div> {/* Reduced text-[10px] to text-[9px] */}
       {children} {/* NEW: Render children here */}
     </div>
   );
@@ -167,7 +167,7 @@ const NextSteps = ({
   const nextRelevantSteps = steps
     .filter(s => s.status !== StepStatus.COMPLETED && s.endDate >= today) // Filter out completed and past due
     .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
-    .slice(0, 5); // Max 5 cards
+    .slice(0, 3); // Changed from 5 to 3 for compactness
 
   return (
     <div className={cx(surface, "rounded-3xl p-6")}>
@@ -186,7 +186,7 @@ const NextSteps = ({
           Todas as etapas futuras concluídas ou sem etapas futuras.
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-3"> {/* Reduced space-y-4 to space-y-3 */}
           {nextRelevantSteps.map((step, idx) => {
             let statusClass = '';
             let statusIcon = '';
@@ -283,7 +283,7 @@ const MaterialsNeeded = ({
         </button>
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-3"> {/* Reduced space-y-4 to space-y-3 */}
         {relevantMaterials.map(mat => {
           const linkedStep = steps.find(s => s.id === mat.stepId);
           const statusText = mat.purchasedQty === 0 ? "Pendente" : "Parcial";
@@ -477,7 +477,7 @@ const Dashboard: React.FC = () => {
   // If no works, show empty state
   if (works.length === 0) {
     return (
-      <div className="max-w-4xl mx-auto py-8 px-4 md:px-0 font-sans">
+      <div className="max-w-4xl mx-auto py-8 px-2 sm:px-4 md:px-0 font-sans">
         <EmptyDashboard onOpenCreateWork={handleOpenCreateWork} />
       </div>
     );
@@ -494,8 +494,8 @@ const Dashboard: React.FC = () => {
 
   // Display dashboard content
   return (
-    <div className="max-w-4xl mx-auto py-8 px-4 md:px-0 font-sans">
-      <div className="flex justify-between items-end mb-8">
+    <div className="max-w-4xl mx-auto py-8 px-2 sm:px-4 md:px-0 font-sans"> {/* Adjusted horizontal padding for mobile */}
+      <div className="flex justify-between items-end mb-8 px-2 sm:px-0"> {/* Adjusted padding */}
         <div>
           <p className={cx("text-sm font-bold uppercase tracking-wider", mutedText)}>Dashboard</p>
           <h1 className="text-3xl font-black text-primary dark:text-white">Olá, {user?.name.split(' ')[0]}!</h1>
@@ -511,7 +511,7 @@ const Dashboard: React.FC = () => {
 
       {/* Work Selector & Current Work Overview */}
       {focusWork && (
-        <div className={cx(surface, card, "mb-8 p-6 md:p-8")}>
+        <div className={cx(surface, "rounded-3xl p-6 md:p-8 mb-8 mx-2 sm:mx-0")}> {/* Reduced outer margin for mobile, restored p-6 */}
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-lg font-black text-primary dark:text-white">Obra Principal:</h2> {/* Terminology changed */}
             <div className="relative flex items-center">
@@ -550,7 +550,7 @@ const Dashboard: React.FC = () => {
 
 
           {/* STATUS DAS ETAPAS (RESUMO VISUAL) */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 mb-8">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8"> {/* Changed to grid-cols-2 lg:grid-cols-4 for more compactness */}
             <KpiCard
                 icon="fa-check-circle"
                 iconClass="bg-green-500/10 text-green-600 dark:bg-green-900/20 dark:text-green-300"
@@ -624,9 +624,9 @@ const Dashboard: React.FC = () => {
 
       {/* NEW: Monthly Expenses Chart (kept as per previous, it's a useful summary) */}
       {focusWork && chartData.length > 0 && (
-        <div className={cx(surface, card, "mb-8")}>
+        <div className={cx(surface, "rounded-3xl p-6 mb-8 mx-2 sm:mx-0")}> {/* Reduced outer margin for mobile */}
           <h2 className="text-lg font-black text-primary dark:text-white mb-4">Gastos Mensais</h2>
-          <div className="h-64"> {/* Define a fixed height for the chart */}
+          <div className="h-48 sm:h-64"> {/* Define a fixed height for the chart, shorter on small mobile */}
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={chartData}
@@ -657,34 +657,34 @@ const Dashboard: React.FC = () => {
 
       {/* NEW: Next Steps Section */}
       {focusWork && steps && (
-        <div className="mb-8">
+        <div className="mb-8 mx-2 sm:mx-0"> {/* Reduced outer margin for mobile */}
           <NextSteps focusWork={focusWork} steps={steps} onOpenWork={() => handleOpenWorkDetail(focusWork.id)} />
         </div>
       )}
 
       {/* NEW: Materials Needed for Purchase (Intelligent) */}
       {focusWork && materials && steps && (
-        <div className="mb-8">
+        <div className="mb-8 mx-2 sm:mx-0"> {/* Reduced outer margin for mobile */}
           <MaterialsNeeded focusWork={focusWork} materials={materials} steps={steps} onOpenWork={() => handleOpenWorkDetail(focusWork.id)} />
         </div>
       )}
 
       {/* Zé da Obra Tip */}
       {zeTip && (
-        <div className={cx(surface, card, "mb-8 flex items-start gap-5 p-6 md:p-8")}>
-          <div className="w-16 h-16 rounded-full p-1 bg-gradient-to-br from-secondary to-orange-400 shadow-lg shrink-0 animate-float">
+        <div className={cx(surface, "rounded-3xl mb-8 flex items-start gap-4 p-5 md:p-6 mx-2 sm:mx-0")}> {/* Reduced padding and gap */}
+          <div className="w-14 h-14 rounded-full p-1 bg-gradient-to-br from-secondary to-orange-400 shadow-lg shrink-0 animate-float"> {/* Reduced size */}
             <img src={ZE_AVATAR} className="w-full h-full object-cover rounded-full border-2 border-white dark:border-slate-800" onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK} alt="Zé da Obra Avatar" />
           </div>
           <div>
             <p className="text-xs font-bold uppercase tracking-widest text-secondary mb-1">{zeTip.tag}</p>
-            <p className="text-md font-medium text-slate-700 dark:text-slate-300 leading-relaxed">{zeTip.text}</p>
+            <p className="text-sm font-medium text-slate-700 dark:text-slate-300 leading-relaxed">{zeTip.text}</p> {/* Reduced text-md to text-sm */}
           </div>
         </div>
       )}
 
       {/* Other Works (List) */}
       {works.length > 1 && (
-        <div className="mb-8">
+        <div className="mb-8 mx-2 sm:mx-0"> {/* Reduced outer margin for mobile */}
           <h2 className="text-lg font-black text-primary dark:text-white mb-4">Outras Obras:</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {works.filter(w => w.id !== focusWork?.id).map((work) => (

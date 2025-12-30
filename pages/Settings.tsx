@@ -1,5 +1,4 @@
 
-
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.tsx';
@@ -77,7 +76,7 @@ const Settings: React.FC = () => {
         </p>
       </div>
       
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-center">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8 items-center"> {/* Adjusted gap */}
         {plans.map(plan => {
           const isVitalicio = plan.id === PlanType.VITALICIO;
           
@@ -101,24 +100,24 @@ const Settings: React.FC = () => {
                             </div>
                         </div>
 
-                        <div className="p-8 flex flex-col h-full bg-gradient-to-b from-slate-800 to-slate-900 rounded-[1.8rem]">
+                        <div className="p-6 md:p-8 flex flex-col h-full bg-gradient-to-b from-slate-800 to-slate-900 rounded-[1.8rem]"> {/* Adjusted padding */}
                             <div className="mb-6 text-center">
-                                <div className="w-16 h-16 mx-auto bg-gradient-gold rounded-2xl flex items-center justify-center text-white text-3xl shadow-glow mb-4">
+                                <div className="w-14 h-14 mx-auto bg-gradient-gold rounded-2xl flex items-center justify-center text-white text-2xl shadow-glow mb-3"> {/* Reduced size, mb-4 to mb-3 */}
                                     <i className="fa-solid fa-crown"></i>
                                 </div>
-                                <h3 className="text-2xl font-black text-white uppercase tracking-wide mb-1">{plan.name}</h3>
+                                <h3 className="text-xl font-black text-white uppercase tracking-wide mb-1">{plan.name}</h3> {/* Reduced text-2xl to text-xl */}
                                 <p className="text-amber-400 text-xs font-bold uppercase tracking-widest">{plan.period}</p>
                             </div>
 
-                            <div className="text-center mb-8">
+                            <div className="text-center mb-6"> {/* Reduced mb-8 to mb-6 */}
                                 <div className="flex items-center justify-center gap-1">
                                     <span className="text-sm text-slate-400 font-medium line-through">{formatCurrency(497)}</span>
-                                    <span className="text-5xl font-black text-white tracking-tighter">{formatCurrency(plan.price)}</span>
+                                    <span className="text-4xl font-black text-white tracking-tighter">{formatCurrency(plan.price)}</span> {/* Reduced text-5xl to text-4xl */}
                                 </div>
                                 <p className="text-xs text-slate-400 mt-2">Parcelamento em até 12x no cartão</p>
                             </div>
 
-                            <div className="flex-1 space-y-4 mb-8">
+                            <div className="flex-1 space-y-3 mb-6"> {/* Reduced space-y-4 and mb-8 */}
                                 <p className="text-center text-xs font-bold uppercase text-amber-500 tracking-widest mb-2 border-b border-white/10 pb-2">Tudo do mensal + Bônus:</p>
                                 <li className="flex items-start text-sm text-slate-200 font-medium">
                                     <i className="fa-solid fa-check-circle mt-0.5 mr-3 text-amber-400 text-lg"></i>
@@ -137,16 +136,17 @@ const Settings: React.FC = () => {
                             <button
                                 disabled={isActiveCurrent}
                                 onClick={() => handleSubscribe(plan.id)}
-                                className={`w-full py-5 rounded-2xl font-black text-lg uppercase tracking-wide shadow-lg transition-all transform active:scale-95 ${
+                                className={`w-full py-4 rounded-xl font-black text-base uppercase tracking-wide shadow-lg transition-all transform active:scale-95 ${ /* Adjusted padding, font size */
                                     isActiveCurrent 
                                     ? 'bg-slate-700 text-slate-400 cursor-default' 
                                     : 'bg-gradient-gold hover:brightness-110 text-white shadow-amber-500/20'
                                 }`}
+                                aria-label={isActiveCurrent ? 'Plano Vitalício Ativo' : 'Garantir Acesso Vitalício Agora'}
                             >
                                 {isActiveCurrent ? 'Plano Ativo' : 'GARANTIR ACESSO AGORA'}
                             </button>
                             {!isActiveCurrent && (
-                                <p className="text-center text-[10px] text-slate-500 mt-4 flex items-center justify-center gap-1">
+                                <p className="text-center text-[10px] text-slate-500 mt-3 flex items-center justify-center gap-1"> {/* Adjusted margin */}
                                     <i className="fa-solid fa-lock"></i> Compra segura e acesso imediato
                                 </p>
                             )}
@@ -160,7 +160,7 @@ const Settings: React.FC = () => {
           return (
             <div 
               key={plan.id} 
-              className={`relative bg-white dark:bg-slate-900 rounded-3xl p-8 flex flex-col border transition-all hover:border-slate-300 dark:hover:border-slate-700 ${isActiveCurrent ? 'border-secondary ring-1 ring-secondary' : 'border-slate-200 dark:border-slate-800'}`}
+              className={`relative bg-white dark:bg-slate-900 rounded-3xl p-6 md:p-8 flex flex-col border transition-all hover:border-slate-300 dark:hover:border-slate-700 ${isActiveCurrent ? 'border-secondary ring-1 ring-secondary' : 'border-slate-200 dark:border-slate-800'}`}
             >
               {isActiveCurrent && (
                 <div className="absolute top-0 right-0 bg-secondary text-white text-[10px] font-bold px-3 py-1.5 rounded-bl-xl rounded-tr-2xl tracking-wider uppercase">
@@ -174,17 +174,17 @@ const Settings: React.FC = () => {
                 </div>
               )}
 
-              <div className="mb-6">
+              <div className="mb-5"> {/* Reduced mb-6 to mb-5 */}
                  <h3 className="text-lg font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-2">{plan.name}</h3>
                  <div className="flex items-baseline gap-1">
-                    <span className="text-3xl font-bold text-primary dark:text-white">{formatCurrency(plan.price)}</span>
+                    <span className="text-2xl font-bold text-primary dark:text-white">{formatCurrency(plan.price)}</span> {/* Reduced text-3xl to text-2xl */}
                     <span className="text-sm text-slate-400">{plan.period}</span>
                  </div>
                  {plan.savings && <span className="inline-block mt-2 text-xs font-bold text-green-600 bg-green-100 dark:bg-green-900/30 px-2 py-1 rounded-md">{plan.savings}</span>}
               </div>
               
-              <div className="flex-1 mb-8">
-                 <ul className="space-y-4">
+              <div className="flex-1 mb-6"> {/* Reduced mb-8 to mb-6 */}
+                 <ul className="space-y-3"> {/* Reduced space-y-4 to space-y-3 */}
                     {commonFeatures.map((f, i) => (
                     <li key={i} className="flex items-start text-sm text-slate-600 dark:text-slate-300">
                         <i className="fa-solid fa-check mt-0.5 mr-3 text-secondary"></i>
@@ -201,74 +201,21 @@ const Settings: React.FC = () => {
               <button
                 disabled={isActiveCurrent}
                 onClick={() => handleSubscribe(plan.id)}
-                className={`w-full py-4 rounded-xl font-bold transition-all flex items-center justify-center border-2 ${
+                className={`w-full py-3 rounded-xl font-bold transition-all flex items-center justify-center border-2 ${ /* Adjusted padding */
                   isActiveCurrent 
                     ? 'bg-slate-100 dark:bg-slate-800 text-slate-400 border-transparent' 
                     : isExpiredCurrent
                         ? 'bg-red-50 text-red-600 border-red-200 hover:bg-red-100'
                         : 'bg-white dark:bg-slate-900 text-primary dark:text-white border-primary dark:border-white hover:bg-slate-50 dark:hover:bg-slate-800'
                 }`}
+                aria-label={isActiveCurrent ? `Seu plano ${plan.name} está ativo` : isExpiredCurrent ? `Renovar plano ${plan.name}` : `Selecionar plano ${plan.name}`}
               >
-                {isActiveCurrent ? 'Ativo' : isExpiredCurrent ? 'Renovar' : 'Selecionar'}
+                {isActiveCurrent ? 'Seu Plano Ativo' : isExpiredCurrent ? 'Renovar Plano' : 'Selecionar Plano'}
               </button>
             </div>
           );
         })}
       </div>
-
-      {/* NEW: Logout Button */}
-      <div className="mt-12 text-center">
-          <button 
-              onClick={logout} 
-              className="py-3 px-6 bg-red-500 hover:bg-red-600 text-white font-bold rounded-xl shadow-lg flex items-center justify-center gap-2 transition-colors mx-auto"
-          >
-              <i className="fa-solid fa-right-from-bracket"></i> Sair da Conta
-          </button>
-      </div>
-
-      {/* MODAL DE BONUS VITALICIO (Info Trigger) */}
-      <div className="mt-16 text-center">
-          <button 
-            onClick={() => setShowBonusModal(true)} 
-            className="text-sm font-bold text-slate-500 hover:text-secondary underline decoration-2 underline-offset-4 transition-colors"
-          >
-            Ver detalhes dos bônus vitalícios
-          </button>
-      </div>
-
-      {showBonusModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-300">
-            <div className="bg-white dark:bg-slate-900 rounded-2xl w-full max-w-lg p-0 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 border border-slate-200 dark:border-slate-800">
-                <div className="bg-gradient-gold p-6 text-center relative overflow-hidden">
-                    <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10"></div>
-                    <i className="fa-solid fa-crown text-4xl text-white mb-2 relative z-10"></i>
-                    <h3 className="text-xl font-black text-white relative z-10">Bônus Exclusivos Vitalício</h3>
-                    <p className="text-amber-100 text-sm font-medium relative z-10">Ferramentas que se pagam na primeira obra.</p>
-                </div>
-                <div className="p-6">
-                    <div className="space-y-4">
-                        {LIFETIME_BONUSES.map((bonus, idx) => (
-                            <div key={idx} className="flex items-start gap-4 p-3 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
-                                <div className="w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-500 flex items-center justify-center shrink-0">
-                                    <i className={`fa-solid ${bonus.icon}`}></i>
-                                </div>
-                                <div>
-                                    <h4 className="font-bold text-primary dark:text-white text-sm">{bonus.title}</h4>
-                                    <p className="text-xs text-slate-500 dark:text-slate-400">{bonus.desc}</p>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                    <button 
-                        onClick={() => setShowBonusModal(false)}
-                        className="mt-6 w-full py-3 bg-slate-100 dark:bg-slate-800 text-primary dark:text-white font-bold rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
-                    >
-                        Fechar
-                    </button>
-                </div>
-            </div>
-        </div>
-      )}
     </div>
   );
 };
