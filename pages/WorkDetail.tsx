@@ -802,8 +802,8 @@ const WorkDetail: React.FC = () => {
 
                                     {/* Budget Progress Bar */}
                                     {work.budgetPlanned > 0 && (
-                                        <>
-                                            <div className="h-2 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden mt-3 mb-1">
+                                        <div className="mt-3"> {/* Replaced <> fragment with <div> */}
+                                            <div className="h-2 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden mb-1">
                                                 <div className="h-full" style={{ width: `${Math.min(100, budgetUsage)}%`, backgroundColor: budgetStatusColor }}></div>
                                             </div>
                                             <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400">
@@ -814,7 +814,7 @@ const WorkDetail: React.FC = () => {
                                                     <span>Restante: {formatCurrency(budgetRemaining)}</span>
                                                 )}
                                             </div>
-                                        </>
+                                        </div>
                                     )}
                                 </div>
 
@@ -1532,3 +1532,4 @@ const WorkDetail: React.FC = () => {
 };
 
 export default WorkDetail;
+    
