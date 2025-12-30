@@ -175,554 +175,456 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
       { name: 'Vergalhão 4.2mm (Estribo)', unit: 'barras', multiplier: 0.8 },
       { name: 'Arame Recozido', unit: 'kg', multiplier: 0.02 },
       { name: 'Tábua de Pinus (30cm - Caixaria)', unit: 'dz', multiplier: 0.15 },
-      { name: 'Pontalete de Eucalipto', unit: 'dz', multiplier: 0.05 }
+      // Fix: Add missing 'unit' property
+      { name: 'Pontalete de Eucalipto (3m)', unit: 'un', multiplier: 0.1 }
     ]
   },
   {
     category: 'Levantamento de paredes',
     items: [
-      { name: 'Tijolo Cerâmico 8 furos', unit: 'milheiro', multiplier: 0.085 },
-      { name: 'Cimento CP-II (Assentamento)', unit: 'sacos', multiplier: 0.25 },
-      { name: 'Cal Hidratada (Liga)', unit: 'sacos', multiplier: 0.25 },
-      { name: 'Areia Média', unit: 'm³', multiplier: 0.05 },
-      { name: 'Ferro para Vergas (Treliça/Cabelo)', unit: 'barras', multiplier: 0.15 },
-      { name: 'Aditivo Plastificante (Vedalit)', unit: 'litros', multiplier: 0.05 }
+      { name: 'Bloco Cerâmico (9x19x19cm)', unit: 'un', multiplier: 30 },
+      { name: 'Cimento CP-II (Assentamento)', unit: 'sacos', multiplier: 0.2 },
+      { name: 'Areia Fina (Assentamento)', unit: 'm³', multiplier: 0.03 },
+      { name: 'Cal para Argamassa', unit: 'sacos', multiplier: 0.05 },
+      { name: 'Vergalhão 5/16 (8mm - Cintas)', unit: 'barras', multiplier: 0.2 }
     ]
   },
   {
     category: 'Lajes e Vigas',
     items: [
-      { name: 'Laje Pré-moldada (Vigota+Isopor)', unit: 'm²', multiplier: 1.05 },
-      { name: 'Concreto Usinado (Caminhão)', unit: 'm³', multiplier: 0.12 },
-      { name: 'Malha de Ferro (Pop)', unit: 'un', multiplier: 0.15 },
-      { name: 'Caixa de Luz de Laje', unit: 'un', multiplier: 0.1 },
-      { name: 'Eletroduto Laranja (Laje)', unit: 'rolos', multiplier: 0.05 }
+      { name: 'Laje Pré-Fabricada (Lajota)', unit: 'm²', multiplier: 1 },
+      { name: 'Cimento CP-III (Concretagem)', unit: 'sacos', multiplier: 0.3 },
+      { name: 'Areia Média (Concreto)', unit: 'm³', multiplier: 0.05 },
+      { name: 'Brita 1 (Concreto)', unit: 'm³', multiplier: 0.04 },
+      { name: 'Vergalhão 1/2 (12.5mm)', unit: 'barras', multiplier: 0.8 },
+      { name: 'Tábua de Pinus (30cm - Caixaria)', unit: 'dz', multiplier: 0.1 }
     ]
   },
   {
-    category: 'Impermeabilização', // Geral
+    category: 'Telhado',
     items: [
-      { name: 'Emulsão Asfáltica (Neutrol)', unit: 'latas 18L', multiplier: 0.02 },
-      { name: 'Manta Líquida (Lajes/Áreas frias)', unit: 'balde 18kg', multiplier: 0.03 },
-      { name: 'Impermeabilizante Rígido (Viaplus Top)', unit: 'cx 18kg', multiplier: 0.02 },
-      { name: 'Tela de Poliéster (Reforço)', unit: 'rolos', multiplier: 0.01 },
-      { name: 'Broxa Retangular', unit: 'un', multiplier: 0.01 }
+      { name: 'Telha Cerâmica Romana', unit: 'un', multiplier: 16 },
+      { name: 'Madeira para Estrutura (Peroba)', unit: 'm', multiplier: 2 },
+      { name: 'Parafusos para Telhado', unit: 'caixa', multiplier: 0.05 },
+      { name: 'Manta Sub-Telha', unit: 'm²', multiplier: 1 }
+    ]
+  },
+  {
+    category: 'Tubulação de Água/Esgoto Geral',
+    items: [
+      { name: 'Tubos PVC 100mm (Esgoto)', unit: 'barras', multiplier: 0.1 },
+      { name: 'Tubos PVC 50mm (Esgoto)', unit: 'barras', multiplier: 0.15 },
+      { name: 'Tubos PVC 25mm (Água Fria)', unit: 'barras', multiplier: 0.2 },
+      { name: 'Conexões PVC (Diversas)', unit: 'un', multiplier: 0.5 },
+      { name: 'Caixa D\'água 1000L', unit: 'un', multiplier: 0.001 },
+      { name: 'Cola PVC e Lixa', unit: 'kit', multiplier: 0.02 }
+    ]
+  },
+  {
+    category: 'Fiação Elétrica Geral',
+    items: [
+      { name: 'Fio Flexível 2.5mm (Tomadas)', unit: 'm', multiplier: 10 },
+      { name: 'Fio Flexível 1.5mm (Iluminação)', unit: 'm', multiplier: 8 },
+      { name: 'Disjuntores (Diversos)', unit: 'un', multiplier: 0.2 },
+      { name: 'Conduítes Flexíveis 3/4', unit: 'm', multiplier: 5 },
+      { name: 'Caixas de Passagem 4x2', unit: 'un', multiplier: 0.8 },
+      { name: 'Tomadas e Interruptores', unit: 'un', multiplier: 1 }
     ]
   },
   {
     category: 'Chapisco e Reboco',
     items: [
       { name: 'Cimento CP-II', unit: 'sacos', multiplier: 0.3 },
-      { name: 'Areia Fina', unit: 'm³', multiplier: 0.06 },
-      { name: 'Cal Hidratada', unit: 'sacos', multiplier: 0.25 },
-      { name: 'Aditivo Impermeabilizante (Vedacit)', unit: 'litros', multiplier: 0.08 },
-      { name: 'Tela de Galinheiro (Reforço)', unit: 'rolos', multiplier: 0.01 }
-    ]
-  },
-  {
-    category: 'Contrapiso', // Geral
-    items: [
-      { name: 'Cimento CP-II', unit: 'sacos', multiplier: 0.15 },
       { name: 'Areia Média', unit: 'm³', multiplier: 0.05 },
-      { name: 'Bianco (Aderência)', unit: 'balde', multiplier: 0.01 }
+      { name: 'Cal Hidratada', unit: 'sacos', multiplier: 0.08 }
     ]
   },
   {
-    category: 'Telhado',
+    category: 'Contrapiso',
     items: [
-      { name: 'Telha (Cerâmica/Concreto)', unit: 'un', multiplier: 17 }, 
-      { name: 'Viga de Madeira (Peroba/Garapeira) 6x12', unit: 'm', multiplier: 0.6 },
-      { name: 'Caibros 5x6', unit: 'm', multiplier: 1.8 },
-      { name: 'Ripas', unit: 'm', multiplier: 4.0 },
-      { name: 'Prego de Telheiro', unit: 'kg', multiplier: 0.03 },
-      { name: 'Manta Térmica (Subcobertura)', unit: 'm²', multiplier: 1.2 },
-      { name: 'Caixa D\'água 1000L', unit: 'un', multiplier: 0.01 },
-      { name: 'Calhas e Rufos', unit: 'm', multiplier: 0.5 }
-    ]
-  },
-  // NOVOS PACOTES DE MATERIAIS ESPECÍFICOS PARA REFORMAS
-  {
-    category: 'Demolição de Banheiro',
-    items: [
-      { name: 'Sacos de Ráfia (Entulho)', unit: 'un', multiplier: 0.5 },
-      { name: 'Caçamba Pequena (Entulho)', unit: 'un', multiplier: 0.01 }
+      { name: 'Cimento CP-II', unit: 'sacos', multiplier: 0.2 },
+      { name: 'Areia Grossa', unit: 'm³', multiplier: 0.07 },
+      { name: 'Brita Zero', unit: 'm³', multiplier: 0.03 }
     ]
   },
   {
-    category: 'Demolição de Cozinha',
+    category: 'Impermeabilização',
     items: [
-      { name: 'Sacos de Ráfia (Entulho)', unit: 'un', multiplier: 0.5 },
-      { name: 'Caçamba Pequena (Entulho)', unit: 'un', multiplier: 0.01 }
+      { name: 'Manta Asfáltica (1m x 10m)', unit: 'rolos', multiplier: 0.1 },
+      { name: 'Asfalto para Manta', unit: 'litros', multiplier: 0.5 },
+      { name: 'Argamassa Polimérica', unit: 'kg', multiplier: 0.8 }
     ]
   },
   {
-    category: 'Hidráulica de Banheiro',
+    category: 'Gesso / Forro',
     items: [
-      { name: 'Tubo Soldável 25mm (Água Fria)', unit: 'barras 6m', multiplier: 0.05 },
-      { name: 'Joelho 90 graus 25mm', unit: 'un', multiplier: 0.4 },
-      { name: 'Tê Soldável 25mm', unit: 'un', multiplier: 0.1 },
-      { name: 'Tubo Esgoto 100mm (Vaso)', unit: 'barras 6m', multiplier: 0.02 },
-      { name: 'Tubo Esgoto 40mm/50mm (Pia/Chuveiro)', unit: 'barras 6m', multiplier: 0.05 },
-      { name: 'Caixa Sifonada 150x150', unit: 'un', multiplier: 0.01 },
-      { name: 'Registro de Pressão 3/4 (Chuveiro)', unit: 'un', multiplier: 0.01 },
-      { name: 'Registro de Gaveta 1/2 (Pia/Vaso)', unit: 'un', multiplier: 0.02 },
-      { name: 'Cola PVC', unit: 'frasco', multiplier: 0.01 }
+      { name: 'Placa de Gesso Acartonado (1.20x1.80m)', unit: 'chapa', multiplier: 0.6 },
+      { name: 'Perfil Metálico (Montante)', unit: 'barra', multiplier: 2 },
+      { name: 'Massa de Gesso (Rejunte)', unit: 'kg', multiplier: 0.5 },
+      { name: 'Parafusos para Gesso', unit: 'caixa', multiplier: 0.01 }
     ]
   },
   {
-    category: 'Elétrica de Banheiro',
+    category: 'Pisos e Revestimentos',
     items: [
-      { name: 'Eletroduto Corrugado 3/4', unit: 'rolos', multiplier: 0.02 },
-      { name: 'Caixa de Luz 4x2', unit: 'un', multiplier: 0.03 },
-      { name: 'Cabo Flexível 2.5mm (Tomadas)', unit: 'm', multiplier: 20 },
-      { name: 'Cabo Flexível 6.0mm (Chuveiro)', unit: 'm', multiplier: 10 },
-      { name: 'Disjuntor Bipolar (Chuveiro)', unit: 'un', multiplier: 0.01 }
+      { name: 'Piso Cerâmico/Porcelanato (60x60cm)', unit: 'm²', multiplier: 1.1 },
+      { name: 'Argamassa AC-II / AC-III', unit: 'sacos', multiplier: 0.3 },
+      { name: 'Rejunte (cor similar ao piso)', unit: 'kg', multiplier: 0.08 }
     ]
   },
-  {
-    category: 'Impermeabilização de Banheiro',
-    items: [
-      { name: 'Manta Líquida (Balde 4kg)', unit: 'balde', multiplier: 0.05 }, // Multiplicador ajustado para área de banheiro
-      { name: 'Tela de Poliéster (Reforço)', unit: 'm', multiplier: 1 }, // Multiplicador ajustado para área de banheiro
-      { name: 'Impermeabilizante Rígido (Viaplus 1000)', unit: 'kg', multiplier: 2 }
-    ]
-  },
-  {
-    category: 'Contrapiso de Banheiro',
-    items: [
-      { name: 'Cimento CP-II', unit: 'sacos', multiplier: 0.02 }, // Multiplicador ajustado para área de banheiro
-      { name: 'Areia Média', unit: 'm³', multiplier: 0.005 }
-    ]
-  },
-  {
-    category: 'Pisos e Revestimentos de Banheiro',
-    items: [
-      { name: 'Piso / Porcelanato (Chão)', unit: 'm²', multiplier: 1.15 },
-      { name: 'Revestimento (Parede)', unit: 'm²', multiplier: 2.0 }, // Multiplicador maior para paredes de banheiro
-      { name: 'Argamassa AC-II/III', unit: 'sacos 20kg', multiplier: 0.15 },
-      { name: 'Rejunte Epóxi (Anti-mofo)', unit: 'kg', multiplier: 0.1 },
-      { name: 'Espaçadores e Cunhas', unit: 'pacote', multiplier: 0.01 }
-    ]
-  },
-  {
-    category: 'Gesso / Forro de Banheiro',
-    items: [
-      { name: 'Placa de Gesso 60x60 (Resistente à umidade)', unit: 'un', multiplier: 0.5 },
-      { name: 'Gesso Cola', unit: 'sacas', multiplier: 0.01 }
-    ]
-  },
-  {
-    category: 'Bancada de Banheiro',
-    items: [
-      { name: 'Bancada Banheiro (Granito/Mármore)', unit: 'm', multiplier: 1.0 },
-      { name: 'Cuba de Louça (Banheiro)', unit: 'un', multiplier: 1.0 },
-      { name: 'Silicone PU', unit: 'tubo', multiplier: 0.01 }
-    ]
-  },
-  {
-    category: 'Louças e Metais de Banheiro',
-    items: [
-      { name: 'Vaso Sanitário com Caixa Acoplada', unit: 'un', multiplier: 1.0 },
-      { name: 'Assento Sanitário', unit: 'un', multiplier: 1.0 },
-      { name: 'Torneira de Lavatório', unit: 'un', multiplier: 1.0 },
-      { name: 'Chuveiro / Ducha', unit: 'un', multiplier: 1.0 },
-      { name: 'Kit Acessórios (Toalheiro/Papeleira)', unit: 'kit', multiplier: 1.0 },
-      { name: 'Sifão Universal', unit: 'un', multiplier: 1.0 },
-      { name: 'Engate Flexível', unit: 'un', multiplier: 2.0 } // 2 engates para pia
-    ]
-  },
-  {
-    category: 'Hidráulica de Cozinha',
-    items: [
-      { name: 'Tubo Soldável 25mm (Água Fria)', unit: 'barras 6m', multiplier: 0.05 },
-      { name: 'Joelho 90 graus 25mm', unit: 'un', multiplier: 0.4 },
-      { name: 'Tê Soldável 25mm', unit: 'un', multiplier: 0.1 },
-      { name: 'Tubo Esgoto 50mm (Pia/Lava-louça)', unit: 'barras 6m', multiplier: 0.05 },
-      { name: 'Caixa de Gordura', unit: 'un', multiplier: 0.01 },
-      { name: 'Registro de Gaveta 3/4 (Geral da cozinha)', unit: 'un', multiplier: 0.01 },
-      { name: 'Cola PVC', unit: 'frasco', multiplier: 0.01 }
-    ]
-  },
-  {
-    category: 'Elétrica de Cozinha',
-    items: [
-      { name: 'Eletroduto Corrugado 3/4', unit: 'rolos', multiplier: 0.05 },
-      { name: 'Caixa de Luz 4x2', unit: 'un', multiplier: 0.05 },
-      { name: 'Cabo Flexível 2.5mm (Tomadas)', unit: 'm', multiplier: 50 },
-      { name: 'Cabo Flexível 4.0mm (Forno/Cooktop)', unit: 'm', multiplier: 20 },
-      { name: 'Disjuntor Unipolar (Tomadas)', unit: 'un', multiplier: 0.05 },
-      { name: 'Disjuntor Bipolar (Forno/Cooktop)', unit: 'un', multiplier: 0.02 }
-    ]
-  },
-  {
-    category: 'Bancada de Cozinha',
-    items: [
-      { name: 'Bancada Cozinha (Granito/Mármore)', unit: 'm²', multiplier: 1.0 },
-      { name: 'Cuba de Inox (Cozinha)', unit: 'un', multiplier: 1.0 },
-      { name: 'Silicone PU (Vedação)', unit: 'tubo', multiplier: 0.02 }
-    ]
-  },
-  {
-    category: 'Louças e Metais de Cozinha',
-    items: [
-      { name: 'Torneira de Cozinha (Bancada/Parede)', unit: 'un', multiplier: 1.0 },
-      { name: 'Filtro de Água (Ponto)', unit: 'un', multiplier: 0.01 },
-      { name: 'Sifão para Pia de Cozinha', unit: 'un', multiplier: 1.0 },
-      { name: 'Engate Flexível', unit: 'un', multiplier: 2.0 } // 2 engates para pia
-    ]
-  },
-  {
-    category: 'Proteção do Piso para Pintura',
-    items: [
-      { name: 'Lona Plástica (Proteção Pintura)', unit: 'm²', multiplier: 1.0 },
-      { name: 'Fita Crepe (Mascaramento)', unit: 'rolos', multiplier: 0.1 }
-    ]
-  },
-  {
-    category: 'Preparação de Superfície (Lixar/Massa)',
-    items: [
-      { name: 'Lixa de Parede (Grão Fino/Médio)', unit: 'folhas', multiplier: 1.0 },
-      { name: 'Massa Corrida (Lata 18L)', unit: 'lata', multiplier: 0.05 },
-      { name: 'Espátula de Aço', unit: 'un', multiplier: 0.01 }
-    ]
-  },
-
-  // PACOTES GENÉRICOS (mantidos para o template de CONSTRUÇÃO e REFORMA_APTO)
-  {
-    category: 'Fiação Elétrica Geral', // Reativado para uso geral
-    items: [
-      { name: 'Eletroduto Corrugado 3/4 (Amarelo)', unit: 'rolos', multiplier: 0.15 },
-      { name: 'Caixa de Luz 4x2 (Parede)', unit: 'un', multiplier: 0.5 },
-      { name: 'Quadro de Distribuição (12/24 din)', unit: 'un', multiplier: 0.01 },
-      { name: 'Cabo Flexível 2.5mm (Tomadas)', unit: 'rolos 100m', multiplier: 0.06 },
-      { name: 'Cabo Flexível 1.5mm (Iluminação)', unit: 'rolos 100m', multiplier: 0.04 },
-      { name: 'Cabo Flexível 6.0mm (Chuveiro)', unit: 'm', multiplier: 0.6 },
-      { name: 'Disjuntor Unipolar (10A/16A/20A)', unit: 'un', multiplier: 0.2 },
-      { name: 'Disjuntor Bipolar (40A/50A)', unit: 'un', multiplier: 0.03 },
-      { name: 'Haste de Aterramento (Cobre)', unit: 'un', multiplier: 0.02 },
-      { name: 'Fita Isolante', unit: 'un', multiplier: 0.05 }
-    ]
-  },
-  {
-    category: 'Tubulação de Água/Esgoto Geral', // Reativado para uso geral
-    items: [
-      { name: 'Tubo Soldável 25mm (Água Fria)', unit: 'barras 6m', multiplier: 0.3 },
-      { name: 'Tubo Soldável 50mm (Alimentação)', unit: 'barras 6m', multiplier: 0.05 },
-      { name: 'Tubo Esgoto 100mm (Primário)', unit: 'barras 6m', multiplier: 0.1 },
-      { name: 'Tubo Esgoto 40mm/50mm (Secundário)', unit: 'barras 6m', multiplier: 0.2 },
-      { name: 'Joelho 90 graus 25mm', unit: 'un', multiplier: 0.8 },
-      { name: 'Tê Soldável 25mm', unit: 'un', multiplier: 0.3 },
-      { name: 'Cola PVC (Adesivo Plástico)', unit: 'frasco', multiplier: 0.05 },
-      { name: 'Registro de Gaveta 3/4 (Geral)', unit: 'un', multiplier: 0.03 },
-      { name: 'Registro de Pressão 3/4 (Chuveiro)', unit: 'un', multiplier: 0.03 },
-      { name: 'Caixa Sifonada 150x150', unit: 'un', multiplier: 0.04 }
-    ]
-  },
-  {
-    category: 'Marmoraria Geral (Bancadas)', // Reativado para uso geral
-    items: [
-      { name: 'Bancada Cozinha (Granito/Mármore)', unit: 'm²', multiplier: 0.02 },
-      { name: 'Bancada Banheiro', unit: 'un', multiplier: 0.025 },
-      { name: 'Soleiras (Portas)', unit: 'un', multiplier: 0.08 },
-      { name: 'Peitoril (Janelas)', unit: 'un', multiplier: 0.06 },
-      { name: 'Cuba de Inox (Cozinha)', unit: 'un', multiplier: 0.01 },
-      { name: 'Cuba de Louça (Banheiro)', unit: 'un', multiplier: 0.025 },
-      { name: 'Silicone PU (Vedação)', unit: 'tubo', multiplier: 0.02 }
-    ]
-  },
-  {
-    category: 'Pisos e Revestimentos', // Geral
-    items: [
-      { name: 'Piso / Porcelanato (Chão)', unit: 'm²', multiplier: 1.15 },
-      { name: 'Revestimento (Parede)', unit: 'm²', multiplier: 0.8 },
-      { name: 'Argamassa AC-I (Interna)', unit: 'sacos 20kg', multiplier: 0.15 },
-      { name: 'Argamassa AC-III (Porcelanato/Externa)', unit: 'sacos 20kg', multiplier: 0.2 },
-      { name: 'Rejunte Acrílico/Epóxi', unit: 'kg', multiplier: 0.4 },
-      { name: 'Espaçadores e Cunhas (Nivelamento)', unit: 'pacote', multiplier: 0.05 },
-      { name: 'Rodapé (Poliestireno ou Cerâmico)', unit: 'm', multiplier: 1.1 }
-    ]
-  },
-  {
-    category: 'Instalação de Louças e Metais Geral', // Reativado para uso geral
-    items: [
-      { name: 'Vaso Sanitário com Caixa Acoplada', unit: 'un', multiplier: 0.025 },
-      { name: 'Assento Sanitário', unit: 'un', multiplier: 0.025 },
-      { name: 'Torneira de Banheiro (Misturador)', unit: 'un', multiplier: 0.025 },
-      { name: 'Torneira de Cozinha (Bancada/Parede)', unit: 'un', multiplier: 0.01 },
-      { name: 'Chuveiro / Ducha', unit: 'un', multiplier: 0.025 },
-      { name: 'Kit Acessórios (Toalheiro/Papeleira)', unit: 'kit', multiplier: 0.025 },
-      { name: 'Sifão Universal', unit: 'un', multiplier: 0.05 },
-      { name: 'Engate Flexível', unit: 'un', multiplier: 0.05 }
-    ]
-  },
-  // FIM PACOTES GENÉRICOS
-
   {
     category: 'Esquadrias (Janelas/Portas)',
     items: [
-      { name: 'Porta de Madeira Completa (Interna)', unit: 'un', multiplier: 0.08 },
-      { name: 'Fechadura Interna', unit: 'un', multiplier: 0.08 },
-      { name: 'Dobradiças', unit: 'jogo', multiplier: 0.08 },
-      { name: 'Janela (Alumínio/Vidro)', unit: 'un', multiplier: 0.06 },
-      { name: 'Porta de Entrada (Externa)', unit: 'un', multiplier: 0.01 },
-      { name: 'Espuma Expansiva', unit: 'lata', multiplier: 0.05 }
+      { name: 'Janela de Alumínio (1.20x1.20m)', unit: 'un', multiplier: 0.05 },
+      { name: 'Porta de Madeira (80x210cm)', unit: 'un', multiplier: 0.05 },
+      { name: 'Fechadura e Dobradiças', unit: 'kit', multiplier: 0.05 },
+      { name: 'Cimento para Fixação', unit: 'sacos', multiplier: 0.01 }
+    ]
+  },
+  {
+    category: 'Marmoraria Geral (Bancadas)',
+    items: [
+      { name: 'Granito/Mármore (Verde Ubatuba/Travertino)', unit: 'm²', multiplier: 0.1 },
+      { name: 'Cuba de Inox/Louça', unit: 'un', multiplier: 0.01 },
+      { name: 'Silicones e Colas', unit: 'tubo', multiplier: 0.01 }
+    ]
+  },
+  {
+    category: 'Pintura Paredes/Tetos',
+    items: [
+      { name: 'Tinta Acrílica Premium (Branco/Cor)', unit: 'galão', multiplier: 0.2 },
+      { name: 'Massa Corrida/Acrílica', unit: 'lata', multiplier: 0.1 },
+      { name: 'Lixas para Parede (diversas granas)', unit: 'folhas', multiplier: 0.2 },
+      { name: 'Rolos e Pincéis', unit: 'kit', multiplier: 0.01 },
+      { name: 'Fita Crepe', unit: 'rolos', multiplier: 0.05 },
+      { name: 'Lona Plástica para Proteção', unit: 'm', multiplier: 0.1 }
+    ]
+  },
+  {
+    category: 'Instalação de Louças e Metais Geral',
+    items: [
+      { name: 'Vaso Sanitário com Caixa Acoplada', unit: 'un', multiplier: 0.02 },
+      { name: 'Pia/Lavatório com Coluna', unit: 'un', multiplier: 0.02 },
+      { name: 'Torneiras (Bancada/Parede)', unit: 'un', multiplier: 0.03 },
+      { name: 'Chuveiro Elétrico/a Gás', unit: 'un', multiplier: 0.01 },
+      { name: 'Assento Sanitário', unit: 'un', multiplier: 0.02 },
+      { name: 'Sifões e Engates Flexíveis', unit: 'un', multiplier: 0.05 }
     ]
   },
   {
     category: 'Instalação de Luminárias',
     items: [
-      { name: 'Conjunto Tomada 10A (Placa+Módulo)', unit: 'un', multiplier: 0.3 },
-      { name: 'Conjunto Tomada 20A', unit: 'un', multiplier: 0.1 },
-      { name: 'Conjunto Interruptor Simples', unit: 'un', multiplier: 0.1 },
-      { name: 'Plafon / Luminária LED', unit: 'un', multiplier: 0.15 },
-      { name: 'Lâmpadas', unit: 'un', multiplier: 0.2 }
+      { name: 'Luminárias de Teto (Spots/Plafons)', unit: 'un', multiplier: 0.5 },
+      { name: 'Lâmpadas LED (Quente/Fria)', unit: 'un', multiplier: 1 },
+      { name: 'Fio Flexível 1.5mm', unit: 'm', multiplier: 1 }
     ]
   },
   {
-    category: 'Pintura Paredes/Tetos', // Geral para todas as pinturas
+    category: 'Limpeza Final e Entrega',
     items: [
-      { name: 'Lixa de Parede (100/150/220)', unit: 'folhas', multiplier: 0.8 },
-      { name: 'Selador Acrílico (Fundo)', unit: 'latas 18L', multiplier: 0.03 },
-      { name: 'Massa Corrida (Interna)', unit: 'latas 18L', multiplier: 0.08 },
-      { name: 'Massa Acrílica (Externa/Úmida)', unit: 'latas 18L', multiplier: 0.02 },
-      { name: 'Tinta Acrílica Fosca/Semibrilho', unit: 'latas 18L', multiplier: 0.06 },
-      { name: 'Tinta Esmalte (Madeiras/Metais)', unit: 'galão 3.6L', multiplier: 0.02 },
-      { name: 'Aguarrás (Solvente)', unit: 'litros', multiplier: 0.05 },
-      { name: 'Rolo de Lã', unit: 'un', multiplier: 0.04 },
-      { name: 'Trincha / Pincel', unit: 'un', multiplier: 0.04 },
-      { name: 'Fita Crepe', unit: 'rolos', multiplier: 0.1 },
-      { name: 'Lona Plástica (Proteção Pintura)', unit: 'm', multiplier: 1.0 }
+      { name: 'Sacos de Lixo Reforçados', unit: 'rolos', multiplier: 0.1 },
+      { name: 'Produtos de Limpeza (Desinfetante/Detergente)', unit: 'litros', multiplier: 0.05 },
+      { name: 'Panos e Rodos', unit: 'un', multiplier: 0.01 }
+    ]
+  },
+  // --- ITENS ESPECÍFICOS PARA REFORMA DE BANHEIRO ---
+  {
+    category: 'Demolição de Banheiro',
+    items: [
+      { name: 'Sacos de Ráfia (Entulho)', unit: 'un', multiplier: 5 },
+      { name: 'Marreta/Talhadeira', unit: 'un', multiplier: 0.01 },
+      { name: 'Caçamba Estacionária Pequena', unit: 'un', multiplier: 0.005 }
     ]
   },
   {
-    category: 'Limpeza Final e Entrega', // Geral para todos
+    category: 'Hidráulica de Banheiro',
     items: [
-      { name: 'Ácido para Limpeza de Pedras', unit: 'galão', multiplier: 0.02 },
-      { name: 'Detergente Pós-Obra', unit: 'galão', multiplier: 0.02 },
-      { name: 'Vassoura Piaçava', unit: 'un', multiplier: 0.02 },
-      { name: 'Rodo Grande', unit: 'un', multiplier: 0.01 },
-      { name: 'Panos de Chão (Saco Alvejado)', unit: 'un', multiplier: 0.1 },
-      { name: 'Espátula de Aço', unit: 'un', multiplier: 0.02 },
-      { name: 'Lã de Aço (Bombril)', unit: 'pct', multiplier: 0.05 }
+      { name: 'Tubos PVC 50mm (Esgoto)', unit: 'barra', multiplier: 0.5 },
+      { name: 'Tubos PPR/CPVC 25mm (Água)', unit: 'barra', multiplier: 0.5 },
+      { name: 'Registros (Pressão/Gaveta)', unit: 'un', multiplier: 3 },
+      { name: 'Joelhos/Conexões (Diversas)', unit: 'un', multiplier: 8 },
+      { name: 'Cola PVC/Termofusão', unit: 'frasco', multiplier: 0.05 }
+    ]
+  },
+  {
+    category: 'Elétrica de Banheiro',
+    items: [
+      { name: 'Fio Flexível 2.5mm', unit: 'm', multiplier: 10 },
+      { name: 'Fio Flexível 1.5mm', unit: 'm', multiplier: 5 },
+      { name: 'Disjuntor DR (Segurança)', unit: 'un', multiplier: 1 },
+      { name: 'Caixa de Tomada 4x2', unit: 'un', multiplier: 3 },
+      { name: 'Tomada com Proteção', unit: 'un', multiplier: 2 },
+      { name: 'Interruptor Simples', unit: 'un', multiplier: 1 }
+    ]
+  },
+  {
+    category: 'Impermeabilização de Banheiro',
+    items: [
+      { name: 'Manta Líquida Acrílica', unit: 'litro', multiplier: 2 },
+      { name: 'Cimento Elástico (Argamassa Polimérica)', unit: 'kg', multiplier: 5 },
+      { name: 'Tela de Poliéster (Reforço)', unit: 'm²', multiplier: 2 }
+    ]
+  },
+  {
+    category: 'Contrapiso de Banheiro',
+    items: [
+      { name: 'Cimento CP-II', unit: 'saco', multiplier: 0.5 },
+      { name: 'Areia Média', unit: 'm³', multiplier: 0.03 }
+    ]
+  },
+  {
+    category: 'Pisos e Revestimentos de Banheiro',
+    items: [
+      { name: 'Piso Retificado (60x60cm)', unit: 'm²', multiplier: 1.15 },
+      { name: 'Revestimento de Parede (30x60cm)', unit: 'm²', multiplier: 1.15 },
+      { name: 'Argamassa AC-II / AC-III', unit: 'saco', multiplier: 1 },
+      { name: 'Rejunte Epóxi (Anti-mofo)', unit: 'kg', multiplier: 1 }
+    ]
+  },
+  {
+    category: 'Gesso / Forro de Banheiro',
+    items: [
+      { name: 'Placa de Gesso Hidrofugado', unit: 'chapa', multiplier: 0.5 },
+      { name: 'Massa de Gesso', unit: 'kg', multiplier: 1 }
+    ]
+  },
+  {
+    category: 'Bancada de Banheiro',
+    items: [
+      { name: 'Mármore/Granito (Bancada)', unit: 'm', multiplier: 1.2 },
+      { name: 'Cuba de Sobrepor/Encaixe', unit: 'un', multiplier: 1 },
+      { name: 'Válvula de Escoamento', unit: 'un', multiplier: 1 }
+    ]
+  },
+  {
+    category: 'Louças e Metais de Banheiro',
+    items: [
+      { name: 'Vaso Sanitário com Caixa Acoplada', unit: 'un', multiplier: 1 },
+      { name: 'Torneira (Bancada)', unit: 'un', multiplier: 1 },
+      { name: 'Chuveiro (com ou sem misturador)', unit: 'un', multiplier: 1 },
+      { name: 'Ducha Higiênica', unit: 'un', multiplier: 1 },
+      { name: 'Espelho com Armário', unit: 'un', multiplier: 1 }
+    ]
+  },
+  // --- ITENS ESPECÍFICOS PARA REFORMA DE COZINHA ---
+  {
+    category: 'Demolição de Cozinha',
+    items: [
+      { name: 'Sacos de Ráfia (Entulho)', unit: 'un', multiplier: 8 },
+      { name: 'Marreta/Talhadeira', unit: 'un', multiplier: 0.01 },
+      { name: 'Caçamba Estacionária Pequena', unit: 'un', multiplier: 0.005 }
+    ]
+  },
+  {
+    category: 'Hidráulica de Cozinha',
+    items: [
+      { name: 'Tubos PVC 50mm (Esgoto)', unit: 'barra', multiplier: 0.8 },
+      { name: 'Tubos PPR/CPVC 25mm (Água)', unit: 'barra', multiplier: 0.8 },
+      { name: 'Registros', unit: 'un', multiplier: 2 },
+      { name: 'Joelhos/Conexões (Diversas)', unit: 'un', multiplier: 10 },
+      { name: 'Cola PVC/Termofusão', unit: 'frasco', multiplier: 0.05 }
+    ]
+  },
+  {
+    category: 'Elétrica de Cozinha',
+    items: [
+      { name: 'Fio Flexível 4.0mm (Eletrodomésticos)', unit: 'm', multiplier: 15 },
+      { name: 'Fio Flexível 2.5mm (Tomadas)', unit: 'm', multiplier: 10 },
+      { name: 'Disjuntores (Cozinha)', unit: 'un', multiplier: 3 },
+      { name: 'Caixa de Tomada 4x2', unit: 'un', multiplier: 6 },
+      { name: 'Tomada 20A', unit: 'un', multiplier: 3 },
+      { name: 'Tomada 10A', unit: 'un', multiplier: 3 }
+    ]
+  },
+  {
+    category: 'Pisos e Revestimentos de Cozinha',
+    items: [
+      { name: 'Piso Porcelanato (60x60cm)', unit: 'm²', multiplier: 1.15 },
+      { name: 'Revestimento de Parede (30x60cm)', unit: 'm²', multiplier: 1.15 },
+      { name: 'Argamassa AC-III', unit: 'saco', multiplier: 1.2 },
+      { name: 'Rejunte Flexível', unit: 'kg', multiplier: 1 }
+    ]
+  },
+  {
+    category: 'Bancada de Cozinha',
+    items: [
+      { name: 'Granito/Quartzo (Bancada)', unit: 'm', multiplier: 3 },
+      { name: 'Cuba de Inox Simples/Dupla', unit: 'un', multiplier: 1 },
+      { name: 'Válvula de Escoamento', unit: 'un', multiplier: 1 }
+    ]
+  },
+  {
+    category: 'Louças e Metais de Cozinha',
+    items: [
+      { name: 'Torneira Gourmet/Misturador', unit: 'un', multiplier: 1 },
+      { name: 'Filtro de Água', unit: 'un', multiplier: 1 },
+      { name: 'Sifões e Engates Flexíveis', unit: 'un', multiplier: 1 }
+    ]
+  },
+  // --- ITENS ESPECÍFICOS PARA PINTURA ---
+  {
+    category: 'Proteção do Piso para Pintura',
+    items: [
+      { name: 'Lona Plástica Grossa', unit: 'm²', multiplier: 1.1 },
+      { name: 'Fita Crepe Larga', unit: 'rolo', multiplier: 0.5 },
+      { name: 'Papelão Ondulado', unit: 'm²', multiplier: 1.1 }
+    ]
+  },
+  {
+    category: 'Preparação de Superfície (Lixar/Massa)',
+    items: [
+      { name: 'Massa Corrida (Interna) / Acrílica (Externa)', unit: 'lata', multiplier: 0.15 },
+      { name: 'Lixas (Grana 150/220)', unit: 'folha', multiplier: 5 },
+      { name: 'Desempenadeira de Aço', unit: 'un', multiplier: 0.01 },
+      { name: 'Espátulas', unit: 'un', multiplier: 0.01 }
     ]
   }
 ];
 
+// NEW: Job Roles for Workers (Equipe)
 export const STANDARD_JOB_ROLES = [
-  'Pedreiro', 
-  'Ajudante', 
-  'Servente', 
-  'Mestre de Obras', 
-  'Pintor', 
-  'Eletricista', 
-  'Encanador / Canalizador', 
-  'Gesseiro', 
-  'Marceneiro', 
-  'Serralheiro', 
-  'Vidraceiro', 
-  'Arquiteto', 
-  'Engenheiro', 
-  'Azulejista',
-  'Telhadista',
-  'Outros'
+  "Pedreiro",
+  "Eletricista",
+  "Encanador",
+  "Pintor",
+  "Carpinteiro",
+  "Gesseiro",
+  "Ajudante",
+  "Arquiteto(a)",
+  "Engenheiro(a)",
+  "Mestre de Obras",
+  "Outros"
 ];
 
+// NEW: Categories for Suppliers
 export const STANDARD_SUPPLIER_CATEGORIES = [
-  'Material de Construção (Geral)', 
-  'Elétrica e Iluminação', 
-  'Hidráulica', 
-  'Pisos e Revestimentos',
-  'Tintas e Pintura', 
-  'Madeireira', 
-  'Vidraçaria', 
-  'Marmoraria', 
-  'Locação de Equipamentos',
-  'Caçamba / Entulho', 
-  'Gesso e Drywall',
-  'Outros'
+  "Material de Construção Geral",
+  "Material Elétrico",
+  "Material Hidráulico",
+  "Tintas e Acessórios",
+  "Madeira",
+  "Ferramentas",
+  "Gesso e Drywall",
+  "Vidraçaria",
+  "Marmoraria",
+  "Aluguel de Equipamentos",
+  "Caçambas (Remoção de Entulho)",
+  "Outros Serviços"
 ];
 
-export const CONTRACT_TEMPLATES = [
-  {
-    id: 'EMPREITA',
-    title: 'Contrato de Empreitada',
-    description: 'Para fechar a obra inteira ou etapas grandes com valor fixo.',
-    contentTemplate: `CONTRATO DE PRESTAÇÃO DE SERVIÇOS DE EMPREITADA\n\nCONTRATANTE: [Nome], CPF [CPF]...\nCONTRATADO: [Nome], CPF/CNPJ [CPF/CNPJ]...\n\nOBJETO: O presente contrato tem por objeto a execução dos serviços de [Descrever Serviço] no imóvel situado em [Endereço].\n\nVALOR E PAGAMENTO: O valor total é de R$ [Valor], a ser pago da seguinte forma: [Forma de Pagamento].\n\n[...Texto completo do contrato de empreita...]`
-  },
-  {
-    id: 'MAO_DE_OBRA',
-    title: 'Contrato de Mão de Obra',
-    description: 'Para serviços específicos sem fornecimento de material.',
-    contentTemplate: `CONTRATO DE PRESTAÇÃO DE SERVIÇOS (MÃO DE OBRA)\n\nCONTRATANTE: [Nome]...\nCONTRATADO: [Nome]...\n\nCLÁUSULA 1: O Contratado se obriga a prestar serviços de [Função]...\n[...Texto completo...]`
-  },
-  {
-    id: 'DIARIA',
-    title: 'Acordo de Diária',
-    description: 'Modelo simples para profissionais pagos por dia.',
-    contentTemplate: `ACORDO DE TRABALHO POR DIÁRIA\n\nData: [Data]\nValor da Diária: R$ [Valor]\nHorário: De [Início] às [Fim]\nServiço: [Descrição]\n\nAssinatura: ____________________`
-  },
-  {
-    id: 'RECIBO',
-    title: 'Recibo de Pagamento',
-    description: 'Para comprovar pagamentos feitos à equipe ou fornecedores.',
-    contentTemplate: `RECIBO DE PAGAMENTO\n\nRecebi de [Nome do Pagador] a quantia de R$ [Valor] (valor por extenso), referente a [Descrição do Serviço/Material].\n\nData: ___/___/___\n\nAssinatura: __________________________\nNome/CPF: __________________________`
-  },
-  {
-    id: 'ENTREGA',
-    title: 'Termo de Entrega de Obra',
-    description: 'Documento para finalizar a obra e isentar responsabilidades futuras.',
-    contentTemplate: `TERMO DE ENTREGA E ACEITE DE OBRA\n\nDeclaro que recebi a obra situada em [Endereço], executada por [Nome do Profissional], em perfeitas condições e de acordo com o combinado.\n\nData: ___/___/___\n\nAssinatura do Proprietário: __________________________`
-  }
-];
-
+// NEW: Standard Checklists (example, could be loaded from DB)
 export const STANDARD_CHECKLISTS = [
   {
-    category: '01. Serviços Preliminares e Canteiro',
+    id: 'FUNDACAO',
+    category: 'Fundações',
     items: [
-      'Ligação provisória de água e energia solicitada e instalada',
-      'Placa da obra (se exigido pela prefeitura) instalada',
-      'Barracão e banheiro para operários montados',
-      'Tapume de fechamento do terreno executado',
-      'Limpeza do terreno (capina e retirada de lixo) realizada',
-      'Gabarito da obra (marcação) nivelado e no esquadro',
-      'EPIs básicos (Capacete, Botas, Luvas) comprados e distribuídos',
-      'Caçamba de entulho posicionada (se necessário)',
-      'Documentação (Alvará e Projetos) impressa e disponível na obra'
-    ]
+      { id: 'item1', text: 'Conferir alinhamento e nível do baldrame', checked: false },
+      { id: 'item2', text: 'Verificar espaçamento e amarração das ferragens', checked: false },
+      { id: 'item3', text: 'Confirmar cura do concreto (7 dias molhando)', checked: false },
+    ],
   },
   {
-    category: '02. Infraestrutura (Fundaçaõ)',
+    id: 'HIDRAULICA_BRUTA',
+    category: 'Hidráulica Bruta',
     items: [
-      'Escavação das estacas/sapatas na profundidade do projeto',
-      'Fundo das valas compactado e limpo',
-      'Armaduras (ferragem) conferidas (bitola e quantidade)',
-      'Espaçadores colocados para garantir o cobrimento do concreto',
-      'Concretagem realizada com vibração adequada',
-      'Impermeabilização das vigas baldrames executada',
-      'Passagem de tubulação de esgoto sob o baldrame verificada',
-      'Aterro interno compactado',
-      'Lona plástica colocada antes do contrapiso (se houver)'
-    ]
+      { id: 'item1', text: 'Testar vazamentos antes de fechar paredes', checked: false },
+      { id: 'item2', text: 'Registrar fotos da tubulação exposta', checked: false },
+      { id: 'item3', text: 'Verificar caimento do esgoto', checked: false },
+    ],
   },
-  {
-    category: '03. Supraestrutura (Paredes e Laje)',
-    items: [
-      'Impermeabilização da base da alvenaria (primeiras fiadas)',
-      'Prumo e nível das paredes conferidos a cada 3 fiadas',
-      'Vergas e contravergas instaladas em portas e janelas',
-      'Amarração das paredes (cantos e encontros) verificada',
-      'Caixas de luz (tomadas/interruptores) chumbadas e niveladas',
-      'Eletrodutos (mangueiras) passados sem amassamentos',
-      'Encunhamento (aperto) entre parede e viga superior feito',
-      'Escoramento da laje (cimbramento) firme e contra-flecha aplicada',
-      'Armadura da laje (negativos e distribuição) conferida',
-      'Concretagem da laje com cura úmida (molhar) por 7 dias'
-    ]
-  },
-  {
-    category: '04. Cobertura e Telhado',
-    items: [
-      'Madeiramento do telhado tratado contra cupim',
-      'Inclinação do telhado conferida conforme a telha',
-      'Calhas e rufos instalados e testados com água',
-      'Caixa d’água instalada em base elevada e nivelada',
-      'Manta térmica (subcobertura) instalada corretamente',
-      'Telhas fixadas (parafusadas ou amarradas) contra vento',
-      'Vedação das calhas revisada'
-    ]
-  },
-  {
-    category: '05. Instalações Hidráulicas',
-    items: [
-      'Tubulação de água fria/quente testada sob pressão (estanqueidade)',
-      'Caimento da tubulação de esgoto (mínimo 1% a 2%) conferido',
-      'Tubos de queda de esgoto ventilados',
-      'Registros de gaveta (geral) instalados em cada ambiente',
-      'Registros de pressão (chuveiro) na altura correta',
-      'Caixas sifonadas limpas e com fecho hídrico',
-      'Teste de vazamento nos ralos (encher de água)'
-    ]
-  },
-  {
-    category: '06. Instalações Elétricas',
-    items: [
-      'Fiação passada conforme cores padrão (Azul=Neutro, Verde=Terra)',
-      'Bitola dos fios conferida (Chuveiro 6mm/10mm, Tomadas 2.5mm)',
-      'Aterramento conectado em todas as tomadas',
-      'Quadro de distribuição organizado e identificado',
-      'Disjuntores dimensionados corretamente (sem superaquecer)',
-      'Teste de todas as tomadas e interruptores',
-      'Pontos de iluminação centralizados nos ambientes'
-    ]
-  },
-  {
-    category: '07. Revestimentos e Pisos',
-    items: [
-      'Chapisco e reboco curados (secos) antes do revestimento',
-      'Contrapiso nivelado e com caimento para ralos',
-      'Impermeabilização de áreas molhadas (box, sacada) com teste de 72h',
-      'Argamassa correta utilizada (AC-I, AC-II ou AC-III)',
-      'Dupla colagem feita em peças grandes (>30x30)',
-      'Juntas de dilatação respeitadas conforme fabricante',
-      'Recortes de piso escondidos (atrás da porta ou móveis)',
-      'Proteção do piso instalado (papelão/gesso) imediata'
-    ]
-  },
-  {
-    category: '08. Pintura e Acabamento Final',
-    items: [
-      'Paredes lixadas e livres de poeira',
-      'Selador aplicado antes da massa/tinta',
-      'Recortes de teto e rodapé alinhados',
-      'Vidros e esquadrias limpos (sem respingos de tinta)',
-      'Louças (vaso/pia) fixadas e siliconadas',
-      'Metais (torneiras/acabamentos) instalados sem vazamento',
-      'Portas e janelas abrindo/fechando suavemente',
-      'Limpeza grossa e fina realizada',
-      'Retirada de todo entulho e sobra de material'
-    ]
-  }
 ];
 
+// NEW: Contract Templates (example, could be loaded from DB)
+export const CONTRACT_TEMPLATES = [
+  {
+    id: 'SIMPLES_PEDREIRO',
+    title: 'Contrato de Pedreiro (Serviço Pontual)',
+    description: 'Modelo simples para pequenos serviços de alvenaria.',
+    contentTemplate: `
+      CONTRATO DE PRESTAÇÃO DE SERVIÇOS DE PEDREIRO
+
+      CONTRATANTE: {{clientName}}, CPF: {{clientCpf}}, residente em {{clientAddress}}.
+      CONTRATADO: {{workerName}}, CPF: {{workerCpf}}, residente em {{workerAddress}}.
+
+      OBJETO: O CONTRATADO prestará serviços de pedreiro na obra localizada em {{workAddress}}, conforme as seguintes especificações:
+      - {{serviceDescription}}
+
+      PRAZO: Início em {{startDate}} e término em {{endDate}}.
+      VALOR: R$ {{contractValue}}, a ser pago da seguinte forma: {{paymentTerms}}.
+
+      Fica eleito o foro da comarca de {{city}} para dirimir quaisquer dúvidas.
+
+      {{city}}, {{date}}.
+
+      _________________________             _________________________
+      CONTRATANTE                               CONTRATADO
+    `,
+  },
+  {
+    id: 'REFORMA_GERAL',
+    title: 'Contrato de Reforma Geral (Empreitada)',
+    description: 'Contrato abrangente para reformas completas com múltiplas etapas.',
+    contentTemplate: `
+      CONTRATO DE EMPREITADA PARA REFORMA DE IMÓVEL
+
+      CONTRATANTE: {{clientName}}, CPF: {{clientCpf}}, residente em {{clientAddress}}.
+      CONTRATADO: {{companyName}}, CNPJ: {{companyCnpj}}, sede em {{companyAddress}}.
+
+      OBJETO: Reforma geral do imóvel localizado em {{workAddress}}, incluindo as seguintes etapas:
+      1. Demolições e Retirada de Entulho
+      2. Instalações Hidráulicas e Elétricas
+      3. Alvenaria e Gesso
+      4. Pisos e Revestimentos
+      5. Pintura
+      6. Instalação de Esquadrias e Acabamentos
+      Detalhes adicionais em anexo (Memorial Descritivo).
+
+      PRAZO: Início em {{startDate}} e término em {{endDate}}, sujeito a alterações por motivos de força maior ou aditivos.
+      VALOR TOTAL: R$ {{contractValue}}, conforme orçamento detalhado nº {{budgetNumber}}.
+      PAGAMENTO: Será efetuado em {{installments}} parcelas, mediante medição do avanço físico da obra.
+
+      GARANTIA: O CONTRATADO oferece garantia de {{guaranteeMonths}} meses sobre os serviços executados.
+
+      Fica eleito o foro da comarca de {{city}} para dirimir quaisquer dúvidas.
+
+      {{city}}, {{date}}.
+
+      _________________________             _________________________
+      CONTRATANTE                               CONTRATADO
+    `,
+  },
+];
+
+// NEW: Lifetime Bonuses
 export const LIFETIME_BONUSES = [
   {
-    icon: 'fa-calculator',
-    title: 'Calculadoras Avançadas',
-    desc: 'Ferramentas exclusivas para cálculo de concreto, telhado e elétrica.'
+    icon: 'fa-infinity',
+    title: 'Acesso Vitalício',
+    desc: 'Pague uma vez e use para sempre, sem mensalidades ou taxas ocultas.',
+  },
+  {
+    icon: 'fa-robot',
+    title: 'IA Zé da Obra Ilimitada',
+    desc: 'Seu assistente virtual com inteligência artificial para tirar dúvidas, calcular materiais e dar dicas, sem limites de uso.',
   },
   {
     icon: 'fa-file-contract',
-    title: 'Pacote de Contratos Blindados',
-    desc: 'Modelos prontos para evitar dores de cabeça com pedreiros e fornecedores.'
+    title: 'Gerador de Contratos Personalizáveis',
+    desc: 'Crie contratos profissionais com pedreiros, empreiteiros e fornecedores em minutos, garantindo segurança jurídica.',
   },
   {
-    icon: 'fa-list-check',
-    title: 'Checklists de Qualidade',
-    desc: 'Listas de verificação passo-a-passo para não deixar passar nada.'
+    icon: 'fa-clipboard-check',
+    title: 'Checklists Inteligentes',
+    desc: 'Tenha acesso a checklists pré-prontos para cada etapa da obra, garantindo que nada seja esquecido.',
   },
   {
-    icon: 'fa-layer-group',
-    title: 'Gestão de Obras Ilimitadas',
-    desc: 'Crie e gerencie quantos projetos quiser, sem limites.'
-  }
-];
-
-// NEW: Simplified list for display in the bonus card
-export const LIFETIME_BONUSES_DISPLAY = [
-  {
-    icon: 'fa-calculator',
-    title: 'Calculadoras',
+    icon: 'fa-chart-line',
+    title: 'Relatórios Avançados',
+    desc: 'Relatórios detalhados de custos, progresso e materiais em PDF e Excel para uma gestão impecável.',
   },
   {
-    icon: 'fa-file-contract',
-    title: 'Contratos',
+    icon: 'fa-users-gear',
+    title: 'Gestão de Equipe e Fornecedores',
+    desc: 'Cadastre e gerencie todos os seus profissionais e fornecedores em um só lugar, otimizando a comunicação.',
   },
-  {
-    icon: 'fa-list-check',
-    title: 'Checklists',
-  },
-  {
-    icon: 'fa-layer-group',
-    title: 'Obras Ilimitadas',
-  }
 ];

@@ -669,7 +669,8 @@ export const dbService = {
             // Fix: Correctly extract count from delete operation.
             // When using .select('*') with delete(), 'data' contains the deleted rows.
             // The 'count' property is not available directly on the response when .select() is used.
-            const { data, error: deleteOpError } = await supabase.from(op.table).delete().eq(op.eq[0], op.eq[1]).select('*');
+            // Provide a default empty array for `data` in case no rows are returned.
+            const { data = [], error: deleteOpError } = await supabase.from(op.table).delete().eq(op.eq[0], op.eq[1]).select('*');
             const count = data ? data.length : 0;
             if (deleteOpError) {
                 // Logar o erro específico de RLS ou DB.

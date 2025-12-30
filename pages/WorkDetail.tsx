@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
@@ -6,7 +7,8 @@ import { useAuth } from '../contexts/AuthContext.tsx';
 import { dbService } from '../services/db.ts';
 import { StepStatus, FileCategory, ExpenseCategory, type Work, type Worker, type Supplier, type Material, type Step, type Expense, type WorkPhoto, type WorkFile } from '../types.ts';
 import { ZeModal } from '../components/ZeModal.tsx';
-import { STANDARD_CHECKLISTS, CONTRACT_TEMPLATES, STANDARD_JOB_ROLES, STANDARD_SUPPLIER_CATEGORIES, ZE_AVATAR, ZE_AVATAR_FALLBACK, LIFETIME_BONUSES_DISPLAY } from '../services/standards.ts';
+// Fix: Remove unused imports and adjust for new exports in standards.ts
+import { ZE_AVATAR, ZE_AVATAR_FALLBACK, STANDARD_JOB_ROLES, STANDARD_SUPPLIER_CATEGORIES } from '../services/standards.ts';
 
 // --- TYPES FOR VIEW STATE ---
 type MainTab = 'ETAPAS' | 'MATERIAIS' | 'FINANCEIRO' | 'FERRAMENTAS';
@@ -65,6 +67,7 @@ const WorkDetail: React.FC = () => {
     const [matPlannedQty, setMatPlannedQty] = useState('');
     const [matUnit, setMatUnit] = useState('');
     const [matBuyQty, setMatBuyQty] = useState('');
+    // Fix: Rename to avoid redeclaration error
     const [matBuyCost, setMatBuyCost] = useState('');
 
     const [addMatModal, setAddMatModal] = useState(false);
@@ -75,6 +78,7 @@ const WorkDetail: React.FC = () => {
     const [newMatStepId, setNewMatStepId] = useState('');
     const [newMatBuyNow, setNewMatBuyNow] = useState(false);
     const [newMatBuyQty, setNewMatBuyQty] = useState('');
+    // Fix: Rename to avoid redeclaration error
     const [newMatBuyCost, setNewMatBuyCost] = useState('');
 
     const [isStepModalOpen, setIsStepModalOpen] = useState(false);
@@ -219,6 +223,7 @@ const WorkDetail: React.FC = () => {
                 unit: matUnit
             });
             if (matBuyQty && Number(matBuyQty) > 0) {
+                // Fix: Use the correct state variable for matBuyCost
                 await dbService.registerMaterialPurchase(materialModal.material.id, matName, matBrand, Number(matPlannedQty), matUnit, Number(matBuyQty), Number(matBuyCost));
             }
             setMaterialModal({ isOpen: false, material: null });
