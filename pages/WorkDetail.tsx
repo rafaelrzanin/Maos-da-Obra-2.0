@@ -409,10 +409,22 @@ const WorkDetail: React.FC = () => {
             });
         } catch (error: any) {
             console.error(`[handleSavePerson] Erro ao salvar ${personMode === 'WORKER' ? 'profissional' : 'fornecedor'}:`, error);
+            let userMessage = `Não foi possível salvar o ${personMode === 'WORKER' ? 'profissional' : 'fornecedor'}.`;
+            
+            // NEW: More specific error message for missing daily_rate column
+            if (error.message?.includes("'daily_rate' column of 'workers' in the schema cache")) {
+                userMessage += `\n\nParece que a coluna 'daily_rate' está faltando na tabela 'workers' do seu banco de dados Supabase. Por favor, adicione-a.`;
+                userMessage += `\n\n**Instrução SQL:** \`\`\`ALTER TABLE workers ADD COLUMN daily_rate NUMERIC NULL DEFAULT 0;\`\`\``;
+            } else if (error.message?.includes('permission denied') || error.code === '42501') {
+                userMessage += `\n\nVerifique suas permissões de RLS (Row Level Security) no Supabase.`;
+            } else {
+                userMessage += `\n\nDetalhes: ${error.message || 'Um erro desconhecido ocorreu.'}`;
+            }
+
             setZeModal({
                 isOpen: true,
-                title: 'Erro ao Salvar',
-                message: `Não foi possível salvar o ${personMode === 'WORKER' ? 'profissional' : 'fornecedor'}: ${error.message || 'Um erro desconhecido ocorreu.'}\nVerifique suas permissões de RLS no Supabase.`,
+                title: 'Erro ao Salvar!',
+                message: userMessage,
                 confirmText: 'Entendido',
                 onCancel: () => setZeModal({ isOpen: false }),
                 type: 'ERROR'
@@ -587,7 +599,7 @@ const WorkDetail: React.FC = () => {
                         else if (isDelayed) { statusColorClass = 'bg-red-500'; statusText = 'Atrasada'; }
 
                         return (
-                            <div key={s.id} className="bg-slate-50 dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-4 shadow-sm">
+                            <div key={s.id} className="mb-4 bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 flex items-start gap-4 shadow-sm">
                                 <div className={`w-3 h-16 rounded-full ${statusColorClass} shrink-0`}></div>
                                 <div className="flex-1">
                                     <p className="font-bold text-primary dark:text-white text-base mb-1">{s.name}</p>
@@ -817,7 +829,7 @@ const WorkDetail: React.FC = () => {
                                         'text-slate-500 dark:text-slate-400';
                                     const stepStatusIcon = 
                                         step.status === StepStatus.COMPLETED ? 'fa-check-circle' :
-                                        step.status === StepStatus.IN_PROGRESS ? 'fa-hammer' :
+                                        step.status === StepStatus.IN_PROGRESS ? 'fa-hammer' : 
                                         isStepDelayed ? 'fa-triangle-exclamation' :
                                     'fa-clock';
 
