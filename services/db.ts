@@ -55,7 +55,8 @@ const parseStepFromDB = (data: any): Step => ({
     name: data.name,
     startDate: data.start_date,
     endDate: data.end_date,
-    realDate: data.real_date, // Added real_date parsing
+    // Fix: Ensure null from DB is mapped to undefined for optional string properties
+    realDate: data.real_date || undefined,
     status: data.status,
     isDelayed: data.is_delayed
 });

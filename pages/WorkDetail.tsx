@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
@@ -234,7 +235,10 @@ const WorkDetail: React.FC = () => {
 
     const openEditExpense = (expense: Expense) => {
         setExpenseModal({ isOpen: true, mode: 'EDIT', id: expense.id });
-        setExpDesc(expense.description); setExpSavedAmount(expense.amount); setExpTotalAgreed(expense.totalAgreed ? String(expense.totalAgreed) : ''); setExpCategory(expense.category); setExpStepId(expense.stepId || '');
+        setExpDesc(expense.description); setExpSavedAmount(expense.amount); setExpTotalAgreed(expense.totalAgreed ? String(expense.totalAgreed) : ''); 
+        // Fix: Cast expense.category to ExpenseCategory to match the state type.
+        setExpCategory(expense.category as ExpenseCategory); 
+        setExpStepId(expense.stepId || '');
     };
 
     const handleSaveExpense = async (e: React.FormEvent) => {
