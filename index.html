@@ -1,8 +1,4 @@
 
-
-
-
-
 <!DOCTYPE html>
 <html lang="pt-BR">
   <head>
@@ -15,70 +11,15 @@
     <link rel="manifest" href="/manifest.json">
     
     <!-- Preconnect for Performance -->
-    <link rel="preconnect" href="https://cdn.tailwindcss.com">
     <link rel="preconnect" href="https://cdnjs.cloudflare.com">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 
-    <!-- Tailwind via CDN - REMOVIDO PARA USAR O ARQUIVO DE CONFIGURAÇÃO LOCAL E BUILD COM POSTCSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Configuração inline do Tailwind CSS - REMOVIDO PARA USAR O ARQUIVO tailwind.config.js -->
-    
+    <!-- Font Awesome e Inter Font -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
-    <style>
-      .material-symbols-outlined {
-        font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
-      }
-      body {
-        background-color: #F8FAFC; 
-        font-family: 'Inter', sans-serif;
-        color: #334155;
-      }
-      .dark body {
-        background-color: #020617;
-        color: #CBD5E1;
-      }
-      /* Custom Scrollbar for Premium Feel */
-      ::-webkit-scrollbar { width: 6px; height: 6px; }
-      ::-webkit-scrollbar-track { background: transparent; }
-      ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 10px; }
-      .dark ::-webkit-scrollbar-thumb { background: #334155; }
-      ::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
-
-      /* Glassmorphism Utilities */
-      .glass-panel {
-        background: rgba(255, 255, 255, 0.7);
-        backdrop-filter: blur(10px);
-        -webkit-backdrop-filter: blur(10px);
-        border: 1px solid rgba(255, 255, 255, 0.5);
-      }
-      .dark .glass-panel {
-        background: rgba(15, 23, 42, 0.6);
-        border: 1px solid rgba(255, 255, 255, 0.05);
-      }
-
-      @keyframes float {
-        0% { transform: translateY(0px) rotate(3deg); }
-        50% { transform: translateY(-8px) rotate(0deg); }
-        100% { transform: translateY(0px) rotate(3deg); }
-      }
-      .animate-float {
-        animation: float 3s ease-in-out infinite;
-      }
-
-      @media print {
-        @page { margin: 1cm; size: A4 portrait; }
-        body, #root, main, div { overflow: visible !important; height: auto !important; min-height: auto !important; }
-        body, .dark body { background-color: white !important; color: black !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-        ::-webkit-scrollbar { display: none; }
-        .grid { display: grid !important; }
-        .flex { display: flex !important; }
-        .dark .text-white { color: #111827 !important; }
-        .dark .bg-slate-900, .dark .bg-surface, .dark .bg-slate-800 { background-color: white !important; border-color: #e5e7eb !important; }
-      }
-    </style>
+    
   <script type="importmap">
 {
   "imports": {
