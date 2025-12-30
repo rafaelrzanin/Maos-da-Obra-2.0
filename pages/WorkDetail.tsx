@@ -10,7 +10,7 @@ import { STANDARD_JOB_ROLES, STANDARD_SUPPLIER_CATEGORIES, ZE_AVATAR, ZE_AVATAR_
 
 // --- TYPES FOR VIEW STATE ---
 type MainTab = 'ETAPAS' | 'MATERIAIS' | 'FINANCEIRO' | 'FERRAMENTAS';
-type SubView = 'NONE' | 'TEAM' | 'REPORTS' | 'PHOTOS' | 'PROJECTS' | 'CALCULATORS' | 'CONTRACTS' | 'CHECKLIST' | 'AICHAT';
+type SubView = 'NONE' | 'WORKERS' | 'SUPPLIERS' | 'REPORTS' | 'PHOTOS' | 'PROJECTS' | 'CALCULATORS' | 'CONTRACTS' | 'CHECKLIST' | 'AICHAT';
 type ReportSubTab = 'CRONOGRAMA' | 'MATERIAIS' | 'FINANCEIRO';
 
 // --- DATE HELPERS ---
@@ -57,7 +57,8 @@ const WorkDetail: React.FC = () => {
     const [uploading, setUploading] = useState<boolean>(false);
     const [reportActiveTab, setReportActiveTab] = useState<ReportSubTab>('CRONOGRAMA');
     
-    const [materialFilterStepId, setMaterialFilterStepId] = useState<string>('ALL');
+    // Filtro para Materiais no Relatório
+    const [reportMaterialFilterStepId, setReportMaterialFilterStepId] = useState<string>('ALL'); // NEW: Filter for Materials Report
     
     const [materialModal, setMaterialModal] = useState<{ isOpen: boolean, material: Material | null }>({ isOpen: false, material: null });
     const [matName, setMatName] = useState('');
@@ -109,7 +110,7 @@ const WorkDetail: React.FC = () => {
     const [isChecklistModalOpen, setIsChecklistModalOpen] = useState(false);
     const [currentChecklist, setCurrentChecklist] = useState<Checklist | null>(null);
     const [allChecklists, setAllChecklists] = useState<Checklist[]>([] );
-    const [selectedChecklistCategory, setSelectedChecklistCategory] = useState<string>('all');
+    const [selectedChecklistCategory, setSelectedChecklistCategory] = useState<string>('all'); // Filter for Checklist view
 
     const [zeModal, setZeModal] = useState<any>({ isOpen: false, title: '', message: '' });
 
@@ -407,9 +408,26 @@ const WorkDetail: React.FC = () => {
     useEffect(() => {
         if (!calcArea) { setCalcResult([]); return; }
         const area = Number(calcArea);
-        if (calcType === 'PISO') setCalcResult([`${Math.ceil(area * 1.15)} m² de Piso`, `${Math.ceil(area * 4)} kg de Argamassa`]);
-        else if (calcType === 'PAREDE') setCalcResult([`${Math.ceil(area * 30)} Tijolos`]);
-        else if (calcType === 'PINTURA') setCalcResult([`${Math.ceil(area / 5)} L de Tinta`]);
+        if (calcType === 'PISO') {
+            setCalcResult([
+                `${Math.ceil(area * 1.15)} m² de Piso`, // 15% de perda
+                `${Math.ceil(area * 4)} kg de Argamassa`, // 4kg/m²
+                `${Math.ceil(area * 0.15)} kg de Rejunte` // 0.15kg/m²
+            ]);
+        }
+        else if (calcType === 'PAREDE') {
+            setCalcResult([
+                `${Math.ceil(area * 30)} Tijolos (9x19x19cm)`, // 30 tijolos/m²
+                `${Math.ceil(area * 0.02)} m³ de Areia Média`, // 0.02m³/m²
+                `${Math.ceil(area * 0.005)} m³ de Cimento` // 0.005m³/m²
+            ]);
+        }
+        else if (calcType === 'PINTURA') {
+            setCalcResult([
+                `${Math.ceil(area / 5)} L de Tinta (2 demãos, 1 demão/5m²/L)`, // Ex: 5m²/L por demão, 2 demãos = 2.5m²/L total
+                `${Math.ceil(area * 0.2)} kg de Massa Corrida` // 0.2kg/m²
+            ]);
+        }
     }, [calcArea, calcType]);
 
     const handleExportExcel = () => {
@@ -446,20 +464,22 @@ const WorkDetail: React.FC = () => {
 
     const handleAddChecklist = async (category: string) => {
         if (!work) return;
-        const existingTemplate = CHECKLIST_TEMPLATES.find(t => t.category === category && t.workId === 'mock-work-id');
+        // Search in CHECKLIST_TEMPLATES (mock data)
+        const templateCategory = category === 'Geral' ? 'Geral' : steps.find(s => s.name === category)?.name || 'Geral';
+        const existingTemplate = CHECKLIST_TEMPLATES.find(t => t.category === templateCategory);
         
-        const newChecklistName = existingTemplate ? existingTemplate.name : `${category} - Checklist Padrão`;
+        const newChecklistName = existingTemplate ? existingTemplate.name : `${templateCategory} - Checklist Padrão`;
         const newChecklistItems = existingTemplate ? existingTemplate.items.map(item => ({...item, id: `${Date.now()}-${Math.random()}`})) : [{id: `${Date.now()}-1`, text: 'Novo item', checked: false}];
 
         const newChecklist: Omit<Checklist, 'id'> = {
             workId: work.id,
             name: newChecklistName,
-            category: category,
+            category: templateCategory,
             items: newChecklistItems
         };
         const savedChecklist = await dbService.addChecklist(newChecklist);
-        load();
-        setCurrentChecklist(savedChecklist);
+        load(); // Reload all checklists, including the newly added one
+        setCurrentChecklist(savedChecklist); // Keep selected for viewing
         setIsChecklistModalOpen(true);
     };
 
@@ -514,80 +534,121 @@ const WorkDetail: React.FC = () => {
     if (!work) return <div className="text-center py-10">Obra não encontrada.</div>;
 
     const RenderCronogramaReport = () => (
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border p-6 shadow-sm">
-            <h3 className="font-bold mb-4 text-primary dark:text-white">Cronograma Detalhado</h3>
+        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 shadow-md animate-in fade-in">
+            <h3 className="font-bold text-xl text-primary dark:text-white mb-6">Cronograma Detalhado</h3>
             <div className="space-y-4">
-                {steps.map(s => {
-                    const isDelayed = s.status !== StepStatus.COMPLETED && s.endDate < todayString;
-                    let statusColor = 'text-slate-500'; // Gray
-                    if (s.status === StepStatus.COMPLETED) statusColor = 'text-green-600';
-                    else if (s.status === StepStatus.IN_PROGRESS) statusColor = 'text-orange-600';
-                    else if (isDelayed) statusColor = 'text-red-600';
+                {steps.length === 0 ? (
+                    <p className="text-center text-slate-400 py-4 italic text-sm">Nenhuma etapa cadastrada para esta obra.</p>
+                ) : (
+                    steps.map(s => {
+                        const isDelayed = s.status !== StepStatus.COMPLETED && new Date(s.endDate) < new Date(todayString);
+                        let statusColorClass = 'bg-slate-500'; // Default gray
+                        let statusText = 'Pendente';
+                        if (s.status === StepStatus.COMPLETED) { statusColorClass = 'bg-green-500'; statusText = 'Concluída'; }
+                        else if (s.status === StepStatus.IN_PROGRESS) { statusColorClass = 'bg-orange-500'; statusText = 'Em Andamento'; }
+                        else if (isDelayed) { statusColorClass = 'bg-red-500'; statusText = 'Atrasada'; }
 
-                    return (
-                        <div key={s.id} className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
-                            <div className="flex justify-between items-center mb-1">
-                                <p className="font-bold text-sm text-primary dark:text-white">{s.name}</p>
-                                <span className={`text-xs font-semibold ${statusColor}`}>
-                                    {isDelayed ? 'Atrasada' : s.status === StepStatus.COMPLETED ? 'Concluída' : s.status === StepStatus.IN_PROGRESS ? 'Em Andamento' : 'Pendente'}
-                                </span>
+                        return (
+                            <div key={s.id} className="bg-slate-50 dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-4 shadow-sm flex items-center gap-4">
+                                <div className={`w-3 h-16 rounded-full ${statusColorClass} shrink-0`}></div>
+                                <div className="flex-1">
+                                    <p className="font-bold text-primary dark:text-white text-base mb-1">{s.name}</p>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400">{parseDateNoTimezone(s.startDate)} - {parseDateNoTimezone(s.endDate)}</p>
+                                </div>
+                                <span className={`px-3 py-1 rounded-full text-xs font-bold text-white ${statusColorClass}`}>{statusText}</span>
                             </div>
-                            <p className="text-xs text-slate-500 dark:text-slate-400">{parseDateNoTimezone(s.startDate)} - {parseDateNoTimezone(s.endDate)}</p>
-                        </div>
-                    );
-                })}
+                        );
+                    })
+                )}
             </div>
         </div>
     );
 
-    const RenderMateriaisReport = () => (
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border p-6 shadow-sm">
-            <h3 className="font-bold mb-4 text-primary dark:text-white">Materiais por Etapa</h3>
-            {steps.map(step => {
-                const stepMats = materials.filter(m => m.stepId === step.id);
-                if (stepMats.length === 0) return null;
-                return (
-                    <div key={step.id} className="mb-6 bg-slate-50 dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700">
-                        <h4 className="text-sm font-black uppercase text-secondary mb-3 border-b border-slate-200 dark:border-slate-700 pb-2">{step.name}</h4>
-                        <div className="space-y-2">
-                            {stepMats.map(m => {
-                                const statusText = m.purchasedQty >= m.plannedQty ? 'Concluído' : m.purchasedQty > 0 ? 'Parcial' : 'Pendente';
-                                const statusColor = m.purchasedQty >= m.plannedQty ? 'text-green-600' : m.purchasedQty > 0 ? 'text-orange-600' : 'text-red-500';
-                                return (
-                                    <div key={m.id} className="flex justify-between items-center text-sm">
-                                        <span className="text-primary dark:text-white">• {m.name}</span>
-                                        <span className={`font-semibold ${statusColor}`}>{m.purchasedQty}/{m.plannedQty} {m.unit} ({statusText})</span>
+    const RenderMateriaisReport = () => {
+        const filteredMaterials = reportMaterialFilterStepId === 'ALL'
+            ? materials
+            : materials.filter(m => m.stepId === reportMaterialFilterStepId);
+
+        return (
+            <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 shadow-md animate-in fade-in">
+                <h3 className="font-bold text-xl text-primary dark:text-white mb-4">Materiais por Etapa</h3>
+                
+                <div className="mb-6">
+                    <label htmlFor="report-material-step-filter" className="block text-sm font-medium text-primary dark:text-white mb-2">Filtrar por Etapa:</label>
+                    <select
+                        id="report-material-step-filter"
+                        value={reportMaterialFilterStepId}
+                        onChange={(e) => setReportMaterialFilterStepId(e.target.value)}
+                        className="w-full p-3 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white focus:ring-secondary focus:border-secondary outline-none transition-colors"
+                        aria-label="Filtrar materiais do relatório por etapa"
+                    >
+                        <option value="ALL">Todas as Etapas</option>
+                        {steps.map(step => (
+                            <option key={step.id} value={step.id}>{step.name}</option>
+                        ))}
+                    </select>
+                </div>
+
+                {filteredMaterials.length === 0 ? (
+                    <p className="text-center text-slate-400 py-8 italic text-sm">Nenhum material encontrado para o filtro selecionado.</p>
+                ) : (
+                    steps
+                        .filter(step => reportMaterialFilterStepId === 'ALL' || step.id === reportMaterialFilterStepId)
+                        .map(step => {
+                            const stepMats = filteredMaterials.filter(m => m.stepId === step.id);
+                            if (stepMats.length === 0) return null; // Only render step if it has filtered materials
+                            return (
+                                <div key={step.id} className="mb-6 bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm last:mb-0">
+                                    <h4 className="font-black uppercase text-secondary mb-3 border-b border-slate-200 dark:border-slate-700 pb-2 text-base">{step.name}</h4>
+                                    <div className="space-y-3">
+                                        {stepMats.map(m => {
+                                            const statusText = m.purchasedQty >= m.plannedQty ? 'Concluído' : m.purchasedQty > 0 ? 'Parcial' : 'Pendente';
+                                            const statusColor = m.purchasedQty >= m.plannedQty ? 'text-green-600' : m.purchasedQty > 0 ? 'text-orange-600' : 'text-red-500';
+                                            const progress = (m.purchasedQty / m.plannedQty) * 100;
+                                            return (
+                                                <div key={m.id} className="flex flex-col text-sm bg-white dark:bg-slate-900 rounded-xl p-3 border border-slate-100 dark:border-slate-700">
+                                                    <div className="flex justify-between items-center mb-1">
+                                                        <span className="font-bold text-primary dark:text-white">{m.name} {m.brand && `(${m.brand})`}</span>
+                                                        <span className={`font-semibold ${statusColor}`}>{statusText}</span>
+                                                    </div>
+                                                    <div className="h-1 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden mb-1">
+                                                        <div className="h-full bg-secondary" style={{ width: `${Math.min(100, progress)}%` }}></div>
+                                                    </div>
+                                                    <p className="text-xs text-slate-500 dark:text-slate-400 text-right">{m.purchasedQty}/{m.plannedQty} {m.unit}</p>
+                                                </div>
+                                            );
+                                        })}
                                     </div>
-                                );
-                            })}
-                        </div>
-                    </div>
-                );
-            })}
-        </div>
-    );
+                                </div>
+                            );
+                        })
+                )}
+            </div>
+        );
+    };
+
 
     const RenderFinanceiroReport = () => (
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border p-6 shadow-sm">
-            <h3 className="font-bold mb-4 text-primary dark:text-white">Lançamentos Financeiros</h3>
+        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 shadow-md animate-in fade-in">
+            <h3 className="font-bold text-xl text-primary dark:text-white mb-6">Lançamentos Financeiros</h3>
             {Object.values(ExpenseCategory).map(category => {
                 const expensesInCategory = Object.values(groupedExpenses[category].steps).flatMap(stepGroup => stepGroup.expenses).concat(groupedExpenses[category].unlinkedExpenses);
                 if (expensesInCategory.length === 0) return null;
 
                 return (
-                    <div key={category} className="mb-6 bg-slate-50 dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700">
-                        <h4 className="text-sm font-black uppercase text-primary dark:text-white mb-3 border-b border-slate-200 dark:border-slate-700 pb-2">
-                            {category} (Total: {formatCurrency(groupedExpenses[category].totalCategoryAmount)})
+                    <div key={category} className="mb-8 bg-slate-50 dark:bg-slate-800 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm last:mb-0">
+                        <h4 className="font-black uppercase text-primary dark:text-white mb-4 border-b border-slate-200 dark:border-slate-700 pb-3 text-lg">
+                            {category} <span className="text-secondary">({formatCurrency(groupedExpenses[category].totalCategoryAmount)})</span>
                         </h4>
-                        <div className="space-y-3">
+                        <div className="space-y-4">
                             {Object.keys(groupedExpenses[category].steps).filter(stepId => groupedExpenses[category].steps[stepId].expenses.length > 0).map(stepId => {
                                 const stepGroup = groupedExpenses[category].steps[stepId];
                                 return (
-                                    <div key={stepId} className="pl-4 border-l border-slate-300 dark:border-slate-700">
-                                        <h5 className="font-bold text-sm text-secondary mb-2">{stepGroup.stepName}</h5>
-                                        <div className="space-y-1">
+                                    <div key={stepId} className="pl-4 border-l-4 border-secondary/20 dark:border-secondary/30">
+                                        <h5 className="font-bold text-base text-primary dark:text-white mb-2">{stepGroup.stepName} <span className="text-slate-500 dark:text-slate-400 text-sm">({formatCurrency(stepGroup.totalStepAmount)})</span></h5>
+                                        <div className="space-y-2">
                                             {stepGroup.expenses.map(e => (
-                                                <div key={e.id} className="flex justify-between text-xs py-1">
+                                                <div key={e.id} className="flex justify-between text-sm py-1 bg-white dark:bg-slate-900 rounded-lg px-3 py-2 border border-slate-100 dark:border-slate-700">
                                                     <span className="text-slate-700 dark:text-slate-300">{e.description}</span>
                                                     <span className="font-bold text-primary dark:text-white">{formatCurrency(e.amount)}</span>
                                                 </div>
@@ -597,11 +658,11 @@ const WorkDetail: React.FC = () => {
                                 );
                             })}
                             {groupedExpenses[category].unlinkedExpenses.length > 0 && (
-                                <div className="pl-4 border-l border-slate-300 dark:border-slate-700 mt-3">
-                                    <h5 className="font-bold text-sm text-slate-500 mb-2">Sem Etapa Específica</h5>
-                                    <div className="space-y-1">
+                                <div className="pl-4 border-l-4 border-slate-300 dark:border-slate-600 mt-6">
+                                    <h5 className="font-bold text-base text-slate-500 dark:text-slate-400 mb-2">Sem Etapa Específica</h5>
+                                    <div className="space-y-2">
                                         {groupedExpenses[category].unlinkedExpenses.map(e => (
-                                            <div key={e.id} className="flex justify-between text-xs py-1">
+                                            <div key={e.id} className="flex justify-between text-sm py-1 bg-white dark:bg-slate-900 rounded-lg px-3 py-2 border border-slate-100 dark:border-slate-700">
                                                 <span className="text-slate-700 dark:text-slate-300">{e.description}</span>
                                                 <span className="font-bold text-primary dark:text-white">{formatCurrency(e.amount)}</span>
                                                 </div>
@@ -637,6 +698,7 @@ const WorkDetail: React.FC = () => {
     }
 
     const hasLifetimeAccess = user?.plan === PlanType.VITALICIO;
+    // const hasAiAccess = hasLifetimeAccess || (user?.isTrial && (trialDaysRemaining !== null && trialDaysRemaining > 0)); // This logic moved to AiChat itself for conditional rendering
 
     return (
         <div className="max-w-4xl mx-auto py-8 px-4 md:px-0 pb-24">
@@ -651,7 +713,7 @@ const WorkDetail: React.FC = () => {
                     <nav className="fixed bottom-0 left-0 w-full bg-white dark:bg-slate-900 border-t z-50 flex justify-around p-2 md:static md:bg-slate-100 md:rounded-2xl md:mb-6 shadow-lg md:shadow-none">
                         {(['ETAPAS', 'MATERIAIS', 'FINANCEIRO', 'FERRAMENTAS'] as MainTab[]).map(tab => (
                             <button key={tab} onClick={() => setActiveTab(tab)} className={`flex flex-col items-center flex-1 py-2 text-[10px] font-bold md:text-sm md:rounded-xl transition-colors ${activeTab === tab ? 'text-secondary md:bg-white md:shadow-sm' : 'text-slate-400 hover:text-primary dark:hover:text-white'}`} aria-label={`Abrir aba ${tab}`}>
-                                <i className={`fa-solid ${tab === 'ETAPAS' ? 'fa-calendar' : tab === 'MATERIAIS' ? 'fa-box' : tab === 'FINANCEIRO' ? 'fa-dollar-sign' : 'fa-ellipsis'} text-lg mb-1`}></i>
+                                <i className={`fa-solid ${tab === 'ETAPAS' ? 'fa-calendar' : tab === 'MATERIAIS' ? 'fa-box' : tab === 'FINANCEIRO' ? 'fa-dollar-sign' : 'fa-wrench'} text-lg mb-1`}></i> {/* Changed tools icon */}
                                 {tab}
                             </button>
                         ))}
@@ -704,7 +766,7 @@ const WorkDetail: React.FC = () => {
                                 steps.map((step, index) => {
                                     const stepMats = materials.filter(m => m.stepId === step.id);
                                     
-                                    const isStepDelayed = step.status !== StepStatus.COMPLETED && step.endDate < todayString;
+                                    const isStepDelayed = step.status !== StepStatus.COMPLETED && new Date(step.endDate) < new Date(todayString);
                                     const stepStatusBgClass = 
                                         step.status === StepStatus.COMPLETED ? 'bg-green-500/10' : 
                                         step.status === StepStatus.IN_PROGRESS ? 'bg-orange-500/10' : 
@@ -840,7 +902,7 @@ const WorkDetail: React.FC = () => {
                                                 const step = steps.find(s => s.id === stepId); 
                                                 if (!step) return null;
                                                 
-                                                const isStepDelayed = step.status !== StepStatus.COMPLETED && step.endDate < todayString;
+                                                const isStepDelayed = step.status !== StepStatus.COMPLETED && new Date(step.endDate) < new Date(todayString);
                                                 const stepStatusBgClass = 
                                                     step.status === StepStatus.COMPLETED ? 'bg-green-500/10' : 
                                                     step.status === StepStatus.IN_PROGRESS ? 'bg-orange-500/10' : 
@@ -969,90 +1031,98 @@ const WorkDetail: React.FC = () => {
                     {activeTab === 'FERRAMENTAS' && (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 animate-in fade-in">
                             {/* Bloco 1: Equipe */}
-                            <button onClick={() => setSubView('TEAM')} className="p-6 bg-white dark:bg-slate-900 rounded-3xl flex flex-col items-center shadow-sm border border-slate-200 dark:border-slate-800 hover:shadow-md transition-shadow" aria-label="Gerenciar Equipe">
-                                <i className="fa-solid fa-users text-2xl mb-2 text-primary"></i> {/* Changed to text-primary */}
+                            <button onClick={() => setSubView('WORKERS')} className="p-6 bg-white dark:bg-slate-900 rounded-3xl flex flex-col items-center shadow-sm border border-slate-200 dark:border-slate-800 hover:shadow-md transition-shadow" aria-label="Gerenciar Equipe">
+                                <i className="fa-solid fa-users text-2xl mb-2 text-primary"></i>
                                 <span className="font-bold text-primary dark:text-white text-sm">Equipe</span>
                             </button>
 
-                            {/* Bloco 2: Fornecedores (NEW) */}
-                            <button onClick={() => setSubView('TEAM')} className="p-6 bg-white dark:bg-slate-900 rounded-3xl flex flex-col items-center shadow-sm border border-slate-200 dark:border-slate-800 hover:shadow-md transition-shadow" aria-label="Gerenciar Fornecedores">
-                                <i className="fa-solid fa-truck-field text-2xl mb-2 text-primary"></i> {/* Changed to text-primary, new icon */}
+                            {/* Bloco 2: Fornecedores */}
+                            <button onClick={() => setSubView('SUPPLIERS')} className="p-6 bg-white dark:bg-slate-900 rounded-3xl flex flex-col items-center shadow-sm border border-slate-200 dark:border-slate-800 hover:shadow-md transition-shadow" aria-label="Gerenciar Fornecedores">
+                                <i className="fa-solid fa-truck-field text-2xl mb-2 text-primary"></i>
                                 <span className="font-bold text-primary dark:text-white text-sm">Fornecedores</span>
                             </button>
 
                             {/* Bloco 3: Relatórios */}
                             <button onClick={() => setSubView('REPORTS')} className="p-6 bg-white dark:bg-slate-900 rounded-3xl flex flex-col items-center shadow-sm border border-slate-200 dark:border-slate-800 hover:shadow-md transition-shadow" aria-label="Gerar Relatórios">
-                                <i className="fa-solid fa-file-pdf text-2xl mb-2 text-primary"></i> {/* Changed to text-primary */}
+                                <i className="fa-solid fa-file-contract text-2xl mb-2 text-primary"></i>
                                 <span className="font-bold text-primary dark:text-white text-sm">Relatórios</span>
                             </button>
                             
                             {/* Bloco 4: Fotos */}
                             <button onClick={() => setSubView('PHOTOS')} className="p-6 bg-white dark:bg-slate-900 rounded-3xl flex flex-col items-center shadow-sm border border-slate-200 dark:border-slate-800 hover:shadow-md transition-shadow" aria-label="Ver Fotos da Obra">
-                                <i className="fa-solid fa-camera text-2xl mb-2 text-primary"></i> {/* Changed to text-primary */}
+                                <i className="fa-solid fa-camera text-2xl mb-2 text-primary"></i>
                                 <span className="font-bold text-primary dark:text-white text-sm">Fotos</span>
                             </button>
 
                             {/* Bloco 5: Arquivos & Projetos */}
                             <button onClick={() => setSubView('PROJECTS')} className="p-6 bg-white dark:bg-slate-900 rounded-3xl flex flex-col items-center shadow-sm border border-slate-200 dark:border-slate-800 hover:shadow-md transition-shadow" aria-label="Gerenciar Arquivos">
-                                <i className="fa-solid fa-folder text-2xl mb-2 text-primary"></i> {/* Changed to text-primary */}
+                                <i className="fa-solid fa-folder text-2xl mb-2 text-primary"></i>
                                 <span className="font-bold text-primary dark:text-white text-sm">Arquivos</span>
                             </button>
 
-                            {/* --- BÔNUS VITALÍCIO - CARDS SEPARADOS --- */}
+                            {/* --- BÔNUS VITALÍCIO - CARDS SEPARADOS COM ESTILO PREMIUM --- */}
                             
                             {/* Bônus: Contratos */}
-                            <div className={`p-6 rounded-3xl flex flex-col items-center shadow-lg border relative ${hasLifetimeAccess ? 'bg-gradient-gold border-amber-900' : 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700'}`}>
+                            <div className={`p-6 rounded-3xl flex flex-col items-center shadow-lg border relative overflow-hidden group 
+                                ${hasLifetimeAccess ? 'bg-gradient-gold border-amber-900' : 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700'}`}>
                                 {!hasLifetimeAccess && (
                                     <div className="absolute inset-0 bg-black/50 rounded-3xl flex items-center justify-center z-10">
                                         <i className="fa-solid fa-lock text-white text-4xl"></i>
                                     </div>
                                 )}
                                 <button onClick={() => hasLifetimeAccess ? setSubView('CONTRACTS') : navigate('/settings')} disabled={!hasLifetimeAccess} className="w-full h-full absolute inset-0 flex flex-col items-center justify-center p-6 text-center z-20">
-                                    <i className={`fa-solid fa-file-contract text-2xl mb-2 ${hasLifetimeAccess ? 'text-white' : 'text-slate-400'}`}></i>
-                                    <span className={`font-bold text-sm ${hasLifetimeAccess ? 'text-white' : 'text-primary dark:text-white'}`}>Contratos</span>
-                                    {!hasLifetimeAccess && <span className="text-[10px] text-slate-500 dark:text-slate-400 mt-1">Exclusivo Vitalício</span>}
+                                    <i className={`fa-solid fa-file-contract text-3xl mb-3 ${hasLifetimeAccess ? 'text-white group-hover:scale-110' : 'text-slate-400'} transition-transform`}></i>
+                                    <span className={`font-black text-sm ${hasLifetimeAccess ? 'text-white' : 'text-primary dark:text-white'} mb-1`}>Contratos</span>
+                                    <span className={`text-[10px] font-medium ${hasLifetimeAccess ? 'text-amber-200' : 'text-slate-500 dark:text-slate-400'}`}>Modelos profissionais completos</span>
+                                    {!hasLifetimeAccess && <span className="text-[10px] text-slate-500 dark:text-slate-400 mt-2">Liberar Plano Vitalício</span>}
                                 </button>
                             </div>
                             
                             {/* Bônus: Calculadoras */}
-                            <div className={`p-6 rounded-3xl flex flex-col items-center shadow-lg border relative ${hasLifetimeAccess ? 'bg-gradient-gold border-amber-900' : 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700'}`}>
+                            <div className={`p-6 rounded-3xl flex flex-col items-center shadow-lg border relative overflow-hidden group 
+                                ${hasLifetimeAccess ? 'bg-gradient-gold border-amber-900' : 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700'}`}>
                                 {!hasLifetimeAccess && (
                                     <div className="absolute inset-0 bg-black/50 rounded-3xl flex items-center justify-center z-10">
                                         <i className="fa-solid fa-lock text-white text-4xl"></i>
                                     </div>
                                 )}
                                 <button onClick={() => hasLifetimeAccess ? setIsCalculatorModalOpen(true) : navigate('/settings')} disabled={!hasLifetimeAccess} className="w-full h-full absolute inset-0 flex flex-col items-center justify-center p-6 text-center z-20">
-                                    <i className={`fa-solid fa-calculator text-2xl mb-2 ${hasLifetimeAccess ? 'text-white' : 'text-slate-400'}`}></i>
-                                    <span className={`font-bold text-sm ${hasLifetimeAccess ? 'text-white' : 'text-primary dark:text-white'}`}>Calculadoras</span>
-                                    {!hasLifetimeAccess && <span className="text-[10px] text-slate-500 dark:text-slate-400 mt-1">Exclusivo Vitalício</span>}
+                                    <i className={`fa-solid fa-calculator text-3xl mb-3 ${hasLifetimeAccess ? 'text-white group-hover:scale-110' : 'text-slate-400'} transition-transform`}></i>
+                                    <span className={`font-black text-sm ${hasLifetimeAccess ? 'text-white' : 'text-primary dark:text-white'} mb-1`}>Calculadoras</span>
+                                    <span className={`text-[10px] font-medium ${hasLifetimeAccess ? 'text-amber-200' : 'text-slate-500 dark:text-slate-400'}`}>Piso, parede, pintura e mais</span>
+                                    {!hasLifetimeAccess && <span className="text-[10px] text-slate-500 dark:text-slate-400 mt-2">Liberar Plano Vitalício</span>}
                                 </button>
                             </div>
 
                             {/* Bônus: Checklist da Obra */}
-                            <div className={`p-6 rounded-3xl flex flex-col items-center shadow-lg border relative ${hasLifetimeAccess ? 'bg-gradient-gold border-amber-900' : 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700'}`}>
+                            <div className={`p-6 rounded-3xl flex flex-col items-center shadow-lg border relative overflow-hidden group 
+                                ${hasLifetimeAccess ? 'bg-gradient-gold border-amber-900' : 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700'}`}>
                                 {!hasLifetimeAccess && (
                                     <div className="absolute inset-0 bg-black/50 rounded-3xl flex items-center justify-center z-10">
                                         <i className="fa-solid fa-lock text-white text-4xl"></i>
                                     </div>
                                 )}
                                 <button onClick={() => hasLifetimeAccess ? setSubView('CHECKLIST') : navigate('/settings')} disabled={!hasLifetimeAccess} className="w-full h-full absolute inset-0 flex flex-col items-center justify-center p-6 text-center z-20">
-                                    <i className={`fa-solid fa-list-check text-2xl mb-2 ${hasLifetimeAccess ? 'text-white' : 'text-slate-400'}`}></i>
-                                    <span className={`font-bold text-sm ${hasLifetimeAccess ? 'text-white' : 'text-primary dark:text-white'}`}>Checklist da Obra</span>
-                                    {!hasLifetimeAccess && <span className="text-[10px] text-slate-500 dark:text-slate-400 mt-1">Exclusivo Vitalício</span>}
+                                    <i className={`fa-solid fa-list-check text-3xl mb-3 ${hasLifetimeAccess ? 'text-white group-hover:scale-110' : 'text-slate-400'} transition-transform`}></i>
+                                    <span className={`font-black text-sm ${hasLifetimeAccess ? 'text-white' : 'text-primary dark:text-white'} mb-1`}>Checklist da Obra</span>
+                                    <span className={`text-[10px] font-medium ${hasLifetimeAccess ? 'text-amber-200' : 'text-slate-500 dark:text-slate-400'}`}>Garanta que nada será esquecido</span>
+                                    {!hasLifetimeAccess && <span className="text-[10px] text-slate-500 dark:text-slate-400 mt-2">Liberar Plano Vitalício</span>}
                                 </button>
                             </div>
 
                             {/* Bônus: IA da Obra */}
-                            <div className={`p-6 rounded-3xl flex flex-col items-center shadow-lg border relative ${hasLifetimeAccess ? 'bg-gradient-gold border-amber-900' : 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700'}`}>
+                            <div className={`p-6 rounded-3xl flex flex-col items-center shadow-lg border relative overflow-hidden group 
+                                ${hasLifetimeAccess ? 'bg-gradient-gold border-amber-900' : 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700'}`}>
                                 {!hasLifetimeAccess && (
                                     <div className="absolute inset-0 bg-black/50 rounded-3xl flex items-center justify-center z-10">
                                         <i className="fa-solid fa-lock text-white text-4xl"></i>
                                     </div>
                                 )}
                                 <button onClick={() => hasLifetimeAccess ? navigate('/ai-chat') : navigate('/settings')} disabled={!hasLifetimeAccess} className="w-full h-full absolute inset-0 flex flex-col items-center justify-center p-6 text-center z-20">
-                                    <i className={`fa-solid fa-robot text-2xl mb-2 ${hasLifetimeAccess ? 'text-white' : 'text-slate-400'}`}></i>
-                                    <span className={`font-bold text-sm ${hasLifetimeAccess ? 'text-white' : 'text-primary dark:text-white'}`}>Zé da Obra AI</span>
-                                    {!hasLifetimeAccess && <span className="text-[10px] text-slate-500 dark:text-slate-400 mt-1">Exclusivo Vitalício</span>}
+                                    <i className={`fa-solid fa-robot text-3xl mb-3 ${hasLifetimeAccess ? 'text-white group-hover:scale-110' : 'text-slate-400'} transition-transform`}></i>
+                                    <span className={`font-black text-sm ${hasLifetimeAccess ? 'text-white' : 'text-primary dark:text-white'} mb-1`}>Zé da Obra AI</span>
+                                    <span className={`text-[10px] font-medium ${hasLifetimeAccess ? 'text-amber-200' : 'text-slate-500 dark:text-slate-400'}`}>Seu especialista 24h na palma da mão</span>
+                                    {!hasLifetimeAccess && <span className="text-[10px] text-slate-500 dark:text-slate-400 mt-2">Liberar Plano Vitalício</span>}
                                 </button>
                             </div>
                         </div>
@@ -1062,13 +1132,13 @@ const WorkDetail: React.FC = () => {
                 <div className="animate-in slide-in-from-right-4">
                     <button onClick={() => setSubView('NONE')} className="mb-6 text-primary font-bold flex items-center gap-2 hover:opacity-80" aria-label="Voltar para Ferramentas"><i className="fa-solid fa-arrow-left"></i> Voltar</button>
                     
-                    {/* --- SUBVIEW: TEAM (Equipe e Fornecedores Separados) --- */}
-                    {subView === 'TEAM' && (
+                    {/* --- SUBVIEW: WORKERS (Equipe Separada) --- */}
+                    {subView === 'WORKERS' && (
                         <div className="space-y-8">
                             {/* Equipe Section */}
                             <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-sm border border-slate-200 dark:border-slate-800">
                                 <div className="flex justify-between items-center mb-6">
-                                    <h2 className="text-xl font-bold text-primary dark:text-white">Equipe</h2>
+                                    <h2 className="text-xl font-bold text-primary dark:text-white">Equipe de Profissionais</h2>
                                     <button onClick={() => openPersonModal('WORKER')} className="bg-primary text-white p-2 rounded-xl shadow-md hover:bg-primary-light transition-colors" aria-label="Adicionar profissional"><i className="fa-solid fa-plus"></i></button>
                                 </div>
                                 {workers.length === 0 ? (
@@ -1095,9 +1165,13 @@ const WorkDetail: React.FC = () => {
                                     </div>
                                 )}
                             </div>
+                        </div>
+                    )}
 
-                            {/* Fornecedores Section */}
-                            <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-sm border border-slate-200 dark:border-slate-800">
+                    {/* --- SUBVIEW: SUPPLIERS (Fornecedores Separados) --- */}
+                    {subView === 'SUPPLIERS' && (
+                        <div className="space-y-8">
+                             <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-sm border border-slate-200 dark:border-slate-800">
                                 <div className="flex justify-between items-center mb-6">
                                     <h2 className="text-xl font-bold text-primary dark:text-white">Fornecedores</h2>
                                     <button onClick={() => openPersonModal('SUPPLIER')} className="bg-primary text-white p-2 rounded-xl shadow-md hover:bg-primary-light transition-colors" aria-label="Adicionar fornecedor"><i className="fa-solid fa-plus"></i></button>
@@ -1128,6 +1202,7 @@ const WorkDetail: React.FC = () => {
                             </div>
                         </div>
                     )}
+
 
                     {/* --- SUBVIEW: REPORTS (Abas) --- */}
                     {subView === 'REPORTS' && (
@@ -1171,7 +1246,7 @@ const WorkDetail: React.FC = () => {
                                         <i className="fa-solid fa-circle-notch fa-spin text-slate-400 text-2xl mb-2"></i>
                                     ) : (
                                         <>
-                                            <i className="fa-solid fa-plus text-slate-400 text-2xl mb-2"></i>
+                                            <i className="fa-solid fa-camera-retro text-slate-400 text-3xl mb-2"></i>
                                             <p className="text-sm text-slate-500 dark:text-slate-400 font-bold">Clique para adicionar fotos</p>
                                             <p className="text-xs text-slate-400 dark:text-slate-500">JPG, PNG</p>
                                         </>
@@ -1184,7 +1259,18 @@ const WorkDetail: React.FC = () => {
                                         <p className="text-xs mt-2">Documente o progresso e os detalhes da sua obra!</p>
                                     </div>
                                 ) : (
-                                    photos.map(p => <img key={p.id} src={p.url} className="aspect-square object-cover rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm" alt={p.description} />)
+                                    photos.map(p => (
+                                        <div key={p.id} className="relative group aspect-square">
+                                            <img src={p.url} className="aspect-square object-cover rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm" alt={p.description} />
+                                            <button 
+                                                onClick={() => { /* Implement delete photo logic here */ }} 
+                                                className="absolute top-2 right-2 p-2 bg-red-500/70 text-white rounded-full hover:bg-red-600 transition-opacity opacity-0 group-hover:opacity-100"
+                                                aria-label="Excluir foto"
+                                            >
+                                                <i className="fa-solid fa-trash text-xs"></i>
+                                            </button>
+                                        </div>
+                                    ))
                                 )}
                             </div>
                         </div>
@@ -1200,7 +1286,7 @@ const WorkDetail: React.FC = () => {
                                     <i className="fa-solid fa-circle-notch fa-spin text-slate-400 text-2xl mb-2"></i>
                                 ) : (
                                     <>
-                                        <i className="fa-solid fa-file-arrow-up text-slate-400 text-2xl mb-2"></i>
+                                        <i className="fa-solid fa-file-arrow-up text-slate-400 text-3xl mb-2"></i>
                                         <p className="text-sm text-slate-500 dark:text-slate-400 font-bold">Arraste e solte ou clique para adicionar arquivos</p>
                                         <p className="text-xs text-slate-400 dark:text-slate-500">PDF, DOCX, XLS, DWG, etc.</p>
                                     </>
@@ -1216,12 +1302,12 @@ const WorkDetail: React.FC = () => {
                                 <div className="space-y-3">
                                     {files.map(f => (
                                         <a href={f.url} target="_blank" rel="noopener noreferrer" key={f.id} className="flex items-center gap-3 p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md transition-shadow">
-                                            <i className="fa-solid fa-file-alt text-lg text-primary"></i> {/* Changed to text-primary */}
+                                            <i className="fa-solid fa-file-alt text-lg text-primary"></i>
                                             <div className="flex-1">
                                                 <p className="font-bold text-primary dark:text-white text-sm">{f.name}</p>
                                                 <p className="text-xs text-slate-500 dark:text-slate-400">{f.category} • {parseDateNoTimezone(f.date)}</p>
                                             </div>
-                                            <i className="fa-solid fa-download text-slate-400"></i>
+                                            <button onClick={(e) => { e.preventDefault(); /* Implement delete file logic */ }} className="text-red-400 hover:text-red-600 p-2" aria-label="Excluir arquivo"><i className="fa-solid fa-trash text-sm"></i></button>
                                         </a>
                                     ))}
                                 </div>
@@ -1242,7 +1328,7 @@ const WorkDetail: React.FC = () => {
                                         className="p-5 rounded-2xl border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-secondary hover:shadow-md transition-shadow flex flex-col items-start text-left group"
                                         aria-label={`Ver modelo de contrato: ${contract.title}`}
                                     >
-                                        <span className="text-sm font-bold text-primary uppercase tracking-wider mb-2">{contract.category}</span> {/* Changed to text-primary */}
+                                        <span className="text-sm font-bold text-primary uppercase tracking-wider mb-2">{contract.category}</span>
                                         <h3 className="font-bold text-lg text-primary dark:text-white group-hover:text-secondary transition-colors">{contract.title}</h3>
                                         <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{contract.contentTemplate.substring(0, 100)}...</p>
                                     </button>
@@ -1257,7 +1343,7 @@ const WorkDetail: React.FC = () => {
                                 Utilize checklists por etapa para garantir que nada seja esquecido.
                             </p>
                             <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-sm border border-slate-200 dark:border-slate-800 mb-6">
-                                <label htmlFor="checklist-category" className="block text-sm font-medium text-primary dark:text-white mb-2">Filtrar por Etapa:</label>
+                                <label htmlFor="checklist-category" className="block text-sm font-medium text-primary dark:text-white mb-2">Filtrar/Criar por Etapa:</label>
                                 <select
                                     id="checklist-category"
                                     value={selectedChecklistCategory}
@@ -1270,6 +1356,8 @@ const WorkDetail: React.FC = () => {
                                         <option key={step.id} value={step.name}>{step.name}</option>
                                     ))}
                                     <option value="Geral">Geral</option>
+                                    <option value="Segurança">Segurança</option> {/* NEW: Example new category */}
+                                    <option value="Entrega">Entrega</option> {/* NEW: Example new category */}
                                 </select>
                             </div>
 
@@ -1493,24 +1581,30 @@ const WorkDetail: React.FC = () => {
             {/* Modal de Calculadora da Obra */}
             {isCalculatorModalOpen && (
                 <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-                    <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl w-full max-w-md shadow-xl border border-slate-200 dark:border-slate-800">
-                        <h3 className="font-bold text-xl text-primary dark:text-white mb-4">Calculadora da Obra</h3>
-                        <div className="space-y-4">
-                            <select value={calcType} onChange={e => setCalcType(e.target.value as typeof calcType)} className="w-full p-3 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white focus:ring-secondary focus:border-secondary outline-none transition-colors" aria-label="Tipo de cálculo">
-                                <option value="PISO">Calcular Piso</option>
-                                <option value="PAREDE">Calcular Parede</option>
-                                <option value="PINTURA">Calcular Pintura</option>
-                            </select>
-                            <input type="number" value={calcArea} onChange={e => setCalcArea(e.target.value)} placeholder="Área em m²" className="w-full p-3 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white focus:ring-secondary focus:border-secondary outline-none transition-colors" aria-label="Área em metros quadrados" />
+                    <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl w-full max-w-md shadow-xl border border-slate-200 dark:border-slate-800 animate-in fade-in zoom-in-95">
+                        <h3 className="font-bold text-2xl text-primary dark:text-white mb-6 text-center">Calculadora da Obra</h3>
+                        <div className="space-y-5">
+                            <div>
+                                <label htmlFor="calc-type" className="block text-sm font-bold text-primary dark:text-white mb-2">Tipo de Cálculo:</label>
+                                <select id="calc-type" value={calcType} onChange={e => setCalcType(e.target.value as typeof calcType)} className="w-full p-3 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white focus:ring-secondary focus:border-secondary outline-none transition-colors" aria-label="Tipo de cálculo">
+                                    <option value="PISO">Piso</option>
+                                    <option value="PAREDE">Parede</option>
+                                    <option value="PINTURA">Pintura</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label htmlFor="calc-area" className="block text-sm font-bold text-primary dark:text-white mb-2">Área (m²):</label>
+                                <input id="calc-area" type="number" value={calcArea} onChange={e => setCalcArea(e.target.value)} placeholder="Ex: 50" className="w-full p-3 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white focus:ring-secondary focus:border-secondary outline-none transition-colors" aria-label="Área em metros quadrados" />
+                            </div>
                             {calcResult.length > 0 && (
-                                <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-xl border border-green-100 dark:border-green-900 text-green-800 dark:text-green-200 font-bold text-sm">
-                                    <h4 className="font-black text-base mb-2">Resultado:</h4>
-                                    <ul className="list-disc list-inside space-y-1">
+                                <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-xl border border-green-100 dark:border-green-900 text-green-800 dark:text-green-200 font-bold text-base animate-in fade-in">
+                                    <h4 className="font-black text-lg mb-3 flex items-center gap-2 text-green-800 dark:text-green-200"><i className="fa-solid fa-check-circle"></i> Resultado:</h4>
+                                    <ul className="list-disc list-inside space-y-2">
                                         {calcResult.map((res, i) => <li key={i}>{res}</li>)}
                                     </ul>
                                 </div>
                             )}
-                            <button type="button" onClick={() => setIsCalculatorModalOpen(false)} className="w-full py-2 text-slate-500 font-medium hover:text-primary dark:hover:text-white transition-colors" aria-label="Fechar calculadora">Fechar</button>
+                            <button type="button" onClick={() => setIsCalculatorModalOpen(false)} className="w-full py-3 bg-primary text-white rounded-xl font-bold shadow-md hover:bg-primary-light transition-colors mt-6" aria-label="Fechar calculadora">Fechar</button>
                         </div>
                     </div>
                 </div>

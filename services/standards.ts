@@ -1,5 +1,4 @@
 
-
 // Standard Libraries for Construction Management
 
 // --- AVATAR CONFIG ---
@@ -537,6 +536,7 @@ export const STANDARD_JOB_ROLES = [
   'Carpinteiro',
   'Azulejista',
   'Mestre de Obras',
+  'Servente', // Adicionado para ser mais explícito
   'Outro'
 ];
 
@@ -553,6 +553,8 @@ export const STANDARD_SUPPLIER_CATEGORIES = [
   'Marmoraria',
   'Vidraçaria',
   'Locação de Equipamentos',
+  'Caminhão de Areia/Brita', // Adicionado
+  'Limpeza', // Adicionado
   'Outro'
 ];
 
@@ -744,14 +746,16 @@ export const CHECKLIST_TEMPLATES: Checklist[] = [
     name: 'Fundações - Pré-Concretagem',
     category: 'Fundações',
     items: [
-      { id: 'item1', text: 'Verificar nível da escavação', checked: false },
-      { id: 'item2', text: 'Conferir alinhamento das brocas/sapatas', checked: false },
-      { id: 'item3', text: 'Instalação da ferragem conforme projeto', checked: false },
-      { id: 'item4', text: 'Cobrimento mínimo da ferragem (esforço)', checked: false },
-      { id: 'item5', text: 'Limpeza do fundo da vala (sem barro/entulho)', checked: false },
-      { id: 'item6', text: 'Instalação dos arranques dos pilares', checked: false },
-      { id: 'item7', text: 'Presença do gabarito (linhas e níveis)', checked: false },
-      { id: 'item8', text: 'Verificar prumo e nível das formas', checked: false },
+      { id: 'item1', text: 'Verificar nível e esquadro da escavação', checked: false },
+      { id: 'item2', text: 'Conferir alinhamento e prumo das sapatas/brocas', checked: false },
+      { id: 'item3', text: 'Posicionamento da ferragem conforme projeto estrutural', checked: false },
+      { id: 'item4', text: 'Garantir cobrimento mínimo da ferragem (espaçadores)', checked: false },
+      { id: 'item5', text: 'Limpeza e umedecimento do fundo da vala antes da concretagem', checked: false },
+      { id: 'item6', text: 'Instalação e prumo dos arranques dos pilares e baldrames', checked: false },
+      { id: 'item7', text: 'Presença e conferência do gabarito (linhas e níveis)', checked: false },
+      { id: 'item8', text: 'Verificar se as formas estão escoradas e contraventadas', checked: false },
+      { id: 'item9', text: 'Preparar pontos de espera para instalações (hidráulica/elétrica)', checked: false },
+      { id: 'item10', text: 'Disponibilidade de cimento, areia, brita e água para o traço', checked: false },
     ],
   },
   {
@@ -760,11 +764,13 @@ export const CHECKLIST_TEMPLATES: Checklist[] = [
     name: 'Impermeabilização de Baldrame',
     category: 'Impermeabilização',
     items: [
-      { id: 'item10', text: 'Superfície limpa e seca', checked: false },
-      { id: 'item11', text: 'Aplicação de primer (se necessário)', checked: false },
-      { id: 'item12', text: 'Primeira demão de argamassa polimérica', checked: false },
-      { id: 'item13', text: 'Segunda demão cruzada (após secagem)', checked: false },
-      { id: 'item14', text: 'Proteção mecânica (regularização)', checked: false },
+      { id: 'item10', text: 'Superfície do baldrame limpa, seca e regularizada', checked: false },
+      { id: 'item11', text: 'Aplicação de primer ou promotor de aderência (se necessário)', checked: false },
+      { id: 'item12', text: 'Primeira demão de impermeabilizante (manta asfáltica ou argamassa polimérica)', checked: false },
+      { id: 'item13', text: 'Segunda demão cruzada (após secagem da primeira)', checked: false },
+      { id: 'item14', text: 'Teste de estanqueidade (se for área horizontal)', checked: false },
+      { id: 'item15', text: 'Execução da proteção mecânica (regularização com argamassa)', checked: false },
+      { id: 'item16', text: 'Verificar rodapés e cantos (arredondamento/reforço)', checked: false },
     ],
   },
   {
@@ -773,12 +779,14 @@ export const CHECKLIST_TEMPLATES: Checklist[] = [
     name: 'Elétrica - Antes do Reboco',
     category: 'Fiação Elétrica Geral',
     items: [
-      { id: 'item20', text: 'Passagem de conduítes (garantir sem amassados)', checked: false },
-      { id: 'item21', text: 'Fixação das caixas 4x2 e 4x4', checked: false },
-      { id: 'item22', text: 'Passagem de fios (bitolas corretas)', checked: false },
-      { id: 'item23', text: 'Identificação dos circuitos', checked: false },
-      { id: 'item24', text: 'Conexão provisória para teste (segurança)', checked: false },
-      { id: 'item25', text: 'Aterramento (se aplicável)', checked: false },
+      { id: 'item20', text: 'Passagem e fixação de todos os conduítes (garantir sem amassados)', checked: false },
+      { id: 'item21', text: 'Fixação das caixas 4x2, 4x4 e de teto (alinhamento e prumo)', checked: false },
+      { id: 'item22', text: 'Passagem de fios com bitolas corretas (iluminação, tomadas, chuveiro)', checked: false },
+      { id: 'item23', text: 'Identificação e etiquetagem dos circuitos (tomadas, iluminação, DRs)', checked: false },
+      { id: 'item24', text: 'Conexão provisória para teste de continuidade (segurança)', checked: false },
+      { id: 'item25', text: 'Instalação do sistema de aterramento (hastes, malha, caixa de inspeção)', checked: false },
+      { id: 'item26', text: 'Verificar passagem para ar condicionado, aquecedores, etc.', checked: false },
+      { id: 'item27', text: 'Posicionamento do quadro de distribuição (altura e acesso)', checked: false },
     ],
   },
   {
@@ -787,11 +795,13 @@ export const CHECKLIST_TEMPLATES: Checklist[] = [
     name: 'Hidráulica - Instalação de Banheiro',
     category: 'Hidráulica de Banheiro',
     items: [
-      { id: 'item30', text: 'Verificar caimento do esgoto', checked: false },
-      { id: 'item31', text: 'Instalação de registros (nível e prumo)', checked: false },
-      { id: 'item32', text: 'Teste de estanqueidade (pressão)', checked: false },
-      { id: 'item33', text: 'Bolsões de ar na tubulação (evitar)', checked: false },
-      { id: 'item34', text: 'Fixação dos pontos de água quente/fria', checked: false },
+      { id: 'item30', text: 'Verificar caimento adequado do esgoto (ralos, vasos, pias)', checked: false },
+      { id: 'item31', text: 'Instalação e alinhamento dos registros (chuveiro, gaveta, pressão)', checked: false },
+      { id: 'item32', text: 'Teste de estanqueidade (pressão) da tubulação de água fria/quente', checked: false },
+      { id: 'item33', text: 'Eliminar bolsões de ar na tubulação para evitar ruídos e golpes de aríete', checked: false },
+      { id: 'item34', text: 'Fixação segura e no nível correto dos pontos de água quente/fria', checked: false },
+      { id: 'item35', text: 'Posicionamento e diâmetro correto dos pontos de esgoto', checked: false },
+      { id: 'item36', text: 'Proteção das tubulações contra danos durante o reboco', checked: false },
     ],
   },
   {
@@ -800,24 +810,64 @@ export const CHECKLIST_TEMPLATES: Checklist[] = [
     name: 'Pintura - Preparação de Superfície',
     category: 'Preparação de Superfície (Lixar/Massa)',
     items: [
-      { id: 'item40', text: 'Lixamento completo da parede', checked: false },
-      { id: 'item41', text: 'Remoção total do pó', checked: false },
-      { id: 'item42', text: 'Aplicação de massa corrida (se necessário)', checked: false },
-      { id: 'item43', text: 'Reaplique massa e lixe, se for o caso', checked: false },
-      { id: 'item44', text: 'Isolamento de rodapés e janelas com fita', checked: false },
+      { id: 'item40', text: 'Lixamento completo da parede (lixa fina para acabamento)', checked: false },
+      { id: 'item41', text: 'Remoção total do pó e resíduos (pano úmido)', checked: false },
+      { id: 'item42', text: 'Aplicação de massa corrida (interna) ou acrílica (externa) para corrigir imperfeições', checked: false },
+      { id: 'item43', text: 'Reaplique massa e lixe novamente, se for o caso, até superfície lisa', checked: false },
+      { id: 'item44', text: 'Isolamento de rodapés, batentes, janelas, espelhos de tomada com fita crepe', checked: false },
+      { id: 'item45', text: 'Aplicação de selador/fundo preparador (principalmente em paredes novas)', checked: false },
+      { id: 'item46', text: 'Verificar umidade ou mofo na parede (tratar antes de pintar)', checked: false },
     ],
   },
-  // Default checklists that apply to any step (if not already covered by specific step templates)
   {
-    id: 'ckl-seguranca-geral',
+    id: 'ckl-geral-1',
     workId: 'mock-work-id',
-    name: 'Segurança Geral da Obra',
+    name: 'Geral - Início da Obra',
     category: 'Geral',
     items: [
-      { id: 'item50', text: 'Uso de EPIs (capacete, luvas, óculos)', checked: false },
-      { id: 'item51', text: 'Caminhos desobstruídos', checked: false },
-      { id: 'item52', text: 'Placas de sinalização (se necessário)', checked: false },
-      { id: 'item53', text: 'Extintor de incêndio acessível', checked: false },
+      { id: 'item50', text: 'Terreno limpo e demarcado', checked: false },
+      { id: 'item51', text: 'Contratos de equipe e fornecedores assinados', checked: false },
+      { id: 'item52', text: 'Licenças e alvarás em dia', checked: false },
+      { id: 'item53', text: 'Canteiro de obras organizado e seguro', checked: false },
+      { id: 'item54', text: 'Pontos de água e luz provisórios instalados', checked: false },
+      { id: 'item55', text: 'EPIs disponíveis para todos os trabalhadores', checked: false },
+    ],
+  },
+  {
+    id: 'ckl-seguranca-1',
+    workId: 'mock-work-id',
+    name: 'Segurança e EPIs',
+    category: 'Segurança',
+    items: [
+      { id: 'item60', text: 'Capacete de segurança em uso', checked: false },
+      { id: 'item61', text: 'Luvas de proteção adequadas para a tarefa', checked: false },
+      { id: 'item62', text: 'Óculos de segurança ou protetor facial', checked: false },
+      { id: 'item63', text: 'Calçados de segurança com biqueira', checked: false },
+      { id: 'item64', text: 'Cinto de segurança e linha de vida para trabalhos em altura', checked: false },
+      { id: 'item65', text: 'Proteção auricular (abafadores ou plugs)', checked: false },
+      { id: 'item66', text: 'Máscaras de proteção respiratória (contra pó ou fumos)', checked: false },
+      { id: 'item67', text: 'Extintores de incêndio próximos e desobstruídos', checked: false },
+      { id: 'item68', text: 'Isolamento de áreas de risco (valas, quedas)', checked: false },
+      { id: 'item69', text: 'Primeiros socorros e kit de emergência acessíveis', checked: false },
+    ],
+  },
+  {
+    id: 'ckl-entrega-1',
+    workId: 'mock-work-id',
+    name: 'Entrega Final da Obra',
+    category: 'Entrega',
+    items: [
+      { id: 'item70', text: 'Limpeza geral pós-obra (vidros, pisos, paredes)', checked: false },
+      { id: 'item71', text: 'Teste de todas as tomadas e interruptores', checked: false },
+      { id: 'item72', text: 'Teste de todas as torneiras, descargas e ralos (caimento)', checked: false },
+      { id: 'item73', text: 'Verificar portas e janelas (funcionamento, vedação, ferragens)', checked: false },
+      { id: 'item74', text: 'Retoques de pintura e pequenos acabamentos', checked: false },
+      { id: 'item75', text: 'Remoção de todo o entulho e resíduos da obra', checked: false },
+      { id: 'item76', text: 'Conferência final com o proprietário (lista de pendências)', checked: false },
+      { id: 'item77', text: 'Entrega de chaves e manuais de equipamentos', checked: false },
+      { id: 'item78', text: 'Quitação final de todos os pagamentos (contratados e fornecedores)', checked: false },
+      { id: 'item79', text: 'Documento de entrega e quitação assinado por ambas as partes', checked: false },
     ],
   },
 ];
+    
