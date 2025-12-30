@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
@@ -7,8 +6,7 @@ import { useAuth } from '../contexts/AuthContext.tsx';
 import { dbService } from '../services/db.ts';
 import { StepStatus, FileCategory, ExpenseCategory, type Work, type Worker, type Supplier, type Material, type Step, type Expense, type WorkPhoto, type WorkFile } from '../types.ts';
 import { ZeModal } from '../components/ZeModal.tsx';
-// Fix: Remove unused imports and adjust for new exports in standards.ts
-import { ZE_AVATAR, ZE_AVATAR_FALLBACK, STANDARD_JOB_ROLES, STANDARD_SUPPLIER_CATEGORIES } from '../services/standards.ts';
+import { STANDARD_JOB_ROLES, STANDARD_SUPPLIER_CATEGORIES, ZE_AVATAR, ZE_AVATAR_FALLBACK } from '../services/standards.ts';
 
 // --- TYPES FOR VIEW STATE ---
 type MainTab = 'ETAPAS' | 'MATERIAIS' | 'FINANCEIRO' | 'FERRAMENTAS';
@@ -67,8 +65,7 @@ const WorkDetail: React.FC = () => {
     const [matPlannedQty, setMatPlannedQty] = useState('');
     const [matUnit, setMatUnit] = useState('');
     const [matBuyQty, setMatBuyQty] = useState('');
-    // Fix: Rename to avoid redeclaration error
-    const [matBuyCost, setMatBuyCost] = useState('');
+    const [matBuyCost, setMatBuyCost] = useState(''); // Keep this for editing existing materials
 
     const [addMatModal, setAddMatModal] = useState(false);
     const [newMatName, setNewMatName] = useState('');
@@ -78,8 +75,7 @@ const WorkDetail: React.FC = () => {
     const [newMatStepId, setNewMatStepId] = useState('');
     const [newMatBuyNow, setNewMatBuyNow] = useState(false);
     const [newMatBuyQty, setNewMatBuyQty] = useState('');
-    // Fix: Rename to avoid redeclaration error
-    const [newMatBuyCost, setNewMatBuyCost] = useState('');
+    const [newMatBuyCost, setNewMatBuyCost] = useState(''); // Corrected name for new material purchases
 
     const [isStepModalOpen, setIsStepModalOpen] = useState(false);
     const [stepModalMode, setStepModalMode] = useState<'ADD' | 'EDIT'>('ADD');
@@ -223,7 +219,6 @@ const WorkDetail: React.FC = () => {
                 unit: matUnit
             });
             if (matBuyQty && Number(matBuyQty) > 0) {
-                // Fix: Use the correct state variable for matBuyCost
                 await dbService.registerMaterialPurchase(materialModal.material.id, matName, matBrand, Number(matPlannedQty), matUnit, Number(matBuyQty), Number(matBuyCost));
             }
             setMaterialModal({ isOpen: false, material: null });
@@ -438,11 +433,19 @@ const WorkDetail: React.FC = () => {
                                 <h2 className="text-xl font-bold">Cronograma</h2>
                                 <button onClick={() => { setStepModalMode('ADD'); setIsStepModalOpen(true); }} className="bg-primary text-white p-2 rounded-lg"><i className="fa-solid fa-plus"></i></button>
                             </div>
-                            {steps.map(s => (
+                            {steps.map((s, index) => (
                                 <div key={s.id} className="bg-white dark:bg-slate-900 p-4 rounded-2xl border flex items-center gap-4">
-                                    <button onClick={() => handleStepStatusClick(s)} className={`w-8 h-8 rounded-full border-2 flex items-center justify-center ${s.status === StepStatus.COMPLETED ? 'bg-green-500 border-green-500 text-white' : 'text-slate-300'}`}><i className="fa-solid fa-check"></i></button>
+                                    <button 
+                                        onClick={() => handleStepStatusClick(s)} 
+                                        className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-white 
+                                            ${s.status === StepStatus.COMPLETED ? 'bg-green-500 border-green-500' : 
+                                              s.status === StepStatus.IN_PROGRESS ? 'bg-orange-500 border-orange-500' : 
+                                              'bg-slate-300 border-slate-300'}`}
+                                    >
+                                        <i className="fa-solid fa-check"></i>
+                                    </button>
                                     <div className="flex-1" onClick={() => { setStepModalMode('EDIT'); setCurrentStepId(s.id); setStepName(s.name); setStepStart(s.startDate); setStepEnd(s.endDate); setIsStepModalOpen(true); }}>
-                                        <p className="font-bold">{s.name}</p>
+                                        <p className="font-bold">{index + 1}. {s.name}</p> {/* Adiciona numeração aqui */}
                                         <p className="text-xs text-slate-500">{parseDateNoTimezone(s.startDate)} - {parseDateNoTimezone(s.endDate)}</p>
                                     </div>
                                     <button onClick={() => handleDeleteStep(s.id)} className="text-red-300"><i className="fa-solid fa-trash"></i></button>
