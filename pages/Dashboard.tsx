@@ -509,6 +509,22 @@ const Dashboard: React.FC = () => {
         </button>
       </div>
 
+      {/* Zé da Obra Tip - NEW POSITION */}
+      {zeTip && (
+        <div className={cx(surface, "rounded-3xl mb-8 flex items-start gap-4 p-5 md:p-6 mx-2 sm:mx-0")}> {/* Reduced padding and gap */}
+          <div className="w-14 h-14 rounded-full p-1 bg-gradient-to-br from-secondary to-orange-400 shadow-lg shrink-0 animate-float"> {/* Reduced size */}
+            <img src={ZE_AVATAR} className="w-full h-full object-cover rounded-full border-2 border-white dark:border-slate-800" onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK} alt="Zé da Obra Avatar" />
+          </div>
+          <div>
+            <p className="text-xs font-black uppercase tracking-widest text-secondary mb-1">DICAS DO ZÉ DA OBRA</p>
+            {zeTip.tag && ( // Optionally display the original tag as a sub-label if it exists
+              <p className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-2">{zeTip.tag}</p> // Muted and slightly smaller
+            )}
+            <p className="text-sm font-medium text-slate-700 dark:text-slate-300 leading-relaxed">{zeTip.text}</p> {/* Reduced text-md to text-sm */}
+          </div>
+        </div>
+      )}
+
       {/* Work Selector & Current Work Overview */}
       {focusWork && (
         <div className={cx(surface, "rounded-3xl p-6 md:p-8 mb-8 mx-2 sm:mx-0")}> {/* Reduced outer margin for mobile, restored p-6 */}
@@ -666,19 +682,6 @@ const Dashboard: React.FC = () => {
       {focusWork && materials && steps && (
         <div className="mb-8 mx-2 sm:mx-0"> {/* Reduced outer margin for mobile */}
           <MaterialsNeeded focusWork={focusWork} materials={materials} steps={steps} onOpenWork={() => handleOpenWorkDetail(focusWork.id)} />
-        </div>
-      )}
-
-      {/* Zé da Obra Tip */}
-      {zeTip && (
-        <div className={cx(surface, "rounded-3xl mb-8 flex items-start gap-4 p-5 md:p-6 mx-2 sm:mx-0")}> {/* Reduced padding and gap */}
-          <div className="w-14 h-14 rounded-full p-1 bg-gradient-to-br from-secondary to-orange-400 shadow-lg shrink-0 animate-float"> {/* Reduced size */}
-            <img src={ZE_AVATAR} className="w-full h-full object-cover rounded-full border-2 border-white dark:border-slate-800" onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK} alt="Zé da Obra Avatar" />
-          </div>
-          <div>
-            <p className="text-xs font-bold uppercase tracking-widest text-secondary mb-1">{zeTip.tag}</p>
-            <p className="text-sm font-medium text-slate-700 dark:text-slate-300 leading-relaxed">{zeTip.text}</p> {/* Reduced text-md to text-sm */}
-          </div>
         </div>
       )}
 
