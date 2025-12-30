@@ -960,8 +960,7 @@ const WorkDetail: React.FC = () => {
                                                                             <>
                                                                                 <div className="h-1 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden mt-2 mb-1">
                                                                                     <div className="h-full" style={{ width: `${Math.min(100, progress)}%`, backgroundColor: progressBarColor }}></div>
-                                                                                </div>
-                                                                                <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400">
+                                                                                    <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400">
                                                                                         <span>{statusText}</span>
                                                                                         <span>{formatCurrency(e.amount)} / {formatCurrency(e.totalAgreed)}</span>
                                                                                     </div>
@@ -1067,6 +1066,7 @@ const WorkDetail: React.FC = () => {
                 </>
             ) : (
                 <div className="animate-in slide-in-from-right-4">
+                    {/* Fixed: Simplified onClick for this button, as it's only rendered when subView is not 'NONE' */}
                     <button onClick={() => setSubView('NONE')} className="mb-6 text-secondary font-bold flex items-center gap-2 hover:opacity-80" aria-label="Voltar para Ferramentas"><i className="fa-solid fa-arrow-left"></i> Voltar</button>
                     {subView === 'TEAM' && (
                         <div className="space-y-8"> {/* Increased space-y */}
@@ -1470,63 +1470,4 @@ const WorkDetail: React.FC = () => {
                             <input type="number" value={calcArea} onChange={e => setCalcArea(e.target.value)} placeholder="Área em m²" className="w-full p-3 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white focus:ring-secondary focus:border-secondary outline-none transition-colors" aria-label="Área em metros quadrados" />
                             {calcResult.length > 0 && (
                                 <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-xl border border-green-100 dark:border-green-900 text-green-800 dark:text-green-200 font-bold text-sm">
-                                    <h4 className="font-black text-base mb-2">Resultado:</h4>
-                                    <ul className="list-disc list-inside space-y-1">
-                                        {calcResult.map((res, i) => <li key={i}>{res}</li>)}
-                                    </ul>
-                                </div>
-                            )}
-                            <button type="button" onClick={() => setIsCalculatorModalOpen(false)} className="w-full py-2 text-slate-500 font-medium hover:text-primary dark:hover:text-white transition-colors" aria-label="Fechar calculadora">Fechar</button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Modal de Visualização de Contrato */}
-            {isContractModalOpen && viewContract && (
-                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-                    <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl w-full max-w-2xl h-[90vh] overflow-hidden flex flex-col shadow-xl border border-slate-200 dark:border-slate-800">
-                        <h3 className="font-bold text-2xl text-primary dark:text-white mb-2">{viewContract.title}</h3>
-                        <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-6 border-b border-slate-100 dark:border-slate-800 pb-4">{viewContract.category}</p>
-                        
-                        <div className="flex-1 overflow-y-auto pr-3 mb-6 custom-scrollbar text-slate-700 dark:text-slate-300 text-sm leading-relaxed whitespace-pre-wrap font-mono">
-                            {viewContract.contentTemplate}
-                        </div>
-
-                        <div className="flex flex-col gap-3 mt-auto">
-                            <button 
-                                onClick={() => navigator.clipboard.writeText(viewContract.contentTemplate).then(() => alert('Contrato copiado para a área de transferência!'))}
-                                className="w-full py-3 bg-primary text-white rounded-xl font-bold shadow-md hover:bg-primary-light transition-colors"
-                                aria-label="Copiar texto do contrato"
-                            >
-                                <i className="fa-solid fa-copy mr-2"></i> Copiar Texto
-                            </button>
-                            <button 
-                                onClick={() => alert('Exportar para Word: Funcionalidade em desenvolvimento!')}
-                                className="w-full py-3 bg-secondary text-white rounded-xl font-bold shadow-md hover:bg-secondary-dark transition-colors"
-                                aria-label="Exportar contrato para Word"
-                            >
-                                <i className="fa-solid fa-file-word mr-2"></i> Exportar para Word (Em Breve)
-                            </button>
-                            <button type="button" onClick={() => {setIsContractModalOpen(false); setViewContract(null);}} className="w-full py-2 text-slate-500 font-medium hover:text-primary dark:hover:text-white transition-colors" aria-label="Fechar modal de contrato">Fechar</button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            <ZeModal
-                isOpen={zeModal.isOpen}
-                title={zeModal.title}
-                message={zeModal.message}
-                confirmText={zeModal.confirmText}
-                cancelText={zeModal.cancelText}
-                onConfirm={zeModal.onConfirm}
-                onCancel={zeModal.onCancel}
-                type={zeModal.type}
-                isConfirming={zeModal.isConfirming}
-            />
-        </React.Fragment>
-    );
-};
-
-export default WorkDetail;
+                                    <h4 className="font-black text-
