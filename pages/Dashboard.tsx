@@ -278,7 +278,7 @@ const MaterialsNeeded = ({
           <p className="text-lg font-black text-slate-900 dark:text-white">Materiais para Compra</p>
           <p className={cx("text-xs font-semibold", mutedText)}>Organize suas compras para não atrasar a obra</p>
         </div>
-        <button onClick={() => onOpenWork()} className="text-xs font-extrabold text-secondary hover:opacity-80 px-3 py-1.5 rounded-lg bg-secondary/5 transition-colors" aria-label="Ver todos os materiais">
+        <button onClick={onOpenWork} className="text-xs font-extrabold text-secondary hover:opacity-80 px-3 py-1.5 rounded-lg bg-secondary/5 transition-colors" aria-label="Ver todos os materiais">
           Ver todos os materiais →
         </button>
       </div>
@@ -535,7 +535,7 @@ const Dashboard: React.FC = () => {
               <select
                 value={focusWork.id}
                 onChange={(e) => setFocusWork(works.find(w => w.id === e.target.value) || null)}
-                className="block min-w-[150px] pl-3 pr-10 py-2 text-base border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white rounded-xl focus:outline-none focus:ring-secondary focus:border-secondary transition-colors cursor-pointer"
+                className="block pl-3 pr-10 py-2 text-base border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white rounded-xl focus:outline-none focus:ring-secondary focus:border-secondary transition-colors cursor-pointer"
                 aria-label="Selecionar Obra Focada"
               >
                 {works.map((w) => (

@@ -110,7 +110,7 @@ const WorkDetail: React.FC = () => {
     // NEW: Checklist states
     const [isChecklistModalOpen, setIsChecklistModalOpen] = useState(false);
     const [currentChecklist, setCurrentChecklist] = useState<Checklist | null>(null);
-    const [allChecklists, setAllChecklists] = useState<Checklist[]>([]);
+    const [allChecklists, setAllChecklists] = useState<Checklist[]>([] );
     const [selectedChecklistCategory, setSelectedChecklistCategory] = useState<string>('all'); // Filter checklists by step category
 
 
@@ -748,7 +748,7 @@ const WorkDetail: React.FC = () => {
                                                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 pl-12">{parseDateNoTimezone(step.startDate)} - {parseDateNoTimezone(step.endDate)}</p>
                                             </div>
 
-                                            <div className="space-y-3 pl-4 border-l-2 border-slate-100 dark:border-slate-800 ml-4">
+                                            <div className="space-y-3 pl-4 border-l-2 border-slate-100 dark:border-slate-800">
                                                 {stepMats.length === 0 ? (
                                                     <p className="text-center text-slate-400 py-4 italic text-sm">Nenhum material associado a esta etapa.</p>
                                                 ) : (
@@ -867,7 +867,7 @@ const WorkDetail: React.FC = () => {
                                                 return (
                                                     <div key={stepId} className="mb-4">
                                                         {/* Step "Chapter" Card for Financeiro */}
-                                                        <div className={`bg-white dark:bg-slate-900 rounded-2xl p-4 mb-4 border border-slate-200 dark:border-slate-800 shadow-lg ${stepStatusBgClass} ${stepStatusTextColorClass} pl-8 ml-4`}>
+                                                        <div className={`bg-white dark:bg-slate-900 rounded-2xl p-4 mb-4 border border-slate-200 dark:border-slate-800 shadow-lg ${stepStatusBgClass} ${stepStatusTextColorClass} pl-6 ml-3`}>
                                                             <div className="flex items-center justify-between">
                                                                 <h3 className="font-black text-xl text-primary dark:text-white flex items-center gap-2">
                                                                     <span className={`w-8 h-8 rounded-full flex items-center justify-center text-base ${stepStatusBgClass.replace('/10', '/20').replace('bg-', 'bg-').replace('dark:bg-green-900/20', 'dark:bg-green-800').replace('dark:text-green-300', 'dark:text-white')}`}> 
@@ -882,7 +882,7 @@ const WorkDetail: React.FC = () => {
                                                             <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 pl-12">{parseDateNoTimezone(step.startDate)} - {parseDateNoTimezone(step.endDate)}</p>
                                                         </div>
 
-                                                        <div className="space-y-3 pl-12 border-l-2 border-slate-100 dark:border-slate-800 ml-8">
+                                                        <div className="space-y-3 pl-8 border-l-2 border-slate-100 dark:border-slate-800 ml-4">
                                                             {stepGroup.expenses.map(e => {
                                                                 const isEmpreita = e.totalAgreed && e.totalAgreed > 0;
                                                                 let statusText = '';
@@ -925,10 +925,10 @@ const WorkDetail: React.FC = () => {
                                             {/* Unlinked expenses within this category */}
                                             {groupedExpenses[category].unlinkedExpenses.length > 0 && (
                                                 <div className="mb-4">
-                                                    <h4 className="text-sm font-black uppercase text-slate-500 dark:text-slate-400 mb-2 border-b border-slate-100 dark:border-slate-800 pb-1 pl-8 ml-4">
+                                                    <h4 className="text-sm font-black uppercase text-slate-500 dark:text-slate-400 mb-2 border-b border-slate-100 dark:border-slate-800 pb-1 pl-6 ml-3">
                                                         Gastos Não Associados à Etapa
                                                     </h4>
-                                                    <div className="space-y-3 pl-12 border-l-2 border-slate-100 dark:border-slate-800 ml-8">
+                                                    <div className="space-y-3 pl-8 border-l-2 border-slate-100 dark:border-slate-800 ml-4">
                                                         {groupedExpenses[category].unlinkedExpenses.map(e => {
                                                             const isEmpreita = e.totalAgreed && e.totalAgreed > 0;
                                                             let statusText = '';
