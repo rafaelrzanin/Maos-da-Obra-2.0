@@ -151,5 +151,8 @@ export default function Register() {
                 </span>
             </p> {/* Melhorado visual do plano */}
         </div>
-
-        <div
+      </div> {/* Closing the main content div */}
+    </div> // Closing the main container div
+  );
+}
+    
