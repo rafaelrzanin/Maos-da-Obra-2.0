@@ -103,6 +103,7 @@ const WorkDetail: React.FC = () => {
     const [personEmail, setPersonEmail] = useState('');
     const [personAddress, setPersonAddress] = useState('');
     const [workerDailyRate, setWorkerDailyRate] = useState('');
+    const [isPersonSaving, setIsPersonSaving] = useState(false); // NEW: State for person modal loading
 
     const [isContractModalOpen, setIsContractModalOpen] = useState(false);
     const [viewContract, setViewContract] = useState<Contract | null>(null);
@@ -197,7 +198,7 @@ const WorkDetail: React.FC = () => {
                 try {
                     await dbService.deleteStep(stepId, work.id);
                     load();
-                    setZeModal({ isOpen: false });
+                    setZeModal({ isOpen: false, title: 'Sucesso!', message: 'Etapa excluída com sucesso.', confirmText: 'Ok', type: 'SUCCESS' }); // Show success message
                 } catch (error: any) {
                     console.error("Erro ao deletar etapa:", error);
                     setZeModal({
@@ -350,18 +351,14 @@ const WorkDetail: React.FC = () => {
 
     const handleSavePerson = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!user || !work) {
-            setZeModal({
-                isOpen: true,
-                title: 'Erro de Autenticação',
-                message: 'Usuário ou obra não identificados. Por favor, recarregue a página.',
-                confirmText: 'Entendido',
-                onCancel: () => setZeModal({ isOpen: false }),
-                type: 'ERROR'
-            });
+        if (!user || !work || isPersonSaving) { // Disable if already saving
+            console.log("[handleSavePerson] Aborting save: user/work missing or already saving.");
             return;
         }
         
+        setIsPersonSaving(true); // Start saving
+        console.log("[handleSavePerson] Started saving. isPersonSaving set to true.");
+
         try {
             if (personMode === 'WORKER') {
                 const payload: Omit<Worker, 'id'> = { 
@@ -397,8 +394,8 @@ const WorkDetail: React.FC = () => {
                     await dbService.addSupplier(payload);
                 }
             }
-            setIsPersonModalOpen(false);
-            load();
+            
+            setIsPersonModalOpen(false); // Close person modal first
             setZeModal({
                 isOpen: true,
                 title: 'Sucesso!',
@@ -407,11 +404,14 @@ const WorkDetail: React.FC = () => {
                 onCancel: () => setZeModal({ isOpen: false }),
                 type: 'SUCCESS'
             });
+            console.log("[handleSavePerson] Person modal closed, success ZeModal shown. Reloading data...");
+            await load(); // Reload data after showing success
+            console.log("[handleSavePerson] Data reloaded successfully.");
+
         } catch (error: any) {
             console.error(`[handleSavePerson] Erro ao salvar ${personMode === 'WORKER' ? 'profissional' : 'fornecedor'}:`, error);
             let userMessage = `Não foi possível salvar o ${personMode === 'WORKER' ? 'profissional' : 'fornecedor'}.`;
             
-            // NEW: More specific error message for missing daily_rate column
             if (error.message?.includes("'daily_rate' column of 'workers' in the schema cache")) {
                 userMessage += `\n\nParece que a coluna 'daily_rate' está faltando na tabela 'workers' do seu banco de dados Supabase. Por favor, adicione-a.`;
                 userMessage += `\n\n**Instrução SQL:** \`\`\`ALTER TABLE workers ADD COLUMN daily_rate NUMERIC NULL DEFAULT 0;\`\`\``;
@@ -429,21 +429,56 @@ const WorkDetail: React.FC = () => {
                 onCancel: () => setZeModal({ isOpen: false }),
                 type: 'ERROR'
             });
+            console.log("[handleSavePerson] Error occurred, error ZeModal shown.");
+
+        } finally {
+            setIsPersonSaving(false); // End saving
+            console.log("[handleSavePerson] Finally block: isPersonSaving set to false.");
         }
     };
 
     const handleDeletePerson = (pid: string, wid: string, mode: 'WORKER' | 'SUPPLIER') => {
         setZeModal({
-            isOpen: true, title: 'Remover?', message: 'Deseja remover esta pessoa?', confirmText: 'Remover', type: 'DANGER',
+            isOpen: true, 
+            title: 'Remover?', 
+            message: 'Deseja remover esta pessoa?', 
+            confirmText: 'Remover', 
+            type: 'DANGER',
             onConfirm: async () => { 
+                setZeModal(prev => ({ ...prev, isConfirming: true })); // Indicate action is confirming
+                console.log(`[handleDeletePerson] Deleting ${mode} ${pid} from work ${wid}.`);
                 try {
                     if (mode === 'WORKER') await dbService.deleteWorker(pid, wid); 
                     else await dbService.deleteSupplier(pid, wid); 
-                    load(); 
-                    setZeModal({ isOpen: false, title: 'Sucesso!', message: `${mode === 'WORKER' ? 'Profissional' : 'Fornecedor'} removido com sucesso.`, confirmText: 'Ok', onCancel: () => setZeModal({ isOpen: false }), type: 'SUCCESS' });
+                    
+                    setZeModal({ 
+                        isOpen: true, 
+                        title: 'Sucesso!', 
+                        message: `${mode === 'WORKER' ? 'Profissional' : 'Fornecedor'} removido com sucesso.`, 
+                        confirmText: 'Ok', 
+                        onCancel: () => setZeModal({ isOpen: false }), 
+                        type: 'SUCCESS' 
+                    });
+                    console.log(`[handleDeletePerson] ${mode} deleted, success ZeModal shown. Reloading data...`);
+                    await load(); // Reload after success message is shown
+                    console.log(`[handleDeletePerson] Data reloaded.`);
+
                 } catch (error: any) {
                     console.error(`Erro ao deletar ${mode === 'WORKER' ? 'profissional' : 'fornecedor'}:`, error);
-                    setZeModal({ isOpen: true, title: 'Erro!', message: `Não foi possível remover: ${error.message}`, confirmText: 'Entendido', onCancel: () => setZeModal({ isOpen: false }), type: 'ERROR' });
+                    setZeModal({ 
+                        isOpen: true, 
+                        title: 'Erro!', 
+                        message: `Não foi possível remover: ${error.message}`, 
+                        confirmText: 'Entendido', 
+                        onCancel: () => setZeModal({ isOpen: false }), 
+                        type: 'ERROR' 
+                    });
+                    console.log(`[handleDeletePerson] Error occurred, error ZeModal shown.`);
+
+                } finally {
+                    setZeModal(prev => ({ ...prev, isConfirming: false })); // Reset confirming state
+                    console.log("[handleDeletePerson] Finally block: isConfirming reset.");
+
                 }
             },
             onCancel: () => setZeModal({ isOpen: false })
@@ -1485,7 +1520,7 @@ const WorkDetail: React.FC = () => {
                             </label>
                             {newMatBuyNow && (
                                 <div className="grid grid-cols-2 gap-3 animate-in fade-in bg-slate-50 dark:bg-slate-800 p-4 rounded-xl border border-slate-100 dark:border-slate-700">
-                                    <input type="number" value={newMatBuyQty} onChange={e => setNewMatBuyQty(e.target.value)} placeholder="Qtd. Comprada" className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white focus:ring-secondary focus:border-secondary outline-none transition-colors" required aria-label="Quantidade Comprada Agora" />
+                                    <input type="number" value={newMatBuyQty} onChange={e => setNewMatBuyQty(e.target.value)} placeholder="Qtd. Comprada Agora" className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white focus:ring-secondary focus:border-secondary outline-none transition-colors" required aria-label="Quantidade Comprada Agora" />
                                     <input type="number" value={newMatBuyCost} onChange={e => setNewMatBuyCost(e.target.value)} placeholder={formatCurrency(0).replace('R$', '')} className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white focus:ring-secondary focus:border-secondary outline-none transition-colors" required aria-label="Custo Total da Compra" />
                                 </div>
                             )}
@@ -1608,8 +1643,23 @@ const WorkDetail: React.FC = () => {
                             </div>
                             
                             {/* Bloco 2 - Ação */}
-                            <button type="submit" className="w-full py-3 bg-primary text-white rounded-xl font-bold shadow-md hover:bg-primary-light transition-colors" aria-label="Salvar pessoa">Salvar {personMode === 'WORKER' ? 'Profissional' : 'Fornecedor'}</button>
-                            <button type="button" onClick={() => setIsPersonModalOpen(false)} className="w-full py-2 text-slate-500 font-medium hover:text-primary dark:hover:text-white transition-colors" aria-label="Cancelar">Cancelar</button>
+                            <button 
+                                type="submit" 
+                                disabled={isPersonSaving} 
+                                className="w-full py-3 bg-primary text-white rounded-xl font-bold shadow-md hover:bg-primary-light transition-colors disabled:opacity-70 flex items-center justify-center gap-2"
+                                aria-label="Salvar pessoa"
+                            >
+                                {isPersonSaving ? <i className="fa-solid fa-circle-notch fa-spin"></i> : 'Salvar ' + (personMode === 'WORKER' ? 'Profissional' : 'Fornecedor')}
+                            </button>
+                            <button 
+                                type="button" 
+                                onClick={() => setIsPersonModalOpen(false)} 
+                                disabled={isPersonSaving} // Also disable cancel button while saving
+                                className="w-full py-2 text-slate-500 font-medium hover:text-primary dark:hover:text-white transition-colors disabled:opacity-70" 
+                                aria-label="Cancelar"
+                            >
+                                Cancelar
+                            </button>
                         </form>
                     </div>
                 </div>
