@@ -183,9 +183,21 @@ const WorkDetail: React.FC = () => {
             confirmText: 'Excluir',
             type: 'DANGER',
             onConfirm: async () => {
-                await dbService.deleteStep(stepId, work.id);
-                load();
-                setZeModal({ isOpen: false });
+                try {
+                    await dbService.deleteStep(stepId, work.id);
+                    load();
+                    setZeModal({ isOpen: false });
+                } catch (error: any) {
+                    console.error("Erro ao deletar etapa:", error);
+                    setZeModal({
+                        isOpen: true,
+                        title: 'Erro ao Excluir Etapa',
+                        message: error.message || 'Não foi possível excluir a etapa. Verifique se há lançamentos financeiros associados a ela ou aos seus materiais.',
+                        confirmText: 'Entendido',
+                        onCancel: () => setZeModal({ isOpen: false }),
+                        type: 'ERROR'
+                    });
+                }
             },
             onCancel: () => setZeModal({ isOpen: false })
         });
@@ -235,7 +247,7 @@ const WorkDetail: React.FC = () => {
 
     const openEditExpense = (expense: Expense) => {
         setExpenseModal({ isOpen: true, mode: 'EDIT', id: expense.id });
-        setExpDesc(expense.description); setExpSavedAmount(expense.amount); setExpTotalAgreed(expense.totalAgreed ? String(expense.totalAgreed) : ''); 
+        setExpDesc(expense.description); setExpAmount(String(expense.amount)); setExpSavedAmount(expense.paidAmount || expense.amount); setExpTotalAgreed(expense.totalAgreed ? String(expense.totalAgreed) : ''); 
         // Fix: Cast expense.category to ExpenseCategory to match the state type.
         setExpCategory(expense.category as ExpenseCategory); 
         setExpStepId(expense.stepId || '');
@@ -260,8 +272,19 @@ const WorkDetail: React.FC = () => {
         } else if (expenseModal.mode === 'EDIT' && expenseModal.id) {
             const existing = expenses.find(ex => ex.id === expenseModal.id);
             if (existing) {
-                const newTotal = expSavedAmount + inputAmount;
-                await dbService.updateExpense({ ...existing, description: expDesc, amount: newTotal, paidAmount: newTotal, category: expCategory, stepId: expStepId || undefined, totalAgreed: expTotalAgreed ? Number(expTotalAgreed) : undefined });
+                // For editing, if totalAgreed exists, we assume `amount` is `paidAmount`
+                const newPaidAmount = (existing.paidAmount || 0) + inputAmount;
+                const newTotalAgreed = expTotalAgreed ? Number(expTotalAgreed) : existing.totalAgreed;
+
+                await dbService.updateExpense({ 
+                    ...existing, 
+                    description: expDesc, 
+                    amount: newPaidAmount, // Amount field now represents total paid
+                    paidAmount: newPaidAmount, 
+                    category: expCategory, 
+                    stepId: expStepId || undefined, 
+                    totalAgreed: newTotalAgreed 
+                });
             }
         }
         setExpenseModal({ isOpen: false, mode: 'ADD' });
@@ -408,6 +431,8 @@ const WorkDetail: React.FC = () => {
         </div>
     );
 
+    const todayString = new Date().toISOString().split('T')[0];
+
     return (
         <div className="max-w-4xl mx-auto py-8 px-4 md:px-0 pb-24">
             <div className="flex items-center justify-between mb-8">
@@ -433,24 +458,27 @@ const WorkDetail: React.FC = () => {
                                 <h2 className="text-xl font-bold">Cronograma</h2>
                                 <button onClick={() => { setStepModalMode('ADD'); setIsStepModalOpen(true); }} className="bg-primary text-white p-2 rounded-lg"><i className="fa-solid fa-plus"></i></button>
                             </div>
-                            {steps.map((s, index) => (
-                                <div key={s.id} className="bg-white dark:bg-slate-900 p-4 rounded-2xl border flex items-center gap-4">
-                                    <button 
-                                        onClick={() => handleStepStatusClick(s)} 
-                                        className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-white 
-                                            ${s.status === StepStatus.COMPLETED ? 'bg-green-500 border-green-500' : 
-                                              s.status === StepStatus.IN_PROGRESS ? 'bg-orange-500 border-orange-500' : 
-                                              'bg-slate-300 border-slate-300'}`}
-                                    >
-                                        <i className="fa-solid fa-check"></i>
-                                    </button>
-                                    <div className="flex-1" onClick={() => { setStepModalMode('EDIT'); setCurrentStepId(s.id); setStepName(s.name); setStepStart(s.startDate); setStepEnd(s.endDate); setIsStepModalOpen(true); }}>
-                                        <p className="font-bold">{index + 1}. {s.name}</p> {/* Adiciona numeração aqui */}
-                                        <p className="text-xs text-slate-500">{parseDateNoTimezone(s.startDate)} - {parseDateNoTimezone(s.endDate)}</p>
+                            {steps.map((s, index) => {
+                                const isDelayed = s.status !== StepStatus.COMPLETED && s.endDate < todayString;
+                                return (
+                                    <div key={s.id} className={`bg-white dark:bg-slate-900 p-4 rounded-2xl border flex items-center gap-4 ${isDelayed ? 'border-red-500 ring-1 ring-red-200' : ''}`}>
+                                        <button 
+                                            onClick={() => handleStepStatusClick(s)} 
+                                            className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-white 
+                                                ${s.status === StepStatus.COMPLETED ? 'bg-green-500 border-green-500' : 
+                                                  s.status === StepStatus.IN_PROGRESS ? 'bg-orange-500 border-orange-500' : 
+                                                  'bg-slate-300 border-slate-300'}`}
+                                        >
+                                            <i className="fa-solid fa-check"></i>
+                                        </button>
+                                        <div className="flex-1" onClick={() => { setStepModalMode('EDIT'); setCurrentStepId(s.id); setStepName(s.name); setStepStart(s.startDate); setStepEnd(s.endDate); setIsStepModalOpen(true); }}>
+                                            <p className="font-bold text-primary dark:text-white">{index + 1}. {s.name} {isDelayed && <span className="ml-2 text-xs font-semibold text-red-500">Atrasada!</span>}</p> {/* Adiciona numeração e status de atraso aqui */}
+                                            <p className="text-xs text-slate-500">{parseDateNoTimezone(s.startDate)} - {parseDateNoTimezone(s.endDate)}</p>
+                                        </div>
+                                        <button onClick={() => handleDeleteStep(s.id)} className="text-red-300 hover:text-red-500 transition-colors"><i className="fa-solid fa-trash"></i></button>
                                     </div>
-                                    <button onClick={() => handleDeleteStep(s.id)} className="text-red-300"><i className="fa-solid fa-trash"></i></button>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     )}
 
@@ -488,12 +516,49 @@ const WorkDetail: React.FC = () => {
                                 <h2 className="text-xl font-bold">Lançamentos</h2>
                                 <button onClick={openAddExpense} className="bg-primary text-white p-2 rounded-lg"><i className="fa-solid fa-plus"></i></button>
                             </div>
-                            {expenses.map(e => (
-                                <div key={e.id} onClick={() => openEditExpense(e)} className="bg-white dark:bg-slate-900 p-4 rounded-2xl border flex justify-between items-center">
-                                    <div><p className="font-bold">{e.description}</p><p className="text-xs text-slate-400">{parseDateNoTimezone(e.date)} • {String(e.category)}</p></div>
-                                    <p className="font-black">{formatCurrency(e.amount)}</p>
-                                </div>
-                            ))}
+                            {expenses.map(e => {
+                                const isEmpreita = e.totalAgreed && e.totalAgreed > 0;
+                                let statusText = '';
+                                let progress = 0;
+                                let progressBarColor = '';
+
+                                if (isEmpreita) {
+                                    progress = (e.amount / e.totalAgreed!) * 100;
+                                    if (progress >= 100) {
+                                        statusText = 'Concluído';
+                                        progressBarColor = 'bg-green-500';
+                                    } else if (e.amount > 0) {
+                                        statusText = 'Parcial';
+                                        progressBarColor = 'bg-orange-500';
+                                    } else {
+                                        statusText = 'Pendente';
+                                        progressBarColor = 'bg-slate-300';
+                                    }
+                                }
+
+                                return (
+                                    <div key={e.id} onClick={() => openEditExpense(e)} className="bg-white dark:bg-slate-900 p-4 rounded-2xl border">
+                                        <div className="flex justify-between items-center mb-2">
+                                            <div>
+                                                <p className="font-bold">{e.description}</p>
+                                                <p className="text-xs text-slate-400">{parseDateNoTimezone(e.date)} • {String(e.category)}</p>
+                                            </div>
+                                            <p className="font-black text-primary dark:text-white">{formatCurrency(e.amount)}</p>
+                                        </div>
+                                        {isEmpreita && (
+                                            <>
+                                                <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden mb-1">
+                                                    <div className="h-full" style={{ width: `${Math.min(100, progress)}%`, backgroundColor: progressBarColor }}></div>
+                                                </div>
+                                                <div className="flex justify-between text-xs text-slate-500">
+                                                    <span>{statusText}</span>
+                                                    <span>{formatCurrency(e.amount)} / {formatCurrency(e.totalAgreed)}</span>
+                                                </div>
+                                            </>
+                                        )}
+                                    </div>
+                                );
+                            })}
                         </div>
                     )}
 
@@ -520,7 +585,7 @@ const WorkDetail: React.FC = () => {
                             {workers.map(w => (
                                 <div key={w.id} className="bg-white dark:bg-slate-900 p-4 rounded-2xl border flex justify-between items-center">
                                     <div><p className="font-bold">{w.name}</p><p className="text-xs text-slate-500">{w.role}</p></div>
-                                    <button onClick={() => handleDeletePerson(w.id, w.workId, 'WORKER')} className="text-red-300"><i className="fa-solid fa-trash"></i></button>
+                                    <button onClick={() => handleDeletePerson(w.id, w.workId, 'WORKER')} className="text-red-300 hover:text-red-500 transition-colors"><i className="fa-solid fa-trash"></i></button>
                                 </div>
                             ))}
                         </div>
@@ -562,6 +627,94 @@ const WorkDetail: React.FC = () => {
                     </div>
                 </div>
             )}
+            
+            {/* Modal de Adicionar Material (EXISTENTE) */}
+            {addMatModal && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+                    <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl w-full max-w-md">
+                        <h3 className="font-bold mb-4">Adicionar Material</h3>
+                        <form onSubmit={handleAddMaterial} className="space-y-4">
+                            <input value={newMatName} onChange={e => setNewMatName(e.target.value)} placeholder="Nome do Material" className="w-full p-3 bg-slate-100 dark:bg-slate-800 rounded-xl" required />
+                            <input value={newMatBrand} onChange={e => setNewMatBrand(e.target.value)} placeholder="Marca (opcional)" className="w-full p-3 bg-slate-100 dark:bg-slate-800 rounded-xl" />
+                            <div className="grid grid-cols-2 gap-2">
+                                <input type="number" value={newMatQty} onChange={e => setNewMatQty(e.target.value)} placeholder="Qtd. Planejada" className="p-3 bg-slate-100 dark:bg-slate-800 rounded-xl" required />
+                                <input value={newMatUnit} onChange={e => setNewMatUnit(e.target.value)} placeholder="Unidade (ex: m², un, kg)" className="p-3 bg-slate-100 dark:bg-slate-800 rounded-xl" required />
+                            </div>
+                            <select value={newMatStepId} onChange={e => setNewMatStepId(e.target.value)} className="w-full p-3 bg-slate-100 dark:bg-slate-800 rounded-xl">
+                                <option value="">Sem Etapa Específica</option>
+                                {steps.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                            </select>
+                            <label className="flex items-center gap-2">
+                                <input type="checkbox" checked={newMatBuyNow} onChange={e => setNewMatBuyNow(e.target.checked)} />
+                                Lançar compra agora?
+                            </label>
+                            {newMatBuyNow && (
+                                <div className="grid grid-cols-2 gap-2">
+                                    <input type="number" value={newMatBuyQty} onChange={e => setNewMatBuyQty(e.target.value)} placeholder="Qtd. Comprada" className="p-3 bg-slate-100 dark:bg-slate-800 rounded-xl" required />
+                                    <input type="number" value={newMatBuyCost} onChange={e => setNewMatBuyCost(e.target.value)} placeholder="Custo Total" className="p-3 bg-slate-100 dark:bg-slate-800 rounded-xl" required />
+                                </div>
+                            )}
+                            <button type="submit" className="w-full py-3 bg-primary text-white rounded-xl font-bold">Adicionar Material</button>
+                            <button type="button" onClick={() => setAddMatModal(false)} className="w-full text-slate-400">Cancelar</button>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal de Edição de Material (EXISTENTE) */}
+            {materialModal.isOpen && materialModal.material && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+                    <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl w-full max-w-md">
+                        <h3 className="font-bold mb-4">Editar Material</h3>
+                        <form onSubmit={handleUpdateMaterial} className="space-y-4">
+                            <input value={matName} onChange={e => setMatName(e.target.value)} placeholder="Nome do Material" className="w-full p-3 bg-slate-100 dark:bg-slate-800 rounded-xl" required />
+                            <input value={matBrand} onChange={e => setMatBrand(e.target.value)} placeholder="Marca (opcional)" className="w-full p-3 bg-slate-100 dark:bg-slate-800 rounded-xl" />
+                            <div className="grid grid-cols-2 gap-2">
+                                <input type="number" value={matPlannedQty} onChange={e => setMatPlannedQty(e.target.value)} placeholder="Qtd. Planejada" className="p-3 bg-slate-100 dark:bg-slate-800 rounded-xl" required />
+                                <input value={matUnit} onChange={e => setMatUnit(e.target.value)} placeholder="Unidade (ex: m², un, kg)" className="p-3 bg-slate-100 dark:bg-slate-800 rounded-xl" required />
+                            </div>
+                            {/* Campo de Compra Agora para materiais já existentes */}
+                            <h4 className="font-bold mt-4">Registrar Nova Compra</h4>
+                            <div className="grid grid-cols-2 gap-2">
+                                <input type="number" value={matBuyQty} onChange={e => setMatBuyQty(e.target.value)} placeholder="Qtd. Comprada Agora" className="p-3 bg-slate-100 dark:bg-slate-800 rounded-xl" />
+                                <input type="number" value={matBuyCost} onChange={e => setMatBuyCost(e.target.value)} placeholder="Custo Total da Compra" className="p-3 bg-slate-100 dark:bg-slate-800 rounded-xl" />
+                            </div>
+                            <button type="submit" className="w-full py-3 bg-primary text-white rounded-xl font-bold">Salvar e Registrar Compra</button>
+                            <button type="button" onClick={() => setMaterialModal({isOpen: false, material: null})} className="w-full text-slate-400">Cancelar</button>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal de Adicionar/Editar Despesa (EXISTENTE) */}
+            {expenseModal.isOpen && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+                    <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl w-full max-w-md">
+                        <h3 className="font-bold mb-4">{expenseModal.mode === 'ADD' ? 'Adicionar Novo Gasto' : 'Registrar Pagamento/Editar Gasto'}</h3>
+                        <form onSubmit={handleSaveExpense} className="space-y-4">
+                            <input value={expDesc} onChange={e => setExpDesc(e.target.value)} placeholder="Descrição do Gasto (ex: Pedreiro, Cimento)" className="w-full p-3 bg-slate-100 dark:bg-slate-800 rounded-xl" required />
+                            <select value={expCategory} onChange={e => setExpCategory(e.target.value as ExpenseCategory)} className="w-full p-3 bg-slate-100 dark:bg-slate-800 rounded-xl">
+                                {Object.values(ExpenseCategory).map(cat => (
+                                    <option key={cat} value={cat}>{cat}</option>
+                                ))}
+                            </select>
+                            <select value={expStepId} onChange={e => setExpStepId(e.target.value)} className="w-full p-3 bg-slate-100 dark:bg-slate-800 rounded-xl">
+                                <option value="">Associar à Etapa (Opcional)</option>
+                                {steps.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                            </select>
+                            {expCategory === ExpenseCategory.LABOR && expenseModal.mode === 'ADD' && ( // Only show totalAgreed for ADD mode and LABOR category
+                                <input type="number" value={expTotalAgreed} onChange={e => setExpTotalAgreed(e.target.value)} placeholder="Preço Combinado (Total da Empreita)" className="w-full p-3 bg-slate-100 dark:bg-slate-800 rounded-xl" />
+                            )}
+                            {expenseModal.mode === 'EDIT' && <p className="text-sm text-slate-500">Valor já pago: {formatCurrency(expSavedAmount)}</p>}
+                            <input type="number" value={expAmount} onChange={e => setExpAmount(e.target.value)} placeholder={expenseModal.mode === 'ADD' ? 'Valor Total do Gasto' : 'Valor Pago Agora'} className="w-full p-3 bg-slate-100 dark:bg-slate-800 rounded-xl" required />
+                            
+                            <button type="submit" className="w-full py-3 bg-primary text-white rounded-xl font-bold">Salvar Gasto</button>
+                            <button type="button" onClick={() => setExpenseModal({isOpen: false, mode: 'ADD'})} className="w-full text-slate-400">Cancelar</button>
+                        </form>
+                    </div>
+                </div>
+            )}
+
 
             <ZeModal isOpen={zeModal.isOpen} title={zeModal.title} message={zeModal.message} confirmText={zeModal.confirmText} onConfirm={zeModal.onConfirm} onCancel={() => setZeModal({isOpen: false})} type={zeModal.type} />
             

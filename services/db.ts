@@ -1,5 +1,4 @@
 
-
 import { PlanType, ExpenseCategory, StepStatus, FileCategory, type User, type Work, type Step, type Material, type Expense, type Worker, type Supplier, type WorkPhoto, type WorkFile, type DBNotification, type PushSubscriptionInfo } from '../types.ts';
 import { WORK_TEMPLATES, FULL_MATERIAL_PACKAGES } from './standards.ts';
 import { supabase } from './supabase.ts';
@@ -754,30 +753,56 @@ export const dbService = {
   },
 
   async deleteStep(stepId: string, workId: string): Promise<void> {
-    // Supabase is guaranteed to be initialized now
+    console.log(`[DB DELETE] Iniciando exclusão para stepId: ${stepId} na workId: ${workId}`);
+
+    // 1. Obter todos os materiais associados a esta etapa
+    const { data: materialsToDelete, error: materialsFetchError } = await supabase
+      .from('materials')
+      .select('id')
+      .eq('step_id', stepId);
+
+    if (materialsFetchError) {
+      console.error(`[DB DELETE] Erro ao buscar materiais para stepId ${stepId}:`, materialsFetchError);
+      throw new Error(`Falha ao verificar materiais associados à etapa: ${materialsFetchError.message}`);
+    }
+
+    const materialIds = materialsToDelete ? materialsToDelete.map(m => m.id) : [];
+
+    // 2. Verificar se existem despesas associadas à etapa ou aos materiais
+    const { data: expensesCheck, error: expensesCheckError } = await supabase
+      .from('expenses')
+      .select('id')
+      .or(`step_id.eq.${stepId},related_material_id.in.(${materialIds.join(',')})`);
+
+    if (expensesCheckError) {
+      console.error(`[DB DELETE] Erro ao verificar despesas para stepId ${stepId}:`, expensesCheckError);
+      throw new Error(`Falha ao verificar despesas associadas à etapa: ${expensesCheckError.message}`);
+    }
+
+    if (expensesCheck && expensesCheck.length > 0) {
+      const expenseCount = expensesCheck.length;
+      throw new Error(`Esta etapa não pode ser excluída pois possui ${expenseCount} lançamento(s) financeiro(s) associado(s). Apague os lançamentos primeiro.`);
+    }
+
+    // Se não há despesas associadas, proceed with deletion
     try {
-      console.log(`[DB DELETE] Iniciando exclusão para stepId: ${stepId} na workId: ${workId}`);
-      // 1. Delete associated materials
-      const { error: matError } = await supabase.from('materials').delete().eq('step_id', stepId);
-      if (matError) {
-        console.error(`[DB DELETE] Erro ao deletar materiais para stepId ${stepId}:`, matError);
-        // Do not throw, continue to delete other related data and the step itself
-      } else {
-        console.log(`[DB DELETE] Materiais para stepId ${stepId} deletados.`);
+      // 3. Deletar materiais associados (agora sabemos que não há despesas vinculadas a eles)
+      if (materialIds.length > 0) {
+        const { error: matError } = await supabase.from('materials').delete().in('id', materialIds);
+        if (matError) {
+          console.error(`[DB DELETE] Erro ao deletar materiais para stepId ${stepId}:`, matError);
+          // throw matError; // Decide if you want to be strict or log and continue
+        } else {
+          console.log(`[DB DELETE] Materiais para stepId ${stepId} deletados.`);
+        }
       }
 
-      // 2. Delete associated expenses
-      const { error: expError } = await supabase.from('expenses').delete().eq('step_id', stepId);
-      if (expError) {
-        console.error(`[DB DELETE] Erro ao deletar despesas para stepId ${stepId}:`, expError);
-        // Do not throw, continue to delete the step itself
-      } else {
-        console.log(`[DB DELETE] Despesas para stepId ${stepId} deletadas.`);
+      // 4. Deletar a própria etapa
+      const { error: deleteStepError } = await supabase.from('steps').delete().eq('id', stepId);
+      if (deleteStepError) {
+        console.error(`[DB DELETE] Erro ao deletar etapa ${stepId}:`, deleteStepError);
+        throw deleteStepError;
       }
-      
-      // 3. Delete the step itself
-      const { error: deleteStepError } = await supabase.from('steps').delete().eq('id', stepId); // Renamed error
-      if (deleteStepError) throw deleteStepError;
       console.log(`[DB DELETE] Etapa ${stepId} deletada com sucesso.`);
 
       // Invalidate caches for the affected work
@@ -971,10 +996,10 @@ export const dbService = {
 
   async deleteExpense(expenseId: string): Promise<void> {
     // Supabase is guaranteed to be initialized now
-    // Fix: Add a default value of `null` to the destructured `data` property,
-    // explicitly acknowledging that `.single()` on a delete operation might return `null`
-    // for `data` if no row matches the criteria, satisfying TypeScript's strict checks.
-    const { data: deletedExpense = null, error: deleteExpenseError } = await supabase.from('expenses').delete().eq('id', expenseId).select('work_id').single(); // Renamed error
+    // Fix: Correctly define the type for `data` when destructuring,
+    // as Supabase's `.single()` can return `null` for `data`.
+    const { data, error: deleteExpenseError } = await supabase.from('expenses').delete().eq('id', expenseId).select('work_id').single();
+    const deletedExpense: { work_id: string } | null = data; // Explicitly type to allow for null
     if (deleteExpenseError) {
       console.error("Erro ao apagar despesa:", deleteExpenseError);
       throw deleteExpenseError;
