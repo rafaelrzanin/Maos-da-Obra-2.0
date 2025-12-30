@@ -463,7 +463,7 @@ export const dbService = {
   async generatePix(_amount: number, _payer: any) {
       // This is a mock function, no actual Supabase interaction required
       return {
-          qr_code_base64: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQyF2NgYGBgAAAABQAEV9D3sgAAAABJRURJAA==",
+          qr_code_base64: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQyF2NgYGBgAAAABQAEV9D3sgAAAABJR1JIBMAA==",
           copy_paste_code: "00020126330014BR.GOV.BCB.PIX011155555555555520400005303986540510.005802BR5913Mãos da Obra6008Brasilia62070503***63041234"
       };
   },
@@ -581,7 +581,7 @@ export const dbService = {
     const dbWork = {
         user_id: workData.userId,
         name: workData.name,
-        address: workData.address,
+        address: workData.address || 'Endereço não informado',
         budget_planned: workData.budgetPlanned,
         start_date: workData.startDate,
         end_date: workData.endDate,
@@ -664,7 +664,8 @@ export const dbService = {
 
         for (const op of deleteOperations) {
             console.log(`[DB DELETE] Tentando deletar da tabela '${op.table}' onde ${op.eq[0]} = '${op.eq[1]}'`);
-            const { count, error: deleteOpError } = await supabase.from(op.table).delete().eq(op.eq[0], op.eq[1]).select('*'); // Renamed error
+            // Fix: Provide a default value for `count` in destructuring.
+            const { count = 0, error: deleteOpError } = await supabase.from(op.table).delete().eq(op.eq[0], op.eq[1]).select('*'); // Renamed error
             if (deleteOpError) {
                 // Logar o erro específico de RLS ou DB.
                 console.error(`[DB DELETE ERROR] Falha ao deletar da tabela '${op.table}' para workId ${workId}:`, deleteOpError);
@@ -915,7 +916,7 @@ export const dbService = {
       description: expense.description,
       amount: expense.amount,
       paid_amount: expense.paidAmount || expense.amount, // Ensure paid_amount is set
-      quantity: expense.quantity || 1, // Default quantity to 1 if not provided
+      quantity: expense.quantity || 1, // Default quantity
       date: expense.date,
       category: expense.category,
       step_id: expense.stepId, // FIX: Changed to snake_case
