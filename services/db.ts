@@ -472,7 +472,7 @@ export const dbService = {
   async getWorks(userId: string): Promise<Work[]> {
     // Supabase is guaranteed to be initialized now
     
-    const now = Date.now();
+    const now = Date.Now();
     // Return cache immediately if valid
     if (_dashboardCache.works && (now - _dashboardCache.works.timestamp < CACHE_TTL)) {
         return _dashboardCache.works.data;
@@ -664,14 +664,17 @@ export const dbService = {
 
         for (const op of deleteOperations) {
             console.log(`[DB DELETE] Tentando deletar da tabela '${op.table}' onde ${op.eq[0]} = '${op.eq[1]}'`);
-            // Fix: Provide a default value for `count` in destructuring.
-            const { count = 0, error: deleteOpError } = await supabase.from(op.table).delete().eq(op.eq[0], op.eq[1]).select('*'); // Renamed error
+            // Fix: Correctly extract count from delete operation.
+            // When using .select('*') with delete(), 'data' contains the deleted rows.
+            // The 'count' property is not available directly on the response when .select() is used.
+            const { data, error: deleteOpError } = await supabase.from(op.table).delete().eq(op.eq[0], op.eq[1]).select('*');
+            const count = data ? data.length : 0;
             if (deleteOpError) {
                 // Logar o erro específico de RLS ou DB.
                 console.error(`[DB DELETE ERROR] Falha ao deletar da tabela '${op.table}' para workId ${workId}:`, deleteOpError);
                 throw new Error(`Falha de RLS/DB ao deletar ${op.table}: ${deleteOpError.message}`);
             }
-            console.log(`[DB DELETE] Tabela '${op.table}' limpa. Registros afetados: ${count || 'N/A'}`);
+            console.log(`[DB DELETE] Tabela '${op.table}' limpa. Registros afetados: ${count}`);
         }
         
         console.log(`[DB DELETE] Obra ${workId} e dados relacionados deletados com sucesso.`);
@@ -1214,7 +1217,7 @@ export const dbService = {
   async calculateWorkStats(workId: string): Promise<{ totalSpent: number, progress: number, delayedSteps: number }> {
     // Supabase is guaranteed to be initialized now
 
-    const now = Date.now();
+    const now = Date.Now();
     if (_dashboardCache.stats[workId] && (now - _dashboardCache.stats[workId].timestamp < CACHE_TTL)) {
         return _dashboardCache.stats[workId].data;
     }
@@ -1247,7 +1250,7 @@ export const dbService = {
   async getDailySummary(workId: string): Promise<{ completedSteps: number, delayedSteps: number, pendingMaterials: number, totalSteps: number }> {
     // Supabase is guaranteed to be initialized now
 
-    const now = Date.now();
+    const now = Date.Now();
     if (_dashboardCache.summary[workId] && (now - _dashboardCache.summary[workId].timestamp < CACHE_TTL)) {
         return _dashboardCache.summary[workId].data;
     }
@@ -1461,94 +1464,94 @@ export const dbService = {
     //                             read: false,
     //                             type: 'WARNING',
     //                             tag: notificationTag 
-    //                         });
-    //                         await dbService.sendPushNotification(userId, { // Changed from dbService.sendPushNotification
-    //                             title: `Atenção: Material em falta para a etapa ${step.name}!`,
-    //                             body: `O material "${material.name}" (${material.purchasedQty}/${material.plannedQty} ${material.unit}) para a etapa "${step.name}" da obra "${currentWork.name}" está em falta. Faça a compra!`,
-    //                             url: `${window.location.origin}/work/${workId}/materials`,
-    //                             tag: notificationTag
-    //                         });
+    //                             });
+    //                             await dbService.sendPushNotification(userId, { // Changed from dbService.sendPushNotification
+    //                                 title: `Atenção: Material em falta para a etapa ${step.name}!`,
+    //                                 body: `O material "${material.name}" (${material.purchasedQty}/${material.plannedQty} ${material.unit}) para a etapa "${step.name}" da obra "${currentWork.name}" está em falta. Faça a compra!`,
+    //                                 url: `${window.location.origin}/work/${workId}/materials`,
+    //                                 tag: notificationTag
+    //                             });
+    //                         }
     //                     }
     //                 }
     //             }
     //         }
-    //     }
 
 
-    //     // Example: Notification for budget usage (existing logic, no changes)
-    //     if (currentWork && currentWork.budgetPlanned > 0) {
-    //         const totalSpent = currentExpenses.reduce((sum, e) => sum + e.amount, 0);
-    //         const budgetUsage = (totalSpent / currentWork.budgetPlanned) * 100;
+    //         // Example: Notification for budget usage (existing logic, no changes)
+    //         if (currentWork && currentWork.budgetPlanned > 0) {
+    //             const totalSpent = currentExpenses.reduce((sum, e) => sum + e.amount, 0);
+    //             const budgetUsage = (totalSpent / currentWork.budgetPlanned) * 100;
 
-    //         if (budgetUsage > 90 && budgetUsage <= 100) {
-    //              const notificationTag = `work-${workId}-budget-warning`; // Unique tag
-    //              const { data: existingNotif } = await supabase
-    //                 .from('notifications')
-    //                 .select('id')
-    //                 .eq('user_id', userId)
-    //                 .eq('work_id', workId) // NEW: Ensure to check for work_id here
-    //                 .eq('tag', notificationTag) // Use tag for unique check
-    //                 .eq('read', false)
-    //                 .maybeSingle();
+    //             if (budgetUsage > 90 && budgetUsage <= 100) {
+    //                  const notificationTag = `work-${workId}-budget-warning`; // Unique tag
+    //                  const { data: existingNotif } = await supabase
+    //                     .from('notifications')
+    //                     .select('id')
+    //                     .eq('user_id', userId)
+    //                     .eq('work_id', workId) // NEW: Ensure to check for work_id here
+    //                     .eq('tag', notificationTag) // Use tag for unique check
+    //                     .eq('read', false)
+    //                     .maybeSingle();
 
-    //             if (!existingNotif) {
-    //                 console.log(`[NOTIF GENERATION] Adding budget warning notification for work "${currentWork.name}"`); // Debug log
-    //                 await dbService.addNotification({ // Changed from this.addNotification
-    //                     userId,
-    //                     workId, // NEW: Add workId to notification
-    //                     title: 'Atenção ao Orçamento!',
-    //                     message: `Você já usou ${Math.round(budgetUsage)}% do orçamento da obra "${currentWork.name}".`,
-    //                     date: new Date().toISOString(),
-    //                     read: false,
-    //                     type: 'WARNING',
-    //                     tag: notificationTag // Save tag
-    //                 });
-    //                 await dbService.sendPushNotification(userId, { // Changed from dbService.sendPushNotification
-    //                     title: 'Atenção ao Orçamento!',
-    //                     body: `Você já usou ${Math.round(budgetUsage)}% do orçamento da obra "${currentWork.name}".`,
-    //                     url: `${window.location.origin}/work/${workId}/financial`,
-    //                     tag: notificationTag
-    //                 });
-    //             }
-    //         } else if (budgetUsage > 100) {
-    //              const notificationTag = `work-${workId}-budget-exceeded`; // Unique tag
-    //              const { data: existingNotif } = await supabase
-    //                 .from('notifications')
-    //                 .select('id')
-    //                 .eq('user_id', userId)
-    //                 .eq('work_id', workId) // NEW: Ensure to check for work_id here
-    //                 .eq('tag', notificationTag) // Use tag for unique check
-    //                 .eq('read', false)
-    //                 .maybeSingle();
+    //                 if (!existingNotif) {
+    //                     console.log(`[NOTIF GENERATION] Adding budget warning notification for work "${currentWork.name}"`); // Debug log
+    //                     await dbService.addNotification({ // Changed from this.addNotification
+    //                         userId,
+    //                         workId, // NEW: Add workId to notification
+    //                         title: 'Atenção ao Orçamento!',
+    //                         message: `Você já usou ${Math.round(budgetUsage)}% do orçamento da obra "${currentWork.name}".`,
+    //                         date: new Date().toISOString(),
+    //                         read: false,
+    //                         type: 'WARNING',
+    //                         tag: notificationTag // Save tag
+    //                     });
+    //                     await dbService.sendPushNotification(userId, { // Changed from dbService.sendPushNotification
+    //                         title: 'Atenção ao Orçamento!',
+    //                         body: `Você já usou ${Math.round(budgetUsage)}% do orçamento da obra "${currentWork.name}".`,
+    //                         url: `${window.location.origin}/work/${workId}/financial`,
+    //                         tag: notificationTag
+    //                     });
+    //                 }
+    //             } else if (budgetUsage > 100) {
+    //                  const notificationTag = `work-${workId}-budget-exceeded`; // Unique tag
+    //                  const { data: existingNotif } = await supabase
+    //                     .from('notifications')
+    //                     .select('id')
+    //                     .eq('user_id', userId)
+    //                     .eq('work_id', workId) // NEW: Ensure to check for work_id here
+    //                     .eq('tag', notificationTag) // Use tag for unique check
+    //                     .eq('read', false)
+    //                     .maybeSingle();
                 
-    //             if (!existingNotif) {
-    //                 console.log(`[NOTIF GENERATION] Adding budget exceeded notification for work "${currentWork.name}"`); // Debug log
-    //                 await dbService.addNotification({ // Changed from this.addNotification
-    //                     userId,
-    //                     workId, // NEW: Add workId to notification
-    //                     title: 'Orçamento Estourado!',
-    //                     message: `O orçamento da obra "${currentWork.name}" foi excedido em ${Math.round(budgetUsage - 100)}%.`,
-    //                     date: new Date().toISOString(),
-    //                     read: false,
-    //                     type: 'ERROR',
-    //                     tag: notificationTag // Save tag
-    //                 });
-    //                 await dbService.sendPushNotification(userId, { // Changed from dbService.sendPushNotification
-    //                     title: 'Orçamento Estourado!',
-    //                     body: `O orçamento da obra "${currentWork.name}" foi excedido em ${Math.round(budgetUsage - 100)}%.`,
-    //                     url: `${window.location.origin}/work/${workId}/financial`,
-    //                     tag: notificationTag
-    //                 });
+    //                 if (!existingNotif) {
+    //                     console.log(`[NOTIF GENERATION] Adding budget exceeded notification for work "${currentWork.name}"`); // Debug log
+    //                     await dbService.addNotification({ // Changed from this.addNotification
+    //                         userId,
+    //                         workId, // NEW: Add workId to notification
+    //                         title: 'Orçamento Estourado!',
+    //                         message: `O orçamento da obra "${currentWork.name}" foi excedido em ${Math.round(budgetUsage - 100)}%.`,
+    //                         date: new Date().toISOString(),
+    //                         read: false,
+    //                         type: 'ERROR',
+    //                         tag: notificationTag // Save tag
+    //                     });
+    //                     await dbService.sendPushNotification(userId, { // Changed from dbService.sendPushNotification
+    //                         title: 'Orçamento Estourado!',
+    //                         body: `O orçamento da obra "${currentWork.name}" foi excedido em ${Math.round(budgetUsage - 100)}%.`,
+    //                         url: `${window.location.origin}/work/${workId}/financial`,
+    //                         tag: notificationTag
+    //                     });
+    //                 }
     //             }
     //         }
+    //         console.log(`[NOTIF DEBUG END] ===================================================`);
+
+    //     } catch (error: any) { // Explicitly type as any to allow .message access
+    //         console.error(`[NOTIF DEBUG ERROR] Erro ao gerar notificações inteligentes para work ${workId}:`, error);
+    //         console.log(`[NOTIF DEBUG END] ===================================================`);
+
     //     }
-    //     console.log(`[NOTIF DEBUG END] ===================================================`);
-
-    // } catch (error: any) { // Explicitly type as any to allow .message access
-    //     console.error(`[NOTIF DEBUG ERROR] Erro ao gerar notificações inteligentes para work ${workId}:`, error);
-    //     console.log(`[NOTIF DEBUG END] ===================================================`);
-
-    // }
   },
 
   // --- NEW: PWA Push Notification Management ---
