@@ -3,6 +3,7 @@
 export default {
   content: [
     "./index.html",
+    "./index.tsx", // Adicionado para garantir que o Tailwind leia as classes do index.tsx
     "./App.tsx",
     "./pages/**/*.{js,ts,jsx,tsx}",
     "./components/**/*.{js,ts,jsx,tsx}",

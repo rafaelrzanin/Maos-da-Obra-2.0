@@ -2,6 +2,7 @@
 
 
 
+
 <!DOCTYPE html>
 <html lang="pt-BR">
   <head>
@@ -19,72 +20,10 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 
-    <!-- Tailwind via CDN -->
+    <!-- Tailwind via CDN - REMOVIDO PARA USAR O ARQUIVO DE CONFIGURAÇÃO LOCAL E BUILD COM POSTCSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-      tailwind.config = {
-        darkMode: 'class',
-        theme: {
-          extend: {
-            colors: {
-              // Deep Navy Palette
-              primary: {
-                DEFAULT: '#0F172A', // Slate 900
-                light: '#1E293B',   // Slate 800
-                dark: '#020617',    // Slate 950
-              },
-              // Architectural Bronze/Gold
-              secondary: {
-                DEFAULT: '#D97706', // Amber 600
-                light: '#F59E0B',   // Amber 500
-                dark: '#B45309',    // Amber 700
-              },
-              // Status Colors (Muted/Premium)
-              success: {
-                DEFAULT: '#059669', // Emerald 600
-                light: '#D1FAE5',
-                dark: '#064E3B'
-              },
-              warning: {
-                DEFAULT: '#D97706', // Amber 600
-                light: '#FEF3C7',
-                dark: '#78350F'
-              },
-              danger: {
-                DEFAULT: '#DC2626', // Red 600
-                light: '#FEE2E2',
-                dark: '#7F1D1D'
-              },
-              // Luxury Gold/Bronze for Lifetime (Replaces Purple)
-              premium: {
-                DEFAULT: '#B45309', // Amber 700 (Bronze/Gold visual)
-                light: '#F59E0B',   // Amber 500
-                dark: '#78350F'     // Amber 900
-              },
-              surface: '#F8FAFC', // Slate 50
-              text: {
-                main: '#0F172A', // Slate 900
-                body: '#334155', // Slate 700
-                muted: '#64748B', // Slate 500
-              }
-            },
-            fontFamily: {
-              sans: ['Inter', 'sans-serif'],
-              display: ['Inter', 'sans-serif'],
-            },
-            backgroundImage: {
-              'gradient-premium': 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)',
-              'gradient-gold': 'linear-gradient(135deg, #F59E0B 0%, #B45309 100%)',
-              'gradient-dark-gold': 'linear-gradient(135deg, #451a03 0%, #78350f 100%)',
-            },
-            boxShadow: {
-              'glass': '0 8px 32px 0 rgba(31, 38, 135, 0.07)',
-              'glow': '0 0 20px rgba(245, 158, 11, 0.4)',
-            }
-          }
-        }
-      }
-    </script>
+    <!-- Configuração inline do Tailwind CSS - REMOVIDO PARA USAR O ARQUIVO tailwind.config.js -->
+    
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200" rel="stylesheet" />
@@ -191,3 +130,4 @@
     </script>
   </body>
 </html>
+    

@@ -1,31 +1,30 @@
 
 
+
 import { GoogleGenAI } from "@google/genai";
 
 // Helper function to safely get environment variables, checking both process.env and import.meta.env
 const safeGetEnv = (key: string): string | undefined => {
   let value: string | undefined;
 
-  // Prefer process.env first as per GenAI guidelines
-  // With Vite's define, process.env.API_KEY will be directly available in the browser.
-  if (typeof process !== 'undefined' && process.env && typeof process.env[key] === 'string') {
-    value = process.env[key];
-    console.log(`[AI safeGetEnv] Lendo ${key} de process.env. Valor: ${value ? 'CONFIGURADO' : 'UNDEFINED'}`);
-    // FIX: Explicitly check for the string "undefined" which can occur if JSON.stringify(undefined) is used.
-    if (value && value !== 'undefined') return value;
-  } else {
-    console.log(`[AI safeGetEnv] process.env.${key} não disponível ou não é string.`);
-  }
-  
-  // Fallback to import.meta.env for Vite client-side environments if necessary
-  // (though with 'define' for process.env.API_KEY, this block might become less critical for API_KEY specifically)
+  // Prioriza import.meta.env para ambientes de cliente (Vite)
   if (typeof import.meta !== 'undefined' && import.meta.env && typeof import.meta.env[key] === 'string') {
     value = import.meta.env[key];
     console.log(`[AI safeGetEnv] Lendo ${key} de import.meta.env. Valor: ${value ? 'CONFIGURADO' : 'UNDEFINED'}`);
-    // FIX: Explicitly check for the string "undefined".
+    // FIX: Explicitly check for the string "undefined" which can occur if JSON.stringify(undefined) is used.
     if (value && value !== 'undefined') return value;
   } else {
     console.log(`[AI safeGetEnv] import.meta.env.${key} não disponível ou não é string.`);
+  }
+  
+  // Fallback to process.env (serverless functions, Node.js)
+  if (typeof process !== 'undefined' && process.env && typeof process.env[key] === 'string') {
+    value = process.env[key];
+    console.log(`[AI safeGetEnv] Lendo ${key} de process.env. Valor: ${value ? 'CONFIGURADO' : 'UNDEFINED'}`);
+    // FIX: Explicitly check for the string "undefined".
+    if (value && value !== 'undefined') return value;
+  } else {
+    console.log(`[AI safeGetEnv] process.env.${key} não disponível ou não é string.`);
   }
 
   console.warn(`[AI safeGetEnv] Variável de ambiente '${key}' não encontrada em nenhum contexto.`);
@@ -33,13 +32,14 @@ const safeGetEnv = (key: string): string | undefined => {
 };
 
 // Access API_KEY using the safeGetEnv helper
-const apiKey = safeGetEnv('API_KEY'); // This will now correctly map to VITE_GOOGLE_API_KEY via vite.config.ts
+// Agora a chave é lida como VITE_GOOGLE_API_KEY diretamente.
+const apiKey = safeGetEnv('VITE_GOOGLE_API_KEY'); // Changed from 'API_KEY'
 
 let ai: GoogleGenAI | null = null;
 
 // NEW: Strict check for API key
 if (!apiKey) {
-  console.error("ERRO CRÍTICO: Google GenAI API Key (process.env.API_KEY) não está configurada.");
+  console.error("ERRO CRÍTICO: Google GenAI API Key (VITE_GOOGLE_API_KEY) não está configurada.");
   console.error("Por favor, adicione sua chave de API nas variáveis de ambiente do seu ambiente de deploy (Vercel, etc.) como 'VITE_GOOGLE_API_KEY' ou no seu arquivo .env local.");
   // A mensagem no frontend já indicará a falta, mas o console será mais explícito.
   // Não lançaremos um erro para que o fallback offline possa ser exibido.
@@ -85,3 +85,4 @@ export const aiService = {
     }
   }
 };
+    
