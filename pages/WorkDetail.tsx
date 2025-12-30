@@ -10,7 +10,7 @@ import { STANDARD_JOB_ROLES, STANDARD_SUPPLIER_CATEGORIES, ZE_AVATAR, ZE_AVATAR_
 
 // --- TYPES FOR VIEW STATE ---
 type MainTab = 'ETAPAS' | 'MATERIAIS' | 'FINANCEIRO' | 'FERRAMENTAS';
-type SubView = 'NONE' | 'TEAM' | 'REPORTS' | 'PHOTOS' | 'PROJECTS' | 'CALCULATORS' | 'CONTRACTS' | 'CHECKLIST' | 'AICHAT'; // Changed SUPPLIERS to be part of TEAM, added AICHAT as a subview for bonus cards
+type SubView = 'NONE' | 'TEAM' | 'REPORTS' | 'PHOTOS' | 'PROJECTS' | 'CALCULATORS' | 'CONTRACTS' | 'CHECKLIST' | 'AICHAT';
 type ReportSubTab = 'CRONOGRAMA' | 'MATERIAIS' | 'FINANCEIRO';
 
 // --- DATE HELPERS ---
@@ -54,7 +54,6 @@ const WorkDetail: React.FC = () => {
 
     const [activeTab, setActiveTab] = useState<MainTab>('ETAPAS');
     const [subView, setSubView] = useState<SubView>('NONE');
-    // FIX: Re-enforced explicit type to help compiler resolve scope.
     const [uploading, setUploading] = useState<boolean>(false);
     const [reportActiveTab, setReportActiveTab] = useState<ReportSubTab>('CRONOGRAMA');
     
@@ -97,23 +96,20 @@ const WorkDetail: React.FC = () => {
     const [personMode, setPersonMode] = useState<'WORKER'|'SUPPLIER'>('WORKER');
     const [personId, setPersonId] = useState<string | null>(null); 
     const [personName, setPersonName] = useState('');
-    const [personRole, setPersonRole] = useState('');
+    const [personRole, setPersonRole] = useState(''); // For worker profession or supplier category
     const [personPhone, setPersonPhone] = useState('');
     const [personNotes, setPersonNotes] = useState('');
-    const [personEmail, setPersonEmail] = useState(''); // NEW: Email for supplier
-    const [personAddress, setPersonAddress] = useState(''); // NEW: Address for supplier
-    const [workerDailyRate, setWorkerDailyRate] = useState(''); // NEW: Daily rate for worker
+    const [personEmail, setPersonEmail] = useState('');
+    const [personAddress, setPersonAddress] = useState('');
+    const [workerDailyRate, setWorkerDailyRate] = useState('');
 
-    // NEW: Contract states
     const [isContractModalOpen, setIsContractModalOpen] = useState(false);
     const [viewContract, setViewContract] = useState<Contract | null>(null);
 
-    // NEW: Checklist states
     const [isChecklistModalOpen, setIsChecklistModalOpen] = useState(false);
     const [currentChecklist, setCurrentChecklist] = useState<Checklist | null>(null);
     const [allChecklists, setAllChecklists] = useState<Checklist[]>([] );
-    const [selectedChecklistCategory, setSelectedChecklistCategory] = useState<string>('all'); // Filter checklists by step category
-
+    const [selectedChecklistCategory, setSelectedChecklistCategory] = useState<string>('all');
 
     const [zeModal, setZeModal] = useState<any>({ isOpen: false, title: '', message: '' });
 
@@ -129,7 +125,7 @@ const WorkDetail: React.FC = () => {
             const w = await dbService.getWorkById(id);
             setWork(w || null);
             if (w) {
-                const [s, m, e, wk, sp, ph, fl, workStats, checklists] = await Promise.all([ // Added checklists
+                const [s, m, e, wk, sp, ph, fl, workStats, checklists] = await Promise.all([
                     dbService.getSteps(w.id),
                     dbService.getMaterials(w.id),
                     dbService.getExpenses(w.id),
@@ -138,7 +134,7 @@ const WorkDetail: React.FC = () => {
                     dbService.getPhotos(w.id),
                     dbService.getFiles(w.id),
                     dbService.calculateWorkStats(w.id),
-                    dbService.getChecklists(w.id) // Fetch checklists
+                    dbService.getChecklists(w.id)
                 ]);
                 setSteps(s ? s.sort((a,b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()) : []);
                 setMaterials(m || []);
@@ -148,7 +144,7 @@ const WorkDetail: React.FC = () => {
                 setPhotos(ph || []);
                 setFiles(fl || []);
                 setStats(workStats);
-                setAllChecklists(checklists || []); // Set all checklists
+                setAllChecklists(checklists || []);
             }
         } catch (error) {
             console.error("Erro ao carregar detalhes da obra:", error);
@@ -338,15 +334,15 @@ const WorkDetail: React.FC = () => {
         if (item) {
             setPersonId(item.id); setPersonName(item.name); setPersonPhone(item.phone); setPersonNotes(item.notes || '');
             setPersonRole(mode === 'WORKER' ? item.role : item.category);
-            setWorkerDailyRate(item.dailyRate ? String(item.dailyRate) : ''); // NEW
-            setPersonEmail(item.email || ''); // NEW
-            setPersonAddress(item.address || ''); // NEW
+            setWorkerDailyRate(item.dailyRate ? String(item.dailyRate) : '');
+            setPersonEmail(item.email || '');
+            setPersonAddress(item.address || '');
         } else {
             setPersonId(null); setPersonName(''); setPersonPhone(''); setPersonNotes('');
             setPersonRole(mode === 'WORKER' ? STANDARD_JOB_ROLES[0] : STANDARD_SUPPLIER_CATEGORIES[0]);
-            setWorkerDailyRate(''); // NEW
-            setPersonEmail(''); // NEW
-            setPersonAddress(''); // NEW
+            setWorkerDailyRate('');
+            setPersonEmail('');
+            setPersonAddress('');
         }
         setIsPersonModalOpen(true);
     };
@@ -378,8 +374,8 @@ const WorkDetail: React.FC = () => {
                 category: personRole, // For supplier, role means category
                 phone: personPhone, 
                 notes: personNotes,
-                email: personEmail || undefined, // NEW
-                address: personAddress || undefined // NEW
+                email: personEmail || undefined,
+                address: personAddress || undefined
             };
             if (personId) {
                 await dbService.updateSupplier({ ...payload, id: personId });
@@ -424,7 +420,6 @@ const WorkDetail: React.FC = () => {
         XLSX.writeFile(wb, `Obra_${work?.name}.xlsx`);
     };
 
-    // NEW: Placeholder for PDF Export (functionality out of scope for UI/UX refactor)
     const handleExportPdf = () => {
         setZeModal({
             isOpen: true,
@@ -436,7 +431,6 @@ const WorkDetail: React.FC = () => {
         });
     };
 
-    // NEW: Handle Checklist item toggle
     const handleChecklistItemToggle = async (checklistId: string, itemId: string) => {
         const updatedChecklists = allChecklists.map(cl => 
             cl.id === checklistId 
@@ -444,19 +438,16 @@ const WorkDetail: React.FC = () => {
             : cl
         );
         setAllChecklists(updatedChecklists);
-        // Find the updated checklist and save it
         const checklistToUpdate = updatedChecklists.find(cl => cl.id === checklistId);
         if (checklistToUpdate) {
             await dbService.updateChecklist(checklistToUpdate);
         }
     };
 
-    // NEW: Add New Checklist
     const handleAddChecklist = async (category: string) => {
         if (!work) return;
-        const existingTemplate = CHECKLIST_TEMPLATES.find(t => t.category === category && t.workId === 'mock-work-id'); // Find a template
+        const existingTemplate = CHECKLIST_TEMPLATES.find(t => t.category === category && t.workId === 'mock-work-id');
         
-        // If no specific template for category, create a generic one
         const newChecklistName = existingTemplate ? existingTemplate.name : `${category} - Checklist Padrão`;
         const newChecklistItems = existingTemplate ? existingTemplate.items.map(item => ({...item, id: `${Date.now()}-${Math.random()}`})) : [{id: `${Date.now()}-1`, text: 'Novo item', checked: false}];
 
@@ -467,12 +458,11 @@ const WorkDetail: React.FC = () => {
             items: newChecklistItems
         };
         const savedChecklist = await dbService.addChecklist(newChecklist);
-        load(); // Reload all checklists
+        load();
         setCurrentChecklist(savedChecklist);
         setIsChecklistModalOpen(true);
     };
 
-    // New: Grouped Expenses logic for rendering
     const groupedExpenses = useMemo(() => {
       const groups: {
         [category: string]: {
@@ -509,7 +499,6 @@ const WorkDetail: React.FC = () => {
         }
       });
 
-      // Sort expenses within each step/unlinked by date
       Object.values(groups).forEach(group => {
         group.unlinkedExpenses.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
         Object.values(group.steps).forEach(stepGroup => {
@@ -650,7 +639,6 @@ const WorkDetail: React.FC = () => {
     const hasLifetimeAccess = user?.plan === PlanType.VITALICIO;
 
     return (
-        // NEW: The root element is now a single <div> that contains all content and modals.
         <div className="max-w-4xl mx-auto py-8 px-4 md:px-0 pb-24">
             <div className="flex items-center justify-between mb-8">
                 <button onClick={() => subView === 'NONE' ? navigate('/') : setSubView('NONE')} className="text-slate-400 hover:text-primary" aria-label="Voltar"><i className="fa-solid fa-arrow-left text-xl"></i></button>
@@ -800,7 +788,7 @@ const WorkDetail: React.FC = () => {
 
                                 {/* Budget Progress Bar */}
                                 {work.budgetPlanned > 0 && (
-                                    <div className="mt-3"> {/* Replaced <> fragment with <div> */}
+                                    <div className="mt-3">
                                         <div className="h-2 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden mb-1">
                                             <div className="h-full" style={{ width: `${Math.min(100, budgetUsage)}%`, backgroundColor: budgetStatusColor }}></div>
                                         </div>
@@ -826,7 +814,7 @@ const WorkDetail: React.FC = () => {
                             ) : (
                                 Object.values(ExpenseCategory).map(category => {
                                     const expensesInCategory = Object.values(groupedExpenses[category].steps).flatMap(stepGroup => stepGroup.expenses).concat(groupedExpenses[category].unlinkedExpenses);
-                                    if (expensesInCategory.length === 0) return null; // Only show category if it has expenses
+                                    if (expensesInCategory.length === 0) return null;
 
                                     return (
                                         <div key={category} className="mb-6 first:mt-0 mt-8">
@@ -846,7 +834,7 @@ const WorkDetail: React.FC = () => {
 
                                             {/* Expenses linked to steps */}
                                             {Object.keys(groupedExpenses[category].steps)
-                                                .filter(stepId => groupedExpenses[category].steps[stepId].expenses.length > 0) // Only show step card if it has expenses
+                                                .filter(stepId => groupedExpenses[category].steps[stepId].expenses.length > 0)
                                                 .map(stepId => {
                                                 const stepGroup = groupedExpenses[category].steps[stepId];
                                                 const step = steps.find(s => s.id === stepId); 
@@ -909,7 +897,7 @@ const WorkDetail: React.FC = () => {
                                                                         </div>
                                                                         <p className="text-xs text-slate-500 dark:text-slate-400">{parseDateNoTimezone(e.date)}</p>
                                                                         {isEmpreita && (
-                                                                            <div className="mt-2"> {/* Replaced <> fragment with <div> */}
+                                                                            <div className="mt-2">
                                                                                 <div className="h-1 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden mb-1">
                                                                                     <div className="h-full" style={{ width: `${Math.min(100, progress)}%`, backgroundColor: progressBarColor }}></div>
                                                                                 </div>
@@ -941,7 +929,6 @@ const WorkDetail: React.FC = () => {
                                                                 let progressBarColor = '';
 
                                                                 if (isEmpreita) {
-                                                                    // Fix: Changed 'e.totalAgereement' to 'e.totalAgreed' to match the Expense interface.
                                                                     progress = (e.amount / e.totalAgreed!) * 100;
                                                                     if (progress >= 100) { statusText = 'Concluído'; progressBarColor = 'bg-green-500'; }
                                                                     else if (e.amount > 0) { statusText = 'Parcial'; progressBarColor = 'bg-orange-500'; }
@@ -956,7 +943,7 @@ const WorkDetail: React.FC = () => {
                                                                         </div>
                                                                         <p className="text-xs text-slate-500 dark:text-slate-400">{parseDateNoTimezone(e.date)}</p>
                                                                         {isEmpreita && (
-                                                                            <div className="mt-2"> {/* Replaced <> fragment with <div> */}
+                                                                            <div className="mt-2">
                                                                                 <div className="h-1 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden mb-1">
                                                                                     <div className="h-full" style={{ width: `${Math.min(100, progress)}%`, backgroundColor: progressBarColor }}></div>
                                                                                 </div>
@@ -983,82 +970,89 @@ const WorkDetail: React.FC = () => {
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 animate-in fade-in">
                             {/* Bloco 1: Equipe */}
                             <button onClick={() => setSubView('TEAM')} className="p-6 bg-white dark:bg-slate-900 rounded-3xl flex flex-col items-center shadow-sm border border-slate-200 dark:border-slate-800 hover:shadow-md transition-shadow" aria-label="Gerenciar Equipe">
-                                <i className="fa-solid fa-users text-2xl mb-2 text-secondary"></i>
+                                <i className="fa-solid fa-users text-2xl mb-2 text-primary"></i> {/* Changed to text-primary */}
                                 <span className="font-bold text-primary dark:text-white text-sm">Equipe</span>
+                            </button>
+
+                            {/* Bloco 2: Fornecedores (NEW) */}
+                            <button onClick={() => setSubView('TEAM')} className="p-6 bg-white dark:bg-slate-900 rounded-3xl flex flex-col items-center shadow-sm border border-slate-200 dark:border-slate-800 hover:shadow-md transition-shadow" aria-label="Gerenciar Fornecedores">
+                                <i className="fa-solid fa-truck-field text-2xl mb-2 text-primary"></i> {/* Changed to text-primary, new icon */}
+                                <span className="font-bold text-primary dark:text-white text-sm">Fornecedores</span>
                             </button>
 
                             {/* Bloco 3: Relatórios */}
                             <button onClick={() => setSubView('REPORTS')} className="p-6 bg-white dark:bg-slate-900 rounded-3xl flex flex-col items-center shadow-sm border border-slate-200 dark:border-slate-800 hover:shadow-md transition-shadow" aria-label="Gerar Relatórios">
-                                <i className="fa-solid fa-file-pdf text-2xl mb-2 text-secondary"></i>
+                                <i className="fa-solid fa-file-pdf text-2xl mb-2 text-primary"></i> {/* Changed to text-primary */}
                                 <span className="font-bold text-primary dark:text-white text-sm">Relatórios</span>
                             </button>
                             
                             {/* Bloco 4: Fotos */}
                             <button onClick={() => setSubView('PHOTOS')} className="p-6 bg-white dark:bg-slate-900 rounded-3xl flex flex-col items-center shadow-sm border border-slate-200 dark:border-slate-800 hover:shadow-md transition-shadow" aria-label="Ver Fotos da Obra">
-                                <i className="fa-solid fa-camera text-2xl mb-2 text-secondary"></i>
+                                <i className="fa-solid fa-camera text-2xl mb-2 text-primary"></i> {/* Changed to text-primary */}
                                 <span className="font-bold text-primary dark:text-white text-sm">Fotos</span>
                             </button>
 
                             {/* Bloco 5: Arquivos & Projetos */}
                             <button onClick={() => setSubView('PROJECTS')} className="p-6 bg-white dark:bg-slate-900 rounded-3xl flex flex-col items-center shadow-sm border border-slate-200 dark:border-slate-800 hover:shadow-md transition-shadow" aria-label="Gerenciar Arquivos">
-                                <i className="fa-solid fa-folder text-2xl mb-2 text-secondary"></i>
+                                <i className="fa-solid fa-folder text-2xl mb-2 text-primary"></i> {/* Changed to text-primary */}
                                 <span className="font-bold text-primary dark:text-white text-sm">Arquivos</span>
                             </button>
 
-                            {/* Bloco 6: Bônus Vitalício - Cards separados */}
-                            {/* Contratos */}
-                            <div className={`p-6 rounded-3xl flex flex-col items-center shadow-lg border relative ${hasLifetimeAccess ? 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800' : 'bg-gradient-dark-gold border-amber-900'}`}>
+                            {/* --- BÔNUS VITALÍCIO - CARDS SEPARADOS --- */}
+                            
+                            {/* Bônus: Contratos */}
+                            <div className={`p-6 rounded-3xl flex flex-col items-center shadow-lg border relative ${hasLifetimeAccess ? 'bg-gradient-gold border-amber-900' : 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700'}`}>
                                 {!hasLifetimeAccess && (
                                     <div className="absolute inset-0 bg-black/50 rounded-3xl flex items-center justify-center z-10">
                                         <i className="fa-solid fa-lock text-white text-4xl"></i>
                                     </div>
                                 )}
                                 <button onClick={() => hasLifetimeAccess ? setSubView('CONTRACTS') : navigate('/settings')} disabled={!hasLifetimeAccess} className="w-full h-full absolute inset-0 flex flex-col items-center justify-center p-6 text-center z-20">
-                                    <i className={`fa-solid fa-file-contract text-2xl mb-2 ${hasLifetimeAccess ? 'text-secondary' : 'text-amber-300'}`}></i>
-                                    <span className={`font-bold text-sm ${hasLifetimeAccess ? 'text-primary dark:text-white' : 'text-white'}`}>Contratos</span>
-                                    {!hasLifetimeAccess && <span className="text-[10px] text-amber-200 mt-1">Exclusivo Vitalício</span>}
+                                    <i className={`fa-solid fa-file-contract text-2xl mb-2 ${hasLifetimeAccess ? 'text-white' : 'text-slate-400'}`}></i>
+                                    <span className={`font-bold text-sm ${hasLifetimeAccess ? 'text-white' : 'text-primary dark:text-white'}`}>Contratos</span>
+                                    {!hasLifetimeAccess && <span className="text-[10px] text-slate-500 dark:text-slate-400 mt-1">Exclusivo Vitalício</span>}
                                 </button>
                             </div>
                             
-                            {/* Calculadora da Obra */}
-                            <div className={`p-6 rounded-3xl flex flex-col items-center shadow-lg border relative ${hasLifetimeAccess ? 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800' : 'bg-gradient-dark-gold border-amber-900'}`}>
+                            {/* Bônus: Calculadoras */}
+                            <div className={`p-6 rounded-3xl flex flex-col items-center shadow-lg border relative ${hasLifetimeAccess ? 'bg-gradient-gold border-amber-900' : 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700'}`}>
                                 {!hasLifetimeAccess && (
                                     <div className="absolute inset-0 bg-black/50 rounded-3xl flex items-center justify-center z-10">
                                         <i className="fa-solid fa-lock text-white text-4xl"></i>
                                     </div>
                                 )}
                                 <button onClick={() => hasLifetimeAccess ? setIsCalculatorModalOpen(true) : navigate('/settings')} disabled={!hasLifetimeAccess} className="w-full h-full absolute inset-0 flex flex-col items-center justify-center p-6 text-center z-20">
-                                    <i className={`fa-solid fa-calculator text-2xl mb-2 ${hasLifetimeAccess ? 'text-secondary' : 'text-amber-300'}`}></i>
-                                    <span className={`font-bold text-sm ${hasLifetimeAccess ? 'text-primary dark:text-white' : 'text-white'}`}>Calculadoras</span>
-                                    {!hasLifetimeAccess && <span className="text-[10px] text-amber-200 mt-1">Exclusivo Vitalício</span>}
+                                    <i className={`fa-solid fa-calculator text-2xl mb-2 ${hasLifetimeAccess ? 'text-white' : 'text-slate-400'}`}></i>
+                                    <span className={`font-bold text-sm ${hasLifetimeAccess ? 'text-white' : 'text-primary dark:text-white'}`}>Calculadoras</span>
+                                    {!hasLifetimeAccess && <span className="text-[10px] text-slate-500 dark:text-slate-400 mt-1">Exclusivo Vitalício</span>}
                                 </button>
                             </div>
 
-                            {/* Checklist da Obra */}
-                            <div className={`p-6 rounded-3xl flex flex-col items-center shadow-lg border relative ${hasLifetimeAccess ? 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800' : 'bg-gradient-dark-gold border-amber-900'}`}>
+                            {/* Bônus: Checklist da Obra */}
+                            <div className={`p-6 rounded-3xl flex flex-col items-center shadow-lg border relative ${hasLifetimeAccess ? 'bg-gradient-gold border-amber-900' : 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700'}`}>
                                 {!hasLifetimeAccess && (
                                     <div className="absolute inset-0 bg-black/50 rounded-3xl flex items-center justify-center z-10">
                                         <i className="fa-solid fa-lock text-white text-4xl"></i>
                                     </div>
                                 )}
                                 <button onClick={() => hasLifetimeAccess ? setSubView('CHECKLIST') : navigate('/settings')} disabled={!hasLifetimeAccess} className="w-full h-full absolute inset-0 flex flex-col items-center justify-center p-6 text-center z-20">
-                                    <i className={`fa-solid fa-list-check text-2xl mb-2 ${hasLifetimeAccess ? 'text-secondary' : 'text-amber-300'}`}></i>
-                                    <span className={`font-bold text-sm ${hasLifetimeAccess ? 'text-primary dark:text-white' : 'text-white'}`}>Checklist da Obra</span>
-                                    {!hasLifetimeAccess && <span className="text-[10px] text-amber-200 mt-1">Exclusivo Vitalício</span>}
+                                    <i className={`fa-solid fa-list-check text-2xl mb-2 ${hasLifetimeAccess ? 'text-white' : 'text-slate-400'}`}></i>
+                                    <span className={`font-bold text-sm ${hasLifetimeAccess ? 'text-white' : 'text-primary dark:text-white'}`}>Checklist da Obra</span>
+                                    {!hasLifetimeAccess && <span className="text-[10px] text-slate-500 dark:text-slate-400 mt-1">Exclusivo Vitalício</span>}
                                 </button>
                             </div>
 
-                            {/* IA da Obra */}
-                            <div className={`p-6 rounded-3xl flex flex-col items-center shadow-lg border relative ${hasLifetimeAccess ? 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800' : 'bg-gradient-dark-gold border-amber-900'}`}>
+                            {/* Bônus: IA da Obra */}
+                            <div className={`p-6 rounded-3xl flex flex-col items-center shadow-lg border relative ${hasLifetimeAccess ? 'bg-gradient-gold border-amber-900' : 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700'}`}>
                                 {!hasLifetimeAccess && (
                                     <div className="absolute inset-0 bg-black/50 rounded-3xl flex items-center justify-center z-10">
                                         <i className="fa-solid fa-lock text-white text-4xl"></i>
                                     </div>
                                 )}
                                 <button onClick={() => hasLifetimeAccess ? navigate('/ai-chat') : navigate('/settings')} disabled={!hasLifetimeAccess} className="w-full h-full absolute inset-0 flex flex-col items-center justify-center p-6 text-center z-20">
-                                    <i className={`fa-solid fa-robot text-2xl mb-2 ${hasLifetimeAccess ? 'text-secondary' : 'text-amber-300'}`}></i>
-                                    <span className={`font-bold text-sm ${hasLifetimeAccess ? 'text-primary dark:text-white' : 'text-white'}`}>Zé da Obra AI</span>
-                                    {!hasLifetimeAccess && <span className="text-[10px] text-amber-200 mt-1">Exclusivo Vitalício</span>}
+                                    <i className={`fa-solid fa-robot text-2xl mb-2 ${hasLifetimeAccess ? 'text-white' : 'text-slate-400'}`}></i>
+                                    <span className={`font-bold text-sm ${hasLifetimeAccess ? 'text-white' : 'text-primary dark:text-white'}`}>Zé da Obra AI</span>
+                                    {!hasLifetimeAccess && <span className="text-[10px] text-slate-500 dark:text-slate-400 mt-1">Exclusivo Vitalício</span>}
                                 </button>
                             </div>
                         </div>
@@ -1066,10 +1060,11 @@ const WorkDetail: React.FC = () => {
                 </>
             ) : (
                 <div className="animate-in slide-in-from-right-4">
-                    {/* Fixed: Simplified onClick for this button, as it's only rendered when subView is not 'NONE' */}
-                    <button onClick={() => setSubView('NONE')} className="mb-6 text-secondary font-bold flex items-center gap-2 hover:opacity-80" aria-label="Voltar para Ferramentas"><i className="fa-solid fa-arrow-left"></i> Voltar</button>
+                    <button onClick={() => setSubView('NONE')} className="mb-6 text-primary font-bold flex items-center gap-2 hover:opacity-80" aria-label="Voltar para Ferramentas"><i className="fa-solid fa-arrow-left"></i> Voltar</button>
+                    
+                    {/* --- SUBVIEW: TEAM (Equipe e Fornecedores Separados) --- */}
                     {subView === 'TEAM' && (
-                        <div className="space-y-8"> {/* Increased space-y */}
+                        <div className="space-y-8">
                             {/* Equipe Section */}
                             <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-sm border border-slate-200 dark:border-slate-800">
                                 <div className="flex justify-between items-center mb-6">
@@ -1077,7 +1072,7 @@ const WorkDetail: React.FC = () => {
                                     <button onClick={() => openPersonModal('WORKER')} className="bg-primary text-white p-2 rounded-xl shadow-md hover:bg-primary-light transition-colors" aria-label="Adicionar profissional"><i className="fa-solid fa-plus"></i></button>
                                 </div>
                                 {workers.length === 0 ? (
-                                    <p className="text-center text-slate-400 py-8 italic text-sm">Nenhum profissional cadastrado.</p>
+                                    <p className="text-center text-slate-400 py-8 italic text-sm">Nenhum profissional cadastrado. Adicione sua equipe!</p>
                                 ) : (
                                     <div className="space-y-4">
                                         {workers.map(w => (
@@ -1087,9 +1082,11 @@ const WorkDetail: React.FC = () => {
                                                     <p className="text-xs text-slate-500 dark:text-slate-400">{w.role} {w.dailyRate && w.dailyRate > 0 ? `• ${formatCurrency(w.dailyRate)}/dia` : ''}</p>
                                                 </div>
                                                 <div className="flex items-center gap-2">
-                                                    <button onClick={() => handleGenerateWhatsappLink(w.phone)} className="w-8 h-8 rounded-full bg-green-500/10 text-green-600 dark:bg-green-900/30 dark:text-green-300 hover:bg-green-500/20 transition-colors flex items-center justify-center" aria-label={`Contatar ${w.name} via WhatsApp`}>
-                                                        <i className="fa-brands fa-whatsapp text-lg"></i>
-                                                    </button>
+                                                    {w.phone && (
+                                                        <button onClick={() => handleGenerateWhatsappLink(w.phone)} className="w-8 h-8 rounded-full bg-green-500/10 text-green-600 dark:bg-green-900/30 dark:text-green-300 hover:bg-green-500/20 transition-colors flex items-center justify-center" aria-label={`Contatar ${w.name} via WhatsApp`}>
+                                                            <i className="fa-brands fa-whatsapp text-lg"></i>
+                                                        </button>
+                                                    )}
                                                     <button onClick={() => openPersonModal('WORKER', w)} className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors flex items-center justify-center" aria-label="Editar profissional"><i className="fa-solid fa-pencil text-sm"></i></button>
                                                     <button onClick={() => handleDeletePerson(w.id, w.workId, 'WORKER')} className="w-8 h-8 rounded-full bg-red-500/10 text-red-600 dark:bg-red-900/30 dark:text-red-300 hover:bg-red-500/20 transition-colors flex items-center justify-center" aria-label="Remover profissional"><i className="fa-solid fa-trash text-sm"></i></button>
                                                 </div>
@@ -1106,19 +1103,21 @@ const WorkDetail: React.FC = () => {
                                     <button onClick={() => openPersonModal('SUPPLIER')} className="bg-primary text-white p-2 rounded-xl shadow-md hover:bg-primary-light transition-colors" aria-label="Adicionar fornecedor"><i className="fa-solid fa-plus"></i></button>
                                 </div>
                                 {suppliers.length === 0 ? (
-                                    <p className="text-center text-slate-400 py-8 italic text-sm">Nenhum fornecedor cadastrado.</p>
+                                    <p className="text-center text-slate-400 py-8 italic text-sm">Nenhum fornecedor cadastrado. Adicione seus parceiros!</p>
                                 ) : (
                                     <div className="space-y-4">
                                         {suppliers.map(s => (
                                             <div key={s.id} className="bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 flex justify-between items-center shadow-xs">
                                                 <div>
                                                     <p className="font-bold text-primary dark:text-white">{s.name}</p>
-                                                    <p className="text-xs text-slate-500 dark:text-slate-400">{s.category} • {s.phone}</p>
+                                                    <p className="text-xs text-slate-500 dark:text-slate-400">{s.category} {s.phone ? `• ${s.phone}` : ''}</p>
                                                 </div>
                                                 <div className="flex items-center gap-2">
-                                                    <button onClick={() => handleGenerateWhatsappLink(s.phone)} className="w-8 h-8 rounded-full bg-green-500/10 text-green-600 dark:bg-green-900/30 dark:text-green-300 hover:bg-green-500/20 transition-colors flex items-center justify-center" aria-label={`Contatar ${s.name} via WhatsApp`}>
-                                                        <i className="fa-brands fa-whatsapp text-lg"></i>
-                                                    </button>
+                                                    {s.phone && (
+                                                        <button onClick={() => handleGenerateWhatsappLink(s.phone)} className="w-8 h-8 rounded-full bg-green-500/10 text-green-600 dark:bg-green-900/30 dark:text-green-300 hover:bg-green-500/20 transition-colors flex items-center justify-center" aria-label={`Contatar ${s.name} via WhatsApp`}>
+                                                            <i className="fa-brands fa-whatsapp text-lg"></i>
+                                                        </button>
+                                                    )}
                                                     <button onClick={() => openPersonModal('SUPPLIER', s)} className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors flex items-center justify-center" aria-label="Editar fornecedor"><i className="fa-solid fa-pencil text-sm"></i></button>
                                                     <button onClick={() => handleDeletePerson(s.id, s.workId, 'SUPPLIER')} className="w-8 h-8 rounded-full bg-red-500/10 text-red-600 dark:bg-red-900/30 dark:text-red-300 hover:bg-red-500/20 transition-colors flex items-center justify-center" aria-label="Remover fornecedor"><i className="fa-solid fa-trash text-sm"></i></button>
                                                 </div>
@@ -1129,40 +1128,69 @@ const WorkDetail: React.FC = () => {
                             </div>
                         </div>
                     )}
+
+                    {/* --- SUBVIEW: REPORTS (Abas) --- */}
                     {subView === 'REPORTS' && (
                         <div className="space-y-6">
                             <h2 className="text-xl font-bold text-primary dark:text-white mb-4">Relatórios da Obra</h2>
-                            <RenderCronogramaReport />
-                            <RenderMateriaisReport />
-                            <RenderFinanceiroReport />
-                            <div className="grid grid-cols-2 gap-4"> {/* Two buttons for export */}
+                            
+                            {/* Tabs for Reports */}
+                            <div className="bg-white dark:bg-slate-900 rounded-2xl p-2 shadow-sm border border-slate-200 dark:border-slate-800 mb-6 flex justify-around">
+                                {(['CRONOGRAMA', 'MATERIAIS', 'FINANCEIRO'] as ReportSubTab[]).map(tab => (
+                                    <button 
+                                        key={tab} 
+                                        onClick={() => setReportActiveTab(tab)} 
+                                        className={`flex-1 py-2 rounded-xl text-sm font-bold transition-colors ${reportActiveTab === tab ? 'bg-secondary text-white shadow-md' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+                                        aria-label={`Ver relatório de ${tab}`}
+                                    >
+                                        {tab}
+                                    </button>
+                                ))}
+                            </div>
+
+                            {/* Report Content based on active tab */}
+                            {reportActiveTab === 'CRONOGRAMA' && <RenderCronogramaReport />}
+                            {reportActiveTab === 'MATERIAIS' && <RenderMateriaisReport />}
+                            {reportActiveTab === 'FINANCEIRO' && <RenderFinanceiroReport />}
+
+                            <div className="grid grid-cols-2 gap-4 mt-6">
                                 <button onClick={handleExportExcel} className="w-full py-4 bg-green-600 text-white rounded-xl font-bold shadow-lg hover:bg-green-700 transition-colors" aria-label="Exportar para Excel"><i className="fa-solid fa-file-excel mr-2"></i> Exportar Excel</button>
                                 <button onClick={handleExportPdf} className="w-full py-4 bg-red-600 text-white rounded-xl font-bold shadow-lg hover:bg-red-700 transition-colors" aria-label="Exportar para PDF"><i className="fa-solid fa-file-pdf mr-2"></i> Exportar PDF</button>
                             </div>
                         </div>
                     )}
+                    
+                    {/* --- SUBVIEW: PHOTOS (com estado vazio aprimorado) --- */}
                     {subView === 'PHOTOS' && (
                         <div className="space-y-6">
                             <h2 className="text-xl font-bold text-primary dark:text-white mb-4">Fotos da Obra</h2>
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                 <div className="relative aspect-square bg-slate-100 dark:bg-slate-800 rounded-2xl flex flex-col items-center justify-center border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-secondary transition-colors cursor-pointer text-center p-4">
                                     <input type="file" accept="image/*" onChange={e => handleFileUpload(e, 'PHOTO')} className="absolute inset-0 opacity-0 cursor-pointer" aria-label="Adicionar foto" />
                                     {uploading ? (
                                         <i className="fa-solid fa-circle-notch fa-spin text-slate-400 text-2xl mb-2"></i>
                                     ) : (
-                                        <i className="fa-solid fa-plus text-slate-400 text-2xl mb-2"></i>
+                                        <>
+                                            <i className="fa-solid fa-plus text-slate-400 text-2xl mb-2"></i>
+                                            <p className="text-sm text-slate-500 dark:text-slate-400 font-bold">Clique para adicionar fotos</p>
+                                            <p className="text-xs text-slate-400 dark:text-slate-500">JPG, PNG</p>
+                                        </>
                                     )}
-                                    <p className="text-sm text-slate-500 dark:text-slate-400">Clique para adicionar fotos</p>
-                                    <p className="text-xs text-slate-400 dark:text-slate-500">JPG, PNG</p>
                                 </div>
                                 {photos.length === 0 ? (
-                                    <div className="col-span-2 text-center text-slate-400 py-8 italic text-sm">Nenhuma foto adicionada.</div>
+                                    <div className="col-span-full text-center text-slate-400 py-8 italic text-sm">
+                                        <i className="fa-solid fa-camera-retro text-4xl mb-4 opacity-50"></i>
+                                        <p>Nenhuma foto adicionada ainda.</p>
+                                        <p className="text-xs mt-2">Documente o progresso e os detalhes da sua obra!</p>
+                                    </div>
                                 ) : (
                                     photos.map(p => <img key={p.id} src={p.url} className="aspect-square object-cover rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm" alt={p.description} />)
                                 )}
                             </div>
                         </div>
                     )}
+
+                    {/* --- SUBVIEW: PROJECTS (com estado vazio aprimorado) --- */}
                     {subView === 'PROJECTS' && (
                         <div className="space-y-6">
                             <h2 className="text-xl font-bold text-primary dark:text-white mb-4">Documentos e Projetos</h2>
@@ -1171,18 +1199,24 @@ const WorkDetail: React.FC = () => {
                                 {uploading ? (
                                     <i className="fa-solid fa-circle-notch fa-spin text-slate-400 text-2xl mb-2"></i>
                                 ) : (
-                                    <i className="fa-solid fa-file-arrow-up text-slate-400 text-2xl mb-2"></i>
+                                    <>
+                                        <i className="fa-solid fa-file-arrow-up text-slate-400 text-2xl mb-2"></i>
+                                        <p className="text-sm text-slate-500 dark:text-slate-400 font-bold">Arraste e solte ou clique para adicionar arquivos</p>
+                                        <p className="text-xs text-slate-400 dark:text-slate-500">PDF, DOCX, XLS, DWG, etc.</p>
+                                    </>
                                 )}
-                                <p className="text-sm text-slate-500 dark:text-slate-400">Arraste e solte ou clique para adicionar arquivos</p>
-                                <p className="text-xs text-slate-400 dark:text-slate-500">PDF, DOCX, XLS, DWG, etc.</p>
                             </div>
                             {files.length === 0 ? (
-                                <p className="text-center text-slate-400 py-8 italic text-sm">Nenhum arquivo adicionado.</p>
+                                <div className="text-center text-slate-400 py-8 italic text-sm">
+                                    <i className="fa-solid fa-file-alt text-4xl mb-4 opacity-50"></i>
+                                    <p>Nenhum arquivo ou projeto adicionado ainda.</p>
+                                    <p className="text-xs mt-2">Organize suas plantas, orçamentos e documentos importantes aqui!</p>
+                                </div>
                             ) : (
                                 <div className="space-y-3">
                                     {files.map(f => (
                                         <a href={f.url} target="_blank" rel="noopener noreferrer" key={f.id} className="flex items-center gap-3 p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md transition-shadow">
-                                            <i className="fa-solid fa-file-alt text-lg text-secondary"></i>
+                                            <i className="fa-solid fa-file-alt text-lg text-primary"></i> {/* Changed to text-primary */}
                                             <div className="flex-1">
                                                 <p className="font-bold text-primary dark:text-white text-sm">{f.name}</p>
                                                 <p className="text-xs text-slate-500 dark:text-slate-400">{f.category} • {parseDateNoTimezone(f.date)}</p>
@@ -1208,7 +1242,7 @@ const WorkDetail: React.FC = () => {
                                         className="p-5 rounded-2xl border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-secondary hover:shadow-md transition-shadow flex flex-col items-start text-left group"
                                         aria-label={`Ver modelo de contrato: ${contract.title}`}
                                     >
-                                        <span className="text-sm font-bold text-secondary uppercase tracking-wider mb-2">{contract.category}</span>
+                                        <span className="text-sm font-bold text-primary uppercase tracking-wider mb-2">{contract.category}</span> {/* Changed to text-primary */}
                                         <h3 className="font-bold text-lg text-primary dark:text-white group-hover:text-secondary transition-colors">{contract.title}</h3>
                                         <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{contract.contentTemplate.substring(0, 100)}...</p>
                                     </button>
@@ -1235,7 +1269,7 @@ const WorkDetail: React.FC = () => {
                                     {steps.map(step => (
                                         <option key={step.id} value={step.name}>{step.name}</option>
                                     ))}
-                                    <option value="Geral">Geral</option> {/* For general checklists not tied to a specific step */}
+                                    <option value="Geral">Geral</option>
                                 </select>
                             </div>
 
