@@ -9,7 +9,7 @@ import { ZeModal } from '../components/ZeModal.tsx';
 import { STANDARD_CHECKLISTS, CONTRACT_TEMPLATES, STANDARD_JOB_ROLES, STANDARD_SUPPLIER_CATEGORIES, ZE_AVATAR, ZE_AVATAR_FALLBACK, LIFETIME_BONUSES_DISPLAY } from '../services/standards.ts';
 
 // --- TYPES FOR VIEW STATE ---
-type MainTab = 'SCHEDULE' | 'MATERIALS' | 'FINANCIAL' | 'MORE';
+type MainTab = 'ETAPAS' | 'MATERIAIS' | 'FINANCEIRO' | 'FERRAMENTAS';
 type SubView = 'NONE' | 'TEAM' | 'SUPPLIERS' | 'REPORTS' | 'PHOTOS' | 'PROJECTS' | 'CALCULATORS' | 'CONTRACTS' | 'CHECKLIST';
 type ReportSubTab = 'CRONOGRAMA' | 'MATERIAIS' | 'FINANCEIRO';
 
@@ -52,7 +52,7 @@ const WorkDetail: React.FC = () => {
     const [files, setFiles] = useState<WorkFile[]>([]);
     const [, setStats] = useState<any>(null);
 
-    const [activeTab, setActiveTab] = useState<MainTab>('SCHEDULE');
+    const [activeTab, setActiveTab] = useState<MainTab>('ETAPAS');
     const [subView, setSubView] = useState<SubView>('NONE');
     const [uploading, setUploading] = useState(false);
     const [reportActiveTab, setReportActiveTab] = useState<ReportSubTab>('CRONOGRAMA');
@@ -419,15 +419,15 @@ const WorkDetail: React.FC = () => {
             {subView === 'NONE' ? (
                 <>
                     <nav className="fixed bottom-0 left-0 w-full bg-white dark:bg-slate-900 border-t z-50 flex justify-around p-2 md:static md:bg-slate-100 md:rounded-2xl md:mb-6">
-                        {(['SCHEDULE', 'MATERIALS', 'FINANCIAL', 'MORE'] as MainTab[]).map(tab => (
+                        {(['ETAPAS', 'MATERIAIS', 'FINANCEIRO', 'FERRAMENTAS'] as MainTab[]).map(tab => (
                             <button key={tab} onClick={() => setActiveTab(tab)} className={`flex flex-col items-center flex-1 py-2 text-[10px] font-bold md:text-sm md:rounded-xl ${activeTab === tab ? 'text-secondary md:bg-white md:shadow-sm' : 'text-slate-400'}`}>
-                                <i className={`fa-solid ${tab === 'SCHEDULE' ? 'fa-calendar' : tab === 'MATERIALS' ? 'fa-box' : tab === 'FINANCIAL' ? 'fa-dollar-sign' : 'fa-ellipsis'} text-lg mb-1`}></i>
+                                <i className={`fa-solid ${tab === 'ETAPAS' ? 'fa-calendar' : tab === 'MATERIAIS' ? 'fa-box' : tab === 'FINANCEIRO' ? 'fa-dollar-sign' : 'fa-ellipsis'} text-lg mb-1`}></i>
                                 {tab}
                             </button>
                         ))}
                     </nav>
 
-                    {activeTab === 'SCHEDULE' && (
+                    {activeTab === 'ETAPAS' && (
                         <div className="space-y-4 animate-in fade-in">
                             <div className="flex justify-between items-center px-2">
                                 <h2 className="text-xl font-bold">Cronograma</h2>
@@ -446,7 +446,7 @@ const WorkDetail: React.FC = () => {
                         </div>
                     )}
 
-                    {activeTab === 'MATERIALS' && (
+                    {activeTab === 'MATERIAIS' && (
                         <div className="space-y-4 animate-in fade-in">
                             <div className="flex justify-between items-center px-2">
                                 <h2 className="text-xl font-bold">Materiais</h2>
@@ -470,7 +470,7 @@ const WorkDetail: React.FC = () => {
                         </div>
                     )}
 
-                    {activeTab === 'FINANCIAL' && (
+                    {activeTab === 'FINANCEIRO' && (
                         <div className="space-y-4 animate-in fade-in">
                             <div className="bg-primary text-white p-6 rounded-3xl shadow-lg">
                                 <p className="text-xs opacity-70 uppercase font-bold mb-1">Gasto Total</p>
@@ -489,7 +489,7 @@ const WorkDetail: React.FC = () => {
                         </div>
                     )}
 
-                    {activeTab === 'MORE' && (
+                    {activeTab === 'FERRAMENTAS' && (
                         <div className="grid grid-cols-2 gap-4 animate-in fade-in">
                             <button onClick={() => setSubView('TEAM')} className="p-6 bg-slate-50 dark:bg-slate-800 rounded-3xl flex flex-col items-center"><i className="fa-solid fa-users text-2xl mb-2 text-secondary"></i>Equipe</button>
                             <button onClick={() => setSubView('PHOTOS')} className="p-6 bg-slate-50 dark:bg-slate-800 rounded-3xl flex flex-col items-center"><i className="fa-solid fa-camera text-2xl mb-2 text-secondary"></i>Fotos</button>

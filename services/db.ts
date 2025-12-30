@@ -969,7 +969,10 @@ export const dbService = {
 
   async deleteExpense(expenseId: string): Promise<void> {
     // Supabase is guaranteed to be initialized now
-    const { data: deletedExpense, error: deleteExpenseError } = await supabase.from('expenses').delete().eq('id', expenseId).select('work_id').single(); // Renamed error
+    // Fix: Add a default value of `null` to the destructured `data` property,
+    // explicitly acknowledging that `.single()` on a delete operation might return `null`
+    // for `data` if no row matches the criteria, satisfying TypeScript's strict checks.
+    const { data: deletedExpense = null, error: deleteExpenseError } = await supabase.from('expenses').delete().eq('id', expenseId).select('work_id').single(); // Renamed error
     if (deleteExpenseError) {
       console.error("Erro ao apagar despesa:", deleteExpenseError);
       throw deleteExpenseError;
