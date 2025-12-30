@@ -4,13 +4,13 @@ import { useParams, useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import { useAuth } from '../contexts/AuthContext.tsx';
 import { dbService } from '../services/db.ts';
-import { StepStatus, FileCategory, ExpenseCategory, type Work, type Worker, type Supplier, type Material, type Step, type Expense, type WorkPhoto, type WorkFile } from '../types.ts';
+import { StepStatus, FileCategory, ExpenseCategory, type Work, type Worker, type Supplier, type Material, type Step, type Expense, type WorkPhoto, type WorkFile, type Contract, type Checklist, type ChecklistItem, PlanType } from '../types.ts';
 import { ZeModal } from '../components/ZeModal.tsx';
-import { STANDARD_JOB_ROLES, STANDARD_SUPPLIER_CATEGORIES, ZE_AVATAR, ZE_AVATAR_FALLBACK } from '../services/standards.ts';
+import { STANDARD_JOB_ROLES, STANDARD_SUPPLIER_CATEGORIES, ZE_AVATAR, ZE_AVATAR_FALLBACK, CONTRACT_TEMPLATES, CHECKLIST_TEMPLATES } from '../services/standards.ts';
 
 // --- TYPES FOR VIEW STATE ---
 type MainTab = 'ETAPAS' | 'MATERIAIS' | 'FINANCEIRO' | 'FERRAMENTAS';
-type SubView = 'NONE' | 'TEAM' | 'SUPPLIERS' | 'REPORTS' | 'PHOTOS' | 'PROJECTS' | 'CALCULATORS' | 'CONTRACTS' | 'CHECKLIST';
+type SubView = 'NONE' | 'TEAM' | 'REPORTS' | 'PHOTOS' | 'PROJECTS' | 'CALCULATORS' | 'CONTRACTS' | 'CHECKLIST' | 'AICHAT'; // Changed SUPPLIERS to be part of TEAM, added AICHAT as a subview for bonus cards
 type ReportSubTab = 'CRONOGRAMA' | 'MATERIAIS' | 'FINANCEIRO';
 
 // --- DATE HELPERS ---
@@ -80,7 +80,6 @@ const WorkDetail: React.FC = () => {
     const [isStepModalOpen, setIsStepModalOpen] = useState(false);
     const [stepModalMode, setStepModalMode] = useState<'ADD' | 'EDIT'>('ADD');
     const [stepName, setStepName] = useState('');
-    // FIX: Correctly initialize stepStart and stepEnd with useState
     const [stepStart, setStepStart] = useState(new Date().toISOString().split('T')[0]);
     const [stepEnd, setStepEnd] = useState(new Date().toISOString().split('T')[0]);
     const [currentStepId, setCurrentStepId] = useState<string | null>(null);
@@ -100,9 +99,20 @@ const WorkDetail: React.FC = () => {
     const [personRole, setPersonRole] = useState('');
     const [personPhone, setPersonPhone] = useState('');
     const [personNotes, setPersonNotes] = useState('');
+    const [personEmail, setPersonEmail] = useState(''); // NEW: Email for supplier
+    const [personAddress, setPersonAddress] = useState(''); // NEW: Address for supplier
+    const [workerDailyRate, setWorkerDailyRate] = useState(''); // NEW: Daily rate for worker
 
-    const [viewContract, setViewContract] = useState<{title: string, content: string} | null>(null);
-    const [activeChecklist, setActiveChecklist] = useState<string | null>(null);
+    // NEW: Contract states
+    const [isContractModalOpen, setIsContractModalOpen] = useState(false);
+    const [viewContract, setViewContract] = useState<Contract | null>(null);
+
+    // NEW: Checklist states
+    const [isChecklistModalOpen, setIsChecklistModalOpen] = useState(false);
+    const [currentChecklist, setCurrentChecklist] = useState<Checklist | null>(null);
+    const [allChecklists, setAllChecklists] = useState<Checklist[]>([]);
+    const [selectedChecklistCategory, setSelectedChecklistCategory] = useState<string>('all'); // Filter checklists by step category
+
 
     const [zeModal, setZeModal] = useState<any>({ isOpen: false, title: '', message: '' });
 
@@ -118,7 +128,7 @@ const WorkDetail: React.FC = () => {
             const w = await dbService.getWorkById(id);
             setWork(w || null);
             if (w) {
-                const [s, m, e, wk, sp, ph, fl, workStats] = await Promise.all([
+                const [s, m, e, wk, sp, ph, fl, workStats, checklists] = await Promise.all([ // Added checklists
                     dbService.getSteps(w.id),
                     dbService.getMaterials(w.id),
                     dbService.getExpenses(w.id),
@@ -126,7 +136,8 @@ const WorkDetail: React.FC = () => {
                     dbService.getSuppliers(w.id),
                     dbService.getPhotos(w.id),
                     dbService.getFiles(w.id),
-                    dbService.calculateWorkStats(w.id)
+                    dbService.calculateWorkStats(w.id),
+                    dbService.getChecklists(w.id) // Fetch checklists
                 ]);
                 setSteps(s ? s.sort((a,b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()) : []);
                 setMaterials(m || []);
@@ -136,6 +147,7 @@ const WorkDetail: React.FC = () => {
                 setPhotos(ph || []);
                 setFiles(fl || []);
                 setStats(workStats);
+                setAllChecklists(checklists || []); // Set all checklists
             }
         } catch (error) {
             console.error("Erro ao carregar detalhes da obra:", error);
@@ -249,11 +261,9 @@ const WorkDetail: React.FC = () => {
     const openEditExpense = (expense: Expense) => {
         setExpenseModal({ isOpen: true, mode: 'EDIT', id: expense.id });
         setExpDesc(expense.description); 
-        // No EDIT mode, expAmount should reflect the *next* payment, not the total paid so far
         setExpAmount(''); 
         setExpSavedAmount(expense.paidAmount || expense.amount); 
         setExpTotalAgreed(expense.totalAgreed ? String(expense.totalAgreed) : ''); 
-        // Fix: Cast expense.category to ExpenseCategory to match the state type.
         setExpCategory(expense.category as ExpenseCategory); 
         setExpStepId(expense.stepId || '');
     };
@@ -277,14 +287,13 @@ const WorkDetail: React.FC = () => {
         } else if (expenseModal.mode === 'EDIT' && expenseModal.id) {
             const existing = expenses.find(ex => ex.id === expenseModal.id);
             if (existing) {
-                // For editing, if totalAgreed exists, we assume `amount` is `paidAmount`
                 const newPaidAmount = (existing.paidAmount || 0) + inputAmount;
                 const newTotalAgreed = expTotalAgreed ? Number(expTotalAgreed) : existing.totalAgreed;
 
                 await dbService.updateExpense({ 
                     ...existing, 
                     description: expDesc, 
-                    amount: newPaidAmount, // Amount field now represents total paid
+                    amount: newPaidAmount, 
                     paidAmount: newPaidAmount, 
                     category: expCategory, 
                     stepId: expStepId || undefined, 
@@ -328,9 +337,15 @@ const WorkDetail: React.FC = () => {
         if (item) {
             setPersonId(item.id); setPersonName(item.name); setPersonPhone(item.phone); setPersonNotes(item.notes || '');
             setPersonRole(mode === 'WORKER' ? item.role : item.category);
+            setWorkerDailyRate(item.dailyRate ? String(item.dailyRate) : ''); // NEW
+            setPersonEmail(item.email || ''); // NEW
+            setPersonAddress(item.address || ''); // NEW
         } else {
             setPersonId(null); setPersonName(''); setPersonPhone(''); setPersonNotes('');
             setPersonRole(mode === 'WORKER' ? STANDARD_JOB_ROLES[0] : STANDARD_SUPPLIER_CATEGORIES[0]);
+            setWorkerDailyRate(''); // NEW
+            setPersonEmail(''); // NEW
+            setPersonAddress(''); // NEW
         }
         setIsPersonModalOpen(true);
     };
@@ -338,13 +353,38 @@ const WorkDetail: React.FC = () => {
     const handleSavePerson = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!user || !work) return;
-        const payload: any = { userId: user.id, workId: work.id, name: personName, phone: personPhone, notes: personNotes };
-        if (personId) {
-            if (personMode === 'WORKER') await dbService.updateWorker({ ...payload, id: personId, role: personRole });
-            else await dbService.updateSupplier({ ...payload, id: personId, category: personRole });
-        } else {
-            if (personMode === 'WORKER') await dbService.addWorker({ ...payload, role: personRole });
-            else await dbService.addSupplier({ ...payload, category: personRole });
+        
+        if (personMode === 'WORKER') {
+            const payload: Omit<Worker, 'id'> = { 
+                userId: user.id, 
+                workId: work.id, 
+                name: personName, 
+                role: personRole, 
+                phone: personPhone, 
+                notes: personNotes,
+                dailyRate: Number(workerDailyRate) || undefined
+            };
+            if (personId) {
+                await dbService.updateWorker({ ...payload, id: personId });
+            } else {
+                await dbService.addWorker(payload);
+            }
+        } else { // SUPPLIER
+            const payload: Omit<Supplier, 'id'> = { 
+                userId: user.id, 
+                workId: work.id, 
+                name: personName, 
+                category: personRole, // For supplier, role means category
+                phone: personPhone, 
+                notes: personNotes,
+                email: personEmail || undefined, // NEW
+                address: personAddress || undefined // NEW
+            };
+            if (personId) {
+                await dbService.updateSupplier({ ...payload, id: personId });
+            } else {
+                await dbService.addSupplier(payload);
+            }
         }
         setIsPersonModalOpen(false);
         load();
@@ -362,6 +402,11 @@ const WorkDetail: React.FC = () => {
         });
     };
 
+    const handleGenerateWhatsappLink = (phone: string) => {
+        const cleanedPhone = phone.replace(/\D/g, '');
+        window.open(`https://wa.me/55${cleanedPhone}`, '_blank');
+    };
+
     useEffect(() => {
         if (!calcArea) { setCalcResult([]); return; }
         const area = Number(calcArea);
@@ -376,6 +421,54 @@ const WorkDetail: React.FC = () => {
         XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(materials), "Materiais");
         XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(expenses), "Financeiro");
         XLSX.writeFile(wb, `Obra_${work?.name}.xlsx`);
+    };
+
+    // NEW: Placeholder for PDF Export (functionality out of scope for UI/UX refactor)
+    const handleExportPdf = () => {
+        setZeModal({
+            isOpen: true,
+            title: 'Exportação em PDF',
+            message: 'A funcionalidade de exportação para PDF está em desenvolvimento e estará disponível em breve com layouts profissionais!',
+            confirmText: 'Entendido',
+            type: 'INFO',
+            onCancel: () => setZeModal({isOpen: false})
+        });
+    };
+
+    // NEW: Handle Checklist item toggle
+    const handleChecklistItemToggle = async (checklistId: string, itemId: string) => {
+        const updatedChecklists = allChecklists.map(cl => 
+            cl.id === checklistId 
+            ? { ...cl, items: cl.items.map(item => item.id === itemId ? { ...item, checked: !item.checked } : item) }
+            : cl
+        );
+        setAllChecklists(updatedChecklists);
+        // Find the updated checklist and save it
+        const checklistToUpdate = updatedChecklists.find(cl => cl.id === checklistId);
+        if (checklistToUpdate) {
+            await dbService.updateChecklist(checklistToUpdate);
+        }
+    };
+
+    // NEW: Add New Checklist
+    const handleAddChecklist = async (category: string) => {
+        if (!work) return;
+        const existingTemplate = CHECKLIST_TEMPLATES.find(t => t.category === category && t.workId === 'mock-work-id'); // Find a template
+        
+        // If no specific template for category, create a generic one
+        const newChecklistName = existingTemplate ? existingTemplate.name : `${category} - Checklist Padrão`;
+        const newChecklistItems = existingTemplate ? existingTemplate.items.map(item => ({...item, id: `${Date.now()}-${Math.random()}`})) : [{id: `${Date.now()}-1`, text: 'Novo item', checked: false}];
+
+        const newChecklist: Omit<Checklist, 'id'> = {
+            workId: work.id,
+            name: newChecklistName,
+            category: category,
+            items: newChecklistItems
+        };
+        const savedChecklist = await dbService.addChecklist(newChecklist);
+        load(); // Reload all checklists
+        setCurrentChecklist(savedChecklist);
+        setIsChecklistModalOpen(true);
     };
 
     // New: Grouped Expenses logic for rendering
@@ -432,28 +525,52 @@ const WorkDetail: React.FC = () => {
 
     const RenderCronogramaReport = () => (
         <div className="bg-white dark:bg-slate-900 rounded-2xl border p-6 shadow-sm">
-            <h3 className="font-bold mb-4">Cronograma</h3>
+            <h3 className="font-bold mb-4 text-primary dark:text-white">Cronograma Detalhado</h3>
             <div className="space-y-4">
-                {steps.map(s => (
-                    <div key={s.id} className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border">
-                        <p className="font-bold text-sm">{s.name}</p>
-                        <p className="text-xs text-slate-500">{parseDateNoTimezone(s.startDate)} - {parseDateNoTimezone(s.endDate)}</p>
-                    </div>
-                ))}
+                {steps.map(s => {
+                    const isDelayed = s.status !== StepStatus.COMPLETED && s.endDate < todayString;
+                    let statusColor = 'text-slate-500'; // Gray
+                    if (s.status === StepStatus.COMPLETED) statusColor = 'text-green-600';
+                    else if (s.status === StepStatus.IN_PROGRESS) statusColor = 'text-orange-600';
+                    else if (isDelayed) statusColor = 'text-red-600';
+
+                    return (
+                        <div key={s.id} className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
+                            <div className="flex justify-between items-center mb-1">
+                                <p className="font-bold text-sm text-primary dark:text-white">{s.name}</p>
+                                <span className={`text-xs font-semibold ${statusColor}`}>
+                                    {isDelayed ? 'Atrasada' : s.status === StepStatus.COMPLETED ? 'Concluída' : s.status === StepStatus.IN_PROGRESS ? 'Em Andamento' : 'Pendente'}
+                                </span>
+                            </div>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">{parseDateNoTimezone(s.startDate)} - {parseDateNoTimezone(s.endDate)}</p>
+                        </div>
+                    );
+                })}
             </div>
         </div>
     );
 
     const RenderMateriaisReport = () => (
         <div className="bg-white dark:bg-slate-900 rounded-2xl border p-6 shadow-sm">
-            <h3 className="font-bold mb-4">Materiais</h3>
+            <h3 className="font-bold mb-4 text-primary dark:text-white">Materiais por Etapa</h3>
             {steps.map(step => {
                 const stepMats = materials.filter(m => m.stepId === step.id);
                 if (stepMats.length === 0) return null;
                 return (
-                    <div key={step.id} className="mb-4">
-                        <h4 className="text-xs font-bold uppercase text-secondary mb-2">{step.name}</h4>
-                        {stepMats.map(m => <p key={m.id} className="text-sm">• {m.name}: {m.purchasedQty}/{m.plannedQty} {m.unit}</p>)}
+                    <div key={step.id} className="mb-6 bg-slate-50 dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700">
+                        <h4 className="text-sm font-black uppercase text-secondary mb-3 border-b border-slate-200 dark:border-slate-700 pb-2">{step.name}</h4>
+                        <div className="space-y-2">
+                            {stepMats.map(m => {
+                                const statusText = m.purchasedQty >= m.plannedQty ? 'Concluído' : m.purchasedQty > 0 ? 'Parcial' : 'Pendente';
+                                const statusColor = m.purchasedQty >= m.plannedQty ? 'text-green-600' : m.purchasedQty > 0 ? 'text-orange-600' : 'text-red-500';
+                                return (
+                                    <div key={m.id} className="flex justify-between items-center text-sm">
+                                        <span className="text-primary dark:text-white">• {m.name}</span>
+                                        <span className={`font-semibold ${statusColor}`}>{m.purchasedQty}/{m.plannedQty} {m.unit} ({statusText})</span>
+                                    </div>
+                                );
+                            })}
+                        </div>
                     </div>
                 );
             })}
@@ -462,15 +579,53 @@ const WorkDetail: React.FC = () => {
 
     const RenderFinanceiroReport = () => (
         <div className="bg-white dark:bg-slate-900 rounded-2xl border p-6 shadow-sm">
-            <h3 className="font-bold mb-4">Financeiro</h3>
-            {expenses.map(e => (
-                <div key={e.id} className="flex justify-between text-sm py-2 border-b">
-                    <span>{e.description}</span>
-                    <span className="font-bold">{formatCurrency(e.amount)}</span>
-                </div>
-            ))}
+            <h3 className="font-bold mb-4 text-primary dark:text-white">Lançamentos Financeiros</h3>
+            {Object.values(ExpenseCategory).map(category => {
+                const expensesInCategory = Object.values(groupedExpenses[category].steps).flatMap(stepGroup => stepGroup.expenses).concat(groupedExpenses[category].unlinkedExpenses);
+                if (expensesInCategory.length === 0) return null;
+
+                return (
+                    <div key={category} className="mb-6 bg-slate-50 dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700">
+                        <h4 className="text-sm font-black uppercase text-primary dark:text-white mb-3 border-b border-slate-200 dark:border-slate-700 pb-2">
+                            {category} (Total: {formatCurrency(groupedExpenses[category].totalCategoryAmount)})
+                        </h4>
+                        <div className="space-y-3">
+                            {Object.keys(groupedExpenses[category].steps).filter(stepId => groupedExpenses[category].steps[stepId].expenses.length > 0).map(stepId => {
+                                const stepGroup = groupedExpenses[category].steps[stepId];
+                                return (
+                                    <div key={stepId} className="pl-4 border-l border-slate-300 dark:border-slate-700">
+                                        <h5 className="font-bold text-sm text-secondary mb-2">{stepGroup.stepName}</h5>
+                                        <div className="space-y-1">
+                                            {stepGroup.expenses.map(e => (
+                                                <div key={e.id} className="flex justify-between text-xs py-1">
+                                                    <span className="text-slate-700 dark:text-slate-300">{e.description}</span>
+                                                    <span className="font-bold text-primary dark:text-white">{formatCurrency(e.amount)}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                            {groupedExpenses[category].unlinkedExpenses.length > 0 && (
+                                <div className="pl-4 border-l border-slate-300 dark:border-slate-700 mt-3">
+                                    <h5 className="font-bold text-sm text-slate-500 mb-2">Sem Etapa Específica</h5>
+                                    <div className="space-y-1">
+                                        {groupedExpenses[category].unlinkedExpenses.map(e => (
+                                            <div key={e.id} className="flex justify-between text-xs py-1">
+                                                <span className="text-slate-700 dark:text-slate-300">{e.description}</span>
+                                                <span className="font-bold text-primary dark:text-white">{formatCurrency(e.amount)}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                );
+            })}
         </div>
     );
+
 
     const todayString = new Date().toISOString().split('T')[0];
 
@@ -491,6 +646,7 @@ const WorkDetail: React.FC = () => {
         budgetStatusIcon = 'fa-exclamation-circle';
     }
 
+    const hasLifetimeAccess = user?.plan === PlanType.VITALICIO;
 
     return (
         <div className="max-w-4xl mx-auto py-8 px-4 md:px-0 pb-24">
@@ -502,7 +658,7 @@ const WorkDetail: React.FC = () => {
 
             {subView === 'NONE' ? (
                 <>
-                    <nav className="fixed bottom-0 left-0 w-full bg-white dark:bg-slate-900 border-t z-50 flex justify-around p-2 md:static md:bg-slate-100 md:rounded-2xl md:mb-6 shadow-lg md:shadow-none"> {/* Added shadow-lg for better visual separation on mobile */}
+                    <nav className="fixed bottom-0 left-0 w-full bg-white dark:bg-slate-900 border-t z-50 flex justify-around p-2 md:static md:bg-slate-100 md:rounded-2xl md:mb-6 shadow-lg md:shadow-none">
                         {(['ETAPAS', 'MATERIAIS', 'FINANCEIRO', 'FERRAMENTAS'] as MainTab[]).map(tab => (
                             <button key={tab} onClick={() => setActiveTab(tab)} className={`flex flex-col items-center flex-1 py-2 text-[10px] font-bold md:text-sm md:rounded-xl transition-colors ${activeTab === tab ? 'text-secondary md:bg-white md:shadow-sm' : 'text-slate-400 hover:text-primary dark:hover:text-white'}`} aria-label={`Abrir aba ${tab}`}>
                                 <i className={`fa-solid ${tab === 'ETAPAS' ? 'fa-calendar' : tab === 'MATERIAIS' ? 'fa-box' : tab === 'FINANCEIRO' ? 'fa-dollar-sign' : 'fa-ellipsis'} text-lg mb-1`}></i>
@@ -515,7 +671,7 @@ const WorkDetail: React.FC = () => {
                         <div className="space-y-4 animate-in fade-in">
                             <div className="flex justify-between items-center px-2">
                                 <h2 className="text-xl font-bold text-primary dark:text-white">Cronograma</h2>
-                                <button onClick={() => { setStepModalMode('ADD'); setIsStepModalOpen(true); }} className="bg-primary text-white p-2 rounded-xl shadow-md hover:bg-primary-light transition-colors" aria-label="Adicionar etapa"><i className="fa-solid fa-plus"></i></button> {/* Rounded-xl, shadow */}
+                                <button onClick={() => { setStepModalMode('ADD'); setIsStepModalOpen(true); }} className="bg-primary text-white p-2 rounded-xl shadow-md hover:bg-primary-light transition-colors" aria-label="Adicionar etapa"><i className="fa-solid fa-plus"></i></button>
                             </div>
                             {steps.length === 0 ? (
                                 <p className="text-center text-slate-400 py-8 italic text-sm">Nenhuma etapa cadastrada. Adicione para começar!</p>
@@ -557,9 +713,7 @@ const WorkDetail: React.FC = () => {
                             ) : (
                                 steps.map((step, index) => {
                                     const stepMats = materials.filter(m => m.stepId === step.id);
-                                    // Always show the step header even if no materials for it, as it's part of the plan/structure.
                                     
-                                    // Determine status for step card header in Materials section
                                     const isStepDelayed = step.status !== StepStatus.COMPLETED && step.endDate < todayString;
                                     const stepStatusBgClass = 
                                         step.status === StepStatus.COMPLETED ? 'bg-green-500/10' : 
@@ -575,15 +729,14 @@ const WorkDetail: React.FC = () => {
                                         step.status === StepStatus.COMPLETED ? 'fa-check-circle' :
                                         step.status === StepStatus.IN_PROGRESS ? 'fa-hammer' :
                                         isStepDelayed ? 'fa-triangle-exclamation' :
-                                        'fa-clock';
+                                       'fa-clock';
 
                                     return (
                                         <div key={step.id} className="mb-6 first:mt-0 mt-8">
-                                            {/* Step "Chapter" Card for Materials */}
                                             <div className={`bg-white dark:bg-slate-900 rounded-2xl p-4 mb-4 border border-slate-200 dark:border-slate-800 shadow-lg ${stepStatusBgClass} ${stepStatusTextColorClass}`}>
                                                 <div className="flex items-center justify-between">
                                                     <h3 className="font-black text-xl text-primary dark:text-white flex items-center gap-2">
-                                                        <span className={`w-8 h-8 rounded-full flex items-center justify-center text-base ${stepStatusBgClass.replace('/10', '/20').replace('bg-', 'bg-').replace('dark:bg-green-900/20', 'dark:bg-green-800').replace('dark:text-green-300', 'dark:text-white')}`}> {/* Use a darker shade for the icon background */}
+                                                        <span className={`w-8 h-8 rounded-full flex items-center justify-center text-base ${stepStatusBgClass.replace('/10', '/20').replace('bg-', 'bg-').replace('dark:bg-green-900/20', 'dark:bg-green-800').replace('dark:text-green-300', 'dark:text-white')}`}>
                                                             <i className={`fa-solid ${stepStatusIcon} ${stepStatusTextColorClass}`}></i>
                                                         </span>
                                                         <span className="text-primary dark:text-white">{index + 1}. {step.name}</span>
@@ -595,8 +748,7 @@ const WorkDetail: React.FC = () => {
                                                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 pl-12">{parseDateNoTimezone(step.startDate)} - {parseDateNoTimezone(step.endDate)}</p>
                                             </div>
 
-                                            {/* Materials for this step */}
-                                            <div className="space-y-3 pl-4 border-l-2 border-slate-100 dark:border-slate-800 ml-4"> {/* Indent materials */}
+                                            <div className="space-y-3 pl-4 border-l-2 border-slate-100 dark:border-slate-800 ml-4">
                                                 {stepMats.length === 0 ? (
                                                     <p className="text-center text-slate-400 py-4 italic text-sm">Nenhum material associado a esta etapa.</p>
                                                 ) : (
@@ -604,7 +756,7 @@ const WorkDetail: React.FC = () => {
                                                         <div key={m.id} onClick={() => { setMaterialModal({isOpen: true, material: m}); setMatName(m.name); setMatBrand(m.brand||''); setMatPlannedQty(String(m.plannedQty)); setMatUnit(m.unit); }} className="bg-white dark:bg-slate-900 p-3 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs cursor-pointer hover:shadow-sm transition-shadow">
                                                             <div className="flex justify-between items-center mb-1">
                                                                 <p className="font-bold text-sm text-primary dark:text-white">{m.name}</p>
-                                                                <span className="text-xs font-black text-green-600 dark:text-green-400">{m.purchasedQty} {m.unit}</span> {/* Purchased Qty in green */}
+                                                                <span className="text-xs font-black text-green-600 dark:text-green-400">{m.purchasedQty} {m.unit}</span>
                                                             </div>
                                                             <div className="h-1 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
                                                                 <div className="h-full bg-secondary" style={{ width: `${(m.purchasedQty/m.plannedQty)*100}%` }}></div>
@@ -692,10 +844,9 @@ const WorkDetail: React.FC = () => {
                                                 .filter(stepId => groupedExpenses[category].steps[stepId].expenses.length > 0) // Only show step card if it has expenses
                                                 .map(stepId => {
                                                 const stepGroup = groupedExpenses[category].steps[stepId];
-                                                const step = steps.find(s => s.id === stepId); // Get actual step object
-                                                if (!step) return null; // Should not happen if data is consistent
+                                                const step = steps.find(s => s.id === stepId); 
+                                                if (!step) return null;
                                                 
-                                                // Determine status for step card header
                                                 const isStepDelayed = step.status !== StepStatus.COMPLETED && step.endDate < todayString;
                                                 const stepStatusBgClass = 
                                                     step.status === StepStatus.COMPLETED ? 'bg-green-500/10' : 
@@ -709,14 +860,14 @@ const WorkDetail: React.FC = () => {
                                                     'text-slate-500 dark:text-slate-400';
                                                 const stepStatusIcon = 
                                                     step.status === StepStatus.COMPLETED ? 'fa-check-circle' :
-                                                    step.status === StepStatus.IN_PROGRESS ? 'fa-hammer' : // Using hammer for in-progress work
+                                                    step.status === StepStatus.IN_PROGRESS ? 'fa-hammer' : 
                                                     isStepDelayed ? 'fa-triangle-exclamation' :
                                                     'fa-clock';
 
                                                 return (
                                                     <div key={stepId} className="mb-4">
                                                         {/* Step "Chapter" Card for Financeiro */}
-                                                        <div className={`bg-white dark:bg-slate-900 rounded-2xl p-4 mb-4 border border-slate-200 dark:border-slate-800 shadow-lg ${stepStatusBgClass} ${stepStatusTextColorClass} pl-8 ml-4`}> {/* Indented step card itself */}
+                                                        <div className={`bg-white dark:bg-slate-900 rounded-2xl p-4 mb-4 border border-slate-200 dark:border-slate-800 shadow-lg ${stepStatusBgClass} ${stepStatusTextColorClass} pl-8 ml-4`}>
                                                             <div className="flex items-center justify-between">
                                                                 <h3 className="font-black text-xl text-primary dark:text-white flex items-center gap-2">
                                                                     <span className={`w-8 h-8 rounded-full flex items-center justify-center text-base ${stepStatusBgClass.replace('/10', '/20').replace('bg-', 'bg-').replace('dark:bg-green-900/20', 'dark:bg-green-800').replace('dark:text-green-300', 'dark:text-white')}`}> 
@@ -731,7 +882,7 @@ const WorkDetail: React.FC = () => {
                                                             <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 pl-12">{parseDateNoTimezone(step.startDate)} - {parseDateNoTimezone(step.endDate)}</p>
                                                         </div>
 
-                                                        <div className="space-y-3 pl-12 border-l-2 border-slate-100 dark:border-slate-800 ml-8"> {/* Further indent individual expenses */}
+                                                        <div className="space-y-3 pl-12 border-l-2 border-slate-100 dark:border-slate-800 ml-8">
                                                             {stepGroup.expenses.map(e => {
                                                                 const isEmpreita = e.totalAgreed && e.totalAgreed > 0;
                                                                 let statusText = '';
@@ -774,10 +925,10 @@ const WorkDetail: React.FC = () => {
                                             {/* Unlinked expenses within this category */}
                                             {groupedExpenses[category].unlinkedExpenses.length > 0 && (
                                                 <div className="mb-4">
-                                                    <h4 className="text-sm font-black uppercase text-slate-500 dark:text-slate-400 mb-2 border-b border-slate-100 dark:border-slate-800 pb-1 pl-8 ml-4"> {/* Indented header */}
+                                                    <h4 className="text-sm font-black uppercase text-slate-500 dark:text-slate-400 mb-2 border-b border-slate-100 dark:border-slate-800 pb-1 pl-8 ml-4">
                                                         Gastos Não Associados à Etapa
                                                     </h4>
-                                                    <div className="space-y-3 pl-12 border-l-2 border-slate-100 dark:border-slate-800 ml-8"> {/* Further indent individual expenses */}
+                                                    <div className="space-y-3 pl-12 border-l-2 border-slate-100 dark:border-slate-800 ml-8">
                                                         {groupedExpenses[category].unlinkedExpenses.map(e => {
                                                             const isEmpreita = e.totalAgreed && e.totalAgreed > 0;
                                                             let statusText = '';
@@ -823,36 +974,87 @@ const WorkDetail: React.FC = () => {
                     )}
 
                     {activeTab === 'FERRAMENTAS' && (
-                        <div className="grid grid-cols-2 gap-4 animate-in fade-in">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 animate-in fade-in">
+                            {/* Bloco 1: Equipe */}
                             <button onClick={() => setSubView('TEAM')} className="p-6 bg-white dark:bg-slate-900 rounded-3xl flex flex-col items-center shadow-sm border border-slate-200 dark:border-slate-800 hover:shadow-md transition-shadow" aria-label="Gerenciar Equipe">
                                 <i className="fa-solid fa-users text-2xl mb-2 text-secondary"></i>
                                 <span className="font-bold text-primary dark:text-white text-sm">Equipe</span>
                             </button>
-                            <button onClick={() => setSubView('PHOTOS')} className="p-6 bg-white dark:bg-slate-900 rounded-3xl flex flex-col items-center shadow-sm border border-slate-200 dark:border-slate-800 hover:shadow-md transition-shadow" aria-label="Ver Fotos da Obra">
-                                <i className="fa-solid fa-camera text-2xl mb-2 text-secondary"></i>
-                                <span className="font-bold text-primary dark:text-white text-sm">Fotos</span>
-                            </button>
+
+                            {/* Bloco 3: Relatórios */}
                             <button onClick={() => setSubView('REPORTS')} className="p-6 bg-white dark:bg-slate-900 rounded-3xl flex flex-col items-center shadow-sm border border-slate-200 dark:border-slate-800 hover:shadow-md transition-shadow" aria-label="Gerar Relatórios">
                                 <i className="fa-solid fa-file-pdf text-2xl mb-2 text-secondary"></i>
                                 <span className="font-bold text-primary dark:text-white text-sm">Relatórios</span>
                             </button>
+                            
+                            {/* Bloco 4: Fotos */}
+                            <button onClick={() => setSubView('PHOTOS')} className="p-6 bg-white dark:bg-slate-900 rounded-3xl flex flex-col items-center shadow-sm border border-slate-200 dark:border-slate-800 hover:shadow-md transition-shadow" aria-label="Ver Fotos da Obra">
+                                <i className="fa-solid fa-camera text-2xl mb-2 text-secondary"></i>
+                                <span className="font-bold text-primary dark:text-white text-sm">Fotos</span>
+                            </button>
+
+                            {/* Bloco 5: Arquivos & Projetos */}
                             <button onClick={() => setSubView('PROJECTS')} className="p-6 bg-white dark:bg-slate-900 rounded-3xl flex flex-col items-center shadow-sm border border-slate-200 dark:border-slate-800 hover:shadow-md transition-shadow" aria-label="Gerenciar Arquivos">
                                 <i className="fa-solid fa-folder text-2xl mb-2 text-secondary"></i>
                                 <span className="font-bold text-primary dark:text-white text-sm">Arquivos</span>
                             </button>
-                            {!isSubscriptionValid && (
-                                <button onClick={() => navigate('/settings')} className="col-span-2 p-6 bg-gradient-gold text-white rounded-3xl font-bold flex items-center justify-center gap-3 shadow-lg hover:shadow-amber-500/30 hover:scale-[1.02] transition-all" aria-label="Liberar Acesso Vitalício">
-                                    <i className="fa-solid fa-crown"></i> Liberar Acesso Vitalício
+
+                            {/* Bloco 6: Bônus Vitalício - Cards separados */}
+                            {/* Contratos */}
+                            <div className={`p-6 rounded-3xl flex flex-col items-center shadow-lg border relative ${hasLifetimeAccess ? 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800' : 'bg-gradient-dark-gold border-amber-900'}`}>
+                                {!hasLifetimeAccess && (
+                                    <div className="absolute inset-0 bg-black/50 rounded-3xl flex items-center justify-center z-10">
+                                        <i className="fa-solid fa-lock text-white text-4xl"></i>
+                                    </div>
+                                )}
+                                <button onClick={() => hasLifetimeAccess ? setSubView('CONTRACTS') : navigate('/settings')} disabled={!hasLifetimeAccess} className="w-full h-full absolute inset-0 flex flex-col items-center justify-center p-6 text-center z-20">
+                                    <i className={`fa-solid fa-file-contract text-2xl mb-2 ${hasLifetimeAccess ? 'text-secondary' : 'text-amber-300'}`}></i>
+                                    <span className={`font-bold text-sm ${hasLifetimeAccess ? 'text-primary dark:text-white' : 'text-white'}`}>Contratos</span>
+                                    {!hasLifetimeAccess && <span className="text-[10px] text-amber-200 mt-1">Exclusivo Vitalício</span>}
                                 </button>
-                            )}
-                            <button onClick={() => setIsCalculatorModalOpen(true)} className="p-6 bg-white dark:bg-slate-900 rounded-3xl flex flex-col items-center shadow-sm border border-slate-200 dark:border-slate-800 hover:shadow-md transition-shadow" aria-label="Abrir Calculadoras">
-                                <i className="fa-solid fa-calculator text-2xl mb-2 text-secondary"></i>
-                                <span className="font-bold text-primary dark:text-white text-sm">Calculadoras</span>
-                            </button>
-                            <button onClick={() => setSubView('CONTRACTS')} className="p-6 bg-white dark:bg-slate-900 rounded-3xl flex flex-col items-center shadow-sm border border-slate-200 dark:border-slate-800 hover:shadow-md transition-shadow" aria-label="Gerar Contratos">
-                                <i className="fa-solid fa-file-contract text-2xl mb-2 text-secondary"></i>
-                                <span className="font-bold text-primary dark:text-white text-sm">Contratos</span>
-                            </button>
+                            </div>
+                            
+                            {/* Calculadora da Obra */}
+                            <div className={`p-6 rounded-3xl flex flex-col items-center shadow-lg border relative ${hasLifetimeAccess ? 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800' : 'bg-gradient-dark-gold border-amber-900'}`}>
+                                {!hasLifetimeAccess && (
+                                    <div className="absolute inset-0 bg-black/50 rounded-3xl flex items-center justify-center z-10">
+                                        <i className="fa-solid fa-lock text-white text-4xl"></i>
+                                    </div>
+                                )}
+                                <button onClick={() => hasLifetimeAccess ? setIsCalculatorModalOpen(true) : navigate('/settings')} disabled={!hasLifetimeAccess} className="w-full h-full absolute inset-0 flex flex-col items-center justify-center p-6 text-center z-20">
+                                    <i className={`fa-solid fa-calculator text-2xl mb-2 ${hasLifetimeAccess ? 'text-secondary' : 'text-amber-300'}`}></i>
+                                    <span className={`font-bold text-sm ${hasLifetimeAccess ? 'text-primary dark:text-white' : 'text-white'}`}>Calculadoras</span>
+                                    {!hasLifetimeAccess && <span className="text-[10px] text-amber-200 mt-1">Exclusivo Vitalício</span>}
+                                </button>
+                            </div>
+
+                            {/* Checklist da Obra */}
+                            <div className={`p-6 rounded-3xl flex flex-col items-center shadow-lg border relative ${hasLifetimeAccess ? 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800' : 'bg-gradient-dark-gold border-amber-900'}`}>
+                                {!hasLifetimeAccess && (
+                                    <div className="absolute inset-0 bg-black/50 rounded-3xl flex items-center justify-center z-10">
+                                        <i className="fa-solid fa-lock text-white text-4xl"></i>
+                                    </div>
+                                )}
+                                <button onClick={() => hasLifetimeAccess ? setSubView('CHECKLIST') : navigate('/settings')} disabled={!hasLifetimeAccess} className="w-full h-full absolute inset-0 flex flex-col items-center justify-center p-6 text-center z-20">
+                                    <i className={`fa-solid fa-list-check text-2xl mb-2 ${hasLifetimeAccess ? 'text-secondary' : 'text-amber-300'}`}></i>
+                                    <span className={`font-bold text-sm ${hasLifetimeAccess ? 'text-primary dark:text-white' : 'text-white'}`}>Checklist da Obra</span>
+                                    {!hasLifetimeAccess && <span className="text-[10px] text-amber-200 mt-1">Exclusivo Vitalício</span>}
+                                </button>
+                            </div>
+
+                            {/* IA da Obra */}
+                            <div className={`p-6 rounded-3xl flex flex-col items-center shadow-lg border relative ${hasLifetimeAccess ? 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800' : 'bg-gradient-dark-gold border-amber-900'}`}>
+                                {!hasLifetimeAccess && (
+                                    <div className="absolute inset-0 bg-black/50 rounded-3xl flex items-center justify-center z-10">
+                                        <i className="fa-solid fa-lock text-white text-4xl"></i>
+                                    </div>
+                                )}
+                                <button onClick={() => hasLifetimeAccess ? navigate('/ai-chat') : navigate('/settings')} disabled={!hasLifetimeAccess} className="w-full h-full absolute inset-0 flex flex-col items-center justify-center p-6 text-center z-20">
+                                    <i className={`fa-solid fa-robot text-2xl mb-2 ${hasLifetimeAccess ? 'text-secondary' : 'text-amber-300'}`}></i>
+                                    <span className={`font-bold text-sm ${hasLifetimeAccess ? 'text-primary dark:text-white' : 'text-white'}`}>Zé da Obra AI</span>
+                                    {!hasLifetimeAccess && <span className="text-[10px] text-amber-200 mt-1">Exclusivo Vitalício</span>}
+                                </button>
+                            </div>
                         </div>
                     )}
                 </>
@@ -860,47 +1062,64 @@ const WorkDetail: React.FC = () => {
                 <div className="animate-in slide-in-from-right-4">
                     <button onClick={() => setSubView('NONE')} className="mb-6 text-secondary font-bold flex items-center gap-2 hover:opacity-80" aria-label="Voltar para Ferramentas"><i className="fa-solid fa-arrow-left"></i> Voltar</button>
                     {subView === 'TEAM' && (
-                        <div className="space-y-4">
-                            <div className="flex justify-between items-center mb-4">
-                                <h2 className="text-xl font-bold text-primary dark:text-white">Equipe</h2>
-                                <button onClick={() => openPersonModal('WORKER')} className="bg-primary text-white p-2 rounded-xl shadow-md hover:bg-primary-light transition-colors" aria-label="Adicionar profissional"><i className="fa-solid fa-plus"></i></button>
-                            </div>
-                            {workers.length === 0 ? (
-                                <p className="text-center text-slate-400 py-8 italic text-sm">Nenhum profissional cadastrado.</p>
-                            ) : (
-                                workers.map(w => (
-                                    <div key={w.id} className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 flex justify-between items-center shadow-sm">
-                                        <div>
-                                            <p className="font-bold text-primary dark:text-white">{w.name}</p>
-                                            <p className="text-xs text-slate-500 dark:text-slate-400">{w.role} • {w.phone}</p>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <button onClick={() => openPersonModal('WORKER', w)} className="text-slate-400 hover:text-secondary transition-colors p-2" aria-label="Editar profissional"><i className="fa-solid fa-pencil"></i></button>
-                                            <button onClick={() => handleDeletePerson(w.id, w.workId, 'WORKER')} className="text-red-400 hover:text-red-600 transition-colors p-2" aria-label="Remover profissional"><i className="fa-solid fa-trash"></i></button>
-                                        </div>
+                        <div className="space-y-8"> {/* Increased space-y */}
+                            {/* Equipe Section */}
+                            <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-sm border border-slate-200 dark:border-slate-800">
+                                <div className="flex justify-between items-center mb-6">
+                                    <h2 className="text-xl font-bold text-primary dark:text-white">Equipe</h2>
+                                    <button onClick={() => openPersonModal('WORKER')} className="bg-primary text-white p-2 rounded-xl shadow-md hover:bg-primary-light transition-colors" aria-label="Adicionar profissional"><i className="fa-solid fa-plus"></i></button>
+                                </div>
+                                {workers.length === 0 ? (
+                                    <p className="text-center text-slate-400 py-8 italic text-sm">Nenhum profissional cadastrado.</p>
+                                ) : (
+                                    <div className="space-y-4">
+                                        {workers.map(w => (
+                                            <div key={w.id} className="bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 flex justify-between items-center shadow-xs">
+                                                <div>
+                                                    <p className="font-bold text-primary dark:text-white">{w.name}</p>
+                                                    <p className="text-xs text-slate-500 dark:text-slate-400">{w.role} {w.dailyRate && w.dailyRate > 0 ? `• ${formatCurrency(w.dailyRate)}/dia` : ''}</p>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <button onClick={() => handleGenerateWhatsappLink(w.phone)} className="w-8 h-8 rounded-full bg-green-500/10 text-green-600 dark:bg-green-900/30 dark:text-green-300 hover:bg-green-500/20 transition-colors flex items-center justify-center" aria-label={`Contatar ${w.name} via WhatsApp`}>
+                                                        <i className="fa-brands fa-whatsapp text-lg"></i>
+                                                    </button>
+                                                    <button onClick={() => openPersonModal('WORKER', w)} className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors flex items-center justify-center" aria-label="Editar profissional"><i className="fa-solid fa-pencil text-sm"></i></button>
+                                                    <button onClick={() => handleDeletePerson(w.id, w.workId, 'WORKER')} className="w-8 h-8 rounded-full bg-red-500/10 text-red-600 dark:bg-red-900/30 dark:text-red-300 hover:bg-red-500/20 transition-colors flex items-center justify-center" aria-label="Remover profissional"><i className="fa-solid fa-trash text-sm"></i></button>
+                                                </div>
+                                            </div>
+                                        ))}
                                     </div>
-                                ))
-                            )}
-                            <div className="flex justify-between items-center mt-8 pt-4 border-t border-slate-200 dark:border-slate-800">
-                                <h2 className="text-xl font-bold text-primary dark:text-white">Fornecedores</h2>
-                                <button onClick={() => openPersonModal('SUPPLIER')} className="bg-primary text-white p-2 rounded-xl shadow-md hover:bg-primary-light transition-colors" aria-label="Adicionar fornecedor"><i className="fa-solid fa-plus"></i></button>
+                                )}
                             </div>
-                            {suppliers.length === 0 ? (
-                                <p className="text-center text-slate-400 py-8 italic text-sm">Nenhum fornecedor cadastrado.</p>
-                            ) : (
-                                suppliers.map(s => (
-                                    <div key={s.id} className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 flex justify-between items-center shadow-sm">
-                                        <div>
-                                            <p className="font-bold text-primary dark:text-white">{s.name}</p>
-                                            <p className="text-xs text-slate-500 dark:text-slate-400">{s.category} • {s.phone}</p>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <button onClick={() => openPersonModal('SUPPLIER', s)} className="text-slate-400 hover:text-secondary transition-colors p-2" aria-label="Editar fornecedor"><i className="fa-solid fa-pencil"></i></button>
-                                            <button onClick={() => handleDeletePerson(s.id, s.workId, 'SUPPLIER')} className="text-red-400 hover:text-red-600 transition-colors p-2" aria-label="Remover fornecedor"><i className="fa-solid fa-trash"></i></button>
-                                        </div>
+
+                            {/* Fornecedores Section */}
+                            <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-sm border border-slate-200 dark:border-slate-800">
+                                <div className="flex justify-between items-center mb-6">
+                                    <h2 className="text-xl font-bold text-primary dark:text-white">Fornecedores</h2>
+                                    <button onClick={() => openPersonModal('SUPPLIER')} className="bg-primary text-white p-2 rounded-xl shadow-md hover:bg-primary-light transition-colors" aria-label="Adicionar fornecedor"><i className="fa-solid fa-plus"></i></button>
+                                </div>
+                                {suppliers.length === 0 ? (
+                                    <p className="text-center text-slate-400 py-8 italic text-sm">Nenhum fornecedor cadastrado.</p>
+                                ) : (
+                                    <div className="space-y-4">
+                                        {suppliers.map(s => (
+                                            <div key={s.id} className="bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 flex justify-between items-center shadow-xs">
+                                                <div>
+                                                    <p className="font-bold text-primary dark:text-white">{s.name}</p>
+                                                    <p className="text-xs text-slate-500 dark:text-slate-400">{s.category} • {s.phone}</p>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <button onClick={() => handleGenerateWhatsappLink(s.phone)} className="w-8 h-8 rounded-full bg-green-500/10 text-green-600 dark:bg-green-900/30 dark:text-green-300 hover:bg-green-500/20 transition-colors flex items-center justify-center" aria-label={`Contatar ${s.name} via WhatsApp`}>
+                                                        <i className="fa-brands fa-whatsapp text-lg"></i>
+                                                    </button>
+                                                    <button onClick={() => openPersonModal('SUPPLIER', s)} className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors flex items-center justify-center" aria-label="Editar fornecedor"><i className="fa-solid fa-pencil text-sm"></i></button>
+                                                    <button onClick={() => handleDeletePerson(s.id, s.workId, 'SUPPLIER')} className="w-8 h-8 rounded-full bg-red-500/10 text-red-600 dark:bg-red-900/30 dark:text-red-300 hover:bg-red-500/20 transition-colors flex items-center justify-center" aria-label="Remover fornecedor"><i className="fa-solid fa-trash text-sm"></i></button>
+                                                </div>
+                                            </div>
+                                        ))}
                                     </div>
-                                ))
-                            )}
+                                )}
+                            </div>
                         </div>
                     )}
                     {subView === 'REPORTS' && (
@@ -909,20 +1128,25 @@ const WorkDetail: React.FC = () => {
                             <RenderCronogramaReport />
                             <RenderMateriaisReport />
                             <RenderFinanceiroReport />
-                            <button onClick={handleExportExcel} className="w-full py-4 bg-green-600 text-white rounded-xl font-bold shadow-lg hover:bg-green-700 transition-colors" aria-label="Exportar para Excel"><i className="fa-solid fa-file-excel mr-2"></i> Exportar Excel</button>
+                            <div className="grid grid-cols-2 gap-4"> {/* Two buttons for export */}
+                                <button onClick={handleExportExcel} className="w-full py-4 bg-green-600 text-white rounded-xl font-bold shadow-lg hover:bg-green-700 transition-colors" aria-label="Exportar para Excel"><i className="fa-solid fa-file-excel mr-2"></i> Exportar Excel</button>
+                                <button onClick={handleExportPdf} className="w-full py-4 bg-red-600 text-white rounded-xl font-bold shadow-lg hover:bg-red-700 transition-colors" aria-label="Exportar para PDF"><i className="fa-solid fa-file-pdf mr-2"></i> Exportar PDF</button>
+                            </div>
                         </div>
                     )}
                     {subView === 'PHOTOS' && (
                         <div className="space-y-6">
                             <h2 className="text-xl font-bold text-primary dark:text-white mb-4">Fotos da Obra</h2>
                             <div className="grid grid-cols-2 gap-4">
-                                <div className="relative aspect-square bg-slate-100 dark:bg-slate-800 rounded-2xl flex items-center justify-center border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-secondary transition-colors cursor-pointer">
+                                <div className="relative aspect-square bg-slate-100 dark:bg-slate-800 rounded-2xl flex flex-col items-center justify-center border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-secondary transition-colors cursor-pointer text-center p-4">
                                     <input type="file" accept="image/*" onChange={e => handleFileUpload(e, 'PHOTO')} className="absolute inset-0 opacity-0 cursor-pointer" aria-label="Adicionar foto" />
                                     {uploading ? (
-                                        <i className="fa-solid fa-circle-notch fa-spin text-slate-400 text-2xl"></i>
+                                        <i className="fa-solid fa-circle-notch fa-spin text-slate-400 text-2xl mb-2"></i>
                                     ) : (
-                                        <i className="fa-solid fa-plus text-slate-400 text-2xl"></i>
+                                        <i className="fa-solid fa-plus text-slate-400 text-2xl mb-2"></i>
                                     )}
+                                    <p className="text-sm text-slate-500 dark:text-slate-400">Clique para adicionar fotos</p>
+                                    <p className="text-xs text-slate-400 dark:text-slate-500">JPG, PNG</p>
                                 </div>
                                 {photos.length === 0 ? (
                                     <div className="col-span-2 text-center text-slate-400 py-8 italic text-sm">Nenhuma foto adicionada.</div>
@@ -935,7 +1159,7 @@ const WorkDetail: React.FC = () => {
                     {subView === 'PROJECTS' && (
                         <div className="space-y-6">
                             <h2 className="text-xl font-bold text-primary dark:text-white mb-4">Documentos e Projetos</h2>
-                            <div className="relative p-6 bg-slate-100 dark:bg-slate-800 rounded-2xl flex flex-col items-center justify-center border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-secondary transition-colors cursor-pointer">
+                            <div className="relative p-6 bg-slate-100 dark:bg-slate-800 rounded-2xl flex flex-col items-center justify-center border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-secondary transition-colors cursor-pointer text-center">
                                 <input type="file" onChange={e => handleFileUpload(e, 'FILE')} className="absolute inset-0 opacity-0 cursor-pointer" aria-label="Adicionar arquivo" />
                                 {uploading ? (
                                     <i className="fa-solid fa-circle-notch fa-spin text-slate-400 text-2xl mb-2"></i>
@@ -943,6 +1167,7 @@ const WorkDetail: React.FC = () => {
                                     <i className="fa-solid fa-file-arrow-up text-slate-400 text-2xl mb-2"></i>
                                 )}
                                 <p className="text-sm text-slate-500 dark:text-slate-400">Arraste e solte ou clique para adicionar arquivos</p>
+                                <p className="text-xs text-slate-400 dark:text-slate-500">PDF, DOCX, XLS, DWG, etc.</p>
                             </div>
                             {files.length === 0 ? (
                                 <p className="text-center text-slate-400 py-8 italic text-sm">Nenhum arquivo adicionado.</p>
@@ -960,6 +1185,87 @@ const WorkDetail: React.FC = () => {
                                     ))}
                                 </div>
                             )}
+                        </div>
+                    )}
+                    {subView === 'CONTRACTS' && (
+                        <div className="space-y-6">
+                            <h2 className="text-xl font-bold text-primary dark:text-white mb-4">Modelos de Contratos</h2>
+                            <p className="text-slate-500 dark:text-slate-400 max-w-2xl mb-6">
+                                Utilize nossos modelos profissionais para formalizar seus acordos.
+                            </p>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {CONTRACT_TEMPLATES.map(contract => (
+                                    <button 
+                                        key={contract.id} 
+                                        onClick={() => { setViewContract(contract); setIsContractModalOpen(true); }}
+                                        className="p-5 rounded-2xl border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-secondary hover:shadow-md transition-shadow flex flex-col items-start text-left group"
+                                        aria-label={`Ver modelo de contrato: ${contract.title}`}
+                                    >
+                                        <span className="text-sm font-bold text-secondary uppercase tracking-wider mb-2">{contract.category}</span>
+                                        <h3 className="font-bold text-lg text-primary dark:text-white group-hover:text-secondary transition-colors">{contract.title}</h3>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{contract.contentTemplate.substring(0, 100)}...</p>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                    {subView === 'CHECKLIST' && (
+                        <div className="space-y-6">
+                            <h2 className="text-xl font-bold text-primary dark:text-white mb-4">Checklists da Obra</h2>
+                            <p className="text-slate-500 dark:text-slate-400 max-w-2xl mb-6">
+                                Utilize checklists por etapa para garantir que nada seja esquecido.
+                            </p>
+                            <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-sm border border-slate-200 dark:border-slate-800 mb-6">
+                                <label htmlFor="checklist-category" className="block text-sm font-medium text-primary dark:text-white mb-2">Filtrar por Etapa:</label>
+                                <select
+                                    id="checklist-category"
+                                    value={selectedChecklistCategory}
+                                    onChange={(e) => setSelectedChecklistCategory(e.target.value)}
+                                    className="w-full p-3 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white focus:ring-secondary focus:border-secondary outline-none transition-colors"
+                                    aria-label="Filtrar checklists por categoria"
+                                >
+                                    <option value="all">Todas as Categorias</option>
+                                    {steps.map(step => (
+                                        <option key={step.id} value={step.name}>{step.name}</option>
+                                    ))}
+                                    <option value="Geral">Geral</option> {/* For general checklists not tied to a specific step */}
+                                </select>
+                            </div>
+
+                            <div className="space-y-4">
+                                {allChecklists
+                                    .filter(cl => selectedChecklistCategory === 'all' || cl.category === selectedChecklistCategory)
+                                    .map(checklist => (
+                                    <div key={checklist.id} className="bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-sm border border-slate-200 dark:border-slate-800">
+                                        <div className="flex justify-between items-center mb-3">
+                                            <h3 className="font-bold text-primary dark:text-white text-lg">{checklist.name}</h3>
+                                            <span className="text-xs font-bold text-slate-500 dark:text-slate-400">{checklist.category}</span>
+                                        </div>
+                                        <ul className="space-y-2">
+                                            {checklist.items.map(item => (
+                                                <li key={item.id} className="flex items-center">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={item.checked}
+                                                        onChange={() => handleChecklistItemToggle(checklist.id, item.id)}
+                                                        className="form-checkbox h-5 w-5 text-secondary rounded border-slate-300 dark:border-slate-700 focus:ring-secondary transition-colors"
+                                                        aria-label={`Marcar ${item.text}`}
+                                                    />
+                                                    <span className={`ml-3 text-base ${item.checked ? 'line-through text-slate-400' : 'text-primary dark:text-white'}`}>
+                                                        {item.text}
+                                                    </span>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                ))}
+                                {allChecklists.filter(cl => selectedChecklistCategory === 'all' || cl.category === selectedChecklistCategory).length === 0 && (
+                                    <p className="text-center text-slate-400 py-8 italic text-sm">Nenhum checklist encontrado para esta categoria ou obra. Que tal adicionar um?</p>
+                                )}
+                            </div>
+                            <button onClick={() => { if(work) handleAddChecklist(selectedChecklistCategory === 'all' ? 'Geral' : selectedChecklistCategory)}} className="w-full py-4 bg-primary text-white rounded-xl font-bold shadow-md hover:bg-primary-light transition-colors mt-6" aria-label="Adicionar novo checklist">
+                                <i className="fa-solid fa-plus mr-2"></i> Adicionar Checklist
+                            </button>
                         </div>
                     )}
                 </div>
@@ -1050,118 +1356,4 @@ const WorkDetail: React.FC = () => {
                             <h4 className="font-bold text-lg text-primary dark:text-white mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">Registrar Nova Compra</h4>
                             <div className="grid grid-cols-2 gap-3 bg-slate-50 dark:bg-slate-800 p-4 rounded-xl border border-slate-100 dark:border-slate-700">
                                 <input type="number" value={matBuyQty} onChange={e => setMatBuyQty(e.target.value)} placeholder="Qtd. Comprada Agora" className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white focus:ring-secondary focus:border-secondary outline-none transition-colors" aria-label="Quantidade comprada agora" />
-                                <input type="number" value={matBuyCost} onChange={e => setMatBuyCost(e.target.value)} placeholder={formatCurrency(0).replace('R$', '')} className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white focus:ring-secondary focus:border-secondary outline-none transition-colors" aria-label="Custo total da nova compra" />
-                            </div>
-                            {/* Bloco 4 - Ação */}
-                            <button type="submit" className="w-full py-3 bg-primary text-white rounded-xl font-bold shadow-md hover:bg-primary-light transition-colors" aria-label="Salvar e Registrar Compra">Salvar e Registrar Compra</button>
-                            <button type="button" onClick={() => setMaterialModal({isOpen: false, material: null})} className="w-full py-2 text-slate-500 font-medium hover:text-primary dark:hover:text-white transition-colors" aria-label="Cancelar">Cancelar</button>
-                        </form>
-                    </div>
-                </div>
-            )}
-
-            {/* Modal de Adicionar/Editar Despesa */}
-            {expenseModal.isOpen && (
-                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-                    <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl w-full max-w-md shadow-xl border border-slate-200 dark:border-slate-800">
-                        <h3 className="font-bold text-xl text-primary dark:text-white mb-4">{expenseModal.mode === 'ADD' ? 'Adicionar Novo Gasto' : 'Registrar Pagamento/Editar Gasto'}</h3>
-                        <form onSubmit={handleSaveExpense} className="space-y-4">
-                            {/* Bloco 1 - Identidade */}
-                            <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-xl border border-slate-100 dark:border-slate-700 space-y-3">
-                                <label className="block text-xs font-black text-slate-700 dark:text-slate-300 uppercase mb-2 tracking-widest pl-1">Identidade do Gasto</label>
-                                <input value={expDesc} onChange={e => setExpDesc(e.target.value)} placeholder="Descrição do Gasto (ex: Pedreiro, Cimento)" className="w-full p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white focus:ring-secondary focus:border-secondary outline-none transition-colors" required aria-label="Descrição do Gasto" />
-                                <select value={expCategory} onChange={e => setExpCategory(e.target.value as ExpenseCategory)} className="w-full p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white focus:ring-secondary focus:border-secondary outline-none transition-colors" aria-label="Categoria do Gasto">
-                                    {Object.values(ExpenseCategory).map(cat => (
-                                        <option key={cat} value={cat}>{cat}</option>
-                                    ))}
-                                </select>
-                                <select value={expStepId} onChange={e => setExpStepId(e.target.value)} className="w-full p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white focus:ring-secondary focus:border-secondary outline-none transition-colors" aria-label="Associar à Etapa">
-                                    <option value="">Associar à Etapa (Opcional)</option>
-                                    {steps.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                                </select>
-                            </div>
-                            
-                            {/* Bloco 2 - Total/Acumulado (se EDITANDO) */}
-                            {expenseModal.mode === 'EDIT' && (
-                                <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-xl border border-green-100 dark:border-green-900 text-green-800 dark:text-green-200 font-bold flex justify-between items-center text-lg">
-                                    <span>Total Pago:</span>
-                                    <span>{formatCurrency(expSavedAmount)}</span>
-                                </div>
-                            )}
-                            
-                            {/* Bloco 3 - Lançamento Atual */}
-                            <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-xl border border-slate-100 dark:border-slate-700 space-y-3">
-                                {expCategory === ExpenseCategory.LABOR && expenseModal.mode === 'ADD' && (
-                                    <input type="number" value={expTotalAgreed} onChange={e => setExpTotalAgreed(e.target.value)} placeholder="Preço Combinado (Total da Empreita)" className="w-full p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white focus:ring-secondary focus:border-secondary outline-none transition-colors" aria-label="Preço Combinado (Total da Empreita)" />
-                                )}
-                                <input type="number" value={expAmount} onChange={e => setExpAmount(e.target.value)} placeholder={expenseModal.mode === 'ADD' ? formatCurrency(0).replace('R$', '') : 'Valor Pago Agora'} className="w-full p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white focus:ring-secondary focus:border-secondary outline-none transition-colors" required aria-label={expenseModal.mode === 'ADD' ? 'Valor Total do Gasto' : 'Valor Pago Agora'} />
-                            </div>
-
-                            {/* Bloco 4 - Ação */}
-                            <button type="submit" className="w-full py-3 bg-primary text-white rounded-xl font-bold shadow-md hover:bg-primary-light transition-colors" aria-label="Salvar Gasto">Salvar Gasto</button>
-                            <button type="button" onClick={() => setExpenseModal({isOpen: false, mode: 'ADD'})} className="w-full py-2 text-slate-500 font-medium hover:text-primary dark:hover:text-white transition-colors" aria-label="Cancelar">Cancelar</button>
-                        </form>
-                    </div>
-                </div>
-            )}
-
-            {/* Modal de Adicionar/Editar Pessoa (Trabalhador/Fornecedor) */}
-            {isPersonModalOpen && (
-                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-                    <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl w-full max-w-md shadow-xl border border-slate-200 dark:border-slate-800">
-                        <h3 className="font-bold text-xl text-primary dark:text-white mb-4">{personId ? `Editar ${personMode === 'WORKER' ? 'Profissional' : 'Fornecedor'}` : `Adicionar Novo ${personMode === 'WORKER' ? 'Profissional' : 'Fornecedor'}`}</h3>
-                        <form onSubmit={handleSavePerson} className="space-y-4">
-                            {/* Bloco 1 - Identidade */}
-                            <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-xl border border-slate-100 dark:border-slate-700 space-y-3">
-                                <label className="block text-xs font-black text-slate-700 dark:text-slate-300 uppercase mb-2 tracking-widest pl-1">Dados Básicos</label>
-                                <input value={personName} onChange={e => setPersonName(e.target.value)} placeholder={`Nome do ${personMode === 'WORKER' ? 'Profissional' : 'Fornecedor'}`} className="w-full p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white focus:ring-secondary focus:border-secondary outline-none transition-colors" required aria-label={`Nome do ${personMode === 'WORKER' ? 'Profissional' : 'Fornecedor'}`} />
-                                <input value={personPhone} onChange={e => setPersonPhone(e.target.value)} placeholder="Telefone (WhatsApp)" className="w-full p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white focus:ring-secondary focus:border-secondary outline-none transition-colors" required aria-label="Telefone (WhatsApp)" />
-                                <select value={personRole} onChange={e => setPersonRole(e.target.value)} className="w-full p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white focus:ring-secondary focus:border-secondary outline-none transition-colors" aria-label={personMode === 'WORKER' ? 'Função do Profissional' : 'Categoria do Fornecedor'}>
-                                    {personMode === 'WORKER' ? (
-                                        STANDARD_JOB_ROLES.map(role => <option key={role} value={role}>{role}</option>)
-                                    ) : (
-                                        STANDARD_SUPPLIER_CATEGORIES.map(category => <option key={category} value={category}>{category}</option>)
-                                    )}
-                                </select>
-                            </div>
-                            {/* Bloco 3 - Observações (opcional) */}
-                            <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-xl border border-slate-100 dark:border-slate-700">
-                                <label className="block text-xs font-black text-slate-700 dark:text-slate-300 uppercase mb-2 tracking-widest pl-1">Observações</label>
-                                <textarea value={personNotes} onChange={e => setPersonNotes(e.target.value)} placeholder="Observações (opcional)" rows={3} className="w-full p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white focus:ring-secondary focus:border-secondary outline-none transition-colors resize-none" aria-label="Observações"></textarea>
-                            </div>
-                            {/* Bloco 4 - Ação */}
-                            <button type="submit" className="w-full py-3 bg-primary text-white rounded-xl font-bold shadow-md hover:bg-primary-light transition-colors" aria-label="Salvar">Salvar</button>
-                            <button type="button" onClick={() => setIsPersonModalOpen(false)} className="w-full py-2 text-slate-500 font-medium hover:text-primary dark:hover:text-white transition-colors" aria-label="Cancelar">Cancelar</button>
-                        </form>
-                    </div>
-                </div>
-            )}
-
-            <ZeModal isOpen={zeModal.isOpen} title={zeModal.title} message={zeModal.message} confirmText={zeModal.confirmText} onConfirm={zeModal.onConfirm} onCancel={() => setZeModal({isOpen: false})} type={zeModal.type} isConfirming={zeModal.isConfirming} />
-            
-            {isCalculatorModalOpen && (
-                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-                    <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl w-full max-w-md shadow-xl border border-slate-200 dark:border-slate-800">
-                        <h3 className="font-bold text-xl text-primary dark:text-white mb-4">Calculadora</h3>
-                        <select value={calcType} onChange={e => setCalcType(e.target.value as any)} className="w-full p-3 mb-4 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white focus:ring-secondary focus:border-secondary outline-none transition-colors" aria-label="Tipo de Cálculo">
-                            <option value="PISO">Piso/Revestimento</option>
-                            <option value="PAREDE">Tijolos/Blocos</option>
-                            <option value="PINTURA">Tinta</option>
-                        </select>
-                        <input type="number" value={calcArea} onChange={e => setCalcArea(e.target.value)} placeholder="Área em m²" className="w-full p-3 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white focus:ring-secondary focus:border-secondary outline-none transition-colors mb-4" aria-label="Área em metros quadrados" />
-                        <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 mb-4">
-                            {calcResult.length === 0 ? (
-                                <p className="text-sm text-slate-500 dark:text-slate-400 italic">Insira a área para calcular.</p>
-                            ) : (
-                                calcResult.map((r, i) => <p key={i} className="text-sm font-bold text-primary dark:text-white">• {r}</p>)
-                            )}
-                        </div>
-                        <button onClick={() => setIsCalculatorModalOpen(false)} className="w-full py-3 bg-primary text-white rounded-xl font-bold shadow-md hover:bg-primary-light transition-colors" aria-label="Fechar calculadora">Fechar</button>
-                    </div>
-                </div>
-            )}
-        </div>
-    );
-};
-
-export default WorkDetail;
+                                <input type="number" value={matBuyCost} onChange={e => setMatBuyCost(e.target.value)} placeholder={formatCurrency(0).replace('R$', '')} className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white focus:ring-secondary focus:border-secondary outline-none transition-colors" aria-label="Custo total da

@@ -557,3 +557,269 @@ export const STANDARD_SUPPLIER_CATEGORIES = [
   'Locação de Equipamentos',
   'Outro'
 ];
+
+// NEW: Contract Templates
+export const CONTRACT_TEMPLATES = [
+  {
+    id: 'contrato-empreita',
+    title: 'Contrato de Empreitada',
+    category: 'Mão de Obra',
+    contentTemplate: `
+      CONTRATO DE EMPREITADA DE MÃO DE OBRA
+
+      Pelo presente instrumento particular de CONTRATO DE EMPREITADA DE MÃO DE OBRA, de um lado, como CONTRATANTE, (Nome do Contratante), brasileiro(a), (estado civil), (profissão), portador(a) do RG nº (número) e CPF nº (número), residente e domiciliado(a) na (endereço completo), e de outro lado, como CONTRATADO(A), (Nome do Contratado), brasileiro(a), (estado civil), (profissão), portador(a) do RG nº (número) e CPF nº (número), residente e domiciliado(a) na (endereço completo), resolvem, por mútuo acordo, ajustar e contratar o serviço de mão de obra de empreitada, mediante as cláusulas e condições seguintes:
+
+      CLÁUSULA PRIMEIRA – DO OBJETO DO CONTRATO
+      O CONTRATADO obriga-se a executar, com sua equipe e sob sua responsabilidade, os serviços de (descrever os serviços a serem executados, por exemplo: construção de um muro, reforma de um banheiro, instalação de piso, etc.), na obra situada à (endereço da obra).
+
+      CLÁUSULA SEGUNDA – DOS PRAZOS
+      O prazo para início dos serviços será em (data de início) e o prazo para conclusão será em (data de término), podendo ser prorrogado mediante acordo formal entre as partes em caso de eventos de força maior ou intercorrências não previstas.
+
+      CLÁUSULA TERCEIRA – DO VALOR E FORMA DE PAGAMENTO
+      O valor total da presente empreitada é de R$ (valor total por extenso) ((valor total em números)), a ser pago da seguinte forma:
+      1. Sinal: R$ (valor do sinal) no ato da assinatura.
+      2. Parcelas: (Número) parcelas de R$ (valor da parcela), a serem pagas conforme (cronograma de pagamentos e etapas).
+
+      CLÁUSULA QUARTA – DOS MATERIAIS
+      (Especificar se os materiais serão fornecidos pelo contratante ou contratado. Exemplo: Os materiais necessários para a execução dos serviços serão fornecidos integralmente pelo CONTRATANTE, de acordo com a lista de materiais acordada. OU: Os materiais serão de responsabilidade do CONTRATADO e estão inclusos no valor total da empreitada.)
+
+      CLÁUSULA QUINTA – DAS RESPONSABILIDADES DO CONTRATADO
+      O CONTRATADO será responsável por:
+      a) Fornecer todas as ferramentas e equipamentos necessários para a execução dos serviços.
+      b) Contratar e gerenciar sua própria equipe, assumindo todas as obrigações trabalhistas, previdenciárias e fiscais.
+      c) Executar os serviços de acordo com as boas práticas da engenharia/construção, normas técnicas vigentes e projeto fornecido.
+      d) Manter a obra organizada e limpa, descartando o entulho em local apropriado.
+      e) Reparar eventuais vícios ou defeitos que surgirem em decorrência da má execução dos serviços, no prazo de 90 (noventa) dias após a entrega.
+
+      CLÁUSULA SEXTA – DAS RESPONSABILIDADES DO CONTRATANTE
+      O CONTRATANTE será responsável por:
+      a) Realizar os pagamentos nas datas e valores acordados.
+      b) Fornecer acesso à obra e à água/energia elétrica para a execução dos serviços.
+      c) Aprovar as etapas concluídas para liberação dos pagamentos subsequentes.
+
+      CLÁUSULA SÉTIMA – DA RESCISÃO
+      O presente contrato poderá ser rescindido por justa causa, em caso de descumprimento de qualquer uma das cláusulas por qualquer das partes, mediante notificação escrita com antecedência mínima de (número) dias.
+
+      CLÁUSULA OITAVA – DO FORO
+      As partes elegem o foro da Comarca de (Cidade), Estado de (Estado), para dirimir quaisquer dúvidas ou litígios decorrentes do presente contrato.
+
+      E por estarem assim justos e contratados, assinam o presente em 2 (duas) vias de igual teor e forma, na presença das testemunhas abaixo.
+
+      (Local), (dia) de (mês) de (ano).
+
+      ______________________________________
+      CONTRATANTE
+
+      ______________________________________
+      CONTRATADO(A)
+
+      TESTEMUNHAS:
+      1. ______________________________________
+         Nome: (Nome da Testemunha 1)
+         CPF: (CPF da Testemunha 1)
+
+      2. ______________________________________
+         Nome: (Nome da Testemunha 2)
+         CPF: (CPF da Testemunha 2)
+    `,
+  },
+  {
+    id: 'contrato-diaria',
+    title: 'Contrato de Diária / Prestação de Serviços',
+    category: 'Mão de Obra',
+    contentTemplate: `
+      CONTRATO DE PRESTAÇÃO DE SERVIÇOS POR DIÁRIA
+
+      Pelo presente instrumento particular de CONTRATO DE PRESTAÇÃO DE SERVIÇOS, de um lado, como CONTRATANTE, (Nome do Contratante), brasileiro(a), (estado civil), (profissão), portador(a) do RG nº (número) e CPF nº (número), residente e domiciliado(a) na (endereço completo), e de outro lado, como PRESTADOR(A) DE SERVIÇOS, (Nome do Prestador), brasileiro(a), (estado civil), (profissão), portador(a) do RG nº (número) e CPF nº (número), residente e domiciliado(a) na (endereço completo), resolvem, por mútuo acordo, ajustar e contratar a prestação de serviços por diária, mediante as cláusulas e condições seguintes:
+
+      CLÁUSULA PRIMEIRA – DO OBJETO DO CONTRATO
+      O PRESTADOR de serviços obriga-se a executar os serviços de (descrever os serviços a serem executados, por exemplo: serviços de pedreiro, eletricista, ajudante, etc.), na obra situada à (endereço da obra).
+
+      CLÁUSULA SEGUNDA – DA DIÁRIA E FORMA DE PAGAMENTO
+      O valor da diária de trabalho será de R$ (valor da diária por extenso) ((valor da diária em números)), a ser paga ao final de cada dia de serviço ou semanalmente, conforme acordado entre as partes. O pagamento será realizado mediante (forma de pagamento, ex: dinheiro, Pix).
+
+      CLÁUSULA TERCEIRA – DOS PRAZOS
+      A prestação dos serviços terá início em (data de início), sem prazo determinado para término, podendo ser encerrada a qualquer tempo por qualquer das partes, mediante aviso prévio de (número) dias (ou imediato, se acordado).
+
+      CLÁUSULA QUARTA – DOS MATERIAIS E FERRAMENTAS
+      Os materiais necessários para a execução dos serviços serão fornecidos integralmente pelo CONTRATANTE. As ferramentas e equipamentos de uso pessoal e segurança (EPIs) serão de responsabilidade do PRESTADOR.
+
+      CLÁUSULA QUINTA – DAS RESPONSABILIDADES DO PRESTADOR
+      O PRESTADOR de serviços será responsável por:
+      a) Executar os serviços com diligência e de acordo com as orientações do CONTRATANTE.
+      b) Utilizar os materiais e equipamentos de forma adequada e segura.
+      c) Zelar pela organização e limpeza do local de trabalho.
+
+      CLÁUSULA SEXTA – DAS RESPONSABILIDADES DO CONTRATANTE
+      O CONTRATANTE será responsável por:
+      a) Efetuar o pagamento da diária nas condições e prazos estabelecidos.
+      b) Fornecer os materiais necessários para a execução dos serviços.
+      c) Proporcionar condições seguras de trabalho.
+
+      CLÁUSULA SÉTIMA – DA INEXISTÊNCIA DE VÍNCULO EMPREGATÍCIO
+      O presente contrato é de natureza civil, não configurando vínculo empregatício entre as partes, sendo o PRESTADOR de serviços autônomo, sem subordinação ou exclusividade.
+
+      CLÁUSULA OITAVA – DO FORO
+      As partes elegem o foro da Comarca de (Cidade), Estado de (Estado), para dirimir quaisquer dúvidas ou litígios decorrentes do presente contrato.
+
+      E por estarem assim justos e contratados, assinam o presente em 2 (duas) vias de igual teor e forma, na presença das testemunhas abaixo.
+
+      (Local), (dia) de (mês) de (ano).
+
+      ______________________________________
+      CONTRATANTE
+
+      ______________________________________
+      PRESTADOR(A) DE SERVIÇOS
+
+      TESTEMUNHAS:
+      1. ______________________________________
+         Nome: (Nome da Testemunha 1)
+         CPF: (CPF da Testemunha 1)
+
+      2. ______________________________________
+         Nome: (Nome da Testemunha 2)
+         CPF: (CPF da Testemunha 2)
+    `,
+  },
+  {
+    id: 'recibo-pagamento',
+    title: 'Recibo de Pagamento de Mão de Obra',
+    category: 'Recibos',
+    contentTemplate: `
+      RECIBO DE PAGAMENTO
+
+      Eu, (Nome do Recebedor), (nacionalidade), (estado civil), (profissão), portador(a) do RG nº (número) e CPF nº (número), residente e domiciliado(a) na (endereço completo), declaro para os devidos fins que recebi de (Nome do Pagador), portador(a) do CPF nº (número), a importância de R$ (valor por extenso) ((valor em números)), referente ao pagamento de (descrever o serviço ou período, por exemplo: serviços de pedreiro referente à semana de 01/01/2024 a 05/01/2024, ou: parcela da empreitada referente à etapa de fundação), da obra situada à (endereço da obra).
+
+      O presente recibo é emitido para que produza seus devidos e legais efeitos.
+
+      (Local), (dia) de (mês) de (ano).
+
+      ______________________________________
+      Assinatura do Recebedor
+      Nome: (Nome do Recebedor)
+      CPF: (CPF do Recebedor)
+    `,
+  },
+  {
+    id: 'recibo-final-obra',
+    title: 'Recibo de Entrega e Quitação Final da Obra',
+    category: 'Recibos',
+    contentTemplate: `
+      RECIBO DE ENTREGA E QUITAÇÃO FINAL DA OBRA
+
+      Eu, (Nome do Contratado/Empreiteiro), (nacionalidade), (estado civil), (profissão), portador(a) do RG nº (número) e CPF nº (número), residente e domiciliado(a) na (endereço completo), doravante denominado(a) CONTRATADO(A), declaro para os devidos fins que, em (dia) de (mês) de (ano), recebi de (Nome do Contratante), portador(a) do CPF nº (número), doravante denominado(a) CONTRATANTE, a importância final de R$ (valor por extenso) ((valor em números)), referente à quitação total dos serviços de (descrever o objeto do contrato, por exemplo: construção civil, reforma de imóvel, etc.), na obra situada à (endereço da obra).
+
+      Com o presente recibo, o(a) CONTRATADO(A) dá plena, rasa e geral quitação de todo e qualquer débito referente aos serviços executados na referida obra, nada mais tendo a reclamar do(a) CONTRATANTE a qualquer título, seja de mão de obra, materiais, multas contratuais ou quaisquer outros encargos.
+
+      Declara, ainda, o(a) CONTRATADO(A) ter cumprido integralmente todas as suas obrigações contratuais, bem como todas as responsabilidades trabalhistas, previdenciárias e fiscais de sua equipe, isentando o(a) CONTRATANTE de qualquer ônus ou responsabilidade nesse sentido.
+
+      O presente recibo é emitido em 2 (duas) vias de igual teor e forma, para que produza seus devidos e legais efeitos.
+
+      (Local), (dia) de (mês) de (ano).
+
+      ______________________________________
+      Assinatura do CONTRATADO(A)
+      Nome: (Nome do Contratado/Empreiteiro)
+      CPF: (CPF do Contratado/Empreiteiro)
+
+      ______________________________________
+      Assinatura do CONTRATANTE (Ciente)
+      Nome: (Nome do Contratante)
+      CPF: (CPF do Contratante)
+    `,
+  },
+];
+
+// NEW: Checklist Templates (mock data)
+// CRITICAL: The 'category' key here MUST match the step names in WORK_TEMPLATES
+// to allow dynamic loading based on the work's steps.
+import { Checklist } from '../types.ts'; // Import Checklist type
+
+export const CHECKLIST_TEMPLATES: Checklist[] = [
+  // Example for a specific work (in a real app, this would be dynamic from DB)
+  // For now, let's assume workId 'mock-work-id' for testing.
+  // We'll generate dynamic IDs in dbService.
+  {
+    id: 'ckl-fundacao-1',
+    workId: 'mock-work-id', // Placeholder, will be replaced dynamically
+    name: 'Fundações - Pré-Concretagem',
+    category: 'Fundações',
+    items: [
+      { id: 'item1', text: 'Verificar nível da escavação', checked: false },
+      { id: 'item2', text: 'Conferir alinhamento das brocas/sapatas', checked: false },
+      { id: 'item3', text: 'Instalação da ferragem conforme projeto', checked: false },
+      { id: 'item4', text: 'Cobrimento mínimo da ferragem (esforço)', checked: false },
+      { id: 'item5', text: 'Limpeza do fundo da vala (sem barro/entulho)', checked: false },
+      { id: 'item6', text: 'Instalação dos arranques dos pilares', checked: false },
+      { id: 'item7', text: 'Presença do gabarito (linhas e níveis)', checked: false },
+      { id: 'item8', text: 'Verificar prumo e nível das formas', checked: false },
+    ],
+  },
+  {
+    id: 'ckl-impermeabilizacao-1',
+    workId: 'mock-work-id',
+    name: 'Impermeabilização de Baldrame',
+    category: 'Impermeabilização',
+    items: [
+      { id: 'item10', text: 'Superfície limpa e seca', checked: false },
+      { id: 'item11', text: 'Aplicação de primer (se necessário)', checked: false },
+      { id: 'item12', text: 'Primeira demão de argamassa polimérica', checked: false },
+      { id: 'item13', text: 'Segunda demão cruzada (após secagem)', checked: false },
+      { id: 'item14', text: 'Proteção mecânica (regularização)', checked: false },
+    ],
+  },
+  {
+    id: 'ckl-eletrica-geral-1',
+    workId: 'mock-work-id',
+    name: 'Elétrica - Antes do Reboco',
+    category: 'Fiação Elétrica Geral',
+    items: [
+      { id: 'item20', text: 'Passagem de conduítes (garantir sem amassados)', checked: false },
+      { id: 'item21', text: 'Fixação das caixas 4x2 e 4x4', checked: false },
+      { id: 'item22', text: 'Passagem de fios (bitolas corretas)', checked: false },
+      { id: 'item23', text: 'Identificação dos circuitos', checked: false },
+      { id: 'item24', text: 'Conexão provisória para teste (segurança)', checked: false },
+      { id: 'item25', text: 'Aterramento (se aplicável)', checked: false },
+    ],
+  },
+  {
+    id: 'ckl-hidraulica-banheiro-1',
+    workId: 'mock-work-id',
+    name: 'Hidráulica - Instalação de Banheiro',
+    category: 'Hidráulica de Banheiro',
+    items: [
+      { id: 'item30', text: 'Verificar caimento do esgoto', checked: false },
+      { id: 'item31', text: 'Instalação de registros (nível e prumo)', checked: false },
+      { id: 'item32', text: 'Teste de estanqueidade (pressão)', checked: false },
+      { id: 'item33', text: 'Bolsões de ar na tubulação (evitar)', checked: false },
+      { id: 'item34', text: 'Fixação dos pontos de água quente/fria', checked: false },
+    ],
+  },
+  {
+    id: 'ckl-pintura-1',
+    workId: 'mock-work-id',
+    name: 'Pintura - Preparação de Superfície',
+    category: 'Preparação de Superfície (Lixar/Massa)',
+    items: [
+      { id: 'item40', text: 'Lixamento completo da parede', checked: false },
+      { id: 'item41', text: 'Remoção total do pó', checked: false },
+      { id: 'item42', text: 'Aplicação de massa corrida (se necessário)', checked: false },
+      { id: 'item43', text: 'Reaplique massa e lixe, se for o caso', checked: false },
+      { id: 'item44', text: 'Isolamento de rodapés e janelas com fita', checked: false },
+    ],
+  },
+  // Default checklists that apply to any step (if not already covered by specific step templates)
+  {
+    id: 'ckl-seguranca-geral',
+    workId: 'mock-work-id',
+    name: 'Segurança Geral da Obra',
+    category: 'Geral',
+    items: [
+      { id: 'item50', text: 'Uso de EPIs (capacete, luvas, óculos)', checked: false },
+      { id: 'item51', text: 'Caminhos desobstruídos', checked: false },
+      { id: 'item52', text: 'Placas de sinalização (se necessário)', checked: false },
+      { id: 'item53', text: 'Extintor de incêndio acessível', checked: false },
+    ],
+  },
+];

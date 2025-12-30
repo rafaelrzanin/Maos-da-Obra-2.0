@@ -1,7 +1,6 @@
 
-
-import { PlanType, ExpenseCategory, StepStatus, FileCategory, type User, type Work, type Step, type Material, type Expense, type Worker, type Supplier, type WorkPhoto, type WorkFile, type DBNotification, type PushSubscriptionInfo } from '../types.ts';
-import { WORK_TEMPLATES, FULL_MATERIAL_PACKAGES } from './standards.ts';
+import { PlanType, ExpenseCategory, StepStatus, FileCategory, type User, type Work, type Step, type Material, type Expense, type Worker, type Supplier, type WorkPhoto, type WorkFile, type DBNotification, type PushSubscriptionInfo, type Contract, type Checklist, type ChecklistItem } from '../types.ts';
+import { WORK_TEMPLATES, FULL_MATERIAL_PACKAGES, CONTRACT_TEMPLATES, CHECKLIST_TEMPLATES } from './standards.ts';
 import { supabase } from './supabase.ts';
 
 // --- CACHE SYSTEM (IN-MEMORY) ---
@@ -258,7 +257,6 @@ export const dbService = {
     // Capture sessionCache locally for better type narrowing by TypeScript
     const currentSessionCache = sessionCache; 
 
-    // Check if we have a valid cached promise
     // Refactored to address TS2801: check if currentSessionCache is not null
     if (currentSessionCache !== null && (now - currentSessionCache.timestamp < AUTH_CACHE_DURATION)) {
         return currentSessionCache.promise;
@@ -343,7 +341,7 @@ export const dbService = {
         options: {
             data: { name }
         }
-    });
+    );
 
     if (authError) throw authError;
     // If user already exists and signed in, just ensure profile and return
@@ -665,6 +663,8 @@ export const dbService = {
             { table: 'workers', eq: ['work_id', workId] },
             { table: 'suppliers', eq: ['work_id', workId] },
             { table: 'notifications', eq: ['work_id', workId] },
+            // NEW: Delete checklists associated with the work
+            { table: 'checklists', eq: ['work_id', workId] },
             { table: 'works', eq: ['id', workId] } // Por último, a obra principal
         ];
 
@@ -759,6 +759,18 @@ export const dbService = {
   async deleteStep(stepId: string, workId: string): Promise<void> {
     console.log(`[DB DELETE] Iniciando exclusão para stepId: ${stepId} na workId: ${workId}`);
 
+    // Fetch the step details first to get its name for checklist deletion
+    const { data: stepToDelete, error: fetchStepError } = await supabase
+        .from('steps')
+        .select('*')
+        .eq('id', stepId)
+        .single();
+
+    if (fetchStepError || !stepToDelete) {
+        console.error(`[DB DELETE] Erro ao buscar etapa ${stepId}:`, fetchStepError || 'Etapa não encontrada.');
+        throw new Error(`Falha ao buscar etapa: ${fetchStepError?.message || 'Etapa não encontrada.'}`);
+    }
+
     // 1. Obter todos os materiais associados a esta etapa
     const { data: materialsToDelete, error: materialsFetchError } = await supabase
       .from('materials')
@@ -799,6 +811,14 @@ export const dbService = {
         } else {
           console.log(`[DB DELETE] Materiais para stepId ${stepId} deletados.`);
         }
+      }
+
+      // NEW: Delete checklists associated with this step
+      const { error: checklistDeleteError } = await supabase.from('checklists').delete().eq('work_id', workId).eq('category', stepToDelete.name); // Assuming category links to step name
+      if (checklistDeleteError) {
+          console.error(`[DB DELETE] Erro ao deletar checklists para stepId ${stepId}:`, checklistDeleteError);
+      } else {
+          console.log(`[DB DELETE] Checklists para stepId ${stepId} deletados.`);
       }
 
       // 4. Deletar a própria etapa
@@ -1041,7 +1061,7 @@ export const dbService = {
       name: worker.name,
       role: worker.role,
       phone: worker.phone,
-      daily_rate: worker.dailyRate,
+      daily_rate: worker.dailyRate, // NEW: Include daily_rate
       notes: worker.notes
     }).select().single();
     if (addWorkerError) {
@@ -1057,7 +1077,7 @@ export const dbService = {
       name: worker.name,
       role: worker.role,
       phone: worker.phone,
-      daily_rate: worker.dailyRate,
+      daily_rate: worker.dailyRate, // NEW: Include daily_rate
       notes: worker.notes
     }).eq('id', worker.id).eq('work_id', worker.workId).select().single(); // NEW: Filter by work_id
     if (updateWorkerError) {
@@ -1095,8 +1115,8 @@ export const dbService = {
       name: supplier.name,
       category: supplier.category,
       phone: supplier.phone,
-      email: supplier.email,
-      address: supplier.address,
+      email: supplier.email, // NEW: Include email
+      address: supplier.address, // NEW: Include address
       notes: supplier.notes
     }).select().single();
     if (addSupplierError) {
@@ -1112,8 +1132,8 @@ export const dbService = {
       name: supplier.name,
       category: supplier.category,
       phone: supplier.phone,
-      email: supplier.email,
-      address: supplier.address,
+      email: supplier.email, // NEW: Include email
+      address: supplier.address, // NEW: Include address
       notes: supplier.notes
     }).eq('id', supplier.id).eq('work_id', supplier.workId).select().single(); // NEW: Filter by work_id
     if (updateSupplierError) {
@@ -1458,7 +1478,7 @@ export const dbService = {
     //                 read: false,
     //                 type: 'INFO',
     //                 tag: notificationTag // Save tag
-    //             });
+    //             );
     //             await dbService.sendPushNotification(userId, { // Changed from dbService.sendPushNotification
     //                 title: `Próxima Etapa: ${step.name}!`,
     //                 body: `A etapa "${step.name}" da obra "${currentWork.name}" inicia em ${daysUntilStart} dia(s). Prepare-se!`,
@@ -1577,7 +1597,7 @@ export const dbService = {
     //                         read: false,
     //                         type: 'ERROR',
     //                         tag: notificationTag // Save tag
-    //                     });
+    //                     );
     //                     await dbService.sendPushNotification(userId, { // Changed from dbService.sendPushNotification
     //                         title: 'Orçamento Estourado!',
     //                         body: `Você já usou ${Math.round(budgetUsage)}% do orçamento da obra "${currentWork.name}".`,
@@ -1694,5 +1714,55 @@ export const dbService = {
         // Não relança o erro, pois a falha na notificação não deve impedir a funcionalidade principal
     }
   },
+
+  // --- NEW: CONTRACTS (MOCK/TEMPLATE) ---
+  async getContractTemplates(): Promise<Contract[]> {
+    // In a real app, this would fetch from a 'contracts' table in Supabase
+    // For now, it returns the static templates from standards.ts
+    await new Promise(r => setTimeout(r, 200)); // Simulate API call
+    return CONTRACT_TEMPLATES;
+  },
+
+  // --- NEW: CHECKLISTS (MOCK/LOCAL DB) ---
+  async getChecklists(workId: string, category?: string): Promise<Checklist[]> {
+    // In a real app, this would fetch from a 'checklists' table in Supabase
+    // For now, it returns the static templates from standards.ts and filters them
+    await new Promise(r => setTimeout(r, 200)); // Simulate API call
+    // Filter by workId (mocked) and category
+    const filtered = CHECKLIST_TEMPLATES.filter(c => 
+        (c.workId === 'mock-work-id' || c.workId === workId) && // Allow general mock or specific work
+        (!category || category === 'all' || c.category === category)
+    );
+    // Simulate deep copy to prevent direct state mutation
+    return filtered.map(c => ({
+      ...c,
+      items: c.items.map(item => ({...item}))
+    }));
+  },
+
+  async addChecklist(checklist: Omit<Checklist, 'id'>): Promise<Checklist> {
+    await new Promise(r => setTimeout(r, 200)); // Simulate API call
+    const newId = `ckl-${Date.now()}`;
+    const newChecklist = { ...checklist, id: newId };
+    CHECKLIST_TEMPLATES.push(newChecklist); // Add to mock DB
+    return newChecklist;
+  },
+
+  async updateChecklist(checklist: Checklist): Promise<Checklist> {
+    await new Promise(r => setTimeout(r, 200)); // Simulate API call
+    const index = CHECKLIST_TEMPLATES.findIndex(c => c.id === checklist.id);
+    if (index !== -1) {
+      CHECKLIST_TEMPLATES[index] = checklist; // Update mock DB
+    }
+    return checklist;
+  },
+
+  async deleteChecklist(checklistId: string): Promise<void> {
+    await new Promise(r => setTimeout(r, 200)); // Simulate API call
+    const index = CHECKLIST_TEMPLATES.findIndex(c => c.id === checklistId);
+    if (index !== -1) {
+      CHECKLIST_TEMPLATES.splice(index, 1); // Delete from mock DB
+    }
+  }
 
 };

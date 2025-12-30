@@ -170,14 +170,16 @@ export interface ChecklistItem {
 
 export interface Checklist {
   id: string;
-  category: string;
+  workId: string; // NEW: Associate checklist with a work
+  name: string; // Ex: "Fundações - Pré-Concretagem"
+  category: string; // Ex: "Fundações", "Elétrica"
   items: ChecklistItem[];
 }
 
-export interface ContractTemplate {
+export interface Contract { // Changed ContractTemplate to Contract
   id: string;
   title: string;
-  description: string;
+  category: string; // Ex: "Mão de Obra", "Serviços", "Recibos"
   contentTemplate: string; 
 }
 
@@ -188,8 +190,8 @@ export interface Supplier {
   name: string;
   category: string;
   phone: string;
-  email?: string;
-  address?: string;
+  email?: string; // NEW: Added email
+  address?: string; // NEW: Added address
   notes?: string;
 }
 
@@ -200,7 +202,7 @@ export interface Worker {
   name: string;
   role: string;
   phone: string;
-  dailyRate?: number;
+  dailyRate?: number; // NEW: Added dailyRate
   notes?: string;
 }
 
