@@ -614,17 +614,17 @@ const WorkDetail: React.FC = () => {
                                             <div key={e.id} className="flex justify-between text-xs py-1">
                                                 <span className="text-slate-700 dark:text-slate-300">{e.description}</span>
                                                 <span className="font-bold text-primary dark:text-white">{formatCurrency(e.amount)}</span>
-                                            </div>
-                                        ))}
+                                                </div>
+                                            ))}
+                                        </div>
                                     </div>
-                                </div>
-                            )}
+                                )}
+                            </div>
                         </div>
-                    </div>
-                );
-            })}
-        </div>
-    );
+                    );
+                })}
+            </div>
+        );
 
 
     const todayString = new Date().toISOString().split('T')[0];
@@ -1356,4 +1356,170 @@ const WorkDetail: React.FC = () => {
                             <h4 className="font-bold text-lg text-primary dark:text-white mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">Registrar Nova Compra</h4>
                             <div className="grid grid-cols-2 gap-3 bg-slate-50 dark:bg-slate-800 p-4 rounded-xl border border-slate-100 dark:border-slate-700">
                                 <input type="number" value={matBuyQty} onChange={e => setMatBuyQty(e.target.value)} placeholder="Qtd. Comprada Agora" className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white focus:ring-secondary focus:border-secondary outline-none transition-colors" aria-label="Quantidade comprada agora" />
-                                <input type="number" value={matBuyCost} onChange={e => setMatBuyCost(e.target.value)} placeholder={formatCurrency(0).replace('R$', '')} className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white focus:ring-secondary focus:border-secondary outline-none transition-colors" aria-label="Custo total da
+                                <input type="number" value={matBuyCost} onChange={e => setMatBuyCost(e.target.value)} placeholder={formatCurrency(0).replace('R$', '')} className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white focus:ring-secondary focus:border-secondary outline-none transition-colors" aria-label="Custo total da nova compra" />
+                            </div>
+                            {/* Bloco 4 - Ação */}
+                            <button type="submit" className="w-full py-3 bg-primary text-white rounded-xl font-bold shadow-md hover:bg-primary-light transition-colors" aria-label="Salvar e Registrar Compra">Salvar e Registrar Compra</button>
+                            <button type="button" onClick={() => setMaterialModal({isOpen: false, material: null})} className="w-full py-2 text-slate-500 font-medium hover:text-primary dark:hover:text-white transition-colors" aria-label="Cancelar">Cancelar</button>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal de Adicionar/Editar Despesa */}
+            {expenseModal.isOpen && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+                    <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl w-full max-w-md shadow-xl border border-slate-200 dark:border-slate-800">
+                        <h3 className="font-bold text-xl text-primary dark:text-white mb-4">{expenseModal.mode === 'ADD' ? 'Adicionar Novo Gasto' : 'Registrar Pagamento/Editar Gasto'}</h3>
+                        <form onSubmit={handleSaveExpense} className="space-y-4">
+                            {/* Bloco 1 - Identidade */}
+                            <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-xl border border-slate-100 dark:border-slate-700 space-y-3">
+                                <label className="block text-xs font-black text-slate-700 dark:text-slate-300 uppercase mb-2 tracking-widest pl-1">Identidade do Gasto</label>
+                                <input value={expDesc} onChange={e => setExpDesc(e.target.value)} placeholder="Descrição do Gasto (ex: Pedreiro, Cimento)" className="w-full p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white focus:ring-secondary focus:border-secondary outline-none transition-colors" required aria-label="Descrição do Gasto" />
+                                <select value={expCategory} onChange={e => setExpCategory(e.target.value as ExpenseCategory)} className="w-full p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white focus:ring-secondary focus:border-secondary outline-none transition-colors" aria-label="Categoria do Gasto">
+                                    {Object.values(ExpenseCategory).map(cat => (
+                                        <option key={cat} value={cat}>{cat}</option>
+                                    ))}
+                                </select>
+                                <select value={expStepId} onChange={e => setExpStepId(e.target.value)} className="w-full p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white focus:ring-secondary focus:border-secondary outline-none transition-colors" aria-label="Associar à Etapa">
+                                    <option value="">Associar à Etapa (Opcional)</option>
+                                    {steps.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                                </select>
+                            </div>
+                            
+                            {/* Bloco 2 - Total/Acumulado (se EDITANDO) */}
+                            {expenseModal.mode === 'EDIT' && (
+                                <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-xl border border-green-100 dark:border-green-900 text-green-800 dark:text-green-200 font-bold flex justify-between items-center text-lg">
+                                    <span>Total Pago:</span>
+                                    <span>{formatCurrency(expSavedAmount)}</span>
+                                </div>
+                            )}
+                            
+                            {/* Bloco 3 - Lançamento Atual */}
+                            <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-xl border border-slate-100 dark:border-slate-700 space-y-3">
+                                {expCategory === ExpenseCategory.LABOR && expenseModal.mode === 'ADD' && (
+                                    <input type="number" value={expTotalAgreed} onChange={e => setExpTotalAgreed(e.target.value)} placeholder="Preço Combinado (Total da Empreita)" className="w-full p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white focus:ring-secondary focus:border-secondary outline-none transition-colors" aria-label="Preço Combinado (Total da Empreita)" />
+                                )}
+                                <input type="number" value={expAmount} onChange={e => setExpAmount(e.target.value)} placeholder={expenseModal.mode === 'ADD' ? formatCurrency(0).replace('R$', '') : 'Valor Pago Agora'} className="w-full p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white focus:ring-secondary focus:border-secondary outline-none transition-colors" required aria-label={expenseModal.mode === 'ADD' ? 'Valor Total do Gasto' : 'Valor Pago Agora'} />
+                            </div>
+
+                            {/* Bloco 4 - Ação */}
+                            <button type="submit" className="w-full py-3 bg-primary text-white rounded-xl font-bold shadow-md hover:bg-primary-light transition-colors" aria-label="Salvar Gasto">Salvar Gasto</button>
+                            <button type="button" onClick={() => setExpenseModal({isOpen: false, mode: 'ADD'})} className="w-full py-2 text-slate-500 font-medium hover:text-primary dark:hover:text-white transition-colors" aria-label="Cancelar">Cancelar</button>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal de Adicionar/Editar Pessoa (Trabalhador/Fornecedor) */}
+            {isPersonModalOpen && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+                    <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl w-full max-w-md shadow-xl border border-slate-200 dark:border-slate-800">
+                        <h3 className="font-bold text-xl text-primary dark:text-white mb-4">{personId ? `Editar ${personMode === 'WORKER' ? 'Profissional' : 'Fornecedor'}` : `Adicionar Novo ${personMode === 'WORKER' ? 'Profissional' : 'Fornecedor'}`}</h3>
+                        <form onSubmit={handleSavePerson} className="space-y-4">
+                            {/* Bloco 1 - Identidade */}
+                            <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-xl border border-slate-100 dark:border-slate-700 space-y-3">
+                                <label className="block text-xs font-black text-slate-700 dark:text-slate-300 uppercase mb-2 tracking-widest pl-1">Dados Básicos</label>
+                                <input value={personName} onChange={e => setPersonName(e.target.value)} placeholder={`Nome do ${personMode === 'WORKER' ? 'Profissional' : 'Fornecedor'}`} className="w-full p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white focus:ring-secondary focus:border-secondary outline-none transition-colors" required aria-label={`Nome do ${personMode === 'WORKER' ? 'Profissional' : 'Fornecedor'}`} />
+                                <input value={personPhone} onChange={e => setPersonPhone(e.target.value)} placeholder="Telefone (WhatsApp)" className="w-full p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white focus:ring-secondary focus:border-secondary outline-none transition-colors" aria-label="Telefone (WhatsApp)" />
+                                {personMode === 'WORKER' ? (
+                                    <select value={personRole} onChange={e => setPersonRole(e.target.value)} className="w-full p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white focus:ring-secondary focus:border-secondary outline-none transition-colors" aria-label="Profissão">
+                                        {STANDARD_JOB_ROLES.map(role => <option key={role} value={role}>{role}</option>)}
+                                    </select>
+                                ) : (
+                                    <>
+                                        <select value={personRole} onChange={e => setPersonRole(e.target.value)} className="w-full p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white focus:ring-secondary focus:border-secondary outline-none transition-colors" aria-label="Tipo de Fornecedor">
+                                            {STANDARD_SUPPLIER_CATEGORIES.map(category => <option key={category} value={category}>{category}</option>)}
+                                        </select>
+                                        <input value={personEmail} onChange={e => setPersonEmail(e.target.value)} placeholder="E-mail (Opcional)" className="w-full p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white focus:ring-secondary focus:border-secondary outline-none transition-colors" aria-label="E-mail do fornecedor" type="email" />
+                                        <input value={personAddress} onChange={e => setPersonAddress(e.target.value)} placeholder="Endereço (Opcional)" className="w-full p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white focus:ring-secondary focus:border-secondary outline-none transition-colors" aria-label="Endereço do fornecedor" />
+                                    </>
+                                )}
+                                {personMode === 'WORKER' && (
+                                    <input type="number" value={workerDailyRate} onChange={e => setWorkerDailyRate(e.target.value)} placeholder="Valor da Diária (R$)" className="w-full p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white focus:ring-secondary focus:border-secondary outline-none transition-colors" aria-label="Valor da diária do profissional" />
+                                )}
+                                <textarea value={personNotes} onChange={e => setPersonNotes(e.target.value)} placeholder="Observações (Opcional)" rows={3} className="w-full p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white focus:ring-secondary focus:border-secondary outline-none transition-colors resize-none" aria-label="Observações"></textarea>
+                            </div>
+                            
+                            {/* Bloco 2 - Ação */}
+                            <button type="submit" className="w-full py-3 bg-primary text-white rounded-xl font-bold shadow-md hover:bg-primary-light transition-colors" aria-label="Salvar pessoa">Salvar {personMode === 'WORKER' ? 'Profissional' : 'Fornecedor'}</button>
+                            <button type="button" onClick={() => setIsPersonModalOpen(false)} className="w-full py-2 text-slate-500 font-medium hover:text-primary dark:hover:text-white transition-colors" aria-label="Cancelar">Cancelar</button>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal de Calculadora da Obra */}
+            {isCalculatorModalOpen && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+                    <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl w-full max-w-md shadow-xl border border-slate-200 dark:border-slate-800">
+                        <h3 className="font-bold text-xl text-primary dark:text-white mb-4">Calculadora da Obra</h3>
+                        <div className="space-y-4">
+                            <select value={calcType} onChange={e => setCalcType(e.target.value as typeof calcType)} className="w-full p-3 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white focus:ring-secondary focus:border-secondary outline-none transition-colors" aria-label="Tipo de cálculo">
+                                <option value="PISO">Calcular Piso</option>
+                                <option value="PAREDE">Calcular Parede</option>
+                                <option value="PINTURA">Calcular Pintura</option>
+                            </select>
+                            <input type="number" value={calcArea} onChange={e => setCalcArea(e.target.value)} placeholder="Área em m²" className="w-full p-3 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white focus:ring-secondary focus:border-secondary outline-none transition-colors" aria-label="Área em metros quadrados" />
+                            {calcResult.length > 0 && (
+                                <div className="bg-green-50 dark:bg-green-900/20 p-4 rounded-xl border border-green-100 dark:border-green-900 text-green-800 dark:text-green-200 font-bold text-sm">
+                                    <h4 className="font-black text-base mb-2">Resultado:</h4>
+                                    <ul className="list-disc list-inside space-y-1">
+                                        {calcResult.map((res, i) => <li key={i}>{res}</li>)}
+                                    </ul>
+                                </div>
+                            )}
+                            <button type="button" onClick={() => setIsCalculatorModalOpen(false)} className="w-full py-2 text-slate-500 font-medium hover:text-primary dark:hover:text-white transition-colors" aria-label="Fechar calculadora">Fechar</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal de Visualização de Contrato */}
+            {isContractModalOpen && viewContract && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+                    <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl w-full max-w-2xl h-[90vh] overflow-hidden flex flex-col shadow-xl border border-slate-200 dark:border-slate-800">
+                        <h3 className="font-bold text-2xl text-primary dark:text-white mb-2">{viewContract.title}</h3>
+                        <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-6 border-b border-slate-100 dark:border-slate-800 pb-4">{viewContract.category}</p>
+                        
+                        <div className="flex-1 overflow-y-auto pr-3 mb-6 custom-scrollbar text-slate-700 dark:text-slate-300 text-sm leading-relaxed whitespace-pre-wrap font-mono">
+                            {viewContract.contentTemplate}
+                        </div>
+
+                        <div className="flex flex-col gap-3 mt-auto">
+                            <button 
+                                onClick={() => navigator.clipboard.writeText(viewContract.contentTemplate).then(() => alert('Contrato copiado para a área de transferência!'))}
+                                className="w-full py-3 bg-primary text-white rounded-xl font-bold shadow-md hover:bg-primary-light transition-colors"
+                                aria-label="Copiar texto do contrato"
+                            >
+                                <i className="fa-solid fa-copy mr-2"></i> Copiar Texto
+                            </button>
+                            <button 
+                                onClick={() => alert('Exportar para Word: Funcionalidade em desenvolvimento!')}
+                                className="w-full py-3 bg-secondary text-white rounded-xl font-bold shadow-md hover:bg-secondary-dark transition-colors"
+                                aria-label="Exportar contrato para Word"
+                            >
+                                <i className="fa-solid fa-file-word mr-2"></i> Exportar para Word (Em Breve)
+                            </button>
+                            <button type="button" onClick={() => {setIsContractModalOpen(false); setViewContract(null);}} className="w-full py-2 text-slate-500 font-medium hover:text-primary dark:hover:text-white transition-colors" aria-label="Fechar modal de contrato">Fechar</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            <ZeModal
+                isOpen={zeModal.isOpen}
+                title={zeModal.title}
+                message={zeModal.message}
+                confirmText={zeModal.confirmText}
+                cancelText={zeModal.cancelText}
+                onConfirm={zeModal.onConfirm}
+                onCancel={zeModal.onCancel}
+                type={zeModal.type}
+                isConfirming={zeModal.isConfirming}
+            />
+        </div>
+    );
+};
+
+export default WorkDetail;

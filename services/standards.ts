@@ -405,7 +405,6 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
       { name: 'Espelho com Armário', unit: 'un', multiplier: 1 }
     ]
   },
-  // --- ITENS ESPECÍFICOS PARA REFORMA DE COZINHA ---
   {
     category: 'Demolição de Cozinha',
     items: [
@@ -460,7 +459,6 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
       { name: 'Sifões e Engates Flexíveis', unit: 'un', multiplier: 1 }
     ]
   },
-  // --- ITENS ESPECÍFICOS PARA PINTURA ---
   {
     category: 'Proteção do Piso para Pintura',
     items: [
@@ -662,7 +660,7 @@ export const CONTRACT_TEMPLATES = [
       CLÁUSULA OITAVA – DO FORO
       As partes elegem o foro da Comarca de (Cidade), Estado de (Estado), para dirimir quaisquer dúvidas ou litígios decorrentes do presente contrato.
 
-      E por estarem assim justos e contratados, assinam o presente em 2 (duas) vias de igual teor e forma, na presença das testemunhas abaixo.
+      E por estarem assim justos e contratados, assinam o presente em 2 (duas) vias de igual tenor e forma, na presença das testemunhas abaixo.
 
       (Local), (dia) de (mês) de (ano).
 

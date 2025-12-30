@@ -341,7 +341,7 @@ export const dbService = {
         options: {
             data: { name }
         }
-    );
+    });
 
     if (authError) throw authError;
     // If user already exists and signed in, just ensure profile and return
@@ -979,7 +979,7 @@ export const dbService = {
       quantity: expense.quantity || 1, // Default quantity
       date: expense.date,
       category: expense.category,
-      step_id: expense.stepId, // FIX: Changed to snake_case
+      stepId: expense.stepId, // FIX: Changed to snake_case
       related_material_id: expense.relatedMaterialId, // FIX: Changed to snake_case
       worker_id: expense.workerId, // FIX: Changed to snake_case
       supplier_id: expense.supplierId, // NEW: Added supplier_id
@@ -1005,7 +1005,7 @@ export const dbService = {
       quantity: expense.quantity,
       date: expense.date,
       category: expense.category,
-      step_id: expense.stepId, // This is already snake_case
+      stepId: expense.stepId, // This is already snake_case
       related_material_id: expense.relatedMaterialId, // This is already snake_case
       worker_id: expense.workerId, // This is already snake_case
       supplier_id: expense.supplierId, // NEW: Added supplier_id
@@ -1478,7 +1478,7 @@ export const dbService = {
     //                 read: false,
     //                 type: 'INFO',
     //                 tag: notificationTag // Save tag
-    //             );
+    //             });
     //             await dbService.sendPushNotification(userId, { // Changed from dbService.sendPushNotification
     //                 title: `Próxima Etapa: ${step.name}!`,
     //                 body: `A etapa "${step.name}" da obra "${currentWork.name}" inicia em ${daysUntilStart} dia(s). Prepare-se!`,
@@ -1597,7 +1597,7 @@ export const dbService = {
     //                         read: false,
     //                         type: 'ERROR',
     //                         tag: notificationTag // Save tag
-    //                     );
+    //                     });
     //                     await dbService.sendPushNotification(userId, { // Changed from dbService.sendPushNotification
     //                         title: 'Orçamento Estourado!',
     //                         body: `Você já usou ${Math.round(budgetUsage)}% do orçamento da obra "${currentWork.name}".`,
