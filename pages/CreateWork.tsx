@@ -220,9 +220,9 @@ const CreateWork: React.FC = () => {
           <div className="text-slate-400 mb-1 group-hover:text-secondary transition-colors text-lg"><i className={`fa-solid ${icon}`}></i></div>
           <label className="text-[10px] font-black text-slate-700 dark:text-slate-300 uppercase mb-2 text-center tracking-wider">{label}</label>
           <div className="flex items-center gap-3 w-full justify-center">
-              <button type="button" onClick={() => handleCounter(field, false)} className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-200 font-bold hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors flex items-center justify-center">-</button>
+              <button type="button" onClick={() => handleCounter(field, false)} className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-200 font-bold hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors flex items-center justify-center" aria-label={`Diminuir ${label.toLowerCase()}`}>-</button>
               <span className="min-w-[1.5rem] text-center font-black text-primary dark:text-white text-xl">{formData[field as keyof typeof formData]}</span>
-              <button type="button" onClick={() => handleCounter(field, true)} className="w-8 h-8 rounded-lg bg-primary text-white font-bold hover:bg-primary-light transition-colors shadow-md shadow-primary/20 flex items-center justify-center">+</button>
+              <button type="button" onClick={() => handleCounter(field, true)} className="w-8 h-8 rounded-lg bg-primary text-white font-bold hover:bg-primary-light transition-colors shadow-md shadow-primary/20 flex items-center justify-center" aria-label={`Aumentar ${label.toLowerCase()}`}>+</button>
           </div>
       </div>
   );
@@ -243,7 +243,7 @@ const CreateWork: React.FC = () => {
           <div className="fixed inset-0 z-50 bg-slate-900 flex flex-col items-center justify-center p-6 text-center animate-in fade-in duration-700">
               <div className="relative mb-8">
                   <div className="w-32 h-32 rounded-full border-4 border-slate-800 flex items-center justify-center relative z-10 bg-slate-900">
-                      <img src={ZE_AVATAR} className="w-24 h-24 rounded-full border-2 border-slate-700 object-cover" onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK}/>
+                      <img src={ZE_AVATAR} className="w-24 h-24 rounded-full border-2 border-slate-700 object-cover" onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK} alt="Zé da Obra Avatar"/>
                   </div>
                   <div className="absolute inset-0 rounded-full border-4 border-t-secondary border-r-secondary border-b-transparent border-l-transparent animate-spin"></div>
               </div>
@@ -281,24 +281,24 @@ const CreateWork: React.FC = () => {
                         <div className="space-y-6">
                             <div>
                                 <label htmlFor="workName" className="block text-xs font-black text-slate-700 dark:text-slate-300 uppercase mb-2 tracking-widest pl-1">Nome ou Apelido da Obra</label>
-                                <input id="workName" name="name" autoFocus placeholder="Ex: Reforma da Cozinha..." value={formData.name} className="w-full px-5 py-4 text-lg font-bold border-2 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white rounded-2xl focus:ring-4 focus:ring-secondary/20 focus:border-secondary outline-none transition-all placeholder:text-slate-300" onChange={handleChange} aria-invalid={!!formErrors.name} aria-describedby="name-error" />
+                                <input id="workName" name="name" autoFocus placeholder="Ex: Reforma da Cozinha..." value={formData.name} className="w-full px-5 py-4 text-lg font-bold border-2 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white rounded-2xl focus:ring-4 focus:ring-secondary/20 focus:border-secondary outline-none transition-all placeholder:text-slate-300" onChange={handleChange} aria-invalid={!!formErrors.name} aria-describedby="name-error" aria-label="Nome ou Apelido da Obra" />
                                 {formErrors.name && <p id="name-error" className="text-red-500 text-sm mt-1">{formErrors.name}</p>}
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label htmlFor="area" className="block text-xs font-black text-slate-700 dark:text-slate-300 uppercase mb-2 tracking-widest pl-1">Tamanho (m²)</label>
-                                    <input id="area" name="area" type="number" placeholder="0" value={formData.area} className="w-full px-5 py-4 text-lg font-bold border-2 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white rounded-2xl focus:ring-4 focus:ring-secondary/20 focus:border-secondary outline-none transition-all placeholder:text-slate-300" onChange={handleChange} aria-invalid={!!formErrors.area} aria-describedby="area-error" />
+                                    <input id="area" name="area" type="number" placeholder="0" value={formData.area} className="w-full px-5 py-4 text-lg font-bold border-2 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white rounded-2xl focus:ring-4 focus:ring-secondary/20 focus:border-secondary outline-none transition-all placeholder:text-slate-300" onChange={handleChange} aria-invalid={!!formErrors.area} aria-describedby="area-error" aria-label="Tamanho em metros quadrados" />
                                     {formErrors.area && <p id="area-error" className="text-red-500 text-sm mt-1">{formErrors.area}</p>}
                                 </div>
                                 <div>
                                     <label htmlFor="budgetPlanned" className="block text-xs font-black text-slate-700 dark:text-slate-300 uppercase mb-2 tracking-widest pl-1">Orçamento (R$)</label>
-                                    <input id="budgetPlanned" name="budgetPlanned" type="number" placeholder={formatCurrency(0)} value={formData.budgetPlanned} className="w-full px-5 py-4 text-lg font-bold border-2 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white rounded-2xl focus:ring-4 focus:ring-secondary/20 focus:border-secondary outline-none transition-all placeholder:text-slate-300" onChange={handleChange} aria-invalid={!!formErrors.budgetPlanned} aria-describedby="budget-error" />
+                                    <input id="budgetPlanned" name="budgetPlanned" type="number" placeholder={formatCurrency(0)} value={formData.budgetPlanned} className="w-full px-5 py-4 text-lg font-bold border-2 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white rounded-2xl focus:ring-4 focus:ring-secondary/20 focus:border-secondary outline-none transition-all placeholder:text-slate-300" onChange={handleChange} aria-invalid={!!formErrors.budgetPlanned} aria-describedby="budget-error" aria-label="Orçamento planejado em Reais" />
                                     {formErrors.budgetPlanned && <p id="budget-error" className="text-red-500 text-sm mt-1">{formErrors.budgetPlanned}</p>}
                                 </div>
                             </div>
                             <div>
                                 <label htmlFor="address" className="block text-xs font-black text-slate-700 dark:text-slate-300 uppercase mb-2 tracking-widest pl-1">Endereço <span className="text-slate-400 font-medium normal-case tracking-normal">(Opcional)</span></label>
-                                <input id="address" name="address" placeholder="Cidade ou bairro" value={formData.address} className="w-full px-5 py-4 text-base font-bold border-2 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white rounded-2xl focus:ring-4 focus:ring-secondary/20 focus:border-secondary outline-none transition-all placeholder:text-slate-300" onChange={handleChange} />
+                                <input id="address" name="address" placeholder="Cidade ou bairro" value={formData.address} className="w-full px-5 py-4 text-base font-bold border-2 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white rounded-2xl focus:ring-4 focus:ring-secondary/20 focus:border-secondary outline-none transition-all placeholder:text-slate-300" onChange={handleChange} aria-label="Endereço da obra (opcional)" />
                             </div>
                         </div>
                     </div>
@@ -312,11 +312,11 @@ const CreateWork: React.FC = () => {
                             <h2 className="text-2xl font-black text-primary dark:text-white mb-2 tracking-tight">Tipo de Projeto</h2>
                             <p className="text-slate-500 dark:text-slate-400 mb-8 font-medium">Escolha a categoria principal.</p>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <button type="button" onClick={() => handleCategorySelect('CONSTRUCTION')} className="relative p-8 rounded-3xl border-2 border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:border-secondary hover:bg-white dark:hover:bg-slate-700 hover:shadow-xl transition-all duration-300 flex flex-col items-center gap-5 group">
+                                <button type="button" onClick={() => handleCategorySelect('CONSTRUCTION')} className="relative p-8 rounded-3xl border-2 border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:border-secondary hover:bg-white dark:hover:bg-slate-700 hover:shadow-xl transition-all duration-300 flex flex-col items-center gap-5 group" aria-label="Tipo de Projeto: Construção">
                                     <div className="w-20 h-20 rounded-full bg-secondary text-white flex items-center justify-center text-3xl shadow-lg group-hover:scale-110 transition-transform"><i className="fa-solid fa-trowel-bricks"></i></div>
                                     <div><h3 className="font-black text-xl text-primary dark:text-white mb-1">Construção</h3><p className="text-sm font-bold text-slate-400">Do zero (Terreno Vazio)</p></div>
                                 </button>
-                                <button type="button" onClick={() => handleCategorySelect('RENOVATION')} className="relative p-8 rounded-3xl border-2 border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:border-secondary hover:bg-white dark:hover:bg-slate-700 hover:shadow-xl transition-all duration-300 flex flex-col items-center gap-5 group">
+                                <button type="button" onClick={() => handleCategorySelect('RENOVATION')} className="relative p-8 rounded-3xl border-2 border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:border-secondary hover:bg-white dark:hover:bg-slate-700 hover:shadow-xl transition-all duration-300 flex flex-col items-center gap-5 group" aria-label="Tipo de Projeto: Reforma">
                                     <div className="w-20 h-20 rounded-full bg-secondary text-white flex items-center justify-center text-3xl shadow-lg group-hover:scale-110 transition-transform"><i className="fa-solid fa-paint-roller"></i></div>
                                     <div><h3 className="font-black text-xl text-primary dark:text-white mb-1">Reforma</h3><p className="text-sm font-bold text-slate-400">Melhoria ou Reparo</p></div>
                                 </button>
@@ -331,7 +331,7 @@ const CreateWork: React.FC = () => {
                     <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 md:p-8 shadow-xl border border-slate-200 dark:border-slate-800">
                         <div className="flex items-center justify-between mb-6 border-b border-slate-100 dark:border-slate-800 pb-4">
                             <div><h2 className="text-2xl font-black text-primary dark:text-white mb-1 tracking-tight">{workCategory === 'CONSTRUCTION' ? 'Estrutura' : 'Tipo de Reforma'}</h2><p className="text-slate-500 dark:text-slate-400 text-sm font-bold">{workCategory === 'CONSTRUCTION' ? 'Detalhe os cômodos.' : 'Selecione o modelo.'}</p></div>
-                            <button onClick={() => setWorkCategory(null)} className="text-xs font-black uppercase tracking-wider text-secondary hover:underline bg-secondary/5 px-3 py-1.5 rounded-lg transition-colors"><i className="fa-solid fa-rotate-left mr-1"></i> Mudar</button>
+                            <button onClick={() => setWorkCategory(null)} className="text-xs font-black uppercase tracking-wider text-secondary hover:underline bg-secondary/5 px-3 py-1.5 rounded-lg transition-colors" aria-label="Mudar tipo de projeto"><i className="fa-solid fa-rotate-left mr-1"></i> Mudar</button>
                         </div>
                         {workCategory === 'RENOVATION' && (
                              <div className="grid grid-cols-2 gap-4 mb-8">
@@ -342,6 +342,7 @@ const CreateWork: React.FC = () => {
                                         onClick={() => { setSelectedTemplateId(template.id); setFormErrors(prev => { const newErrors = { ...prev }; delete newErrors.selectedTemplate; return newErrors; }); }} 
                                         className={`p-5 rounded-2xl border-2 text-left transition-all relative flex flex-col gap-3 group ${selectedTemplateId === template.id ? 'border-secondary bg-secondary/5 shadow-md' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-secondary/50'}`}
                                         aria-pressed={selectedTemplateId === template.id}
+                                        aria-label={`Selecionar modelo: ${template.label}`}
                                     >
                                         <div className="w-12 h-12 rounded-xl flex items-center justify-center text-xl transition-colors bg-slate-100 dark:bg-slate-700 text-slate-400 group-hover:text-secondary"><i className={`fa-solid ${template.icon}`}></i></div>
                                         <div>
@@ -381,7 +382,7 @@ const CreateWork: React.FC = () => {
                         
                         <div>
                             <label htmlFor="startDate" className="block text-xs font-black text-slate-700 dark:text-slate-300 uppercase mb-2 tracking-widest pl-1">Data de Início</label>
-                            <input id="startDate" type="date" name="startDate" value={formData.startDate} onChange={handleChange} className="w-full px-5 py-4 text-base font-bold border-2 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white rounded-2xl focus:ring-4 focus:ring-secondary/20 focus:border-secondary outline-none transition-all placeholder:text-slate-300" aria-invalid={!!formErrors.startDate} aria-describedby="startDate-error" />
+                            <input id="startDate" type="date" name="startDate" value={formData.startDate} onChange={handleChange} className="w-full px-5 py-4 text-base font-bold border-2 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white rounded-2xl focus:ring-4 focus:ring-secondary/20 focus:border-secondary outline-none transition-all placeholder:text-slate-300" aria-invalid={!!formErrors.startDate} aria-describedby="startDate-error" aria-label="Data de início da obra" />
                             {formErrors.startDate && <p id="startDate-error" className="text-red-500 text-sm mt-1">{formErrors.startDate}</p>}
                         </div>
                     </div>
@@ -423,6 +424,7 @@ const CreateWork: React.FC = () => {
                     type="button" 
                     onClick={() => { if(validateStep(currentStep)) setCurrentStep(prev => prev + 1); setGeneralError(''); }} 
                     className="px-8 py-4 bg-primary text-white font-bold rounded-2xl shadow-lg hover:bg-primary-light transition-all flex items-center gap-3"
+                    aria-label="Próxima etapa do formulário"
                   >
                       Próximo <i className="fa-solid fa-arrow-right"></i>
                   </button>
@@ -431,6 +433,7 @@ const CreateWork: React.FC = () => {
                     type="submit" 
                     disabled={loading} 
                     className="px-8 py-4 bg-gradient-gold text-white font-bold rounded-2xl shadow-lg hover:shadow-orange-500/30 hover:scale-105 transition-all flex items-center justify-center gap-3 disabled:opacity-70 disabled:scale-100"
+                    aria-label={loading ? 'Gerando obra' : 'Criar obra'}
                   >
                       {loading ? 'Gerando...' : 'Criar Obra'} {loading ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-check"></i>}
                   </button>

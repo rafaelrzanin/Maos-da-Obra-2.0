@@ -111,22 +111,26 @@ const Profile: React.FC = () => {
 
         <form onSubmit={handleSubmit} className="space-y-6">
             <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nome Completo</label>
+                <label htmlFor="profileName" className="block text-xs font-bold text-slate-500 uppercase mb-1">Nome Completo</label>
                 <input 
+                    id="profileName"
                     type="text" 
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
+                    aria-label="Nome Completo"
                 />
             </div>
             
             <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">WhatsApp</label>
+                <label htmlFor="profileWhatsapp" className="block text-xs font-bold text-slate-500 uppercase mb-1">WhatsApp</label>
                 <input 
+                    id="profileWhatsapp"
                     type="text" 
                     value={whatsapp}
                     onChange={(e) => setWhatsapp(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
+                    aria-label="Número de WhatsApp"
                 />
             </div>
 
@@ -138,30 +142,36 @@ const Profile: React.FC = () => {
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Nova Senha</label>
+                        <label htmlFor="newPassword" className="block text-xs font-bold text-slate-500 uppercase mb-1">Nova Senha</label>
                         <input 
+                            id="newPassword"
                             type="password" 
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
                             placeholder="Deixe em branco para manter"
-                            className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
+                            aria-label="Nova Senha"
+                            autoComplete="new-password"
                         />
                     </div>
                     <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Confirmar Senha</label>
+                        <label htmlFor="confirmNewPassword" className="block text-xs font-bold text-slate-500 uppercase mb-1">Confirmar Senha</label>
                         <input 
+                            id="confirmNewPassword"
                             type="password" 
                             value={confirmPassword}
                             onChange={(e) => setConfirmPassword(e.target.value)}
                             placeholder="Repita a nova senha"
-                            className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-primary/20 transition-all"
+                            className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
+                            aria-label="Confirmar Nova Senha"
+                            autoComplete="new-password"
                         />
                     </div>
                 </div>
             </div>
 
             {errorMsg && (
-                <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-900 text-red-600 dark:text-red-400 rounded-xl text-sm font-bold flex items-center gap-2 animate-in fade-in">
+                <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-900 text-red-600 dark:text-red-400 rounded-xl text-sm font-bold flex items-center gap-2 animate-in fade-in" role="alert">
                     <i className="fa-solid fa-triangle-exclamation"></i> {errorMsg}
                 </div>
             )}
@@ -176,6 +186,7 @@ const Profile: React.FC = () => {
             type="submit" 
             disabled={loading}
             className="w-full py-4 bg-primary hover:bg-primary-dark text-white font-bold rounded-xl shadow-lg shadow-primary/20 transition-all disabled:opacity-70 flex items-center justify-center gap-2"
+            aria-label="Salvar alterações do perfil"
             >
             {loading ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-save"></i>}
             {loading ? 'Salvando...' : 'Salvar Alterações'}

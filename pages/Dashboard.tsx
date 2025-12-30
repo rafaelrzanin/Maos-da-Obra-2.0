@@ -176,7 +176,7 @@ const NextSteps = ({
           <p className="text-lg font-black text-slate-900 dark:text-white">Próximas Etapas</p>
           <p className={cx("text-xs font-semibold", mutedText)}>Organize os próximos passos da sua obra</p>
         </div>
-        <button onClick={onOpenWork} className="text-xs font-extrabold text-secondary hover:opacity-80 px-3 py-1.5 rounded-lg bg-secondary/5 transition-colors">
+        <button onClick={onOpenWork} className="text-xs font-extrabold text-secondary hover:opacity-80 px-3 py-1.5 rounded-lg bg-secondary/5 transition-colors" aria-label="Ver cronograma completo">
           Ver cronograma →
         </button>
       </div>
@@ -278,7 +278,7 @@ const MaterialsNeeded = ({
           <p className="text-lg font-black text-slate-900 dark:text-white">Materiais para Compra</p>
           <p className={cx("text-xs font-semibold", mutedText)}>Organize suas compras para não atrasar a obra</p>
         </div>
-        <button onClick={() => onOpenWork()} className="text-xs font-extrabold text-secondary hover:opacity-80 px-3 py-1.5 rounded-lg bg-secondary/5 transition-colors">
+        <button onClick={() => onOpenWork()} className="text-xs font-extrabold text-secondary hover:opacity-80 px-3 py-1.5 rounded-lg bg-secondary/5 transition-colors" aria-label="Ver todos os materiais">
           Ver todos os materiais →
         </button>
       </div>
