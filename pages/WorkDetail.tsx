@@ -1060,70 +1060,55 @@ const WorkDetail: React.FC = () => {
                                 <span className="font-bold text-primary dark:text-white text-sm">Arquivos</span>
                             </button>
 
-                            {/* --- BÔNUS VITALÍCIO - CARDS SEPARADOS COM ESTILO PREMIUM --- */}
-                            
-                            {/* Bônus: Contratos */}
-                            <div className={`p-6 rounded-3xl flex flex-col items-center shadow-lg border relative overflow-hidden group 
-                                ${hasLifetimeAccess ? 'bg-gradient-gold border-amber-900' : 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700'}`}>
+                            {/* --- BÔNUS VITALÍCIO - GRANDE CARD CONSOLIDADO --- */}
+                            <div className={`relative col-span-full rounded-3xl shadow-lg border p-6 md:p-8 flex flex-col justify-between 
+                                ${hasLifetimeAccess ? 'bg-gradient-to-br from-primary-dark to-primary border-secondary/50' : 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700'}`}>
                                 {!hasLifetimeAccess && (
-                                    <div className="absolute inset-0 bg-black/50 rounded-3xl flex items-center justify-center z-10">
-                                        <i className="fa-solid fa-lock text-white text-4xl"></i>
+                                    <div className="absolute inset-0 bg-black/70 rounded-3xl flex flex-col items-center justify-center z-10 p-4 text-center">
+                                        <i className="fa-solid fa-lock text-white text-5xl mb-4 opacity-80"></i>
+                                        <p className="font-black text-xl text-white mb-2">Exclusivo Plano Vitalício</p>
+                                        <button onClick={() => navigate('/settings')} className="mt-4 px-6 py-3 bg-gradient-gold text-white font-black rounded-xl shadow-lg hover:brightness-110 transition-all" aria-label="Liberar Plano Vitalício">
+                                            Liberar Acesso Vitalício
+                                        </button>
                                     </div>
                                 )}
-                                <button onClick={() => hasLifetimeAccess ? setSubView('CONTRACTS') : navigate('/settings')} disabled={!hasLifetimeAccess} className="w-full h-full absolute inset-0 flex flex-col items-center justify-center p-6 text-center z-20">
-                                    <i className={`fa-solid fa-file-contract text-3xl mb-3 ${hasLifetimeAccess ? 'text-white group-hover:scale-110' : 'text-slate-400'} transition-transform`}></i>
-                                    <span className={`font-black text-sm ${hasLifetimeAccess ? 'text-white' : 'text-primary dark:text-white'} mb-1`}>Contratos</span>
-                                    <span className={`text-[10px] font-medium ${hasLifetimeAccess ? 'text-amber-200' : 'text-slate-500 dark:text-slate-400'}`}>Modelos profissionais completos</span>
-                                    {!hasLifetimeAccess && <span className="text-[10px] text-slate-500 dark:text-slate-400 mt-2">Liberar Plano Vitalício</span>}
-                                </button>
-                            </div>
-                            
-                            {/* Bônus: Calculadoras */}
-                            <div className={`p-6 rounded-3xl flex flex-col items-center shadow-lg border relative overflow-hidden group 
-                                ${hasLifetimeAccess ? 'bg-gradient-gold border-amber-900' : 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700'}`}>
-                                {!hasLifetimeAccess && (
-                                    <div className="absolute inset-0 bg-black/50 rounded-3xl flex items-center justify-center z-10">
-                                        <i className="fa-solid fa-lock text-white text-4xl"></i>
+                                <div className={`${!hasLifetimeAccess ? 'opacity-30 pointer-events-none' : ''}`}>
+                                    <div className="flex items-center gap-4 mb-6">
+                                        <div className="w-14 h-14 rounded-full bg-secondary text-white flex items-center justify-center text-2xl shrink-0 shadow-lg">
+                                            <i className="fa-solid fa-crown"></i>
+                                        </div>
+                                        <div>
+                                            <h2 className="text-2xl font-black text-white mb-1 tracking-tight">Bônus Vitalícios</h2>
+                                            <p className="text-amber-200 text-sm font-medium">Desbloqueie ferramentas premium para sua obra.</p>
+                                        </div>
                                     </div>
-                                )}
-                                <button onClick={() => hasLifetimeAccess ? setIsCalculatorModalOpen(true) : navigate('/settings')} disabled={!hasLifetimeAccess} className="w-full h-full absolute inset-0 flex flex-col items-center justify-center p-6 text-center z-20">
-                                    <i className={`fa-solid fa-calculator text-3xl mb-3 ${hasLifetimeAccess ? 'text-white group-hover:scale-110' : 'text-slate-400'} transition-transform`}></i>
-                                    <span className={`font-black text-sm ${hasLifetimeAccess ? 'text-white' : 'text-primary dark:text-white'} mb-1`}>Calculadoras</span>
-                                    <span className={`text-[10px] font-medium ${hasLifetimeAccess ? 'text-amber-200' : 'text-slate-500 dark:text-slate-400'}`}>Piso, parede, pintura e mais</span>
-                                    {!hasLifetimeAccess && <span className="text-[10px] text-slate-500 dark:text-slate-400 mt-2">Liberar Plano Vitalício</span>}
-                                </button>
-                            </div>
-
-                            {/* Bônus: Checklist da Obra */}
-                            <div className={`p-6 rounded-3xl flex flex-col items-center shadow-lg border relative overflow-hidden group 
-                                ${hasLifetimeAccess ? 'bg-gradient-gold border-amber-900' : 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700'}`}>
-                                {!hasLifetimeAccess && (
-                                    <div className="absolute inset-0 bg-black/50 rounded-3xl flex items-center justify-center z-10">
-                                        <i className="fa-solid fa-lock text-white text-4xl"></i>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        {/* Bônus: Contratos */}
+                                        <button onClick={() => setSubView('CONTRACTS')} className="p-4 rounded-2xl border-2 border-slate-700 bg-gradient-to-br from-amber-600 to-orange-700 hover:from-amber-500 hover:to-orange-600 transition-all flex flex-col items-center text-center shadow-md text-white">
+                                            <i className="fa-solid fa-file-contract text-2xl mb-2"></i>
+                                            <span className="font-black text-sm">Contratos</span>
+                                            <span className="text-[10px] text-amber-100 mt-1">Modelos profissionais</span>
+                                        </button>
+                                        {/* Bônus: Calculadoras */}
+                                        <button onClick={() => setIsCalculatorModalOpen(true)} className="p-4 rounded-2xl border-2 border-slate-700 bg-gradient-to-br from-green-600 to-emerald-700 hover:from-green-500 hover:to-emerald-600 transition-all flex flex-col items-center text-center shadow-md text-white">
+                                            <i className="fa-solid fa-calculator text-2xl mb-2"></i>
+                                            <span className="font-black text-sm">Calculadoras</span>
+                                            <span className="text-[10px] text-green-100 mt-1">Piso, parede, pintura</span>
+                                        </button>
+                                        {/* Bônus: Checklist da Obra */}
+                                        <button onClick={() => setSubView('CHECKLIST')} className="p-4 rounded-2xl border-2 border-slate-700 bg-gradient-to-br from-purple-600 to-indigo-700 hover:from-purple-500 hover:to-indigo-600 transition-all flex flex-col items-center text-center shadow-md text-white">
+                                            <i className="fa-solid fa-list-check text-2xl mb-2"></i>
+                                            <span className="font-black text-sm">Checklist da Obra</span>
+                                            <span className="text-[10px] text-purple-100 mt-1">Nada será esquecido</span>
+                                        </button>
+                                        {/* Bônus: IA da Obra */}
+                                        <button onClick={() => navigate('/ai-chat')} className="p-4 rounded-2xl border-2 border-slate-700 bg-gradient-to-br from-cyan-600 to-blue-700 hover:from-cyan-500 hover:to-blue-600 transition-all flex flex-col items-center text-center shadow-md text-white">
+                                            <i className="fa-solid fa-robot text-2xl mb-2"></i>
+                                            <span className="font-black text-sm">Zé da Obra AI</span>
+                                            <span className="text-[10px] text-cyan-100 mt-1">Seu especialista 24h</span>
+                                        </button>
                                     </div>
-                                )}
-                                <button onClick={() => hasLifetimeAccess ? setSubView('CHECKLIST') : navigate('/settings')} disabled={!hasLifetimeAccess} className="w-full h-full absolute inset-0 flex flex-col items-center justify-center p-6 text-center z-20">
-                                    <i className={`fa-solid fa-list-check text-3xl mb-3 ${hasLifetimeAccess ? 'text-white group-hover:scale-110' : 'text-slate-400'} transition-transform`}></i>
-                                    <span className={`font-black text-sm ${hasLifetimeAccess ? 'text-white' : 'text-primary dark:text-white'} mb-1`}>Checklist da Obra</span>
-                                    <span className={`text-[10px] font-medium ${hasLifetimeAccess ? 'text-amber-200' : 'text-slate-500 dark:text-slate-400'}`}>Garanta que nada será esquecido</span>
-                                    {!hasLifetimeAccess && <span className="text-[10px] text-slate-500 dark:text-slate-400 mt-2">Liberar Plano Vitalício</span>}
-                                </button>
-                            </div>
-
-                            {/* Bônus: IA da Obra */}
-                            <div className={`p-6 rounded-3xl flex flex-col items-center shadow-lg border relative overflow-hidden group 
-                                ${hasLifetimeAccess ? 'bg-gradient-gold border-amber-900' : 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700'}`}>
-                                {!hasLifetimeAccess && (
-                                    <div className="absolute inset-0 bg-black/50 rounded-3xl flex items-center justify-center z-10">
-                                        <i className="fa-solid fa-lock text-white text-4xl"></i>
-                                    </div>
-                                )}
-                                <button onClick={() => hasLifetimeAccess ? navigate('/ai-chat') : navigate('/settings')} disabled={!hasLifetimeAccess} className="w-full h-full absolute inset-0 flex flex-col items-center justify-center p-6 text-center z-20">
-                                    <i className={`fa-solid fa-robot text-3xl mb-3 ${hasLifetimeAccess ? 'text-white group-hover:scale-110' : 'text-slate-400'} transition-transform`}></i>
-                                    <span className={`font-black text-sm ${hasLifetimeAccess ? 'text-white' : 'text-primary dark:text-white'} mb-1`}>Zé da Obra AI</span>
-                                    <span className={`text-[10px] font-medium ${hasLifetimeAccess ? 'text-amber-200' : 'text-slate-500 dark:text-slate-400'}`}>Seu especialista 24h na palma da mão</span>
-                                    {!hasLifetimeAccess && <span className="text-[10px] text-slate-500 dark:text-slate-400 mt-2">Liberar Plano Vitalício</span>}
-                                </button>
+                                </div>
                             </div>
                         </div>
                     )}

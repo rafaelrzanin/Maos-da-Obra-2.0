@@ -6,21 +6,26 @@
 .material-symbols-outlined {
   font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
 }
+
+/* Base styles for light mode */
 body {
-  background-color: #F8FAFC; 
+  @apply bg-surface text-text-body;
   font-family: 'Inter', sans-serif;
-  color: #334155;
 }
-.dark body {
-  background-color: #020617;
-  color: #CBD5E1;
+
+/* Styles for dark mode, applied when 'dark' class is on html element */
+html.dark body {
+  @apply bg-slate-950 text-slate-200; /* Ensuring text color is visible in dark mode */
 }
+
 /* Custom Scrollbar for Premium Feel */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 10px; }
-.dark ::-webkit-scrollbar-thumb { background: #334155; }
-::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
+::-webkit-scrollbar-thumb { background: #94A3B8; border-radius: 10px; } /* Default for light mode */
+html.dark ::-webkit-scrollbar-thumb { background: #475569; } /* Darker for dark mode */
+::-webkit-scrollbar-thumb:hover { background: #64748B; } /* Hover for light mode */
+html.dark ::-webkit-scrollbar-thumb:hover { background: #64748B; } /* Hover for dark mode */
+
 
 /* Glassmorphism Utilities */
 .glass-panel {
@@ -43,10 +48,11 @@ body {
   animation: float 3s ease-in-out infinite;
 }
 
+/* Print Styles */
 @media print {
   @page { margin: 1cm; size: A4 portrait; }
   body, #root, main, div { overflow: visible !important; height: auto !important; min-height: auto !important; }
-  body, .dark body { background-color: white !important; color: black !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body, html.dark body { background-color: white !important; color: black !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   ::-webkit-scrollbar { display: none; }
   .grid { display: grid !important; }
   .flex { display: flex !important; }

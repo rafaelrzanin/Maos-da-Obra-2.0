@@ -24,7 +24,7 @@ const Notifications = lazy(() => import('./pages/Notifications.tsx')); // NEW: L
 
 // --- Componente de Carregamento ---
 const LoadingScreen = () => (
-  <div className="h-screen w-full flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-950 transition-colors">
+  <div className="h-screen w-full flex flex-col items-center justify-center bg-surface dark:bg-slate-950 transition-colors">
     <div className="relative">
         <div className="w-16 h-16 border-4 border-slate-200 dark:border-slate-800 border-t-secondary rounded-full animate-spin"></div>
         <div className="absolute inset-0 flex items-center justify-center text-xs font-bold text-secondary">
@@ -179,15 +179,17 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
       
       {/* Sidebar */}
       <div 
-        className={`fixed top-0 left-0 h-full w-full max-w-[300px] bg-white dark:bg-slate-900 shadow-2xl z-[1000] transform transition-transform duration-300 ease-in-out
+        className={`fixed top-0 left-0 h-full w-full max-w-[300px] bg-gradient-to-b from-primary-dark to-primary shadow-2xl z-[1000] transform transition-transform duration-300 ease-in-out
           ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}
         role="navigation"
         aria-label="Menu principal"
       >
         <div className="p-6 h-full flex flex-col">
-          <div className="flex items-center justify-between mb-8 pb-4 border-b border-slate-200 dark:border-slate-800">
-            <h2 className="text-2xl font-black text-primary dark:text-white">Menu</h2>
-            <button onClick={() => setIsSidebarOpen(false)} className="text-slate-400 hover:text-primary dark:hover:text-white text-xl" aria-label="Fechar menu principal">
+          <div className="flex items-center justify-between mb-8 pb-4 border-b border-slate-700"> {/* Adjusted border color for dark theme */}
+            <h2 className="text-2xl font-black text-white">
+                MÃOS DA <span className="text-secondary">OBRA</span> {/* Logo with accent color */}
+            </h2>
+            <button onClick={() => setIsSidebarOpen(false)} className="text-slate-400 hover:text-white text-xl" aria-label="Fechar menu principal">
               <i className="fa-solid fa-xmark"></i>
             </button>
           </div>
@@ -197,7 +199,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
                 key={item.path} 
                 onClick={() => { navigate(item.path); setIsSidebarOpen(false); }}
                 className={`flex items-center gap-4 w-full py-3 px-4 rounded-xl text-left font-bold transition-colors 
-                  ${location.pathname === item.path ? 'bg-secondary/10 text-secondary' : 'text-primary dark:text-white hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+                  ${location.pathname === item.path ? 'bg-secondary/20 text-secondary' : 'text-slate-200 hover:bg-slate-800'}`} {/* Adjusted colors */}
                 aria-current={location.pathname === item.path ? 'page' : undefined}
               >
                 <div className="relative text-lg w-6 flex justify-center">
@@ -212,10 +214,24 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
               </button>
             ))}
           </nav>
-          <div className="mt-8 pt-4 border-t border-slate-200 dark:border-slate-800">
+          
+          {/* High Premium User Info Card */}
+          {user && (
+            <div className="mt-8 p-4 rounded-xl bg-gradient-gold shadow-lg flex items-center gap-4 border border-amber-800">
+                <div className="w-12 h-12 rounded-full bg-amber-900 text-white flex items-center justify-center text-xl font-bold shadow-inner">
+                    {user.name.charAt(0)}
+                </div>
+                <div>
+                    <p className="font-bold text-white text-md">{user.name}</p>
+                    <p className="text-xs text-amber-100 uppercase tracking-wide">{user.plan || 'Plano Básico'}</p>
+                </div>
+            </div>
+          )}
+
+          <div className="mt-4 pt-4 border-t border-slate-700"> {/* Adjusted border color for dark theme */}
             <button 
                 onClick={() => { logout(); setIsSidebarOpen(false); }}
-                className="flex items-center gap-4 w-full py-3 px-4 rounded-xl text-left font-bold transition-colors text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20"
+                className="flex items-center gap-4 w-full py-3 px-4 rounded-xl text-left font-bold transition-colors text-red-400 hover:bg-red-500/20" {/* Adjusted colors */}
                 aria-label="Sair da conta"
             >
                 <i className="fa-solid fa-right-from-bracket text-lg w-6 flex justify-center"></i> Sair da Conta
@@ -275,3 +291,4 @@ const App: React.FC = () => {
 };
 
 export default App;
+    

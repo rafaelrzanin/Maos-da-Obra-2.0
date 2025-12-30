@@ -15,6 +15,7 @@ export default {
           DEFAULT: '#0F172A', // Slate 900
           light: '#1E293B',   // Slate 800
           dark: '#020617',    // Slate 950
+          darker: '#000000',  // NEW: Even darker for sidebar background
         },
         secondary: {
           DEFAULT: '#D97706', // Amber 600
@@ -56,6 +57,8 @@ export default {
         'gradient-premium': 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)',
         'gradient-gold': 'linear-gradient(135deg, #F59E0B 0%, #B45309 100%)',
         'gradient-dark-gold': 'linear-gradient(135deg, #451a03 0%, #78350f 100%)',
+        // NEW: Specific gradient for the vitalício bonus container
+        'gradient-vitalicio-blue': 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)', // Similar to primary dark but distinct
       },
       boxShadow: {
         'glass': '0 8px 32px 0 rgba(31, 38, 135, 0.07)',

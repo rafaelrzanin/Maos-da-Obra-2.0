@@ -737,9 +737,6 @@ export const CONTRACT_TEMPLATES = [
 import { Checklist } from '../types.ts'; // Import Checklist type
 
 export const CHECKLIST_TEMPLATES: Checklist[] = [
-  // Example for a specific work (in a real app, this would be dynamic from DB)
-  // For now, let's assume workId 'mock-work-id' for testing.
-  // We'll generate dynamic IDs in dbService.
   {
     id: 'ckl-fundacao-1',
     workId: 'mock-work-id', // Placeholder, will be replaced dynamically
@@ -756,6 +753,59 @@ export const CHECKLIST_TEMPLATES: Checklist[] = [
       { id: 'item8', text: 'Verificar se as formas estão escoradas e contraventadas', checked: false },
       { id: 'item9', text: 'Preparar pontos de espera para instalações (hidráulica/elétrica)', checked: false },
       { id: 'item10', text: 'Disponibilidade de cimento, areia, brita e água para o traço', checked: false },
+      { id: 'item11', text: 'Verificar compactação do solo e presença de umidade', checked: false },
+      { id: 'item12', text: 'Conferir impermeabilização do baldrame (se já executada)', checked: false },
+      { id: 'item13', text: 'Registro fotográfico da ferragem antes da concretagem', checked: false },
+    ],
+  },
+  {
+    id: 'ckl-levantamento-paredes-1',
+    workId: 'mock-work-id',
+    name: 'Levantamento de Paredes - Alvenaria',
+    category: 'Levantamento de paredes',
+    items: [
+      { id: 'item1', text: 'Conferir primeira fiada com nível e prumo (fundação seca)', checked: false },
+      { id: 'item2', text: 'Utilizar gabarito e linhas para alinhamento das fiadas', checked: false },
+      { id: 'item3', text: 'Espessura uniforme da argamassa de assentamento', checked: false },
+      { id: 'item4', text: 'Amarrar as paredes nas quinas e em encontros com pilares', checked: false },
+      { id: 'item5', text: 'Furos para passagem de tubulação elétrica e hidráulica (sem quebrar blocos)', checked: false },
+      { id: 'item6', text: 'Verificar prumo e nível a cada 3 fiadas', checked: false },
+      { id: 'item7', text: 'Cintas de amarração (vergalhões) nas aberturas e no topo das paredes', checked: false },
+      { id: 'item8', text: 'Deixar espera para vergas e contravergas', checked: false },
+      { id: 'item9', text: 'Limpeza dos excessos de argamassa', checked: false },
+    ],
+  },
+  {
+    id: 'ckl-lajes-vigas-1',
+    workId: 'mock-work-id',
+    name: 'Lajes e Vigas - Concretagem',
+    category: 'Lajes e Vigas',
+    items: [
+      { id: 'item1', text: 'Conferir escoramento e formas (prumo e nível)', checked: false },
+      { id: 'item2', text: 'Verificar ferragem (bitolas, espaçamentos, cobrimento)', checked: false },
+      { id: 'item3', text: 'Limpeza da área (remover detritos, umedecer formas)', checked: false },
+      { id: 'item4', text: 'Instalações elétricas e hidráulicas embutidas posicionadas', checked: false },
+      { id: 'item5', text: 'Aguardar liberação do engenheiro/responsável técnico', checked: false },
+      { id: 'item6', text: 'Conferir traço do concreto (se for usinado, verificar nota)', checked: false },
+      { id: 'item7', text: 'Adensamento do concreto com vibrador (evitar falhas)', checked: false },
+      { id: 'item8', text: 'Cura do concreto (molhar por 7 dias, no mínimo)', checked: false },
+      { id: 'item9', text: 'Remoção das escoras e formas no tempo correto', checked: false },
+    ],
+  },
+  {
+    id: 'ckl-telhado-1',
+    workId: 'mock-work-id',
+    name: 'Telhado - Estrutura e Cobertura',
+    category: 'Telhado',
+    items: [
+      { id: 'item1', text: 'Conferir estrutura de madeira (dimensões, fixação, escoramento)', checked: false },
+      { id: 'item2', text: 'Tratamento da madeira (cupinicida, impermeabilizante)', checked: false },
+      { id: 'item3', text: 'Caimento adequado para escoamento da água', checked: false },
+      { id: 'item4', text: 'Instalação da manta sub-telha (se aplicável)', checked: false },
+      { id: 'item5', text: 'Fixação das telhas (amarração, parafusos)', checked: false },
+      { id: 'item6', text: 'Verificar rufos e calhas (alinhamento, caimento, vedação)', checked: false },
+      { id: 'item7', text: 'Cumeeiras e espigões bem vedados', checked: false },
+      { id: 'item8', text: 'Proteção contra ventos (teste de estanqueidade)', checked: false },
     ],
   },
   {
@@ -771,6 +821,8 @@ export const CHECKLIST_TEMPLATES: Checklist[] = [
       { id: 'item14', text: 'Teste de estanqueidade (se for área horizontal)', checked: false },
       { id: 'item15', text: 'Execução da proteção mecânica (regularização com argamassa)', checked: false },
       { id: 'item16', text: 'Verificar rodapés e cantos (arredondamento/reforço)', checked: false },
+      { id: 'item17', text: 'Conferir sobreposição das mantas (se for o caso)', checked: false },
+      { id: 'item18', text: 'Remover bolhas de ar na aplicação da manta', checked: false },
     ],
   },
   {
@@ -787,6 +839,8 @@ export const CHECKLIST_TEMPLATES: Checklist[] = [
       { id: 'item25', text: 'Instalação do sistema de aterramento (hastes, malha, caixa de inspeção)', checked: false },
       { id: 'item26', text: 'Verificar passagem para ar condicionado, aquecedores, etc.', checked: false },
       { id: 'item27', text: 'Posicionamento do quadro de distribuição (altura e acesso)', checked: false },
+      { id: 'item28', text: 'Tirar fotos da fiação antes do reboco (para futuras manutenções)', checked: false },
+      { id: 'item29', text: 'Deixar sobra de fio nas caixas para futuras conexões', checked: false },
     ],
   },
   {
@@ -802,6 +856,8 @@ export const CHECKLIST_TEMPLATES: Checklist[] = [
       { id: 'item34', text: 'Fixação segura e no nível correto dos pontos de água quente/fria', checked: false },
       { id: 'item35', text: 'Posicionamento e diâmetro correto dos pontos de esgoto', checked: false },
       { id: 'item36', text: 'Proteção das tubulações contra danos durante o reboco', checked: false },
+      { id: 'item37', text: 'Isolamento térmico para tubulação de água quente', checked: false },
+      { id: 'item38', text: 'Instalação de sifões e flexíveis com vedação adequada', checked: false },
     ],
   },
   {
@@ -817,6 +873,8 @@ export const CHECKLIST_TEMPLATES: Checklist[] = [
       { id: 'item44', text: 'Isolamento de rodapés, batentes, janelas, espelhos de tomada com fita crepe', checked: false },
       { id: 'item45', text: 'Aplicação de selador/fundo preparador (principalmente em paredes novas)', checked: false },
       { id: 'item46', text: 'Verificar umidade ou mofo na parede (tratar antes de pintar)', checked: false },
+      { id: 'item47', text: 'Proteção de pisos e móveis com lona', checked: false },
+      { id: 'item48', text: 'Escolha da tinta (tipo e cor) aprovada pelo cliente', checked: false },
     ],
   },
   {
@@ -831,6 +889,10 @@ export const CHECKLIST_TEMPLATES: Checklist[] = [
       { id: 'item53', text: 'Canteiro de obras organizado e seguro', checked: false },
       { id: 'item54', text: 'Pontos de água e luz provisórios instalados', checked: false },
       { id: 'item55', text: 'EPIs disponíveis para todos os trabalhadores', checked: false },
+      { id: 'item56', text: 'Placa de obra instalada', checked: false },
+      { id: 'item57', text: 'Primeira reunião com a equipe para alinhar o cronograma', checked: false },
+      { id: 'item58', text: 'Definição de local para descarte de entulho', checked: false },
+      { id: 'item59', text: 'Verificar acesso para entrega de materiais', checked: false },
     ],
   },
   {
@@ -849,6 +911,9 @@ export const CHECKLIST_TEMPLATES: Checklist[] = [
       { id: 'item67', text: 'Extintores de incêndio próximos e desobstruídos', checked: false },
       { id: 'item68', text: 'Isolamento de áreas de risco (valas, quedas)', checked: false },
       { id: 'item69', text: 'Primeiros socorros e kit de emergência acessíveis', checked: false },
+      { id: 'item70', text: 'Proteção de máquinas e equipamentos', checked: false },
+      { id: 'item71', text: 'Sinalização de segurança na obra', checked: false },
+      { id: 'item72', text: 'Treinamento de segurança para novos colaboradores', checked: false },
     ],
   },
   {
@@ -867,6 +932,8 @@ export const CHECKLIST_TEMPLATES: Checklist[] = [
       { id: 'item77', text: 'Entrega de chaves e manuais de equipamentos', checked: false },
       { id: 'item78', text: 'Quitação final de todos os pagamentos (contratados e fornecedores)', checked: false },
       { id: 'item79', text: 'Documento de entrega e quitação assinado por ambas as partes', checked: false },
+      { id: 'item80', text: 'Registro fotográfico da obra finalizada', checked: false },
+      { id: 'item81', text: 'Avaliação da satisfação do cliente', checked: false },
     ],
   },
 ];
