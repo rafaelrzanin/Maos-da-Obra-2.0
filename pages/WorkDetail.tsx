@@ -1,6 +1,4 @@
 
-
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
@@ -82,8 +80,8 @@ const WorkDetail: React.FC = () => {
     const [isStepModalOpen, setIsStepModalOpen] = useState(false);
     const [stepModalMode, setStepModalMode] = useState<'ADD' | 'EDIT'>('ADD');
     const [stepName, setStepName] = useState('');
-    const [stepStart, setStepStart] = new Date().toISOString().split('T')[0];
-    const [stepEnd, setStepEnd] = new Date().toISOString().split('T')[0];
+    const [stepStart, setStepStart] = useState(new Date().toISOString().split('T')[0]);
+    const [stepEnd, setStepEnd] = useState(new Date().toISOString().split('T')[0]);
     const [currentStepId, setCurrentStepId] = useState<string | null>(null);
 
     const [expenseModal, setExpenseModal] = useState<{ isOpen: boolean, mode: 'ADD'|'EDIT', id?: string }>({ isOpen: false, mode: 'ADD' });
@@ -420,8 +418,8 @@ const WorkDetail: React.FC = () => {
                         <h4 className="text-xs font-bold uppercase text-secondary mb-2">{step.name}</h4>
                         {stepMats.map(m => <p key={m.id} className="text-sm">• {m.name}: {m.purchasedQty}/{m.plannedQty} {m.unit}</p>)}
                     </div>
-                ))}
-            </div>
+                ); // Corrected: ensure 'return' statement is properly closed with ');'
+            })}
         </div>
     );
 
