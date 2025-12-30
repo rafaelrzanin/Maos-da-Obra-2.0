@@ -6,9 +6,9 @@ import { dbService } from '../services/db.ts';
 import { StepStatus, PlanType, WorkStatus, type Work, type DBNotification, type Step, type Material } from '../types.ts';
 import { ZE_AVATAR, ZE_AVATAR_FALLBACK, getRandomZeTip, ZeTip } from '../services/standards.ts';
 import { ZeModal, ZeModalProps } from '../components/ZeModal.tsx'; // Importa ZeModalProps
-import { Recharts } from '../components/RechartsWrapper.tsx'; // Importa Recharts
+// REMOVIDO: import { Recharts } from '../components/RechartsWrapper.tsx'; // Importa Recharts
 
-const { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } = Recharts;
+// REMOVIDO: const { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } = Recharts;
 
 /** =========================
  * UI helpers
@@ -351,7 +351,7 @@ const Dashboard: React.FC = () => {
   const [dailySummary, setDailySummary] = useState<{ completedSteps: number, delayedSteps: number, pendingMaterials: number, totalSteps: number } | null>(null);
   const [materials, setMaterials] = useState<Material[]>([]);
   const [steps, setSteps] = useState<Step[]>([]); 
-  // REMOVED: expenses state and chartData useMemo as per request.
+  // REMOVIDO: expenses state and chartData useMemo as per request.
   // const [expenses, setExpenses] = useState<Expense[]>([]); // Added expenses state for the chart
   // const chartData = useMemo(...)
 
@@ -392,14 +392,14 @@ const Dashboard: React.FC = () => {
         setDailySummary(summary);
         setMaterials(materialsList);
         setSteps(stepsList);
-        // REMOVED: setExpenses(expensesList);
+        // REMOVIDO: setExpenses(expensesList);
       } else {
         setFocusWork(null);
         setStats(null);
         setDailySummary(null);
         setMaterials([]);
         setSteps([]);
-        // REMOVED: setExpenses([]);
+        // REMOVIDO: setExpenses([]);
       }
       setZeTip(getRandomZeTip()); // Load a random tip
     } catch (error: any) {
@@ -459,7 +459,7 @@ const Dashboard: React.FC = () => {
     });
   };
 
-  // Process expenses for chart data (REMOVED)
+  // REMOVIDO: Process expenses for chart data (REMOVED)
   // const chartData = useMemo(() => {
   //   if (!expenses || expenses.length === 0) return [];
   //   const monthlyExpenses: { [key: string]: number } = {};
@@ -655,7 +655,7 @@ const Dashboard: React.FC = () => {
         </div>
       )}
 
-      {/* REMOVED: Monthly Expenses Chart */}
+      {/* REMOVIDO: Monthly Expenses Chart */}
 
       {/* NEW: Next Steps Section */}
       {focusWork && steps && (
