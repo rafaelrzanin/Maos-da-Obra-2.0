@@ -475,156 +475,108 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
     items: [
       { name: 'Massa Corrida (Interna) / Acrílica (Externa)', unit: 'lata', multiplier: 0.15 },
       { name: 'Lixas (Grana 150/220)', unit: 'folha', multiplier: 5 },
-      { name: 'Desempenadeira de Aço', unit: 'un', multiplier: 0.01 },
-      { name: 'Espátulas', unit: 'un', multiplier: 0.01 }
-    ]
+      { name: 'Desempenadeira de--- START OF FILE services/gateway.ts ---
+
+
+import { PlanType, User } from '../types.ts';
+
+// --- CONFIGURAÇÃO DO GATEWAY ---
+// Coloca aquí las credenciales de tu portal de pago
+// const API_URL = "https://api.tu-portal-de-pago.com/v1"; // Reemplazar con la URL real
+// const PUBLIC_KEY = "TU_PUBLIC_KEY"; // Si la API requiere auth desde el front
+
+// IDs de los planes en tu portal de pago
+const GATEWAY_PLAN_IDS = {
+  [PlanType.MENSAL]: "plan_id_mensal_real",
+  [PlanType.SEMESTRAL]: "plan_id_semestral_real",
+  [PlanType.VITALICIO]: "plan_id_vitalicio_real"
+};
+
+export const gatewayService = {
+  /**
+   * Crea una sesión de checkout en el portal de pago.
+   */
+  checkout: async (user: User, planType: PlanType): Promise<string> => {
+    console.log(`[Gateway] Iniciando checkout para ${user.email} no plano ${planType}...`);
+
+    try {
+      // 1. Preparar el cuerpo de la solicitud según la documentación de tu API
+      /* 
+      const payload = {
+        items: [
+          {
+            id: GATEWAY_PLAN_IDS[planType],
+            title: `Assinatura Mãos da Obra - ${planType}`,
+            quantity: 1,
+            currency_id: 'BRL',
+            unit_price: planType === PlanType.VITALICIO ? 247.00 : (planType === PlanType.SEMESTRAL ? 97.00 : 29.90)
+          }
+        ],
+        payer: {
+          email: user.email,
+          name: user.name,
+          // phone: user.whatsapp // Opcional dependiendo de la API
+        },
+        external_reference: user.id, // IMPORTANTE: Para vincular el pago al usuario en el Webhook
+        back_urls: {
+          success: `${window.location.origin}/settings?status=success`,
+          failure: `${window.location.origin}/settings?status=failure`,
+          pending: `${window.location.origin}/settings?status=pending`
+        },
+        auto_return: "approved"
+      };
+      */
+
+      // 2. Hacer la llamada a la API (Ejemplo genérico, ajustar headers según documentación)
+      /* 
+      const response = await fetch(`${API_URL}/checkout/preferences`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${PUBLIC_KEY}`
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Erro ao criar preferência de pagamento');
+      }
+
+      const data = await response.json();
+      return data.init_point; // URL de redirección (Mercado Pago usa init_point, Stripe usa url, etc.)
+      */
+
+      // --- SIMULACIÓN PARA MANTENER LA APP FUNCIONANDO MIENTRAS INTEGRAS ---
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Simula que la API devolveu una URL de pago real
+      // Em produção, descomenta o bloque fetch de cima e elimina isso
+      const mockCheckoutUrl = `https://checkout.pagamento.com/pay/${GATEWAY_PLAN_IDS[planType]}?ref=${user.id}`;
+      console.warn("MODO SIMULACIÓN: Redirecionando a URL ficticia. Implementar fetch real em services/gateway.ts");
+      
+      return mockCheckoutUrl;
+
+    } catch (error) {
+      console.error("Erro no gateway de pagamento:", error);
+      throw error;
+    }
+  },
+
+  /**
+   * Verifica se uma transação foi exitosa baseado nos parâmetros de la URL
+   * (Útil para feedback imediato no frontend, mas NO para segurança final)
+   */
+  checkPaymentStatus: (searchParams: URLSearchParams): 'success' | 'failure' | 'pending' | null => {
+    const status = searchParams.get('status');
+    // const paymentId = searchParams.get('payment_id'); // O el parámetro que use tu gateway
+
+    if (status === 'approved' || status === 'success') {
+      return 'success';
+    }
+    if (status === 'failure' || status === 'rejected') {
+      return 'failure';
+    }
+    return null;
   }
-];
-
-// NEW: Job Roles for Workers (Equipe)
-export const STANDARD_JOB_ROLES = [
-  "Pedreiro",
-  "Eletricista",
-  "Encanador",
-  "Pintor",
-  "Carpinteiro",
-  "Gesseiro",
-  "Ajudante",
-  "Arquiteto(a)",
-  "Engenheiro(a)",
-  "Mestre de Obras",
-  "Outros"
-];
-
-// NEW: Categories for Suppliers
-export const STANDARD_SUPPLIER_CATEGORIES = [
-  "Material de Construção Geral",
-  "Material Elétrico",
-  "Material Hidráulico",
-  "Tintas e Acessórios",
-  "Madeira",
-  "Ferramentas",
-  "Gesso e Drywall",
-  "Vidraçaria",
-  "Marmoraria",
-  "Aluguel de Equipamentos",
-  "Caçambas (Remoção de Entulho)",
-  "Outros Serviços"
-];
-
-// NEW: Standard Checklists (example, could be loaded from DB)
-export const STANDARD_CHECKLISTS = [
-  {
-    id: 'FUNDACAO',
-    category: 'Fundações',
-    items: [
-      { id: 'item1', text: 'Conferir alinhamento e nível do baldrame', checked: false },
-      { id: 'item2', text: 'Verificar espaçamento e amarração das ferragens', checked: false },
-      { id: 'item3', text: 'Confirmar cura do concreto (7 dias molhando)', checked: false },
-    ],
-  },
-  {
-    id: 'HIDRAULICA_BRUTA',
-    category: 'Hidráulica Bruta',
-    items: [
-      { id: 'item1', text: 'Testar vazamentos antes de fechar paredes', checked: false },
-      { id: 'item2', text: 'Registrar fotos da tubulação exposta', checked: false },
-      { id: 'item3', text: 'Verificar caimento do esgoto', checked: false },
-    ],
-  },
-];
-
-// NEW: Contract Templates (example, could be loaded from DB)
-export const CONTRACT_TEMPLATES = [
-  {
-    id: 'SIMPLES_PEDREIRO',
-    title: 'Contrato de Pedreiro (Serviço Pontual)',
-    description: 'Modelo simples para pequenos serviços de alvenaria.',
-    contentTemplate: `
-      CONTRATO DE PRESTAÇÃO DE SERVIÇOS DE PEDREIRO
-
-      CONTRATANTE: {{clientName}}, CPF: {{clientCpf}}, residente em {{clientAddress}}.
-      CONTRATADO: {{workerName}}, CPF: {{workerCpf}}, residente em {{workerAddress}}.
-
-      OBJETO: O CONTRATADO prestará serviços de pedreiro na obra localizada em {{workAddress}}, conforme as seguintes especificações:
-      - {{serviceDescription}}
-
-      PRAZO: Início em {{startDate}} e término em {{endDate}}.
-      VALOR: R$ {{contractValue}}, a ser pago da seguinte forma: {{paymentTerms}}.
-
-      Fica eleito o foro da comarca de {{city}} para dirimir quaisquer dúvidas.
-
-      {{city}}, {{date}}.
-
-      _________________________             _________________________
-      CONTRATANTE                               CONTRATADO
-    `,
-  },
-  {
-    id: 'REFORMA_GERAL',
-    title: 'Contrato de Reforma Geral (Empreitada)',
-    description: 'Contrato abrangente para reformas completas com múltiplas etapas.',
-    contentTemplate: `
-      CONTRATO DE EMPREITADA PARA REFORMA DE IMÓVEL
-
-      CONTRATANTE: {{clientName}}, CPF: {{clientCpf}}, residente em {{clientAddress}}.
-      CONTRATADO: {{companyName}}, CNPJ: {{companyCnpj}}, sede em {{companyAddress}}.
-
-      OBJETO: Reforma geral do imóvel localizado em {{workAddress}}, incluindo as seguintes etapas:
-      1. Demolições e Retirada de Entulho
-      2. Instalações Hidráulicas e Elétricas
-      3. Alvenaria e Gesso
-      4. Pisos e Revestimentos
-      5. Pintura
-      6. Instalação de Esquadrias e Acabamentos
-      Detalhes adicionais em anexo (Memorial Descritivo).
-
-      PRAZO: Início em {{startDate}} e término em {{endDate}}, sujeito a alterações por motivos de força maior ou aditivos.
-      VALOR TOTAL: R$ {{contractValue}}, conforme orçamento detalhado nº {{budgetNumber}}.
-      PAGAMENTO: Será efetuado em {{installments}} parcelas, mediante medição do avanço físico da obra.
-
-      GARANTIA: O CONTRATADO oferece garantia de {{guaranteeMonths}} meses sobre os serviços executados.
-
-      Fica eleito o foro da comarca de {{city}} para dirimir quaisquer dúvidas.
-
-      {{city}}, {{date}}.
-
-      _________________________             _________________________
-      CONTRATANTE                               CONTRATADO
-    `,
-  },
-];
-
-// NEW: Lifetime Bonuses
-export const LIFETIME_BONUSES = [
-  {
-    icon: 'fa-infinity',
-    title: 'Acesso Vitalício',
-    desc: 'Pague uma vez e use para sempre, sem mensalidades ou taxas ocultas.',
-  },
-  {
-    icon: 'fa-robot',
-    title: 'IA Zé da Obra Ilimitada',
-    desc: 'Seu assistente virtual com inteligência artificial para tirar dúvidas, calcular materiais e dar dicas, sem limites de uso.',
-  },
-  {
-    icon: 'fa-file-contract',
-    title: 'Gerador de Contratos Personalizáveis',
-    desc: 'Crie contratos profissionais com pedreiros, empreiteiros e fornecedores em minutos, garantindo segurança jurídica.',
-  },
-  {
-    icon: 'fa-clipboard-check',
-    title: 'Checklists Inteligentes',
-    desc: 'Tenha acesso a checklists pré-prontos para cada etapa da obra, garantindo que nada seja esquecido.',
-  },
-  {
-    icon: 'fa-chart-line',
-    title: 'Relatórios Avançados',
-    desc: 'Relatórios detalhados de custos, progresso e materiais em PDF e Excel para uma gestão impecável.',
-  },
-  {
-    icon: 'fa-users-gear',
-    title: 'Gestão de Equipe e Fornecedores',
-    desc: 'Cadastre e gerencie todos os seus profissionais e fornecedores em um só lugar, otimizando a comunicação.',
-  },
-];
+};

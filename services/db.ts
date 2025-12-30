@@ -1,4 +1,5 @@
 
+
 import { PlanType, ExpenseCategory, StepStatus, FileCategory, type User, type Work, type Step, type Material, type Expense, type Worker, type Supplier, type WorkPhoto, type WorkFile, type DBNotification, type PushSubscriptionInfo } from '../types.ts';
 import { WORK_TEMPLATES, FULL_MATERIAL_PACKAGES } from './standards.ts';
 import { supabase } from './supabase.ts';
@@ -831,7 +832,8 @@ export const dbService = {
   async addMaterial(material: Omit<Material, 'id'>, purchaseInfo?: {qty: number, cost: number, date: string}): Promise<Material | null> {
     // Supabase is guaranteed to be initialized now
     
-    const { data: newMaterialData, error: addMaterialError } = await supabase.from('materials').insert({ // Renamed data and error
+    // Fix: Safely destructure data and error from the response object
+    const response = await supabase.from('materials').insert({ 
       work_id: material.workId,
       name: material.name,
       brand: material.brand,
@@ -841,6 +843,9 @@ export const dbService = {
       step_id: material.stepId, // FIX: Changed to snake_case
       category: material.category
     }).select().single();
+
+    const newMaterialData = response.data;
+    const addMaterialError = response.error;
 
     if (addMaterialError) {
       console.error("Erro ao adicionar material:", addMaterialError);

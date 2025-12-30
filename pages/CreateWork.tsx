@@ -1,5 +1,4 @@
 
-
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext.tsx'; // Use authLoading and isUserAuthFinished
 import { useNavigate } from 'react-router-dom';
