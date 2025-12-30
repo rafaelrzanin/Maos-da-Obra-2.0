@@ -460,10 +460,11 @@ export const dbService = {
       sessionCache = null; // Invalida cache
   },
 
-  async generatePix(_amount: number, _payer: any) {
+  // Fix: Added default values to unused parameters to resolve TypeScript error.
+  async generatePix(_amount: number = 0, _payer: any = {}) {
       // This is a mock function, no actual Supabase interaction required
       return {
-          qr_code_base64: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQyF2NgYGBgAAAABQAEV9D3sgAAAABJR1JIBMAA==",
+          qr_code_base64: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQyF2NgYGBgAAAABQAEV9D3sgAAAABJRोहIBMAA==",
           copy_paste_code: "00020126330014BR.GOV.BCB.PIX011155555555555520400005303986540510.005802BR5913Mãos da Obra6008Brasilia62070503***63041234"
       };
   },
@@ -472,7 +473,7 @@ export const dbService = {
   async getWorks(userId: string): Promise<Work[]> {
     // Supabase is guaranteed to be initialized now
     
-    const now = Date.Now();
+    const now = Date.now();
     // Return cache immediately if valid
     if (_dashboardCache.works && (now - _dashboardCache.works.timestamp < CACHE_TTL)) {
         return _dashboardCache.works.data;
@@ -1217,7 +1218,7 @@ export const dbService = {
   async calculateWorkStats(workId: string): Promise<{ totalSpent: number, progress: number, delayedSteps: number }> {
     // Supabase is guaranteed to be initialized now
 
-    const now = Date.Now();
+    const now = Date.now();
     if (_dashboardCache.stats[workId] && (now - _dashboardCache.stats[workId].timestamp < CACHE_TTL)) {
         return _dashboardCache.stats[workId].data;
     }
@@ -1250,7 +1251,7 @@ export const dbService = {
   async getDailySummary(workId: string): Promise<{ completedSteps: number, delayedSteps: number, pendingMaterials: number, totalSteps: number }> {
     // Supabase is guaranteed to be initialized now
 
-    const now = Date.Now();
+    const now = Date.now();
     if (_dashboardCache.summary[workId] && (now - _dashboardCache.summary[workId].timestamp < CACHE_TTL)) {
         return _dashboardCache.summary[workId].data;
     }
@@ -1538,7 +1539,7 @@ export const dbService = {
     //                     });
     //                     await dbService.sendPushNotification(userId, { // Changed from dbService.sendPushNotification
     //                         title: 'Orçamento Estourado!',
-    //                         body: `O orçamento da obra "${currentWork.name}" foi excedido em ${Math.round(budgetUsage - 100)}%.`,
+    //                         body: `Você já usou ${Math.round(budgetUsage)}% do orçamento da obra "${currentWork.name}".`,
     //                         url: `${window.location.origin}/work/${workId}/financial`,
     //                         tag: notificationTag
     //                     });
