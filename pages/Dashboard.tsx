@@ -1,5 +1,4 @@
 
-
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.tsx';
@@ -83,24 +82,45 @@ const DashboardSkeleton = () => (
 /** =========================
  * Sub-Componentes
  * ========================= */
-const Donut = ({ value, label }: { value: number; label: string }) => {
-  const v = Math.max(0, Math.min(100, value));
+
+// NEW: Segmented Progress Bar Component
+const SegmentedProgressBar = ({ steps }: { steps: Step[] }) => {
+  if (!steps || steps.length === 0) {
+    return (
+      <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-3 mb-2 flex">
+        <div className="h-full bg-slate-300 rounded-full" style={{ width: '100%' }}></div>
+      </div>
+    );
+  }
+
+  const totalSteps = steps.length;
+  const today = new Date().toISOString().split('T')[0];
+
+  const completed = steps.filter(s => s.status === StepStatus.COMPLETED);
+  const inProgress = steps.filter(s => s.status === StepStatus.IN_PROGRESS);
+  const notStarted = steps.filter(s => s.status === StepStatus.NOT_STARTED);
+  const delayed = steps.filter(s => s.status !== StepStatus.COMPLETED && s.endDate < today);
+
+  // Remove delayed steps from inProgress and notStarted to avoid double counting for accurate segment widths
+  const actualInProgress = inProgress.filter(s => !delayed.some(d => d.id === s.id));
+  const actualNotStarted = notStarted.filter(s => !delayed.some(d => d.id === s.id));
+
+
+  const completedPct = (completed.length / totalSteps) * 100;
+  const inProgressPct = (actualInProgress.length / totalSteps) * 100;
+  const delayedPct = (delayed.length / totalSteps) * 100;
+  const notStartedPct = (actualNotStarted.length / totalSteps) * 100; // Remaining
+
   return (
-    <div className="flex items-center gap-4">
-      <div
-        className="relative w-14 h-14 rounded-full"
-        style={{ background: `conic-gradient(rgb(245 158 11) ${v * 3.6}deg, rgba(148,163,184,0.25) 0deg)` }}
-      >
-        <div className="absolute inset-[6px] rounded-full bg-white dark:bg-slate-950/60 border border-slate-200/50 dark:border-white/10"></div>
-        <div className="absolute inset-0 grid place-items-center text-xs font-black text-slate-700 dark:text-slate-200">{v}%</div>
-      </div>
-      <div className="min-w-0">
-        <p className="text-sm font-extrabold text-slate-900 dark:text-white leading-tight">{label}</p>
-        <p className={cx("text-xs font-semibold", mutedText)}>Progresso geral</p>
-      </div>
+    <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-3 mb-2 flex overflow-hidden">
+      {completedPct > 0 && <div className="h-full bg-green-500" style={{ width: `${completedPct}%` }} title={`Concluído: ${completedPct.toFixed(0)}%`}></div>}
+      {inProgressPct > 0 && <div className="h-full bg-orange-500" style={{ width: `${inProgressPct}%` }} title={`Em Andamento: ${inProgressPct.toFixed(0)}%`}></div>}
+      {delayedPct > 0 && <div className="h-full bg-red-500" style={{ width: `${delayedPct}%` }} title={`Atrasado: ${delayedPct.toFixed(0)}%`}></div>}
+      {notStartedPct > 0 && <div className="h-full bg-slate-300" style={{ width: `${notStartedPct}%` }} title={`Pendente: ${notStartedPct.toFixed(0)}%`}></div>}
     </div>
   );
 };
+
 
 // FIX: Updated KpiCardProps interface to accept `children`
 const KpiCard = ({ onClick, icon, iconClass, value, label, badge, accent, children }: {
@@ -138,10 +158,10 @@ const NextSteps = ({
   onOpenWork: () => void;
 }) => {
   const today = new Date().toISOString().split('T')[0];
-  const nextThreeSteps = steps
+  const nextRelevantSteps = steps
     .filter(s => s.status !== StepStatus.COMPLETED && s.endDate >= today) // Filter out completed and past due
     .sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime())
-    .slice(0, 3); // Get next 3
+    .slice(0, 5); // Max 5 cards
 
   return (
     <div className={cx(surface, "rounded-3xl p-6")}>
@@ -155,36 +175,30 @@ const NextSteps = ({
         </button>
       </div>
 
-      {nextThreeSteps.length === 0 ? (
+      {nextRelevantSteps.length === 0 ? (
         <div className="text-center text-slate-400 py-8 italic text-sm">
           Todas as etapas futuras concluídas ou sem etapas futuras.
         </div>
       ) : (
         <div className="space-y-4">
-          {nextThreeSteps.map((step, idx) => {
-            const daysUntilStart = Math.ceil((new Date(step.startDate).getTime() - new Date(today).getTime()) / (1000 * 60 * 60 * 24));
-            let statusText = '';
-            let statusClass = 'text-slate-500';
-            let iconClass = 'fa-clock';
+          {nextRelevantSteps.map((step, idx) => {
+            let statusClass = '';
+            let statusIcon = '';
 
-            if (step.status === StepStatus.IN_PROGRESS) {
-                statusText = 'Em Andamento';
-                statusClass = 'text-orange-600';
-                iconClass = 'fa-hammer';
-            } else if (daysUntilStart === 0) {
-                statusText = 'Começa Hoje!';
+            const isDelayed = step.status !== StepStatus.COMPLETED && step.endDate < today;
+
+            if (isDelayed) {
+                statusClass = 'text-red-600';
+                statusIcon = 'fa-triangle-exclamation';
+            } else if (step.status === StepStatus.COMPLETED) {
                 statusClass = 'text-green-600';
-                iconClass = 'fa-calendar-day';
-            } else if (daysUntilStart === 1) {
-                statusText = 'Amanhã';
-                statusClass = 'text-blue-600';
-                iconClass = 'fa-calendar-alt';
-            } else if (daysUntilStart > 1) {
-                statusText = `Em ${daysUntilStart} dias`;
-                statusClass = 'text-blue-600';
-                iconClass = 'fa-calendar-alt';
-            } else {
-                statusText = 'Pendente'; // Fallback for other cases
+                statusIcon = 'fa-check-circle';
+            } else if (step.status === StepStatus.IN_PROGRESS) {
+                statusClass = 'text-orange-600';
+                statusIcon = 'fa-hammer';
+            } else { // StepStatus.NOT_STARTED
+                statusClass = 'text-slate-500';
+                statusIcon = 'fa-clock';
             }
 
             return (
@@ -192,7 +206,7 @@ const NextSteps = ({
                 <div className="flex items-center justify-between mb-1">
                   <p className="font-bold text-primary dark:text-white text-sm">{step.name}</p>
                   <span className={cx("text-xs font-semibold flex items-center gap-1", statusClass)}>
-                    <i className={`fa-solid ${iconClass}`}></i> {statusText}
+                    <i className={`fa-solid ${statusIcon}`}></i> {isDelayed ? "Atrasada" : (step.status === StepStatus.COMPLETED ? "Concluída" : (step.status === StepStatus.IN_PROGRESS ? "Em Andamento" : "Pendente"))}
                   </span>
                 </div>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
@@ -203,6 +217,86 @@ const NextSteps = ({
           })}
         </div>
       )}
+    </div>
+  );
+};
+
+// NEW: MaterialsNeeded Component
+const MaterialsNeeded = ({
+  focusWork,
+  materials,
+  steps,
+  onOpenWork,
+}: {
+  focusWork: Work;
+  materials: Material[];
+  steps: Step[];
+  onOpenWork: () => void;
+}) => {
+  const today = new Date();
+  const threeDaysFromNow = new Date();
+  threeDaysFromNow.setDate(today.getDate() + 3);
+
+  const relevantMaterials = materials.filter(mat => {
+    if (!mat.stepId || mat.purchasedQty >= mat.plannedQty) return false; // Already purchased or no step
+
+    const linkedStep = steps.find(s => s.id === mat.stepId);
+    if (!linkedStep) return false;
+
+    const stepStartDate = new Date(linkedStep.startDate);
+    const stepEndDate = new Date(linkedStep.endDate);
+
+    // Rule 1: Step starts in up to 3 days
+    const isUpcoming = stepStartDate >= today && stepStartDate <= threeDaysFromNow;
+
+    // Rule 2: Step already started AND material is pending/partial
+    const hasStartedAndPending = stepStartDate <= today && mat.purchasedQty < mat.plannedQty;
+    
+    return isUpcoming || hasStartedAndPending;
+  });
+
+  if (relevantMaterials.length === 0) {
+    return null; // Don't render the section if no relevant materials
+  }
+
+  return (
+    <div className={cx(surface, "rounded-3xl p-6")}>
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <p className="text-lg font-black text-slate-900 dark:text-white">Materiais para Compra</p>
+          <p className={cx("text-xs font-semibold", mutedText)}>Organize suas compras para não atrasar a obra</p>
+        </div>
+        <button onClick={() => onOpenWork()} className="text-xs font-extrabold text-secondary hover:opacity-80">
+          Ver todos os materiais →
+        </button>
+      </div>
+
+      <div className="space-y-4">
+        {relevantMaterials.map(mat => {
+          const linkedStep = steps.find(s => s.id === mat.stepId);
+          const statusText = mat.purchasedQty === 0 ? "Pendente" : "Parcial";
+          const statusClass = mat.purchasedQty === 0 ? "text-red-500" : "text-orange-500";
+          const progress = (mat.purchasedQty / mat.plannedQty) * 100;
+
+          return (
+            <div key={mat.id} className="bg-slate-50 dark:bg-slate-800 rounded-xl p-3 border border-slate-200 dark:border-slate-700">
+              <div className="flex items-center justify-between mb-1">
+                <p className="font-bold text-primary dark:text-white text-sm">{mat.name}</p>
+                <span className={cx("text-xs font-semibold flex items-center gap-1", statusClass)}>
+                  <i className="fa-solid fa-box"></i> {statusText}
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Etapa: {linkedStep?.name || 'N/A'}</p>
+              <div className="h-1 bg-slate-100 rounded-full overflow-hidden">
+                <div className="h-full bg-secondary" style={{ width: `${Math.min(100, progress)}%` }}></div>
+              </div>
+              <p className="text-[10px] text-right text-slate-500 dark:text-slate-400 mt-1">
+                {mat.purchasedQty}/{mat.plannedQty} {mat.unit} comprados
+              </p>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 };
@@ -373,12 +467,13 @@ const Dashboard: React.FC = () => {
     );
   }
 
-  // Calculate step counts
+  // Calculate step counts for KPI Cards
   const totalSteps = steps.length;
-  const completedSteps = steps.filter(s => s.status === StepStatus.COMPLETED).length;
-  const inProgressSteps = steps.filter(s => s.status === StepStatus.IN_PROGRESS).length;
-  const today = new Date().toISOString().split('T')[0];
-  const delayedSteps = steps.filter(s => s.status !== StepStatus.COMPLETED && s.endDate < today).length;
+  const completedStepsCount = steps.filter(s => s.status === StepStatus.COMPLETED).length;
+  const inProgressStepsCount = steps.filter(s => s.status === StepStatus.IN_PROGRESS).length;
+  const todayDateString = new Date().toISOString().split('T')[0];
+  const delayedStepsCount = steps.filter(s => s.status !== StepStatus.COMPLETED && s.endDate < todayDateString).length;
+  const notStartedStepsCount = steps.filter(s => s.status === StepStatus.NOT_STARTED && s.endDate >= todayDateString).length;
 
 
   // Display dashboard content
@@ -419,49 +514,57 @@ const Dashboard: React.FC = () => {
             </div>
           </div>
 
+          {/* PROGRESSO GERAL DA OBRA (BLOCO PRINCIPAL) */}
+          <div className="mb-8">
+            <h3 className="text-xl font-black text-slate-900 dark:text-white leading-tight mb-2">Progresso Geral da Obra</h3>
+            <p className={cx("text-sm font-semibold mb-4", mutedText)}>Visão completa das etapas da obra</p>
+            
+            {/* Segmented Progress Bar */}
+            <SegmentedProgressBar steps={steps} />
+
+            <div className="flex justify-between text-xs font-semibold text-slate-500 dark:text-slate-400 mt-2">
+                <span>Total: {totalSteps} etapas</span>
+                {totalSteps > 0 && <span>{((completedStepsCount / totalSteps) * 100).toFixed(0)}% Concluído</span>}
+            </div>
+          </div>
+
+
+          {/* STATUS DAS ETAPAS (RESUMO VISUAL) */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 mb-8">
-            <Donut value={stats?.progress || 0} label="Progresso da Obra" />
-            <div className="space-y-3">
-              {/* New/Enhanced KPI Cards */}
-              <KpiCard
-                icon="fa-list-ol"
-                iconClass="bg-blue-500/10 text-blue-600 dark:bg-blue-900/20 dark:text-blue-300"
-                value={totalSteps}
-                label="Total de Etapas"
-                onClick={() => handleOpenWorkDetail(focusWork.id)}
-              />
-              <KpiCard
+            <KpiCard
                 icon="fa-check-circle"
                 iconClass="bg-green-500/10 text-green-600 dark:bg-green-900/20 dark:text-green-300"
-                value={completedSteps}
+                value={completedStepsCount}
                 label="Etapas Concluídas"
                 onClick={() => handleOpenWorkDetail(focusWork.id)}
-              />
-              <KpiCard
+            />
+            <KpiCard
                 icon="fa-hammer"
                 iconClass="bg-orange-500/10 text-orange-600 dark:bg-orange-900/20 dark:text-orange-300"
-                value={inProgressSteps}
+                value={inProgressStepsCount}
                 label="Etapas Em Andamento"
-                accent={inProgressSteps > 0 ? "warn" : "ok"}
+                accent={inProgressStepsCount > 0 ? "warn" : "ok"}
                 onClick={() => handleOpenWorkDetail(focusWork.id)}
-              />
-              <KpiCard
-                icon="fa-calendar-days"
+            />
+            <KpiCard
+                icon="fa-clock"
+                iconClass="bg-slate-300/10 text-slate-500 dark:bg-slate-700/20 dark:text-slate-400"
+                value={notStartedStepsCount}
+                label="Etapas Pendentes"
+                onClick={() => handleOpenWorkDetail(focusWork.id)}
+            />
+            <KpiCard
+                icon="fa-triangle-exclamation"
                 iconClass="bg-red-500/10 text-red-600 dark:bg-red-900/20 dark:text-red-300"
-                value={delayedSteps || 0}
+                value={delayedStepsCount}
                 label="Etapas Atrasadas"
-                accent={delayedSteps > 0 ? "danger" : "ok"}
+                accent={delayedStepsCount > 0 ? "danger" : "ok"}
                 onClick={() => handleOpenWorkDetail(focusWork.id)}
-              />
-              <KpiCard
-                icon="fa-boxes-stacked"
-                iconClass="bg-amber-500/10 text-amber-600 dark:bg-amber-900/20 dark:text-amber-300"
-                value={dailySummary?.pendingMaterials || 0}
-                label="Materiais Pendentes"
-                accent={dailySummary && dailySummary.pendingMaterials > 0 ? "warn" : "ok"}
-                onClick={() => handleOpenWorkDetail(focusWork.id)}
-              />
-              <KpiCard
+            />
+          </div>
+
+          {/* Budget Overview (KpiCard with progress bar, kept as per previous) */}
+          <KpiCard
                 icon="fa-dollar-sign"
                 iconClass="bg-secondary/10 text-secondary dark:bg-secondary-dark/20 dark:text-secondary-light"
                 value={formatCurrency(stats?.totalSpent || 0)} // Currency formatted
@@ -486,8 +589,7 @@ const Dashboard: React.FC = () => {
                   </div>
                 )}
               </KpiCard>
-            </div>
-          </div>
+
           <div className="pt-4">
             <button onClick={() => handleOpenWorkDetail(focusWork.id)} className="w-full py-4 bg-secondary text-white font-bold rounded-xl shadow-lg hover:bg-secondary-dark transition-colors flex items-center justify-center gap-2">
               <i className="fa-solid fa-arrow-right"></i> Acessar Obra
@@ -496,7 +598,7 @@ const Dashboard: React.FC = () => {
         </div>
       )}
 
-      {/* NEW: Monthly Expenses Chart */}
+      {/* NEW: Monthly Expenses Chart (kept as per previous, it's a useful summary) */}
       {focusWork && chartData.length > 0 && (
         <div className={cx(surface, card, "mb-8")}>
           <h2 className="text-lg font-black text-primary dark:text-white mb-4">Gastos Mensais</h2>
@@ -533,6 +635,13 @@ const Dashboard: React.FC = () => {
       {focusWork && steps && (
         <div className="mb-8">
           <NextSteps focusWork={focusWork} steps={steps} onOpenWork={() => handleOpenWorkDetail(focusWork.id)} />
+        </div>
+      )}
+
+      {/* NEW: Materials Needed for Purchase (Intelligent) */}
+      {focusWork && materials && steps && (
+        <div className="mb-8">
+          <MaterialsNeeded focusWork={focusWork} materials={materials} steps={steps} onOpenWork={() => handleOpenWorkDetail(focusWork.id)} />
         </div>
       )}
 

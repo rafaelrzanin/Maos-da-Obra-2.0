@@ -998,8 +998,10 @@ export const dbService = {
     // Supabase is guaranteed to be initialized now
     // Fix: Correctly define the type for `data` when destructuring,
     // as Supabase's `.single()` can return `null` for `data`.
-    const { data, error: deleteExpenseError } = await supabase.from('expenses').delete().eq('id', expenseId).select('work_id').single();
-    const deletedExpense: { work_id: string } | null = data; // Explicitly type to allow for null
+    const response = await supabase.from('expenses').delete().eq('id', expenseId).select('work_id').single();
+    const deletedExpense: { work_id: string } | null = response.data; // Explicitly type to allow for null
+    const deleteExpenseError = response.error; // Extract error from response
+
     if (deleteExpenseError) {
       console.error("Erro ao apagar despesa:", deleteExpenseError);
       throw deleteExpenseError;
