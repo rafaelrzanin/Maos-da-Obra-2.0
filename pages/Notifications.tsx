@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext.tsx';
 import { dbService } from '../services/db.ts';
@@ -82,12 +81,14 @@ const Notifications: React.FC = () => {
           <button
             onClick={() => setFilterRead('unread')}
             className={`px-4 py-2 rounded-xl text-sm font-bold transition-colors ${filterRead === 'unread' ? 'bg-secondary text-white shadow-md' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'}`}
+            aria-label="Mostrar apenas notificações não lidas"
           >
             Não Lidas
           </button>
           <button
             onClick={() => setFilterRead('all')}
             className={`px-4 py-2 rounded-xl text-sm font-bold transition-colors ${filterRead === 'all' ? 'bg-secondary text-white shadow-md' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'}`}
+            aria-label="Mostrar todas as notificações"
           >
             Todas
           </button>
@@ -96,6 +97,7 @@ const Notifications: React.FC = () => {
           onClick={handleClearAllNotifications}
           className="text-sm font-bold text-slate-500 hover:text-red-500 transition-colors"
           disabled={allNotifications.filter(n => !n.read).length === 0}
+          aria-label="Marcar todas as notificações como lidas"
         >
           Marcar todas como lidas
         </button>
@@ -137,6 +139,7 @@ const Notifications: React.FC = () => {
                 <button
                   onClick={() => handleDismissNotification(notification.id)}
                   className="px-3 py-1 bg-secondary text-white text-xs font-bold rounded-lg hover:bg-secondary-dark transition-colors shrink-0"
+                  aria-label={`Marcar notificação "${notification.title}" como lida`}
                 >
                   Marcar como lida
                 </button>
