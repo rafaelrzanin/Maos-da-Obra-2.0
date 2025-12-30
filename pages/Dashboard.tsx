@@ -638,11 +638,12 @@ const Dashboard: React.FC = () => {
         </div>
       )}
 
-      {/* NEW: Monthly Expenses Chart (kept as per previous, it's a useful summary) */}
+      {/* REMOVED: Monthly Expenses Chart (kept as per previous, it's a useful summary) */}
+      {/*
       {focusWork && chartData.length > 0 && (
-        <div className={cx(surface, "rounded-3xl p-6 mb-8 mx-2 sm:mx-0")}> {/* Reduced outer margin for mobile */}
+        <div className={cx(surface, "rounded-3xl p-6 mb-8 mx-2 sm:mx-0")}>
           <h2 className="text-lg font-black text-primary dark:text-white mb-4">Gastos Mensais</h2>
-          <div className="h-48 sm:h-64"> {/* Define a fixed height for the chart, shorter on small mobile */}
+          <div className="h-48 sm:h-64">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={chartData}
@@ -670,6 +671,7 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
       )}
+      */}
 
       {/* NEW: Next Steps Section */}
       {focusWork && steps && (
