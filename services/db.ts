@@ -491,6 +491,7 @@ export const dbService = {
         return _dashboardCache.works.data;
     }
 
+    console.log(`[dbService.getWorks] Fetching works for user: ${userId}`); // Log para depuração
     const { data, error: fetchWorksError } = await supabase // Renamed error
         .from('works')
         .select('*')
@@ -498,7 +499,7 @@ export const dbService = {
         .order('created_at', { ascending: false });
         
     if (fetchWorksError) {
-        console.error("Erro ao buscar obras:", fetchWorksError);
+        console.error(`[dbService.getWorks] Erro ao buscar obras para user ${userId}:`, fetchWorksError); // Log de erro mais detalhado
         return []; // Return empty on error
     }
     
@@ -516,9 +517,10 @@ export const dbService = {
         if (cached) return cached;
     }
 
+    console.log(`[dbService.getWorkById] Fetching work by ID: ${workId}`); // Log para depuração
     const { data, error: fetchWorkError } = await supabase.from('works').select('*').eq('id', workId).single(); // Renamed error
     if (fetchWorkError) {
-        console.error("Erro ao buscar obra por ID:", fetchWorkError);
+        console.error(`[dbService.getWorkById] Erro ao buscar obra por ID ${workId}:`, fetchWorkError); // Log de erro mais detalhado
         return null;
     }
     return data ? parseWorkFromDB(data) : null;
@@ -726,9 +728,10 @@ export const dbService = {
         return _dashboardCache.steps[workId].data;
     }
 
+    console.log(`[dbService.getSteps] Fetching steps for work: ${workId}`); // Log para depuração
     const { data, error: fetchStepsError } = await supabase.from('steps').select('*').eq('work_id', workId).order('start_date', { ascending: true }); // Renamed error
     if (fetchStepsError) {
-      console.error("Erro ao buscar etapas:", fetchStepsError);
+      console.error(`[dbService.getSteps] Erro ao buscar etapas para work ${workId}:`, fetchStepsError); // Log de erro mais detalhado
       return [];
     }
     const parsed = (data || []).map(parseStepFromDB);
@@ -876,9 +879,10 @@ export const dbService = {
         return _dashboardCache.materials[workId].data;
     }
 
+    console.log(`[dbService.getMaterials] Fetching materials for work: ${workId}`); // Log para depuração
     const { data, error: fetchMaterialsError } = await supabase.from('materials').select('*').eq('work_id', workId).order('category', { ascending: true }).order('name', { ascending: true }); // Renamed error
     if (fetchMaterialsError) {
-      console.error("Erro ao buscar materiais:", fetchMaterialsError);
+      console.error(`[dbService.getMaterials] Erro ao buscar materiais para work ${workId}:`, fetchMaterialsError); // Log de erro mais detalhado
       return [];
     }
     const parsed = (data || []).map(parseMaterialFromDB);
@@ -998,9 +1002,10 @@ export const dbService = {
   // --- EXPENSES ---
   async getExpenses(workId: string): Promise<Expense[]> {
     // Supabase is guaranteed to be initialized now
+    console.log(`[dbService.getExpenses] Fetching expenses for work: ${workId}`); // Log para depuração
     const { data, error: fetchExpensesError } = await supabase.from('expenses').select('*').eq('work_id', workId).order('date', { ascending: false }); // Renamed error
     if (fetchExpensesError) {
-      console.error("Erro ao buscar despesas:", fetchExpensesError);
+      console.error(`[dbService.getExpenses] Erro ao buscar despesas para work ${workId}:`, fetchExpensesError); // Log de erro mais detalhado
       return [];
     }
     return (data || []).map(parseExpenseFromDB);
@@ -1082,9 +1087,10 @@ export const dbService = {
   // --- WORKERS ---
   async getWorkers(workId: string): Promise<Worker[]> { // NEW: Accepts workId
     // Supabase is guaranteed to be initialized now
+    console.log(`[dbService.getWorkers] Fetching workers for work: ${workId}`); // Log para depuração
     const { data, error: fetchWorkersError } = await supabase.from('workers').select('*').eq('work_id', workId).order('name', { ascending: true }); // NEW: Filter by work_id // Renamed error
     if (fetchWorkersError) {
-      console.error("Erro ao buscar profissionais:", fetchWorkersError);
+      console.error(`[dbService.getWorkers] Erro ao buscar profissionais para work ${workId}:`, fetchWorkersError); // Log de erro mais detalhado
       return [];
     }
     return (data || []).map(parseWorkerFromDB);
@@ -1136,9 +1142,10 @@ export const dbService = {
   // --- SUPPLIERS ---
   async getSuppliers(workId: string): Promise<Supplier[]> { // NEW: Accepts workId
     // Supabase is guaranteed to be initialized now
+    console.log(`[dbService.getSuppliers] Fetching suppliers for work: ${workId}`); // Log para depuração
     const { data, error: fetchSuppliersError } = await supabase.from('suppliers').select('*').eq('work_id', workId).order('name', { ascending: true }); // NEW: Filter by work_id // Renamed error
     if (fetchSuppliersError) {
-      console.error("Erro ao buscar fornecedores:", fetchSuppliersError);
+      console.error(`[dbService.getSuppliers] Erro ao buscar fornecedores para work ${workId}:`, fetchSuppliersError); // Log de erro mais detalhado
       return [];
     }
     return (data || []).map(parseSupplierFromDB);
@@ -1192,9 +1199,10 @@ export const dbService = {
   // --- WORK PHOTOS ---
   async getPhotos(workId: string): Promise<WorkPhoto[]> {
     // Supabase is guaranteed to be initialized now
+    console.log(`[dbService.getPhotos] Fetching photos for work: ${workId}`); // Log para depuração
     const { data, error: fetchPhotosError } = await supabase.from('work_photos').select('*').eq('work_id', workId).order('date', { ascending: false }); // Renamed error
     if (fetchPhotosError) {
-      console.error("Erro ao buscar fotos:", fetchPhotosError);
+      console.error(`[dbService.getPhotos] Erro ao buscar fotos para work ${workId}:`, fetchPhotosError); // Log de erro mais detalhado
       return [];
     }
     return (data || []).map(parsePhotoFromDB);
@@ -1219,9 +1227,10 @@ export const dbService = {
   // --- WORK FILES ---
   async getFiles(workId: string): Promise<WorkFile[]> {
     // Supabase is guaranteed to be initialized now
+    console.log(`[dbService.getFiles] Fetching files for work: ${workId}`); // Log para depuração
     const { data, error: fetchFilesError } = await supabase.from('work_files').select('*').eq('work_id', workId).order('date', { ascending: false }); // Renamed error
     if (fetchFilesError) {
-      console.error("Erro ao buscar arquivos:", fetchFilesError);
+      console.error(`[dbService.getFiles] Erro ao buscar arquivos para work ${workId}:`, fetchFilesError); // Log de erro mais detalhado
       return [];
     }
     return (data || []).map(parseFileFromDB);
@@ -1253,6 +1262,7 @@ export const dbService = {
         return _dashboardCache.notifications.data;
     }
 
+    console.log(`[dbService.getNotifications] Fetching notifications for user: ${userId}`); // Log para depuração
     const { data, error: fetchNotificationsError } = await supabase.from('notifications') // Renamed error
       .select('*')
       .eq('user_id', userId)
@@ -1260,7 +1270,7 @@ export const dbService = {
       .order('date', { ascending: false });
 
     if (fetchNotificationsError) {
-      console.error("Erro ao buscar notificações:", fetchNotificationsError);
+      console.error(`[dbService.getNotifications] Erro ao buscar notificações para user ${userId}:`, fetchNotificationsError); // Log de erro mais detalhado
       return [];
     }
     const parsed = (data || []).map(parseNotificationFromDB);
@@ -1321,6 +1331,7 @@ export const dbService = {
         return _dashboardCache.stats[workId].data;
     }
 
+    console.log(`[dbService.calculateWorkStats] Fetching stats for work: ${workId}`); // Log para depuração
     const [expensesResult, stepsResult, workResult] = await Promise.all([
       supabase.from('expenses').select('amount').eq('work_id', workId),
       supabase.from('steps').select('id, status, end_date').eq('work_id', workId),
@@ -1328,7 +1339,7 @@ export const dbService = {
     ]);
 
     if (expensesResult.error || stepsResult.error || workResult.error) {
-      console.error("Erro ao calcular stats da obra:", expensesResult.error || stepsResult.error || workResult.error);
+      console.error(`[dbService.calculateWorkStats] Erro ao calcular stats para work ${workId}:`, expensesResult.error || stepsResult.error || workResult.error); // Log de erro mais detalhado
       return { totalSpent: 0, progress: 0, delayedSteps: 0 };
     }
 
@@ -1354,13 +1365,14 @@ export const dbService = {
         return _dashboardCache.summary[workId].data;
     }
 
+    console.log(`[dbService.getDailySummary] Fetching summary for work: ${workId}`); // Log para depuração
     const [stepsResult, materialsResult] = await Promise.all([
       supabase.from('steps').select('id, status, end_date').eq('work_id', workId),
       supabase.from('materials').select('id, planned_qty, purchased_qty, step_id, name').eq('work_id', workId) // Fetch name and step_id
     ]);
 
     if (stepsResult.error || materialsResult.error) {
-      console.error("Erro ao buscar summary da obra:", stepsResult.error || materialsResult.error);
+      console.error(`[dbService.getDailySummary] Erro ao buscar summary para work ${workId}:`, stepsResult.error || materialsResult.error); // Log de erro mais detalhado
       return { completedSteps: 0, delayedSteps: 0, pendingMaterials: 0, totalSteps: 0 };
     }
 

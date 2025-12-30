@@ -57,8 +57,11 @@ const WorkDetail: React.FC = () => {
     const [uploading, setUploading] = useState<boolean>(false);
     const [reportActiveTab, setReportActiveTab] = useState<ReportSubTab>('CRONOGRAMA');
     
-    // Filtro para Materiais no Relatório
-    const [reportMaterialFilterStepId, setReportMaterialFilterStepId] = useState<string>('ALL'); // NEW: Filter for Materials Report
+    // Filtro para Materiais no Relatório (mantido separado)
+    const [reportMaterialFilterStepId, setReportMaterialFilterStepId] = useState<string>('ALL');
+    
+    // NOVO: Filtro para Materiais na aba principal
+    const [mainMaterialFilterStepId, setMainMaterialFilterStepId] = useState<string>('ALL'); 
     
     const [materialModal, setMaterialModal] = useState<{ isOpen: boolean, material: Material | null }>({ isOpen: false, material: null });
     const [matName, setMatName] = useState('');
@@ -148,8 +151,18 @@ const WorkDetail: React.FC = () => {
                 setStats(workStats);
                 setAllChecklists(checklists || []);
             }
-        } catch (error) {
+        } catch (error: any) { // Explicitly type error as any to access .message
             console.error("Erro ao carregar detalhes da obra:", error);
+            // NEW: Display this error in ZeModal
+            setZeModal({
+                isOpen: true,
+                title: 'Erro ao Carregar Dados da Obra',
+                message: `Não foi possível carregar os detalhes da obra. Detalhes: ${error.message || 'Um erro desconhecido ocorreu.'}\nPor favor, verifique sua conexão ou tente novamente.`,
+                confirmText: 'Entendido',
+                onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
+                type: 'ERROR',
+                isConfirming: false
+            });
         } finally {
             setLoading(false);
         }
@@ -656,10 +669,155 @@ const WorkDetail: React.FC = () => {
     }, [expenses, steps]);
 
 
+    const todayString = new Date().toISOString().split('T')[0];
+
+    const totalSpent = expenses.reduce((s, e) => s + e.amount, 0);
+    const budgetUsage = work.budgetPlanned > 0 ? (totalSpent / work.budgetPlanned) * 100 : 0;
+    const budgetRemaining = work.budgetPlanned > 0 ? Math.max(0, work.budgetPlanned - totalSpent) : 0;
+
+    let budgetStatusColor = 'bg-green-500';
+    let budgetStatusAccent = 'border-green-500 ring-1 ring-green-200';
+    let budgetStatusIcon = 'fa-check-circle';
+    if (budgetUsage > 100) {
+        budgetStatusColor = 'bg-red-500';
+        budgetStatusAccent = 'border-red-500 ring-1 ring-red-200';
+        budgetStatusIcon = 'fa-triangle-exclamation';
+    } else if (budgetUsage > 80) {
+        budgetStatusColor = 'bg-orange-500';
+        budgetStatusAccent = 'border-orange-500 ring-1 ring-orange-200';
+        budgetStatusIcon = 'fa-exclamation-circle';
+    }
+
+    const hasLifetimeAccess = user?.plan === PlanType.VITALICIO;
+    // const hasAiAccess = hasLifetimeAccess || (user?.isTrial && (trialDaysRemaining !== null && trialDaysRemaining > 0)); // This logic moved to AiChat itself for conditional rendering
+
+
+    // Helper para renderizar a lista de materiais na aba principal
+    const renderMainMaterialList = () => {
+        const hasUnlinkedMaterials = materials.some(m => !m.stepId);
+        
+        // Filtra as etapas que devem ser exibidas
+        const filteredSteps = steps.filter(step => 
+            mainMaterialFilterStepId === 'ALL' || 
+            step.id === mainMaterialFilterStepId
+        );
+
+        const renderedContent: JSX.Element[] = [];
+
+        // Condição de "nenhum material encontrado" mais abrangente
+        if (
+            (filteredSteps.length === 0 && !hasUnlinkedMaterials) || // Não há etapas nem materiais sem etapa
+            (mainMaterialFilterStepId === 'UNLINKED' && !hasUnlinkedMaterials) || // Filtro por sem etapa, mas não há materiais sem etapa
+            (mainMaterialFilterStepId !== 'ALL' && mainMaterialFilterStepId !== 'UNLINKED' && 
+             !materials.some(m => m.stepId === mainMaterialFilterStepId)) // Filtro por etapa específica, mas não há materiais para ela
+        ) {
+            return (
+                <p className="text-center text-slate-400 py-8 italic text-sm mx-2 sm:mx-0">
+                    Nenhum material encontrado para o filtro selecionado.
+                </p>
+            );
+        }
+
+        // Renderiza materiais vinculados a etapas específicas
+        filteredSteps.forEach((step, index) => {
+            const stepMats = materials.filter(m => m.stepId === step.id);
+            // Se o filtro for por etapa específica e não houver materiais para ela, não renderiza o bloco da etapa
+            if (stepMats.length === 0 && mainMaterialFilterStepId !== 'ALL') return; 
+
+            const isStepDelayed = step.status !== StepStatus.COMPLETED && new Date(step.endDate) < new Date(todayString);
+            const stepStatusBgClass = 
+                step.status === StepStatus.COMPLETED ? 'bg-green-500/10' : 
+                step.status === StepStatus.IN_PROGRESS ? 'bg-orange-500/10' : 
+                isStepDelayed ? 'bg-red-500/10' : 
+                'bg-slate-300/10';
+            const stepStatusTextColorClass =
+                step.status === StepStatus.COMPLETED ? 'text-green-600 dark:text-green-300' :
+                step.status === StepStatus.IN_PROGRESS ? 'text-orange-600 dark:text-orange-300' :
+                isStepDelayed ? 'text-red-600 dark:text-red-300' :
+                'text-slate-500 dark:text-slate-400';
+            const stepStatusIcon = 
+                step.status === StepStatus.COMPLETED ? 'fa-check-circle' :
+                step.status === StepStatus.IN_PROGRESS ? 'fa-hammer' : 
+                isStepDelayed ? 'fa-triangle-exclamation' :
+                'fa-clock';
+
+            renderedContent.push(
+                <div key={step.id} className="mb-6 first:mt-0 mt-8 mx-2 sm:mx-0">
+                    <div className={`bg-white dark:bg-slate-900 rounded-2xl p-4 mb-4 border border-slate-200 dark:border-slate-800 shadow-lg dark:shadow-card-dark-subtle ${stepStatusBgClass} ${stepStatusTextColorClass}`}>
+                        <div className="flex items-center justify-between">
+                            <h3 className="font-black text-xl text-primary dark:text-white flex items-center gap-2 pl-0">
+                                <span className={`w-8 h-8 rounded-full flex items-center justify-center text-base ${stepStatusBgClass.replace('/10', '/20').replace('bg-', 'bg-').replace('dark:bg-green-900/20', 'dark:bg-green-800').replace('dark:text-green-300', 'dark:text-white')}`}>
+                                    <i className={`fa-solid ${stepStatusIcon} ${stepStatusTextColorClass}`}></i>
+                                </span>
+                                <span className="text-primary dark:text-white">{index + 1}. {step.name}</span>
+                            </h3>
+                            <span className={`text-sm font-semibold ${stepStatusTextColorClass}`}>
+                                {isStepDelayed ? 'Atrasada' : step.status === StepStatus.COMPLETED ? 'Concluída' : step.status === StepStatus.IN_PROGRESS ? 'Em Andamento' : 'Pendente'}
+                            </span>
+                        </div>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 pl-9">{parseDateNoTimezone(step.startDate)} - {parseDateNoTimezone(step.endDate)}</p>
+                    </div>
+
+                    <div className="space-y-3 pl-3 border-l-2 border-slate-100 dark:border-slate-800">
+                        {stepMats.length === 0 ? (
+                            <p className="text-center text-slate-400 py-4 italic text-sm">Nenhum material associado a esta etapa.</p>
+                        ) : (
+                            stepMats.map(m => (
+                                <div key={m.id} onClick={() => { setMaterialModal({isOpen: true, material: m}); setMatName(m.name); setMatBrand(m.brand||''); setMatPlannedQty(String(m.plannedQty)); setMatUnit(m.unit); }} className="bg-white dark:bg-slate-900 p-2 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs dark:shadow-card-dark-subtle cursor-pointer hover:shadow-sm transition-shadow">
+                                    <div className="flex justify-between items-center mb-1">
+                                        <p className="font-bold text-sm text-primary dark:text-white">{m.name}</p>
+                                        <span className="text-xs font-black text-green-600 dark:text-green-400">{m.purchasedQty} {m.unit}</span>
+                                    </div>
+                                    <div className="h-1 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                                        <div className="h-full bg-secondary" style={{ width: `${(m.purchasedQty/m.plannedQty)*100}%` }}></div>
+                                    </div>
+                                    <p className="text-[10px] text-right text-slate-500 dark:text-slate-400 mt-1">Planejado: {m.plannedQty} {m.unit}</p>
+                                </div>
+                            ))
+                        )}
+                    </div>
+                </div>
+            );
+        });
+
+        // Renderiza materiais sem etapa específica quando "ALL" ou "UNLINKED" é selecionado
+        if ((mainMaterialFilterStepId === 'ALL' || mainMaterialFilterStepId === 'UNLINKED') && hasUnlinkedMaterials) {
+            renderedContent.push(
+                <div key="unlinked-materials" className="mb-6 first:mt-0 mt-8 mx-2 sm:mx-0">
+                    <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 mb-4 border border-slate-200 dark:border-slate-800 shadow-lg dark:shadow-card-dark-subtle bg-slate-300/10 text-slate-500 dark:text-slate-400">
+                        <h3 className="font-black text-xl text-primary dark:text-white flex items-center gap-2 pl-0">
+                            <span className="w-8 h-8 rounded-full flex items-center justify-center text-base bg-slate-300/20 text-slate-500 dark:text-slate-400">
+                                <i className="fa-solid fa-tag"></i>
+                            </span>
+                            <span className="text-primary dark:text-white">Materiais Sem Etapa Associada</span>
+                        </h3>
+                    </div>
+                    <div className="space-y-3 pl-3 border-l-2 border-slate-100 dark:border-slate-800">
+                        {materials.filter(m => !m.stepId).map(m => (
+                            <div key={m.id} onClick={() => { setMaterialModal({isOpen: true, material: m}); setMatName(m.name); setMatBrand(m.brand||''); setMatPlannedQty(String(m.plannedQty)); setMatUnit(m.unit); }} className="bg-white dark:bg-slate-900 p-2 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs dark:shadow-card-dark-subtle cursor-pointer hover:shadow-sm transition-shadow">
+                                <div className="flex justify-between items-center mb-1">
+                                    <p className="font-bold text-sm text-primary dark:text-white">{m.name}</p>
+                                    <span className="text-xs font-black text-green-600 dark:text-green-400">{m.purchasedQty} {m.unit}</span>
+                                </div>
+                                <div className="h-1 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
+                                    <div className="h-full bg-secondary" style={{ width: `${(m.purchasedQty/m.plannedQty)*100}%` }}></div>
+                                </div>
+                                <p className="text-[10px] text-right text-slate-500 dark:text-slate-400 mt-1">Planejado: {m.plannedQty} {m.unit}</p>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        }
+        return renderedContent;
+    };
+    // FIM Helper para renderizar a lista de materiais
+
     if (authLoading || !isUserAuthFinished || loading) return <div className="h-screen flex items-center justify-center"><i className="fa-solid fa-circle-notch fa-spin text-3xl text-primary"></i></div>;
     if (!work) return <div className="text-center py-10">Obra não encontrada.</div>;
 
-    const RenderCronogramaReport = () => (
+    // Add explicit React.FC type to functional components
+    const RenderCronogramaReport: React.FC = () => (
         <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 shadow-md dark:shadow-card-dark-subtle animate-in fade-in">
             <h3 className="font-bold text-xl text-primary dark:text-white mb-6">Cronograma Detalhado</h3>
             <div className="space-y-4">
@@ -690,7 +848,8 @@ const WorkDetail: React.FC = () => {
         </div>
     );
 
-    const RenderMateriaisReport = () => {
+    // Add explicit React.FC type to functional components
+    const RenderMateriaisReport: React.FC = () => {
         const filteredMaterials = reportMaterialFilterStepId === 'ALL'
             ? materials
             : materials.filter(m => m.stepId === reportMaterialFilterStepId);
@@ -754,7 +913,8 @@ const WorkDetail: React.FC = () => {
     };
 
 
-    const RenderFinanceiroReport = () => (
+    // Add explicit React.FC type to functional components
+    const RenderFinanceiroReport: React.FC = () => (
         <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 shadow-md dark:shadow-card-dark-subtle animate-in fade-in">
             <h3 className="font-bold text-xl text-primary dark:text-white mb-6">Lançamentos Financeiros</h3>
             {Object.values(ExpenseCategory).map(category => {
@@ -804,27 +964,8 @@ const WorkDetail: React.FC = () => {
         );
 
 
-    const todayString = new Date().toISOString().split('T')[0];
-
-    const totalSpent = expenses.reduce((s, e) => s + e.amount, 0);
-    const budgetUsage = work.budgetPlanned > 0 ? (totalSpent / work.budgetPlanned) * 100 : 0;
-    const budgetRemaining = work.budgetPlanned > 0 ? Math.max(0, work.budgetPlanned - totalSpent) : 0;
-
-    let budgetStatusColor = 'bg-green-500';
-    let budgetStatusAccent = 'border-green-500 ring-1 ring-green-200';
-    let budgetStatusIcon = 'fa-check-circle';
-    if (budgetUsage > 100) {
-        budgetStatusColor = 'bg-red-500';
-        budgetStatusAccent = 'border-red-500 ring-1 ring-red-200';
-        budgetStatusIcon = 'fa-triangle-exclamation';
-    } else if (budgetUsage > 80) {
-        budgetStatusColor = 'bg-orange-500';
-        budgetStatusAccent = 'border-orange-500 ring-1 ring-orange-200';
-        budgetStatusIcon = 'fa-exclamation-circle';
-    }
-
-    const hasLifetimeAccess = user?.plan === PlanType.VITALICIO;
-    // const hasAiAccess = hasLifetimeAccess || (user?.isTrial && (trialDaysRemaining !== null && trialDaysRemaining > 0)); // This logic moved to AiChat itself for conditional rendering
+    if (authLoading || !isUserAuthFinished || loading) return <div className="h-screen flex items-center justify-center"><i className="fa-solid fa-circle-notch fa-spin text-3xl text-primary"></i></div>;
+    if (!work) return <div className="text-center py-10">Obra não encontrada.</div>;
 
     return (
         <div className="max-w-4xl mx-auto py-8 px-4 md:px-0 pb-24">
@@ -886,68 +1027,27 @@ const WorkDetail: React.FC = () => {
                                 <h2 className="text-xl font-bold text-primary dark:text-white">Materiais</h2>
                                 <button onClick={() => setAddMatModal(true)} className="bg-primary text-white p-2 rounded-xl shadow-md hover:bg-primary-light transition-colors" aria-label="Adicionar material"><i className="fa-solid fa-plus"></i></button>
                             </div>
-                            {steps.length === 0 && materials.length === 0 ? (
-                                <p className="text-center text-slate-400 py-8 italic text-sm">Nenhuma etapa ou material cadastrado.</p>
-                            ) : (
-                                steps.map((step, index) => {
-                                    const stepMats = materials.filter(m => m.stepId === step.id);
-                                    
-                                    const isStepDelayed = step.status !== StepStatus.COMPLETED && new Date(step.endDate) < new Date(todayString);
-                                    const stepStatusBgClass = 
-                                        step.status === StepStatus.COMPLETED ? 'bg-green-500/10' : 
-                                        step.status === StepStatus.IN_PROGRESS ? 'bg-orange-500/10' : 
-                                        isStepDelayed ? 'bg-red-500/10' : 
-                                        'bg-slate-300/10';
-                                    const stepStatusTextColorClass =
-                                        step.status === StepStatus.COMPLETED ? 'text-green-600 dark:text-green-300' :
-                                        step.status === StepStatus.IN_PROGRESS ? 'text-orange-600 dark:text-orange-300' :
-                                        isStepDelayed ? 'text-red-600 dark:text-red-300' :
-                                        'text-slate-500 dark:text-slate-400';
-                                    const stepStatusIcon = 
-                                        step.status === StepStatus.COMPLETED ? 'fa-check-circle' :
-                                        step.status === StepStatus.IN_PROGRESS ? 'fa-hammer' : 
-                                        isStepDelayed ? 'fa-triangle-exclamation' :
-                                    'fa-clock';
 
-                                    return (
-                                        <div key={step.id} className="mb-6 first:mt-0 mt-8">
-                                            <div className={`bg-white dark:bg-slate-900 rounded-2xl p-4 mb-4 border border-slate-200 dark:border-slate-800 shadow-lg dark:shadow-card-dark-subtle ${stepStatusBgClass} ${stepStatusTextColorClass}`}>
-                                                <div className="flex items-center justify-between">
-                                                    <h3 className="font-black text-xl text-primary dark:text-white flex items-center gap-2 pl-0">
-                                                        <span className={`w-8 h-8 rounded-full flex items-center justify-center text-base ${stepStatusBgClass.replace('/10', '/20').replace('bg-', 'bg-').replace('dark:bg-green-900/20', 'dark:bg-green-800').replace('dark:text-green-300', 'dark:text-white')}`}>
-                                                            <i className={`fa-solid ${stepStatusIcon} ${stepStatusTextColorClass}`}></i>
-                                                        </span>
-                                                        <span className="text-primary dark:text-white">{index + 1}. {step.name}</span>
-                                                    </h3>
-                                                    <span className={`text-sm font-semibold ${stepStatusTextColorClass}`}>
-                                                        {isStepDelayed ? 'Atrasada' : step.status === StepStatus.COMPLETED ? 'Concluída' : step.status === StepStatus.IN_PROGRESS ? 'Em Andamento' : 'Pendente'}
-                                                    </span>
-                                                </div>
-                                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 pl-9">{parseDateNoTimezone(step.startDate)} - {parseDateNoTimezone(step.endDate)}</p>
-                                            </div>
+                            {/* NOVO: Filtro para Materiais na aba principal */}
+                            <div className="mb-6 mx-2 sm:mx-0">
+                                <label htmlFor="main-material-step-filter" className="block text-sm font-medium text-primary dark:text-white mb-2">Filtrar por Etapa:</label>
+                                <select
+                                    id="main-material-step-filter"
+                                    value={mainMaterialFilterStepId}
+                                    onChange={(e) => setMainMaterialFilterStepId(e.target.value)}
+                                    className="w-full p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 text-primary dark:text-white focus:ring-secondary focus:border-secondary outline-none transition-colors"
+                                    aria-label="Filtrar materiais por etapa"
+                                >
+                                    <option value="ALL">Todas as Etapas</option>
+                                    {steps.map(step => (
+                                        <option key={step.id} value={step.id}>{step.name}</option>
+                                    ))}
+                                    {materials.some(m => !m.stepId) && <option value="UNLINKED">Sem Etapa Associada</option>}
+                                </select>
+                            </div>
+                            {/* FIM NOVO FILTRO */}
 
-                                            <div className="space-y-3 pl-3 border-l-2 border-slate-100 dark:border-slate-800">
-                                                {stepMats.length === 0 ? (
-                                                    <p className="text-center text-slate-400 py-4 italic text-sm">Nenhum material associado a esta etapa.</p>
-                                                ) : (
-                                                    stepMats.map(m => (
-                                                        <div key={m.id} onClick={() => { setMaterialModal({isOpen: true, material: m}); setMatName(m.name); setMatBrand(m.brand||''); setMatPlannedQty(String(m.plannedQty)); setMatUnit(m.unit); }} className="bg-white dark:bg-slate-900 p-2 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs dark:shadow-card-dark-subtle cursor-pointer hover:shadow-sm transition-shadow">
-                                                            <div className="flex justify-between items-center mb-1">
-                                                                <p className="font-bold text-sm text-primary dark:text-white">{m.name}</p>
-                                                                <span className="text-xs font-black text-green-600 dark:text-green-400">{m.purchasedQty} {m.unit}</span>
-                                                            </div>
-                                                            <div className="h-1 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
-                                                                <div className="h-full bg-secondary" style={{ width: `${(m.purchasedQty/m.plannedQty)*100}%` }}></div>
-                                                            </div>
-                                                            <p className="text-[10px] text-right text-slate-500 dark:text-slate-400 mt-1">Planejado: {m.plannedQty} {m.unit}</p>
-                                                        </div>
-                                                    ))
-                                                )}
-                                            </div>
-                                        </div>
-                                    );
-                                })
-                            )}
+                            {renderMainMaterialList()} {/* Chama o helper para renderizar a lista de materiais */}
                         </div>
                     )}
 
@@ -1334,15 +1434,17 @@ const WorkDetail: React.FC = () => {
                                 ))}
                             </div>
 
+                            {/* MOVIDO: Botões de Exportação aqui */}
+                            <div className="grid grid-cols-2 gap-4 mt-6 mb-8"> {/* Adicionado mb-8 para espaçamento */}
+                                <button onClick={handleExportExcel} className="w-full py-4 bg-green-600 text-white rounded-xl font-bold shadow-lg hover:bg-green-700 transition-colors" aria-label="Exportar para Excel"><i className="fa-solid fa-file-excel mr-2"></i> Exportar Excel</button>
+                                <button onClick={handleExportPdf} className="w-full py-4 bg-red-600 text-white rounded-xl font-bold shadow-lg hover:bg-red-700 transition-colors" aria-label="Exportar para PDF"><i className="fa-solid fa-file-pdf mr-2"></i> Exportar PDF</button>
+                            </div>
+                            {/* FIM MOVED: Botões de Exportação */}
+
                             {/* Report Content based on active tab */}
                             {reportActiveTab === 'CRONOGRAMA' && <RenderCronogramaReport />}
                             {reportActiveTab === 'MATERIAIS' && <RenderMateriaisReport />}
                             {reportActiveTab === 'FINANCEIRO' && <RenderFinanceiroReport />}
-
-                            <div className="grid grid-cols-2 gap-4 mt-6">
-                                <button onClick={handleExportExcel} className="w-full py-4 bg-green-600 text-white rounded-xl font-bold shadow-lg hover:bg-green-700 transition-colors" aria-label="Exportar para Excel"><i className="fa-solid fa-file-excel mr-2"></i> Exportar Excel</button>
-                                <button onClick={handleExportPdf} className="w-full py-4 bg-red-600 text-white rounded-xl font-bold shadow-lg hover:bg-red-700 transition-colors" aria-label="Exportar para PDF"><i className="fa-solid fa-file-pdf mr-2"></i> Exportar PDF</button>
-                            </div>
                         </div>
                     )}
                     
@@ -1642,7 +1744,7 @@ const WorkDetail: React.FC = () => {
                                 {expCategory === ExpenseCategory.LABOR && expenseModal.mode === 'ADD' && (
                                     <input type="number" value={expTotalAgreed} onChange={e => setExpTotalAgreed(e.target.value)} placeholder="Preço Combinado (Total da Empreita)" className="w-full p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white focus:ring-secondary focus:border-secondary outline-none transition-colors" aria-label="Preço Combinado (Total da Empreita)" />
                                 )}
-                                <input type="number" value={expAmount} onChange={e => setExpAmount(e.target.value)} placeholder={expenseModal.mode === 'ADD' ? formatCurrency(0).replace('R$', '') : 'Valor Pago Agora'} className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white focus:ring-secondary focus:border-secondary outline-none transition-colors" required aria-label={expenseModal.mode === 'ADD' ? 'Valor Total do Gasto' : 'Valor Pago Agora'} />
+                                <input type="number" value={expAmount} onChange={e => setExpAmount(e.target.value)} placeholder={expenseModal.mode === 'ADD' ? formatCurrency(0).replace('R$', '') : 'Valor Pago Agora'} className="w-full p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white focus:ring-secondary focus:border-secondary outline-none transition-colors" required aria-label={expenseModal.mode === 'ADD' ? 'Valor Total do Gasto' : 'Valor Pago Agora'} />
                             </div>
 
                             {/* Bloco 4 - Ação */}
@@ -1786,4 +1888,3 @@ const WorkDetail: React.FC = () => {
 };
 
 export default WorkDetail;
-    
