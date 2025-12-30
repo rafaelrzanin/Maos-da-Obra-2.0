@@ -350,51 +350,89 @@ const WorkDetail: React.FC = () => {
 
     const handleSavePerson = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!user || !work) return;
-        
-        if (personMode === 'WORKER') {
-            const payload: Omit<Worker, 'id'> = { 
-                userId: user.id, 
-                workId: work.id, 
-                name: personName, 
-                role: personRole, 
-                phone: personPhone, 
-                notes: personNotes,
-                dailyRate: Number(workerDailyRate) || undefined
-            };
-            if (personId) {
-                await dbService.updateWorker({ ...payload, id: personId });
-            } else {
-                await dbService.addWorker(payload);
-            }
-        } else { // SUPPLIER
-            const payload: Omit<Supplier, 'id'> = { 
-                userId: user.id, 
-                workId: work.id, 
-                name: personName, 
-                category: personRole, // For supplier, role means category
-                phone: personPhone, 
-                notes: personNotes,
-                email: personEmail || undefined,
-                address: personAddress || undefined
-            };
-            if (personId) {
-                await dbService.updateSupplier({ ...payload, id: personId });
-            } else {
-                await dbService.addSupplier(payload);
-            }
+        if (!user || !work) {
+            setZeModal({
+                isOpen: true,
+                title: 'Erro de Autenticação',
+                message: 'Usuário ou obra não identificados. Por favor, recarregue a página.',
+                confirmText: 'Entendido',
+                onCancel: () => setZeModal({ isOpen: false }),
+                type: 'ERROR'
+            });
+            return;
         }
-        setIsPersonModalOpen(false);
-        load();
+        
+        try {
+            if (personMode === 'WORKER') {
+                const payload: Omit<Worker, 'id'> = { 
+                    userId: user.id, 
+                    workId: work.id, 
+                    name: personName, 
+                    role: personRole, 
+                    phone: personPhone, 
+                    notes: personNotes,
+                    dailyRate: Number(workerDailyRate) || undefined
+                };
+                console.log("[handleSavePerson] Salvando Trabalhador. Payload:", payload, "personId:", personId);
+                if (personId) {
+                    await dbService.updateWorker({ ...payload, id: personId });
+                } else {
+                    await dbService.addWorker(payload);
+                }
+            } else { // SUPPLIER
+                const payload: Omit<Supplier, 'id'> = { 
+                    userId: user.id, 
+                    workId: work.id, 
+                    name: personName, 
+                    category: personRole, // For supplier, role means category
+                    phone: personPhone, 
+                    notes: personNotes,
+                    email: personEmail || undefined,
+                    address: personAddress || undefined
+                };
+                console.log("[handleSavePerson] Salvando Fornecedor. Payload:", payload, "personId:", personId);
+                if (personId) {
+                    await dbService.updateSupplier({ ...payload, id: personId });
+                } else {
+                    await dbService.addSupplier(payload);
+                }
+            }
+            setIsPersonModalOpen(false);
+            load();
+            setZeModal({
+                isOpen: true,
+                title: 'Sucesso!',
+                message: `${personMode === 'WORKER' ? 'Profissional' : 'Fornecedor'} salvo com sucesso.`,
+                confirmText: 'Ok',
+                onCancel: () => setZeModal({ isOpen: false }),
+                type: 'SUCCESS'
+            });
+        } catch (error: any) {
+            console.error(`[handleSavePerson] Erro ao salvar ${personMode === 'WORKER' ? 'profissional' : 'fornecedor'}:`, error);
+            setZeModal({
+                isOpen: true,
+                title: 'Erro ao Salvar',
+                message: `Não foi possível salvar o ${personMode === 'WORKER' ? 'profissional' : 'fornecedor'}: ${error.message || 'Um erro desconhecido ocorreu.'}\nVerifique suas permissões de RLS no Supabase.`,
+                confirmText: 'Entendido',
+                onCancel: () => setZeModal({ isOpen: false }),
+                type: 'ERROR'
+            });
+        }
     };
 
     const handleDeletePerson = (pid: string, wid: string, mode: 'WORKER' | 'SUPPLIER') => {
         setZeModal({
             isOpen: true, title: 'Remover?', message: 'Deseja remover esta pessoa?', confirmText: 'Remover', type: 'DANGER',
             onConfirm: async () => { 
-                if (mode === 'WORKER') await dbService.deleteWorker(pid, wid); 
-                else await dbService.deleteSupplier(pid, wid); 
-                load(); setZeModal({ isOpen: false }); 
+                try {
+                    if (mode === 'WORKER') await dbService.deleteWorker(pid, wid); 
+                    else await dbService.deleteSupplier(pid, wid); 
+                    load(); 
+                    setZeModal({ isOpen: false, title: 'Sucesso!', message: `${mode === 'WORKER' ? 'Profissional' : 'Fornecedor'} removido com sucesso.`, confirmText: 'Ok', onCancel: () => setZeModal({ isOpen: false }), type: 'SUCCESS' });
+                } catch (error: any) {
+                    console.error(`Erro ao deletar ${mode === 'WORKER' ? 'profissional' : 'fornecedor'}:`, error);
+                    setZeModal({ isOpen: true, title: 'Erro!', message: `Não foi possível remover: ${error.message}`, confirmText: 'Entendido', onCancel: () => setZeModal({ isOpen: false }), type: 'ERROR' });
+                }
             },
             onCancel: () => setZeModal({ isOpen: false })
         });

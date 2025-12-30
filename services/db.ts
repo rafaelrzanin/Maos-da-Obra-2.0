@@ -10,11 +10,16 @@ const _dashboardCache: {
     stats: Record<string, { data: any, timestamp: number }>;
     summary: Record<string, { data: any, timestamp: number }>;
     notifications: { data: DBNotification[], timestamp: number } | null;
+    // NEW: Caching for steps and materials per workId
+    steps: Record<string, { data: Step[], timestamp: number }>;
+    materials: Record<string, { data: Material[], timestamp: number }>;
 } = {
     works: null,
     stats: {},
     summary: {},
-    notifications: null
+    notifications: null,
+    steps: {}, // Initialize new cache
+    materials: {}, // Initialize new cache
 };
 
 // --- HELPERS ---
@@ -305,6 +310,8 @@ export const dbService = {
             _dashboardCache.stats = {};
             _dashboardCache.summary = {};
             _dashboardCache.notifications = null;
+            _dashboardCache.steps = {}; // NEW: Clear steps cache on logout
+            _dashboardCache.materials = {}; // NEW: Clear materials cache on logout
             callback(null);
         }
     });
@@ -382,6 +389,8 @@ export const dbService = {
     _dashboardCache.stats = {};
     _dashboardCache.summary = {};
     _dashboardCache.notifications = null;
+    _dashboardCache.steps = {}; // NEW: Clear steps cache on logout
+    _dashboardCache.materials = {}; // NEW: Clear materials cache on logout
   },
 
   async getUserProfile(userId: string): Promise<User | null> {
@@ -569,8 +578,8 @@ export const dbService = {
             }
         }
         
-        // NOTIFICATIONS: Comentado cache de notificações
-        // _dashboardCache.notifications = null; // Invalidate notifications cache due to potential material-related alerts
+        // Invalidate caches
+        _dashboardCache.materials[workId] = null; // NEW: Invalidate materials cache for this workId
         console.log(`[REGEN MATERIAL] Materiais para obra ${workId} regenerados com sucesso.`);
 
     } catch (error: any) {
@@ -613,6 +622,9 @@ export const dbService = {
     _dashboardCache.works = null;
     delete _dashboardCache.stats[parsedWork.id]; // Invalidate specific stats for new work
     delete _dashboardCache.summary[parsedWork.id]; // Invalidate specific summary for new work
+    _dashboardCache.steps[parsedWork.id] = null; // NEW: Invalidate steps cache for this workId
+    _dashboardCache.materials[parsedWork.id] = null; // NEW: Invalidate materials cache for this workId
+
 
     // Generate Steps
     const template = WORK_TEMPLATES.find(t => t.id === templateId);
@@ -690,6 +702,8 @@ export const dbService = {
         delete _dashboardCache.stats[workId]; // Invalidate specific stats for deleted work
         delete _dashboardCache.summary[workId]; // Invalidate specific summary for deleted work
         _dashboardCache.notifications = null; // Invalidate global notification cache
+        _dashboardCache.steps[workId] = null; // NEW: Invalidate steps cache for this workId
+        _dashboardCache.materials[workId] = null; // NEW: Invalidate materials cache for this workId
         console.log(`[DB DELETE] Caches para workId ${workId} invalidados.`);
 
     } catch (error: unknown) { // Explicitly type as unknown
@@ -706,12 +720,20 @@ export const dbService = {
   // --- STEPS ---
   async getSteps(workId: string): Promise<Step[]> {
     // Supabase is guaranteed to be initialized now
+    const now = Date.now();
+    if (_dashboardCache.steps[workId] && (now - _dashboardCache.steps[workId].timestamp < CACHE_TTL)) {
+        console.log(`[CACHE HIT] getSteps for workId ${workId}`);
+        return _dashboardCache.steps[workId].data;
+    }
+
     const { data, error: fetchStepsError } = await supabase.from('steps').select('*').eq('work_id', workId).order('start_date', { ascending: true }); // Renamed error
     if (fetchStepsError) {
       console.error("Erro ao buscar etapas:", fetchStepsError);
       return [];
     }
-    return (data || []).map(parseStepFromDB);
+    const parsed = (data || []).map(parseStepFromDB);
+    _dashboardCache.steps[workId] = { data: parsed, timestamp: now }; // Cache the result
+    return parsed;
   },
 
   async addStep(step: Omit<Step, 'id'>): Promise<Step | null> {
@@ -732,6 +754,7 @@ export const dbService = {
     delete _dashboardCache.stats[step.workId];
     delete _dashboardCache.summary[step.workId];
     _dashboardCache.notifications = null; // NEW: Invalidate notifications cache
+    _dashboardCache.steps[step.workId] = null; // NEW: Invalidate steps cache for this workId
     return parseStepFromDB(newStepData);
   },
 
@@ -753,6 +776,7 @@ export const dbService = {
     delete _dashboardCache.stats[step.workId];
     delete _dashboardCache.summary[step.workId];
     _dashboardCache.notifications = null; // NEW: Invalidate notifications cache
+    _dashboardCache.steps[step.workId] = null; // NEW: Invalidate steps cache for this workId
     return parseStepFromDB(updatedStepData);
   },
 
@@ -833,6 +857,8 @@ export const dbService = {
       delete _dashboardCache.stats[workId];
       delete _dashboardCache.summary[workId];
       _dashboardCache.notifications = null; // Notifications might be tied to steps, invalidate global cache
+      _dashboardCache.steps[workId] = null; // NEW: Invalidate steps cache for this workId
+      _dashboardCache.materials[workId] = null; // NEW: Invalidate materials cache for this workId
       console.log(`[DB DELETE] Caches para workId ${workId} invalidados após exclusão da etapa.`);
 
     } catch (error: any) {
@@ -844,12 +870,20 @@ export const dbService = {
   // --- MATERIALS ---
   async getMaterials(workId: string): Promise<Material[]> {
     // Supabase is guaranteed to be initialized now
+    const now = Date.now();
+    if (_dashboardCache.materials[workId] && (now - _dashboardCache.materials[workId].timestamp < CACHE_TTL)) {
+        console.log(`[CACHE HIT] getMaterials for workId ${workId}`);
+        return _dashboardCache.materials[workId].data;
+    }
+
     const { data, error: fetchMaterialsError } = await supabase.from('materials').select('*').eq('work_id', workId).order('category', { ascending: true }).order('name', { ascending: true }); // Renamed error
     if (fetchMaterialsError) {
       console.error("Erro ao buscar materiais:", fetchMaterialsError);
       return [];
     }
-    return (data || []).map(parseMaterialFromDB);
+    const parsed = (data || []).map(parseMaterialFromDB);
+    _dashboardCache.materials[workId] = { data: parsed, timestamp: now }; // Cache the result
+    return parsed;
   },
 
   async addMaterial(material: Omit<Material, 'id'>, purchaseInfo?: {qty: number, cost: number, date: string}): Promise<Material | null> {
@@ -891,6 +925,7 @@ export const dbService = {
     delete _dashboardCache.stats[material.workId];
     delete _dashboardCache.summary[material.workId];
     _dashboardCache.notifications = null; // NEW: Invalidate notifications cache
+    _dashboardCache.materials[material.workId] = null; // NEW: Invalidate materials cache for this workId
     return parseMaterialFromDB(newMaterialData);
   },
 
@@ -913,6 +948,7 @@ export const dbService = {
     delete _dashboardCache.stats[material.workId];
     delete _dashboardCache.summary[material.workId];
     _dashboardCache.notifications = null; // NEW: Invalidate notifications cache
+    _dashboardCache.materials[material.workId] = null; // NEW: Invalidate materials cache for this workId
     return parseMaterialFromDB(updatedMaterialData);
   },
 
@@ -956,6 +992,7 @@ export const dbService = {
     delete _dashboardCache.stats[existingMaterial.work_id];
     delete _dashboardCache.summary[existingMaterial.work_id];
     _dashboardCache.notifications = null; // NEW: Invalidate notifications cache
+    _dashboardCache.materials[existingMaterial.work_id] = null; // NEW: Invalidate materials cache for this workId
   },
 
   // --- EXPENSES ---
@@ -979,7 +1016,7 @@ export const dbService = {
       quantity: expense.quantity || 1, // Default quantity
       date: expense.date,
       category: expense.category,
-      stepId: expense.stepId, // FIX: Changed to snake_case
+      step_id: expense.stepId, // FIX: Changed to snake_case
       related_material_id: expense.relatedMaterialId, // FIX: Changed to snake_case
       worker_id: expense.workerId, // FIX: Changed to snake_case
       supplier_id: expense.supplierId, // NEW: Added supplier_id
@@ -1005,7 +1042,7 @@ export const dbService = {
       quantity: expense.quantity,
       date: expense.date,
       category: expense.category,
-      stepId: expense.stepId, // This is already snake_case
+      step_id: expense.stepId, // This is already snake_case
       related_material_id: expense.relatedMaterialId, // This is already snake_case
       worker_id: expense.workerId, // This is already snake_case
       supplier_id: expense.supplierId, // NEW: Added supplier_id
@@ -1766,3 +1803,4 @@ export const dbService = {
   }
 
 };
+    

@@ -151,8 +151,71 @@ export default function Register() {
                 </span>
             </p> {/* Melhorado visual do plano */}
         </div>
-      </div> {/* Closing the main content div */}
-    </div> // Closing the main container div
+
+        {/* Formulário de Registro */}
+        <div className="backdrop-blur-xl bg-black/70 border border-white/10 rounded-[2.5rem] p-8 shadow-2xl dark:shadow-card-dark-subtle"> {/* Added dark shadow for consistency */}
+          <h2 className="text-xl font-bold text-white text-center mb-6">
+              Dados Pessoais
+          </h2>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+              <input type="text" name="name" placeholder="Nome Completo" value={formData.name} onChange={handleChange}
+                  className="w-full px-4 py-3 bg-white/10 border border-white/10 rounded-xl text-white outline-none focus:border-secondary transition-colors placeholder:text-gray-400 dark:placeholder:text-gray-500" // Adjusted placeholder for dark mode
+                  aria-label="Nome Completo"
+                  autoComplete="name"
+                  required
+              />
+              <input type="email" name="email" placeholder="E-mail" value={formData.email} onChange={handleChange}
+                  className="w-full px-4 py-3 bg-white/10 border border-white/10 rounded-xl text-white outline-none focus:border-secondary transition-colors placeholder:text-gray-400 dark:placeholder:text-gray-500" // Adjusted placeholder for dark mode
+                  aria-label="E-mail"
+                  autoComplete="email"
+                  required
+              />
+              <input type="text" name="cpf" placeholder="CPF" value={formData.cpf} onChange={handleChange}
+                  className="w-full px-4 py-3 bg-white/10 border border-white/10 rounded-xl text-white outline-none focus:border-secondary transition-colors placeholder:text-gray-400 dark:placeholder:text-gray-500" // Adjusted placeholder for dark mode
+                  aria-label="CPF"
+                  autoComplete="off" // No autocomplete for CPF
+                  inputMode="numeric"
+                  maxLength={14} // 11 digits + 3 masks
+                  required
+              />
+              <input type="tel" name="phone" placeholder="Celular (WhatsApp)" value={formData.phone} onChange={handleChange}
+                  className="w-full px-4 py-3 bg-white/10 border border-white/10 rounded-xl text-white outline-none focus:border-secondary transition-colors placeholder:text-gray-400 dark:placeholder:text-gray-500" // Adjusted placeholder for dark mode
+                  aria-label="Celular (WhatsApp)"
+                  autoComplete="tel"
+                  inputMode="tel"
+                  maxLength={15} // (XX) XXXXX-XXXX
+                  required
+              />
+              <input type="password" name="password" placeholder="Senha (mín. 6 caracteres)" value={formData.password} onChange={handleChange}
+                  className="w-full px-4 py-3 bg-white/10 border border-white/10 rounded-xl text-white outline-none focus:border-secondary transition-colors placeholder:text-gray-400 dark:placeholder:text-gray-500" // Adjusted placeholder for dark mode
+                  aria-label="Senha"
+                  autoComplete="new-password"
+                  minLength={6}
+                  required
+              />
+
+              {errorMsg && (
+                  <div className="p-4 bg-red-500/20 border border-red-500/50 text-red-200 rounded-xl text-sm font-bold flex items-center gap-2 animate-in fade-in" role="alert">
+                      <i className="fa-solid fa-triangle-exclamation"></i> {errorMsg}
+                  </div>
+              )}
+
+              <button type="submit" disabled={authLoading}
+                  className="w-full py-4 bg-secondary hover:bg-orange-600 text-white font-bold rounded-xl transition-all shadow-lg shadow-secondary/20 disabled:opacity-50 flex items-center justify-center gap-2"
+                  aria-label="Criar sua conta"
+              >
+                  {authLoading && <i className="fa-solid fa-circle-notch fa-spin"></i>}
+                  Criar minha conta
+              </button>
+          </form>
+
+          <p className="text-center text-gray-400 text-sm mt-6">
+              Já tem conta? <button onClick={() => navigate('/login')} className="text-secondary hover:underline font-medium" aria-label="Fazer login">Faça login aqui</button>
+          </p>
+        </div>
+      </div>
+    </div>
   );
 }
     
