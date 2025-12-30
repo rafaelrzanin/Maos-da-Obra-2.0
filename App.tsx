@@ -232,7 +232,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           <div className="mt-4 pt-4 border-t border-slate-700"> {/* Adjusted border color for dark theme */}
             <button 
                 onClick={() => { logout(); setIsSidebarOpen(false); }}
-                className="flex items-center gap-4 w-full py-3 px-4 rounded-xl text-left font-bold transition-colors text-red-400 hover:bg-red-500/20" {/* Adjusted colors */}
+                className="flex items-center gap-4 w-full py-3 px-4 rounded-xl text-left font-bold transition-colors text-red-400 hover:bg-red-500/20"
                 aria-label="Sair da conta"
             >
                 <i className="fa-solid fa-right-from-bracket text-lg w-6 flex justify-center"></i> Sair da Conta
