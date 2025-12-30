@@ -175,7 +175,6 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
       { name: 'Vergalhão 4.2mm (Estribo)', unit: 'barras', multiplier: 0.8 },
       { name: 'Arame Recozido', unit: 'kg', multiplier: 0.02 },
       { name: 'Tábua de Pinus (30cm - Caixaria)', unit: 'dz', multiplier: 0.15 },
-      // Fix: Add missing 'unit' property
       { name: 'Pontalete de Eucalipto (3m)', unit: 'un', multiplier: 0.1 }
     ]
   },
@@ -475,108 +474,86 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
     items: [
       { name: 'Massa Corrida (Interna) / Acrílica (Externa)', unit: 'lata', multiplier: 0.15 },
       { name: 'Lixas (Grana 150/220)', unit: 'folha', multiplier: 5 },
-      { name: 'Desempenadeira de--- START OF FILE services/gateway.ts ---
-
-
-import { PlanType, User } from '../types.ts';
-
-// --- CONFIGURAÇÃO DO GATEWAY ---
-// Coloca aquí las credenciales de tu portal de pago
-// const API_URL = "https://api.tu-portal-de-pago.com/v1"; // Reemplazar con la URL real
-// const PUBLIC_KEY = "TU_PUBLIC_KEY"; // Si la API requiere auth desde el front
-
-// IDs de los planes en tu portal de pago
-const GATEWAY_PLAN_IDS = {
-  [PlanType.MENSAL]: "plan_id_mensal_real",
-  [PlanType.SEMESTRAL]: "plan_id_semestral_real",
-  [PlanType.VITALICIO]: "plan_id_vitalicio_real"
-};
-
-export const gatewayService = {
-  /**
-   * Crea una sesión de checkout en el portal de pago.
-   */
-  checkout: async (user: User, planType: PlanType): Promise<string> => {
-    console.log(`[Gateway] Iniciando checkout para ${user.email} no plano ${planType}...`);
-
-    try {
-      // 1. Preparar el cuerpo de la solicitud según la documentación de tu API
-      /* 
-      const payload = {
-        items: [
-          {
-            id: GATEWAY_PLAN_IDS[planType],
-            title: `Assinatura Mãos da Obra - ${planType}`,
-            quantity: 1,
-            currency_id: 'BRL',
-            unit_price: planType === PlanType.VITALICIO ? 247.00 : (planType === PlanType.SEMESTRAL ? 97.00 : 29.90)
-          }
-        ],
-        payer: {
-          email: user.email,
-          name: user.name,
-          // phone: user.whatsapp // Opcional dependiendo de la API
-        },
-        external_reference: user.id, // IMPORTANTE: Para vincular el pago al usuario en el Webhook
-        back_urls: {
-          success: `${window.location.origin}/settings?status=success`,
-          failure: `${window.location.origin}/settings?status=failure`,
-          pending: `${window.location.origin}/settings?status=pending`
-        },
-        auto_return: "approved"
-      };
-      */
-
-      // 2. Hacer la llamada a la API (Ejemplo genérico, ajustar headers según documentación)
-      /* 
-      const response = await fetch(`${API_URL}/checkout/preferences`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${PUBLIC_KEY}`
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Erro ao criar preferência de pagamento');
-      }
-
-      const data = await response.json();
-      return data.init_point; // URL de redirección (Mercado Pago usa init_point, Stripe usa url, etc.)
-      */
-
-      // --- SIMULACIÓN PARA MANTENER LA APP FUNCIONANDO MIENTRAS INTEGRAS ---
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Simula que la API devolveu una URL de pago real
-      // Em produção, descomenta o bloque fetch de cima e elimina isso
-      const mockCheckoutUrl = `https://checkout.pagamento.com/pay/${GATEWAY_PLAN_IDS[planType]}?ref=${user.id}`;
-      console.warn("MODO SIMULACIÓN: Redirecionando a URL ficticia. Implementar fetch real em services/gateway.ts");
-      
-      return mockCheckoutUrl;
-
-    } catch (error) {
-      console.error("Erro no gateway de pagamento:", error);
-      throw error;
-    }
-  },
-
-  /**
-   * Verifica se uma transação foi exitosa baseado nos parâmetros de la URL
-   * (Útil para feedback imediato no frontend, mas NO para segurança final)
-   */
-  checkPaymentStatus: (searchParams: URLSearchParams): 'success' | 'failure' | 'pending' | null => {
-    const status = searchParams.get('status');
-    // const paymentId = searchParams.get('payment_id'); // O el parámetro que use tu gateway
-
-    if (status === 'approved' || status === 'success') {
-      return 'success';
-    }
-    if (status === 'failure' || status === 'rejected') {
-      return 'failure';
-    }
-    return null;
+      { name: 'Desempenadeira de Aço', unit: 'un', multiplier: 0.05 } // Corrected line
+    ]
   }
-};
+];
+
+export interface LifetimeBonus {
+  icon: string;
+  title: string;
+  desc: string;
+}
+
+export const LIFETIME_BONUSES: LifetimeBonus[] = [
+  {
+    icon: 'fa-user-clock',
+    title: 'Acesso Vitalício',
+    desc: 'Sem mensalidades! Pague uma única vez e tenha acesso ilimitado para sempre.'
+  },
+  {
+    icon: 'fa-robot',
+    title: 'Zé da Obra AI Ilimitado',
+    desc: 'Seu engenheiro virtual particular sem restrições. Pergunte o que quiser!'
+  },
+  {
+    icon: 'fa-file-contract',
+    title: 'Gerador de Contratos Personalizáveis',
+    desc: 'Crie contratos de mão de obra e serviços em segundos, de forma profissional.'
+  },
+  {
+    icon: 'fa-list-check',
+    title: 'Checklists Inteligentes',
+    desc: 'Listas de verificação para cada etapa da obra, garantindo que nada seja esquecido.'
+  },
+  {
+    icon: 'fa-calculator',
+    title: 'Calculadoras Avançadas',
+    desc: 'Calcule quantidades de materiais (pisos, tintas, blocos) de forma rápida e precisa.'
+  },
+  {
+    icon: 'fa-users-gear',
+    title: 'Gestão Completa de Equipe & Fornecedores',
+    desc: 'Cadastre, organize e acompanhe todos os seus contatos e orçamentos.'
+  },
+  {
+    icon: 'fa-cloud-arrow-up',
+    title: 'Armazenamento Ilimitado de Arquivos',
+    desc: 'Guarde plantas, orçamentos e fotos da obra na nuvem com segurança.'
+  },
+  {
+    icon: 'fa-chart-line',
+    title: 'Relatórios Detalhados',
+    desc: 'Acompanhe o desempenho financeiro e de cronograma com relatórios completos em PDF e Excel.'
+  }
+];
+
+// NEW: Standard job roles for workers
+export const STANDARD_JOB_ROLES = [
+  'Pedreiro',
+  'Ajudante',
+  'Eletricista',
+  'Encanador',
+  'Pintor',
+  'Gesseiro',
+  'Carpinteiro',
+  'Azulejista',
+  'Mestre de Obras',
+  'Outro'
+];
+
+// NEW: Standard categories for suppliers
+export const STANDARD_SUPPLIER_CATEGORIES = [
+  'Material de Construção',
+  'Madeireira',
+  'Ferragens',
+  'Elétrica',
+  'Hidráulica',
+  'Pisos e Revestimentos',
+  'Gesso',
+  'Tintas',
+  'Marmoraria',
+  'Vidraçaria',
+  'Locação de Equipamentos',
+  'Outro'
+];

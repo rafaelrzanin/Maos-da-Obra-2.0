@@ -266,7 +266,10 @@ export const dbService = {
 
     // If no valid cache, create a new promise
     const newPromise = (async (): Promise<User | null> => {
-        const { data: { session } = {} } = await client.auth.getSession(); // Default to empty object for destructuring
+        // Fix: Explicitly retrieve `data` and then `session` to resolve TypeScript error
+        // "Initializer provides no value for this binding element and the binding element has no default value."
+        const { data, error: sessionError } = await client.auth.getSession();
+        const session = data?.session;
         if (!session?.user) {
             // If no user, ensure sessionCache is null before returning
             sessionCache = null; 
