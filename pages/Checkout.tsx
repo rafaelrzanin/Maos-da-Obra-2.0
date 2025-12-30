@@ -189,7 +189,7 @@ const Checkout: React.FC = () => {
       )}
 
       {/* DETALHES DO PEDIDO */}
-      <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-sm border border-slate-200 dark:border-slate-800 mb-8">
+      <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800 mb-8">
         <h2 className="text-xl font-bold text-primary dark:text-white mb-4">Seu Pedido</h2>
         <div className="flex justify-between items-center text-lg font-bold mb-2">
           <span className="text-slate-700 dark:text-slate-300">{planDetails.label}</span>
@@ -202,7 +202,7 @@ const Checkout: React.FC = () => {
       </div>
 
       {/* SELEÇÃO DO MÉTODO DE PAGAMENTO */}
-      <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-sm border border-slate-200 dark:border-slate-800 mb-8">
+      <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800 mb-8">
         <h2 className="text-xl font-bold text-primary dark:text-white mb-4">Forma de Pagamento</h2>
         <div className="grid grid-cols-2 gap-4">
           <button
@@ -228,7 +228,7 @@ const Checkout: React.FC = () => {
 
       {/* DETALHES DO PAGAMENTO (PIX) */}
       {paymentMethod === 'PIX' && (
-        <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-sm border border-slate-200 dark:border-slate-800 mb-8 animate-in fade-in">
+        <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800 mb-8 animate-in fade-in">
           <h2 className="text-xl font-bold text-primary dark:text-white mb-4 flex items-center gap-2">
             <i className="fa-brands fa-pix text-green-500"></i> Pagar com PIX
           </h2>
@@ -277,7 +277,7 @@ const Checkout: React.FC = () => {
 
       {/* DETALHES DO PAGAMENTO (CARTÃO DE CRÉDITO) */}
       {paymentMethod === 'CREDIT_CARD' && (
-        <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-sm border border-slate-200 dark:border-slate-800 mb-8 animate-in fade-in">
+        <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800 mb-8 animate-in fade-in">
           <h2 className="text-xl font-bold text-primary dark:text-white mb-4 flex items-center gap-2">
             <i className="fa-regular fa-credit-card text-blue-500"></i> Pagar com Cartão de Crédito
           </h2>
@@ -377,3 +377,4 @@ const Checkout: React.FC = () => {
 };
 
 export default Checkout;
+    

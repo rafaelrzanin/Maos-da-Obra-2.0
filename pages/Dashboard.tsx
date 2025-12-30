@@ -15,9 +15,10 @@ const { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } = Recharts;
  * ========================= */
 const cx = (...c: Array<string | false | undefined>) => c.filter(Boolean).join(' ');
 
+// Updated to use new shadow classes
 const surface =
-  "bg-white border border-slate-200/90 shadow-[0_18px_45px_-30px_rgba(15,23,42,0.45)] ring-1 ring-black/5 " +
-  "dark:bg-slate-900/70 dark:border-slate-800 dark:shadow-none dark:ring-0";
+  "bg-white border border-slate-200/90 shadow-card-default ring-1 ring-black/5 " +
+  "dark:bg-slate-900/70 dark:border-slate-800 dark:shadow-card-dark-subtle dark:ring-0";
 
 const card = "rounded-3xl p-6 lg:p-8";
 const mutedText = "text-slate-500 dark:text-slate-400";
@@ -703,3 +704,4 @@ const Dashboard: React.FC = () => {
 };
 
 export default Dashboard;
+    

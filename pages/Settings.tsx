@@ -92,7 +92,7 @@ const Settings: React.FC = () => {
                     {/* Glowing Effect */}
                     <div className="absolute inset-0 bg-gradient-gold blur-2xl opacity-20 rounded-[2.5rem]"></div>
                     
-                    <div className="relative bg-slate-900 text-white rounded-[2rem] border-2 border-amber-500/50 p-1 overflow-hidden shadow-2xl shadow-amber-900/50">
+                    <div className="relative bg-slate-900 text-white rounded-[2rem] border-2 border-amber-500/50 p-1 overflow-hidden shadow-2xl dark:shadow-card-dark-subtle shadow-amber-900/50">
                         {/* RIBBON */}
                         <div className="absolute top-0 right-0">
                             <div className="bg-gradient-gold text-white text-[10px] font-black px-4 py-1 rounded-bl-xl uppercase tracking-widest shadow-lg">
@@ -160,7 +160,7 @@ const Settings: React.FC = () => {
           return (
             <div 
               key={plan.id} 
-              className={`relative bg-white dark:bg-slate-900 rounded-3xl p-6 md:p-8 flex flex-col border transition-all hover:border-slate-300 dark:hover:border-slate-700 ${isActiveCurrent ? 'border-secondary ring-1 ring-secondary' : 'border-slate-200 dark:border-slate-800'}`}
+              className={`relative bg-white dark:bg-slate-900 rounded-3xl p-6 md:p-8 flex flex-col border transition-all hover:border-slate-300 dark:hover:border-slate-700 ${isActiveCurrent ? 'border-secondary ring-1 ring-secondary' : 'border-slate-200 dark:border-slate-800'} shadow-sm dark:shadow-card-dark-subtle`}
             >
               {isActiveCurrent && (
                 <div className="absolute top-0 right-0 bg-secondary text-white text-[10px] font-bold px-3 py-1.5 rounded-bl-xl rounded-tr-2xl tracking-wider uppercase">
@@ -221,3 +221,4 @@ const Settings: React.FC = () => {
 };
 
 export default Settings;
+    

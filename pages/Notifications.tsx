@@ -76,7 +76,7 @@ const Notifications: React.FC = () => {
         Aqui você encontra todos os alertas e informações importantes sobre suas obras.
       </p>
 
-      <div className="flex items-center justify-between mb-6 bg-white dark:bg-slate-900 rounded-2xl p-3 shadow-sm border border-slate-200 dark:border-slate-800">
+      <div className="flex items-center justify-between mb-6 bg-white dark:bg-slate-900 rounded-2xl p-3 shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800">
         <div className="flex gap-2">
           <button
             onClick={() => setFilterRead('unread')}
@@ -112,7 +112,7 @@ const Notifications: React.FC = () => {
           filteredNotifications.map(notification => (
             <div
               key={notification.id}
-              className={`bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-sm border ${notification.read ? 'border-slate-200 dark:border-slate-800' : 'border-secondary/50 dark:border-amber-700/50 ring-1 ring-secondary/20'} flex items-start gap-4 transition-all`}
+              className={`bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-sm dark:shadow-card-dark-subtle border ${notification.read ? 'border-slate-200 dark:border-slate-800' : 'border-secondary/50 dark:border-amber-700/50 ring-1 ring-secondary/20'} flex items-start gap-4 transition-all`}
             >
               <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white text-lg shrink-0 ${
                 notification.type === 'WARNING' ? 'bg-amber-500' :
@@ -153,3 +153,4 @@ const Notifications: React.FC = () => {
 };
 
 export default Notifications;
+    

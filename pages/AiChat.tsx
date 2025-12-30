@@ -71,7 +71,7 @@ const AiChat: React.FC = () => {
   if (!hasAiAccess) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[70vh] p-6 text-center animate-in fade-in">
-        <div className="w-full max-w-sm bg-gradient-to-br from-slate-900 to-slate-950 rounded-[2.5rem] p-8 shadow-2xl relative overflow-hidden border border-slate-800 group">
+        <div className="w-full max-w-sm bg-gradient-to-br from-slate-900 to-slate-950 rounded-[2.5rem] p-8 shadow-2xl dark:shadow-card-dark-subtle relative overflow-hidden border border-slate-800 group">
           <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20"></div>
           <div className="absolute -top-20 -right-20 w-40 h-40 bg-secondary/30 rounded-full blur-3xl animate-pulse"></div>
           <div className="relative z-10 flex flex-col items-center">
@@ -84,7 +84,7 @@ const AiChat: React.FC = () => {
             <button onClick={() => navigate('/settings')} className="w-full py-4 bg-gradient-gold text-white font-black rounded-2xl shadow-lg hover:shadow-orange-500/20 hover:scale-105 transition-all flex items-center justify-center gap-3 group-hover:animate-pulse">
               <i className="fa-solid fa-crown"></i> Liberar Acesso Vitalício
             </button>
-            <p className="text-center text-[10px] text-slate-500 mt-4 flex items-center justify-center gap-1">
+            <p className="text-center text-[10px] text-slate-500 dark:text-slate-400 mt-4 flex items-center justify-center gap-1">
                 <i className="fa-solid fa-info-circle"></i> Acesso à IA é exclusivo para assinantes Vitalícios ou em período de trial.
             </p>
           </div>
@@ -105,11 +105,11 @@ const AiChat: React.FC = () => {
         {messages.map((msg) => (
           <div key={msg.id} className={`flex gap-4 mb-6 animate-in fade-in ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
             {msg.sender === 'ai' && (
-              <img src={ZE_AVATAR} className="w-10 h-10 rounded-full border border-slate-200" onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK} alt="Zé da Obra Avatar" />
+              <img src={ZE_AVATAR} className="w-10 h-10 rounded-full border border-slate-200 dark:border-slate-700" onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK} alt="Zé da Obra Avatar" />
             )}
             <div className={`p-3 rounded-2xl max-w-[80%] ${
               msg.sender === 'ai' 
-                ? 'bg-slate-100 dark:bg-slate-800 rounded-tl-none text-slate-700 dark:text-slate-300 shadow-sm' 
+                ? 'bg-slate-100 dark:bg-slate-800 rounded-tl-none text-slate-700 dark:text-slate-300 shadow-sm dark:shadow-card-dark-subtle' 
                 : 'bg-primary text-white rounded-tr-none shadow-md'
             }`}>
               {msg.sender === 'ai' && <p className="font-bold text-secondary mb-1">Zé da Obra</p>}
@@ -119,8 +119,8 @@ const AiChat: React.FC = () => {
         ))}
         {aiLoading && (
           <div className="flex gap-4 mb-6">
-            <img src={ZE_AVATAR} className="w-10 h-10 rounded-full border border-slate-200" onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK} alt="Zé da Obra Avatar" />
-            <div className="bg-slate-100 dark:bg-slate-800 p-3 rounded-tr-xl rounded-b-xl text-sm shadow-sm flex items-center">
+            <img src={ZE_AVATAR} className="w-10 h-10 rounded-full border border-slate-200 dark:border-slate-700" onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK} alt="Zé da Obra Avatar" />
+            <div className="bg-slate-100 dark:bg-slate-800 p-3 rounded-tr-xl rounded-b-xl text-sm shadow-sm dark:shadow-card-dark-subtle flex items-center">
               <span className="animate-pulse text-secondary">Digitando...</span>
             </div>
           </div>
@@ -133,7 +133,7 @@ const AiChat: React.FC = () => {
           value={aiMessage}
           onChange={(e) => setAiMessage(e.target.value)}
           placeholder="Pergunte ao Zé..."
-          className="flex-1 p-4 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-secondary transition-colors"
+          className="flex-1 p-4 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-secondary transition-colors text-primary dark:text-white"
           disabled={aiLoading}
         />
         <button
@@ -149,3 +149,4 @@ const AiChat: React.FC = () => {
 };
 
 export default AiChat;
+    

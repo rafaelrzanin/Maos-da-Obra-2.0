@@ -64,6 +64,9 @@ export default {
       boxShadow: {
         'glass': '0 8px 32px 0 rgba(31, 38, 135, 0.07)',
         'glow': '0 0 20px rgba(245, 158, 11, 0.4)',
+        // NEW: Custom shadows for cards
+        'card-default': '0 18px 45px -30px rgba(15,23,42,0.45)', // Existing light mode shadow
+        'card-dark-subtle': '0 4px 15px rgba(255, 255, 255, 0.08), 0 0 5px rgba(255, 255, 255, 0.05)', // Subtle light shadow for dark mode
       }
     },
   },

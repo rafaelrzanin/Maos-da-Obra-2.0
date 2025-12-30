@@ -534,7 +534,7 @@ const WorkDetail: React.FC = () => {
     if (!work) return <div className="text-center py-10">Obra não encontrada.</div>;
 
     const RenderCronogramaReport = () => (
-        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 shadow-md animate-in fade-in">
+        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 shadow-md dark:shadow-card-dark-subtle animate-in fade-in">
             <h3 className="font-bold text-xl text-primary dark:text-white mb-6">Cronograma Detalhado</h3>
             <div className="space-y-4">
                 {steps.length === 0 ? (
@@ -549,7 +549,7 @@ const WorkDetail: React.FC = () => {
                         else if (isDelayed) { statusColorClass = 'bg-red-500'; statusText = 'Atrasada'; }
 
                         return (
-                            <div key={s.id} className="bg-slate-50 dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-4 shadow-sm flex items-center gap-4">
+                            <div key={s.id} className="bg-slate-50 dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 p-4 shadow-sm">
                                 <div className={`w-3 h-16 rounded-full ${statusColorClass} shrink-0`}></div>
                                 <div className="flex-1">
                                     <p className="font-bold text-primary dark:text-white text-base mb-1">{s.name}</p>
@@ -570,7 +570,7 @@ const WorkDetail: React.FC = () => {
             : materials.filter(m => m.stepId === reportMaterialFilterStepId);
 
         return (
-            <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 shadow-md animate-in fade-in">
+            <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 shadow-md dark:shadow-card-dark-subtle animate-in fade-in">
                 <h3 className="font-bold text-xl text-primary dark:text-white mb-4">Materiais por Etapa</h3>
                 
                 <div className="mb-6">
@@ -629,7 +629,7 @@ const WorkDetail: React.FC = () => {
 
 
     const RenderFinanceiroReport = () => (
-        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 shadow-md animate-in fade-in">
+        <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 shadow-md dark:shadow-card-dark-subtle animate-in fade-in">
             <h3 className="font-bold text-xl text-primary dark:text-white mb-6">Lançamentos Financeiros</h3>
             {Object.values(ExpenseCategory).map(category => {
                 const expensesInCategory = Object.values(groupedExpenses[category].steps).flatMap(stepGroup => stepGroup.expenses).concat(groupedExpenses[category].unlinkedExpenses);
@@ -710,7 +710,7 @@ const WorkDetail: React.FC = () => {
 
             {subView === 'NONE' ? (
                 <>
-                    <nav className="fixed bottom-0 left-0 w-full bg-white dark:bg-slate-900 border-t z-50 flex justify-around p-2 md:static md:bg-slate-100 md:rounded-2xl md:mb-6 shadow-lg md:shadow-none">
+                    <nav className="fixed bottom-0 left-0 w-full bg-white dark:bg-slate-900 border-t z-50 flex justify-around p-2 md:static md:bg-slate-100 md:rounded-2xl md:mb-6 shadow-lg md:shadow-none dark:shadow-card-dark-subtle">
                         {(['ETAPAS', 'MATERIAIS', 'FINANCEIRO', 'FERRAMENTAS'] as MainTab[]).map(tab => (
                             <button key={tab} onClick={() => setActiveTab(tab)} className={`flex flex-col items-center flex-1 py-2 text-[10px] font-bold md:text-sm md:rounded-xl transition-colors ${activeTab === tab ? 'text-secondary md:bg-white md:shadow-sm' : 'text-slate-400 hover:text-primary dark:hover:text-white'}`} aria-label={`Abrir aba ${tab}`}>
                                 <i className={`fa-solid ${tab === 'ETAPAS' ? 'fa-calendar' : tab === 'MATERIAIS' ? 'fa-box' : tab === 'FINANCEIRO' ? 'fa-dollar-sign' : 'fa-wrench'} text-lg mb-1`}></i> {/* Changed tools icon */}
@@ -731,7 +731,7 @@ const WorkDetail: React.FC = () => {
                                 steps.map((s, index) => {
                                     const isDelayed = s.status !== StepStatus.COMPLETED && s.endDate < todayString;
                                     return (
-                                        <div key={s.id} className={`bg-white dark:bg-slate-900 p-4 rounded-2xl border flex items-center gap-4 shadow-sm ${isDelayed ? 'border-red-500 ring-1 ring-red-200' : 'border-slate-200 dark:border-slate-800'}`}>
+                                        <div key={s.id} className={`bg-white dark:bg-slate-900 p-4 rounded-2xl border flex items-center gap-4 shadow-sm dark:shadow-card-dark-subtle ${isDelayed ? 'border-red-500 ring-1 ring-red-200' : 'border-slate-200 dark:border-slate-800'}`}>
                                             <button 
                                                 onClick={() => handleStepStatusClick(s)} 
                                                 className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-white transition-colors duration-200
@@ -785,7 +785,7 @@ const WorkDetail: React.FC = () => {
 
                                     return (
                                         <div key={step.id} className="mb-6 first:mt-0 mt-8">
-                                            <div className={`bg-white dark:bg-slate-900 rounded-2xl p-4 mb-4 border border-slate-200 dark:border-slate-800 shadow-lg ${stepStatusBgClass} ${stepStatusTextColorClass}`}>
+                                            <div className={`bg-white dark:bg-slate-900 rounded-2xl p-4 mb-4 border border-slate-200 dark:border-slate-800 shadow-lg dark:shadow-card-dark-subtle ${stepStatusBgClass} ${stepStatusTextColorClass}`}>
                                                 <div className="flex items-center justify-between">
                                                     <h3 className="font-black text-xl text-primary dark:text-white flex items-center gap-2 pl-0">
                                                         <span className={`w-8 h-8 rounded-full flex items-center justify-center text-base ${stepStatusBgClass.replace('/10', '/20').replace('bg-', 'bg-').replace('dark:bg-green-900/20', 'dark:bg-green-800').replace('dark:text-green-300', 'dark:text-white')}`}>
@@ -805,7 +805,7 @@ const WorkDetail: React.FC = () => {
                                                     <p className="text-center text-slate-400 py-4 italic text-sm">Nenhum material associado a esta etapa.</p>
                                                 ) : (
                                                     stepMats.map(m => (
-                                                        <div key={m.id} onClick={() => { setMaterialModal({isOpen: true, material: m}); setMatName(m.name); setMatBrand(m.brand||''); setMatPlannedQty(String(m.plannedQty)); setMatUnit(m.unit); }} className="bg-white dark:bg-slate-900 p-2 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs cursor-pointer hover:shadow-sm transition-shadow">
+                                                        <div key={m.id} onClick={() => { setMaterialModal({isOpen: true, material: m}); setMatName(m.name); setMatBrand(m.brand||''); setMatPlannedQty(String(m.plannedQty)); setMatUnit(m.unit); }} className="bg-white dark:bg-slate-900 p-2 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs dark:shadow-card-dark-subtle cursor-pointer hover:shadow-sm transition-shadow">
                                                             <div className="flex justify-between items-center mb-1">
                                                                 <p className="font-bold text-sm text-primary dark:text-white">{m.name}</p>
                                                                 <span className="text-xs font-black text-green-600 dark:text-green-400">{m.purchasedQty} {m.unit}</span>
@@ -828,7 +828,7 @@ const WorkDetail: React.FC = () => {
                     {activeTab === 'FINANCEIRO' && (
                         <div className="space-y-6 animate-in fade-in">
                             {/* Budget Summary Card */}
-                            <div className={`bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-lg border ${budgetStatusAccent}`}>
+                            <div className={`bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-lg dark:shadow-card-dark-subtle border ${budgetStatusAccent}`}>
                                 {/* Gasto Total Block */}
                                 <div className="flex items-center gap-3 mb-4">
                                     <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white text-lg shrink-0 ${budgetStatusColor}`}>
@@ -881,7 +881,7 @@ const WorkDetail: React.FC = () => {
                                     return (
                                         <div key={category} className="mb-6 first:mt-0 mt-8">
                                             {/* Category "Root" Card */}
-                                            <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 mb-4 border border-slate-200 dark:border-slate-800 shadow-lg">
+                                            <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 mb-4 border border-slate-200 dark:border-slate-800 shadow-lg dark:shadow-card-dark-subtle">
                                                 <h3 className="font-black text-xl text-primary dark:text-white flex items-center gap-2 pl-0">
                                                     <span className="w-8 h-8 rounded-full bg-secondary/10 text-secondary dark:bg-secondary-dark/20 dark:text-secondary-light flex items-center justify-center text-base">
                                                         {category === ExpenseCategory.MATERIAL ? <i className="fa-solid fa-box"></i> :
@@ -922,7 +922,7 @@ const WorkDetail: React.FC = () => {
                                                 return (
                                                     <div key={stepId} className="mb-4 pl-3 border-l-2 border-slate-100 dark:border-slate-800 ml-2">
                                                         {/* Step "Chapter" Card for Financeiro */}
-                                                        <div className={`bg-white dark:bg-slate-900 rounded-2xl p-2 mb-3 border border-slate-200 dark:border-slate-800 shadow-lg ${stepStatusBgClass} ${stepStatusTextColorClass}`}>
+                                                        <div className={`bg-white dark:bg-slate-900 rounded-2xl p-2 mb-3 border border-slate-200 dark:border-slate-800 shadow-lg dark:shadow-card-dark-subtle ${stepStatusBgClass} ${stepStatusTextColorClass}`}>
                                                             <div className="flex items-center justify-between">
                                                                 <h3 className="font-black text-lg text-primary dark:text-white flex items-center gap-2 pl-0"> 
                                                                     <span className={`w-7 h-7 rounded-full flex items-center justify-center text-sm ${stepStatusBgClass.replace('/10', '/20').replace('bg-', 'bg-').replace('dark:bg-green-900/20', 'dark:bg-green-800').replace('dark:text-green-300', 'dark:text-white')}`}> 
@@ -952,7 +952,7 @@ const WorkDetail: React.FC = () => {
                                                                 }
 
                                                                 return (
-                                                                    <div key={e.id} onClick={() => openEditExpense(e)} className="bg-white dark:bg-slate-900 p-2 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs cursor-pointer hover:shadow-sm transition-shadow">
+                                                                    <div key={e.id} onClick={() => openEditExpense(e)} className="bg-white dark:bg-slate-900 p-2 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs dark:shadow-card-dark-subtle cursor-pointer hover:shadow-sm transition-shadow">
                                                                         <div className="flex justify-between items-center mb-1">
                                                                             <p className="font-bold text-sm text-primary dark:text-white">{e.description}</p>
                                                                             <p className="font-black text-sm text-primary dark:text-white">{formatCurrency(e.amount)}</p>
@@ -998,7 +998,7 @@ const WorkDetail: React.FC = () => {
                                                                 }
 
                                                                 return (
-                                                                    <div key={e.id} onClick={() => openEditExpense(e)} className="bg-white dark:bg-slate-900 p-2 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs cursor-pointer hover:shadow-sm transition-shadow">
+                                                                    <div key={e.id} onClick={() => openEditExpense(e)} className="bg-white dark:bg-slate-900 p-2 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs dark:shadow-card-dark-subtle cursor-pointer hover:shadow-sm transition-shadow">
                                                                         <div className="flex justify-between items-center mb-1">
                                                                             <p className="font-bold text-sm text-primary dark:text-white">{e.description}</p>
                                                                             <p className="font-black text-sm text-primary dark:text-white">{formatCurrency(e.amount)}</p>
@@ -1031,37 +1031,37 @@ const WorkDetail: React.FC = () => {
                     {activeTab === 'FERRAMENTAS' && (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 animate-in fade-in">
                             {/* Bloco 1: Equipe */}
-                            <button onClick={() => setSubView('WORKERS')} className="p-6 bg-white dark:bg-slate-900 rounded-3xl flex flex-col items-center shadow-sm border border-slate-200 dark:border-slate-800 hover:shadow-md transition-shadow" aria-label="Gerenciar Equipe">
-                                <i className="fa-solid fa-users text-2xl mb-2 text-primary"></i>
+                            <button onClick={() => setSubView('WORKERS')} className="p-6 bg-white dark:bg-slate-900 rounded-3xl flex flex-col items-center shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800 hover:shadow-md transition-shadow" aria-label="Gerenciar Equipe">
+                                <i className="fa-solid fa-users text-2xl mb-2 text-primary dark:text-white"></i> {/* Adjusted for dark mode */}
                                 <span className="font-bold text-primary dark:text-white text-sm">Equipe</span>
                             </button>
 
                             {/* Bloco 2: Fornecedores */}
-                            <button onClick={() => setSubView('SUPPLIERS')} className="p-6 bg-white dark:bg-slate-900 rounded-3xl flex flex-col items-center shadow-sm border border-slate-200 dark:border-slate-800 hover:shadow-md transition-shadow" aria-label="Gerenciar Fornecedores">
-                                <i className="fa-solid fa-truck-field text-2xl mb-2 text-primary"></i>
+                            <button onClick={() => setSubView('SUPPLIERS')} className="p-6 bg-white dark:bg-slate-900 rounded-3xl flex flex-col items-center shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800 hover:shadow-md transition-shadow" aria-label="Gerenciar Fornecedores">
+                                <i className="fa-solid fa-truck-field text-2xl mb-2 text-primary dark:text-white"></i> {/* Adjusted for dark mode */}
                                 <span className="font-bold text-primary dark:text-white text-sm">Fornecedores</span>
                             </button>
 
                             {/* Bloco 3: Relatórios */}
-                            <button onClick={() => setSubView('REPORTS')} className="p-6 bg-white dark:bg-slate-900 rounded-3xl flex flex-col items-center shadow-sm border border-slate-200 dark:border-slate-800 hover:shadow-md transition-shadow" aria-label="Gerar Relatórios">
-                                <i className="fa-solid fa-file-contract text-2xl mb-2 text-primary"></i>
+                            <button onClick={() => setSubView('REPORTS')} className="p-6 bg-white dark:bg-slate-900 rounded-3xl flex flex-col items-center shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800 hover:shadow-md transition-shadow" aria-label="Gerar Relatórios">
+                                <i className="fa-solid fa-file-contract text-2xl mb-2 text-primary dark:text-white"></i> {/* Adjusted for dark mode */}
                                 <span className="font-bold text-primary dark:text-white text-sm">Relatórios</span>
                             </button>
                             
                             {/* Bloco 4: Fotos */}
-                            <button onClick={() => setSubView('PHOTOS')} className="p-6 bg-white dark:bg-slate-900 rounded-3xl flex flex-col items-center shadow-sm border border-slate-200 dark:border-slate-800 hover:shadow-md transition-shadow" aria-label="Ver Fotos da Obra">
-                                <i className="fa-solid fa-camera text-2xl mb-2 text-primary"></i>
+                            <button onClick={() => setSubView('PHOTOS')} className="p-6 bg-white dark:bg-slate-900 rounded-3xl flex flex-col items-center shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800 hover:shadow-md transition-shadow" aria-label="Ver Fotos da Obra">
+                                <i className="fa-solid fa-camera text-2xl mb-2 text-primary dark:text-white"></i> {/* Adjusted for dark mode */}
                                 <span className="font-bold text-primary dark:text-white text-sm">Fotos</span>
                             </button>
 
                             {/* Bloco 5: Arquivos & Projetos */}
-                            <button onClick={() => setSubView('PROJECTS')} className="p-6 bg-white dark:bg-slate-900 rounded-3xl flex flex-col items-center shadow-sm border border-slate-200 dark:border-slate-800 hover:shadow-md transition-shadow" aria-label="Gerenciar Arquivos">
-                                <i className="fa-solid fa-folder text-2xl mb-2 text-primary"></i>
+                            <button onClick={() => setSubView('PROJECTS')} className="p-6 bg-white dark:bg-slate-900 rounded-3xl flex flex-col items-center shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800 hover:shadow-md transition-shadow" aria-label="Gerenciar Arquivos">
+                                <i className="fa-solid fa-folder text-2xl mb-2 text-primary dark:text-white"></i> {/* Adjusted for dark mode */}
                                 <span className="font-bold text-primary dark:text-white text-sm">Arquivos</span>
                             </button>
 
                             {/* --- BÔNUS VITALÍCIO - GRANDE CARD CONSOLIDADO --- */}
-                            <div className={`relative col-span-full rounded-3xl shadow-lg border p-6 md:p-8 flex flex-col justify-between 
+                            <div className={`relative col-span-full rounded-3xl shadow-lg border dark:shadow-card-dark-subtle p-6 md:p-8 flex flex-col justify-between 
                                 ${hasLifetimeAccess ? 'bg-gradient-to-br from-primary-darker to-primary-dark border-secondary/50' : 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700'}`}>
                                 {!hasLifetimeAccess && (
                                     <div className="absolute inset-0 bg-black/70 rounded-3xl flex flex-col items-center justify-center z-10 p-4 text-center">
@@ -1115,13 +1115,13 @@ const WorkDetail: React.FC = () => {
                 </>
             ) : (
                 <div className="animate-in slide-in-from-right-4">
-                    <button onClick={() => setSubView('NONE')} className="mb-6 text-primary font-bold flex items-center gap-2 hover:opacity-80" aria-label="Voltar para Ferramentas"><i className="fa-solid fa-arrow-left"></i> Voltar</button>
+                    <button onClick={() => setSubView('NONE')} className="mb-6 text-primary font-bold flex items-center gap-2 hover:opacity-80" aria-label="Voltar para Ferramentas"><i className="fa-solid fa-arrow-left text-xl"></i> Voltar</button>
                     
                     {/* --- SUBVIEW: WORKERS (Equipe Separada) --- */}
                     {subView === 'WORKERS' && (
                         <div className="space-y-8">
                             {/* Equipe Section */}
-                            <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-sm border border-slate-200 dark:border-slate-800">
+                            <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800">
                                 <div className="flex justify-between items-center mb-6">
                                     <h2 className="text-xl font-bold text-primary dark:text-white">Equipe de Profissionais</h2>
                                     <button onClick={() => openPersonModal('WORKER')} className="bg-primary text-white p-2 rounded-xl shadow-md hover:bg-primary-light transition-colors" aria-label="Adicionar profissional"><i className="fa-solid fa-plus"></i></button>
@@ -1131,7 +1131,7 @@ const WorkDetail: React.FC = () => {
                                 ) : (
                                     <div className="space-y-4">
                                         {workers.map(w => (
-                                            <div key={w.id} className="bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 flex justify-between items-center shadow-xs">
+                                            <div key={w.id} className="bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 flex justify-between items-center shadow-xs dark:shadow-card-dark-subtle">
                                                 <div>
                                                     <p className="font-bold text-primary dark:text-white">{w.name}</p>
                                                     <p className="text-xs text-slate-500 dark:text-slate-400">{w.role} {w.dailyRate && w.dailyRate > 0 ? `• ${formatCurrency(w.dailyRate)}/dia` : ''}</p>
@@ -1156,7 +1156,7 @@ const WorkDetail: React.FC = () => {
                     {/* --- SUBVIEW: SUPPLIERS (Fornecedores Separados) --- */}
                     {subView === 'SUPPLIERS' && (
                         <div className="space-y-8">
-                             <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-sm border border-slate-200 dark:border-slate-800">
+                             <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800">
                                 <div className="flex justify-between items-center mb-6">
                                     <h2 className="text-xl font-bold text-primary dark:text-white">Fornecedores</h2>
                                     <button onClick={() => openPersonModal('SUPPLIER')} className="bg-primary text-white p-2 rounded-xl shadow-md hover:bg-primary-light transition-colors" aria-label="Adicionar fornecedor"><i className="fa-solid fa-plus"></i></button>
@@ -1166,7 +1166,7 @@ const WorkDetail: React.FC = () => {
                                 ) : (
                                     <div className="space-y-4">
                                         {suppliers.map(s => (
-                                            <div key={s.id} className="bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 flex justify-between items-center shadow-xs">
+                                            <div key={s.id} className="bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 flex justify-between items-center shadow-xs dark:shadow-card-dark-subtle">
                                                 <div>
                                                     <p className="font-bold text-primary dark:text-white">{s.name}</p>
                                                     <p className="text-xs text-slate-500 dark:text-slate-400">{s.category} {s.phone ? `• ${s.phone}` : ''}</p>
@@ -1195,7 +1195,7 @@ const WorkDetail: React.FC = () => {
                             <h2 className="text-xl font-bold text-primary dark:text-white mb-4">Relatórios da Obra</h2>
                             
                             {/* Tabs for Reports */}
-                            <div className="bg-white dark:bg-slate-900 rounded-2xl p-2 shadow-sm border border-slate-200 dark:border-slate-800 mb-6 flex justify-around">
+                            <div className="bg-white dark:bg-slate-900 rounded-2xl p-2 shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800 mb-6 flex justify-around">
                                 {(['CRONOGRAMA', 'MATERIAIS', 'FINANCEIRO'] as ReportSubTab[]).map(tab => (
                                     <button 
                                         key={tab} 
@@ -1246,7 +1246,7 @@ const WorkDetail: React.FC = () => {
                                 ) : (
                                     photos.map(p => (
                                         <div key={p.id} className="relative group aspect-square">
-                                            <img src={p.url} className="aspect-square object-cover rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm" alt={p.description} />
+                                            <img src={p.url} className="aspect-square object-cover rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm dark:shadow-card-dark-subtle" alt={p.description} />
                                             <button 
                                                 onClick={() => { /* Implement delete photo logic here */ }} 
                                                 className="absolute top-2 right-2 p-2 bg-red-500/70 text-white rounded-full hover:bg-red-600 transition-opacity opacity-0 group-hover:opacity-100"
@@ -1286,8 +1286,8 @@ const WorkDetail: React.FC = () => {
                             ) : (
                                 <div className="space-y-3">
                                     {files.map(f => (
-                                        <a href={f.url} target="_blank" rel="noopener noreferrer" key={f.id} className="flex items-center gap-3 p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md transition-shadow">
-                                            <i className="fa-solid fa-file-alt text-lg text-primary"></i>
+                                        <a href={f.url} target="_blank" rel="noopener noreferrer" key={f.id} className="flex items-center gap-3 p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm dark:shadow-card-dark-subtle hover:shadow-md transition-shadow">
+                                            <i className="fa-solid fa-file-alt text-lg text-primary dark:text-white"></i> {/* Adjusted for dark mode */}
                                             <div className="flex-1">
                                                 <p className="font-bold text-primary dark:text-white text-sm">{f.name}</p>
                                                 <p className="text-xs text-slate-500 dark:text-slate-400">{f.category} • {parseDateNoTimezone(f.date)}</p>
@@ -1310,10 +1310,12 @@ const WorkDetail: React.FC = () => {
                                     <button 
                                         key={contract.id} 
                                         onClick={() => { setViewContract(contract); setIsContractModalOpen(true); }}
-                                        className="p-5 rounded-2xl border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-secondary hover:shadow-md transition-shadow flex flex-col items-start text-left group"
+                                        className="p-5 rounded-2xl border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-secondary hover:shadow-md dark:shadow-card-dark-subtle transition-shadow flex flex-col items-start text-left group"
                                         aria-label={`Ver modelo de contrato: ${contract.title}`}
                                     >
-                                        <span className="text-sm font-bold text-primary uppercase tracking-wider mb-2">{contract.category}</span>
+                                        <span className="text-sm font-bold text-primary uppercase tracking-wider mb-2">
+                                          <span className="text-primary dark:text-white">{contract.category}</span> {/* Adjusted for dark mode */}
+                                        </span>
                                         <h3 className="font-bold text-lg text-primary dark:text-white group-hover:text-secondary transition-colors">{contract.title}</h3>
                                         <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{contract.contentTemplate.substring(0, 100)}...</p>
                                     </button>
@@ -1327,7 +1329,7 @@ const WorkDetail: React.FC = () => {
                             <p className="text-slate-500 dark:text-slate-400 max-w-2xl mb-8">
                                 Utilize checklists por etapa para garantir que nada seja esquecido.
                             </p>
-                            <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-sm border border-slate-200 dark:border-slate-800 mb-6">
+                            <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800 mb-6">
                                 <label htmlFor="checklist-category" className="block text-sm font-medium text-primary dark:text-white mb-2">Filtrar/Criar por Etapa:</label>
                                 <select
                                     id="checklist-category"
@@ -1350,7 +1352,7 @@ const WorkDetail: React.FC = () => {
                                 {allChecklists
                                     .filter(cl => selectedChecklistCategory === 'all' || cl.category === selectedChecklistCategory)
                                     .map(checklist => (
-                                    <div key={checklist.id} className="bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-sm border border-slate-200 dark:border-slate-800">
+                                    <div key={checklist.id} className="bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800">
                                         <div className="flex justify-between items-center mb-3">
                                             <h3 className="font-bold text-primary dark:text-white text-lg">{checklist.name}</h3>
                                             <span className="text-xs font-bold text-slate-500 dark:text-slate-400">{checklist.category}</span>
@@ -1388,7 +1390,7 @@ const WorkDetail: React.FC = () => {
             {/* Modals Simplificados para Funcionalidade */}
             {isStepModalOpen && (
                 <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-                    <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl w-full max-w-md shadow-xl border border-slate-200 dark:border-slate-800">
+                    <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl w-full max-w-md shadow-xl dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800">
                         <h3 className="font-bold text-xl text-primary dark:text-white mb-4">{stepModalMode === 'ADD' ? 'Adicionar Nova Etapa' : 'Editar Etapa'}</h3>
                         <form onSubmit={handleSaveStep} className="space-y-4">
                             <input value={stepName} onChange={e => setStepName(e.target.value)} placeholder="Nome da Etapa" className="w-full p-3 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white focus:ring-secondary focus:border-secondary outline-none transition-colors" required aria-label="Nome da Etapa" />
@@ -1408,7 +1410,7 @@ const WorkDetail: React.FC = () => {
             {/* Modal de Adicionar Material */}
             {addMatModal && (
                 <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-                    <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl w-full max-w-md shadow-xl border border-slate-200 dark:border-slate-800">
+                    <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl w-full max-w-md shadow-xl dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800">
                         <h3 className="font-bold text-xl text-primary dark:text-white mb-4">Adicionar Material</h3>
                         <form onSubmit={handleAddMaterial} className="space-y-4">
                             {/* Bloco 1 - Identidade */}
@@ -1448,7 +1450,7 @@ const WorkDetail: React.FC = () => {
             {/* Modal de Edição de Material */}
             {materialModal.isOpen && materialModal.material && (
                 <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-                    <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl w-full max-w-md shadow-xl border border-slate-200 dark:border-slate-800">
+                    <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl w-full max-w-md shadow-xl dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800">
                         <h3 className="font-bold text-xl text-primary dark:text-white mb-4">Editar Material</h3>
                         <form onSubmit={handleUpdateMaterial} className="space-y-4">
                              {/* Bloco 1 - Identidade */}
@@ -1483,7 +1485,7 @@ const WorkDetail: React.FC = () => {
             {/* Modal de Adicionar/Editar Despesa */}
             {expenseModal.isOpen && (
                 <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-                    <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl w-full max-w-md shadow-xl border border-slate-200 dark:border-slate-800">
+                    <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl w-full max-w-md shadow-xl dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800">
                         <h3 className="font-bold text-xl text-primary dark:text-white mb-4">{expenseModal.mode === 'ADD' ? 'Adicionar Novo Gasto' : 'Registrar Pagamento/Editar Gasto'}</h3>
                         <form onSubmit={handleSaveExpense} className="space-y-4">
                             {/* Bloco 1 - Identidade */}
@@ -1528,7 +1530,7 @@ const WorkDetail: React.FC = () => {
             {/* Modal de Adicionar/Editar Pessoa (Trabalhador/Fornecedor) */}
             {isPersonModalOpen && (
                 <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-                    <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl w-full max-w-md shadow-xl border border-slate-200 dark:border-slate-800">
+                    <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl w-full max-w-md shadow-xl dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800">
                         <h3 className="font-bold text-xl text-primary dark:text-white mb-4">{personId ? `Editar ${personMode === 'WORKER' ? 'Profissional' : 'Fornecedor'}` : `Adicionar Novo ${personMode === 'WORKER' ? 'Profissional' : 'Fornecedor'}`}</h3>
                         <form onSubmit={handleSavePerson} className="space-y-4">
                             {/* Bloco 1 - Identidade */}
@@ -1566,7 +1568,7 @@ const WorkDetail: React.FC = () => {
             {/* Modal de Calculadora da Obra */}
             {isCalculatorModalOpen && (
                 <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-                    <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl w-full max-w-md shadow-xl border border-slate-200 dark:border-slate-800 animate-in fade-in zoom-in-95">
+                    <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl w-full max-w-md shadow-xl dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800 animate-in fade-in zoom-in-95">
                         <h3 className="font-bold text-2xl text-primary dark:text-white mb-6 text-center">Calculadora da Obra</h3>
                         <div className="space-y-5">
                             <div>
@@ -1598,7 +1600,7 @@ const WorkDetail: React.FC = () => {
             {/* Modal de Visualização de Contrato */}
             {isContractModalOpen && viewContract && (
                 <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-                    <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl w-full max-w-2xl h-[90vh] overflow-hidden flex flex-col shadow-xl border border-slate-200 dark:border-slate-800">
+                    <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl w-full max-w-2xl h-[90vh] overflow-hidden flex flex-col shadow-xl dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800">
                         <h3 className="font-bold text-2xl text-primary dark:text-white mb-2">{viewContract.title}</h3>
                         <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-6 border-b border-slate-100 dark:border-slate-800 pb-4">{viewContract.category}</p>
                         

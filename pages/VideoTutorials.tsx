@@ -1,5 +1,6 @@
 
 
+
 import React from 'react';
 import { LIFETIME_BONUSES } from '../services/standards.ts'; 
 
@@ -35,7 +36,7 @@ const VideoTutorials: React.FC = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {videos.map(video => (
-          <div key={video.id} className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-sm border border-slate-200 dark:border-slate-800">
+          <div key={video.id} className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800">
             <h2 className="text-xl font-bold text-primary dark:text-white mb-3">{video.title}</h2>
             <p className="text-slate-500 dark:text-slate-400 text-sm mb-4">{video.description}</p>
             <div className="relative w-full aspect-video rounded-xl overflow-hidden mb-4">
@@ -67,7 +68,7 @@ const VideoTutorials: React.FC = () => {
         </p>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {LIFETIME_BONUSES.map((bonus, idx) => (
-                <div key={idx} className="flex items-start gap-4 p-4 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                <div key={idx} className="flex items-start gap-4 p-4 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm dark:shadow-card-dark-subtle">
                     <div className="w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-500 flex items-center justify-center shrink-0">
                         <i className={`fa-solid ${bonus.icon}`}></i>
                     </div>
@@ -84,3 +85,4 @@ const VideoTutorials: React.FC = () => {
 };
 
 export default VideoTutorials;
+    
