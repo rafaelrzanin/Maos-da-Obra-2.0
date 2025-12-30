@@ -476,22 +476,7 @@ const Dashboard: React.FC = () => {
   //     }));
   // }, [expenses]);
 
-
-  // Show skeleton if AuthContext is still loading OR if local dashboard data is loading
-  if (authLoading || loading) {
-    return <DashboardSkeleton />;
-  }
-
-  // If no works, show empty state
-  if (works.length === 0) {
-    return (
-      <div className="max-w-4xl mx-auto py-8 px-2 sm:px-4 md:px-0 font-sans">
-        <EmptyDashboard onOpenCreateWork={handleOpenCreateWork} />
-      </div>
-    );
-  }
-
-  // Calculate step counts for KPI Cards
+  // Calculate step counts for KPI Cards - MOVIDO PARA O TOPO (incondicional)
   const { totalSteps, completedStepsCount, inProgressStepsCount, delayedStepsCount, notStartedStepsCount } = useMemo(() => {
     const total = steps.length;
     const completed = steps.filter(s => s.status === StepStatus.COMPLETED).length;
@@ -508,6 +493,20 @@ const Dashboard: React.FC = () => {
     };
   }, [steps]);
 
+
+  // Show skeleton if AuthContext is still loading OR if local dashboard data is loading
+  if (authLoading || loading) {
+    return <DashboardSkeleton />;
+  }
+
+  // If no works, show empty state
+  if (works.length === 0) {
+    return (
+      <div className="max-w-4xl mx-auto py-8 px-2 sm:px-4 md:px-0 font-sans">
+        <EmptyDashboard onOpenCreateWork={handleOpenCreateWork} />
+      </div>
+    );
+  }
 
   // Display dashboard content
   return (
