@@ -3,7 +3,7 @@ import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.tsx';
 import { dbService } from '../services/db.ts';
-import { StepStatus, PlanType, WorkStatus, type Work, type DBNotification, type Step, type Expense, type Material } from '../types.ts';
+import { StepStatus, PlanType, WorkStatus, type Work, type DBNotification, type Step, type Material } from '../types.ts';
 import { ZE_AVATAR, ZE_AVATAR_FALLBACK, getRandomZeTip, ZeTip } from '../services/standards.ts';
 import { ZeModal, ZeModalProps } from '../components/ZeModal.tsx'; // Importa ZeModalProps
 import { Recharts } from '../components/RechartsWrapper.tsx'; // Importa Recharts
@@ -343,7 +343,10 @@ const Dashboard: React.FC = () => {
   const [dailySummary, setDailySummary] = useState<{ completedSteps: number, delayedSteps: number, pendingMaterials: number, totalSteps: number } | null>(null);
   const [materials, setMaterials] = useState<Material[]>([]);
   const [steps, setSteps] = useState<Step[]>([]); 
-  const [expenses, setExpenses] = useState<Expense[]>([]); // Added expenses state for the chart
+  // REMOVED: expenses state and chartData useMemo as per request.
+  // const [expenses, setExpenses] = useState<Expense[]>([]); // Added expenses state for the chart
+  // const chartData = useMemo(...)
+
   const [zeTip, setZeTip] = useState<ZeTip | null>(null);
 
   // General Purpose Modal for Delete Confirmation
@@ -370,25 +373,25 @@ const Dashboard: React.FC = () => {
         const primaryWork = fetchedWorks[0];
         setFocusWork(primaryWork);
 
-        const [workStats, summary, materialsList, stepsList, expensesList] = await Promise.all([ // Fetch expensesList too
+        const [workStats, summary, materialsList, stepsList] = await Promise.all([ // Removed expensesList
           dbService.calculateWorkStats(primaryWork.id),
           dbService.getDailySummary(primaryWork.id),
           dbService.getMaterials(primaryWork.id),
           dbService.getSteps(primaryWork.id),
-          dbService.getExpenses(primaryWork.id) // Fetch expenses for chart
+          // Removed dbService.getExpenses(primaryWork.id)
         ]);
         setStats(workStats);
         setDailySummary(summary);
         setMaterials(materialsList);
         setSteps(stepsList);
-        setExpenses(expensesList); // Set expenses
+        // REMOVED: setExpenses(expensesList);
       } else {
         setFocusWork(null);
         setStats(null);
         setDailySummary(null);
         setMaterials([]);
         setSteps([]);
-        setExpenses([]); // Clear expenses
+        // REMOVED: setExpenses([]);
       }
       setZeTip(getRandomZeTip()); // Load a random tip
     } catch (error: any) {
@@ -449,24 +452,22 @@ const Dashboard: React.FC = () => {
     });
   };
 
-  // Process expenses for chart data
-  const chartData = useMemo(() => {
-    if (!expenses || expenses.length === 0) return [];
-
-    const monthlyExpenses: { [key: string]: number } = {};
-    expenses.forEach(exp => {
-      const date = new Date(exp.date);
-      const monthYear = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
-      monthlyExpenses[monthYear] = (monthlyExpenses[monthYear] || 0) + exp.amount;
-    });
-
-    return Object.keys(monthlyExpenses)
-      .sort()
-      .map(monthYear => ({
-        month: new Date(monthYear).toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }),
-        value: monthlyExpenses[monthYear],
-      }));
-  }, [expenses]);
+  // Process expenses for chart data (REMOVED)
+  // const chartData = useMemo(() => {
+  //   if (!expenses || expenses.length === 0) return [];
+  //   const monthlyExpenses: { [key: string]: number } = {};
+  //   expenses.forEach(exp => {
+  //     const date = new Date(exp.date);
+  //     const monthYear = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}`;
+  //     monthlyExpenses[monthYear] = (monthlyExpenses[monthYear] || 0) + exp.amount;
+  //   });
+  //   return Object.keys(monthlyExpenses)
+  //     .sort()
+  //     .map(monthYear => ({
+  //       month: new Date(monthYear).toLocaleDateString('pt-BR', { month: 'short', year: '2-digit' }),
+  //       value: monthlyExpenses[monthYear],
+  //     }));
+  // }, [expenses]);
 
 
   // Show skeleton if AuthContext is still loading OR if local dashboard data is loading
@@ -638,40 +639,7 @@ const Dashboard: React.FC = () => {
         </div>
       )}
 
-      {/* REMOVED: Monthly Expenses Chart (kept as per previous, it's a useful summary) */}
-      {/*
-      {focusWork && chartData.length > 0 && (
-        <div className={cx(surface, "rounded-3xl p-6 mb-8 mx-2 sm:mx-0")}>
-          <h2 className="text-lg font-black text-primary dark:text-white mb-4">Gastos Mensais</h2>
-          <div className="h-48 sm:h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={chartData}
-                margin={{
-                  top: 5, right: 10, left: 0, bottom: 5,
-                }}
-              >
-                <XAxis dataKey="month" stroke="rgb(100 116 139)" tickLine={false} axisLine={false} />
-                <YAxis stroke="rgb(100 116 139)" tickFormatter={value => `R$ ${value.toLocaleString('pt-BR')}`} axisLine={false} tickLine={false} />
-                <Tooltip 
-                  cursor={{ fill: 'rgba(100, 116, 139, 0.1)' }} 
-                  formatter={(value: number) => [formatCurrency(value), 'Gasto']} 
-                  labelFormatter={(label) => `Mês: ${label}`}
-                  contentStyle={{ 
-                    backgroundColor: 'rgb(15 23 42 / 0.8)', 
-                    borderColor: 'rgb(51 65 85 / 0.8)', 
-                    borderRadius: '0.75rem',
-                    color: 'white' 
-                  }}
-                  itemStyle={{ color: 'white' }}
-                />
-                <Bar dataKey="value" fill="rgb(217 119 6)" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      )}
-      */}
+      {/* REMOVED: Monthly Expenses Chart */}
 
       {/* NEW: Next Steps Section */}
       {focusWork && steps && (
