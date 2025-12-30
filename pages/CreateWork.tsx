@@ -6,6 +6,18 @@ import { dbService } from '../services/db.ts';
 import { WorkStatus } from '../types.ts';
 import { WORK_TEMPLATES, ZE_AVATAR, ZE_AVATAR_FALLBACK } from '../services/standards.ts';
 
+// Helper para formatar valores monetários
+const formatCurrency = (value: number | string | undefined): string => {
+  if (value === undefined || value === null || isNaN(Number(value))) {
+    return '0,00'; // Retorna apenas o valor sem R$ para placeholder
+  }
+  return Number(value).toLocaleString('pt-BR', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+};
+
+
 const CreateWork: React.FC = () => {
   const { user, authLoading, isUserAuthFinished } = useAuth(); // Use authLoading and isUserAuthFinished
   const navigate = useNavigate();
@@ -100,10 +112,10 @@ const CreateWork: React.FC = () => {
           // --- INÍCIO DA CORREÇÃO DA VALIDAÇÃO DE DATA ---
           // Garante que ambas as datas são comparadas como "início do dia" na hora LOCAL.
           const [year, month, day] = formData.startDate.split('-').map(Number);
-          const selectedDateAtLocalMidnight = new Date(year, month - 1, day).getTime();
+          const selectedDateAtLocalMidnight = new Date(year, month - 1, day, 0, 0, 0, 0).getTime(); // Set to midnight local time
 
           const today = new Date();
-          const todayAtLocalMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
+          const todayAtLocalMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0, 0).getTime(); // Set to midnight local time
 
           if (selectedDateAtLocalMidnight < todayAtLocalMidnight) {
               newErrors.startDate = "A data de início não pode ser no passado.";
@@ -280,7 +292,7 @@ const CreateWork: React.FC = () => {
                                 </div>
                                 <div>
                                     <label className="block text-xs font-black text-slate-700 dark:text-slate-300 uppercase mb-2 tracking-widest pl-1">Orçamento (R$)</label>
-                                    <input name="budgetPlanned" type="number" placeholder="0,00" value={formData.budgetPlanned} className="w-full px-5 py-4 text-lg font-bold border-2 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white rounded-2xl focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all placeholder:text-slate-300" onChange={handleChange} />
+                                    <input name="budgetPlanned" type="number" placeholder={formatCurrency(0)} value={formData.budgetPlanned} className="w-full px-5 py-4 text-lg font-bold border-2 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white rounded-2xl focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all placeholder:text-slate-300" onChange={handleChange} />
                                     {formErrors.budgetPlanned && <p className="text-red-500 text-sm mt-1">{formErrors.budgetPlanned}</p>}
                                 </div>
                             </div>

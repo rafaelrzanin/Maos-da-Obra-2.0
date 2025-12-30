@@ -4,6 +4,20 @@ import { useAuth } from '../contexts/AuthContext.tsx';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { dbService } from '../services/db.ts';
 
+// Helper para formatar valores monetários (adicionado para consistência, mas não usado diretamente aqui)
+const formatCurrency = (value: number | string | undefined): string => {
+  if (value === undefined || value === null || isNaN(Number(value))) {
+    return 'R$ 0,00';
+  }
+  return Number(value).toLocaleString('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+};
+
+
 const Login: React.FC = () => {
   const { login, user, authLoading, isUserAuthFinished, isSubscriptionValid } = useAuth();
   const navigate = useNavigate();

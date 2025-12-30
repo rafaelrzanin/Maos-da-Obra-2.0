@@ -34,21 +34,21 @@ const Settings: React.FC = () => {
     {
       id: PlanType.MENSAL,
       name: 'Mensal',
-      price: 29.90, // Changed to number
+      price: 29.90, 
       period: '/mês',
       savings: null,
     },
     {
       id: PlanType.SEMESTRAL,
       name: 'Semestral',
-      price: 97.00, // Changed to number
+      price: 97.00, 
       period: '/semestre',
       savings: 'Economia de 46%',
     },
     {
       id: PlanType.VITALICIO,
       name: 'VITALÍCIO',
-      price: 247.00, // Changed to number
+      price: 247.00, 
       period: 'PAGAMENTO ÚNICO',
       savings: 'OFERTA ESPECIAL',
     }

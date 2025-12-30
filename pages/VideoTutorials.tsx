@@ -1,5 +1,4 @@
 
-
 import React from 'react';
 import { LIFETIME_BONUSES } from '../services/standards.ts'; 
 

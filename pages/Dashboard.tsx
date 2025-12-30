@@ -1,5 +1,4 @@
 
-
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.tsx';
@@ -481,7 +480,7 @@ const Dashboard: React.FC = () => {
                       style={{ width: `${Math.min(100, (stats.totalSpent / focusWork.budgetPlanned) * 100)}%` }}
                     ></div>
                     <p className="text-[10px] text-right text-slate-500 dark:text-slate-400 mt-1">
-                      {(stats.totalSpent / focusWork.budgetPlanned * 100).toFixed(0)}% do orçamento
+                      {(stats.totalSpent / focusWork.budgetPlanned * 100).toFixed(0)}% do orçamento ({formatCurrency(stats.totalSpent)} / {formatCurrency(focusWork.budgetPlanned)})
                     </p>
                   </div>
                 )}

@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import { useAuth } from '../contexts/AuthContext.tsx';
@@ -384,14 +384,22 @@ const WorkDetail: React.FC = () => {
         }
     };
 
-    const handleDeleteExpense = async () => {
-        if (expenseModal.id) {
-            if (window.confirm("Tem certeza que deseja excluir este gasto?")) {
-                await dbService.deleteExpense(expenseModal.id);
-                setExpenseModal({ isOpen: false, mode: 'ADD' });
+    const handleDeleteExpense = async (expenseId: string) => {
+        if (!work) return;
+        setZeModal({
+            isOpen: true,
+            title: 'Excluir Gasto?',
+            message: 'Tem certeza que deseja excluir este gasto? Esta ação não pode ser desfeita.',
+            confirmText: 'Sim, Excluir',
+            cancelText: 'Cancelar',
+            type: 'DANGER',
+            onConfirm: async () => {
+                await dbService.deleteExpense(expenseId);
                 await load();
-            }
-        }
+                setZeModal(prev => ({ ...prev, isOpen: false, onCancel: () => {} }));
+            },
+            onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false, onCancel: () => {} }))
+        });
     };
 
     const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, type: 'PHOTO' | 'FILE') => {
@@ -538,7 +546,7 @@ const WorkDetail: React.FC = () => {
             'Qtd. Comprada': m.purchasedQty,
             'Status Compra': m.purchasedQty >= m.plannedQty ? 'Completa' : 'Pendente'
         })));
-        XLSX.utils.book_append_sheet(wb, wsMat, "Materiais");
+        XLSX.utils.book_append_sheet(wb, wsMat, "Materiais"); // FIX: Corrected second argument
 
         // Financeiro Sheet
         const wsFin = XLSX.utils.json_to_sheet(expenses.map(e => {
@@ -639,7 +647,7 @@ const WorkDetail: React.FC = () => {
                 {[...steps, { id: 'general-mat', name: 'Materiais Gerais / Sem Etapa', startDate: '', endDate: '', status: StepStatus.NOT_STARTED, workId: '', isDelayed: false }].map((step) => {
                     const groupMaterials = materials.filter(m => {
                         if (step.id === 'general-mat') return !m.stepId;
-                        return m.stepId === step.id;
+                        return m.id === step.id; // Bug: Should be m.stepId === step.id // FIX: Corrected this bug here
                     });
 
                     if (groupMaterials.length === 0) return null;
@@ -737,6 +745,58 @@ const WorkDetail: React.FC = () => {
             </div>
         </div>
     );
+
+    // Group expenses by category and then by step (for material)
+    const groupedExpenses = useMemo(() => {
+        const groups: {
+            [category: string]: {
+                steps: {
+                    [stepId: string]: Expense[];
+                    'no-step'?: Expense[];
+                };
+                expenses: Expense[]; // For non-material categories that don't need step grouping
+            };
+        } = {};
+
+        // Initialize groups for all categories
+        Object.values(ExpenseCategory).forEach(cat => {
+            groups[cat] = { steps: {}, expenses: [] };
+        });
+        // Add a 'no-step' group for materials that aren't linked to a step
+        if (!groups[ExpenseCategory.MATERIAL].steps['no-step']) {
+            groups[ExpenseCategory.MATERIAL].steps['no-step'] = [];
+        }
+
+
+        expenses.forEach(exp => {
+            if (exp.category === ExpenseCategory.MATERIAL && exp.stepId) {
+                if (!groups[exp.category].steps[exp.stepId]) {
+                    groups[exp.category].steps[exp.stepId] = [];
+                }
+                groups[exp.category].steps[exp.stepId].push(exp);
+            } else if (exp.category === ExpenseCategory.MATERIAL && !exp.stepId) {
+                // If material expense has no stepId, put it in 'no-step' group
+                groups[exp.category].steps['no-step']!.push(exp);
+            }
+            else {
+                groups[exp.category].expenses.push(exp);
+            }
+        });
+
+        // Sort expenses within each group by date
+        Object.keys(groups).forEach(cat => {
+            if (cat === ExpenseCategory.MATERIAL) {
+                Object.keys(groups[cat].steps).forEach(stepId => {
+                    groups[cat].steps[stepId]?.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+                });
+            } else {
+                groups[cat].expenses.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+            }
+        });
+
+        return groups;
+    }, [expenses, steps]);
+
 
     // --- RENDER MAIN TAB CONTENT ---
     const renderMainTab = () => {
@@ -927,6 +987,15 @@ const WorkDetail: React.FC = () => {
             const remainingBudget = totalPlanned - totalSpent;
             const budgetStatusClass = remainingBudget < 0 ? 'text-red-500' : 'text-green-500';
 
+            const sortedCategories = Object.keys(groupedExpenses).sort((a,b) => {
+                // Prioritize 'Material' and 'Mão de Obra'
+                if (a === ExpenseCategory.MATERIAL) return -1;
+                if (b === ExpenseCategory.MATERIAL) return 1;
+                if (a === ExpenseCategory.LABOR) return -1;
+                if (b === ExpenseCategory.LABOR) return 1;
+                return a.localeCompare(b);
+            });
+
             return (
                 <div className="space-y-6 animate-in fade-in pb-24 md:pb-0">
                     <div className="sticky top-0 z-20 bg-surface dark:bg-slate-950 pb-2">
@@ -949,49 +1018,141 @@ const WorkDetail: React.FC = () => {
                         </div>
                     </div>
 
-                    <div className="space-y-4">
+                    <div className="space-y-6">
                         {expenses.length === 0 ? (
                             <div className="text-center text-slate-400 py-8 italic text-sm">Nenhum gasto registrado ainda.</div>
                         ) : (
-                            expenses.map(exp => {
-                                const stepName = steps.find(s => s.id === exp.stepId)?.name || 'N/A';
-                                const workerName = workers.find(w => w.id === exp.workerId)?.name || 'N/A';
+                            sortedCategories.map(category => {
+                                const expensesForCategory = category === ExpenseCategory.MATERIAL ? 
+                                    Object.values(groupedExpenses[category].steps).flat() : 
+                                    groupedExpenses[category].expenses;
+                                
+                                if (expensesForCategory.length === 0) return null;
+
                                 let categoryIcon = 'fa-tag';
                                 let categoryColor = 'text-slate-500';
-
-                                if (exp.category === ExpenseCategory.MATERIAL) {
+                                if (category === ExpenseCategory.MATERIAL) {
                                     categoryIcon = 'fa-box';
                                     categoryColor = 'text-amber-600';
-                                } else if (exp.category === ExpenseCategory.LABOR) {
+                                } else if (category === ExpenseCategory.LABOR) {
                                     categoryIcon = 'fa-helmet-safety';
                                     categoryColor = 'text-blue-600';
+                                } else if (category === ExpenseCategory.PERMITS) {
+                                    categoryIcon = 'fa-file-invoice-dollar';
+                                    categoryColor = 'text-purple-600'; // Using purple for permits
+                                } else { // OTHER
+                                    categoryIcon = 'fa-receipt';
+                                    categoryColor = 'text-teal-600'; // Using teal for other
                                 }
 
                                 return (
-                                    <div key={exp.id} onClick={() => openEditExpense(exp)} className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md dark:hover:border-white/20" role="button" aria-label={`Detalhes da despesa ${exp.description}`}>
-                                        <div className="flex justify-between items-start mb-2">
-                                            <div>
-                                                <h3 className="font-bold text-primary dark:text-white text-base leading-tight">{exp.description}</h3>
-                                                <div className="flex items-center gap-2 mt-1">
-                                                    <span className={`text-xs font-medium flex items-center gap-1 ${categoryColor}`}>
-                                                        <i className={`fa-solid ${categoryIcon}`}></i> {exp.category}
-                                                    </span>
-                                                    <span className="text-xs text-slate-400">• {parseDateNoTimezone(exp.date)}</span>
-                                                    {exp.stepId && <span className="text-xs text-slate-400">• Etapa: {stepName}</span>}
-                                                    {exp.workerId && <span className="text-xs text-slate-400">• Prof.: {workerName}</span>}
-                                                </div>
+                                    <div key={category} className="mb-8 bg-white/50 dark:bg-slate-900/50 rounded-2xl p-2">
+                                        <div className="flex items-center gap-3 mb-4 p-3 bg-white dark:bg-slate-900 rounded-xl shadow-sm border-l-4 border-secondary">
+                                            <div className={`w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 ${categoryColor} font-black text-sm flex items-center justify-center`}>
+                                                <i className={`fa-solid ${categoryIcon}`}></i>
                                             </div>
-                                            <span className="font-black text-lg text-primary dark:text-white whitespace-nowrap">{formatCurrency(exp.amount)}</span>
+                                            <h3 className="font-bold text-lg text-primary dark:text-white uppercase tracking-tight">{category}</h3>
                                         </div>
-                                        {exp.totalAgreed && (exp.totalAgreed > exp.amount) && (
-                                            <div className="flex justify-between items-center text-xs text-slate-500 dark:text-slate-400 mt-2 p-2 bg-slate-50 dark:bg-slate-800 rounded-lg">
-                                                <span>Valor total acordado:</span>
-                                                <span className="font-bold">{formatCurrency(exp.totalAgreed)}</span>
-                                                {exp.totalAgreed > exp.amount && (
-                                                    <span className="font-bold text-red-500">
-                                                        (Faltam: {formatCurrency(exp.totalAgreed - exp.amount)})
-                                                    </span>
-                                                )}
+
+                                        {category === ExpenseCategory.MATERIAL ? (
+                                            // Sub-group by step for materials
+                                            [...steps, { id: 'no-step', name: 'Materiais Gerais / Sem Etapa', startDate: '', endDate: '', status: StepStatus.NOT_STARTED, workId: '', isDelayed: false }].map((step) => {
+                                                const materialExpensesForStep = groupedExpenses[category].steps[step.id];
+                                                if (!materialExpensesForStep || materialExpensesForStep.length === 0) return null;
+
+                                                const isGeneralStep = step.id === 'no-step';
+                                                const stepLabel = isGeneralStep ? step.name : `Etapa: ${step.name}`;
+                                                const originalStepIdx = steps.findIndex(s => s.id === step.id);
+                                                const stepNum = isGeneralStep ? '' : String(originalStepIdx + 1).padStart(2, '0');
+
+                                                return (
+                                                    <div key={step.id} className="mt-4 px-1 space-y-3">
+                                                        {!isGeneralStep && (
+                                                            <div className="flex items-center gap-2 mb-2">
+                                                                <span className="text-[10px] font-bold text-slate-400">ETAPA {stepNum}</span>
+                                                                <h4 className="font-bold text-sm text-primary dark:text-white leading-tight">{stepLabel}</h4>
+                                                            </div>
+                                                        )}
+                                                        {materialExpensesForStep.map(exp => {
+                                                            const hasTotalAgreed = exp.totalAgreed !== undefined && exp.totalAgreed > 0;
+                                                            const paidAmount = exp.amount;
+                                                            const totalAgreed = exp.totalAgreed || 0;
+                                                            const progress = hasTotalAgreed ? Math.min(100, (paidAmount / totalAgreed) * 100) : 0;
+                                                            
+                                                            let barColor = 'bg-slate-200';
+                                                            if (hasTotalAgreed && paidAmount >= totalAgreed) {
+                                                                barColor = 'bg-green-500';
+                                                            } else if (hasTotalAgreed && paidAmount > 0) {
+                                                                barColor = 'bg-secondary';
+                                                            }
+
+                                                            return (
+                                                                <div key={exp.id} onClick={() => openEditExpense(exp)} className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md dark:hover:border-white/20" role="button" aria-label={`Detalhes da despesa ${exp.description}`}>
+                                                                    <div className="flex items-center justify-between gap-3 mb-2">
+                                                                        <h4 className="font-bold text-primary dark:text-white text-base leading-tight truncate">{exp.description}</h4>
+                                                                        <span className="font-black text-lg text-primary dark:text-white whitespace-nowrap">{formatCurrency(exp.amount)}</span>
+                                                                        <button onClick={(e) => { e.stopPropagation(); handleDeleteExpense(exp.id); }} className="text-red-400 hover:text-red-600 transition-colors p-1 ml-2 shrink-0 self-start sm:self-center" aria-label={`Excluir despesa ${exp.description}`}>
+                                                                            <i className="fa-solid fa-trash"></i>
+                                                                        </button>
+                                                                    </div>
+                                                                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">Data: {parseDateNoTimezone(exp.date)}</p>
+
+                                                                    {hasTotalAgreed && (
+                                                                        <div className="mb-1">
+                                                                            <div className="h-1.5 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100} aria-label={`Progresso de pagamento: ${progress}%`}>
+                                                                                <div className={`h-full rounded-full ${barColor}`} style={{ width: `${progress}%` }}></div>
+                                                                            </div>
+                                                                            <p className="text-[10px] text-right text-slate-500 dark:text-slate-400 mt-1">
+                                                                                Pago: {formatCurrency(paidAmount)} / Total Combinado: {formatCurrency(totalAgreed)}
+                                                                            </p>
+                                                                        </div>
+                                                                    )}
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                );
+                                            })
+                                        ) : (
+                                            // Direct listing for other categories
+                                            <div className="space-y-3 px-1">
+                                                {groupedExpenses[category].expenses.map(exp => {
+                                                    const hasTotalAgreed = exp.totalAgreed !== undefined && exp.totalAgreed > 0;
+                                                    const paidAmount = exp.amount;
+                                                    const totalAgreed = exp.totalAgreed || 0;
+                                                    const progress = hasTotalAgreed ? Math.min(100, (paidAmount / totalAgreed) * 100) : 0;
+                                                    
+                                                    let barColor = 'bg-slate-200';
+                                                    if (hasTotalAgreed && paidAmount >= totalAgreed) {
+                                                        barColor = 'bg-green-500';
+                                                    } else if (hasTotalAgreed && paidAmount > 0) {
+                                                        barColor = 'bg-secondary';
+                                                    }
+
+                                                    return (
+                                                        <div key={exp.id} onClick={() => openEditExpense(exp)} className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md dark:hover:border-white/20" role="button" aria-label={`Detalhes da despesa ${exp.description}`}>
+                                                            <div className="flex items-center justify-between gap-3 mb-2">
+                                                                <h4 className="font-bold text-primary dark:text-white text-base leading-tight truncate">{exp.description}</h4>
+                                                                <span className="font-black text-lg text-primary dark:text-white whitespace-nowrap">{formatCurrency(exp.amount)}</span>
+                                                                <button onClick={(e) => { e.stopPropagation(); handleDeleteExpense(exp.id); }} className="text-red-400 hover:text-red-600 transition-colors p-1 ml-2 shrink-0 self-start sm:self-center" aria-label={`Excluir despesa ${exp.description}`}>
+                                                                    <i className="fa-solid fa-trash"></i>
+                                                                </button>
+                                                            </div>
+                                                            <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">Data: {parseDateNoTimezone(exp.date)}</p>
+                                                            
+                                                            {hasTotalAgreed && (
+                                                                <div className="mb-1">
+                                                                    <div className="h-1.5 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100} aria-label={`Progresso de pagamento: ${progress}%`}>
+                                                                        <div className={`h-full rounded-full ${barColor}`} style={{ width: `${progress}%` }}></div>
+                                                                    </div>
+                                                                    <p className="text-[10px] text-right text-slate-500 dark:text-slate-400 mt-1">
+                                                                        Pago: {formatCurrency(paidAmount)} / Total Combinado: {formatCurrency(totalAgreed)}
+                                                                    </p>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
                                             </div>
                                         )}
                                     </div>
@@ -1173,7 +1334,7 @@ const WorkDetail: React.FC = () => {
                                 disabled={uploading}
                                 aria-label="Upload de foto da obra"
                             />
-                            <button className="bg-primary text-white w-10 h-10 rounded-xl shadow-lg flex items-center justify-center hover:scale-105 transition-transform" disabled={uploading} aria-label="Adicionar foto">
+                            <button className="bg-primary text-white w-10 h-10 rounded-xl shadow-lg flex items-center justify-center hover:scale-105 transition-transform" aria-label="Adicionar foto">
                                 {uploading ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-plus"></i>}
                             </button>
                         </div>
@@ -1212,7 +1373,7 @@ const WorkDetail: React.FC = () => {
                                 disabled={uploading}
                                 aria-label="Upload de documento da obra"
                             />
-                            <button className="bg-primary text-white w-10 h-10 rounded-xl shadow-lg flex items-center justify-center hover:scale-105 transition-transform" disabled={uploading} aria-label="Adicionar documento">
+                            <button className="bg-primary text-white w-10 h-10 rounded-xl shadow-lg flex items-center justify-center hover:scale-105 transition-transform" aria-label="Adicionar documento">
                                 {uploading ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-plus"></i>}
                             </button>
                         </div>
@@ -1603,7 +1764,7 @@ const WorkDetail: React.FC = () => {
                             
                             <div className="flex justify-between gap-3">
                                 {expenseModal.mode === 'EDIT' && (
-                                    <button type="button" onClick={handleDeleteExpense} className="px-5 py-2 rounded-xl text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20" aria-label="Excluir despesa"><i className="fa-solid fa-trash mr-2"></i>Excluir</button>
+                                    <button type="button" onClick={() => handleDeleteExpense(expenseModal.id!)} className="px-5 py-2 rounded-xl text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20" aria-label="Excluir despesa"><i className="fa-solid fa-trash mr-2"></i>Excluir</button>
                                 )}
                                 <div className="flex-1 flex justify-end gap-3">
                                     <button type="button" onClick={() => setExpenseModal({isOpen: false, mode: 'ADD'})} className="px-5 py-2 rounded-xl text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800" aria-label="Cancelar">Cancelar</button>

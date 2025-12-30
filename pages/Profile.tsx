@@ -3,6 +3,19 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext.tsx';
 import { dbService } from '../services/db.ts';
 
+// Helper para formatar valores monetários
+const formatCurrency = (value: number | string | undefined): string => {
+  if (value === undefined || value === null || isNaN(Number(value))) {
+    return 'R$ 0,00';
+  }
+  return Number(value).toLocaleString('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+};
+
 const Profile: React.FC = () => {
   const { user, refreshUser, authLoading } = useAuth();
   const [name, setName] = useState('');

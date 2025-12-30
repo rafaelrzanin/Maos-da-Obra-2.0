@@ -3,6 +3,20 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.tsx'; // Import useAuth
 
+// Helper para formatar valores monetários (adicionado para consistência, mas não usado diretamente aqui)
+const formatCurrency = (value: number | string | undefined): string => {
+  if (value === undefined || value === null || isNaN(Number(value))) {
+    return 'R$ 0,00';
+  }
+  return Number(value).toLocaleString('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+};
+
+
 export default function Register() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
