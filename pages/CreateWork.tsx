@@ -280,25 +280,25 @@ const CreateWork: React.FC = () => {
 
                         <div className="space-y-6">
                             <div>
-                                <label className="block text-xs font-black text-slate-700 dark:text-slate-300 uppercase mb-2 tracking-widest pl-1">Nome ou Apelido da Obra</label>
-                                <input name="name" autoFocus placeholder="Ex: Reforma da Cozinha..." value={formData.name} className="w-full px-5 py-4 text-lg font-bold border-2 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white rounded-2xl focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all placeholder:text-slate-300" onChange={handleChange} />
-                                {formErrors.name && <p className="text-red-500 text-sm mt-1">{formErrors.name}</p>}
+                                <label htmlFor="workName" className="block text-xs font-black text-slate-700 dark:text-slate-300 uppercase mb-2 tracking-widest pl-1">Nome ou Apelido da Obra</label>
+                                <input id="workName" name="name" autoFocus placeholder="Ex: Reforma da Cozinha..." value={formData.name} className="w-full px-5 py-4 text-lg font-bold border-2 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white rounded-2xl focus:ring-4 focus:ring-secondary/20 focus:border-secondary outline-none transition-all placeholder:text-slate-300" onChange={handleChange} aria-invalid={!!formErrors.name} aria-describedby="name-error" />
+                                {formErrors.name && <p id="name-error" className="text-red-500 text-sm mt-1">{formErrors.name}</p>}
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-xs font-black text-slate-700 dark:text-slate-300 uppercase mb-2 tracking-widest pl-1">Tamanho (m²)</label>
-                                    <input name="area" type="number" placeholder="0" value={formData.area} className="w-full px-5 py-4 text-lg font-bold border-2 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white rounded-2xl focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all placeholder:text-slate-300" onChange={handleChange} />
-                                    {formErrors.area && <p className="text-red-500 text-sm mt-1">{formErrors.area}</p>}
+                                    <label htmlFor="area" className="block text-xs font-black text-slate-700 dark:text-slate-300 uppercase mb-2 tracking-widest pl-1">Tamanho (m²)</label>
+                                    <input id="area" name="area" type="number" placeholder="0" value={formData.area} className="w-full px-5 py-4 text-lg font-bold border-2 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white rounded-2xl focus:ring-4 focus:ring-secondary/20 focus:border-secondary outline-none transition-all placeholder:text-slate-300" onChange={handleChange} aria-invalid={!!formErrors.area} aria-describedby="area-error" />
+                                    {formErrors.area && <p id="area-error" className="text-red-500 text-sm mt-1">{formErrors.area}</p>}
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-black text-slate-700 dark:text-slate-300 uppercase mb-2 tracking-widest pl-1">Orçamento (R$)</label>
-                                    <input name="budgetPlanned" type="number" placeholder={formatCurrency(0)} value={formData.budgetPlanned} className="w-full px-5 py-4 text-lg font-bold border-2 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white rounded-2xl focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all placeholder:text-slate-300" onChange={handleChange} />
-                                    {formErrors.budgetPlanned && <p className="text-red-500 text-sm mt-1">{formErrors.budgetPlanned}</p>}
+                                    <label htmlFor="budgetPlanned" className="block text-xs font-black text-slate-700 dark:text-slate-300 uppercase mb-2 tracking-widest pl-1">Orçamento (R$)</label>
+                                    <input id="budgetPlanned" name="budgetPlanned" type="number" placeholder={formatCurrency(0)} value={formData.budgetPlanned} className="w-full px-5 py-4 text-lg font-bold border-2 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white rounded-2xl focus:ring-4 focus:ring-secondary/20 focus:border-secondary outline-none transition-all placeholder:text-slate-300" onChange={handleChange} aria-invalid={!!formErrors.budgetPlanned} aria-describedby="budget-error" />
+                                    {formErrors.budgetPlanned && <p id="budget-error" className="text-red-500 text-sm mt-1">{formErrors.budgetPlanned}</p>}
                                 </div>
                             </div>
                             <div>
-                                <label className="block text-xs font-black text-slate-700 dark:text-slate-300 uppercase mb-2 tracking-widest pl-1">Endereço <span className="text-slate-400 font-medium normal-case tracking-normal">(Opcional)</span></label>
-                                <input name="address" placeholder="Cidade ou bairro" value={formData.address} className="w-full px-5 py-4 text-base font-bold border-2 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white rounded-2xl focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all placeholder:text-slate-300" onChange={handleChange} />
+                                <label htmlFor="address" className="block text-xs font-black text-slate-700 dark:text-slate-300 uppercase mb-2 tracking-widest pl-1">Endereço <span className="text-slate-400 font-medium normal-case tracking-normal">(Opcional)</span></label>
+                                <input id="address" name="address" placeholder="Cidade ou bairro" value={formData.address} className="w-full px-5 py-4 text-base font-bold border-2 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white rounded-2xl focus:ring-4 focus:ring-secondary/20 focus:border-secondary outline-none transition-all placeholder:text-slate-300" onChange={handleChange} />
                             </div>
                         </div>
                     </div>
@@ -321,7 +321,7 @@ const CreateWork: React.FC = () => {
                                     <div><h3 className="font-black text-xl text-primary dark:text-white mb-1">Reforma</h3><p className="text-sm font-bold text-slate-400">Melhoria ou Reparo</p></div>
                                 </button>
                             </div>
-                            {formErrors.workCategory && <p className="text-orange-500 text-sm mt-4">{formErrors.workCategory}</p>}
+                            {formErrors.workCategory && <p className="text-red-500 text-sm mt-4">{formErrors.workCategory}</p>}
                         </div>
                     </div>
                 );
@@ -336,7 +336,13 @@ const CreateWork: React.FC = () => {
                         {workCategory === 'RENOVATION' && (
                              <div className="grid grid-cols-2 gap-4 mb-8">
                                 {WORK_TEMPLATES.filter(t => t.id !== 'CONSTRUCAO').map(template => (
-                                    <button key={template.id} type="button" onClick={() => { setSelectedTemplateId(template.id); setFormErrors(prev => { const newErrors = { ...prev }; delete newErrors.selectedTemplate; return newErrors; }); }} className={`p-5 rounded-2xl border-2 text-left transition-all relative flex flex-col gap-3 group ${selectedTemplateId === template.id ? 'border-secondary bg-secondary/5 shadow-md' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-secondary/50'}`}>
+                                    <button 
+                                        key={template.id} 
+                                        type="button" 
+                                        onClick={() => { setSelectedTemplateId(template.id); setFormErrors(prev => { const newErrors = { ...prev }; delete newErrors.selectedTemplate; return newErrors; }); }} 
+                                        className={`p-5 rounded-2xl border-2 text-left transition-all relative flex flex-col gap-3 group ${selectedTemplateId === template.id ? 'border-secondary bg-secondary/5 shadow-md' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-secondary/50'}`}
+                                        aria-pressed={selectedTemplateId === template.id}
+                                    >
                                         <div className="w-12 h-12 rounded-xl flex items-center justify-center text-xl transition-colors bg-slate-100 dark:bg-slate-700 text-slate-400 group-hover:text-secondary"><i className={`fa-solid ${template.icon}`}></i></div>
                                         <div>
                                             <h3 className="font-black text-sm mb-1">{template.label}</h3>
@@ -366,7 +372,7 @@ const CreateWork: React.FC = () => {
                                          <div className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-colors ${formData.hasLeisureArea ? 'bg-secondary border-secondary' : 'border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800'}`}>
                                              {formData.hasLeisureArea && <i className="fa-solid fa-check text-white text-xs"></i>}
                                          </div>
-                                         <input type="checkbox" name="hasLeisureArea" checked={formData.hasLeisureArea} onChange={handleChange} className="hidden" />
+                                         <input type="checkbox" name="hasLeisureArea" checked={formData.hasLeisureArea} onChange={handleChange} className="hidden" aria-label="Possui área de lazer ou piscina" />
                                          <span className="text-sm font-bold text-slate-600 dark:text-slate-300 group-hover:text-primary dark:group-hover:text-white transition-colors">Possui área de lazer / piscina?</span>
                                      </label>
                                  </div>
@@ -374,9 +380,9 @@ const CreateWork: React.FC = () => {
                         )}
                         
                         <div>
-                            <label className="block text-xs font-black text-slate-700 dark:text-slate-300 uppercase mb-2 tracking-widest pl-1">Data de Início</label>
-                            <input type="date" name="startDate" value={formData.startDate} onChange={handleChange} className="w-full px-5 py-4 text-base font-bold border-2 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white rounded-2xl focus:ring-4 focus:ring-primary/10 focus:border-primary outline-none transition-all placeholder:text-slate-300" />
-                            {formErrors.startDate && <p className="text-red-500 text-sm mt-1">{formErrors.startDate}</p>}
+                            <label htmlFor="startDate" className="block text-xs font-black text-slate-700 dark:text-slate-300 uppercase mb-2 tracking-widest pl-1">Data de Início</label>
+                            <input id="startDate" type="date" name="startDate" value={formData.startDate} onChange={handleChange} className="w-full px-5 py-4 text-base font-bold border-2 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white rounded-2xl focus:ring-4 focus:ring-secondary/20 focus:border-secondary outline-none transition-all placeholder:text-slate-300" aria-invalid={!!formErrors.startDate} aria-describedby="startDate-error" />
+                            {formErrors.startDate && <p id="startDate-error" className="text-red-500 text-sm mt-1">{formErrors.startDate}</p>}
                         </div>
                     </div>
                 </div>
@@ -388,18 +394,24 @@ const CreateWork: React.FC = () => {
   return (
     <div className="max-w-2xl mx-auto pb-12 pt-6 px-4">
       <div className="flex items-center justify-between mb-8">
-          <button onClick={() => { if(currentStep === 1) navigate('/'); else setCurrentStep(prev => prev - 1); setFormErrors({}); setGeneralError(''); }} className="text-slate-400 hover:text-primary dark:hover:text-white transition-colors"><i className="fa-solid fa-arrow-left text-xl"></i></button>
-          <div className="flex gap-2">
+          <button 
+            onClick={() => { if(currentStep === 1) navigate('/'); else setCurrentStep(prev => prev - 1); setFormErrors({}); setGeneralError(''); }} 
+            className="text-slate-400 hover:text-primary dark:hover:text-white transition-colors p-2 -ml-2"
+            aria-label={currentStep === 1 ? "Voltar ao Dashboard" : "Voltar à etapa anterior"}
+          >
+            <i className="fa-solid fa-arrow-left text-xl"></i>
+          </button>
+          <div className="flex gap-2" role="progressbar" aria-valuenow={currentStep} aria-valuemin={1} aria-valuemax={totalSteps}>
               {[1, 2].map(s => (
                   <div key={s} className={`h-2 rounded-full transition-all duration-500 ${s <= currentStep ? 'w-8 bg-secondary' : 'w-2 bg-slate-200 dark:bg-slate-700'}`}></div>
               ))}
           </div>
-          <div className="w-6"></div>
+          <div className="w-6"></div> {/* Placeholder for alignment */}
       </div>
 
       <form onSubmit={handleSubmit}>
           {generalError && (
-              <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-900 text-red-600 dark:text-red-400 rounded-xl text-sm font-bold flex items-center gap-2 animate-in fade-in">
+              <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-900 text-red-600 dark:text-red-400 rounded-xl text-sm font-bold flex items-center gap-2 animate-in fade-in" role="alert">
                   <i className="fa-solid fa-triangle-exclamation"></i> {generalError}
               </div>
           )}
@@ -407,12 +419,20 @@ const CreateWork: React.FC = () => {
           
           <div className="mt-8 flex justify-end">
               {currentStep < totalSteps ? (
-                  <button type="button" onClick={() => { if(validateStep(currentStep)) setCurrentStep(prev => prev + 1); setGeneralError(''); }} className="px-8 py-4 bg-primary text-white font-bold rounded-2xl shadow-lg hover:bg-primary-light transition-all flex items-center gap-3">
+                  <button 
+                    type="button" 
+                    onClick={() => { if(validateStep(currentStep)) setCurrentStep(prev => prev + 1); setGeneralError(''); }} 
+                    className="px-8 py-4 bg-primary text-white font-bold rounded-2xl shadow-lg hover:bg-primary-light transition-all flex items-center gap-3"
+                  >
                       Próximo <i className="fa-solid fa-arrow-right"></i>
                   </button>
               ) : (
-                  <button type="submit" disabled={loading} className="px-8 py-4 bg-gradient-gold text-white font-bold rounded-2xl shadow-lg hover:shadow-orange-500/30 hover:scale-105 transition-all flex items-center justify-center gap-3 disabled:opacity-70 disabled:scale-100">
-                      {loading ? 'Gerando...' : 'Criar Obra'} <i className="fa-solid fa-check"></i>
+                  <button 
+                    type="submit" 
+                    disabled={loading} 
+                    className="px-8 py-4 bg-gradient-gold text-white font-bold rounded-2xl shadow-lg hover:shadow-orange-500/30 hover:scale-105 transition-all flex items-center justify-center gap-3 disabled:opacity-70 disabled:scale-100"
+                  >
+                      {loading ? 'Gerando...' : 'Criar Obra'} {loading ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-check"></i>}
                   </button>
               )}
           </div>

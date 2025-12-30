@@ -135,7 +135,13 @@ const KpiCard = ({ onClick, icon, iconClass, value, label, badge, accent, childr
 }) => {
   const ring = accent === "danger" ? "ring-1 ring-red-500/20" : accent === "warn" ? "ring-1 ring-amber-500/20" : "ring-1 ring-emerald-500/10";
   return (
-    <div onClick={onClick} className={cx(surface, "rounded-3xl p-4 transition-all cursor-pointer hover:-translate-y-0.5 hover:shadow-xl hover:border-secondary/40", ring)} role={onClick ? "button" : undefined}>
+    <div 
+      onClick={onClick} 
+      className={cx(surface, "rounded-3xl p-4 transition-all cursor-pointer hover:-translate-y-0.5 hover:shadow-xl hover:border-secondary/40", ring)} 
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : -1} // Make clickable elements focusable
+      onKeyDown={(e) => { if (onClick && (e.key === 'Enter' || e.key === ' ')) onClick(); }} // Keyboard accessibility
+    >
       <div className="flex items-start justify-between mb-3">
         <div className={cx("w-10 h-10 rounded-xl grid place-items-center text-base", iconClass)}><i className={icon}></i></div>
         {badge}
@@ -170,7 +176,7 @@ const NextSteps = ({
           <p className="text-lg font-black text-slate-900 dark:text-white">Próximas Etapas</p>
           <p className={cx("text-xs font-semibold", mutedText)}>Organize os próximos passos da sua obra</p>
         </div>
-        <button onClick={onOpenWork} className="text-xs font-extrabold text-secondary hover:opacity-80">
+        <button onClick={onOpenWork} className="text-xs font-extrabold text-secondary hover:opacity-80 px-3 py-1.5 rounded-lg bg-secondary/5 transition-colors">
           Ver cronograma →
         </button>
       </div>
@@ -202,7 +208,7 @@ const NextSteps = ({
             }
 
             return (
-              <div key={step.id} className="bg-slate-50 dark:bg-slate-800 rounded-xl p-3 border border-slate-200 dark:border-slate-700">
+              <div key={step.id} className="bg-slate-50 dark:bg-slate-800 rounded-xl p-3 border border-slate-200 dark:border-slate-700 shadow-sm">
                 <div className="flex items-center justify-between mb-1">
                   <p className="font-bold text-primary dark:text-white text-sm">{step.name}</p>
                   <span className={cx("text-xs font-semibold flex items-center gap-1", statusClass)}>
@@ -234,8 +240,9 @@ const MaterialsNeeded = ({
   onOpenWork: () => void;
 }) => {
   const today = new Date();
-  const threeDaysFromNow = new Date();
-  threeDaysFromNow.setDate(today.getDate() + 3);
+  today.setHours(0, 0, 0, 0); // Normalize today to midnight for comparison
+  const threeDaysFromNow = new Date(today);
+  threeDaysFromNow.setDate(today.getDate() + 3); // threeDaysFromNow is inclusive of day 3
 
   const relevantMaterials = materials.filter(mat => {
     if (!mat.stepId || mat.purchasedQty >= mat.plannedQty) return false; // Already purchased or no step
@@ -243,13 +250,18 @@ const MaterialsNeeded = ({
     const linkedStep = steps.find(s => s.id === mat.stepId);
     if (!linkedStep) return false;
 
-    const stepStartDate = new Date(linkedStep.startDate);
-    const stepEndDate = new Date(linkedStep.endDate);
+    // Normalize step dates to local midnight for consistent comparison
+    const [yearS, monthS, dayS] = linkedStep.startDate.split('-').map(Number);
+    const stepStartDate = new Date(yearS, monthS - 1, dayS, 0, 0, 0, 0);
 
-    // Rule 1: Step starts in up to 3 days
+    const [yearE, monthE, dayE] = linkedStep.endDate.split('-').map(Number);
+    const stepEndDate = new Date(yearE, monthE - 1, dayE, 0, 0, 0, 0);
+
+
+    // Rule 1: Step starts in up to 3 days (inclusive)
     const isUpcoming = stepStartDate >= today && stepStartDate <= threeDaysFromNow;
 
-    // Rule 2: Step already started AND material is pending/partial
+    // Rule 2: Step has already started (or is today) AND material is pending/partial
     const hasStartedAndPending = stepStartDate <= today && mat.purchasedQty < mat.plannedQty;
     
     return isUpcoming || hasStartedAndPending;
@@ -266,7 +278,7 @@ const MaterialsNeeded = ({
           <p className="text-lg font-black text-slate-900 dark:text-white">Materiais para Compra</p>
           <p className={cx("text-xs font-semibold", mutedText)}>Organize suas compras para não atrasar a obra</p>
         </div>
-        <button onClick={() => onOpenWork()} className="text-xs font-extrabold text-secondary hover:opacity-80">
+        <button onClick={() => onOpenWork()} className="text-xs font-extrabold text-secondary hover:opacity-80 px-3 py-1.5 rounded-lg bg-secondary/5 transition-colors">
           Ver todos os materiais →
         </button>
       </div>
@@ -279,7 +291,7 @@ const MaterialsNeeded = ({
           const progress = (mat.purchasedQty / mat.plannedQty) * 100;
 
           return (
-            <div key={mat.id} className="bg-slate-50 dark:bg-slate-800 rounded-xl p-3 border border-slate-200 dark:border-slate-700">
+            <div key={mat.id} className="bg-slate-50 dark:bg-slate-800 rounded-xl p-3 border border-slate-200 dark:border-slate-700 shadow-sm">
               <div className="flex items-center justify-between mb-1">
                 <p className="font-bold text-primary dark:text-white text-sm">{mat.name}</p>
                 <span className={cx("text-xs font-semibold flex items-center gap-1", statusClass)}>
@@ -310,7 +322,11 @@ const EmptyDashboard = ({ onOpenCreateWork }: { onOpenCreateWork: () => void }) 
       <p className={cx("text-md max-w-md", mutedText)}>
         Ainda não há nenhuma obra cadastrada. Que tal começar um novo projeto e ter tudo sob controle?
       </p>
-      <button onClick={onOpenCreateWork} className="mt-8 px-6 py-3 bg-secondary text-white font-bold rounded-xl shadow-lg hover:bg-secondary-dark transition-colors flex items-center gap-2">
+      <button 
+        onClick={onOpenCreateWork} 
+        className="mt-8 px-6 py-3 bg-secondary text-white font-bold rounded-xl shadow-lg hover:bg-secondary-dark transition-colors flex items-center gap-2"
+        aria-label="Começar Nova Obra"
+      >
         <i className="fa-solid fa-plus-circle"></i> Começar Nova Obra
       </button>
     </div>
@@ -484,7 +500,11 @@ const Dashboard: React.FC = () => {
           <p className={cx("text-sm font-bold uppercase tracking-wider", mutedText)}>Dashboard</p>
           <h1 className="text-3xl font-black text-primary dark:text-white">Olá, {user?.name.split(' ')[0]}!</h1>
         </div>
-        <button onClick={handleOpenCreateWork} className="px-5 py-2 bg-primary text-white font-bold rounded-xl shadow-lg hover:bg-primary-light transition-colors flex items-center gap-2">
+        <button 
+          onClick={handleOpenCreateWork} 
+          className="px-5 py-2 bg-primary text-white font-bold rounded-xl shadow-lg hover:bg-primary-light transition-colors flex items-center gap-2"
+          aria-label="Adicionar Nova Obra"
+        >
           <i className="fa-solid fa-plus-circle"></i> Nova Obra
         </button>
       </div>
@@ -591,7 +611,11 @@ const Dashboard: React.FC = () => {
               </KpiCard>
 
           <div className="pt-4">
-            <button onClick={() => handleOpenWorkDetail(focusWork.id)} className="w-full py-4 bg-secondary text-white font-bold rounded-xl shadow-lg hover:bg-secondary-dark transition-colors flex items-center justify-center gap-2">
+            <button 
+              onClick={() => handleOpenWorkDetail(focusWork.id)} 
+              className="w-full py-4 bg-secondary text-white font-bold rounded-xl shadow-lg hover:bg-secondary-dark transition-colors flex items-center justify-center gap-2"
+              aria-label={`Acessar detalhes da obra ${focusWork.name}`}
+            >
               <i className="fa-solid fa-arrow-right"></i> Acessar Obra
             </button>
           </div>
@@ -664,12 +688,24 @@ const Dashboard: React.FC = () => {
           <h2 className="text-lg font-black text-primary dark:text-white mb-4">Outras Obras:</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {works.filter(w => w.id !== focusWork?.id).map((work) => (
-              <div key={work.id} onClick={() => setFocusWork(work)} className={cx(surface, "rounded-2xl p-4 flex items-center justify-between cursor-pointer hover:-translate-y-0.5 hover:shadow-lg transition-all")}>
+              <div 
+                key={work.id} 
+                onClick={() => setFocusWork(work)} 
+                className={cx(surface, "rounded-2xl p-4 flex items-center justify-between cursor-pointer hover:-translate-y-0.5 hover:shadow-lg transition-all")}
+                role="button"
+                tabIndex={0}
+                aria-label={`Selecionar obra ${work.name}`}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setFocusWork(work); }}
+              >
                 <div>
                   <h3 className="font-bold text-primary dark:text-white text-md">{work.name}</h3>
                   <p className="text-xs text-slate-500 dark:text-slate-400">{formatDateDisplay(work.startDate)} - {formatDateDisplay(work.endDate)}</p>
                 </div>
-                <button onClick={() => setFocusWork(work)} className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 flex items-center justify-center hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
+                <button 
+                  onClick={() => setFocusWork(work)} 
+                  className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 flex items-center justify-center hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
+                  aria-label={`Ver detalhes da obra ${work.name}`}
+                >
                   <i className="fa-solid fa-arrow-right"></i>
                 </button>
               </div>

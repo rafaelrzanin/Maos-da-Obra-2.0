@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, createContext, useContext, useMemo, useCallback } from 'react';
 import { User, PlanType, DBNotification } from '../types.ts';
 import { dbService } from '../services/db.ts';
@@ -188,6 +189,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.error("[AuthContext] Social login exception:", e);
         return false;
     } finally {
+        setAuthLoading(false); // Ensure loading is set to false in finally block
         console.log("[AuthContext] loginSocial finished. Redirect/onAuthChange will handle final authLoading state.");
     }
   };

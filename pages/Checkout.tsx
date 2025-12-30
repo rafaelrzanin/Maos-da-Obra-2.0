@@ -183,7 +183,7 @@ const Checkout: React.FC = () => {
       </p>
 
       {errorMsg && (
-        <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-900 text-red-600 dark:text-red-400 rounded-xl text-sm font-bold flex items-center gap-2 animate-in fade-in">
+        <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-900 text-red-600 dark:text-red-400 rounded-xl text-sm font-bold flex items-center gap-2 animate-in fade-in" role="alert">
           <i className="fa-solid fa-triangle-exclamation"></i> {errorMsg}
         </div>
       )}
@@ -208,6 +208,8 @@ const Checkout: React.FC = () => {
           <button
             onClick={() => setPaymentMethod('PIX')}
             className={`p-4 rounded-xl border-2 flex flex-col items-center justify-center transition-all ${paymentMethod === 'PIX' ? 'border-secondary bg-secondary/5' : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:border-secondary/50'}`}
+            aria-pressed={paymentMethod === 'PIX'}
+            aria-label="Pagar com PIX"
           >
             <i className="fa-brands fa-pix text-3xl mb-2 text-green-500"></i>
             <span className="text-sm font-bold text-primary dark:text-white">PIX</span>
@@ -215,6 +217,8 @@ const Checkout: React.FC = () => {
           <button
             onClick={() => setPaymentMethod('CREDIT_CARD')}
             className={`p-4 rounded-xl border-2 flex flex-col items-center justify-center transition-all ${paymentMethod === 'CREDIT_CARD' ? 'border-secondary bg-secondary/5' : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:border-secondary/50'}`}
+            aria-pressed={paymentMethod === 'CREDIT_CARD'}
+            aria-label="Pagar com Cartão de Crédito"
           >
             <i className="fa-regular fa-credit-card text-3xl mb-2 text-blue-500"></i>
             <span className="text-sm font-bold text-primary dark:text-white">Cartão</span>
@@ -238,10 +242,12 @@ const Checkout: React.FC = () => {
                   readOnly
                   value={pixData.copy_paste_code}
                   className="w-full p-3 pr-12 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white text-sm"
+                  aria-label="Código Pix Copia e Cola"
                 />
                 <button
                   onClick={handleCopyPix}
                   className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-lg bg-secondary text-white hover:bg-secondary-dark text-xs font-bold"
+                  aria-label={copySuccess ? 'Código Pix copiado' : 'Copiar código Pix'}
                 >
                   {copySuccess ? 'Copiado!' : 'Copiar'}
                 </button>
@@ -250,7 +256,8 @@ const Checkout: React.FC = () => {
               <button
                 onClick={handleSimulatePayment} // Simula o clique em "Já paguei" para fins de teste
                 disabled={processing}
-                className="w-full py-3 bg-primary hover:bg-primary-light text-white font-bold rounded-xl shadow-lg shadow-primary/20 transition-all disabled:opacity-70 flex items-center justify-center gap-2"
+                className="w-full py-4 bg-primary hover:bg-primary-light text-white font-bold rounded-xl shadow-lg shadow-primary/20 transition-all disabled:opacity-70 flex items-center justify-center gap-2"
+                aria-label="Ativar plano após pagamento via Pix"
               >
                 {processing ? <i className="fa-solid fa-circle-notch fa-spin"></i> : 'Já Paguei! Ativar Plano'}
               </button>
@@ -260,6 +267,7 @@ const Checkout: React.FC = () => {
               onClick={handleSimulatePayment} // Simula a geração do PIX
               disabled={processing}
               className="w-full py-4 bg-primary hover:bg-primary-light text-white font-bold rounded-xl shadow-lg shadow-primary/20 transition-all disabled:opacity-70 flex items-center justify-center gap-2"
+              aria-label="Gerar QR Code Pix para pagamento"
             >
               {processing ? <i className="fa-solid fa-circle-notch fa-spin"></i> : 'Gerar PIX para Pagar'}
             </button>
@@ -289,6 +297,7 @@ const Checkout: React.FC = () => {
                 placeholder="XXXX XXXX XXXX XXXX"
                 className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
                 disabled={true} // Disable while in development
+                aria-label="Número do Cartão de Crédito"
               />
             </div>
             <div>
@@ -302,6 +311,7 @@ const Checkout: React.FC = () => {
                 placeholder="NOME COMPLETO"
                 className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
                 disabled={true} // Disable while in development
+                aria-label="Nome completo no cartão"
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -317,6 +327,7 @@ const Checkout: React.FC = () => {
                   placeholder="MM/AA"
                   className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
                   disabled={true} // Disable while in development
+                  aria-label="Data de validade do cartão"
                 />
               </div>
               <div>
@@ -331,6 +342,7 @@ const Checkout: React.FC = () => {
                   placeholder="XXX"
                   className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
                   disabled={true} // Disable while in development
+                  aria-label="Código de segurança do cartão"
                 />
               </div>
             </div>
@@ -343,6 +355,7 @@ const Checkout: React.FC = () => {
                 onChange={handleCardChange}
                 className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
                 disabled={true} // Disable while in development
+                aria-label="Número de parcelas"
               >
                 <option value="1">1x de {formatCurrency(planDetails.price)}</option>
                 {/* Add more installment options here if needed, calculating price */}
@@ -352,6 +365,7 @@ const Checkout: React.FC = () => {
               type="submit"
               disabled={true} // Always disabled as a placeholder
               className="w-full py-4 bg-primary hover:bg-primary-light text-white font-bold rounded-xl shadow-lg shadow-primary/20 transition-all disabled:opacity-70 flex items-center justify-center gap-2"
+              aria-label="Pagar com Cartão de Crédito (funcionalidade em breve)"
             >
               Pagar com Cartão (Em Breve)
             </button>
