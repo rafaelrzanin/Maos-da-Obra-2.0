@@ -197,8 +197,17 @@ const WorkDetail: React.FC = () => {
             onConfirm: async () => {
                 try {
                     await dbService.deleteStep(stepId, work.id);
-                    load();
-                    setZeModal({ isOpen: false, title: 'Sucesso!', message: 'Etapa excluída com sucesso.', confirmText: 'Ok', type: 'SUCCESS' }); // Show success message
+                    await load();
+                    // FIX: Ensure success modal is explicitly opened with isOpen: true and not confirming
+                    setZeModal({ 
+                        isOpen: true, // MUST be true to show the modal
+                        title: 'Sucesso!', 
+                        message: 'Etapa excluída com sucesso.', 
+                        confirmText: 'Ok', 
+                        onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
+                        type: 'SUCCESS',
+                        isConfirming: false // Not confirming anymore
+                    });
                 } catch (error: any) {
                     console.error("Erro ao deletar etapa:", error);
                     setZeModal({
@@ -206,12 +215,13 @@ const WorkDetail: React.FC = () => {
                         title: 'Erro ao Excluir Etapa',
                         message: error.message || 'Não foi possível excluir a etapa. Verifique se há lançamentos financeiros associados a ela ou aos seus materiais.',
                         confirmText: 'Entendido',
-                        onCancel: () => setZeModal({ isOpen: false }),
-                        type: 'ERROR'
+                        onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
+                        type: 'ERROR',
+                        isConfirming: false // Not confirming anymore
                     });
                 }
             },
-            onCancel: () => setZeModal({ isOpen: false })
+            onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false }))
         });
     };
 
@@ -307,8 +317,33 @@ const WorkDetail: React.FC = () => {
     const handleDeleteExpense = async (expenseId: string) => {
         setZeModal({
             isOpen: true, title: 'Excluir Gasto?', message: 'Deseja excluir este registro?', confirmText: 'Excluir', type: 'DANGER',
-            onConfirm: async () => { await dbService.deleteExpense(expenseId); load(); setZeModal({ isOpen: false }); },
-            onCancel: () => setZeModal({ isOpen: false })
+            onConfirm: async () => { 
+                try {
+                    await dbService.deleteExpense(expenseId); 
+                    await load(); 
+                    setZeModal({ 
+                        isOpen: true, // MUST be true
+                        title: 'Sucesso!', 
+                        message: 'Gasto excluído com sucesso.', 
+                        confirmText: 'Ok', 
+                        onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })), 
+                        type: 'SUCCESS',
+                        isConfirming: false
+                    }); 
+                } catch (error: any) {
+                    console.error("Erro ao deletar gasto:", error);
+                    setZeModal({ 
+                        isOpen: true, 
+                        title: 'Erro!', 
+                        message: `Não foi possível remover: ${error.message}`, 
+                        confirmText: 'Entendido', 
+                        onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })), 
+                        type: 'ERROR',
+                        isConfirming: false
+                    }); 
+                }
+            },
+            onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false }))
         });
     };
 
@@ -397,12 +432,13 @@ const WorkDetail: React.FC = () => {
             
             setIsPersonModalOpen(false); // Close person modal first
             setZeModal({
-                isOpen: true,
+                isOpen: true, // MUST be true
                 title: 'Sucesso!',
                 message: `${personMode === 'WORKER' ? 'Profissional' : 'Fornecedor'} salvo com sucesso.`,
                 confirmText: 'Ok',
-                onCancel: () => setZeModal({ isOpen: false }),
-                type: 'SUCCESS'
+                onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })), // Keep previous logic to use prev state if needed for other properties
+                type: 'SUCCESS',
+                isConfirming: false // Ensure it's not confirming
             });
             console.log("[handleSavePerson] Person modal closed, success ZeModal shown. Reloading data...");
             await load(); // Reload data after showing success
@@ -422,12 +458,13 @@ const WorkDetail: React.FC = () => {
             }
 
             setZeModal({
-                isOpen: true,
+                isOpen: true, // MUST be true
                 title: 'Erro ao Salvar!',
                 message: userMessage,
                 confirmText: 'Entendido',
-                onCancel: () => setZeModal({ isOpen: false }),
-                type: 'ERROR'
+                onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })), // Keep previous logic
+                type: 'ERROR',
+                isConfirming: false // Ensure it's not confirming
             });
             console.log("[handleSavePerson] Error occurred, error ZeModal shown.");
 
@@ -451,13 +488,15 @@ const WorkDetail: React.FC = () => {
                     if (mode === 'WORKER') await dbService.deleteWorker(pid, wid); 
                     else await dbService.deleteSupplier(pid, wid); 
                     
+                    // FIX: Ensure success modal is explicitly opened with isOpen: true and not confirming
                     setZeModal({ 
-                        isOpen: true, 
+                        isOpen: true, // MUST be true
                         title: 'Sucesso!', 
                         message: `${mode === 'WORKER' ? 'Profissional' : 'Fornecedor'} removido com sucesso.`, 
                         confirmText: 'Ok', 
-                        onCancel: () => setZeModal({ isOpen: false }), 
-                        type: 'SUCCESS' 
+                        onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })), 
+                        type: 'SUCCESS',
+                        isConfirming: false // Not confirming anymore
                     });
                     console.log(`[handleDeletePerson] ${mode} deleted, success ZeModal shown. Reloading data...`);
                     await load(); // Reload after success message is shown
@@ -466,12 +505,13 @@ const WorkDetail: React.FC = () => {
                 } catch (error: any) {
                     console.error(`Erro ao deletar ${mode === 'WORKER' ? 'profissional' : 'fornecedor'}:`, error);
                     setZeModal({ 
-                        isOpen: true, 
+                        isOpen: true, // MUST be true
                         title: 'Erro!', 
                         message: `Não foi possível remover: ${error.message}`, 
                         confirmText: 'Entendido', 
-                        onCancel: () => setZeModal({ isOpen: false }), 
-                        type: 'ERROR' 
+                        onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })), 
+                        type: 'ERROR',
+                        isConfirming: false // Not confirming anymore
                     });
                     console.log(`[handleDeletePerson] Error occurred, error ZeModal shown.`);
 
@@ -481,7 +521,7 @@ const WorkDetail: React.FC = () => {
 
                 }
             },
-            onCancel: () => setZeModal({ isOpen: false })
+            onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false }))
         });
     };
 
@@ -530,7 +570,8 @@ const WorkDetail: React.FC = () => {
             message: 'A funcionalidade de exportação para PDF está em desenvolvimento e estará disponível em breve com layouts profissionais!',
             confirmText: 'Entendido',
             type: 'INFO',
-            onCancel: () => setZeModal({isOpen: false})
+            onCancel: () => setZeModal(prev => ({...prev, isOpen: false})),
+            isConfirming: false // Ensure not confirming
         });
     };
 
@@ -1601,7 +1642,7 @@ const WorkDetail: React.FC = () => {
                                 {expCategory === ExpenseCategory.LABOR && expenseModal.mode === 'ADD' && (
                                     <input type="number" value={expTotalAgreed} onChange={e => setExpTotalAgreed(e.target.value)} placeholder="Preço Combinado (Total da Empreita)" className="w-full p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white focus:ring-secondary focus:border-secondary outline-none transition-colors" aria-label="Preço Combinado (Total da Empreita)" />
                                 )}
-                                <input type="number" value={expAmount} onChange={e => setExpAmount(e.target.value)} placeholder={expenseModal.mode === 'ADD' ? formatCurrency(0).replace('R$', '') : 'Valor Pago Agora'} className="w-full p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white focus:ring-secondary focus:border-secondary outline-none transition-colors" required aria-label={expenseModal.mode === 'ADD' ? 'Valor Total do Gasto' : 'Valor Pago Agora'} />
+                                <input type="number" value={expAmount} onChange={e => setExpAmount(e.target.value)} placeholder={expenseModal.mode === 'ADD' ? formatCurrency(0).replace('R$', '') : 'Valor Pago Agora'} className="p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white focus:ring-secondary focus:border-secondary outline-none transition-colors" required aria-label={expenseModal.mode === 'ADD' ? 'Valor Total do Gasto' : 'Valor Pago Agora'} />
                             </div>
 
                             {/* Bloco 4 - Ação */}
