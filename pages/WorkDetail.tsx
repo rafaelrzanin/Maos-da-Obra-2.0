@@ -474,6 +474,24 @@ const WorkDetail: React.FC = () => {
 
     const todayString = new Date().toISOString().split('T')[0];
 
+    const totalSpent = expenses.reduce((s, e) => s + e.amount, 0);
+    const budgetUsage = work.budgetPlanned > 0 ? (totalSpent / work.budgetPlanned) * 100 : 0;
+    const budgetRemaining = work.budgetPlanned > 0 ? Math.max(0, work.budgetPlanned - totalSpent) : 0;
+
+    let budgetStatusColor = 'bg-green-500';
+    let budgetStatusAccent = 'border-green-500 ring-1 ring-green-200';
+    let budgetStatusIcon = 'fa-check-circle';
+    if (budgetUsage > 100) {
+        budgetStatusColor = 'bg-red-500';
+        budgetStatusAccent = 'border-red-500 ring-1 ring-red-200';
+        budgetStatusIcon = 'fa-triangle-exclamation';
+    } else if (budgetUsage > 80) {
+        budgetStatusColor = 'bg-orange-500';
+        budgetStatusAccent = 'border-orange-500 ring-1 ring-orange-200';
+        budgetStatusIcon = 'fa-exclamation-circle';
+    }
+
+
     return (
         <div className="max-w-4xl mx-auto py-8 px-4 md:px-0 pb-24">
             <div className="flex items-center justify-between mb-8">
@@ -605,10 +623,42 @@ const WorkDetail: React.FC = () => {
 
                     {activeTab === 'FINANCEIRO' && (
                         <div className="space-y-6 animate-in fade-in">
-                            <div className="bg-primary text-white p-6 rounded-3xl shadow-lg">
-                                <p className="text-xs opacity-70 uppercase font-bold mb-1">Gasto Total</p>
-                                <h3 className="text-3xl font-black">{formatCurrency(expenses.reduce((s, e) => s + e.amount, 0))}</h3>
+                            {/* Budget Summary Card */}
+                            <div className={`bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-lg border ${budgetStatusAccent}`}>
+                                <div className="flex items-center justify-between mb-4">
+                                    <div className="flex items-center gap-3">
+                                        <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white text-lg shrink-0 ${budgetStatusColor}`}>
+                                            <i className={`fa-solid ${budgetStatusIcon}`}></i>
+                                        </div>
+                                        <div>
+                                            <p className="text-xs font-bold uppercase text-slate-500 dark:text-slate-400 mb-1">Gasto Total</p>
+                                            <h3 className="text-2xl font-black text-primary dark:text-white">{formatCurrency(totalSpent)}</h3>
+                                        </div>
+                                    </div>
+                                    {work.budgetPlanned > 0 && (
+                                        <div className="text-right">
+                                            <p className="text-xs font-bold uppercase text-slate-500 dark:text-slate-400 mb-1">Orçamento Planejado</p>
+                                            <p className="text-lg font-black text-primary dark:text-white">{formatCurrency(work.budgetPlanned)}</p>
+                                        </div>
+                                    )}
+                                </div>
+                                {work.budgetPlanned > 0 && (
+                                    <>
+                                        <div className="h-2 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden mt-3 mb-1">
+                                            <div className="h-full" style={{ width: `${Math.min(100, budgetUsage)}%`, backgroundColor: budgetStatusColor }}></div>
+                                        </div>
+                                        <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400">
+                                            <span>{Math.round(budgetUsage)}% Usado</span>
+                                            {budgetUsage > 100 ? (
+                                                <span className="text-red-500">Excedido em {formatCurrency(Math.abs(budgetRemaining))}</span>
+                                            ) : (
+                                                <span>Restante: {formatCurrency(budgetRemaining)}</span>
+                                            )}
+                                        </div>
+                                    </>
+                                )}
                             </div>
+
                             <div className="flex justify-between items-center px-2 pt-4">
                                 <h2 className="text-xl font-bold text-primary dark:text-white">Lançamentos</h2>
                                 <button onClick={openAddExpense} className="bg-primary text-white p-2 rounded-xl shadow-md hover:bg-primary-light transition-colors" aria-label="Adicionar novo gasto"><i className="fa-solid fa-plus"></i></button>
@@ -619,7 +669,7 @@ const WorkDetail: React.FC = () => {
                             ) : (
                                 Object.values(ExpenseCategory).map(category => {
                                     const expensesInCategory = Object.values(groupedExpenses[category].steps).flatMap(stepGroup => stepGroup.expenses).concat(groupedExpenses[category].unlinkedExpenses);
-                                    if (expensesInCategory.length === 0) return null;
+                                    if (expensesInCategory.length === 0) return null; // Only show category if it has expenses
 
                                     return (
                                         <div key={category} className="mb-6 first:mt-0 mt-8">
@@ -629,7 +679,7 @@ const WorkDetail: React.FC = () => {
                                                     <span className="w-8 h-8 rounded-full bg-secondary/10 text-secondary dark:bg-secondary-dark/20 dark:text-secondary-light flex items-center justify-center text-base">
                                                         {category === ExpenseCategory.MATERIAL ? <i className="fa-solid fa-box"></i> :
                                                         category === ExpenseCategory.LABOR ? <i className="fa-solid fa-hard-hat"></i> :
-                                                        category === ExpenseCategory.PERMITS ? <i className="fa-solid fa-file-invoice-dollar"></i> : // Changed icon for permits
+                                                        category === ExpenseCategory.PERMITS ? <i className="fa-solid fa-file-invoice-dollar"></i> : 
                                                         <i className="fa-solid fa-ellipsis"></i>}
                                                     </span>
                                                     <span className="text-primary dark:text-white">{category}</span>
@@ -638,17 +688,50 @@ const WorkDetail: React.FC = () => {
                                             </div>
 
                                             {/* Expenses linked to steps */}
-                                            {Object.keys(groupedExpenses[category].steps).map(stepId => {
+                                            {Object.keys(groupedExpenses[category].steps)
+                                                .filter(stepId => groupedExpenses[category].steps[stepId].expenses.length > 0) // Only show step card if it has expenses
+                                                .map(stepId => {
                                                 const stepGroup = groupedExpenses[category].steps[stepId];
-                                                if (stepGroup.expenses.length === 0) return null;
+                                                const step = steps.find(s => s.id === stepId); // Get actual step object
+                                                if (!step) return null; // Should not happen if data is consistent
+                                                
+                                                // Determine status for step card header
+                                                const isStepDelayed = step.status !== StepStatus.COMPLETED && step.endDate < todayString;
+                                                const stepStatusBgClass = 
+                                                    step.status === StepStatus.COMPLETED ? 'bg-green-500/10' : 
+                                                    step.status === StepStatus.IN_PROGRESS ? 'bg-orange-500/10' : 
+                                                    isStepDelayed ? 'bg-red-500/10' : 
+                                                    'bg-slate-300/10';
+                                                const stepStatusTextColorClass =
+                                                    step.status === StepStatus.COMPLETED ? 'text-green-600 dark:text-green-300' :
+                                                    step.status === StepStatus.IN_PROGRESS ? 'text-orange-600 dark:text-orange-300' :
+                                                    isStepDelayed ? 'text-red-600 dark:text-red-300' :
+                                                    'text-slate-500 dark:text-slate-400';
+                                                const stepStatusIcon = 
+                                                    step.status === StepStatus.COMPLETED ? 'fa-check-circle' :
+                                                    step.status === StepStatus.IN_PROGRESS ? 'fa-hammer' : // Using hammer for in-progress work
+                                                    isStepDelayed ? 'fa-triangle-exclamation' :
+                                                    'fa-clock';
 
                                                 return (
                                                     <div key={stepId} className="mb-4">
-                                                        {/* Step "Intermediate" Header */}
-                                                        <h4 className="text-sm font-black uppercase text-slate-500 dark:text-slate-400 mb-2 border-b border-slate-100 dark:border-slate-800 pb-1 pl-8">
-                                                            Etapa: {stepGroup.stepName}
-                                                        </h4>
-                                                        <div className="space-y-3 pl-8 border-l-2 border-slate-100 dark:border-slate-800"> {/* Indent expenses */}
+                                                        {/* Step "Chapter" Card for Financeiro */}
+                                                        <div className={`bg-white dark:bg-slate-900 rounded-2xl p-4 mb-4 border border-slate-200 dark:border-slate-800 shadow-lg ${stepStatusBgClass} ${stepStatusTextColorClass} pl-8 ml-4`}> {/* Indented step card itself */}
+                                                            <div className="flex items-center justify-between">
+                                                                <h3 className="font-black text-xl text-primary dark:text-white flex items-center gap-2">
+                                                                    <span className={`w-8 h-8 rounded-full flex items-center justify-center text-base ${stepStatusBgClass.replace('/10', '/20').replace('bg-', 'bg-').replace('dark:bg-green-900/20', 'dark:bg-green-800').replace('dark:text-green-300', 'dark:text-white')}`}> 
+                                                                        <i className={`fa-solid ${stepStatusIcon} ${stepStatusTextColorClass}`}></i>
+                                                                    </span>
+                                                                    <span className="text-primary dark:text-white">{step.name}</span>
+                                                                </h3>
+                                                                <span className={`text-sm font-semibold ${stepStatusTextColorClass}`}>
+                                                                    {formatCurrency(stepGroup.totalStepAmount)}
+                                                                </span>
+                                                            </div>
+                                                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 pl-12">{parseDateNoTimezone(step.startDate)} - {parseDateNoTimezone(step.endDate)}</p>
+                                                        </div>
+
+                                                        <div className="space-y-3 pl-12 border-l-2 border-slate-100 dark:border-slate-800 ml-8"> {/* Further indent individual expenses */}
                                                             {stepGroup.expenses.map(e => {
                                                                 const isEmpreita = e.totalAgreed && e.totalAgreed > 0;
                                                                 let statusText = '';
@@ -691,10 +774,10 @@ const WorkDetail: React.FC = () => {
                                             {/* Unlinked expenses within this category */}
                                             {groupedExpenses[category].unlinkedExpenses.length > 0 && (
                                                 <div className="mb-4">
-                                                    <h4 className="text-sm font-black uppercase text-slate-500 dark:text-slate-400 mb-2 border-b border-slate-100 dark:border-slate-800 pb-1 pl-8">
+                                                    <h4 className="text-sm font-black uppercase text-slate-500 dark:text-slate-400 mb-2 border-b border-slate-100 dark:border-slate-800 pb-1 pl-8 ml-4"> {/* Indented header */}
                                                         Gastos Não Associados à Etapa
                                                     </h4>
-                                                    <div className="space-y-3 pl-8 border-l-2 border-slate-100 dark:border-slate-800">
+                                                    <div className="space-y-3 pl-12 border-l-2 border-slate-100 dark:border-slate-800 ml-8"> {/* Further indent individual expenses */}
                                                         {groupedExpenses[category].unlinkedExpenses.map(e => {
                                                             const isEmpreita = e.totalAgreed && e.totalAgreed > 0;
                                                             let statusText = '';
