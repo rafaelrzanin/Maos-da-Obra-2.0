@@ -8,6 +8,7 @@ import { dbService } from '../services/db.ts';
 import { StepStatus, FileCategory, ExpenseCategory, type Work, type Worker, type Supplier, type Material, type Step, type Expense, type WorkPhoto, type WorkFile, type Contract, type Checklist, type ChecklistItem, PlanType } from '../types.ts';
 import { ZeModal } from '../components/ZeModal.tsx';
 import { STANDARD_JOB_ROLES, STANDARD_SUPPLIER_CATEGORIES, ZE_AVATAR, ZE_AVATAR_FALLBACK, CONTRACT_TEMPLATES, CHECKLIST_TEMPLATES } from '../services/standards.ts';
+import type { FC } from 'react'; // NEW: Explicitly import FC type
 
 // --- TYPES FOR VIEW STATE ---
 type MainTab = 'ETAPAS' | 'MATERIAIS' | 'FINANCEIRO' | 'FERRAMENTAS';
@@ -879,7 +880,7 @@ const WorkDetail: React.FC = () => {
     if (!work) return <div className="text-center py-10">Obra não encontrada.</div>;
 
     // Add explicit React.FC type to functional components
-    const RenderCronogramaReport: React.FC = () => (
+    const RenderCronogramaReport: FC = () => (
         <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 shadow-md dark:shadow-card-dark-subtle animate-in fade-in">
             <h3 className="font-bold text-xl text-primary dark:text-white mb-6">Cronograma Detalhado</h3>
             <div className="space-y-4">
@@ -911,7 +912,7 @@ const WorkDetail: React.FC = () => {
     );
 
     // Add explicit React.FC type to functional components
-    const RenderMateriaisReport: React.FC = () => {
+    const RenderMateriaisReport: FC = () => {
         const filteredMaterials = reportMaterialFilterStepId === 'ALL'
             ? materials
             : materials.filter(m => m.stepId === reportMaterialFilterStepId);
@@ -976,7 +977,7 @@ const WorkDetail: React.FC = () => {
 
 
     // Add explicit React.FC type to functional components
-    const RenderFinanceiroReport: React.FC = () => (
+    const RenderFinanceiroReport: FC = () => (
         <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 shadow-md dark:shadow-card-dark-subtle animate-in fade-in">
             <h3 className="font-bold text-xl text-primary dark:text-white mb-6">Lançamentos Financeiros</h3>
             {Object.values(ExpenseCategory).map(category => {
@@ -1572,7 +1573,7 @@ const WorkDetail: React.FC = () => {
                                     <i className="fa-solid fa-folder-open text-4xl mb-4 opacity-50"></i>
                                     <p>Nenhum documento ou projeto adicionado ainda.</p>
                                     <p className="text-xs mt-2">Mantenha tudo organizado e acessível!</p>
-                                </div>
+                                    </div>
                             ) : (
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                     {files.map(f => (
@@ -1749,7 +1750,7 @@ const WorkDetail: React.FC = () => {
                                     </div>
                                     <div>
                                         <label htmlFor="new-mat-buy-cost" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Custo Total</label>
-                                        <input id="new-mat-buy-cost" type="number" value={newMatBuyCost} onChange={(e) => setNewMatBuyCost(e.target.value)} className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white" required />
+                                        <input id="new-mat-buy-cost" type="number" value={newMatBuyCost} onChange={(e) => setNewMatBuyCost(e.target.value)} placeholder="0.00" className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white" required />
                                     </div>
                                 </div>
                             )}

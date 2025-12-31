@@ -366,7 +366,7 @@ const Dashboard: React.FC = () => {
     isConfirming: false
   });
 
-  const loadDashboardData = useCallback(async () => {
+  const loadDashboardData = useCallback(async (workIdToLoad?: string) => {
     if (!user?.id || !isUserAuthFinished || authLoading) return;
     console.log("[Dashboard] loadDashboardData: Fetching data from DB..."); // Debug log
 
@@ -378,7 +378,13 @@ const Dashboard: React.FC = () => {
 
 
       if (fetchedWorks.length > 0) {
-        const primaryWork = fetchedWorks[0];
+        // Determine which work to focus on
+        const primaryWork = workIdToLoad 
+            ? fetchedWorks.find(w => w.id === workIdToLoad) || fetchedWorks[0]
+            : focusWork && fetchedWorks.some(w => w.id === focusWork.id) 
+                ? focusWork 
+                : fetchedWorks[0];
+
         setFocusWork(primaryWork);
 
         const [workStats, summary, materialsList, stepsList] = await Promise.all([ // Removed expensesList
@@ -409,12 +415,23 @@ const Dashboard: React.FC = () => {
       setLoading(false);
       console.log("[Dashboard] loadDashboardData: Data fetched and loading set to false."); // Debug log
     }
-  }, [user, isUserAuthFinished, authLoading]);
+  }, [user, isUserAuthFinished, authLoading, focusWork]); // Add focusWork to deps to ensure it's captured correctly
 
   useEffect(() => {
-    loadDashboardData();
-  }, [loadDashboardData]);
+    // Initial load, only if focusWork is null or not in the works list yet
+    if (!focusWork || !works.some(w => w.id === focusWork.id)) {
+        loadDashboardData();
+    }
+  }, [loadDashboardData, focusWork, works]); // Now depends on works and focusWork for re-evaluation
 
+  const handleWorkSelect = async (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const selectedWorkId = e.target.value;
+    const newFocusWork = works.find(w => w.id === selectedWorkId) || null;
+    if (newFocusWork) {
+        // Trigger a full reload for the newly selected work
+        await loadDashboardData(newFocusWork.id);
+    }
+  };
 
   const handleOpenCreateWork = () => {
     navigate('/create');
@@ -438,7 +455,7 @@ const Dashboard: React.FC = () => {
         try {
           await dbService.deleteWork(workToDelete.id);
           console.log(`[Dashboard] handleDeleteWork: Successfully deleted work ID: ${workToDelete.id}. Reloading data...`);
-          await loadDashboardData();
+          await loadDashboardData(); // Reload all data after deletion
           setZeModal(prev => ({ ...prev, isOpen: false }));
           console.log(`[Dashboard] handleDeleteWork: Modal closed and data reloaded.`);
         } catch (error: any) {
@@ -549,7 +566,7 @@ const Dashboard: React.FC = () => {
             <div className="relative flex items-center">
               <select
                 value={focusWork.id}
-                onChange={(e) => setFocusWork(works.find(w => w.id === e.target.value) || null)}
+                onChange={handleWorkSelect} // Updated to use new handler
                 className="block pl-3 pr-10 py-2 text-base border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white rounded-xl focus:outline-none focus:ring-secondary focus:border-secondary transition-colors cursor-pointer"
                 aria-label="Selecionar Obra Focada"
               >
@@ -557,9 +574,7 @@ const Dashboard: React.FC = () => {
                   <option key={w.id} value={w.id}>{w.name}</option>
                 ))}
               </select>
-              <div className="pointer-events-none absolute inset-y-0 right-10 flex items-center px-2 text-slate-700 dark:text-slate-300">
-                <i className="fa-solid fa-chevron-down text-sm"></i>
-              </div>
+              {/* REMOVIDO: A div com a seta customizada para deixar a nativa do select */}
               <button onClick={() => handleDeleteWork(focusWork)} className="text-red-400 hover:text-red-600 transition-colors p-2 ml-2" aria-label={`Excluir obra ${focusWork.name}`}>
                 <i className="fa-solid fa-trash"></i>
               </button>
@@ -670,37 +685,7 @@ const Dashboard: React.FC = () => {
         </div>
       )}
 
-      {/* Other Works (List) */}
-      {works.length > 1 && (
-        <div className="mb-8 mx-2 sm:mx-0"> {/* Reduced outer margin for mobile */}
-          <h2 className="text-lg font-black text-primary dark:text-white mb-4">Outras Obras:</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-            {works.filter(w => w.id !== focusWork?.id).map((work) => (
-              <div 
-                key={work.id} 
-                onClick={() => setFocusWork(work)} 
-                className={cx(surface, "rounded-2xl p-4 flex items-center justify-between cursor-pointer hover:-translate-y-0.5 hover:shadow-lg transition-all")}
-                role="button"
-                tabIndex={0}
-                aria-label={`Selecionar obra ${work.name}`}
-                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setFocusWork(work); }}
-              >
-                <div>
-                  <h3 className="font-bold text-primary dark:text-white text-md">{work.name}</h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">{formatDateDisplay(work.startDate)} - {formatDateDisplay(work.endDate)}</p>
-                </div>
-                <button 
-                  onClick={() => setFocusWork(work)} 
-                  className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 flex items-center justify-center hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors"
-                  aria-label={`Ver detalhes da obra ${work.name}`}
-                >
-                  <i className="fa-solid fa-arrow-right"></i>
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* REMOVIDO: Seção "Outras Obras" */}
 
       <ZeModal
         isOpen={zeModal.isOpen}
@@ -718,4 +703,3 @@ const Dashboard: React.FC = () => {
 };
 
 export default Dashboard;
-    
