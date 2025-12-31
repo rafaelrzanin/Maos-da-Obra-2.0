@@ -671,22 +671,38 @@ const WorkDetail: React.FC = () => {
 
     const todayString = new Date().toISOString().split('T')[0];
 
-    const totalSpent = expenses.reduce((s, e) => s + e.amount, 0);
-    const budgetUsage = work.budgetPlanned > 0 ? (totalSpent / work.budgetPlanned) * 100 : 0;
-    const budgetRemaining = work.budgetPlanned > 0 ? Math.max(0, work.budgetPlanned - totalSpent) : 0;
+    // Refatorado para usar useMemo e garantir segurança contra `work` ser null
+    const totalSpent = useMemo(() => expenses.reduce((s, e) => s + e.amount, 0), [expenses]);
+    
+    const budgetUsage = useMemo(() => 
+        work && work.budgetPlanned > 0 ? (totalSpent / work.budgetPlanned) * 100 : 0, 
+        [work, totalSpent]
+    );
+    
+    const budgetRemaining = useMemo(() => 
+        work && work.budgetPlanned > 0 ? Math.max(0, work.budgetPlanned - totalSpent) : 0, 
+        [work, totalSpent]
+    );
 
-    let budgetStatusColor = 'bg-green-500';
-    let budgetStatusAccent = 'border-green-500 ring-1 ring-green-200';
-    let budgetStatusIcon = 'fa-check-circle';
-    if (budgetUsage > 100) {
-        budgetStatusColor = 'bg-red-500';
-        budgetStatusAccent = 'border-red-500 ring-1 ring-red-200';
-        budgetStatusIcon = 'fa-triangle-exclamation';
-    } else if (budgetUsage > 80) {
-        budgetStatusColor = 'bg-orange-500';
-        budgetStatusAccent = 'border-orange-500 ring-1 ring-orange-200';
-        budgetStatusIcon = 'fa-exclamation-circle';
-    }
+    const { budgetStatusColor, budgetStatusAccent, budgetStatusIcon } = useMemo(() => {
+        let color = 'bg-green-500';
+        let accent = 'border-green-500 ring-1 ring-green-200';
+        let icon = 'fa-check-circle';
+
+        if (work && work.budgetPlanned > 0) {
+            if (budgetUsage > 100) {
+                color = 'bg-red-500';
+                accent = 'border-red-500 ring-1 ring-red-200';
+                icon = 'fa-triangle-exclamation';
+            } else if (budgetUsage > 80) {
+                color = 'bg-orange-500';
+                accent = 'border-orange-500 ring-1 ring-orange-200';
+                icon = 'fa-exclamation-circle';
+            }
+        }
+        return { budgetStatusColor: color, budgetStatusAccent: accent, budgetStatusIcon: icon };
+    }, [work, budgetUsage]);
+
 
     const hasLifetimeAccess = user?.plan === PlanType.VITALICIO;
     // const hasAiAccess = hasLifetimeAccess || (user?.isTrial && (trialDaysRemaining !== null && trialDaysRemaining > 0)); // This logic moved to AiChat itself for conditional rendering
@@ -706,7 +722,7 @@ const WorkDetail: React.FC = () => {
 
         // Condição de "nenhum material encontrado" mais abrangente
         if (
-            (filteredSteps.length === 0 && !hasUnlinkedMaterials) || // Não há etapas nem materiais sem etapa
+            (filteredSteps.length === 0 && !hasUnlinkedMaterials && mainMaterialFilterStepId === 'ALL') || // Não há etapas nem materiais sem etapa, e filtro é "TODOS"
             (mainMaterialFilterStepId === 'UNLINKED' && !hasUnlinkedMaterials) || // Filtro por sem etapa, mas não há materiais sem etapa
             (mainMaterialFilterStepId !== 'ALL' && mainMaterialFilterStepId !== 'UNLINKED' && 
              !materials.some(m => m.stepId === mainMaterialFilterStepId)) // Filtro por etapa específica, mas não há materiais para ela
@@ -817,7 +833,8 @@ const WorkDetail: React.FC = () => {
     if (!work) return <div className="text-center py-10">Obra não encontrada.</div>;
 
     // Add explicit React.FC type to functional components
-    const RenderCronogramaReport: React.FC = () => (
+    // Fix: Removed explicit React.FC type as it is often inferred correctly and can sometimes resolve issues with JSX namespace resolution.
+    const RenderCronogramaReport = () => (
         <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 shadow-md dark:shadow-card-dark-subtle animate-in fade-in">
             <h3 className="font-bold text-xl text-primary dark:text-white mb-6">Cronograma Detalhado</h3>
             <div className="space-y-4">
@@ -849,7 +866,8 @@ const WorkDetail: React.FC = () => {
     );
 
     // Add explicit React.FC type to functional components
-    const RenderMateriaisReport: React.FC = () => {
+    // Fix: Removed explicit React.FC type as it is often inferred correctly and can sometimes resolve issues with JSX namespace resolution.
+    const RenderMateriaisReport = () => {
         const filteredMaterials = reportMaterialFilterStepId === 'ALL'
             ? materials
             : materials.filter(m => m.stepId === reportMaterialFilterStepId);
@@ -914,7 +932,8 @@ const WorkDetail: React.FC = () => {
 
 
     // Add explicit React.FC type to functional components
-    const RenderFinanceiroReport: React.FC = () => (
+    // Fix: Removed explicit React.FC type as it is often inferred correctly and can sometimes resolve issues with JSX namespace resolution.
+    const RenderFinanceiroReport = () => (
         <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 shadow-md dark:shadow-card-dark-subtle animate-in fade-in">
             <h3 className="font-bold text-xl text-primary dark:text-white mb-6">Lançamentos Financeiros</h3>
             {Object.values(ExpenseCategory).map(category => {
@@ -1057,7 +1076,7 @@ const WorkDetail: React.FC = () => {
                             <div className={`bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-lg dark:shadow-card-dark-subtle border ${budgetStatusAccent}`}>
                                 {/* Gasto Total Block */}
                                 <div className="flex items-center gap-3 mb-4">
-                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white text-lg shrink-0 ${budgetStatusColor}`}>
+                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white text-lg shrink-0 ${budgetStatusIcon}`}>
                                         <i className={`fa-solid ${budgetStatusIcon}`}></i>
                                     </div>
                                     <div>
