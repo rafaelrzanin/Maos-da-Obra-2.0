@@ -158,11 +158,9 @@ const CreateWork: React.FC = () => {
     });
 
     try {
-        const duration = selectedTemplate?.defaultDurationDays || 90;
-        const start = new Date(formData.startDate);
-        const end = new Date(start);
-        end.setDate(end.getDate() + duration);
-
+        // A duração será calculada dinamicamente dentro do dbService.createWork
+        // Aqui, passamos apenas a data de início
+        
         // Start Creation Process
         const createPromise = dbService.createWork({
           userId: user.id,
@@ -170,7 +168,7 @@ const CreateWork: React.FC = () => {
           address: formData.address || 'Endereço não informado',
           budgetPlanned: Number(formData.budgetPlanned),
           startDate: formData.startDate,
-          endDate: end.toISOString().split('T')[0],
+          // endDate será calculada e atualizada dentro do dbService
           area: Number(formData.area) || 0,
           floors: Number(formData.floors) || 1,
           bedrooms: Number(formData.bedrooms),
@@ -445,3 +443,4 @@ const CreateWork: React.FC = () => {
 };
 
 export default CreateWork;
+    

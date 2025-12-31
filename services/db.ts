@@ -155,6 +155,37 @@ const mapPushSubscriptionFromDB = (data: any): PushSubscriptionInfo => ({
   endpoint: data.endpoint,
 });
 
+// NEW: Helper para mapear nome de etapa dinâmica para categoria de material genérica
+const getMaterialCategoryFromStepName = (stepName: string): string => {
+  // Regras para etapas dinâmicas
+  if (stepName.includes('Levantamento de paredes')) return 'Levantamento de paredes';
+  if (stepName.includes('Lajes e Vigas')) return 'Lajes e Vigas';
+  if (stepName.includes('Demolição de Banheiro')) return 'Demolição de Banheiro';
+  if (stepName.includes('Hidráulica de Banheiro')) return 'Hidráulica de Banheiro';
+  if (stepName.includes('Elétrica de Banheiro')) return 'Elétrica de Banheiro';
+  if (stepName.includes('Impermeabilização de Banheiro')) return 'Impermeabilização de Banheiro';
+  if (stepName.includes('Contrapiso de Banheiro')) return 'Contrapiso de Banheiro';
+  if (stepName.includes('Pisos e Revestimentos de Banheiro')) return 'Pisos e Revestimentos de Banheiro';
+  if (stepName.includes('Gesso / Forro de Banheiro')) return 'Gesso / Forro de Banheiro';
+  if (stepName.includes('Bancada de Banheiro')) return 'Bancada de Banheiro';
+  if (stepName.includes('Louças e Metais de Banheiro')) return 'Louças e Metais de Banheiro';
+  if (stepName.includes('Demolição de Cozinha')) return 'Demolição de Cozinha';
+  if (stepName.includes('Hidráulica de Cozinha')) return 'Hidráulica de Cozinha';
+  if (stepName.includes('Elétrica de Cozinha')) return 'Elétrica de Cozinha';
+  if (stepName.includes('Pisos e Revestimentos de Cozinha')) return 'Pisos e Revestimentos de Cozinha';
+  if (stepName.includes('Bancada de Cozinha')) return 'Bancada de Cozinha';
+  if (stepName.includes('Louças e Metais de Cozinha')) return 'Louças e Metais de Cozinha';
+  if (stepName.includes('Pintura Paredes/Tetos')) return 'Pintura Paredes/Tetos'; 
+  if (stepName.includes('Preparação de Superfície (Lixar/Massa)')) return 'Preparação de Superfície (Lixar/Massa)';
+  if (stepName.includes('Proteção do Piso para Pintura')) return 'Proteção do Piso para Pintura';
+  
+  // Para Telhado, Mantém o nome exato se Telhado é uma categoria de material.
+  if (stepName.includes('Telhado')) return 'Telhado';
+
+  // Outros casos: retorna o próprio nome da etapa (para correspondência exata)
+  return stepName;
+};
+
 
 // --- AUTH CACHE & DEDUPLICATION ---
 let sessionCache: { promise: Promise<User | null>, timestamp: number } | null = null;
@@ -476,7 +507,7 @@ export const dbService = {
   async generatePix(_amount: number = 0, _payer: any = {}) {
       // This is a mock function, no actual Supabase interaction required
       return {
-          qr_code_base64: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQyF2NgYGBgAAAABQAEV9D3sgAAAABJRोहIBMAA==",
+          qr_code_base64: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQyF2NgYGBgAAAABQAEV9D3sgAAAABJRohIBMAA==",
           copy_paste_code: "00020126330014BR.GOV.BCB.PIX011155555555555520400005303986540510.005802BR5913Mãos da Obra6008Brasilia62070503***63041234"
       };
   },
@@ -527,53 +558,41 @@ export const dbService = {
   },
 
   // NEW: Method to regenerate materials based on work template and area
-  async regenerateMaterials(workId: string, area: number, templateId: string, createdSteps: Step[]): Promise<void> {
+  async regenerateMaterials(workId: string, area: number, createdSteps: Step[]): Promise<void> {
     // Supabase is guaranteed to be initialized now
     try {
         // 1. Delete existing materials for this work
         await supabase.from('materials').delete().eq('work_id', workId);
 
-        // 2. Find the selected work template
-        const template = WORK_TEMPLATES.find(t => t.id === templateId);
-        if (!template) {
-            console.warn(`[REGEN MATERIAL] Template with ID ${templateId} not found.`);
-            return;
-        }
-
-        const materialsToInsert: any[] = []; // Changed to any[] to allow snake_case keys
+        const materialsToInsert: any[] = [];
         
-        // Iterate through included steps (which map to material categories)
-        for (const stepName of template!.includedSteps) { // Added non-null assertion
-            const materialCategory = FULL_MATERIAL_PACKAGES.find(p => p.category === stepName);
-            if (materialCategory) {
-                // Find the actual created step to get its ID
-                const step = createdSteps.find(s => s.name === stepName);
-                if (!step) {
-                    console.warn(`[REGEN MATERIAL] Step "${stepName}" not found in createdSteps. Materials for this category will not be linked to a step.`);
-                }
+        // Iterate through the actual created steps
+        for (const step of createdSteps) {
+            const materialCategoryName = getMaterialCategoryFromStepName(step.name);
+            const materialCategory = FULL_MATERIAL_PACKAGES.find(p => p.category === materialCategoryName);
 
+            if (materialCategory) {
                 for (const item of materialCategory.items) {
-                    const multiplier = item.multiplier || 1; // Default multiplier to 1
+                    const multiplier = item.multiplier || 1; 
                     materialsToInsert.push({
-                        work_id: workId, // Use snake_case
+                        work_id: workId, 
                         name: item.name,
-                        brand: undefined, // No brand by default
-                        planned_qty: Math.ceil(area * multiplier), // Use snake_case
-                        purchased_qty: 0, // Use snake_case
+                        brand: undefined, 
+                        planned_qty: Math.ceil(area * multiplier), 
+                        purchased_qty: 0, 
                         unit: item.unit,
-                        step_id: step?.id || undefined, // Assign the actual step ID
+                        step_id: step.id, // Link material to the specific step
                         category: materialCategory.category
                     });
                 }
             } else {
-                console.warn(`[REGEN MATERIAL] Material package for category "${stepName}" not found.`);
+                console.warn(`[REGEN MATERIAL] Pacote de material para categoria "${materialCategoryName}" (baseado na etapa "${step.name}") não encontrado.`);
             }
         }
         
         // 3. Insert new materials
         if (materialsToInsert.length > 0) {
-            // Bulk insert
-            const { error: insertMaterialsError } = await supabase.from('materials').insert(materialsToInsert); // Renamed error
+            const { error: insertMaterialsError } = await supabase.from('materials').insert(materialsToInsert);
             if (insertMaterialsError) {
                 console.error("Erro ao inserir materiais gerados:", insertMaterialsError);
                 throw insertMaterialsError;
@@ -581,7 +600,7 @@ export const dbService = {
         }
         
         // Invalidate caches
-        _dashboardCache.materials[workId] = null; // NEW: Invalidate materials cache for this workId
+        _dashboardCache.materials[workId] = null; 
         console.log(`[REGEN MATERIAL] Materiais para obra ${workId} regenerados com sucesso.`);
 
     } catch (error: any) {
@@ -590,8 +609,12 @@ export const dbService = {
     }
   },
 
-  async createWork(workData: Partial<Work>, templateId: string): Promise<Work> { // Renamed 'work' param to 'workData'
+  async createWork(workData: Partial<Work>, templateId: string): Promise<Work> {
     // Supabase is guaranteed to be initialized now
+    
+    // Calcula a data final com base no número de etapas dinamicamente geradas
+    let finalEndDate = workData.endDate;
+    let effectiveDefaultDurationDays = 0; // Para calcular a duração final
     
     const dbWork = {
         user_id: workData.userId,
@@ -599,7 +622,7 @@ export const dbService = {
         address: workData.address || 'Endereço não informado',
         budget_planned: workData.budgetPlanned,
         start_date: workData.startDate,
-        end_date: workData.endDate,
+        // end_date será definido após a geração das etapas
         area: workData.area,
         status: workData.status,
         notes: workData.notes,
@@ -607,11 +630,11 @@ export const dbService = {
         bedrooms: workData.bedrooms,
         bathrooms: workData.bathrooms,
         kitchens: workData.kitchens,
-        living_rooms: workData.livingRooms, // Corrected to snake_case for DB column compatibility
+        living_rooms: workData.livingRooms, 
         has_leisure_area: workData.hasLeisureArea 
     };
 
-    const { data: savedWork, error: createWorkError } = await supabase.from('works').insert(dbWork).select().single(); // Renamed error
+    const { data: savedWork, error: createWorkError } = await supabase.from('works').insert(dbWork).select().single();
     
     if (createWorkError) {
         console.error("Erro SQL ao criar obra:", createWorkError);
@@ -622,42 +645,93 @@ export const dbService = {
     
     // Invalidate Cache
     _dashboardCache.works = null;
-    delete _dashboardCache.stats[parsedWork.id]; // Invalidate specific stats for new work
-    delete _dashboardCache.summary[parsedWork.id]; // Invalidate specific summary for new work
-    _dashboardCache.steps[parsedWork.id] = null; // NEW: Invalidate steps cache for this workId
-    _dashboardCache.materials[parsedWork.id] = null; // NEW: Invalidate materials cache for this workId
+    delete _dashboardCache.stats[parsedWork.id];
+    delete _dashboardCache.summary[parsedWork.id];
+    _dashboardCache.notifications = null; 
+    _dashboardCache.steps[parsedWork.id] = null;
+    _dashboardCache.materials[parsedWork.id] = null;
 
 
-    // Generate Steps
     const template = WORK_TEMPLATES.find(t => t.id === templateId);
-    if (template) {
-        const stepsToInsert = template.includedSteps.map((stepName, idx) => {
-            const start = new Date(workData.startDate!); // Used workData.startDate
-            start.setDate(start.getDate() + (idx * 5)); 
-            const end = new Date(start);
-            end.setDate(end.getDate() + 5);
-
-            return {
-                work_id: parsedWork.id,
-                name: stepName,
-                start_date: start.toISOString().split('T')[0],
-                end_date: end.toISOString().split('T')[0],
-                status: StepStatus.NOT_STARTED,
-                is_delayed: false
-            };
-        });
-        
-        // Ensure steps are returned with their generated IDs
-        const { data: createdStepsData, error: stepsError } = await supabase.from('steps').insert(stepsToInsert).select('*');
-        if (stepsError) {
-          console.error("Erro ao inserir etapas:", stepsError);
-          // Don't throw, continue to create materials even if steps insertion partially failed
-        }
-        const createdSteps = (createdStepsData || []).map(parseStepFromDB);
-
-        // FIXED: Now calling the correctly defined method with createdSteps
-        await dbService.regenerateMaterials(parsedWork.id, parsedWork.area, templateId, createdSteps); // Changed from this.regenerateMaterials
+    if (!template) {
+        throw new Error(`Template de obra com ID ${templateId} não encontrado.`);
     }
+
+    let finalStepNames: string[] = [];
+    const numFloors = parsedWork.floors || 1; // Garante pelo menos 1 pavimento
+
+    if (template.id === 'CONSTRUCAO') {
+        // Etapas base que são sempre incluídas
+        const baseStepsExcludingDynamic = template.includedSteps.filter(name => 
+            !name.includes('Limpeza do terreno') &&
+            !name.includes('Fundações') &&
+            !name.includes('Levantamento de paredes') &&
+            !name.includes('Lajes e Vigas') &&
+            !name.includes('Telhado') // Telhado será adicionado dinamicamente no final
+        );
+
+        finalStepNames.push('Limpeza do terreno');
+        finalStepNames.push('Fundações');
+        finalStepNames.push('Levantamento de paredes (Térreo)');
+
+        for (let i = 1; i < numFloors; i++) {
+            finalStepNames.push(`Lajes e Vigas (Piso ${i}º Pavimento)`);
+            finalStepNames.push(`Levantamento de paredes (${i}º Pavimento)`);
+        }
+        finalStepNames.push('Lajes e Vigas (Cobertura)');
+        finalStepNames.push('Telhado'); // Adiciona o telhado uma única vez no final
+
+        finalStepNames = [...finalStepNames, ...baseStepsExcludingDynamic];
+        effectiveDefaultDurationDays = finalStepNames.length * 10; // Cerca de 10 dias por etapa
+        if (effectiveDefaultDurationDays < template.defaultDurationDays) {
+            effectiveDefaultDurationDays = template.defaultDurationDays; // Garante uma duração mínima
+        }
+
+    } else {
+        finalStepNames = template.includedSteps;
+        effectiveDefaultDurationDays = template.defaultDurationDays;
+    }
+
+    // Calcula a endDate com base nas etapas geradas
+    const startDate = new Date(workData.startDate!);
+    const calculatedEndDate = new Date(startDate);
+    calculatedEndDate.setDate(startDate.getDate() + effectiveDefaultDurationDays);
+    finalEndDate = calculatedEndDate.toISOString().split('T')[0];
+
+    // Atualiza a obra com a data final calculada
+    const { error: updateWorkError } = await supabase.from('works').update({ end_date: finalEndDate }).eq('id', parsedWork.id);
+    if (updateWorkError) {
+        console.error("Erro ao atualizar data final da obra:", updateWorkError);
+        // Não jogamos erro crítico, a obra já foi criada
+    }
+    // Atualiza o objeto parsedWork para refletir a nova data final
+    parsedWork.endDate = finalEndDate;
+
+
+    const stepsToInsert = finalStepNames.map((stepName, idx) => {
+        const start = new Date(workData.startDate!);
+        start.setDate(start.getDate() + (idx * (effectiveDefaultDurationDays / finalStepNames.length))); // Distribui o tempo
+        const end = new Date(start);
+        end.setDate(end.getDate() + (effectiveDefaultDurationDays / finalStepNames.length) -1); // Define a duração da etapa
+
+        return {
+            work_id: parsedWork.id,
+            name: stepName,
+            start_date: start.toISOString().split('T')[0],
+            end_date: end.toISOString().split('T')[0],
+            status: StepStatus.NOT_STARTED,
+            is_delayed: false
+        };
+    });
+    
+    const { data: createdStepsData, error: stepsError } = await supabase.from('steps').insert(stepsToInsert).select('*');
+    if (stepsError) {
+      console.error("Erro ao inserir etapas:", stepsError);
+    }
+    const createdSteps = (createdStepsData || []).map(parseStepFromDB);
+
+    // FIX: Agora chamando a função regenerateMaterials com a lista real de etapas criadas
+    await dbService.regenerateMaterials(parsedWork.id, parsedWork.area, createdSteps); 
 
     return parsedWork;
   },

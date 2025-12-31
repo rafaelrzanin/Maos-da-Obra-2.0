@@ -47,14 +47,12 @@ export const WORK_TEMPLATES: WorkTemplate[] = [
     label: 'Casa inteira do zero',
     icon: 'fa-house-chimney',
     description: 'Começar do terreno vazio até a mudança.',
-    defaultDurationDays: 180,
+    defaultDurationDays: 180, // Será ajustado dinamicamente
+    // Estas são as etapas BASE que serão combinadas com as etapas dinâmicas por pavimento
     includedSteps: [
       'Limpeza do terreno', 
       'Fundações', 
-      'Levantamento de paredes', 
-      'Lajes e Vigas', 
-      'Telhado',
-      // Usar os pacotes genéricos de instalações para construção do zero
+      // 'Levantamento de paredes', 'Lajes e Vigas' e 'Telhado' serão gerenciados dinamicamente
       'Tubulação de Água/Esgoto Geral', 
       'Fiação Elétrica Geral', 
       'Chapisco e Reboco', 
@@ -63,9 +61,9 @@ export const WORK_TEMPLATES: WorkTemplate[] = [
       'Gesso / Forro', 
       'Pisos e Revestimentos', 
       'Esquadrias (Janelas/Portas)',
-      'Marmoraria Geral (Bancadas)', // Usar o geral para construção
+      'Marmoraria Geral (Bancadas)', 
       'Pintura Paredes/Tetos', 
-      'Instalação de Louças e Metais Geral', // Usar o geral para construção
+      'Instalação de Louças e Metais Geral', 
       'Instalação de Luminárias',
       'Limpeza Final e Entrega'
     ]
