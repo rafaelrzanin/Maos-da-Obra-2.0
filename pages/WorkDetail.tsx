@@ -111,9 +111,11 @@ const WorkDetail: React.FC = () => {
     const [isContractModalOpen, setIsContractModalOpen] = useState(false);
     const [viewContract, setViewContract] = useState<Contract | null>(null);
 
+    // NEW: Checklist Modal States
     const [isChecklistModalOpen, setIsChecklistModalOpen] = useState(false);
-    const [currentChecklist, setCurrentChecklist] = useState<Checklist | null>(null);
-    const [allChecklists, setAllChecklists] = useState<Checklist[]>([] );
+    const [editingChecklist, setEditingChecklist] = useState<Checklist | null>(null); // Checklist being edited
+    const [newChecklistItemText, setNewChecklistItemText] = useState(''); // For adding new items
+    const [allChecklists, setAllChecklists] = useState<Checklist[]>([]);
     const [selectedChecklistCategory, setSelectedChecklistCategory] = useState<string>('all'); // Filter for Checklist view
 
     const [zeModal, setZeModal] = useState<any>({ isOpen: false, title: '', message: '' });
@@ -595,6 +597,10 @@ const WorkDetail: React.FC = () => {
             : cl
         );
         setAllChecklists(updatedChecklists);
+        // Only update the specific checklist if it's the one currently being edited
+        if (editingChecklist && editingChecklist.id === checklistId) {
+            setEditingChecklist(updatedChecklists.find(cl => cl.id === checklistId) || null);
+        }
         const checklistToUpdate = updatedChecklists.find(cl => cl.id === checklistId);
         if (checklistToUpdate) {
             await dbService.updateChecklist(checklistToUpdate);
@@ -617,8 +623,45 @@ const WorkDetail: React.FC = () => {
             items: newChecklistItems
         };
         const savedChecklist = await dbService.addChecklist(newChecklist);
-        load(); // Reload all checklists, including the newly added one
-        setCurrentChecklist(savedChecklist); // Keep selected for viewing
+        await load(); // Reload all checklists, including the newly added one
+        setEditingChecklist(savedChecklist); // Set the newly created checklist as the one being edited
+        setIsChecklistModalOpen(true); // Open the editing modal
+    };
+
+    // NEW: Handle update to checklist name
+    const handleUpdateChecklistName = async (newName: string) => {
+        if (!editingChecklist || !work) return;
+        setEditingChecklist(prev => prev ? { ...prev, name: newName } : null); // Optimistic UI update
+        const updated = { ...editingChecklist, name: newName };
+        await dbService.updateChecklist(updated);
+        await load(); // Reload all to keep state in sync
+    };
+
+    // NEW: Handle add new checklist item
+    const handleAddChecklistItem = async () => {
+        if (!editingChecklist || !newChecklistItemText.trim() || !work) return;
+        const newItem = { id: `${Date.now()}-${Math.random()}`, text: newChecklistItemText, checked: false };
+        const updatedItems = [...editingChecklist.items, newItem];
+        const updatedChecklist = { ...editingChecklist, items: updatedItems };
+        setEditingChecklist(updatedChecklist); // Optimistic UI update
+        await dbService.updateChecklist(updatedChecklist);
+        setNewChecklistItemText(''); // Clear input
+        await load(); // Reload all to keep state in sync
+    };
+
+    // NEW: Handle delete checklist item
+    const handleDeleteChecklistItem = async (itemId: string) => {
+        if (!editingChecklist || !work) return;
+        const updatedItems = editingChecklist.items.filter(item => item.id !== itemId);
+        const updatedChecklist = { ...editingChecklist, items: updatedItems };
+        setEditingChecklist(updatedChecklist); // Optimistic UI update
+        await dbService.updateChecklist(updatedChecklist);
+        await load(); // Reload all to keep state in sync
+    };
+
+    // NEW: Handle editing checklist (opening modal)
+    const handleEditChecklist = (checklist: Checklist) => {
+        setEditingChecklist(checklist);
         setIsChecklistModalOpen(true);
     };
 
@@ -833,8 +876,7 @@ const WorkDetail: React.FC = () => {
     if (!work) return <div className="text-center py-10">Obra não encontrada.</div>;
 
     // Add explicit React.FC type to functional components
-    // Fix: Removed explicit React.FC type as it is often inferred correctly and can sometimes resolve issues with JSX namespace resolution.
-    const RenderCronogramaReport = () => (
+    const RenderCronogramaReport: React.FC = () => (
         <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 shadow-md dark:shadow-card-dark-subtle animate-in fade-in">
             <h3 className="font-bold text-xl text-primary dark:text-white mb-6">Cronograma Detalhado</h3>
             <div className="space-y-4">
@@ -866,8 +908,7 @@ const WorkDetail: React.FC = () => {
     );
 
     // Add explicit React.FC type to functional components
-    // Fix: Removed explicit React.FC type as it is often inferred correctly and can sometimes resolve issues with JSX namespace resolution.
-    const RenderMateriaisReport = () => {
+    const RenderMateriaisReport: React.FC = () => {
         const filteredMaterials = reportMaterialFilterStepId === 'ALL'
             ? materials
             : materials.filter(m => m.stepId === reportMaterialFilterStepId);
@@ -932,8 +973,7 @@ const WorkDetail: React.FC = () => {
 
 
     // Add explicit React.FC type to functional components
-    // Fix: Removed explicit React.FC type as it is often inferred correctly and can sometimes resolve issues with JSX namespace resolution.
-    const RenderFinanceiroReport = () => (
+    const RenderFinanceiroReport: React.FC = () => (
         <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 shadow-md dark:shadow-card-dark-subtle animate-in fade-in">
             <h3 className="font-bold text-xl text-primary dark:text-white mb-6">Lançamentos Financeiros</h3>
             {Object.values(ExpenseCategory).map(category => {
@@ -1274,35 +1314,35 @@ const WorkDetail: React.FC = () => {
                             )}
 
                     {activeTab === 'FERRAMENTAS' && (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 animate-in fade-in">
+                        <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4 animate-in fade-in">
                             {/* Bloco 1: Equipe */}
-                            <button onClick={() => setSubView('WORKERS')} className="p-6 bg-white dark:bg-slate-900 rounded-3xl flex flex-col items-center shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800 hover:shadow-md transition-shadow" aria-label="Gerenciar Equipe">
-                                <i className="fa-solid fa-users text-2xl mb-2 text-primary dark:text-white"></i> {/* Adjusted for dark mode */}
-                                <span className="font-bold text-primary dark:text-white text-sm">Equipe</span>
+                            <button onClick={() => setSubView('WORKERS')} className="p-4 bg-white dark:bg-slate-900 rounded-3xl flex flex-col items-center shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800 hover:shadow-md transition-shadow" aria-label="Gerenciar Equipe">
+                                <i className="fa-solid fa-users text-xl mb-1 text-primary dark:text-white"></i> {/* Adjusted for dark mode */}
+                                <span className="font-bold text-primary dark:text-white text-xs">Equipe</span>
                             </button>
 
                             {/* Bloco 2: Fornecedores */}
-                            <button onClick={() => setSubView('SUPPLIERS')} className="p-6 bg-white dark:bg-slate-900 rounded-3xl flex flex-col items-center shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800 hover:shadow-md transition-shadow" aria-label="Gerenciar Fornecedores">
-                                <i className="fa-solid fa-truck-field text-2xl mb-2 text-primary dark:text-white"></i> {/* Adjusted for dark mode */}
-                                <span className="font-bold text-primary dark:text-white text-sm">Fornecedores</span>
+                            <button onClick={() => setSubView('SUPPLIERS')} className="p-4 bg-white dark:bg-slate-900 rounded-3xl flex flex-col items-center shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800 hover:shadow-md transition-shadow" aria-label="Gerenciar Fornecedores">
+                                <i className="fa-solid fa-truck-field text-xl mb-1 text-primary dark:text-white"></i> {/* Adjusted for dark mode */}
+                                <span className="font-bold text-primary dark:text-white text-xs">Fornecedores</span>
                             </button>
 
                             {/* Bloco 3: Relatórios */}
-                            <button onClick={() => setSubView('REPORTS')} className="p-6 bg-white dark:bg-slate-900 rounded-3xl flex flex-col items-center shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800 hover:shadow-md transition-shadow" aria-label="Gerar Relatórios">
-                                <i className="fa-solid fa-file-contract text-2xl mb-2 text-primary dark:text-white"></i> {/* Adjusted for dark mode */}
-                                <span className="font-bold text-primary dark:text-white text-sm">Relatórios</span>
+                            <button onClick={() => setSubView('REPORTS')} className="p-4 bg-white dark:bg-slate-900 rounded-3xl flex flex-col items-center shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800 hover:shadow-md transition-shadow" aria-label="Gerar Relatórios">
+                                <i className="fa-solid fa-file-contract text-xl mb-1 text-primary dark:text-white"></i> {/* Adjusted for dark mode */}
+                                <span className="font-bold text-primary dark:text-white text-xs">Relatórios</span>
                             </button>
                             
                             {/* Bloco 4: Fotos */}
-                            <button onClick={() => setSubView('PHOTOS')} className="p-6 bg-white dark:bg-slate-900 rounded-3xl flex flex-col items-center shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800 hover:shadow-md transition-shadow" aria-label="Ver Fotos da Obra">
-                                <i className="fa-solid fa-camera text-2xl mb-2 text-primary dark:text-white"></i> {/* Adjusted for dark mode */}
-                                <span className="font-bold text-primary dark:text-white text-sm">Fotos</span>
+                            <button onClick={() => setSubView('PHOTOS')} className="p-4 bg-white dark:bg-slate-900 rounded-3xl flex flex-col items-center shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800 hover:shadow-md transition-shadow" aria-label="Ver Fotos da Obra">
+                                <i className="fa-solid fa-camera text-xl mb-1 text-primary dark:text-white"></i> {/* Adjusted for dark mode */}
+                                <span className="font-bold text-primary dark:text-white text-xs">Fotos</span>
                             </button>
 
                             {/* Bloco 5: Arquivos & Projetos */}
-                            <button onClick={() => setSubView('PROJECTS')} className="p-6 bg-white dark:bg-slate-900 rounded-3xl flex flex-col items-center shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800 hover:shadow-md transition-shadow" aria-label="Gerenciar Arquivos">
-                                <i className="fa-solid fa-folder text-2xl mb-2 text-primary dark:text-white"></i> {/* Adjusted for dark mode */}
-                                <span className="font-bold text-primary dark:text-white text-sm">Arquivos</span>
+                            <button onClick={() => setSubView('PROJECTS')} className="p-4 bg-white dark:bg-slate-900 rounded-3xl flex flex-col items-center shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800 hover:shadow-md transition-shadow" aria-label="Gerenciar Arquivos">
+                                <i className="fa-solid fa-folder text-xl mb-1 text-primary dark:text-white"></i> {/* Adjusted for dark mode */}
+                                <span className="font-bold text-primary dark:text-white text-xs">Arquivos</span>
                             </button>
 
                             {/* --- BÔNUS VITALÍCIO - GRANDE CARD CONSOLIDADO --- */}
@@ -1599,26 +1639,25 @@ const WorkDetail: React.FC = () => {
                                 {allChecklists
                                     .filter(cl => selectedChecklistCategory === 'all' || cl.category === selectedChecklistCategory)
                                     .map(checklist => (
-                                    <div key={checklist.id} className="bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800">
+                                    <div 
+                                        key={checklist.id} 
+                                        onClick={() => handleEditChecklist(checklist)} // Open edit modal on click
+                                        className="bg-white dark:bg-slate-900 rounded-2xl p-5 shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800 cursor-pointer hover:shadow-md transition-shadow"
+                                    >
                                         <div className="flex justify-between items-center mb-3">
                                             <h3 className="font-bold text-primary dark:text-white text-lg">{checklist.name}</h3>
                                             <span className="text-xs font-bold text-slate-500 dark:text-slate-400">{checklist.category}</span>
                                         </div>
                                         <ul className="space-y-2">
-                                            {checklist.items.map(item => (
-                                                <li key={item.id} className="flex items-center">
-                                                    <input
-                                                        type="checkbox"
-                                                        checked={item.checked}
-                                                        onChange={() => handleChecklistItemToggle(checklist.id, item.id)}
-                                                        className="form-checkbox h-5 w-5 text-secondary rounded border-slate-300 dark:border-slate-700 focus:ring-secondary transition-colors"
-                                                        aria-label={`Marcar ${item.text}`}
-                                                    />
-                                                    <span className={`ml-3 text-base ${item.checked ? 'line-through text-slate-400' : 'text-primary dark:text-white'}`}>
-                                                        {item.text}
-                                                    </span>
+                                            {checklist.items.slice(0, 3).map(item => ( // Show only first 3 items
+                                                <li key={item.id} className="flex items-center text-sm text-slate-600 dark:text-slate-300">
+                                                    <i className={`fa-solid ${item.checked ? 'fa-check-square text-green-500' : 'fa-square text-slate-400'} mr-2`}></i>
+                                                    <span className={`${item.checked ? 'line-through text-slate-400' : ''}`}>{item.text}</span>
                                                 </li>
                                             ))}
+                                            {checklist.items.length > 3 && (
+                                                <li className="text-xs text-slate-500 italic mt-2">...e mais {checklist.items.length - 3} itens</li>
+                                            )}
                                         </ul>
                                     </div>
                                 ))}
@@ -1761,7 +1800,7 @@ const WorkDetail: React.FC = () => {
                             {/* Bloco 3 - Lançamento Atual */}
                             <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-xl border border-slate-100 dark:border-slate-700 space-y-3">
                                 {expCategory === ExpenseCategory.LABOR && expenseModal.mode === 'ADD' && (
-                                    <input type="number" value={expTotalAgreed} onChange={e => setExpTotalAgreed(e.target.value)} placeholder="Preço Combinado (Total da Empreita)" className="w-full p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white focus:ring-secondary focus:border-secondary outline-none transition-colors" aria-label="Preço Combinado (Total da Empreita)" />
+                                    <input type="number" value={expTotalAgreed} onChange={e => setExpTotalAgacted(e.target.value)} placeholder="Preço Combinado (Total da Empreita)" className="w-full p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white focus:ring-secondary focus:border-secondary outline-none transition-colors" aria-label="Preço Combinado (Total da Empreita)" />
                                 )}
                                 <input type="number" value={expAmount} onChange={e => setExpAmount(e.target.value)} placeholder={expenseModal.mode === 'ADD' ? formatCurrency(0).replace('R$', '') : 'Valor Pago Agora'} className="w-full p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white focus:ring-secondary focus:border-secondary outline-none transition-colors" required aria-label={expenseModal.mode === 'ADD' ? 'Valor Total do Gasto' : 'Valor Pago Agora'} />
                             </div>
@@ -1890,6 +1929,89 @@ const WorkDetail: React.FC = () => {
                     </div>
                 </div>
             )}
+
+            {/* NEW: Checklist Edit/View Modal */}
+            {isChecklistModalOpen && editingChecklist && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+                    <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl w-full max-w-md shadow-xl dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800">
+                        <h3 className="font-bold text-xl text-primary dark:text-white mb-4">Editar Checklist</h3>
+                        <div className="space-y-4">
+                            <div>
+                                <label htmlFor="checklistName" className="block text-xs font-black text-slate-700 dark:text-slate-300 uppercase mb-2 tracking-widest pl-1">Nome do Checklist</label>
+                                <input 
+                                    id="checklistName"
+                                    type="text" 
+                                    value={editingChecklist.name} 
+                                    onChange={(e) => handleUpdateChecklistName(e.target.value)} 
+                                    className="w-full p-3 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white focus:ring-secondary focus:border-secondary outline-none transition-colors" 
+                                    aria-label="Nome do Checklist" 
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-black text-slate-700 dark:text-slate-300 uppercase mb-2 tracking-widest pl-1">Categoria</label>
+                                <p className="w-full p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-700 text-slate-500 dark:text-slate-400 text-sm">
+                                    {editingChecklist.category}
+                                </p>
+                            </div>
+
+                            <div className="space-y-2 max-h-60 overflow-y-auto custom-scrollbar p-2 -mx-2">
+                                <h4 className="font-bold text-primary dark:text-white text-md mb-2 sticky top-0 bg-white dark:bg-slate-900 pb-2">Itens:</h4>
+                                {editingChecklist.items.map(item => (
+                                    <div key={item.id} className="flex items-center gap-2 bg-slate-50 dark:bg-slate-800 p-2 rounded-lg border border-slate-100 dark:border-slate-700">
+                                        <input
+                                            type="checkbox"
+                                            checked={item.checked}
+                                            onChange={() => handleChecklistItemToggle(editingChecklist.id, item.id)}
+                                            className="form-checkbox h-5 w-5 text-secondary rounded border-slate-300 dark:border-slate-700 focus:ring-secondary transition-colors shrink-0"
+                                            aria-label={`Marcar ${item.text}`}
+                                        />
+                                        <input
+                                            type="text"
+                                            value={item.text}
+                                            onChange={(e) => {
+                                                const updatedItems = editingChecklist.items.map(i => i.id === item.id ? { ...i, text: e.target.value } : i);
+                                                setEditingChecklist(prev => prev ? { ...prev, items: updatedItems } : null);
+                                            }}
+                                            onBlur={async () => await dbService.updateChecklist(editingChecklist)} // Save on blur
+                                            className={`flex-1 p-1 bg-transparent rounded text-primary dark:text-white outline-none focus:bg-slate-100 dark:focus:bg-slate-700 ${item.checked ? 'line-through text-slate-400' : ''}`}
+                                            aria-label={`Editar item ${item.text}`}
+                                        />
+                                        <button 
+                                            onClick={() => handleDeleteChecklistItem(item.id)} 
+                                            className="text-red-400 hover:text-red-600 p-1 rounded-full transition-colors shrink-0"
+                                            aria-label={`Excluir item ${item.text}`}
+                                        >
+                                            <i className="fa-solid fa-trash-alt text-sm"></i>
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <div className="flex gap-2">
+                                <input 
+                                    type="text" 
+                                    placeholder="Novo item do checklist" 
+                                    value={newChecklistItemText} 
+                                    onChange={(e) => setNewChecklistItemText(e.target.value)} 
+                                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddChecklistItem(); }}} // Add on Enter
+                                    className="flex-1 p-3 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white focus:ring-secondary focus:border-secondary outline-none transition-colors" 
+                                    aria-label="Adicionar novo item ao checklist"
+                                />
+                                <button 
+                                    onClick={handleAddChecklistItem} 
+                                    className="p-3 bg-primary text-white rounded-xl hover:bg-primary-light transition-colors"
+                                    aria-label="Adicionar item"
+                                >
+                                    <i className="fa-solid fa-plus"></i>
+                                </button>
+                            </div>
+                            
+                            <button type="button" onClick={() => setIsChecklistModalOpen(false)} className="w-full py-3 bg-primary text-white rounded-xl font-bold shadow-md hover:bg-primary-light transition-colors mt-6" aria-label="Fechar modal do checklist">Fechar</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
 
             <ZeModal
                 isOpen={zeModal.isOpen}
