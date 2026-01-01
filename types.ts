@@ -208,7 +208,7 @@ export interface Worker {
   notes?: string;
 }
 
-// Fix: Add ambient module declarations for import.meta.env AND process.env
+// Add ambient module declarations for import.meta.env AND process.env
 // This resolves TypeScript errors like "Property 'env' does not exist on type 'ImportMeta')"
 // When types.ts is a module (has exports), ambient declarations must be in a 'declare global {}' block
 declare global {

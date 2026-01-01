@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, createContext, useContext, useMemo, useCallback } from 'react';
-import { User, PlanType, DBNotification } from '../types.ts';
-import { dbService } from '../services/db.ts';
+import { User, PlanType, DBNotification } from './types.ts';
+import { dbService } from './services/db.ts';
 
 // --- Theme Context ---
 type Theme = 'light' | 'dark';
@@ -172,19 +172,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
 
     // Supabase auth state change listener (deve rodar apenas uma vez para registrar o listener)
-    // Fix: The callback for dbService.onAuthChange expects a single 'user: User | null' argument.
     const unsubscribe = dbService.onAuthChange(async (user: User | null) => {
       if (!mounted) return;
 
       console.log("[AuthContext] onAuthChange event received.", { user: user?.id });
 
-      // The `user` argument received here is ALREADY the result of `ensureUserProfile` from `dbService.onAuthChange`.
-      // No need to call `dbService.getUserProfile` again or process `_event` and `session`.
       if (mounted) {
         setUser(user);
         if (user) {
           await refreshNotifications(); 
-          // REMOVIDO: A chamada a requestPushNotificationPermission daqui. Será feita no Dashboard.
+          // A chamada a requestPushNotificationPermission será feita no Dashboard
         } else {
           setUnreadNotificationsCount(0); // Limpa notificações no logout
           setPushSubscriptionStatus('idle'); // Reset push status on logout
@@ -198,7 +195,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       unsubscribe();
       console.log("[AuthContext] Main useEffect cleanup: Auth listener unsubscribed.");
     };
-  }, [refreshNotifications]); // requestPushNotificationPermission foi removido dos deps
+  }, [refreshNotifications]); 
 
   const isSubscriptionValid = useMemo(() => user ? dbService.isSubscriptionActive(user) : false, [user]);
   const isNewAccount = useMemo(() => user ? !user.subscriptionExpiresAt : true, [user]);
@@ -221,7 +218,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (currentUser) {
             setUser(currentUser);
             await refreshNotifications(); // Refresh notifications after user data is refreshed
-            // REMOVIDO: A chamada a requestPushNotificationPermission daqui. Será feita no Dashboard.
+            // A chamada a requestPushNotificationPermission será feita no Dashboard
           } else {
             setUser(null); // Clear user if session sync fails
             setUnreadNotificationsCount(0); // Clear notifications
@@ -242,7 +239,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (u) {
             setUser(u);
             await refreshNotifications(); // Refresh notifications on successful login
-            // REMOVIDO: A chamada a requestPushNotificationPermission daqui. Será feita no Dashboard.
+            // A chamada a requestPushNotificationPermission será feita no Dashboard
             console.log("[AuthContext] login successful. User:", u ? u.email : 'null');
             return true;
         }
@@ -285,7 +282,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (u) {
             setUser(u);
             await refreshNotifications(); // Refresh notifications on successful signup
-            // REMOVIDO: A chamada a requestPushNotificationPermission daqui. Será feita no Dashboard.
+            // A chamada a requestPushNotificationPermission será feita no Dashboard
             console.log("[AuthContext] signup successful. User:", u ? u.email : 'null');
             return true;
         }

@@ -1,5 +1,6 @@
 
-import { PlanType, ExpenseCategory, StepStatus, FileCategory, type User, type Work, type Step, type Material, type Expense, type Worker, type Supplier, type WorkPhoto, type WorkFile, type DBNotification, type PushSubscriptionInfo, type Contract, type Checklist, type ChecklistItem } from '../types.ts';
+
+import { PlanType, ExpenseCategory, StepStatus, FileCategory, type User, type Work, type Step, type Material, type Expense, type Worker, type Supplier, type WorkPhoto, type WorkFile, type DBNotification, type PushSubscriptionInfo, type Contract, type Checklist, type ChecklistItem } from './types.ts';
 import { WORK_TEMPLATES, FULL_MATERIAL_PACKAGES, CONTRACT_TEMPLATES, CHECKLIST_TEMPLATES } from './standards.ts';
 import { supabase } from './supabase.ts';
 
@@ -222,9 +223,7 @@ const ensureUserProfile = async (authUser: any): Promise<User | null> => {
                 return mapProfileFromSupabase(existingProfile);
             }
 
-            // FIX: If RLS denies access (42501), return null instead of a partial user.
-            // This ensures AuthContext correctly identifies a non-accessible profile,
-            // preventing login loops and inconsistent state.
+            // If RLS denies access (42501), return null instead of a partial user.
             if (readError) {
                 console.error(`[ensureUserProfile] Erro ao buscar perfil para ${authUser.id}:`, readError);
                 if (readError.code === '42501') { 
@@ -290,22 +289,17 @@ export const dbService = {
     
     const now = Date.now();
     
-    // Capture sessionCache locally for better type narrowing by TypeScript
     const currentSessionCache = sessionCache; 
 
-    // Refactored to address TS2801: check if currentSessionCache is not null
     if (currentSessionCache !== null && (now - currentSessionCache.timestamp < AUTH_CACHE_DURATION)) {
         return currentSessionCache.promise;
     }
 
     // If no valid cache, create a new promise
     const newPromise = (async (): Promise<User | null> => {
-        // Fix: Explicitly retrieve `data` and then `session` to resolve TypeScript error
-        // "Initializer provides no value for this binding element and the binding element has no default value."
         const { data, error: sessionError } = await client.auth.getSession();
         const session = data?.session;
         if (!session?.user) {
-            // If no user, ensure sessionCache is null before returning
             sessionCache = null; 
             return null;
         }
@@ -320,9 +314,7 @@ export const dbService = {
 
   async syncSession(): Promise<User | null> { // Explicitly set return type
     sessionCache = null; // Invalidate cache to force a fresh fetch
-    // FIX: ensure getCurrentUser returns a Promise<User | null>
     const userPromise = dbService.getCurrentUser(); // Changed from this.getCurrentUser()
-    // Wait for the promise to resolve before returning, so AuthContext gets the actual user object.
     return userPromise; 
   },
 
@@ -630,8 +622,8 @@ export const dbService = {
         bedrooms: workData.bedrooms,
         bathrooms: workData.bathrooms,
         kitchens: workData.kitchens,
-        livingRooms: workData.livingRooms, 
-        hasLeisureArea: workData.hasLeisureArea 
+        living_rooms: workData.livingRooms, 
+        has_leisure_area: workData.hasLeisureArea 
     };
 
     const { data: savedWork, error: createWorkError } = await supabase.from('works').insert(dbWork).select().single();
@@ -758,10 +750,6 @@ export const dbService = {
 
         for (const op of deleteOperations) {
             console.log(`[DB DELETE] Tentando deletar da tabela '${op.table}' onde ${op.eq[0]} = '${op.eq[1]}'`);
-            // Fix: Correctly extract count from delete operation.
-            // When using .select('*') with delete(), 'data' contains the deleted rows.
-            // The 'count' property is not available directly on the response when .select() is used.
-            // Provide a default empty array for `data` in case no rows are returned.
             const { data = [], error: deleteOpError } = await supabase.from(op.table).delete().eq(op.eq[0], op.eq[1]).select('*');
             const count = data ? data.length : 0;
             if (deleteOpError) {
@@ -818,8 +806,8 @@ export const dbService = {
     const { data: newStepData, error: addStepError } = await supabase.from('steps').insert({ // Renamed data and error
       work_id: step.workId,
       name: step.name,
-      start_date: step.startDate, // FIX: Changed to snake_case
-      end_date: step.endDate, // FIX: Changed to snake_case
+      start_date: step.startDate, 
+      end_date: step.endDate, 
       status: step.status,
       is_delayed: step.isDelayed
     }).select().single();
@@ -1095,9 +1083,9 @@ export const dbService = {
       quantity: expense.quantity || 1, // Default quantity
       date: expense.date,
       category: expense.category,
-      step_id: expense.stepId, // FIX: Changed to snake_case
-      related_material_id: expense.relatedMaterialId, // FIX: Changed to snake_case
-      worker_id: expense.workerId, // FIX: Changed to snake_case
+      step_id: expense.stepId, 
+      related_material_id: expense.relatedMaterialId, 
+      worker_id: expense.workerId, 
       supplier_id: expense.supplierId, // NEW: Added supplier_id
       total_agreed: expense.totalAgreed // Corrected to total_agreed
     }).select().single();
@@ -1121,9 +1109,9 @@ export const dbService = {
       quantity: expense.quantity,
       date: expense.date,
       category: expense.category,
-      step_id: expense.stepId, // This is already snake_case
-      related_material_id: expense.relatedMaterialId, // This is already snake_case
-      worker_id: expense.workerId, // This is already snake_case
+      step_id: expense.stepId, 
+      related_material_id: expense.relatedMaterialId, 
+      worker_id: expense.workerId, 
       supplier_id: expense.supplierId, // NEW: Added supplier_id
       total_agreed: expense.totalAgreed // Corrected to total_agreed
     }).eq('id', expense.id).select().single();
@@ -1140,8 +1128,6 @@ export const dbService = {
 
   async deleteExpense(expenseId: string): Promise<void> {
     // Supabase is guaranteed to be initialized now
-    // Fix: Correctly define the type for `data` when destructuring,
-    // as Supabase's `.single()` can return `null` for `data`.
     const response = await supabase.from('expenses').delete().eq('id', expenseId).select('work_id').single();
     const deletedExpense: { work_id: string } | null = response.data; // Explicitly type to allow for null
     const deleteExpenseError = response.error; // Extract error from response
@@ -1454,7 +1440,6 @@ export const dbService = {
     const completedSteps = stepsResult.data.filter(s => s.status === 'CONCLUIDO').length;
     
     const today = new Date().toISOString().split('T')[0];
-    // FIX: Changed 's.endDate' to 's.end_date' to match the database column name and resolve type errors.
     const delayedSteps = stepsResult.data.filter(s => s.status !== 'CONCLUIDO' && s.end_date < today).length;
 
     const pendingMaterials = materialsResult.data.filter(m => m.purchased_qty < m.planned_qty).length;
@@ -1464,9 +1449,7 @@ export const dbService = {
     return summary;
   },
 
-  // generateSmartNotifications is MOVED TO SERVERLESS FUNCTION api/send-daily-notifications.js
-  // The client-side dbService will no longer contain this heavy logic.
-  // async generateSmartNotifications(...) { ... }
+  // generateSmartNotifications logic MOVED TO SERVERLESS FUNCTION api/send-daily-notifications.js
 
 
   // --- NEW: PWA Push Notification Management ---
@@ -1598,7 +1581,8 @@ export const dbService = {
   async addChecklist(checklist: Omit<Checklist, 'id'>): Promise<Checklist> {
     await new Promise(r => setTimeout(r, 200)); // Simulate API call
     const newId = `ckl-${Date.now()}`;
-    const newChecklist = { ...checklist, id: newId };
+    // FIX: Explicitly type newChecklist as Checklist to ensure stricter type checking.
+    const newChecklist: Checklist = { ...checklist, id: newId }; 
     CHECKLIST_TEMPLATES.push(newChecklist); // Add to mock DB
     return newChecklist;
   },
@@ -1621,4 +1605,3 @@ export const dbService = {
   }
 
 };
-    

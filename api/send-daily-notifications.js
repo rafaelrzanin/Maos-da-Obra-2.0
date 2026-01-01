@@ -9,15 +9,14 @@ const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseKey) {
   console.error("CRITICAL ERROR: Supabase URL ou Key missing for daily notifications.");
-  // throw new Error("Supabase configuration missing."); // Avoid throwing during deployment
 }
 
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// Web-push VAPID key configuration (same as send-event-notification)
+// Web-push VAPID key configuration
 const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY;
 const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY;
-const VAPID_EMAIL = "mailto:seuemail@example.com"; // Replace with your actual email
+const VAPID_EMAIL = "mailto:seuemail@example.com";
 
 console.log(`[send-daily-notifications] VAPID_PUBLIC_KEY presence: ${!!VAPID_PUBLIC_KEY}`);
 console.log(`[send-daily-notifications] VAPID_PRIVATE_KEY presence: ${!!VAPID_PRIVATE_KEY}`);
@@ -34,10 +33,7 @@ if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
 }
 
 // ===============================================
-// Mock/Simplified dbService for Serverless context
-// (In a real scenario, you'd import and use dbService
-// but it needs to be adapted for server-side usage
-// as it currently depends on browser APIs/global window)
+// Simplified dbService for Serverless context
 // ===============================================
 
 // Helper para obter a data local da meia-noite

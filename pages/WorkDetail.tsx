@@ -1,3 +1,5 @@
+
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
@@ -6,7 +8,6 @@ import { dbService } from '../services/db.ts';
 import { StepStatus, FileCategory, ExpenseCategory, type Work, type Worker, type Supplier, type Material, type Step, type Expense, type WorkPhoto, type WorkFile, type Contract, type Checklist, type ChecklistItem, PlanType } from '../types.ts';
 import { ZeModal } from '../components/ZeModal.tsx';
 import { STANDARD_JOB_ROLES, STANDARD_SUPPLIER_CATEGORIES, ZE_AVATAR, ZE_AVATAR_FALLBACK, CONTRACT_TEMPLATES, CHECKLIST_TEMPLATES } from '../services/standards.ts';
-// Fix: Combine `FC` type import with the main `React` import to ensure `React` namespace is correctly handled.
 
 // --- TYPES FOR VIEW STATE ---
 type MainTab = 'ETAPAS' | 'MATERIAIS' | 'FINANCEIRO' | 'FERRAMENTAS';
@@ -231,15 +232,14 @@ const WorkDetail: React.FC = () => {
                 try {
                     await dbService.deleteStep(stepId, work.id);
                     await load();
-                    // FIX: Ensure success modal is explicitly opened with isOpen: true and not confirming
                     setZeModal({ 
-                        isOpen: true, // MUST be true to show the modal
+                        isOpen: true, 
                         title: 'Sucesso!', 
                         message: 'Etapa excluída com sucesso.', 
                         confirmText: 'Ok', 
                         onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
                         type: 'SUCCESS',
-                        isConfirming: false // Not confirming anymore
+                        isConfirming: false 
                     });
                 }                       catch (error: any) {
                     console.error("Erro ao deletar etapa:", error);
@@ -250,10 +250,10 @@ const WorkDetail: React.FC = () => {
                         confirmText: 'Entendido',
                         onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
                         type: 'ERROR',
-                        isConfirming: false // Not confirming anymore
+                        isConfirming: false 
                     });
                 } finally {
-                    setZeModal(prev => ({ ...prev, isConfirming: false })); // Reset confirming state
+                    setZeModal(prev => ({ ...prev, isConfirming: false })); 
                 }
             },
             onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false }))
@@ -357,7 +357,7 @@ const WorkDetail: React.FC = () => {
                     await dbService.deleteExpense(expenseId); 
                     await load(); 
                     setZeModal({ 
-                        isOpen: true, // MUST be true
+                        isOpen: true, 
                         title: 'Sucesso!', 
                         message: 'Gasto excluído com sucesso.', 
                         confirmText: 'Ok', 
@@ -467,13 +467,13 @@ const WorkDetail: React.FC = () => {
             
             setIsPersonModalOpen(false); // Close person modal first
             setZeModal({
-                isOpen: true, // MUST be true
+                isOpen: true, 
                 title: 'Sucesso!',
                 message: `${personMode === 'WORKER' ? 'Profissional' : 'Fornecedor'} salvo com sucesso.`,
                 confirmText: 'Ok',
-                onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })), // Keep previous logic to use prev state if needed for other properties
+                onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })), 
                 type: 'SUCCESS',
-                isConfirming: false // Ensure it's not confirming
+                isConfirming: false 
             });
             console.log("[handleSavePerson] Person modal closed, success ZeModal shown. Reloading data...");
             await load(); // Reload data after showing success
@@ -493,18 +493,18 @@ const WorkDetail: React.FC = () => {
             }
 
             setZeModal({
-                isOpen: true, // MUST be true
+                isOpen: true, 
                 title: 'Erro ao Salvar!',
                 message: userMessage,
                 confirmText: 'Entendido',
-                onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })), // Keep previous logic
+                onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })), 
                 type: 'ERROR',
-                isConfirming: false // Ensure it's not confirming
+                isConfirming: false 
             });
             console.log("[handleSavePerson] Error occurred, error ZeModal shown.");
 
         } finally {
-            setIsPersonSaving(false); // End saving
+            setIsPersonSaving(false); 
             console.log("[handleSavePerson] Finally block: isPersonSaving set to false.");
         }
     };
@@ -517,41 +517,40 @@ const WorkDetail: React.FC = () => {
             confirmText: 'Remover', 
             type: 'DANGER',
             onConfirm: async () => { 
-                setZeModal(prev => ({ ...prev, isConfirming: true })); // Indicate action is confirming
+                setZeModal(prev => ({ ...prev, isConfirming: true })); 
                 console.log(`[handleDeletePerson] Deleting ${mode} ${pid} from work ${wid}.`);
                 try {
                     if (mode === 'WORKER') await dbService.deleteWorker(pid, wid); 
                     else await dbService.deleteSupplier(pid, wid); 
                     
-                    // FIX: Ensure success modal is explicitly opened with isOpen: true and not confirming
                     setZeModal({ 
-                        isOpen: true, // MUST be true
+                        isOpen: true, 
                         title: 'Sucesso!', 
                         message: `${mode === 'WORKER' ? 'Profissional' : 'Fornecedor'} removido com sucesso.`, 
                         confirmText: 'Ok', 
                         onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })), 
                         type: 'SUCCESS',
-                        isConfirming: false // Not confirming anymore
+                        isConfirming: false 
                     });
                     console.log(`[handleDeletePerson] ${mode} deleted, success ZeModal shown. Reloading data...`);
-                    await load(); // Reload after success message is shown
+                    await load(); 
                     console.log(`[handleDeletePerson] Data reloaded.`);
 
                 }                   catch (error: any) {
                     console.error(`Erro ao deletar ${mode === 'WORKER' ? 'profissional' : 'fornecedor'}:`, error);
                     setZeModal({ 
-                        isOpen: true, // MUST be true
+                        isOpen: true, 
                         title: 'Erro!', 
                         message: `Não foi possível remover: ${error.message}`, 
                         confirmText: 'Entendido', 
                         onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })), 
                         type: 'ERROR',
-                        isConfirming: false // Not confirming anymore
+                        isConfirming: false 
                     });
                     console.log(`[handleDeletePerson] Error occurred, error ZeModal shown.`);
 
                 } finally {
-                    setZeModal(prev => ({ ...prev, isConfirming: false })); // Reset confirming state
+                    setZeModal(prev => ({ ...prev, isConfirming: false })); 
                     console.log("[handleDeletePerson] Finally block: isConfirming reset.");
 
                 }
@@ -606,7 +605,7 @@ const WorkDetail: React.FC = () => {
             confirmText: 'Entendido',
             type: 'INFO',
             onCancel: () => setZeModal(prev => ({...prev, isOpen: false})),
-            isConfirming: false // Ensure not confirming
+            isConfirming: false
         });
     };
 
@@ -719,7 +718,7 @@ const WorkDetail: React.FC = () => {
       });
 
       expenses.forEach(exp => {
-        const category = exp.category as ExpenseCategory;
+        const category = exp.category as ExpenseCategory; // Type assertion here
         if (!groups[category]) { // Defensive check
             groups[category] = { totalCategoryAmount: 0, steps: {}, unlinkedExpenses: [] };
         }
@@ -738,10 +737,12 @@ const WorkDetail: React.FC = () => {
         }
       });
 
-      (Object.values(groups) as Array<GroupedExpenses[ExpenseCategory]>).forEach(group => {
-        group.unlinkedExpenses.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-        (Object.values(group.steps) as ExpenseStepGroup[]).forEach(stepGroup => {
-          stepGroup.expenses.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      // FIX: Simplified type assertion for Object.values to avoid potential compiler confusion
+      // and explicitly typed the 'group' and 'stepGroup' parameters in forEach callbacks.
+      (Object.values(groups) as any[]).forEach((group: { unlinkedExpenses: Expense[], steps: { [key: string]: ExpenseStepGroup } }) => {
+        group.unlinkedExpenses.sort((a: Expense, b: Expense) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        (Object.values(group.steps) as any[]).forEach((stepGroup: ExpenseStepGroup) => {
+          stepGroup.expenses.sort((a: Expense, b: Expense) => new Date(b.date).getTime() - new Date(a.date).getTime());
         });
       });
       
@@ -802,10 +803,10 @@ const WorkDetail: React.FC = () => {
 
         // Condição de "nenhum material encontrado" mais abrangente
         if (
-            (filteredSteps.length === 0 && !hasUnlinkedMaterials && mainMaterialFilterStepId === 'ALL') || // Não há etapas nem materiais sem etapa, e filtro é "TODOS"
-            (mainMaterialFilterStepId === 'UNLINKED' && !hasUnlinkedMaterials) || // Filtro por sem etapa, mas não há materiais sem etapa
+            (filteredSteps.length === 0 && !hasUnlinkedMaterials && mainMaterialFilterStepId === 'ALL') || 
+            (mainMaterialFilterStepId === 'UNLINKED' && !hasUnlinkedMaterials) || 
             (mainMaterialFilterStepId !== 'ALL' && mainMaterialFilterStepId !== 'UNLINKED' && 
-             !materials.some(m => m.stepId === mainMaterialFilterStepId)) // Filtro por etapa específica, mas não há materiais para ela
+             !materials.some(m => m.stepId === mainMaterialFilterStepId)) 
         ) {
             return (
                 <p className="text-center text-slate-400 py-8 italic text-sm mx-2 sm:mx-0">
@@ -907,13 +908,13 @@ const WorkDetail: React.FC = () => {
         }
         return renderedContent;
     };
-    // FIM Helper para renderizar a lista de materiais
 
     if (authLoading || !isUserAuthFinished || loading) return <div className="h-screen flex items-center justify-center"><i className="fa-solid fa-circle-notch fa-spin text-3xl text-primary"></i></div>;
     if (!work) return <div className="text-center py-10">Obra não encontrada.</div>;
 
-    // Add explicit React.FC type to functional components
-    const RenderCronogramaReport: React.FC = () => (
+    // FIX: Changed React.FC to a direct functional component with explicit return type
+    // to work around "Cannot find namespace 'JSX'" without modifying tsconfig.json.
+    const RenderCronogramaReport = (): React.JSX.Element => (
         <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 shadow-md dark:shadow-card-dark-subtle animate-in fade-in">
             <h3 className="font-bold text-xl text-primary dark:text-white mb-6">Cronograma Detalhado</h3>
             <div className="space-y-4">
@@ -944,8 +945,9 @@ const WorkDetail: React.FC = () => {
         </div>
     );
 
-    // Add explicit React.FC type to functional components
-    const RenderMateriaisReport: React.FC = () => {
+    // FIX: Changed React.FC to a direct functional component with explicit return type
+    // to work around "Cannot find namespace 'JSX'" without modifying tsconfig.json.
+    const RenderMateriaisReport = (): React.JSX.Element => {
         const filteredMaterials = reportMaterialFilterStepId === 'ALL'
             ? materials
             : materials.filter(m => m.stepId === reportMaterialFilterStepId);
@@ -977,7 +979,7 @@ const WorkDetail: React.FC = () => {
                         .filter(step => reportMaterialFilterStepId === 'ALL' || step.id === reportMaterialFilterStepId)
                         .map(step => {
                             const stepMats = filteredMaterials.filter(m => m.stepId === step.id);
-                            if (stepMats.length === 0) return null; // Only render step if it has filtered materials
+                            if (stepMats.length === 0) return null; 
                             return (
                                 <div key={step.id} className="mb-6 bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm last:mb-0">
                                     <h4 className="font-black uppercase text-secondary mb-3 border-b border-slate-200 dark:border-slate-700 pb-2 text-base">{step.name}</h4>
@@ -1009,8 +1011,9 @@ const WorkDetail: React.FC = () => {
     };
 
 
-    // Add explicit React.FC type to functional components
-    const RenderFinanceiroReport: React.FC = () => (
+    // FIX: Changed React.FC to a direct functional component with explicit return type
+    // to work around "Cannot find namespace 'JSX'" without modifying tsconfig.json.
+    const RenderFinanceiroReport = (): React.JSX.Element => (
         <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 shadow-md dark:shadow-card-dark-subtle animate-in fade-in">
             <h3 className="font-bold text-xl text-primary dark:text-white mb-6">Lançamentos Financeiros</h3>
             {(Object.values(ExpenseCategory) as ExpenseCategory[]).map(category => {
@@ -1067,6 +1070,7 @@ const WorkDetail: React.FC = () => {
 
                                         <div className="space-y-2 pl-3 border-l-2 border-slate-100 dark:border-slate-800 ml-3">
                                             {stepGroup.expenses.map(e => {
+                                                // FIX: Corrected typo 'totalAgumeded' to 'totalAgreed'.
                                                 const isEmpreita = e.totalAgreed && e.totalAgreed > 0;
                                                 let statusText = '';
                                                 let progress = 0;
@@ -1100,10 +1104,10 @@ const WorkDetail: React.FC = () => {
                                                         </div>
                                                     );
                                                 })}
-                                                            </div>
-                                                        </div>
-                                                    );
-                                                })}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
 
                                                 {/* Unlinked expenses within this category */}
                                                 {groupedExpenses[category].unlinkedExpenses.length > 0 && (
@@ -1149,47 +1153,42 @@ const WorkDetail: React.FC = () => {
                                                             </div>
                                                         </div>
                                                     )}
-                                                </div>
+                                                </div> 
                                             );
                                         })
                                     )}
                                 </div>
                             )}
 
-                    {/*
-                        Fix: Apply type assertion `(activeTab as string)` to resolve TypeScript errors
-                        where `activeTab` was being incorrectly inferred as an object instead of a string literal.
-                        This ensures the comparison `activeTab === 'FERRAMENTAS'` (and similar) is correctly evaluated.
-                    */}
                     {(activeTab as string) === 'FERRAMENTAS' && (
                         <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4 animate-in fade-in">
                             {/* Bloco 1: Equipe */}
                             <button onClick={() => setSubView('WORKERS')} className="p-4 bg-white dark:bg-slate-900 rounded-3xl flex flex-col items-center shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800 hover:shadow-md transition-shadow" aria-label="Gerenciar Equipe">
-                                <i className="fa-solid fa-users text-xl mb-1 text-primary dark:text-white"></i> {/* Adjusted for dark mode */}
+                                <i className="fa-solid fa-users text-xl mb-1 text-primary dark:text-white"></i> 
                                 <span className="font-bold text-primary dark:text-white text-xs">Equipe</span>
                             </button>
 
                             {/* Bloco 2: Fornecedores */}
                             <button onClick={() => setSubView('SUPPLIERS')} className="p-4 bg-white dark:bg-slate-900 rounded-3xl flex flex-col items-center shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800 hover:shadow-md transition-shadow" aria-label="Gerenciar Fornecedores">
-                                <i className="fa-solid fa-truck-field text-xl mb-1 text-primary dark:text-white"></i> {/* Adjusted for dark mode */}
+                                <i className="fa-solid fa-truck-field text-xl mb-1 text-primary dark:text-white"></i> 
                                 <span className="font-bold text-primary dark:text-white text-xs">Fornecedores</span>
                             </button>
 
                             {/* Bloco 3: Relatórios */}
                             <button onClick={() => setSubView('REPORTS')} className="p-4 bg-white dark:bg-slate-900 rounded-3xl flex flex-col items-center shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800 hover:shadow-md transition-shadow" aria-label="Gerar Relatórios">
-                                <i className="fa-solid fa-file-contract text-xl mb-1 text-primary dark:text-white"></i> {/* Adjusted for dark mode */}
+                                <i className="fa-solid fa-file-contract text-xl mb-1 text-primary dark:text-white"></i> 
                                 <span className="font-bold text-primary dark:text-white text-xs">Relatórios</span>
                             </button>
                             
                             {/* Bloco 4: Fotos */}
                             <button onClick={() => setSubView('PHOTOS')} className="p-4 bg-white dark:bg-slate-900 rounded-3xl flex flex-col items-center shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800 hover:shadow-md transition-shadow" aria-label="Ver Fotos da Obra">
-                                <i className="fa-solid fa-camera text-xl mb-1 text-primary dark:text-white"></i> {/* Adjusted for dark mode */}
+                                <i className="fa-solid fa-camera text-xl mb-1 text-primary dark:text-white"></i> 
                                 <span className="font-bold text-primary dark:text-white text-xs">Fotos</span>
                             </button>
 
                             {/* Bloco 5: Arquivos & Projetos */}
                             <button onClick={() => setSubView('PROJECTS')} className="p-4 bg-white dark:bg-slate-900 rounded-3xl flex flex-col items-center shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800 hover:shadow-md transition-shadow" aria-label="Gerenciar Arquivos">
-                                <i className="fa-solid fa-folder text-xl mb-1 text-primary dark:text-white"></i> {/* Adjusted for dark mode */}
+                                <i className="fa-solid fa-folder text-xl mb-1 text-primary dark:text-white"></i> 
                                 <span className="font-bold text-primary dark:text-white text-xs">Arquivos</span>
                             </button>
 
@@ -1207,23 +1206,4 @@ const WorkDetail: React.FC = () => {
                                 )}
                                 <div className={`${!hasLifetimeAccess ? 'opacity-30 pointer-events-none' : ''}`}>
                                     <div className="flex items-center gap-4 mb-6">
-                                        <div className="w-14 h-14 rounded-full bg-secondary text-white flex items-center justify-center text-2xl shrink-0 shadow-lg">
-                                            <i className="fa-solid fa-crown"></i>
-                                        </div>
-                                        <div>
-                                            <h2 className="text-2xl font-black text-white mb-1 tracking-tight">Bônus Vitalícios</h2>
-                                            <p className="text-amber-200 text-sm font-medium">Desbloqueie ferramentas premium para sua obra.</p>
-                                        </div>
-                                    </div>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                        {/* Bônus: Contratos */}
-                                        <button onClick={() => setSubView('CONTRACTS')} className="p-4 rounded-2xl border-2 border-slate-700 bg-gradient-to-br from-amber-600 to-orange-700 hover:from-amber-500 hover:to-orange-600 transition-all flex flex-col items-center text-center shadow-md text-white">
-                                            <i className="fa-solid fa-file-contract text-2xl mb-2"></i>
-                                            <span className="font-black text-sm">Contratos</span>
-                                            <span className="text-[10px] text-amber-100 mt-1">Modelos profissionais</span>
-                                        </button>
-                                        {/* Bônus: Calculadoras */}
-                                        <button onClick={() => setIsCalculatorModalOpen(true)} className="p-4 rounded-2xl border-2 border-slate-700 bg-gradient-to-br from-green-600 to-emerald-700 hover:from-green-500 hover:to-emerald-600 transition-all flex flex-col items-center text-center shadow-md text-white">
-                                            <i className="fa-solid fa-calculator text-2xl mb-2"></i>
-                                            <span className="font-black text-sm">Calculadoras</span>
-                                            <span className="text-[10px] text-green-100 mt-1">Piso, parede, pintura
+                                        <div className="w-14 h-14 rounded-full bg-secondary text-white
