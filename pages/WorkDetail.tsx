@@ -1,6 +1,5 @@
 
-
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, type FC } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import { useAuth } from '../contexts/AuthContext.tsx';
@@ -8,7 +7,8 @@ import { dbService } from '../services/db.ts';
 import { StepStatus, FileCategory, ExpenseCategory, type Work, type Worker, type Supplier, type Material, type Step, type Expense, type WorkPhoto, type WorkFile, type Contract, type Checklist, type ChecklistItem, PlanType } from '../types.ts';
 import { ZeModal } from '../components/ZeModal.tsx';
 import { STANDARD_JOB_ROLES, STANDARD_SUPPLIER_CATEGORIES, ZE_AVATAR, ZE_AVATAR_FALLBACK, CONTRACT_TEMPLATES, CHECKLIST_TEMPLATES } from '../services/standards.ts';
-import type { FC } from 'react'; // NEW: Explicitly import FC type
+// NEW: Explicitly import FC type
+// Fix: Combine `FC` type import with the main `React` import to ensure `React` namespace is correctly handled.
 
 // --- TYPES FOR VIEW STATE ---
 type MainTab = 'ETAPAS' | 'MATERIAIS' | 'FINANCEIRO' | 'FERRAMENTAS';
@@ -880,7 +880,7 @@ const WorkDetail: React.FC = () => {
     if (!work) return <div className="text-center py-10">Obra não encontrada.</div>;
 
     // Add explicit React.FC type to functional components
-    const RenderCronogramaReport: FC = () => (
+    const RenderCronogramaReport: React.FC = () => (
         <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 shadow-md dark:shadow-card-dark-subtle animate-in fade-in">
             <h3 className="font-bold text-xl text-primary dark:text-white mb-6">Cronograma Detalhado</h3>
             <div className="space-y-4">
@@ -912,7 +912,7 @@ const WorkDetail: React.FC = () => {
     );
 
     // Add explicit React.FC type to functional components
-    const RenderMateriaisReport: FC = () => {
+    const RenderMateriaisReport: React.FC = () => {
         const filteredMaterials = reportMaterialFilterStepId === 'ALL'
             ? materials
             : materials.filter(m => m.stepId === reportMaterialFilterStepId);
@@ -977,7 +977,7 @@ const WorkDetail: React.FC = () => {
 
 
     // Add explicit React.FC type to functional components
-    const RenderFinanceiroReport: FC = () => (
+    const RenderFinanceiroReport: React.FC = () => (
         <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 shadow-md dark:shadow-card-dark-subtle animate-in fade-in">
             <h3 className="font-bold text-xl text-primary dark:text-white mb-6">Lançamentos Financeiros</h3>
             {Object.values(ExpenseCategory).map(category => {
