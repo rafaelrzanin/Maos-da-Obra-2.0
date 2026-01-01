@@ -38,6 +38,8 @@ interface AuthContextType {
   trialDaysRemaining: number | null;
   unreadNotificationsCount: number; // NEW: Unread notifications count
   refreshNotifications: () => Promise<void>; // NEW: Function to refresh notification count
+  requestPushNotificationPermission: () => Promise<void>; // NEW: Function to request push permission
+  pushSubscriptionStatus: 'idle' | 'prompting' | 'granted' | 'denied' | 'error'; // NEW: Status of push notifications
 }
 
 const AuthContext = createContext<AuthContextType>(null!);
@@ -48,6 +50,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [authLoading, setAuthLoading] = useState(true); // Initial state: true, as we're loading auth
   const [isUserAuthFinished, setIsUserAuthFinished] = useState(false); // NEW: Initially false
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0); // NEW
+  const [pushSubscriptionStatus, setPushSubscriptionStatus] = useState<'idle' | 'prompting' | 'granted' | 'denied' | 'error'>('idle'); // NEW
 
   console.log("[AuthProvider] Component rendered. Initial authLoading:", authLoading, "isUserAuthFinished:", isUserAuthFinished);
 
@@ -57,6 +60,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
         const notifications = await dbService.getNotifications(user.id);
         setUnreadNotificationsCount(notifications.length);
+        console.log(`[AuthContext] Unread notifications count: ${notifications.length}`);
       } catch (error) {
         console.error("Error refreshing notifications:", error);
         setUnreadNotificationsCount(0);
@@ -65,6 +69,77 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUnreadNotificationsCount(0);
     }
   }, [user]); // Depends on `user`
+
+  // NEW: Push Notification Permission Logic
+  const requestPushNotificationPermission = useCallback(async () => {
+    if (!('serviceWorker' in navigator) || !('Notification' in window) || !user?.id) {
+      console.warn("Push notifications not supported by this browser or user not logged in.");
+      setPushSubscriptionStatus('error');
+      return;
+    }
+
+    console.log(`[Push Notif] Current Notification.permission: ${Notification.permission}`);
+    const hasPromptedOnce = localStorage.getItem('hasPromptedPushOnce');
+    console.log(`[Push Notif] Has prompted before (localStorage): ${hasPromptedOnce}`);
+
+    if (Notification.permission === 'granted') {
+      setPushSubscriptionStatus('granted');
+      console.log("[Push Notif] Notification permission already granted. Ensuring subscription is active.");
+      try {
+        const registration = await navigator.serviceWorker.ready;
+        const subscription = await registration.pushManager.getSubscription();
+        if (!subscription) {
+          console.log("[Push Notif] No existing push subscription found, creating a new one.");
+          const newSubscription = await registration.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: import.meta.env.VITE_VAPID_PUBLIC_KEY, // Use VITE_ prefix for client
+          });
+          await dbService.savePushSubscription(user.id, newSubscription.toJSON());
+        } else {
+          console.log("[Push Notif] Existing push subscription found.");
+        }
+      } catch (err) {
+        console.error("[Push Notif] Error managing push subscription:", err);
+        setPushSubscriptionStatus('error');
+      }
+      return;
+    }
+
+    if (Notification.permission === 'denied') {
+      setPushSubscriptionStatus('denied');
+      console.warn("[Push Notif] Notification permission previously denied by user.");
+      return;
+    }
+
+    // Only prompt if permission is 'default' and we haven't prompted before in this session/app lifetime
+    if (Notification.permission === 'default' && !hasPromptedOnce) {
+      setPushSubscriptionStatus('prompting');
+      console.log("[Push Notif] Requesting notification permission from user...");
+      localStorage.setItem('hasPromptedPushOnce', 'true'); // Set flag immediately
+
+      try {
+        const permissionResult = await Notification.requestPermission();
+        if (permissionResult === 'granted') {
+          setPushSubscriptionStatus('granted');
+          console.log("[Push Notif] Notification permission granted by user!");
+          const registration = await navigator.serviceWorker.ready;
+          const subscription = await registration.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: import.meta.env.VITE_VAPID_PUBLIC_KEY, // Use VITE_ prefix for client
+          });
+          await dbService.savePushSubscription(user.id, subscription.toJSON());
+        } else {
+          setPushSubscriptionStatus('denied');
+          console.warn("[Push Notif] Notification permission denied by user.");
+        }
+      } catch (err) {
+        console.error("[Push Notif] Error requesting notification permission:", err);
+        setPushSubscriptionStatus('error');
+      }
+    } else if (Notification.permission === 'default' && hasPromptedOnce) {
+        console.log("[Push Notif] Notification permission is default, but already prompted once. Not prompting again.");
+    }
+  }, [user]); // Only re-create if `user` changes
 
   useEffect(() => {
     let mounted = true;
@@ -78,6 +153,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const currentUser = await dbService.getCurrentUser();
         if (mounted) {
           setUser(currentUser);
+          if (currentUser) {
+            await refreshNotifications(); // Refresh notifications on initial load
+          }
         }
       } catch (error) {
         console.error("[AuthContext] Error during initial auth check:", error);
@@ -105,9 +183,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (mounted) {
         setUser(user);
         if (user) {
-          refreshNotifications(); 
+          await refreshNotifications(); 
+          // REMOVIDO: A chamada a requestPushNotificationPermission daqui. Será feita no Dashboard.
         } else {
           setUnreadNotificationsCount(0); // Limpa notificações no logout
+          setPushSubscriptionStatus('idle'); // Reset push status on logout
         }
         setIsUserAuthFinished(true); // Garante que auth esteja marcado como finished após qualquer evento
       }
@@ -118,7 +198,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       unsubscribe();
       console.log("[AuthContext] Main useEffect cleanup: Auth listener unsubscribed.");
     };
-  }, []); // <--- CRÍTICO: Array de dependências vazio para garantir que o useEffect rode apenas uma vez.
+  }, [refreshNotifications]); // requestPushNotificationPermission foi removido dos deps
 
   const isSubscriptionValid = useMemo(() => user ? dbService.isSubscriptionActive(user) : false, [user]);
   const isNewAccount = useMemo(() => user ? !user.subscriptionExpiresAt : true, [user]);
@@ -140,10 +220,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           const currentUser = await dbService.syncSession();
           if (currentUser) {
             setUser(currentUser);
-            refreshNotifications(); // Refresh notifications after user data is refreshed
+            await refreshNotifications(); // Refresh notifications after user data is refreshed
+            // REMOVIDO: A chamada a requestPushNotificationPermission daqui. Será feita no Dashboard.
           } else {
             setUser(null); // Clear user if session sync fails
             setUnreadNotificationsCount(0); // Clear notifications
+            setPushSubscriptionStatus('idle'); // Reset push status
           }
       } finally {
           setAuthLoading(false); // Loading complete
@@ -159,7 +241,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         if (u) {
             setUser(u);
-            refreshNotifications(); // Refresh notifications on successful login
+            await refreshNotifications(); // Refresh notifications on successful login
+            // REMOVIDO: A chamada a requestPushNotificationPermission daqui. Será feita no Dashboard.
             console.log("[AuthContext] login successful. User:", u ? u.email : 'null');
             return true;
         }
@@ -201,7 +284,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const u = await dbService.signup(name, email, whatsapp, password, cpf, planType);
         if (u) {
             setUser(u);
-            refreshNotifications(); // Refresh notifications on successful signup
+            await refreshNotifications(); // Refresh notifications on successful signup
+            // REMOVIDO: A chamada a requestPushNotificationPermission daqui. Será feita no Dashboard.
             console.log("[AuthContext] signup successful. User:", u ? u.email : 'null');
             return true;
         }
@@ -233,6 +317,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       try {
           await dbService.updatePlan(user.id, plan);
           await refreshUser(); // Refresh user to get updated plan details
+          await refreshNotifications(); // NEW: Refresh notifications after plan update
       } finally {
           setAuthLoading(false); // Loading complete
           console.log("[AuthContext] updatePlan finished. Setting authLoading to false.");
@@ -241,8 +326,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   return (
-    <AuthContext.Provider value={{ user, authLoading, isUserAuthFinished, login, signup, logout, updatePlan, refreshUser, isSubscriptionValid, isNewAccount, trialDaysRemaining, unreadNotificationsCount, refreshNotifications }}>
+    <AuthContext.Provider value={{ user, authLoading, isUserAuthFinished, login, signup, logout, updatePlan, refreshUser, isSubscriptionValid, isNewAccount, trialDaysRemaining, unreadNotificationsCount, refreshNotifications, requestPushNotificationPermission, pushSubscriptionStatus }}>
       {children}
     </AuthContext.Provider>
   );
 };
+    

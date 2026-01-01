@@ -342,7 +342,7 @@ const EmptyDashboard = ({ onOpenCreateWork }: { onOpenCreateWork: () => void }) 
 };
 
 const Dashboard: React.FC = () => {
-  const { user, authLoading, isUserAuthFinished } = useAuth();
+  const { user, authLoading, isUserAuthFinished, requestPushNotificationPermission, pushSubscriptionStatus } = useAuth(); // NEW: Destructure requestPushNotificationPermission and pushSubscriptionStatus
   const navigate = useNavigate();
   const [works, setWorks] = useState<Work[]>([]);
   const [loading, setLoading] = useState(true);
@@ -422,7 +422,15 @@ const Dashboard: React.FC = () => {
     if (!focusWork || !works.some(w => w.id === focusWork.id)) {
         loadDashboardData();
     }
-  }, [loadDashboardData, focusWork, works]); // Now depends on works and focusWork for re-evaluation
+    // NEW: Request push notification permission when dashboard loads if user is authenticated and not prompted before
+    // This runs AFTER initial auth check is finished.
+    if (isUserAuthFinished && user) { // Check user exists and auth is finished
+        console.log(`[Dashboard useEffect] Checking push notification permission. Current status: ${pushSubscriptionStatus}`);
+        if (pushSubscriptionStatus === 'idle' || (Notification.permission === 'default' && !localStorage.getItem('hasPromptedPushOnce'))) {
+            requestPushNotificationPermission();
+        }
+    }
+  }, [loadDashboardData, focusWork, works, isUserAuthFinished, user, requestPushNotificationPermission, pushSubscriptionStatus]); // Now depends on works and focusWork for re-evaluation
 
   const handleWorkSelect = async (e: React.ChangeEvent<HTMLSelectElement>) => {
     const selectedWorkId = e.target.value;
@@ -703,3 +711,4 @@ const Dashboard: React.FC = () => {
 };
 
 export default Dashboard;
+    

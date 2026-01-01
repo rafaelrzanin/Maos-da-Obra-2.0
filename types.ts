@@ -217,6 +217,7 @@ declare global {
     readonly VITE_SUPABASE_ANON_KEY: string;
     readonly VITE_VAPID_PUBLIC_KEY: string; // Adicionado explicitamente para client-side
     readonly VITE_GOOGLE_API_KEY: string; // NEW: Adicionado para a chave da IA com o nome específico
+    readonly VITE_APP_URL: string; // NEW: Adicionado para o URL base do aplicativo
     // Add an index signature to allow dynamic access with string keys
     [key: string]: string | undefined; 
   }
@@ -237,6 +238,7 @@ declare global {
       // Adicionado explicitamente para serverless functions/process.env
       readonly VITE_SUPABASE_URL: string; 
       readonly VITE_SUPABASE_ANON_KEY: string;
+      readonly VITE_APP_URL: string; // NEW: Adicionado para o URL base do aplicativo (server-side)
       // Add an index signature to allow dynamic access with string keys
       [key: string]: string | undefined; 
     }

@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect, useCallback, useMemo, type FC } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import { useAuth } from '../contexts/AuthContext.tsx';
@@ -7,13 +6,30 @@ import { dbService } from '../services/db.ts';
 import { StepStatus, FileCategory, ExpenseCategory, type Work, type Worker, type Supplier, type Material, type Step, type Expense, type WorkPhoto, type WorkFile, type Contract, type Checklist, type ChecklistItem, PlanType } from '../types.ts';
 import { ZeModal } from '../components/ZeModal.tsx';
 import { STANDARD_JOB_ROLES, STANDARD_SUPPLIER_CATEGORIES, ZE_AVATAR, ZE_AVATAR_FALLBACK, CONTRACT_TEMPLATES, CHECKLIST_TEMPLATES } from '../services/standards.ts';
-// NEW: Explicitly import FC type
 // Fix: Combine `FC` type import with the main `React` import to ensure `React` namespace is correctly handled.
 
 // --- TYPES FOR VIEW STATE ---
 type MainTab = 'ETAPAS' | 'MATERIAIS' | 'FINANCEIRO' | 'FERRAMENTAS';
 type SubView = 'NONE' | 'WORKERS' | 'SUPPLIERS' | 'REPORTS' | 'PHOTOS' | 'PROJECTS' | 'CALCULATORS' | 'CONTRACTS' | 'CHECKLIST' | 'AICHAT';
 type ReportSubTab = 'CRONOGRAMA' | 'MATERIAIS' | 'FINANCEIRO';
+
+// Define a type for a single step group inside expenses
+interface ExpenseStepGroup {
+    stepName: string;
+    expenses: Expense[];
+    totalStepAmount: number;
+}
+
+// Define the full structure of groupedExpenses
+interface GroupedExpenses {
+    [category: string]: {
+        totalCategoryAmount: number;
+        steps: {
+            [stepId: string]: ExpenseStepGroup;
+        };
+        unlinkedExpenses: Expense[];
+    };
+}
 
 // --- DATE HELPERS ---
 const parseDateNoTimezone = (dateStr: string) => {
@@ -656,11 +672,37 @@ const WorkDetail: React.FC = () => {
     // NEW: Handle delete checklist item
     const handleDeleteChecklistItem = async (itemId: string) => {
         if (!editingChecklist || !work) return;
-        const updatedItems = editingChecklist.items.filter(item => item.id !== itemId);
-        const updatedChecklist = { ...editingChecklist, items: updatedItems };
-        setEditingChecklist(updatedChecklist); // Optimistic UI update
-        await dbService.updateChecklist(updatedChecklist);
-        await load(); // Reload all to keep state in sync
+        setZeModal({
+            isOpen: true,
+            title: 'Remover Item?',
+            message: 'Tem certeza que deseja remover este item da lista?',
+            confirmText: 'Remover',
+            type: 'DANGER',
+            onConfirm: async () => {
+                setZeModal(prev => ({ ...prev, isConfirming: true }));
+                try {
+                    const updatedItems = editingChecklist.items.filter(item => item.id !== itemId);
+                    const updatedChecklist = { ...editingChecklist, items: updatedItems };
+                    setEditingChecklist(updatedChecklist); // Optimistic UI update
+                    await dbService.updateChecklist(updatedChecklist);
+                    await load(); // Reload all to keep state in sync
+                    setZeModal(prev => ({ ...prev, isOpen: false }));
+                } catch (error: any) {
+                    console.error("Erro ao remover item do checklist:", error);
+                    setZeModal({
+                        isOpen: true,
+                        title: 'Erro!',
+                        message: `Não foi possível remover o item: ${error.message}`,
+                        confirmText: 'Entendido',
+                        onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
+                        type: 'ERROR'
+                    });
+                } finally {
+                    setZeModal(prev => ({ ...prev, isConfirming: false }));
+                }
+            },
+            onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false }))
+        });
     };
 
     // NEW: Handle editing checklist (opening modal)
@@ -669,27 +711,18 @@ const WorkDetail: React.FC = () => {
         setIsChecklistModalOpen(true);
     };
 
-    const groupedExpenses = useMemo(() => {
-      const groups: {
-        [category: string]: {
-          totalCategoryAmount: number;
-          steps: {
-            [stepId: string]: {
-              stepName: string;
-              expenses: Expense[];
-              totalStepAmount: number;
-            };
-          };
-          unlinkedExpenses: Expense[];
-        };
-      } = {};
+    const groupedExpenses = useMemo<GroupedExpenses>(() => {
+      const groups: GroupedExpenses = {};
 
-      Object.values(ExpenseCategory).forEach(cat => {
+      Object.values(ExpenseCategory).forEach((cat: ExpenseCategory) => { // Explicitly type cat
         groups[cat] = { totalCategoryAmount: 0, steps: {}, unlinkedExpenses: [] };
       });
 
       expenses.forEach(exp => {
-        const category = exp.category as ExpenseCategory;
+        const category = exp.category as ExpenseCategory; // Type assertion here
+        if (!groups[category]) { // Defensive check
+            groups[category] = { totalCategoryAmount: 0, steps: {}, unlinkedExpenses: [] };
+        }
         groups[category].totalCategoryAmount += exp.amount;
 
         if (exp.stepId) {
@@ -705,9 +738,9 @@ const WorkDetail: React.FC = () => {
         }
       });
 
-      Object.values(groups).forEach(group => {
+      (Object.values(groups) as Array<GroupedExpenses[keyof GroupedExpenses]>).forEach(group => {
         group.unlinkedExpenses.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-        Object.values(group.steps).forEach(stepGroup => {
+        (Object.values(group.steps) as ExpenseStepGroup[]).forEach(stepGroup => { // Type assertion here
           stepGroup.expenses.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
         });
       });
@@ -980,8 +1013,8 @@ const WorkDetail: React.FC = () => {
     const RenderFinanceiroReport: React.FC = () => (
         <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 shadow-md dark:shadow-card-dark-subtle animate-in fade-in">
             <h3 className="font-bold text-xl text-primary dark:text-white mb-6">Lançamentos Financeiros</h3>
-            {Object.values(ExpenseCategory).map(category => {
-                const expensesInCategory = Object.values(groupedExpenses[category].steps).flatMap(stepGroup => stepGroup.expenses).concat(groupedExpenses[category].unlinkedExpenses);
+            {(Object.values(ExpenseCategory) as ExpenseCategory[]).map(category => {
+                const expensesInCategory = (Object.values(groupedExpenses[category].steps) as ExpenseStepGroup[]).flatMap(stepGroup => stepGroup.expenses).concat(groupedExpenses[category].unlinkedExpenses);
                 if (expensesInCategory.length === 0) return null;
 
                 return (
@@ -990,277 +1023,83 @@ const WorkDetail: React.FC = () => {
                             {category} <span className="text-secondary">({formatCurrency(groupedExpenses[category].totalCategoryAmount)})</span>
                         </h4>
                         <div className="space-y-4">
-                            {Object.keys(groupedExpenses[category].steps).filter(stepId => groupedExpenses[category].steps[stepId].expenses.length > 0).map(stepId => {
-                                const stepGroup = groupedExpenses[category].steps[stepId];
-                                return (
-                                    <div key={stepId} className="pl-4 border-l-4 border-secondary/20 dark:border-secondary/30">
-                                        <h5 className="font-bold text-base text-primary dark:text-white mb-2">{stepGroup.stepName} <span className="text-slate-500 dark:text-slate-400 text-sm">({formatCurrency(stepGroup.totalStepAmount)})</span></h5>
-                                        <div className="space-y-2">
-                                            {stepGroup.expenses.map(e => (
-                                                <div key={e.id} className="flex justify-between text-sm py-1 bg-white dark:bg-slate-900 rounded-lg px-3 py-2 border border-slate-100 dark:border-slate-700">
-                                                    <span className="text-slate-700 dark:text-slate-300">{e.description}</span>
-                                                    <span className="font-bold text-primary dark:text-white">{formatCurrency(e.amount)}</span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                            {groupedExpenses[category].unlinkedExpenses.length > 0 && (
-                                <div className="pl-4 border-l-4 border-slate-300 dark:border-slate-600 mt-6">
-                                    <h5 className="font-bold text-base text-slate-500 dark:text-slate-400 mb-2">Sem Etapa Específica</h5>
-                                    <div className="space-y-2">
-                                        {groupedExpenses[category].unlinkedExpenses.map(e => (
-                                            <div key={e.id} className="flex justify-between text-sm py-1 bg-white dark:bg-slate-900 rounded-lg px-3 py-2 border border-slate-100 dark:border-slate-700">
-                                                <span className="text-slate-700 dark:text-slate-300">{e.description}</span>
-                                                <span className="font-bold text-primary dark:text-white">{formatCurrency(e.amount)}</span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    );
-                })}
-            </div>
-        );
-
-
-    if (authLoading || !isUserAuthFinished || loading) return <div className="h-screen flex items-center justify-center"><i className="fa-solid fa-circle-notch fa-spin text-3xl text-primary"></i></div>;
-    if (!work) return <div className="text-center py-10">Obra não encontrada.</div>;
-
-    return (
-        <div className="max-w-4xl mx-auto py-8 px-4 md:px-0 pb-24">
-            <div className="flex items-center justify-between mb-8">
-                <button onClick={() => subView === 'NONE' ? navigate('/') : setSubView('NONE')} className="text-slate-400 hover:text-primary" aria-label="Voltar"><i className="fa-solid fa-arrow-left text-xl"></i></button>
-                <h1 className="text-2xl font-black text-primary dark:text-white">{work.name}</h1>
-                <div className="w-10"></div>
-            </div>
-
-            {subView === 'NONE' ? (
-                <>
-                    <nav className="fixed bottom-0 left-0 w-full bg-white dark:bg-slate-900 border-t z-50 flex justify-around p-2 md:static md:bg-slate-100 md:rounded-2xl md:mb-6 shadow-lg md:shadow-none dark:shadow-card-dark-subtle">
-                        {(['ETAPAS', 'MATERIAIS', 'FINANCEIRO', 'FERRAMENTAS'] as MainTab[]).map(tab => (
-                            <button key={tab} onClick={() => setActiveTab(tab)} className={`flex flex-col items-center flex-1 py-2 text-[10px] font-bold md:text-sm md:rounded-xl transition-colors ${activeTab === tab ? 'text-secondary md:bg-white md:shadow-sm' : 'text-slate-400 hover:text-primary dark:hover:text-white'}`} aria-label={`Abrir aba ${tab}`}>
-                                <i className={`fa-solid ${tab === 'ETAPAS' ? 'fa-calendar' : tab === 'MATERIAIS' ? 'fa-box' : tab === 'FINANCEIRO' ? 'fa-dollar-sign' : 'fa-wrench'} text-lg mb-1`}></i> {/* Changed tools icon */}
-                                {tab}
-                            </button>
-                        ))}
-                    </nav>
-
-                    {activeTab === 'ETAPAS' && (
-                        <div className="space-y-4 animate-in fade-in">
-                            <div className="flex justify-between items-center px-2">
-                                <h2 className="text-xl font-bold text-primary dark:text-white">Cronograma</h2>
-                                <button onClick={() => { setStepModalMode('ADD'); setIsStepModalOpen(true); }} className="bg-primary text-white p-2 rounded-xl shadow-md hover:bg-primary-light transition-colors" aria-label="Adicionar etapa"><i className="fa-solid fa-plus"></i></button>
-                            </div>
-                            {steps.length === 0 ? (
-                                <p className="text-center text-slate-400 py-8 italic text-sm">Nenhuma etapa cadastrada. Adicione para começar!</p>
-                            ) : (
-                                steps.map((s, index) => {
-                                    const isDelayed = s.status !== StepStatus.COMPLETED && s.endDate < todayString;
-                                    return (
-                                        <div key={s.id} className={`bg-white dark:bg-slate-900 p-4 rounded-2xl border flex items-center gap-4 shadow-sm dark:shadow-card-dark-subtle ${isDelayed ? 'border-red-500 ring-1 ring-red-200' : 'border-slate-200 dark:border-slate-800'}`}>
-                                            <button 
-                                                onClick={() => handleStepStatusClick(s)} 
-                                                className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-white transition-colors duration-200
-                                                    ${s.status === StepStatus.COMPLETED ? 'bg-green-500 border-green-500' : 
-                                                    s.status === StepStatus.IN_PROGRESS ? 'bg-orange-500 border-orange-500' : 
-                                                    'bg-slate-300 border-slate-300 hover:bg-slate-400 hover:border-slate-400'}`}
-                                                aria-label={`Mudar status da etapa ${s.name}`}
-                                            >
-                                                <i className="fa-solid fa-check"></i>
-                                            </button>
-                                            <div className="flex-1 cursor-pointer" onClick={() => { setStepModalMode('EDIT'); setCurrentStepId(s.id); setStepName(s.name); setStepStart(s.startDate); setStepEnd(s.endDate); setIsStepModalOpen(true); }} aria-label={`Editar etapa ${s.name}`}>
-                                                <p className="font-bold text-primary dark:text-white">{index + 1}. {s.name} {isDelayed && <span className="ml-2 text-xs font-semibold text-red-500">Atrasada!</span>}</p>
-                                                <p className="text-xs text-slate-500 dark:text-slate-400">{parseDateNoTimezone(s.startDate)} - {parseDateNoTimezone(s.endDate)}</p>
-                                            </div>
-                                            <button onClick={() => handleDeleteStep(s.id)} className="text-red-400 hover:text-red-600 transition-colors p-2" aria-label={`Excluir etapa ${s.name}`}><i className="fa-solid fa-trash"></i></button>
-                                        </div>
-                                    );
-                                })
-                            )}
-                        </div>
-                    )}
-
-                    {activeTab === 'MATERIAIS' && (
-                        <div className="space-y-6 animate-in fade-in">
-                            <div className="flex justify-between items-center px-2">
-                                <h2 className="text-xl font-bold text-primary dark:text-white">Materiais</h2>
-                                <button onClick={() => setAddMatModal(true)} className="bg-primary text-white p-2 rounded-xl shadow-md hover:bg-primary-light transition-colors" aria-label="Adicionar material"><i className="fa-solid fa-plus"></i></button>
-                            </div>
-
-                            {/* NOVO: Filtro para Materiais na aba principal */}
-                            <div className="mb-6 mx-2 sm:mx-0">
-                                <label htmlFor="main-material-step-filter" className="block text-sm font-medium text-primary dark:text-white mb-2">Filtrar por Etapa:</label>
-                                <select
-                                    id="main-material-step-filter"
-                                    value={mainMaterialFilterStepId}
-                                    onChange={(e) => setMainMaterialFilterStepId(e.target.value)}
-                                    className="w-full p-3 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 text-primary dark:text-white focus:ring-secondary focus:border-secondary outline-none transition-colors"
-                                    aria-label="Filtrar materiais por etapa"
-                                >
-                                    <option value="ALL">Todas as Etapas</option>
-                                    {steps.map(step => (
-                                        <option key={step.id} value={step.id}>{step.name}</option>
-                                    ))}
-                                    {materials.some(m => !m.stepId) && <option value="UNLINKED">Sem Etapa Associada</option>}
-                                </select>
-                            </div>
-                            {/* FIM NOVO FILTRO */}
-
-                            {renderMainMaterialList()} {/* Chama o helper para renderizar a lista de materiais */}
-                        </div>
-                    )}
-
-                    {activeTab === 'FINANCEIRO' && (
-                        <div className="space-y-6 animate-in fade-in">
-                            {/* Budget Summary Card */}
-                            <div className={`bg-white dark:bg-slate-900 p-6 rounded-3xl shadow-lg dark:shadow-card-dark-subtle border ${budgetStatusAccent}`}>
-                                {/* Gasto Total Block */}
-                                <div className="flex items-center gap-3 mb-4">
-                                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white text-lg shrink-0 ${budgetStatusIcon}`}>
-                                        <i className={`fa-solid ${budgetStatusIcon}`}></i>
-                                    </div>
-                                    <div>
-                                        <p className="text-xs font-bold uppercase text-slate-500 dark:text-slate-400 mb-1">Gasto Total</p>
-                                        <h3 className="text-2xl font-black text-primary dark:text-white">{formatCurrency(totalSpent)}</h3>
-                                    </div>
-                                </div>
+                            {(Object.keys(groupedExpenses[category].steps) as string[])
+                                .filter(stepId => (groupedExpenses[category].steps[stepId] as ExpenseStepGroup).expenses.length > 0)
+                                .map(stepId => {
+                                const stepGroup: ExpenseStepGroup = groupedExpenses[category].steps[stepId];
+                                const step = steps.find(s => s.id === stepId); 
+                                if (!step) return null;
                                 
-                                {/* Orçamento Planejado Block (moved below Gasto Total) */}
-                                {work.budgetPlanned > 0 && (
-                                    <div className="flex justify-between items-center text-lg font-bold text-slate-700 dark:text-slate-300 mb-4 border-t border-slate-100 dark:border-slate-800 pt-4 mt-4">
-                                        <span className="text-xs font-bold uppercase text-slate-500 dark:text-slate-400">Orçamento Planejado</span>
-                                        <span className="text-lg font-black text-primary dark:text-white">{formatCurrency(work.budgetPlanned)}</span>
-                                    </div>
-                                )}
+                                const isStepDelayed = step.status !== StepStatus.COMPLETED && new Date(step.endDate) < new Date(todayString);
+                                const stepStatusBgClass = 
+                                    step.status === StepStatus.COMPLETED ? 'bg-green-500/10' : 
+                                    step.status === StepStatus.IN_PROGRESS ? 'bg-orange-500/10' : 
+                                    isStepDelayed ? 'bg-red-500/10' : 
+                                    'bg-slate-300/10';
+                                const stepStatusTextColorClass =
+                                    step.status === StepStatus.COMPLETED ? 'text-green-600 dark:text-green-300' :
+                                    step.status === StepStatus.IN_PROGRESS ? 'text-orange-600 dark:text-orange-300' :
+                                    isStepDelayed ? 'text-red-600 dark:text-red-300' :
+                                    'text-slate-500 dark:text-slate-400';
+                                const stepStatusIcon = 
+                                    step.status === StepStatus.COMPLETED ? 'fa-check-circle' :
+                                    step.status === StepStatus.IN_PROGRESS ? 'fa-hammer' : 
+                                    isStepDelayed ? 'fa-triangle-exclamation' :
+                                    'fa-clock';
 
-                                {/* Budget Progress Bar */}
-                                {work.budgetPlanned > 0 && (
-                                    <div className="mt-3">
-                                        <div className="h-2 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden mb-1">
-                                            <div className="h-full" style={{ width: `${Math.min(100, budgetUsage)}%`, backgroundColor: budgetStatusColor }}></div>
-                                        </div>
-                                        <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400">
-                                            <span>{Math.round(budgetUsage)}% Usado</span>
-                                            {budgetUsage > 100 ? (
-                                                <span className="text-red-500">Excedido em {formatCurrency(Math.abs(budgetRemaining))}</span>
-                                            ) : (
-                                                <span>Restante: {formatCurrency(budgetRemaining)}</span>
-                                            )}
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-
-                            <div className="flex justify-between items-center px-2 pt-4">
-                                <h2 className="text-xl font-bold text-primary dark:text-white">Lançamentos</h2>
-                                <button onClick={openAddExpense} className="bg-primary text-white p-2 rounded-xl shadow-md hover:bg-primary-light transition-colors" aria-label="Adicionar novo gasto"><i className="fa-solid fa-plus"></i></button>
-                            </div>
-                            
-                            {expenses.length === 0 ? (
-                                <p className="text-center text-slate-400 py-8 italic text-sm">Nenhum gasto registrado.</p>
-                            ) : (
-                                Object.values(ExpenseCategory).map(category => {
-                                    const expensesInCategory = Object.values(groupedExpenses[category].steps).flatMap(stepGroup => stepGroup.expenses).concat(groupedExpenses[category].unlinkedExpenses);
-                                    if (expensesInCategory.length === 0) return null;
-
-                                    return (
-                                        <div key={category} className="mb-6 first:mt-0 mt-8">
-                                            {/* Category "Root" Card */}
-                                            <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 mb-4 border border-slate-200 dark:border-slate-800 shadow-lg dark:shadow-card-dark-subtle">
-                                                <h3 className="font-black text-xl text-primary dark:text-white flex items-center gap-2 pl-0">
-                                                    <span className="w-8 h-8 rounded-full bg-secondary/10 text-secondary dark:bg-secondary-dark/20 dark:text-secondary-light flex items-center justify-center text-base">
-                                                        {category === ExpenseCategory.MATERIAL ? <i className="fa-solid fa-box"></i> :
-                                                        category === ExpenseCategory.LABOR ? <i className="fa-solid fa-hard-hat"></i> :
-                                                        category === ExpenseCategory.PERMITS ? <i className="fa-solid fa-file-invoice-dollar"></i> : 
-                                                        <i className="fa-solid fa-ellipsis"></i>}
+                                return (
+                                    <div key={stepId} className="mb-4 pl-3 border-l-2 border-slate-100 dark:border-slate-800 ml-2">
+                                        {/* Step "Chapter" Card for Financeiro */}
+                                        <div className={`bg-white dark:bg-slate-900 rounded-2xl p-2 mb-3 border border-slate-200 dark:border-slate-800 shadow-lg dark:shadow-card-dark-subtle ${stepStatusBgClass} ${stepStatusTextColorClass}`}>
+                                            <div className="flex items-center justify-between">
+                                                <h3 className="font-black text-lg text-primary dark:text-white flex items-center gap-2 pl-0"> 
+                                                    <span className={`w-7 h-7 rounded-full flex items-center justify-center text-sm ${stepStatusBgClass.replace('/10', '/20').replace('bg-', 'bg-').replace('dark:bg-green-900/20', 'dark:bg-green-800').replace('dark:text-green-300', 'dark:text-white')}`}> 
+                                                        <i className={`fa-solid ${stepStatusIcon} ${stepStatusTextColorClass}`}></i>
                                                     </span>
-                                                    <span className="text-primary dark:text-white">{category}</span>
+                                                    <span className="text-primary dark:text-white">{step.name}</span>
                                                 </h3>
-                                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 pl-10">Total: {formatCurrency(groupedExpenses[category].totalCategoryAmount)}</p>
+                                                <span className={`text-xs font-semibold ${stepStatusTextColorClass}`}>
+                                                    {formatCurrency(stepGroup.totalStepAmount)}
+                                                </span>
                                             </div>
+                                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 pl-8">{parseDateNoTimezone(step.startDate)} - {parseDateNoTimezone(step.endDate)}</p>
+                                        </div>
 
-                                            {/* Expenses linked to steps */}
-                                            {Object.keys(groupedExpenses[category].steps)
-                                                .filter(stepId => groupedExpenses[category].steps[stepId].expenses.length > 0)
-                                                .map(stepId => {
-                                                const stepGroup = groupedExpenses[category].steps[stepId];
-                                                const step = steps.find(s => s.id === stepId); 
-                                                if (!step) return null;
-                                                
-                                                const isStepDelayed = step.status !== StepStatus.COMPLETED && new Date(step.endDate) < new Date(todayString);
-                                                const stepStatusBgClass = 
-                                                    step.status === StepStatus.COMPLETED ? 'bg-green-500/10' : 
-                                                    step.status === StepStatus.IN_PROGRESS ? 'bg-orange-500/10' : 
-                                                    isStepDelayed ? 'bg-red-500/10' : 
-                                                    'bg-slate-300/10';
-                                                const stepStatusTextColorClass =
-                                                    step.status === StepStatus.COMPLETED ? 'text-green-600 dark:text-green-300' :
-                                                    step.status === StepStatus.IN_PROGRESS ? 'text-orange-600 dark:text-orange-300' :
-                                                    isStepDelayed ? 'text-red-600 dark:text-red-300' :
-                                                    'text-slate-500 dark:text-slate-400';
-                                                const stepStatusIcon = 
-                                                    step.status === StepStatus.COMPLETED ? 'fa-check-circle' :
-                                                    step.status === StepStatus.IN_PROGRESS ? 'fa-hammer' : 
-                                                    isStepDelayed ? 'fa-triangle-exclamation' :
-                                                    'fa-clock';
+                                        <div className="space-y-2 pl-3 border-l-2 border-slate-100 dark:border-slate-800 ml-3">
+                                            {stepGroup.expenses.map(e => {
+                                                const isEmpreita = e.totalAgreed && e.totalAgreed > 0;
+                                                let statusText = '';
+                                                let progress = 0;
+                                                let progressBarColor = '';
+
+                                                if (isEmpreita) {
+                                                    progress = (e.amount / e.totalAgreed!) * 100;
+                                                    if (progress >= 100) { statusText = 'Concluído'; progressBarColor = 'bg-green-500'; }
+                                                    else if (e.amount > 0) { statusText = 'Parcial'; progressBarColor = 'bg-orange-500'; }
+                                                    else { statusText = 'Pendente'; progressBarColor = 'bg-slate-300'; }
+                                                }
 
                                                 return (
-                                                    <div key={stepId} className="mb-4 pl-3 border-l-2 border-slate-100 dark:border-slate-800 ml-2">
-                                                        {/* Step "Chapter" Card for Financeiro */}
-                                                        <div className={`bg-white dark:bg-slate-900 rounded-2xl p-2 mb-3 border border-slate-200 dark:border-slate-800 shadow-lg dark:shadow-card-dark-subtle ${stepStatusBgClass} ${stepStatusTextColorClass}`}>
-                                                            <div className="flex items-center justify-between">
-                                                                <h3 className="font-black text-lg text-primary dark:text-white flex items-center gap-2 pl-0"> 
-                                                                    <span className={`w-7 h-7 rounded-full flex items-center justify-center text-sm ${stepStatusBgClass.replace('/10', '/20').replace('bg-', 'bg-').replace('dark:bg-green-900/20', 'dark:bg-green-800').replace('dark:text-green-300', 'dark:text-white')}`}> 
-                                                                        <i className={`fa-solid ${stepStatusIcon} ${stepStatusTextColorClass}`}></i>
-                                                                    </span>
-                                                                    <span className="text-primary dark:text-white">{step.name}</span>
-                                                                </h3>
-                                                                <span className={`text-xs font-semibold ${stepStatusTextColorClass}`}>
-                                                                    {formatCurrency(stepGroup.totalStepAmount)}
-                                                                </span>
-                                                            </div>
-                                                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 pl-8">{parseDateNoTimezone(step.startDate)} - {parseDateNoTimezone(step.endDate)}</p>
+                                                    <div key={e.id} onClick={() => openEditExpense(e)} className="bg-white dark:bg-slate-900 p-2 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs dark:shadow-card-dark-subtle cursor-pointer hover:shadow-sm transition-shadow">
+                                                        <div className="flex justify-between items-center mb-1">
+                                                            <p className="font-bold text-sm text-primary dark:text-white">{e.description}</p>
+                                                            <p className="font-black text-sm text-primary dark:text-white">{formatCurrency(e.amount)}</p>
                                                         </div>
-
-                                                        <div className="space-y-2 pl-3 border-l-2 border-slate-100 dark:border-slate-800 ml-3">
-                                                            {stepGroup.expenses.map(e => {
-                                                                const isEmpreita = e.totalAgreed && e.totalAgreed > 0;
-                                                                let statusText = '';
-                                                                let progress = 0;
-                                                                let progressBarColor = '';
-
-                                                                if (isEmpreita) {
-                                                                    progress = (e.amount / e.totalAgreed!) * 100;
-                                                                    if (progress >= 100) { statusText = 'Concluído'; progressBarColor = 'bg-green-500'; }
-                                                                    else if (e.amount > 0) { statusText = 'Parcial'; progressBarColor = 'bg-orange-500'; }
-                                                                    else { statusText = 'Pendente'; progressBarColor = 'bg-slate-300'; }
-                                                                }
-
-                                                                return (
-                                                                    <div key={e.id} onClick={() => openEditExpense(e)} className="bg-white dark:bg-slate-900 p-2 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs dark:shadow-card-dark-subtle cursor-pointer hover:shadow-sm transition-shadow">
-                                                                        <div className="flex justify-between items-center mb-1">
-                                                                            <p className="font-bold text-sm text-primary dark:text-white">{e.description}</p>
-                                                                            <p className="font-black text-sm text-primary dark:text-white">{formatCurrency(e.amount)}</p>
-                                                                        </div>
-                                                                        <p className="text-xs text-slate-500 dark:text-slate-400">{parseDateNoTimezone(e.date)}</p>
-                                                                        {isEmpreita && (
-                                                                            <div className="mt-2">
-                                                                                <div className="h-1 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden mb-1">
-                                                                                    <div className="h-full" style={{ width: `${Math.min(100, progress)}%`, backgroundColor: progressBarColor }}></div>
-                                                                                </div>
-                                                                                <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400">
-                                                                                        <span>{statusText}</span>
-                                                                                        <span>{formatCurrency(e.amount)} / {formatCurrency(e.totalAgreed)}</span>
-                                                                                    </div>
-                                                                                </div>
-                                                                            )}
-                                                                        </div>
-                                                                    );
-                                                                })}
+                                                        <p className="text-xs text-slate-500 dark:text-slate-400">{parseDateNoTimezone(e.date)}</p>
+                                                        {isEmpreita && (
+                                                            <div className="mt-2">
+                                                                <div className="h-1 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden mb-1">
+                                                                    <div className="h-full" style={{ width: `${Math.min(100, progress)}%`, backgroundColor: progressBarColor }}></div>
+                                                                </div>
+                                                                <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400">
+                                                                        <span>{statusText}</span>
+                                                                        <span>{formatCurrency(e.amount)} / {formatCurrency(e.totalAgreed)}</span>
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
                                                             </div>
                                                         </div>
                                                     );
@@ -1317,7 +1156,12 @@ const WorkDetail: React.FC = () => {
                                 </div>
                             )}
 
-                    {activeTab === 'FERRAMENTAS' && (
+                    {/*
+                        Fix: Apply type assertion `(activeTab as string)` to resolve TypeScript errors
+                        where `activeTab` was being incorrectly inferred as an object instead of a string literal.
+                        This ensures the comparison `activeTab === 'FERRAMENTAS'` (and similar) is correctly evaluated.
+                    */}
+                    {(activeTab as string) === 'FERRAMENTAS' && (
                         <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4 animate-in fade-in">
                             {/* Bloco 1: Equipe */}
                             <button onClick={() => setSubView('WORKERS')} className="p-4 bg-white dark:bg-slate-900 rounded-3xl flex flex-col items-center shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800 hover:shadow-md transition-shadow" aria-label="Gerenciar Equipe">
@@ -1382,242 +1226,4 @@ const WorkDetail: React.FC = () => {
                                         <button onClick={() => setIsCalculatorModalOpen(true)} className="p-4 rounded-2xl border-2 border-slate-700 bg-gradient-to-br from-green-600 to-emerald-700 hover:from-green-500 hover:to-emerald-600 transition-all flex flex-col items-center text-center shadow-md text-white">
                                             <i className="fa-solid fa-calculator text-2xl mb-2"></i>
                                             <span className="font-black text-sm">Calculadoras</span>
-                                            <span className="text-[10px] text-green-100 mt-1">Piso, parede, pintura</span>
-                                        </button>
-                                        {/* Bônus: Checklist da Obra */}
-                                        <button onClick={() => setSubView('CHECKLIST')} className="p-4 rounded-2xl border-2 border-slate-700 bg-gradient-to-br from-purple-600 to-indigo-700 hover:from-purple-500 hover:to-indigo-600 transition-all flex flex-col items-center text-center shadow-md text-white">
-                                            <i className="fa-solid fa-list-check text-2xl mb-2"></i>
-                                            <span className="font-black text-sm">Checklist da Obra</span>
-                                            <span className="text-[10px] text-purple-100 mt-1">Nada será esquecido</span>
-                                        </button>
-                                        {/* Bônus: IA da Obra */}
-                                        <button onClick={() => navigate('/ai-chat')} className="p-4 rounded-2xl border-2 border-slate-700 bg-gradient-to-br from-cyan-600 to-blue-700 hover:from-cyan-500 hover:to-blue-600 transition-all flex flex-col items-center text-center shadow-md text-white">
-                                            <i className="fa-solid fa-robot text-2xl mb-2"></i>
-                                            <span className="font-black text-sm">Zé da Obra AI</span>
-                                            <span className="text-[10px] text-cyan-100 mt-1">Seu especialista 24h</span>
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                </>
-            ) : (
-                <div className="animate-in slide-in-from-right-4">
-                    <button onClick={() => setSubView('NONE')} className="mb-6 text-primary font-bold flex items-center gap-2 hover:opacity-80" aria-label="Voltar para Ferramentas"><i className="fa-solid fa-arrow-left text-xl"></i> Voltar</button>
-                    
-                    {/* --- SUBVIEW: WORKERS (Equipe Separada) --- */}
-                    {subView === 'WORKERS' && (
-                        <div className="space-y-8">
-                            {/* Equipe Section */}
-                            <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800">
-                                <div className="flex justify-between items-center mb-6">
-                                    <h2 className="text-xl font-bold text-primary dark:text-white">Equipe de Profissionais</h2>
-                                    <button onClick={() => openPersonModal('WORKER')} className="bg-primary text-white p-2 rounded-xl shadow-md hover:bg-primary-light transition-colors" aria-label="Adicionar profissional"><i className="fa-solid fa-plus"></i></button>
-                                </div>
-                                {workers.length === 0 ? (
-                                    <p className="text-center text-slate-400 py-8 italic text-sm">Nenhum profissional cadastrado. Adicione sua equipe!</p>
-                                ) : (
-                                    <div className="space-y-4">
-                                        {workers.map(w => (
-                                            <div key={w.id} className="bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 flex justify-between items-center shadow-xs dark:shadow-card-dark-subtle">
-                                                <div>
-                                                    <p className="font-bold text-primary dark:text-white">{w.name}</p>
-                                                    <p className="text-xs text-slate-500 dark:text-slate-400">{w.role} {w.dailyRate && w.dailyRate > 0 ? `• ${formatCurrency(w.dailyRate)}/dia` : ''}</p>
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    {w.phone && (
-                                                        <button onClick={() => handleGenerateWhatsappLink(w.phone)} className="w-8 h-8 rounded-full bg-green-500/10 text-green-600 dark:bg-green-900/30 dark:text-green-300 hover:bg-green-500/20 transition-colors flex items-center justify-center" aria-label={`Contatar ${w.name} via WhatsApp`}>
-                                                            <i className="fa-brands fa-whatsapp text-lg"></i>
-                                                        </button>
-                                                    )}
-                                                    <button onClick={() => openPersonModal('WORKER', w)} className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors flex items-center justify-center" aria-label="Editar profissional"><i className="fa-solid fa-pencil text-sm"></i></button>
-                                                    <button onClick={() => handleDeletePerson(w.id, w.workId, 'WORKER')} className="w-8 h-8 rounded-full bg-red-500/10 text-red-600 dark:bg-red-900/30 dark:text-red-300 hover:bg-red-500/20 transition-colors flex items-center justify-center" aria-label="Remover profissional"><i className="fa-solid fa-trash text-sm"></i></button>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* --- SUBVIEW: SUPPLIERS (Fornecedores Separados) --- */}
-                    {subView === 'SUPPLIERS' && (
-                        <div className="space-y-8">
-                             <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800">
-                                <div className="flex justify-between items-center mb-6">
-                                    <h2 className="text-xl font-bold text-primary dark:text-white">Fornecedores</h2>
-                                    <button onClick={() => openPersonModal('SUPPLIER')} className="bg-primary text-white p-2 rounded-xl shadow-md hover:bg-primary-light transition-colors" aria-label="Adicionar fornecedor"><i className="fa-solid fa-plus"></i></button>
-                                </div>
-                                {suppliers.length === 0 ? (
-                                    <p className="text-center text-slate-400 py-8 italic text-sm">Nenhum fornecedor cadastrado. Adicione seus parceiros!</p>
-                                ) : (
-                                    <div className="space-y-4">
-                                        {suppliers.map(s => (
-                                            <div key={s.id} className="bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 flex justify-between items-center shadow-xs dark:shadow-card-dark-subtle">
-                                                <div>
-                                                    <p className="font-bold text-primary dark:text-white">{s.name}</p>
-                                                    <p className="text-xs text-slate-500 dark:text-slate-400">{s.category} {s.phone ? `• ${s.phone}` : ''}</p>
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    {s.phone && (
-                                                        <button onClick={() => handleGenerateWhatsappLink(s.phone)} className="w-8 h-8 rounded-full bg-green-500/10 text-green-600 dark:bg-green-900/30 dark:text-green-300 hover:bg-green-500/20 transition-colors flex items-center justify-center" aria-label={`Contatar ${s.name} via WhatsApp`}>
-                                                            <i className="fa-brands fa-whatsapp text-lg"></i>
-                                                        </button>
-                                                    )}
-                                                    <button onClick={() => openPersonModal('SUPPLIER', s)} className="w-8 h-8 rounded-full bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors flex items-center justify-center" aria-label="Editar fornecedor"><i className="fa-solid fa-pencil text-sm"></i></button>
-                                                    <button onClick={() => handleDeletePerson(s.id, s.workId, 'SUPPLIER')} className="w-8 h-8 rounded-full bg-red-500/10 text-red-600 dark:bg-red-900/30 dark:text-red-300 hover:bg-red-500/20 transition-colors flex items-center justify-center" aria-label="Remover fornecedor"><i className="fa-solid fa-trash text-sm"></i></button>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    )}
-
-
-                    {/* --- SUBVIEW: REPORTS (Abas) --- */}
-                    {subView === 'REPORTS' && (
-                        <div className="space-y-6">
-                            <h2 className="text-xl font-bold text-primary dark:text-white mb-4">Relatórios da Obra</h2>
-                            
-                            {/* Tabs for Reports */}
-                            <div className="bg-white dark:bg-slate-900 rounded-2xl p-2 shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800 mb-6 flex justify-around">
-                                {(['CRONOGRAMA', 'MATERIAIS', 'FINANCEIRO'] as ReportSubTab[]).map(tab => (
-                                    <button 
-                                        key={tab} 
-                                        onClick={() => setReportActiveTab(tab)} 
-                                        className={`flex-1 py-2 rounded-xl text-sm font-bold transition-colors ${reportActiveTab === tab ? 'bg-secondary text-white shadow-md' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
-                                        aria-label={`Ver relatório de ${tab}`}
-                                    >
-                                        {tab}
-                                    </button>
-                                ))}
-                            </div>
-
-                            {/* MOVIDO: Botões de Exportação aqui */}
-                            <div className="grid grid-cols-2 gap-4 mt-6 mb-8"> {/* Adicionado mb-8 para espaçamento */}
-                                <button onClick={handleExportExcel} className="w-full py-4 bg-green-600 text-white rounded-xl font-bold shadow-lg hover:bg-green-700 transition-colors" aria-label="Exportar para Excel"><i className="fa-solid fa-file-excel mr-2"></i> Exportar Excel</button>
-                                <button onClick={handleExportPdf} className="w-full py-4 bg-red-600 text-white rounded-xl font-bold shadow-lg hover:bg-red-700 transition-colors" aria-label="Exportar para PDF"><i className="fa-solid fa-file-pdf mr-2"></i> Exportar PDF</button>
-                            </div>
-                            {/* FIM MOVED: Botões de Exportação */}
-
-                            {/* Report Content based on active tab */}
-                            {reportActiveTab === 'CRONOGRAMA' && <RenderCronogramaReport />}
-                            {reportActiveTab === 'MATERIAIS' && <RenderMateriaisReport />}
-                            {reportActiveTab === 'FINANCEIRO' && <RenderFinanceiroReport />}
-                        </div>
-                    )}
-                    
-                    {/* --- SUBVIEW: PHOTOS (com estado vazio aprimorado) --- */}
-                    {subView === 'PHOTOS' && (
-                        <div className="space-y-6">
-                            <h2 className="text-xl font-bold text-primary dark:text-white mb-4">Fotos da Obra</h2>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                                <div className="relative aspect-square bg-slate-100 dark:bg-slate-800 rounded-2xl flex flex-col items-center justify-center border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-secondary transition-colors cursor-pointer text-center p-4">
-                                    <input type="file" accept="image/*" onChange={e => handleFileUpload(e, 'PHOTO')} className="absolute inset-0 opacity-0 cursor-pointer" aria-label="Adicionar foto" />
-                                    {uploading ? (
-                                        <i className="fa-solid fa-circle-notch fa-spin text-slate-400 text-2xl mb-2"></i>
-                                    ) : (
-                                        <>
-                                            <i className="fa-solid fa-camera-retro text-slate-400 text-3xl mb-2"></i>
-                                            <p className="text-sm text-slate-500 dark:text-slate-400 font-bold">Clique para adicionar fotos</p>
-                                            <p className="text-xs text-slate-400 dark:text-slate-500">JPG, PNG</p>
-                                        </>
-                                    )}
-                                </div>
-                                {photos.length === 0 ? (
-                                    <div className="col-span-full text-center text-slate-400 py-8 italic text-sm">
-                                        <i className="fa-solid fa-camera-retro text-4xl mb-4 opacity-50"></i>
-                                        <p>Nenhuma foto adicionada ainda.</p>
-                                        <p className="text-xs mt-2">Documente o progresso e os detalhes da sua obra!</p>
-                                    </div>
-                                ) : (
-                                    photos.map(p => (
-                                        <div key={p.id} className="relative group aspect-square">
-                                            <img src={p.url} className="aspect-square object-cover rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm dark:shadow-card-dark-subtle" alt={p.description} />
-                                            <button 
-                                                onClick={() => { /* Implement delete photo logic here */ }} 
-                                                className="absolute top-2 right-2 p-2 bg-red-500/70 text-white rounded-full hover:bg-red-600 transition-opacity opacity-0 group-hover:opacity-100"
-                                                aria-label="Excluir foto"
-                                            >
-                                                <i className="fa-solid fa-trash text-xs"></i>
-                                            </button>
-                                        </div>
-                                    ))
-                                )}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* --- SUBVIEW: PROJECTS (com estado vazio aprimorado) --- */}
-                    {subView === 'PROJECTS' && (
-                        <div className="space-y-6">
-                            <h2 className="text-xl font-bold text-primary dark:text-white mb-4">Documentos e Projetos</h2>
-                            <div className="relative p-6 bg-slate-100 dark:bg-slate-800 rounded-2xl flex flex-col items-center justify-center border-2 border-dashed border-slate-300 dark:border-slate-700 hover:border-secondary transition-colors cursor-pointer text-center">
-                                <input type="file" onChange={e => handleFileUpload(e, 'FILE')} className="absolute inset-0 opacity-0 cursor-pointer" aria-label="Adicionar arquivo" />
-                                {uploading ? (
-                                    <i className="fa-solid fa-circle-notch fa-spin text-slate-400 text-2xl mb-2"></i>
-                                ) : (
-                                    <>
-                                        <i className="fa-solid fa-file-arrow-up text-slate-400 text-3xl mb-2"></i>
-                                        <p className="text-sm text-slate-500 dark:text-slate-400 font-bold">Clique para adicionar documentos</p>
-                                        <p className="text-xs text-slate-400 dark:text-slate-500">PDF, DWG, DOC, JPG, etc.</p>
-                                    </>
-                                )}
-                            </div>
-                            {files.length === 0 ? (
-                                <div className="text-center text-slate-400 py-8 italic text-sm">
-                                    <i className="fa-solid fa-folder-open text-4xl mb-4 opacity-50"></i>
-                                    <p>Nenhum documento ou projeto adicionado ainda.</p>
-                                    <p className="text-xs mt-2">Mantenha tudo organizado e acessível!</p>
-                                    </div>
-                            ) : (
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                                    {files.map(f => (
-                                        <a href={f.url} target="_blank" rel="noopener noreferrer" key={f.id} className="p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 flex items-center gap-3 shadow-sm dark:shadow-card-dark-subtle hover:shadow-md transition-shadow">
-                                            <div className="w-10 h-10 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 flex items-center justify-center text-xl shrink-0">
-                                                <i className={`fa-solid ${f.type.includes('image') ? 'fa-image' : f.type.includes('pdf') ? 'fa-file-pdf' : f.type.includes('cad') ? 'fa-file-code' : 'fa-file'}`}></i>
-                                            </div>
-                                            <div>
-                                                <p className="font-bold text-primary dark:text-white text-sm leading-tight">{f.name}</p>
-                                                <p className="text-xs text-slate-500 dark:text-slate-400">{f.category}</p>
-                                            </div>
-                                        </a>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    )}
-                    
-                    {/* --- SUBVIEW: CONTRACTS --- */}
-                    {subView === 'CONTRACTS' && (
-                        <div className="space-y-6">
-                            <h2 className="text-xl font-bold text-primary dark:text-white mb-4">Modelos de Contratos</h2>
-                            <p className="text-slate-500 dark:text-slate-400 max-w-2xl mb-6">
-                                Utilize nossos modelos prontos para formalizar acordos de mão de obra e serviços.
-                            </p>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {CONTRACT_TEMPLATES.map(contract => (
-                                    <button 
-                                        key={contract.id} 
-                                        onClick={() => { setViewContract(contract); setIsContractModalOpen(true); }}
-                                        className="p-4 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 flex items-center gap-4 shadow-sm dark:shadow-card-dark-subtle hover:shadow-md transition-shadow text-left"
-                                        aria-label={`Ver modelo de contrato: ${contract.title}`}
-                                    >
-                                        <div className="w-10 h-10 rounded-lg bg-secondary/10 text-secondary flex items-center justify-center text-xl shrink-0">
-                                            {contract.category === 'Mão de Obra' ? <i className="fa-solid fa-hard-hat"></i> : <i className="fa-solid fa-file-alt"></i>}
-                                        </div>
-                                        <div>
-                                            <p className="font-bold text-primary dark:text-white text-base leading-tight">{contract.title}</p>
-                                            <p className="text-xs text-slate-500 dark:text-slate-400">{contract.category}</p>
-                                        </div>
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* --- SUBVIEW: CHECK
+                                            <span className="text-[10px] text-green-100 mt-1">Piso, parede, pintura

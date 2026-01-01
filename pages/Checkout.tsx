@@ -131,7 +131,8 @@ const Checkout: React.FC = () => {
     if (name === 'number') value = value.replace(/\D/g, '').replace(/(.{4})/g, '$1 ').trim().slice(0, 19);
     if (name === 'expiry') value = value.replace(/\D/g, '').replace(/^(\d{2})(\d)/, '$1/$2').slice(0, 5);
     if (name === 'cvv') value = value.replace(/\D/g, '').slice(0, 4);
-    // Complete the function by updating the state for the changed field.
+    
+    // Atualiza o estado
     setCardData(prev => ({ ...prev, [name]: value }));
   };
 
@@ -365,7 +366,7 @@ const Checkout: React.FC = () => {
               type="submit"
               disabled={true} // Always disabled as a placeholder
               className="w-full py-4 bg-primary hover:bg-primary-light text-white font-bold rounded-xl shadow-lg shadow-primary/20 transition-all disabled:opacity-70 flex items-center justify-center gap-2"
-              aria-label="Pagar com Cartão de Crédito (funcionalidade em breve)"
+              aria-label="Pagar com Cartão (funcionalidade em breve)"
             >
               Pagar com Cartão (Em Breve)
             </button>

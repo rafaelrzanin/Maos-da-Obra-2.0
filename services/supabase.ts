@@ -41,3 +41,4 @@ if (!supabaseUrl || !supabaseKey) {
 export const supabase = createClient(supabaseUrl, supabaseKey);
 
 console.log("Supabase CLIENTE INICIALIZADO com sucesso.");
+    
