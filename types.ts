@@ -20,7 +20,7 @@ export interface User {
 
 // NEW: Interface para armazenar a PushSubscription de um usuário
 export interface PushSubscriptionInfo {
-  id: string; // UUID do Supabase
+  id: string; // UUID do Supabase (pode ser ignorado se não for usado)
   userId: string; // Added userId to match database mapping
   // O objeto PushSubscription é o que o navegador retorna e é necessário para enviar notificações
   subscription: PushSubscriptionJSON; 

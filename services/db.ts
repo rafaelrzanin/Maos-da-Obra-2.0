@@ -1,5 +1,4 @@
 
-
 import { PlanType, ExpenseCategory, StepStatus, FileCategory, type User, type Work, type Step, type Material, type Expense, type Worker, type Supplier, type WorkPhoto, type WorkFile, type DBNotification, type PushSubscriptionInfo, type Contract, type Checklist, type ChecklistItem } from './types.ts';
 import { WORK_TEMPLATES, FULL_MATERIAL_PACKAGES, CONTRACT_TEMPLATES, CHECKLIST_TEMPLATES } from './standards.ts';
 import { supabase } from './supabase.ts';
@@ -1456,7 +1455,7 @@ export const dbService = {
   async getPushSubscription(userId: string): Promise<PushSubscriptionInfo | null> {
     const { data: subscriptionData, error: fetchSubscriptionError } = await supabase // Renamed data and error
       .from('user_subscriptions')
-      .select('*')
+      .select('subscription') // Select only subscription data
       .eq('user_id', userId)
       .single();
 
@@ -1464,7 +1463,8 @@ export const dbService = {
       console.error("Erro ao buscar PushSubscription:", fetchSubscriptionError);
       return null;
     }
-    return subscriptionData ? mapPushSubscriptionFromDB(subscriptionData) : null;
+    // FIX: Parse subscription data correctly to PushSubscriptionInfo
+    return subscriptionData ? { id: 'ignored', userId: userId, subscription: subscriptionData.subscription as PushSubscriptionJSON, endpoint: (subscriptionData.subscription as PushSubscriptionJSON).endpoint } : null;
   },
 
   async savePushSubscription(userId: string, subscription: PushSubscriptionJSON): Promise<void> {
@@ -1605,3 +1605,4 @@ export const dbService = {
   }
 
 };
+    

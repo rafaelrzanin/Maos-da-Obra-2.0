@@ -912,9 +912,9 @@ const WorkDetail: React.FC = () => {
     if (authLoading || !isUserAuthFinished || loading) return <div className="h-screen flex items-center justify-center"><i className="fa-solid fa-circle-notch fa-spin text-3xl text-primary"></i></div>;
     if (!work) return <div className="text-center py-10">Obra não encontrada.</div>;
 
-    // FIX: Changed React.FC to a direct functional component with explicit return type
-    // to work around "Cannot find namespace 'JSX'" without modifying tsconfig.json.
-    const RenderCronogramaReport = (): React.JSX.Element => (
+    // FIX: Changed React.FC to a direct functional component with implicit return type
+    // to avoid "Cannot find namespace 'JSX'" when tsconfig.json is not changed.
+    const RenderCronogramaReport = () => (
         <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 shadow-md dark:shadow-card-dark-subtle animate-in fade-in">
             <h3 className="font-bold text-xl text-primary dark:text-white mb-6">Cronograma Detalhado</h3>
             <div className="space-y-4">
@@ -945,9 +945,9 @@ const WorkDetail: React.FC = () => {
         </div>
     );
 
-    // FIX: Changed React.FC to a direct functional component with explicit return type
-    // to work around "Cannot find namespace 'JSX'" without modifying tsconfig.json.
-    const RenderMateriaisReport = (): React.JSX.Element => {
+    // FIX: Changed React.FC to a direct functional component with implicit return type
+    // to avoid "Cannot find namespace 'JSX'" when tsconfig.json is not changed.
+    const RenderMateriaisReport = () => {
         const filteredMaterials = reportMaterialFilterStepId === 'ALL'
             ? materials
             : materials.filter(m => m.stepId === reportMaterialFilterStepId);
@@ -1011,9 +1011,9 @@ const WorkDetail: React.FC = () => {
     };
 
 
-    // FIX: Changed React.FC to a direct functional component with explicit return type
-    // to work around "Cannot find namespace 'JSX'" without modifying tsconfig.json.
-    const RenderFinanceiroReport = (): React.JSX.Element => (
+    // FIX: Changed React.FC to a direct functional component with implicit return type
+    // to avoid "Cannot find namespace 'JSX'" when tsconfig.json is not changed.
+    const RenderFinanceiroReport = () => (
         <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 shadow-md dark:shadow-card-dark-subtle animate-in fade-in">
             <h3 className="font-bold text-xl text-primary dark:text-white mb-6">Lançamentos Financeiros</h3>
             {(Object.values(ExpenseCategory) as ExpenseCategory[]).map(category => {
@@ -1042,168 +1042,4 @@ const WorkDetail: React.FC = () => {
                                 const stepStatusTextColorClass =
                                     step.status === StepStatus.COMPLETED ? 'text-green-600 dark:text-green-300' :
                                     step.status === StepStatus.IN_PROGRESS ? 'text-orange-600 dark:text-orange-300' :
-                                    isStepDelayed ? 'text-red-600 dark:text-red-300' :
-                                    'text-slate-500 dark:text-slate-400';
-                                const stepStatusIcon = 
-                                    step.status === StepStatus.COMPLETED ? 'fa-check-circle' :
-                                    step.status === StepStatus.IN_PROGRESS ? 'fa-hammer' : 
-                                    isStepDelayed ? 'fa-triangle-exclamation' :
-                                    'fa-clock';
-
-                                return (
-                                    <div key={stepId} className="mb-4 pl-3 border-l-2 border-slate-100 dark:border-slate-800 ml-2">
-                                        {/* Step "Chapter" Card for Financeiro */}
-                                        <div className={`bg-white dark:bg-slate-900 rounded-2xl p-2 mb-3 border border-slate-200 dark:border-slate-800 shadow-lg dark:shadow-card-dark-subtle ${stepStatusBgClass} ${stepStatusTextColorClass}`}>
-                                            <div className="flex items-center justify-between">
-                                                <h3 className="font-black text-lg text-primary dark:text-white flex items-center gap-2 pl-0"> 
-                                                    <span className={`w-7 h-7 rounded-full flex items-center justify-center text-sm ${stepStatusBgClass.replace('/10', '/20').replace('bg-', 'bg-').replace('dark:bg-green-900/20', 'dark:bg-green-800').replace('dark:text-green-300', 'dark:text-white')}`}> 
-                                                        <i className={`fa-solid ${stepStatusIcon} ${stepStatusTextColorClass}`}></i>
-                                                    </span>
-                                                    <span className="text-primary dark:text-white">{step.name}</span>
-                                                </h3>
-                                                <span className={`text-xs font-semibold ${stepStatusTextColorClass}`}>
-                                                    {formatCurrency(stepGroup.totalStepAmount)}
-                                                </span>
-                                            </div>
-                                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 pl-8">{parseDateNoTimezone(step.startDate)} - {parseDateNoTimezone(step.endDate)}</p>
-                                        </div>
-
-                                        <div className="space-y-2 pl-3 border-l-2 border-slate-100 dark:border-slate-800 ml-3">
-                                            {stepGroup.expenses.map(e => {
-                                                // FIX: Corrected typo 'totalAgumeded' to 'totalAgreed'.
-                                                const isEmpreita = e.totalAgreed && e.totalAgreed > 0;
-                                                let statusText = '';
-                                                let progress = 0;
-                                                let progressBarColor = '';
-
-                                                if (isEmpreita) {
-                                                    progress = (e.amount / e.totalAgreed!) * 100;
-                                                    if (progress >= 100) { statusText = 'Concluído'; progressBarColor = 'bg-green-500'; }
-                                                    else if (e.amount > 0) { statusText = 'Parcial'; progressBarColor = 'bg-orange-500'; }
-                                                    else { statusText = 'Pendente'; progressBarColor = 'bg-slate-300'; }
-                                                }
-
-                                                return (
-                                                    <div key={e.id} onClick={() => openEditExpense(e)} className="bg-white dark:bg-slate-900 p-2 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs dark:shadow-card-dark-subtle cursor-pointer hover:shadow-sm transition-shadow">
-                                                        <div className="flex justify-between items-center mb-1">
-                                                            <p className="font-bold text-sm text-primary dark:text-white">{e.description}</p>
-                                                            <p className="font-black text-sm text-primary dark:text-white">{formatCurrency(e.amount)}</p>
-                                                        </div>
-                                                        <p className="text-xs text-slate-500 dark:text-slate-400">{parseDateNoTimezone(e.date)}</p>
-                                                        {isEmpreita && (
-                                                            <div className="mt-2">
-                                                                <div className="h-1 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden mb-1">
-                                                                    <div className="h-full" style={{ width: `${Math.min(100, progress)}%`, backgroundColor: progressBarColor }}></div>
-                                                                </div>
-                                                                <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400">
-                                                                        <span>{statusText}</span>
-                                                                        <span>{formatCurrency(e.amount)} / {formatCurrency(e.totalAgreed)}</span>
-                                                                    </div>
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-
-                                                {/* Unlinked expenses within this category */}
-                                                {groupedExpenses[category].unlinkedExpenses.length > 0 && (
-                                                    <div className="mb-4 pl-3 border-l-2 border-slate-100 dark:border-slate-800 ml-2">
-                                                        <h4 className="text-sm font-black uppercase text-slate-500 dark:text-slate-400 mb-2 border-b border-slate-100 dark:border-slate-800 pb-1 pl-0">
-                                                            Gastos Não Associados à Etapa
-                                                        </h4>
-                                                        <div className="space-y-2 pl-3 border-l-2 border-slate-100 dark:border-slate-800 ml-3">
-                                                            {groupedExpenses[category].unlinkedExpenses.map(e => {
-                                                                const isEmpreita = e.totalAgreed && e.totalAgreed > 0;
-                                                                let statusText = '';
-                                                                let progress = 0;
-                                                                let progressBarColor = '';
-
-                                                                if (isEmpreita) {
-                                                                    progress = (e.amount / e.totalAgreed!) * 100;
-                                                                    if (progress >= 100) { statusText = 'Concluído'; progressBarColor = 'bg-green-500'; }
-                                                                    else if (e.amount > 0) { statusText = 'Parcial'; progressBarColor = 'bg-orange-500'; }
-                                                                    else { statusText = 'Pendente'; progressBarColor = 'bg-slate-300'; }
-                                                                }
-
-                                                                return (
-                                                                    <div key={e.id} onClick={() => openEditExpense(e)} className="bg-white dark:bg-slate-900 p-2 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs dark:shadow-card-dark-subtle cursor-pointer hover:shadow-sm transition-shadow">
-                                                                        <div className="flex justify-between items-center mb-1">
-                                                                            <p className="font-bold text-sm text-primary dark:text-white">{e.description}</p>
-                                                                            <p className="font-black text-sm text-primary dark:text-white">{formatCurrency(e.amount)}</p>
-                                                                        </div>
-                                                                        <p className="text-xs text-slate-500 dark:text-slate-400">{parseDateNoTimezone(e.date)}</p>
-                                                                        {isEmpreita && (
-                                                                            <div className="mt-2">
-                                                                                <div className="h-1 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden mb-1">
-                                                                                    <div className="h-full" style={{ width: `${Math.min(100, progress)}%`, backgroundColor: progressBarColor }}></div>
-                                                                                </div>
-                                                                                <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400">
-                                                                                        <span>{statusText}</span>
-                                                                                        <span>{formatCurrency(e.amount)} / {formatCurrency(e.totalAgreed)}</span>
-                                                                                    </div>
-                                                                                </div>
-                                                                            )}
-                                                                        </div>
-                                                                    );
-                                                                })}
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                </div> 
-                                            );
-                                        })
-                                    )}
-                                </div>
-                            )}
-
-                    {(activeTab as string) === 'FERRAMENTAS' && (
-                        <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4 animate-in fade-in">
-                            {/* Bloco 1: Equipe */}
-                            <button onClick={() => setSubView('WORKERS')} className="p-4 bg-white dark:bg-slate-900 rounded-3xl flex flex-col items-center shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800 hover:shadow-md transition-shadow" aria-label="Gerenciar Equipe">
-                                <i className="fa-solid fa-users text-xl mb-1 text-primary dark:text-white"></i> 
-                                <span className="font-bold text-primary dark:text-white text-xs">Equipe</span>
-                            </button>
-
-                            {/* Bloco 2: Fornecedores */}
-                            <button onClick={() => setSubView('SUPPLIERS')} className="p-4 bg-white dark:bg-slate-900 rounded-3xl flex flex-col items-center shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800 hover:shadow-md transition-shadow" aria-label="Gerenciar Fornecedores">
-                                <i className="fa-solid fa-truck-field text-xl mb-1 text-primary dark:text-white"></i> 
-                                <span className="font-bold text-primary dark:text-white text-xs">Fornecedores</span>
-                            </button>
-
-                            {/* Bloco 3: Relatórios */}
-                            <button onClick={() => setSubView('REPORTS')} className="p-4 bg-white dark:bg-slate-900 rounded-3xl flex flex-col items-center shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800 hover:shadow-md transition-shadow" aria-label="Gerar Relatórios">
-                                <i className="fa-solid fa-file-contract text-xl mb-1 text-primary dark:text-white"></i> 
-                                <span className="font-bold text-primary dark:text-white text-xs">Relatórios</span>
-                            </button>
-                            
-                            {/* Bloco 4: Fotos */}
-                            <button onClick={() => setSubView('PHOTOS')} className="p-4 bg-white dark:bg-slate-900 rounded-3xl flex flex-col items-center shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800 hover:shadow-md transition-shadow" aria-label="Ver Fotos da Obra">
-                                <i className="fa-solid fa-camera text-xl mb-1 text-primary dark:text-white"></i> 
-                                <span className="font-bold text-primary dark:text-white text-xs">Fotos</span>
-                            </button>
-
-                            {/* Bloco 5: Arquivos & Projetos */}
-                            <button onClick={() => setSubView('PROJECTS')} className="p-4 bg-white dark:bg-slate-900 rounded-3xl flex flex-col items-center shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800 hover:shadow-md transition-shadow" aria-label="Gerenciar Arquivos">
-                                <i className="fa-solid fa-folder text-xl mb-1 text-primary dark:text-white"></i> 
-                                <span className="font-bold text-primary dark:text-white text-xs">Arquivos</span>
-                            </button>
-
-                            {/* --- BÔNUS VITALÍCIO - GRANDE CARD CONSOLIDADO --- */}
-                            <div className={`relative col-span-full rounded-3xl shadow-lg border dark:shadow-card-dark-subtle p-6 md:p-8 flex flex-col justify-between 
-                                ${hasLifetimeAccess ? 'bg-gradient-to-br from-primary-darker to-primary-dark border-secondary/50' : 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700'}`}>
-                                {!hasLifetimeAccess && (
-                                    <div className="absolute inset-0 bg-black/70 rounded-3xl flex flex-col items-center justify-center z-10 p-4 text-center">
-                                        <i className="fa-solid fa-lock text-white text-5xl mb-4 opacity-80"></i>
-                                        <p className="font-black text-xl text-white mb-2">Exclusivo Plano Vitalício</p>
-                                        <button onClick={() => navigate('/settings')} className="mt-4 px-6 py-3 bg-gradient-gold text-white font-black rounded-2xl shadow-lg hover:brightness-110 transition-all" aria-label="Liberar Plano Vitalício">
-                                            Liberar Acesso Vitalício
-                                        </button>
-                                    </div>
-                                )}
-                                <div className={`${!hasLifetimeAccess ? 'opacity-30 pointer-events-none' : ''}`}>
-                                    <div className="flex items-center gap-4 mb-6">
-                                        <div className="w-14 h-14 rounded-full bg-secondary text-white
+                                    isStepDelayed ? 'text-red-600 dark:text-red

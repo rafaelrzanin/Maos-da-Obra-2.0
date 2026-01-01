@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, createContext, useContext, useMemo, useCallback } from 'react';
-import { User, PlanType, DBNotification } from './types.ts';
-import { dbService } from './services/db.ts';
+import { User, PlanType, DBNotification } from '../types.ts';
+import { dbService } from '../services/db.ts';
 
 // --- Theme Context ---
 type Theme = 'light' | 'dark';
