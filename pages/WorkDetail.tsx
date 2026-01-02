@@ -363,7 +363,7 @@ const WorkDetail: React.FC = () => {
                         confirmText: 'Ok', 
                         onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })), 
                         type: 'SUCCESS',
-                        isConfirming: false
+                        isConfirming: false 
                     }); 
                 } catch (error: any) {
                     console.error("Erro ao deletar gasto:", error);

@@ -107,8 +107,9 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
   // Log Auth State for debugging
   useEffect(() => {
-    console.log(`[Layout] Render - authLoading: ${authLoading}, isUserAuthFinished: ${isUserAuthFinished}, User: ${user ? user.email : 'null'}, Path: ${location.pathname}`);
-  }, [authLoading, isUserAuthFinished, user, location.pathname]);
+    console.log(`[App - Layout] Render. Path: ${location.pathname}, authLoading: ${authLoading}, isUserAuthFinished: ${isUserAuthFinished}, User: ${user ? user.email : 'null'}`);
+  }); // Run on every render for detailed debugging
+
 
   // Scroll to top on route change & close sidebar
   useEffect(() => {
@@ -135,10 +136,16 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   }, [location.search, user, updatePlan, navigate, location.pathname]);
 
   // Use isUserAuthFinished for the initial loading screen
-  if (!isUserAuthFinished || authLoading) return <LoadingScreen />; 
+  if (!isUserAuthFinished || authLoading) {
+    console.log("[App - Layout] Displaying LoadingScreen due to auth state.");
+    return <LoadingScreen />; 
+  }
   
   // If no user, redirect to login.
-  if (!user) return <Navigate to="/login" replace />;
+  if (!user) {
+    console.log("[App - Layout] No user, redirecting to /login.");
+    return <Navigate to="/login" replace />;
+  }
 
   const isSettingsPage = location.pathname === '/settings';
   const isCheckoutPage = location.pathname === '/checkout';
@@ -148,8 +155,10 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 
   // If subscription is not valid and AI trial is not active, and not on settings/checkout page, redirect to settings
   if (!isSubscriptionValid && !isAiTrialActive && !isSettingsPage && !isCheckoutPage) {
+      console.log("[App - Layout] Subscription invalid/AI trial inactive, redirecting to /settings.");
       return <Navigate to="/settings" replace />;
   }
+  console.log("[App - Layout] All auth/subscription checks passed, rendering main layout.");
 
   // Define navigation items for the sidebar
   const navItems = [

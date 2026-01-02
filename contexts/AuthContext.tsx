@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, createContext, useContext, useMemo, useCallback } from 'react';
 import { User, PlanType, DBNotification } from '../types.ts';
 import { dbService } from '../services/db.ts';
@@ -20,7 +19,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     localStorage.setItem('maos_theme', theme);
   }, [theme]);
   const toggleTheme = () => setTheme(prev => (prev === 'light' ? 'dark' : 'light'));
-  return <ThemeContext.Provider value={{ theme, toggleTheme }}>{children}</ThemeContext.Provider>;
+  return <ThemeContext.Provider value={{ theme, toggleTheme }}>{children}</AuthContext.Provider>;
 };
 
 // --- Auth Context ---
@@ -52,7 +51,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0); // NEW
   const [pushSubscriptionStatus, setPushSubscriptionStatus] = useState<'idle' | 'prompting' | 'granted' | 'denied' | 'error'>('idle'); // NEW
 
-  console.log("[AuthProvider] Component rendered. Initial authLoading:", authLoading, "isUserAuthFinished:", isUserAuthFinished);
+  console.log("[AuthContext] Render AuthProvider:", { authLoading, isUserAuthFinished, user: user?.id });
+
+  // Add more verbose logging for state changes
+  useEffect(() => {
+    console.log("[AuthContext] State Change: authLoading =", authLoading);
+  }, [authLoading]);
+
+  useEffect(() => {
+    console.log("[AuthContext] State Change: isUserAuthFinished =", isUserAuthFinished);
+  }, [isUserAuthFinished]);
+
+  useEffect(() => {
+    console.log("[AuthContext] State Change: user =", user?.id);
+  }, [user]);
+
 
   const refreshNotifications = useCallback(async () => {
     console.log("[AuthContext] refreshNotifications triggered. User:", user?.id);
@@ -78,28 +91,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
 
-    console.log(`[Push Notif] Current Notification.permission: ${Notification.permission}`);
+    console.log(`[AuthContext - Push Notif] Current Notification.permission: ${Notification.permission}`);
     const hasPromptedOnce = localStorage.getItem('hasPromptedPushOnce');
-    console.log(`[Push Notif] Has prompted before (localStorage): ${hasPromptedOnce}`);
+    console.log(`[AuthContext - Push Notif] Has prompted before (localStorage): ${hasPromptedOnce}`);
 
     if (Notification.permission === 'granted') {
       setPushSubscriptionStatus('granted');
-      console.log("[Push Notif] Notification permission already granted. Ensuring subscription is active.");
+      console.log("[AuthContext - Push Notif] Notification permission already granted. Ensuring subscription is active.");
       try {
         const registration = await navigator.serviceWorker.ready;
         const subscription = await registration.pushManager.getSubscription();
         if (!subscription) {
-          console.log("[Push Notif] No existing push subscription found, creating a new one.");
+          console.log("[AuthContext - Push Notif] No existing push subscription found, creating a new one.");
           const newSubscription = await registration.pushManager.subscribe({
             userVisibleOnly: true,
             applicationServerKey: import.meta.env.VITE_VAPID_PUBLIC_KEY, // Use VITE_ prefix for client
           });
           await dbService.savePushSubscription(user.id, newSubscription.toJSON());
         } else {
-          console.log("[Push Notif] Existing push subscription found.");
+          console.log("[AuthContext - Push Notif] Existing push subscription found.");
         }
       } catch (err) {
-        console.error("[Push Notif] Error managing push subscription:", err);
+        console.error("[AuthContext - Push Notif] Error managing push subscription:", err);
         setPushSubscriptionStatus('error');
       }
       return;
@@ -107,21 +120,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     if (Notification.permission === 'denied') {
       setPushSubscriptionStatus('denied');
-      console.warn("[Push Notif] Notification permission previously denied by user.");
+      console.warn("[AuthContext - Push Notif] Notification permission previously denied by user.");
       return;
     }
 
     // Only prompt if permission is 'default' and we haven't prompted before in this session/app lifetime
     if (Notification.permission === 'default' && !hasPromptedOnce) {
       setPushSubscriptionStatus('prompting');
-      console.log("[Push Notif] Requesting notification permission from user...");
+      console.log("[AuthContext - Push Notif] Requesting notification permission from user...");
       localStorage.setItem('hasPromptedPushOnce', 'true'); // Set flag immediately
 
       try {
         const permissionResult = await Notification.requestPermission();
         if (permissionResult === 'granted') {
           setPushSubscriptionStatus('granted');
-          console.log("[Push Notif] Notification permission granted by user!");
+          console.log("[AuthContext - Push Notif] Notification permission granted by user!");
           const registration = await navigator.serviceWorker.ready;
           const subscription = await registration.pushManager.subscribe({
             userVisibleOnly: true,
@@ -130,14 +143,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           await dbService.savePushSubscription(user.id, subscription.toJSON());
         } else {
           setPushSubscriptionStatus('denied');
-          console.warn("[Push Notif] Notification permission denied by user.");
+          console.warn("[AuthContext - Push Notif] Notification permission denied by user.");
         }
       } catch (err) {
-        console.error("[Push Notif] Error requesting notification permission:", err);
+        console.error("[AuthContext - Push Notif] Error requesting notification permission:", err);
         setPushSubscriptionStatus('error');
       }
     } else if (Notification.permission === 'default' && hasPromptedOnce) {
-        console.log("[Push Notif] Notification permission is default, but already prompted once. Not prompting again.");
+        console.log("[AuthContext - Push Notif] Notification permission is default, but already prompted once. Not prompting again.");
     }
   }, [user]); // Only re-create if `user` changes
 
@@ -147,24 +160,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // Initial auth check
     const checkInitialAuth = async () => {
+      console.log("[AuthContext - checkInitialAuth] Starting initial auth check.");
       setAuthLoading(true); // Começa com loading
       try {
-        console.log("[AuthContext] checkInitialAuth: Calling dbService.getCurrentUser().");
+        console.log("[AuthContext - checkInitialAuth] Calling dbService.getCurrentUser().");
         const currentUser = await dbService.getCurrentUser();
         if (mounted) {
           setUser(currentUser);
           if (currentUser) {
+            console.log("[AuthContext - checkInitialAuth] User found, refreshing notifications.");
             await refreshNotifications(); // Refresh notifications on initial load
+          } else {
+            console.log("[AuthContext - checkInitialAuth] No user found.");
           }
         }
       } catch (error) {
-        console.error("[AuthContext] Error during initial auth check:", error);
+        console.error("[AuthContext - checkInitialAuth] Error during initial auth check:", error);
         if (mounted) setUser(null);
       } finally {
         if (mounted) {
           setAuthLoading(false); // Termina o loading inicial
           setIsUserAuthFinished(true); // Marca que a checagem inicial foi concluída
-          console.log("[AuthContext] checkInitialAuth: Initial auth check finished.");
+          console.log("[AuthContext - checkInitialAuth] Initial auth check finished. authLoading=false, isUserAuthFinished=true.");
         }
       }
     };
@@ -172,21 +189,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
 
     // Supabase auth state change listener (deve rodar apenas uma vez para registrar o listener)
-    const unsubscribe = dbService.onAuthChange(async (user: User | null) => {
+    const unsubscribe = dbService.onAuthChange(async (userFromDbService: User | null) => {
       if (!mounted) return;
 
-      console.log("[AuthContext] onAuthChange event received.", { user: user?.id });
+      // The dbService.onAuthChange already handles session and ensures the user profile.
+      // We just receive the final User | null object here.
+      console.log(`[AuthContext] onAuthChange event received from dbService. User: ${userFromDbService?.id || 'null'}.`);
 
       if (mounted) {
-        setUser(user);
-        if (user) {
+        setUser(userFromDbService); // This will trigger user useEffect
+        if (userFromDbService) {
+          console.log("[AuthContext - onAuthChange] User updated, refreshing notifications.");
           await refreshNotifications(); 
           // A chamada a requestPushNotificationPermission será feita no Dashboard
         } else {
+          console.log("[AuthContext - onAuthChange] No user after auth change (logout/no session). Clearing notifications and resetting push status.");
           setUnreadNotificationsCount(0); // Limpa notificações no logout
           setPushSubscriptionStatus('idle'); // Reset push status on logout
         }
         setIsUserAuthFinished(true); // Garante que auth esteja marcado como finished após qualquer evento
+        setAuthLoading(false); // Ensure loading is off after auth change handling
+        console.log("[AuthContext - onAuthChange] Auth change handler finished. authLoading=false, isUserAuthFinished=true.");
       }
     });
 
@@ -231,8 +254,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const login = async (email: string, password?: string) => {
+    console.log("[AuthContext] login called.");
     setAuthLoading(true); // Indicate active loading
-    console.log("[AuthContext] login called. Setting authLoading to true.");
     try {
         const u = await dbService.login(email, password);
         
@@ -255,8 +278,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   async function loginSocial(provider: 'google') {
+    console.log("[AuthContext] loginSocial called.");
     setAuthLoading(true); // Indicate active loading
-    console.log("[AuthContext] loginSocial called. Setting authLoading to true.");
     try {
         const { error } = await dbService.loginSocial(provider);
 
@@ -275,8 +298,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signup = async (name: string, email: string, whatsapp: string, password?: string, cpf?: string, planType?: string | null) => {
+    console.log("[AuthContext] signup called.");
     setAuthLoading(true); // Indicate active loading
-    console.log("[AuthContext] signup called. Setting authLoading to true.");
     try {
         const u = await dbService.signup(name, email, whatsapp, password, cpf, planType);
         if (u) {
@@ -305,6 +328,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.removeItem('hasPromptedPushOnce'); // NEW: Clear push notification prompt status on logout
     setAuthLoading(false); // Explicitly set to false after logout operation
     setIsUserAuthFinished(true); // Still ready, just no user.
+    console.log("[AuthContext] logout finished. Auth states reset.");
   };
 
   const updatePlan = async (plan: PlanType) => {
@@ -328,4 +352,3 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     </AuthContext.Provider>
   );
 };
-    
