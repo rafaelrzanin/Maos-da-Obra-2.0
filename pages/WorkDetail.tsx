@@ -302,6 +302,50 @@ const WorkDetail = () => {
         }
     };
 
+    const handleDeleteMaterial = async (materialId: string) => {
+        if (!work) return;
+        setZeModal(prev => ({
+            ...prev,
+            isOpen: true,
+            title: 'Excluir Material?',
+            message: 'Tem certeza que deseja excluir este material e todos os seus registros de compra? Esta ação é irreversível.',
+            confirmText: 'Sim, Excluir Material',
+            type: 'DANGER',
+            onConfirm: async () => {
+                setZeModal(prevConfirm => ({ ...prevConfirm, isConfirming: true }));
+                try {
+                    await dbService.deleteMaterial(materialId, work.id);
+                    await load();
+                    setZeModal(prevConfirm => ({
+                        ...prevConfirm,
+                        isOpen: true,
+                        title: 'Sucesso!',
+                        message: 'Material excluído com sucesso.',
+                        confirmText: 'Ok',
+                        onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
+                        type: 'SUCCESS',
+                        isConfirming: false
+                    }));
+                } catch (error: any) {
+                    console.error("Erro ao deletar material:", error);
+                    setZeModal(prevConfirm => ({
+                        ...prevConfirm,
+                        isOpen: true,
+                        title: 'Erro!',
+                        message: `Falha ao excluir material: ${error.message || 'Um erro desconhecido ocorreu.'}`,
+                        confirmText: 'Entendido',
+                        onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
+                        type: 'ERROR',
+                        isConfirming: false
+                    }));
+                } finally {
+                    setZeModal(prevConfirm => ({ ...prevConfirm, isConfirming: false }));
+                }
+            },
+            onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false }))
+        }));
+    };
+
     const openAddExpense = () => {
         setExpenseModal({ isOpen: true, mode: 'ADD' });
         setExpDesc(''); setExpAmount(''); setExpSavedAmount(0); setExpTotalAgreed(''); setExpCategory(ExpenseCategory.LABOR); setExpStepId('');
@@ -691,18 +735,18 @@ const WorkDetail = () => {
             confirmText: 'Remover',
             type: 'DANGER',
             onConfirm: async () => {
-                setZeModal(prev => ({ ...prev, isConfirming: true }));
+                setZeModal(prevConfirm => ({ ...prevConfirm, isConfirming: true }));
                 try {
                     const updatedItems = editingChecklist.items.filter(item => item.id !== itemId);
                     const updatedChecklist = { ...editingChecklist, items: updatedItems };
                     setEditingChecklist(updatedChecklist); // Optimistic UI update
                     await dbService.updateChecklist(updatedChecklist);
                     await load(); // Reload all to keep state in sync
-                    setZeModal(prev => ({ ...prev, isOpen: false }));
+                    setZeModal(prevConfirm => ({ ...prevConfirm, isOpen: false }));
                 } catch (error: any) {
                     console.error("Erro ao remover item do checklist:", error);
-                    setZeModal(prev => ({
-                        ...prev,
+                    setZeModal(prevConfirm => ({
+                        ...prevConfirm,
                         isOpen: true,
                         title: 'Erro!',
                         message: `Não foi possível remover o item: ${error.message}`,
@@ -711,7 +755,7 @@ const WorkDetail = () => {
                         type: 'ERROR'
                     }));
                 } finally {
-                    setZeModal(prev => ({ ...prev, isConfirming: false }));
+                    setZeModal(prevConfirm => ({ ...prevConfirm, isConfirming: false }));
                 }
             },
             onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false }))
@@ -874,15 +918,17 @@ const WorkDetail = () => {
                             <p className="text-center text-slate-400 py-4 italic text-sm">Nenhum material associado a esta etapa.</p>
                         ) : (
                             stepMats.map(m => (
-                                <div key={m.id} onClick={() => { setMaterialModal({isOpen: true, material: m}); setMatName(m.name); setMatBrand(m.brand||''); setMatPlannedQty(String(m.plannedQty)); setMatUnit(m.unit); }} className="bg-white dark:bg-slate-900 p-2 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs dark:shadow-card-dark-subtle cursor-pointer hover:shadow-sm transition-shadow">
-                                    <div className="flex justify-between items-center mb-1">
+                                <div key={m.id} onClick={() => { setMaterialModal({isOpen: true, material: m}); setMatName(m.name); setMatBrand(m.brand||''); setMatPlannedQty(String(m.plannedQty)); setMatUnit(m.unit); }} className="bg-white dark:bg-slate-900 p-2 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs dark:shadow-card-dark-subtle cursor-pointer hover:shadow-sm transition-shadow flex justify-between items-center">
+                                    <div>
                                         <p className="font-bold text-sm text-primary dark:text-white">{m.name}</p>
-                                        <span className="text-xs font-black text-green-600 dark:text-green-400">{m.purchasedQty} {m.unit}</span>
+                                        <div className="h-1 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden mt-1">
+                                            <div className="h-full bg-secondary" style={{ width: `${(m.purchasedQty/m.plannedQty)*100}%` }}></div>
+                                        </div>
+                                        <p className="text-[10px] text-right text-slate-500 dark:text-slate-400 mt-1">Planejado: {m.plannedQty} {m.unit}</p>
                                     </div>
-                                    <div className="h-1 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
-                                        <div className="h-full bg-secondary" style={{ width: `${(m.purchasedQty/m.plannedQty)*100}%` }}></div>
-                                    </div>
-                                    <p className="text-[10px] text-right text-slate-500 dark:text-slate-400 mt-1">Planejado: {m.plannedQty} {m.unit}</p>
+                                    <button onClick={(e) => { e.stopPropagation(); handleDeleteMaterial(m.id); }} className="text-red-400 hover:text-red-600 transition-colors p-2 -mr-2" aria-label={`Excluir material ${m.name}`}>
+                                        <i className="fa-solid fa-trash-alt"></i>
+                                    </button>
                                 </div>
                             ))
                         )}
@@ -905,15 +951,17 @@ const WorkDetail = () => {
                     </div>
                     <div className="space-y-3 pl-3 border-l-2 border-slate-100 dark:border-slate-800">
                         {materials.filter(m => !m.stepId).map(m => (
-                            <div key={m.id} onClick={() => { setMaterialModal({isOpen: true, material: m}); setMatName(m.name); setMatBrand(m.brand||''); setMatPlannedQty(String(m.plannedQty)); setMatUnit(m.unit); }} className="bg-white dark:bg-slate-900 p-2 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs dark:shadow-card-dark-subtle cursor-pointer hover:shadow-sm transition-shadow">
-                                <div className="flex justify-between items-center mb-1">
+                            <div key={m.id} onClick={() => { setMaterialModal({isOpen: true, material: m}); setMatName(m.name); setMatBrand(m.brand||''); setMatPlannedQty(String(m.plannedQty)); setMatUnit(m.unit); }} className="bg-white dark:bg-slate-900 p-2 rounded-xl border border-slate-200 dark:border-slate-800 shadow-xs dark:shadow-card-dark-subtle cursor-pointer hover:shadow-sm transition-shadow flex justify-between items-center">
+                                <div>
                                     <p className="font-bold text-sm text-primary dark:text-white">{m.name}</p>
-                                    <span className="text-xs font-black text-green-600 dark:text-green-400">{m.purchasedQty} {m.unit}</span>
+                                    <div className="h-1 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden mt-1">
+                                        <div className="h-full bg-secondary" style={{ width: `${(m.purchasedQty/m.plannedQty)*100}%` }}></div>
+                                    </div>
+                                    <p className="text-[10px] text-right text-slate-500 dark:text-slate-400 mt-1">Planejado: {m.plannedQty} {m.unit}</p>
                                 </div>
-                                <div className="h-1 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden">
-                                    <div className="h-full bg-secondary" style={{ width: `${(m.purchasedQty/m.plannedQty)*100}%` }}></div>
-                                </div>
-                                <p className="text-[10px] text-right text-slate-500 dark:text-slate-400 mt-1">Planejado: {m.plannedQty} {m.unit}</p>
+                                <button onClick={(e) => { e.stopPropagation(); handleDeleteMaterial(m.id); }} className="text-red-400 hover:text-red-600 transition-colors p-2 -mr-2" aria-label={`Excluir material ${m.name}`}>
+                                    <i className="fa-solid fa-trash-alt"></i>
+                                </button>
                             </div>
                         ))}
                     </div>
@@ -1394,7 +1442,7 @@ const WorkDetail = () => {
                                                     reportActiveTab === tab
                                                         ? 'bg-secondary text-white shadow-md'
                                                         : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-                                                        }`}
+                                                }`}
                                                 aria-selected={reportActiveTab === tab}
                                                 role="tab"
                                             >
@@ -1673,20 +1721,20 @@ const WorkDetail = () => {
                 <form onSubmit={addMatModal ? handleAddMaterial : handleUpdateMaterial} className="space-y-4">
                     <div>
                         <label htmlFor="mat-name" className="block text-sm font-medium text-primary dark:text-white mb-2">Nome do Material:</label>
-                        <input id="mat-name" type="text" value={addMatModal ? newMatName : matName} onChange={(e) => addMatModal ? setNewMatName(e.target.value) : setMatName(e.target.value)} className="w-full p-3 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white" required aria-label="Nome do material" />
+                        <input id="mat-name" type="text" value={addMatModal ? newMatName : matName} onChange={(e) => addMatModal ? setNewMatName(e.target.value) : setMatName(e.target.value)} className="w-full p-3 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-green-500 font-black" required aria-label="Nome do material" />
                     </div>
                     <div>
                         <label htmlFor="mat-brand" className="block text-sm font-medium text-primary dark:text-white mb-2">Marca (Opcional):</label>
-                        <input id="mat-brand" type="text" value={addMatModal ? newMatBrand : matBrand} onChange={(e) => addMatModal ? setNewMatBrand(e.target.value) : setMatBrand(e.target.value)} className="w-full p-3 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white" aria-label="Marca do material (opcional)" />
+                        <input id="mat-brand" type="text" value={addMatModal ? newMatBrand : matBrand} onChange={(e) => addMatModal ? setNewMatBrand(e.target.value) : setMatBrand(e.target.value)} className="w-full p-3 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-green-500 font-black" aria-label="Marca do material (opcional)" />
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label htmlFor="mat-qty" className="block text-sm font-medium text-primary dark:text-white mb-2">Qtd. Planejada:</label>
-                            <input id="mat-qty" type="number" value={addMatModal ? newMatQty : matPlannedQty} onChange={(e) => addMatModal ? setNewMatQty(e.target.value) : setMatPlannedQty(e.target.value)} className="w-full p-3 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white" required aria-label="Quantidade planejada" />
+                            <input id="mat-qty" type="number" value={addMatModal ? newMatQty : matPlannedQty} onChange={(e) => addMatModal ? setNewMatQty(e.target.value) : setMatPlannedQty(e.target.value)} className="w-full p-3 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-green-500 font-black" required aria-label="Quantidade planejada" />
                         </div>
                         <div>
                             <label htmlFor="mat-unit" className="block text-sm font-medium text-primary dark:text-white mb-2">Unidade:</label>
-                            <input id="mat-unit" type="text" value={addMatModal ? newMatUnit : matUnit} onChange={(e) => addMatModal ? setNewMatUnit(e.target.value) : setMatUnit(e.target.value)} className="w-full p-3 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white" required aria-label="Unidade de medida" />
+                            <input id="mat-unit" type="text" value={addMatModal ? newMatUnit : matUnit} onChange={(e) => addMatModal ? setNewMatUnit(e.target.value) : setMatUnit(e.target.value)} className="w-full p-3 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-green-500 font-black" required aria-label="Unidade de medida" />
                         </div>
                     </div>
                     {addMatModal && (
@@ -1706,11 +1754,11 @@ const WorkDetail = () => {
                                 <div className="grid grid-cols-2 gap-4 mt-4">
                                     <div>
                                         <label htmlFor="new-mat-buy-qty" className="block text-sm font-medium text-primary dark:text-white mb-2">Qtd. Comprada:</label>
-                                        <input id="new-mat-buy-qty" type="number" value={newMatBuyQty} onChange={(e) => setNewMatBuyQty(e.target.value)} className="w-full p-3 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white" required aria-label="Quantidade comprada" />
+                                        <input id="new-mat-buy-qty" type="number" value={newMatBuyQty} onChange={(e) => setNewMatBuyQty(e.target.value)} className="w-full p-3 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-green-500 font-black" required aria-label="Quantidade comprada" />
                                     </div>
                                     <div>
                                         <label htmlFor="new-mat-buy-cost" className="block text-sm font-medium text-primary dark:text-white mb-2">Custo Total (R$):</label>
-                                        <input id="new-mat-buy-cost" type="number" value={newMatBuyCost} onChange={(e) => setNewMatBuyCost(e.target.value)} className="w-full p-3 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white" required aria-label="Custo total da compra" />
+                                        <input id="new-mat-buy-cost" type="number" value={newMatBuyCost} onChange={(e) => setNewMatBuyCost(e.target.value)} className="w-full p-3 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-green-500 font-black" required aria-label="Custo total da compra" />
                                     </div>
                                 </div>
                             )}
@@ -1722,11 +1770,11 @@ const WorkDetail = () => {
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label htmlFor="mat-buy-qty" className="block text-sm font-medium text-primary dark:text-white mb-2">Qtd. Comprada:</label>
-                                    <input id="mat-buy-qty" type="number" value={matBuyQty} onChange={(e) => setMatBuyQty(e.target.value)} className="w-full p-3 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white" aria-label="Quantidade comprada (adicionar)" />
+                                    <input id="mat-buy-qty" type="number" value={matBuyQty} onChange={(e) => setMatBuyQty(e.target.value)} className="w-full p-3 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-green-500 font-black" aria-label="Quantidade comprada (adicionar)" />
                                 </div>
                                 <div>
                                     <label htmlFor="mat-buy-cost" className="block text-sm font-medium text-primary dark:text-white mb-2">Custo Total (R$):</label>
-                                    <input id="mat-buy-cost" type="number" value={matBuyCost} onChange={(e) => setMatBuyCost(e.target.value)} className="w-full p-3 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white" aria-label="Custo total da nova compra" />
+                                    <input id="mat-buy-cost" type="number" value={matBuyCost} onChange={(e) => setMatBuyCost(e.target.value)} className="w-full p-3 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-green-500 font-black" aria-label="Custo total da nova compra" />
                                 </div>
                             </div>
                             <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">Atual: {materialModal.material.purchasedQty} {materialModal.material.unit} comprados de {materialModal.material.plannedQty} {materialModal.material.unit} planejados.</p>
@@ -1736,7 +1784,7 @@ const WorkDetail = () => {
                         {addMatModal ? 'Adicionar Material' : 'Salvar Alterações'}
                     </button>
                     {!addMatModal && (
-                        <button onClick={() => {}} className="w-full py-3 mt-2 bg-red-500/10 text-red-600 dark:bg-red-900/20 dark:text-red-300 font-bold rounded-xl hover:bg-red-500/20 dark:hover:bg-red-800 transition-colors" aria-label="Excluir material">
+                        <button onClick={() => handleDeleteMaterial(materialModal.material!.id)} className="w-full py-3 mt-2 bg-red-500/10 text-red-600 dark:bg-red-900/20 dark:text-red-300 font-bold rounded-xl hover:bg-red-500/20 dark:hover:bg-red-800 transition-colors" aria-label="Excluir material">
                             Excluir Material
                         </button>
                     )}
@@ -1756,28 +1804,28 @@ const WorkDetail = () => {
                 <form onSubmit={handleSaveExpense} className="space-y-4">
                     <div>
                         <label htmlFor="exp-desc" className="block text-sm font-medium text-primary dark:text-white mb-2">Descrição:</label>
-                        <input id="exp-desc" type="text" value={expDesc} onChange={(e) => setExpDesc(e.target.value)} className="w-full p-3 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white" required aria-label="Descrição da despesa" />
+                        <input id="exp-desc" type="text" value={expDesc} onChange={(e) => setExpDesc(e.target.value)} className="w-full p-3 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-green-500 font-black" required aria-label="Descrição da despesa" />
                     </div>
                     {expenseModal.mode === 'ADD' && (
                         <div>
                             <label htmlFor="exp-amount" className="block text-sm font-medium text-primary dark:text-white mb-2">Valor (R$):</label>
-                            <input id="exp-amount" type="number" value={expAmount} onChange={(e) => setExpAmount(e.target.value)} className="w-full p-3 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white" required aria-label="Valor da despesa" />
+                            <input id="exp-amount" type="number" value={expAmount} onChange={(e) => setExpAmount(e.target.value)} className="w-full p-3 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-green-500 font-black" required aria-label="Valor da despesa" />
                         </div>
                     )}
                     {expenseModal.mode === 'EDIT' && (
                         <div>
                             <label htmlFor="exp-amount-add" className="block text-sm font-medium text-primary dark:text-white mb-2">Adicionar Novo Pagamento (R$):</label>
-                            <input id="exp-amount-add" type="number" value={expAmount} onChange={(e) => setExpAmount(e.target.value)} placeholder="0.00" className="w-full p-3 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white" aria-label="Adicionar novo pagamento" />
+                            <input id="exp-amount-add" type="number" value={expAmount} onChange={(e) => setExpAmount(e.target.value)} placeholder="0.00" className="w-full p-3 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-green-500 font-black" aria-label="Adicionar novo pagamento" />
                             <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Total já pago: {formatCurrency(expSavedAmount)}</p>
                         </div>
                     )}
                     <div>
                         <label htmlFor="exp-total-agreed" className="block text-sm font-medium text-primary dark:text-white mb-2">Valor Total Acordado (Opcional - R$):</label>
-                        <input id="exp-total-agreed" type="number" value={expTotalAgreed} onChange={(e) => setExpTotalAgreed(e.target.value)} placeholder="0.00" className="w-full p-3 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white" aria-label="Valor total acordado (opcional)" />
+                        <input id="exp-total-agreed" type="number" value={expTotalAgreed} onChange={(e) => setExpTotalAgreed(e.target.value)} placeholder="0.00" className="w-full p-3 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-green-500 font-black" aria-label="Valor total acordado (opcional)" />
                     </div>
                     <div>
                         <label htmlFor="exp-category" className="block text-sm font-medium text-primary dark:text-white mb-2">Categoria:</label>
-                        <select id="exp-category" value={expCategory} onChange={(e) => setExpCategory(e.target.value as ExpenseCategory)} className="w-full p-3 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white" aria-label="Categoria da despesa">
+                        <select id="exp-category" value={expCategory} onChange={(e) => setExpCategory(e.target.value as ExpenseCategory)} className="w-full p-3 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-green-500 font-black" aria-label="Categoria da despesa">
                             {Object.values(ExpenseCategory).map(cat => (
                                 <option key={cat} value={cat}>{cat}</option>
                             ))}

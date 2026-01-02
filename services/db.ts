@@ -1057,6 +1057,39 @@ export const dbService = {
     return parseMaterialFromDB(updatedMaterialData);
   },
 
+  async deleteMaterial(materialId: string, workId: string): Promise<void> {
+    // Supabase is guaranteed to be initialized now
+    console.log(`[DB DELETE] Iniciando exclusão de material para materialId: ${materialId} na workId: ${workId}`);
+
+    // Verificar se existem despesas associadas a este material
+    const { data: expensesCheck, error: expensesCheckError } = await supabase
+      .from('expenses')
+      .select('id')
+      .eq('related_material_id', materialId);
+
+    if (expensesCheckError) {
+      console.error(`[DB DELETE] Erro ao verificar despesas para materialId ${materialId}:`, expensesCheckError);
+      throw new Error(`Falha ao verificar despesas associadas ao material: ${expensesCheckError.message}`);
+    }
+
+    if (expensesCheck && expensesCheck.length > 0) {
+      const expenseCount = expensesCheck.length;
+      throw new Error(`Este material não pode ser excluído pois possui ${expenseCount} lançamento(s) financeiro(s) associado(s). Apague os lançamentos primeiro.`);
+    }
+    
+    // Se não há despesas associadas, proceed with deletion
+    const { error: deleteMaterialError } = await supabase.from('materials').delete().eq('id', materialId).eq('work_id', workId);
+    if (deleteMaterialError) {
+      console.error("Erro ao apagar material:", deleteMaterialError);
+      throw deleteMaterialError;
+    }
+    _dashboardCache.materials[workId] = null; // Invalidate cache
+    _dashboardCache.notifications = null; // Invalidate notifications cache
+    delete _dashboardCache.stats[workId];
+    delete _dashboardCache.summary[workId];
+    console.log(`[DB DELETE] Material ${materialId} deletado com sucesso.`);
+  },
+
   async registerMaterialPurchase(materialId: string, name: string, brand: string | undefined, plannedQty: number, unit: string, qty: number, cost: number): Promise<void> {
     // Supabase is guaranteed to be initialized now
 
