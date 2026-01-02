@@ -12,6 +12,8 @@ export interface ZeModalProps {
   onConfirm?: () => void; // Made optional, but should be handled with a default no-op
   onCancel: () => void; // Still required as the primary way to close
   isConfirming?: boolean; // NEW: To disable confirm button during async ops
+  // Add children prop explicitly
+  children?: React.ReactNode; 
 }
 
 export const ZeModal: React.FC<ZeModalProps> = ({ 
@@ -23,7 +25,8 @@ export const ZeModal: React.FC<ZeModalProps> = ({
   type = 'INFO', // Default to INFO
   onConfirm = () => {}, // Changed to a no-op default to always be a function
   onCancel,
-  isConfirming = false // NEW: Default to false
+  isConfirming = false, // NEW: Default to false
+  children // Destructure children
 }) => {
   if (!isOpen) return null;
   
@@ -82,9 +85,16 @@ export const ZeModal: React.FC<ZeModalProps> = ({
                 </div>
             </div>
             
-            <div className={`mb-8 p-4 rounded-2xl text-sm leading-relaxed border ${messageBoxBgClass}`}>
-                <p>{message}</p>
-            </div>
+            {/* Render children if provided, otherwise render the message */}
+            {children ? (
+                <div className="mb-8">
+                    {children}
+                </div>
+            ) : (
+                <div className={`mb-8 p-4 rounded-2xl text-sm leading-relaxed border ${messageBoxBgClass}`}>
+                    <p>{message}</p>
+                </div>
+            )}
 
             <div className="flex flex-col gap-3">
                 <button 
