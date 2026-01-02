@@ -450,6 +450,63 @@ export const dbService = {
       }
   },
 
+  // NEW: Method to update user's plan details including subscription_expires_at and is_trial.
+  async updatePlan(userId: string, planType: PlanType): Promise<void> {
+    const { data: currentProfile, error: fetchError } = await supabase
+      .from('profiles')
+      .select('subscription_expires_at, is_trial')
+      .eq('id', userId)
+      .single();
+
+    if (fetchError || !currentProfile) {
+      console.error("Erro ao buscar perfil para atualizar plano:", fetchError);
+      throw new Error("Não foi possível encontrar o perfil do usuário.");
+    }
+
+    let newExpiresAt: string | null = null;
+    let newIsTrial: boolean = false;
+
+    if (planType === PlanType.VITALICIO) {
+      // For lifetime plan, set expiration to a very distant future date or null.
+      // Using a distant date for easier comparison logic with `new Date()`.
+      newExpiresAt = '2100-01-01T00:00:00.000Z'; 
+      newIsTrial = false;
+    } else {
+      let baseDate = new Date();
+      // If current subscription is still active (expires in the future),
+      // the new subscription starts from the end of the current one.
+      if (currentProfile.subscription_expires_at && new Date(currentProfile.subscription_expires_at) > baseDate) {
+        baseDate = new Date(currentProfile.subscription_expires_at);
+      }
+
+      if (planType === PlanType.MENSAL) {
+        baseDate.setMonth(baseDate.getMonth() + 1);
+      } else if (planType === PlanType.SEMESTRAL) {
+        baseDate.setMonth(baseDate.getMonth() + 6);
+      }
+      newExpiresAt = baseDate.toISOString();
+      newIsTrial = false; // Once a paid plan is active, trial is over.
+    }
+
+    const { error: updateError } = await supabase
+      .from('profiles')
+      .update({
+        plan: planType,
+        subscription_expires_at: newExpiresAt,
+        is_trial: newIsTrial
+      })
+      .eq('id', userId);
+
+    if (updateError) {
+      console.error("Erro ao atualizar plano do usuário:", updateError);
+      throw new Error(`Falha ao atualizar o plano: ${updateError.message}`);
+    }
+
+    // Invalidate caches to ensure fresh data on next fetch
+    sessionCache = null;
+    _dashboardCache.notifications = null; // Plan updates might affect notification logic.
+  },
+
   async resetPassword(email: string) {
       // Supabase is guaranteed to be initialized now
       const { error: resetPassError } = await supabase.auth.resetPasswordForEmail(email, { // Renamed error
@@ -475,23 +532,6 @@ export const dbService = {
 
     // Se a data de expiração existe e está no futuro, a assinatura está ativa.
     return new Date(user.subscriptionExpiresAt) > new Date();
-  },
-
-  async updatePlan(userId: string, plan: PlanType) {
-      // Supabase is guaranteed to be initialized now
-      
-      let expires = new Date();
-      if (plan === PlanType.MENSAL) expires.setDate(expires.getDate() + 30);
-      if (plan === PlanType.SEMESTRAL) expires.setDate(expires.getDate() + 180);
-      if (plan === PlanType.VITALICIO) expires.setFullYear(expires.getFullYear() + 100); // Effectively forever
-
-      await supabase.from('profiles').update({
-          plan,
-          subscription_expires_at: expires.toISOString(),
-          is_trial: false // Após o pagamento do plano, a flag `is_trial` para o app principal é desativada
-      }).eq('id', userId);
-      
-      sessionCache = null; // Invalida cache
   },
 
   // Fix: Added default values to unused parameters to resolve TypeScript error.
@@ -1605,4 +1645,3 @@ export const dbService = {
   }
 
 };
-    

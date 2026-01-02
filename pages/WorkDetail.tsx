@@ -1,4 +1,6 @@
 
+
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import * as ReactRouter from 'react-router-dom';
 import * as XLSX from 'xlsx';
@@ -137,6 +139,7 @@ const WorkDetail = () => {
     const [allChecklists, setAllChecklists] = useState<Checklist[]>([]);
     const [selectedChecklistCategory, setSelectedChecklistCategory] = useState<string>('all'); // Filter for Checklist view
 
+    // FIX: Type ZeModal state properly
     const [zeModal, setZeModal] = useState<ZeModalProps & { id?: string, isConfirming?: boolean }>({ isOpen: false, title: '', message: '', onCancel: () => {} });
 
     const [isCalculatorModalOpen, setIsCalculatorModalOpen] = useState(false);
@@ -1391,7 +1394,7 @@ const WorkDetail = () => {
                                                     reportActiveTab === tab
                                                         ? 'bg-secondary text-white shadow-md'
                                                         : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-                                                }`}
+                                                        }`}
                                                 aria-selected={reportActiveTab === tab}
                                                 role="tab"
                                             >

@@ -219,7 +219,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       unsubscribe();
       console.log("[AuthContext] Main useEffect cleanup: Auth listener unsubscribed.");
     };
-  }, [refreshNotifications]); 
+  }, []); // CRITICAL FIX: Empty dependency array to ensure this effect runs only once on mount.
 
   const isSubscriptionValid = useMemo(() => user ? dbService.isSubscriptionActive(user) : false, [user]);
   const isNewAccount = useMemo(() => user ? !user.subscriptionExpiresAt : true, [user]);
@@ -353,4 +353,3 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     </AuthContext.Provider>
   );
 };
-    
