@@ -1,4 +1,5 @@
 
+
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext.tsx'; // Use authLoading and isUserAuthFinished
 import * as ReactRouter from 'react-router-dom';
@@ -150,7 +151,7 @@ const CreateWork = () => {
 
     setLoading(true);
     setGenerationMode(true); // Activate overlay
-    setGeneralError(''); // Clear general error before submission
+    setGeneralError(''); // Clear general error antes da submissão
 
     // Timeout safety
     const timeoutPromise = new Promise((_, reject) => {

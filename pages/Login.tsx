@@ -5,80 +5,148 @@ import * as ReactRouter from 'react-router-dom';
 import { dbService } from '../services/db.ts';
 
 const Login = () => {
-  const { login, user, authLoading, isUserAuthFinished, isSubscriptionValid } = useAuth();
+  const { login, signup, user, authLoading, isUserAuthFinished, isSubscriptionValid } = useAuth();
   const navigate = ReactRouter.useNavigate();
   const location = ReactRouter.useLocation();
+  const [searchParams] = ReactRouter.useSearchParams(); // NEW: To read plan from URL
+
+  // Mode: 'login' or 'register'
+  const [mode, setMode] = useState<'login' | 'register'>('login');
   
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  // Login Form State
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  
+  // Register Form State
+  const [registerName, setRegisterName] = useState('');
+  const [registerEmail, setRegisterEmail] = useState('');
+  const [registerCpf, setRegisterCpf] = useState('');
+  const [registerPhone, setRegisterPhone] = useState('');
+  const [registerPassword, setRegisterPassword] = useState('');
+  
   const [loading, setLoading] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
+  const [errorMsg, setErrorMsg] = useState('');
 
   // Password Recovery State
   const [showForgotModal, setShowForgotModal] = useState(false);
   const [forgotEmail, setForgotEmail] = useState('');
-  // Fix: Correctly initialize useState with a type and initial value.
   const [forgotStatus, setForgotStatus] = useState<'IDLE' | 'SENDING' | 'SENT' | 'ERROR'>('IDLE');
 
-  console.log("[Login] Component rendered. Current user from AuthContext:", user ? user.email : 'null', "Auth Loading:", authLoading, "isUserAuthFinished:", isUserAuthFinished);
+  // Detect plan from URL (for pre-selection/redirect after signup)
+  const planParam = searchParams.get('plan');
 
-
-  // Detect plan from URL (for immediate redirect after social login/signup)
-  useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const plan = params.get('plan');
-    if (plan) {
-      setSelectedPlan(plan);
-    }
-  }, [location.search]);
+  console.log("[Login] Component rendered. Current user from AuthContext:", user ? user.email : 'null', "Auth Loading:", authLoading, "isUserAuthFinished:", isUserAuthFinished, "Mode:", mode, "PlanParam:", planParam);
 
   // Main redirect logic
   useEffect(() => {
-    console.log("[Login] useEffect trigger. AuthState:", { user: user ? user.email : 'null', authLoading, isUserAuthFinished, isSubscriptionValid, selectedPlan, currentPath: location.pathname });
+    console.log("[Login useEffect] AuthState:", { user: user ? user.email : 'null', authLoading, isUserAuthFinished, isSubscriptionValid, planParam, currentPath: location.pathname });
 
     if (isUserAuthFinished && user && !authLoading) {
-        console.log("[Login] Auth Finished, User exists, and Auth not loading. Checking redirect conditions...");
-        if (selectedPlan) {
-            console.log("[Login] Redirecting to /checkout due to selectedPlan:", selectedPlan);
-            navigate('/checkout', { replace: true });
+        console.log("[Login useEffect] Auth Finished, User exists, and Auth not loading. Checking redirect conditions...");
+        if (planParam) {
+            console.log("[Login useEffect] Redirecting to /checkout due to planParam:", planParam);
+            navigate(`/checkout?plan=${planParam}`, { replace: true });
         } 
         else if (isSubscriptionValid) {
-            console.log("[Login] Redirecting to / (Dashboard) due to valid subscription.");
+            console.log("[Login useEffect] Redirecting to / (Dashboard) due to valid subscription.");
             navigate('/', { replace: true });
         } 
         else {
-            console.log("[Login] Redirecting to /settings (Subscription management).");
+            console.log("[Login useEffect] Redirecting to /settings (Subscription management).");
             navigate('/settings', { replace: true });
         }
     } else if (!user && isUserAuthFinished && !authLoading) {
-        console.log("[Login] No user found, Auth Finished, and Auth not loading. Displaying login form.");
+        console.log("[Login useEffect] No user found, Auth Finished, and Auth not loading. Displaying form (current mode: " + mode + ").");
     } else if (!isUserAuthFinished || authLoading) {
-        console.log("[Login] Auth is still loading or not finished. Waiting...");
+        console.log("[Login useEffect] Auth is still loading or not finished. Waiting...");
     }
-  }, [user, navigate, selectedPlan, authLoading, isUserAuthFinished, isSubscriptionValid, location.pathname]);
+  }, [user, navigate, planParam, authLoading, isUserAuthFinished, isSubscriptionValid, location.pathname, mode]);
 
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (loading) return;
     setLoading(true);
+    setErrorMsg('');
 
     try {
-        const success = await login(email, password);
+        const success = await login(loginEmail, loginPassword);
         if (!success) {
-            alert('E-mail ou senha incorretos.');
+            setErrorMsg('E-mail ou senha incorretos.');
         } 
     } catch (error: any) {
-        console.error(error);
-        
+        console.error("Login exception:", error);
         let msg = "Erro no sistema. Verifique sua conexão.";
         if (error.message?.includes("Invalid login")) {
             msg = "E-mail ou senha incorretos. Se você ainda não tem cadastro, clique em 'Criar conta' abaixo.";
         } else if (error.message?.includes("security purposes")) {
             msg = "Muitas tentativas. Aguarde alguns minutos.";
         }
-        
-        alert(msg);
+        setErrorMsg(msg);
+    } finally {
+        setLoading(false);
+    }
+  };
+
+  const handleRegisterSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (loading) return;
+    setLoading(true);
+    setErrorMsg('');
+
+    const cleanCpf = registerCpf.replace(/\D/g, '');
+    const cleanPhone = registerPhone.replace(/\D/g, '');
+
+    if (!registerName.trim() || !registerEmail.trim() || !registerPassword.trim()) {
+        setErrorMsg('Preencha todos os campos obrigatórios (Nome, E-mail, Senha).');
+        setLoading(false);
+        return;
+    }
+    if (cleanCpf.length !== 11) {
+        setErrorMsg('Por favor, insira um CPF válido com 11 dígitos.');
+        setLoading(false);
+        return;
+    }
+    if (cleanPhone.length !== 11 && cleanPhone.length !== 10) { // Allow 10 or 11 digits for phone
+        setErrorMsg('Por favor, insira um número de celular válido com 10 ou 11 dígitos.');
+        setLoading(false);
+        return;
+    }
+    if (registerPassword.length < 6) {
+        setErrorMsg('A senha deve ter no mínimo 6 caracteres.');
+        setLoading(false);
+        return;
+    }
+
+    try {
+        // CRITICAL: signup NO LONGER takes planType. Profile is created plan-agnostic.
+        const success = await signup(
+            registerName,
+            registerEmail,
+            cleanPhone,
+            registerPassword,
+            cleanCpf
+        );
+
+        if (success) {
+            // Redirect based on whether a plan was pre-selected from external link
+            if (planParam) {
+                console.log("[Register Submit] Signup successful with planParam. Redirecting to checkout.");
+                navigate(`/checkout?plan=${planParam}`, { replace: true });
+            } else {
+                console.log("[Register Submit] Signup successful without planParam. Redirecting to settings.");
+                navigate('/settings', { replace: true });
+            }
+        } else {
+            setErrorMsg("Falha ao criar conta. Verifique os dados e tente novamente.");
+        }
+    } catch (error: any) {
+        console.error("Erro ao registrar:", error);
+        let msg = "Erro no registro. Tente novamente.";
+        if (error.message?.includes("User already registered")) {
+            msg = "E-mail já cadastrado. Tente fazer login ou use outro e-mail.";
+        }
+        setErrorMsg(msg);
     } finally {
         setLoading(false);
     }
@@ -86,12 +154,14 @@ const Login = () => {
 
   const handleSocialLogin = async (provider: 'google') => {
     setLoading(true);
+    setErrorMsg('');
     const { error } = await dbService.loginSocial(provider);
 
     if (error) {
         console.error(error);
-        alert("Erro no login Google. Verifique se o domínio da Vercel está autorizado no Supabase.");
+        setErrorMsg("Erro no login com Google. Verifique se o domínio da Vercel está autorizado no Supabase.");
     } 
+    // Redirecionamento é tratado pelo useEffect principal após onAuthChange
     setLoading(false);
   };
 
@@ -108,8 +178,48 @@ const Login = () => {
           }
       } catch (e) {
           setForgotStatus('ERROR');
+          setErrorMsg('Erro ao enviar e-mail. Verifique se o e-mail está correto.');
       }
   };
+
+  // Common input change handler for both forms with masks
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let { name, value } = e.target;
+
+    // Apply masks
+    if (name === 'cpf') {
+        value = value.replace(/\D/g, '').substring(0, 11);
+        if (value.length === 11) {
+            value = value.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, "$1.$2.$3-$4");
+        } else {
+            value = value.replace(/(\d{3})(\d)/, "$1.$2");
+            value = value.replace(/(\d{3})(\d)/, "$1.$2");
+            value = value.replace(/(\d{3})(\d{1,2})$/, "$1-$2");
+        }
+    }
+    if (name === 'phone') {
+        value = value.replace(/\D/g, '').substring(0, 11);
+        if (value.length === 11) {
+            value = value.replace(/^(\d{2})(\d{5})(\d{4})/, "($1) $2-$3");
+        } else {
+            value = value.replace(/^(\d{2})(\d)/g, "($1) $2");
+            value = value.replace(/(\d{5})(\d)/, "$1-$2");
+        }
+    }
+
+    if (mode === 'login') {
+        if (name === 'email') setLoginEmail(value);
+        if (name === 'password') setLoginPassword(value);
+    } else { // register mode
+        if (name === 'name') setRegisterName(value);
+        if (name === 'email') setRegisterEmail(value);
+        if (name === 'cpf') setRegisterCpf(value);
+        if (name === 'phone') setRegisterPhone(value);
+        if (name === 'password') setRegisterPassword(value);
+    }
+    setErrorMsg(''); // Clear error on input change
+  };
+
 
   if (!isUserAuthFinished || authLoading) {
     return (
@@ -154,45 +264,97 @@ const Login = () => {
 
           <div className="backdrop-blur-xl bg-black/70 border border-white/10 rounded-[2.5rem] p-8 shadow-2xl">
               <h2 className="text-xl font-bold text-white text-center mb-6">
-                  Bem-vindo de volta
+                  {mode === 'login' ? 'Bem-vindo de volta' : 'Criar sua Conta'}
               </h2>
+              {planParam && mode === 'register' && (
+                <p className="text-center text-amber-400 text-sm mb-4 font-semibold">
+                  Você está se cadastrando para o plano {planParam.toUpperCase()}. Você poderá confirmá-lo após o cadastro.
+                </p>
+              )}
 
-              <form onSubmit={handleSubmit} className="space-y-4">
-                  <input type="email" placeholder="E-mail" value={email} onChange={e => setEmail(e.target.value)}
-                      className="w-full px-4 py-3 bg-white/10 border border-white/10 rounded-xl text-white outline-none focus:border-amber-500/50" 
-                      aria-label="E-mail"
-                      autoComplete="username"
-                  />
-                  
-                  <input type="password" placeholder="Senha" value={password} onChange={e => setPassword(e.target.value)}
-                      className="w-full px-4 py-3 bg-white/10 border border-white/10 rounded-xl text-white outline-none focus:border-amber-500/50" 
-                      aria-label="Senha"
-                      autoComplete="current-password"
-                  />
 
-                  <button type="submit" disabled={loading}
-                      className="w-full py-4 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl transition-all shadow-lg shadow-amber-500/20 disabled:opacity-50 flex items-center justify-center gap-2"
-                      aria-label="Entrar na sua conta"
-                  >
-                      {loading && <i className="fa-solid fa-circle-notch fa-spin"></i>}
-                      Entrar
-                  </button>
-              </form>
+              {mode === 'login' && (
+                <form onSubmit={handleLoginSubmit} className="space-y-4 animate-in fade-in slide-in-from-left-4 duration-300">
+                    <input type="email" placeholder="E-mail" value={loginEmail} onChange={handleInputChange} name="email"
+                        className="w-full px-4 py-3 bg-white/10 border border-white/10 rounded-xl text-white outline-none focus:border-amber-500/50" 
+                        aria-label="E-mail"
+                        autoComplete="username"
+                    />
+                    
+                    <input type="password" placeholder="Senha" value={loginPassword} onChange={handleInputChange} name="password"
+                        className="w-full px-4 py-3 bg-white/10 border border-white/10 rounded-xl text-white outline-none focus:border-amber-500/50" 
+                        aria-label="Senha"
+                        autoComplete="current-password"
+                    />
+
+                    <button type="submit" disabled={loading}
+                        className="w-full py-4 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl transition-all shadow-lg shadow-amber-500/20 disabled:opacity-50 flex items-center justify-center gap-2"
+                        aria-label="Entrar na sua conta"
+                    >
+                        {loading && <i className="fa-solid fa-circle-notch fa-spin"></i>}
+                        Entrar
+                    </button>
+                </form>
+              )}
+
+              {mode === 'register' && (
+                <form onSubmit={handleRegisterSubmit} className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
+                    <input type="text" name="name" placeholder="Nome Completo" value={registerName} onChange={handleInputChange}
+                        className="w-full px-4 py-3 bg-white/10 border border-white/10 rounded-xl text-white outline-none focus:border-secondary transition-colors placeholder:text-gray-400 dark:placeholder:text-gray-500"
+                        aria-label="Nome Completo" autoComplete="name" required />
+                    <input type="email" name="email" placeholder="E-mail" value={registerEmail} onChange={handleInputChange}
+                        className="w-full px-4 py-3 bg-white/10 border border-white/10 rounded-xl text-white outline-none focus:border-secondary transition-colors placeholder:text-gray-400 dark:placeholder:text-gray-500"
+                        aria-label="E-mail" autoComplete="email" required />
+                    <input type="text" name="cpf" placeholder="CPF" value={registerCpf} onChange={handleInputChange}
+                        className="w-full px-4 py-3 bg-white/10 border border-white/10 rounded-xl text-white outline-none focus:border-secondary transition-colors placeholder:text-gray-400 dark:placeholder:text-gray-500"
+                        aria-label="CPF" autoComplete="off" inputMode="numeric" maxLength={14} required />
+                    <input type="tel" name="phone" placeholder="Celular (WhatsApp)" value={registerPhone} onChange={handleInputChange}
+                        className="w-full px-4 py-3 bg-white/10 border border-white/10 rounded-xl text-white outline-none focus:border-secondary transition-colors placeholder:text-gray-400 dark:placeholder:text-gray-500"
+                        aria-label="Celular (WhatsApp)" autoComplete="tel" inputMode="tel" maxLength={15} required />
+                    <input type="password" name="password" placeholder="Senha (mín. 6 caracteres)" value={registerPassword} onChange={handleInputChange}
+                        className="w-full px-4 py-3 bg-white/10 border border-white/10 rounded-xl text-white outline-none focus:border-secondary transition-colors placeholder:text-gray-400 dark:placeholder:text-gray-500"
+                        aria-label="Senha" autoComplete="new-password" minLength={6} required />
+
+                    <button type="submit" disabled={loading}
+                        className="w-full py-4 bg-secondary hover:bg-orange-600 text-white font-bold rounded-xl transition-all shadow-lg shadow-secondary/20 disabled:opacity-50 flex items-center justify-center gap-2"
+                        aria-label="Criar sua conta"
+                    >
+                        {loading && <i className="fa-solid fa-circle-notch fa-spin"></i>}
+                        Criar minha conta
+                    </button>
+                </form>
+              )}
+
+
+              {errorMsg && (
+                  <div className="mt-6 p-4 bg-red-500/20 border border-red-500/50 text-red-200 rounded-xl text-sm font-bold flex items-center gap-2 animate-in fade-in" role="alert">
+                      <i className="fa-solid fa-triangle-exclamation"></i> {errorMsg}
+                  </div>
+              )}
 
               <div className="mt-6 flex flex-col gap-4">
-                  <button onClick={() => handleSocialLogin('google')} type="button" className="w-full py-3 bg-white text-slate-900 font-bold rounded-xl flex items-center justify-center gap-3 hover:bg-slate-100 transition-colors" aria-label="Entrar com Google">
+                  <button onClick={() => handleSocialLogin('google')} type="button" disabled={loading} className="w-full py-3 bg-white text-slate-900 font-bold rounded-xl flex items-center justify-center gap-3 hover:bg-slate-100 transition-colors disabled:opacity-50" aria-label="Entrar com Google">
                       <img src="https://www.svgrepo.com/show/475656/google-color.svg" className="w-5 h-5" alt="Google" />
                       Entrar com Google
                   </button>
 
-                  <div className="flex justify-between items-center text-sm">
-                      <button onClick={() => navigate('/register')} className="text-white/70 hover:text-white font-medium" aria-label="Criar nova conta">
-                          Criar conta
-                      </button>
-                      <button onClick={() => setShowForgotModal(true)} className="text-amber-400 hover:text-amber-300 font-medium" aria-label="Esqueci minha senha">
-                          Esqueci a senha
-                      </button>
-                  </div>
+                  {mode === 'login' && (
+                    <div className="flex justify-between items-center text-sm">
+                        <button onClick={() => setMode('register')} className="text-white/70 hover:text-white font-medium" aria-label="Criar nova conta">
+                            Criar conta
+                        </button>
+                        <button onClick={() => setShowForgotModal(true)} className="text-amber-400 hover:text-amber-300 font-medium" aria-label="Esqueci minha senha">
+                            Esqueci a senha
+                        </button>
+                    </div>
+                  )}
+                  {mode === 'register' && (
+                    <div className="flex justify-center text-sm">
+                        <button onClick={() => setMode('login')} className="text-white/70 hover:text-white font-medium" aria-label="Fazer login se já tem conta">
+                            Já tem conta? Faça login aqui
+                        </button>
+                    </div>
+                  )}
               </div>
           </div>
       </div>

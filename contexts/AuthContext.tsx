@@ -29,7 +29,7 @@ interface AuthContextType {
   authLoading: boolean; // True if any auth operation (initial check, login, refresh) is in progress
   isUserAuthFinished: boolean; // NEW: True once the *initial* auth check has completed
   login: (email: string, password?: string) => Promise<boolean>;
-  signup: (name: string, email: string, whatsapp: string, password?: string, cpf?: string, planType?: string | null) => Promise<boolean>;
+  signup: (name: string, email: string, whatsapp: string, password?: string, cpf?: string) => Promise<boolean>; // REMOVED planType
   logout: () => void;
   updatePlan: (plan: PlanType) => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -298,11 +298,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const signup = async (name: string, email: string, whatsapp: string, password?: string, cpf?: string, planType?: string | null) => {
+  const signup = async (name: string, email: string, whatsapp: string, password?: string, cpf?: string) => { // REMOVED planType parameter
     console.log("[AuthContext] signup called.");
     setAuthLoading(true); // Indicate active loading
     try {
-        const u = await dbService.signup(name, email, whatsapp, password, cpf, planType);
+        const u = await dbService.signup(name, email, whatsapp, password, cpf); // REMOVED planType argument
         if (u) {
             setUser(u);
             await refreshNotifications(); // Refresh notifications on successful signup

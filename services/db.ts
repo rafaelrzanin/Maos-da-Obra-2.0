@@ -1,4 +1,5 @@
 
+
 import { PlanType, ExpenseCategory, StepStatus, FileCategory, type User, type Work, type Step, type Material, type Expense, type Worker, type Supplier, type WorkPhoto, type WorkFile, type DBNotification, type PushSubscriptionInfo, type Contract, type Checklist, type ChecklistItem } from '../types.ts';
 import { WORK_TEMPLATES, FULL_MATERIAL_PACKAGES, CONTRACT_TEMPLATES, CHECKLIST_TEMPLATES } from './standards.ts';
 import { supabase } from './supabase.ts';
@@ -235,18 +236,16 @@ const ensureUserProfile = async (authUser: any): Promise<User | null> => {
                 console.log(`[ensureUserProfile] Nenhum perfil existente encontrado para ${authUser.id}. Criando um novo...`);
             }
 
-            const trialExpires = new Date();
-            trialExpires.setDate(trialExpires.getDate() + 7);
-
+            // CRITICAL FIX: NEW PROFILE CREATION MUST BE PLAN-AGNOSTIC
             const newProfileData = {
                 id: authUser.id,
                 name: authUser.user_metadata?.name || authUser.email?.split('@')[0] || 'Novo Usuário',
                 email: authUser.email,
-                whatsapp: null, // Default to null for new profile
-                cpf: null, // Default to null for new profile
-                plan: PlanType.MENSAL,
-                is_trial: true,
-                subscription_expires_at: trialExpires.toISOString()
+                whatsapp: null, 
+                cpf: null, 
+                plan: null, // Set to null initially
+                is_trial: false, // No trial by default on registration
+                subscription_expires_at: null // No expiration by default on registration
             };
 
             const { data: createdProfile, error: createError } = await client
@@ -313,7 +312,7 @@ export const dbService = {
 
   async syncSession(): Promise<User | null> { // Explicitly set return type
     sessionCache = null; // Invalidate cache to force a fresh fetch
-    const userPromise = dbService.getCurrentUser(); // Changed from this.getCurrentUser()
+    const userPromise = this.getCurrentUser();
     return userPromise; 
   },
 
@@ -361,7 +360,7 @@ export const dbService = {
     });
   },
 
-  async signup(name: string, email: string, whatsapp: string, password?: string, cpf?: string, planType?: string | null): Promise<User | null> { // Explicitly set return type
+  async signup(name: string, email: string, whatsapp: string, password?: string, cpf?: string): Promise<User | null> { // REMOVED planType parameter
     // Supabase is guaranteed to be initialized now
     
     const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -375,28 +374,12 @@ export const dbService = {
     if (authError) throw authError;
     // If user already exists and signed in, just ensure profile and return
     if (!authData.user) { 
-        return dbService.login(email, password); // Changed from this.login
+        return this.login(email, password);
     }
 
-    const trialExpires = new Date();
-    trialExpires.setDate(trialExpires.getDate() + 7);
-
-    const newProfileData = {
-        id: authData.user.id,
-        name: authData.user.user_metadata?.name || authData.user.email?.split('@')[0] || 'Novo Usuário',
-        email: authData.user.email,
-        whatsapp: null, // Default to null for new profile
-        cpf: null, // Default to null for new profile
-        plan: planType || PlanType.MENSAL, 
-        is_trial: true,
-        subscription_expires_at: trialExpires.toISOString()
-    };
-
-    const { error: profileError } = await supabase.from('profiles').insert(newProfileData);
-
-    if (profileError) {
-        console.error("Erro ao criar perfil:", profileError);
-    }
+    // CRITICAL: New profile data is handled by ensureUserProfile now.
+    // The ensureUserProfile will set plan: null, is_trial: false, subscription_expires_at: null
+    // This ensures registration is plan-agnostic.
 
     sessionCache = null; // Invalidate cache
     return await ensureUserProfile(authData.user);
@@ -762,7 +745,7 @@ export const dbService = {
     const createdSteps = (createdStepsData || []).map(parseStepFromDB);
 
     // FIX: Agora chamando a função regenerateMaterials com a lista real de etapas criadas
-    await dbService.regenerateMaterials(parsedWork.id, parsedWork.area, createdSteps); 
+    await this.regenerateMaterials(parsedWork.id, parsedWork.area, createdSteps); 
 
     return parsedWork;
   },
@@ -1016,7 +999,7 @@ export const dbService = {
 
     if (purchaseInfo && newMaterialData) { // Used newMaterialData
       // Also record as an expense
-      await dbService.addExpense({ // Changed from this.addExpense
+      await this.addExpense({
         workId: material.workId,
         description: `Compra de ${material.name}`,
         amount: purchaseInfo.cost,
@@ -1057,39 +1040,6 @@ export const dbService = {
     return parseMaterialFromDB(updatedMaterialData);
   },
 
-  async deleteMaterial(materialId: string, workId: string): Promise<void> {
-    // Supabase is guaranteed to be initialized now
-    console.log(`[DB DELETE] Iniciando exclusão de material para materialId: ${materialId} na workId: ${workId}`);
-
-    // Verificar se existem despesas associadas a este material
-    const { data: expensesCheck, error: expensesCheckError } = await supabase
-      .from('expenses')
-      .select('id')
-      .eq('related_material_id', materialId);
-
-    if (expensesCheckError) {
-      console.error(`[DB DELETE] Erro ao verificar despesas para materialId ${materialId}:`, expensesCheckError);
-      throw new Error(`Falha ao verificar despesas associadas ao material: ${expensesCheckError.message}`);
-    }
-
-    if (expensesCheck && expensesCheck.length > 0) {
-      const expenseCount = expensesCheck.length;
-      throw new Error(`Este material não pode ser excluído pois possui ${expenseCount} lançamento(s) financeiro(s) associado(s). Apague os lançamentos primeiro.`);
-    }
-    
-    // Se não há despesas associadas, proceed with deletion
-    const { error: deleteMaterialError } = await supabase.from('materials').delete().eq('id', materialId).eq('work_id', workId);
-    if (deleteMaterialError) {
-      console.error("Erro ao apagar material:", deleteMaterialError);
-      throw deleteMaterialError;
-    }
-    _dashboardCache.materials[workId] = null; // Invalidate cache
-    _dashboardCache.notifications = null; // Invalidate notifications cache
-    delete _dashboardCache.stats[workId];
-    delete _dashboardCache.summary[workId];
-    console.log(`[DB DELETE] Material ${materialId} deletado com sucesso.`);
-  },
-
   async registerMaterialPurchase(materialId: string, name: string, brand: string | undefined, plannedQty: number, unit: string, qty: number, cost: number): Promise<void> {
     // Supabase is guaranteed to be initialized now
 
@@ -1117,7 +1067,7 @@ export const dbService = {
     }
 
     // 2. Record as an expense
-    await dbService.addExpense({ // Changed from this.addExpense
+    await this.addExpense({
       workId: existingMaterial.work_id,
       description: `Compra de ${name} (${qty} ${unit})`,
       amount: cost,
@@ -1597,7 +1547,7 @@ export const dbService = {
   },
 
   async sendPushNotification(userId: string, notificationPayload: { title: string, body: string, url?: string, tag?: string }): Promise<void> {
-    const APP_URL = import.meta.env.VITE_APP_URL || window.location.origin; // Fallback to window.location.origin
+    const APP_URL = process.env.VITE_APP_URL || window.location.origin; // Fallback to window.location.origin
 
     try {
         const response = await fetch('/api/send-event-notification', {

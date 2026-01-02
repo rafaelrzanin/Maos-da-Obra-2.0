@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, Suspense, lazy } from 'react';
 import * as ReactRouter from 'react-router-dom';
 import { PlanType } from './types.ts';
@@ -16,7 +17,7 @@ const Profile = lazy(() => import('./pages/Profile.tsx').then(module => ({ defau
 const VideoTutorials = lazy(() => import('./pages/VideoTutorials.tsx').then(module => ({ default: (module as any).default })));
 const Checkout = lazy(() => import('./pages/Checkout.tsx').then(module => ({ default: (module as any).default })));
 const AiChat = lazy(() => import('./pages/AiChat.tsx').then(module => ({ default: (module as any).default }))); // Lazy load AiChat page
-const Register = lazy(() => import('./pages/Register.tsx').then(module => ({ default: (module as any).default }))); 
+// const Register = lazy(() => import('./pages/Register.tsx').then(module => ({ default: (module as any).default }))); // REMOVED: Register absorbed into Login
 const Notifications = lazy(() => import('./pages/Notifications.tsx')); // NEW: Lazy load Notifications page
 
 
@@ -150,12 +151,13 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
   const isSettingsPage = location.pathname === '/settings';
   const isCheckoutPage = location.pathname === '/checkout';
   
-  // Check if AI trial is active
+  // Check if AI trial is active (user must have isTrial true AND trialDaysRemaining > 0 AND NOT be Vitalício)
   const isAiTrialActive = user?.isTrial && trialDaysRemaining !== null && trialDaysRemaining > 0 && user?.plan !== PlanType.VITALICIO;
 
-  // If subscription is not valid and AI trial is not active, and not on settings/checkout page, redirect to settings
+  // CRITICAL REDIRECT LOGIC: If subscription is not valid AND AI trial is not active
+  // This handles new users (plan: null, isTrial: false) and expired users.
   if (!isSubscriptionValid && !isAiTrialActive && !isSettingsPage && !isCheckoutPage) {
-      console.log("[App - Layout] Subscription invalid/AI trial inactive, redirecting to /settings.");
+      console.log("[App - Layout] Subscription invalid/AI trial inactive, redirecting to /settings to choose plan.");
       return <ReactRouter.Navigate to="/settings" replace />;
   }
   console.log("[App - Layout] All auth/subscription checks passed, rendering main layout.");
@@ -277,7 +279,7 @@ const App = () => {
               <ReactRouter.Routes>
                 {/* Public Routes */}
                 <ReactRouter.Route path="/login" element={<Login />} />
-                <ReactRouter.Route path="/register" element={<Register />} /> 
+                {/* <ReactRouter.Route path="/register" element={<Register />} /> REMOVED: Register absorbed into Login */}
                 
                 {/* Protected Routes - Wrapped by Layout */}
                 <ReactRouter.Route path="/" element={<Layout><Dashboard /></Layout>} />
@@ -290,7 +292,7 @@ const App = () => {
                 <ReactRouter.Route path="/tutorials" element={<Layout><VideoTutorials /></Layout>} />
                 <ReactRouter.Route path="/checkout" element={<Layout><Checkout /></Layout>} /> 
                 
-                <ReactRouter.Route path="*" element={<ReactRouter.Navigate to="/" replace />} />
+                <ReactRouter.Route path="*" element={<ReactRouter.Navigate to="/login" replace />} /> {/* Redirects to login if route not found */}
               </ReactRouter.Routes>
             </Suspense>
           </ErrorBoundary>
