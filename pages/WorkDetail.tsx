@@ -1,6 +1,4 @@
 
-
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import * as ReactRouter from 'react-router-dom';
 import * as XLSX from 'xlsx';
@@ -8,6 +6,8 @@ import { useAuth } from '../contexts/AuthContext.tsx';
 import { dbService } from '../services/db.ts';
 import { StepStatus, FileCategory, ExpenseCategory, type Work, type Worker, type Supplier, type Material, type Step, type Expense, type WorkPhoto, type WorkFile, type Contract, type Checklist, type ChecklistItem, PlanType } from '../types.ts';
 import { STANDARD_JOB_ROLES, STANDARD_SUPPLIER_CATEGORIES, ZE_AVATAR, ZE_AVATAR_FALLBACK, CONTRACT_TEMPLATES, CHECKLIST_TEMPLATES } from '../services/standards.ts';
+// NEW: Import ZeModal
+import { ZeModal, ZeModalProps } from '../components/ZeModal.tsx';
 
 // --- TYPES FOR VIEW STATE ---
 type MainTab = 'ETAPAS' | 'MATERIAIS' | 'FINANCEIRO' | 'FERRAMENTAS';
@@ -137,7 +137,7 @@ const WorkDetail = () => {
     const [allChecklists, setAllChecklists] = useState<Checklist[]>([]);
     const [selectedChecklistCategory, setSelectedChecklistCategory] = useState<string>('all'); // Filter for Checklist view
 
-    const [zeModal, setZeModal] = useState<any>({ isOpen: false, title: '', message: '' });
+    const [zeModal, setZeModal] = useState<ZeModalProps & { id?: string, isConfirming?: boolean }>({ isOpen: false, title: '', message: '', onCancel: () => {} });
 
     const [isCalculatorModalOpen, setIsCalculatorModalOpen] = useState(false);
     const [calcType, setCalcType] = useState<'PISO'|'PAREDE'|'PINTURA'>('PISO');
@@ -232,7 +232,8 @@ const WorkDetail = () => {
                 try {
                     await dbService.deleteStep(stepId, work.id);
                     await load();
-                    setZeModal({ 
+                    setZeModal(prev => ({ 
+                        ...prev, 
                         isOpen: true, 
                         title: 'Sucesso!', 
                         message: 'Etapa excluída com sucesso.', 
@@ -240,10 +241,11 @@ const WorkDetail = () => {
                         onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
                         type: 'SUCCESS',
                         isConfirming: false 
-                    });
+                    }));
                 }                       catch (error: any) {
                     console.error("Erro ao deletar etapa:", error);
-                    setZeModal({
+                    setZeModal(prev => ({
+                        ...prev,
                         isOpen: true,
                         title: 'Erro ao Excluir Etapa',
                         message: error.message || 'Não foi possível excluir a etapa. Verifique se há lançamentos financeiros associados a ela ou aos seus materiais.',
@@ -251,7 +253,7 @@ const WorkDetail = () => {
                         onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
                         type: 'ERROR',
                         isConfirming: false 
-                    });
+                    }));
                 } finally {
                     setZeModal(prev => ({ ...prev, isConfirming: false })); 
                 }
@@ -356,7 +358,8 @@ const WorkDetail = () => {
                 try {
                     await dbService.deleteExpense(expenseId); 
                     await load(); 
-                    setZeModal({ 
+                    setZeModal(prev => ({ 
+                        ...prev, 
                         isOpen: true, 
                         title: 'Sucesso!', 
                         message: 'Gasto excluído com sucesso.', 
@@ -364,10 +367,11 @@ const WorkDetail = () => {
                         onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })), 
                         type: 'SUCCESS',
                         isConfirming: false 
-                    }); 
+                    })); 
                 } catch (error: any) {
                     console.error("Erro ao deletar gasto:", error);
-                    setZeModal({ 
+                    setZeModal(prev => ({ 
+                        ...prev, 
                         isOpen: true, 
                         title: 'Erro!', 
                         message: `Não foi possível remover: ${error.message}`, 
@@ -375,7 +379,7 @@ const WorkDetail = () => {
                         onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })), 
                         type: 'ERROR',
                         isConfirming: false
-                    }); 
+                    })); 
                 }
             },
             onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false }))
@@ -466,7 +470,8 @@ const WorkDetail = () => {
             }
             
             setIsPersonModalOpen(false); // Close person modal first
-            setZeModal({
+            setZeModal(prev => ({
+                ...prev,
                 isOpen: true, 
                 title: 'Sucesso!',
                 message: `${personMode === 'WORKER' ? 'Profissional' : 'Fornecedor'} salvo com sucesso.`,
@@ -474,7 +479,7 @@ const WorkDetail = () => {
                 onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })), 
                 type: 'SUCCESS',
                 isConfirming: false 
-            });
+            }));
             console.log("[handleSavePerson] Person modal closed, success ZeModal shown. Reloading data...");
             await load(); // Reload data after showing success
             console.log("[handleSavePerson] Data reloaded successfully.");
@@ -492,7 +497,8 @@ const WorkDetail = () => {
                 userMessage += `\n\nDetalhes: ${error.message || 'Um erro desconhecido ocorreu.'}`;
             }
 
-            setZeModal({
+            setZeModal(prev => ({
+                ...prev,
                 isOpen: true, 
                 title: 'Erro ao Salvar!',
                 message: userMessage,
@@ -500,7 +506,7 @@ const WorkDetail = () => {
                 onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })), 
                 type: 'ERROR',
                 isConfirming: false 
-            });
+            }));
             console.log("[handleSavePerson] Error occurred, error ZeModal shown.");
 
         } finally {
@@ -523,7 +529,8 @@ const WorkDetail = () => {
                     if (mode === 'WORKER') await dbService.deleteWorker(pid, wid); 
                     else await dbService.deleteSupplier(pid, wid); 
                     
-                    setZeModal({ 
+                    setZeModal(prev => ({ 
+                        ...prev, 
                         isOpen: true, 
                         title: 'Sucesso!', 
                         message: `${mode === 'WORKER' ? 'Profissional' : 'Fornecedor'} removido com sucesso.`, 
@@ -531,14 +538,15 @@ const WorkDetail = () => {
                         onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })), 
                         type: 'SUCCESS',
                         isConfirming: false 
-                    });
+                    }));
                     console.log(`[handleDeletePerson] ${mode} deleted, success ZeModal shown. Reloading data...`);
                     await load(); 
                     console.log(`[handleDeletePerson] Data reloaded.`);
 
                 }                   catch (error: any) {
                     console.error(`Erro ao deletar ${mode === 'WORKER' ? 'profissional' : 'fornecedor'}:`, error);
-                    setZeModal({ 
+                    setZeModal(prev => ({ 
+                        ...prev, 
                         isOpen: true, 
                         title: 'Erro!', 
                         message: `Não foi possível remover: ${error.message}`, 
@@ -546,7 +554,7 @@ const WorkDetail = () => {
                         onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })), 
                         type: 'ERROR',
                         isConfirming: false 
-                    });
+                    }));
                     console.log(`[handleDeletePerson] Error occurred, error ZeModal shown.`);
 
                 } finally {
@@ -598,7 +606,8 @@ const WorkDetail = () => {
     };
 
     const handleExportPdf = () => {
-        setZeModal({
+        setZeModal(prev => ({
+            ...prev,
             isOpen: true,
             title: 'Exportação em PDF',
             message: 'A funcionalidade de exportação para PDF está em desenvolvimento e estará disponível em breve com layouts profissionais!',
@@ -606,7 +615,7 @@ const WorkDetail = () => {
             type: 'INFO',
             onCancel: () => setZeModal(prev => ({...prev, isOpen: false})),
             isConfirming: false
-        });
+        }));
     };
 
     const handleChecklistItemToggle = async (checklistId: string, itemId: string) => {
@@ -671,7 +680,8 @@ const WorkDetail = () => {
     // NEW: Handle delete checklist item
     const handleDeleteChecklistItem = async (itemId: string) => {
         if (!editingChecklist || !work) return;
-        setZeModal({
+        setZeModal(prev => ({
+            ...prev,
             isOpen: true,
             title: 'Remover Item?',
             message: 'Tem certeza que deseja remover este item da lista?',
@@ -688,20 +698,21 @@ const WorkDetail = () => {
                     setZeModal(prev => ({ ...prev, isOpen: false }));
                 } catch (error: any) {
                     console.error("Erro ao remover item do checklist:", error);
-                    setZeModal({
+                    setZeModal(prev => ({
+                        ...prev,
                         isOpen: true,
                         title: 'Erro!',
                         message: `Não foi possível remover o item: ${error.message}`,
                         confirmText: 'Entendido',
                         onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
                         type: 'ERROR'
-                    });
+                    }));
                 } finally {
                     setZeModal(prev => ({ ...prev, isConfirming: false }));
                 }
             },
             onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false }))
-        });
+        }));
     };
 
     // NEW: Handle editing checklist (opening modal)
@@ -1218,8 +1229,8 @@ const WorkDetail = () => {
                                                         Editar
                                                     </button>
                                                     <button onClick={() => handleDeleteExpense(expense.id)} className="px-3 py-1 bg-red-500/10 text-red-600 dark:bg-red-900/20 dark:text-red-300 text-xs font-bold rounded-lg hover:bg-red-500/20 dark:hover:bg-red-800 transition-colors" aria-label={`Excluir despesa ${expense.description}`}>
-                                                        Excluir
-                                                    </button>
+                                                            Excluir
+                                                        </button>
                                                 </div>
                                             </div>
                                         </div>
@@ -1258,7 +1269,7 @@ const WorkDetail = () => {
                                         <p className="font-bold text-lg text-primary dark:text-white">Projetos & Docs</p>
                                         <p className="text-sm text-slate-500 dark:text-slate-400 text-center">Mantenha seus arquivos organizados.</p>
                                     </button>
-                                    <button onClick={() => { if(hasLifetimeAccess) setSubView('CONTRACTS'); else setZeModal({ isOpen: true, title: 'Recurso Premium!', message: 'O Gerador de Contratos é uma funcionalidade exclusiva do Plano Vitalício. Libere acesso ilimitado a todas as ferramentas!', confirmText: 'Entendido', onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })), type: 'WARNING' }); }} className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center gap-4 hover:shadow-md transition-shadow group" aria-label="Gerador de Contratos">
+                                    <button onClick={() => { if(hasLifetimeAccess) setSubView('CONTRACTS'); else setZeModal(prev => ({ ...prev, isOpen: true, title: 'Recurso Premium!', message: 'O Gerador de Contratos é uma funcionalidade exclusiva do Plano Vitalício. Libere acesso ilimitado a todas as ferramentas!', confirmText: 'Entendido', onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })), type: 'WARNING' })); }} className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center gap-4 hover:shadow-md transition-shadow group" aria-label="Gerador de Contratos">
                                         <div className={`w-16 h-16 rounded-full ${hasLifetimeAccess ? 'bg-amber-500/10 text-amber-600' : 'bg-slate-300/10 text-slate-400'} flex items-center justify-center text-3xl`}>
                                             <i className="fa-solid fa-file-contract"></i>
                                             {!hasLifetimeAccess && <span className="absolute top-1 right-1 bg-amber-500 text-white text-xs px-2 py-1 rounded-full animate-bounce">PRO</span>}
@@ -1266,7 +1277,7 @@ const WorkDetail = () => {
                                         <p className={`font-bold text-lg ${hasLifetimeAccess ? 'text-primary dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}>Contratos</p>
                                         <p className="text-sm text-slate-500 dark:text-slate-400 text-center">Gere contratos e recibos para sua equipe.</p>
                                     </button>
-                                    <button onClick={() => { if(hasLifetimeAccess) setSubView('CHECKLIST'); else setZeModal({ isOpen: true, title: 'Recurso Premium!', message: 'Os Checklists Inteligentes são uma funcionalidade exclusiva do Plano Vitalício. Libere acesso ilimitado a todas as ferramentas!', confirmText: 'Entendido', onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })), type: 'WARNING' }); }} className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center gap-4 hover:shadow-md transition-shadow group" aria-label="Checklists Inteligentes">
+                                    <button onClick={() => { if(hasLifetimeAccess) setSubView('CHECKLIST'); else setZeModal(prev => ({ ...prev, isOpen: true, title: 'Recurso Premium!', message: 'Os Checklists Inteligentes são uma funcionalidade exclusiva do Plano Vitalício. Libere acesso ilimitado a todas as ferramentas!', confirmText: 'Entendido', onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })), type: 'WARNING' })); }} className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center gap-4 hover:shadow-md transition-shadow group" aria-label="Checklists Inteligentes">
                                         <div className={`w-16 h-16 rounded-full ${hasLifetimeAccess ? 'bg-emerald-500/10 text-emerald-600' : 'bg-slate-300/10 text-slate-400'} flex items-center justify-center text-3xl`}>
                                             <i className="fa-solid fa-list-check"></i>
                                             {!hasLifetimeAccess && <span className="absolute top-1 right-1 bg-amber-500 text-white text-xs px-2 py-1 rounded-full animate-bounce">PRO</span>}
@@ -1274,7 +1285,7 @@ const WorkDetail = () => {
                                         <p className={`font-bold text-lg ${hasLifetimeAccess ? 'text-primary dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}>Checklists</p>
                                         <p className="text-sm text-slate-500 dark:text-slate-400 text-center">Listas de verificação para cada etapa da obra.</p>
                                     </button>
-                                    <button onClick={() => { if(hasLifetimeAccess) setSubView('CALCULATORS'); else setZeModal({ isOpen: true, title: 'Recurso Premium!', message: 'As Calculadoras Inteligentes são uma funcionalidade exclusiva do Plano Vitalício. Libere acesso ilimitado a todas as ferramentas!', confirmText: 'Entendido', onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })), type: 'WARNING' }); }} className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center gap-4 hover:shadow-md transition-shadow group" aria-label="Calculadoras Inteligentes">
+                                    <button onClick={() => { if(hasLifetimeAccess) setSubView('CALCULATORS'); else setZeModal(prev => ({ ...prev, isOpen: true, title: 'Recurso Premium!', message: 'As Calculadoras Inteligentes são uma funcionalidade exclusiva do Plano Vitalício. Libere acesso ilimitado a todas as ferramentas!', confirmText: 'Entendido', onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })), type: 'WARNING' })); }} className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center gap-4 hover:shadow-md transition-shadow group" aria-label="Calculadoras Inteligentes">
                                         <div className={`w-16 h-16 rounded-full ${hasLifetimeAccess ? 'bg-cyan-500/10 text-cyan-600' : 'bg-slate-300/10 text-slate-400'} flex items-center justify-center text-3xl`}>
                                             <i className="fa-solid fa-calculator"></i>
                                             {!hasLifetimeAccess && <span className="absolute top-1 right-1 bg-amber-500 text-white text-xs px-2 py-1 rounded-full animate-bounce">PRO</span>}

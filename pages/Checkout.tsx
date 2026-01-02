@@ -136,6 +136,21 @@ const Checkout = () => {
     setCardData(prev => ({ ...prev, [name]: value }));
   };
 
+  // NEW: handleCopyPix function
+  const handleCopyPix = () => {
+    if (pixData?.copy_paste_code) {
+        navigator.clipboard.writeText(pixData.copy_paste_code)
+            .then(() => {
+                setCopySuccess(true);
+                setTimeout(() => setCopySuccess(false), 2000); // Reset after 2 seconds
+            })
+            .catch(err => {
+                console.error("Failed to copy PIX code:", err);
+                setErrorMsg("Falha ao copiar o código Pix.");
+            });
+    }
+  };
+
   const handleSimulatePayment = async () => {
     setProcessing(true);
     setErrorMsg('');
@@ -352,4 +367,3 @@ const Checkout = () => {
 };
 
 export default Checkout;
-    
