@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext.tsx'; // Use authLoading and isUserAuthFinished
-import { useNavigate } from 'react-router-dom';
+import * as ReactRouter from 'react-router-dom';
 import { dbService } from '../services/db.ts';
 import { WorkStatus } from '../types.ts';
 import { WORK_TEMPLATES, ZE_AVATAR, ZE_AVATAR_FALLBACK } from '../services/standards.ts';
@@ -18,9 +18,9 @@ const formatCurrency = (value: number | string | undefined): string => {
 };
 
 
-const CreateWork: React.FC = () => {
+const CreateWork = () => {
   const { user, authLoading, isUserAuthFinished } = useAuth(); // Use authLoading and isUserAuthFinished
-  const navigate = useNavigate();
+  const navigate = ReactRouter.useNavigate();
   
   // Wizard State
   const [currentStep, setCurrentStep] = useState(1);
@@ -443,4 +443,3 @@ const CreateWork: React.FC = () => {
 };
 
 export default CreateWork;
-    

@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import * as ReactRouter from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.tsx';
 import { dbService } from '../services/db.ts';
 import { StepStatus, PlanType, WorkStatus, type Work, type DBNotification, type Step, type Material } from '../types.ts';
@@ -341,9 +341,9 @@ const EmptyDashboard = ({ onOpenCreateWork }: { onOpenCreateWork: () => void }) 
   );
 };
 
-const Dashboard: React.FC = () => {
+const Dashboard = () => {
   const { user, authLoading, isUserAuthFinished, requestPushNotificationPermission, pushSubscriptionStatus } = useAuth();
-  const navigate = useNavigate();
+  const navigate = ReactRouter.useNavigate();
   const [works, setWorks] = useState<Work[]>([]);
   const [loading, setLoading] = useState(true);
   const [focusWork, setFocusWork] = useState<Work | null>(null);
@@ -462,7 +462,7 @@ const Dashboard: React.FC = () => {
           setZeModal({
             isOpen: true,
             title: 'Erro!',
-            message: `Falha ao excluir obra: ${error.message || 'Um erro desconhecido ocorreu.'}\nPor favor, verifique suas permissões de RLS no Supabase.`,
+            message: `Falha ao excluir obra: ${error.message || 'Um erro desconhecido ocorreu.'}\nPor favor, verifique suas permissões de RLS ou logs do servidor.`,
             confirmText: 'Entendido',
             onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
             type: 'ERROR'
@@ -567,7 +567,7 @@ const Dashboard: React.FC = () => {
             <h3 className="text-xl font-black text-slate-900 dark:text-white leading-tight mb-2">Progresso Geral da Obra</h3>
             <p className="text-slate-500 dark:text-slate-400 text-sm font-semibold mb-4">Visão completa das etapas da obra</p>
             
-            {/* Segmented Progress Bar */}
+            {/* Segmented ProgressBar */}
             <SegmentedProgressBar steps={steps} />
 
             <div className="flex justify-between text-xs font-semibold text-slate-500 dark:text-slate-400 mt-2">
@@ -680,4 +680,3 @@ const Dashboard: React.FC = () => {
 };
 
 export default Dashboard;
-    

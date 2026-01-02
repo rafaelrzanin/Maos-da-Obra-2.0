@@ -1,13 +1,13 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext.tsx';
-import { useNavigate, useLocation } from 'react-router-dom';
+import * as ReactRouter from 'react-router-dom';
 import { dbService } from '../services/db.ts';
 
-const Login: React.FC = () => {
+const Login = () => {
   const { login, user, authLoading, isUserAuthFinished, isSubscriptionValid } = useAuth();
-  const navigate = useNavigate();
-  const location = useLocation();
+  const navigate = ReactRouter.useNavigate();
+  const location = ReactRouter.useLocation();
   
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');

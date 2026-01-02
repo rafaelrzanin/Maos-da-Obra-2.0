@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, Suspense, lazy } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
+import * as ReactRouter from 'react-router-dom';
 import { PlanType } from './types.ts';
 import { AuthProvider, ThemeProvider, useAuth, useTheme } from './contexts/AuthContext.tsx';
 
@@ -98,11 +98,11 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
 }
 
 // Layout Component - Only applies to authenticated, subscribed areas of the app
-const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+const Layout = ({ children }: { children: React.ReactNode }) => {
   const { user, authLoading, isUserAuthFinished, isSubscriptionValid, trialDaysRemaining, updatePlan, unreadNotificationsCount, logout } = useAuth(); // NEW: Get unreadNotificationsCount, logout
   const { theme, toggleTheme } = useTheme();
-  const navigate = useNavigate();
-  const location = useLocation();
+  const navigate = ReactRouter.useNavigate();
+  const location = ReactRouter.useLocation();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Sidebar state
 
   // Log Auth State for debugging
@@ -144,7 +144,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // If no user, redirect to login.
   if (!user) {
     console.log("[App - Layout] No user, redirecting to /login.");
-    return <Navigate to="/login" replace />;
+    return <ReactRouter.Navigate to="/login" replace />;
   }
 
   const isSettingsPage = location.pathname === '/settings';
@@ -156,7 +156,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // If subscription is not valid and AI trial is not active, and not on settings/checkout page, redirect to settings
   if (!isSubscriptionValid && !isAiTrialActive && !isSettingsPage && !isCheckoutPage) {
       console.log("[App - Layout] Subscription invalid/AI trial inactive, redirecting to /settings.");
-      return <Navigate to="/settings" replace />;
+      return <ReactRouter.Navigate to="/settings" replace />;
   }
   console.log("[App - Layout] All auth/subscription checks passed, rendering main layout.");
 
@@ -267,38 +267,37 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   );
 };
 
-const App: React.FC = () => {
+const App = () => {
   return (
-    <BrowserRouter>
+    <ReactRouter.BrowserRouter>
       <ThemeProvider>
         <AuthProvider>
           <ErrorBoundary>
             <Suspense fallback={<LoadingScreen />}>
-              <Routes>
+              <ReactRouter.Routes>
                 {/* Public Routes */}
-                <Route path="/login" element={<Login />} />
-                <Route path="/register" element={<Register />} /> 
+                <ReactRouter.Route path="/login" element={<Login />} />
+                <ReactRouter.Route path="/register" element={<Register />} /> 
                 
                 {/* Protected Routes - Wrapped by Layout */}
-                <Route path="/" element={<Layout><Dashboard /></Layout>} />
-                <Route path="/create" element={<Layout><CreateWork /></Layout>} />
-                <Route path="/work/:id" element={<Layout><WorkDetail /></Layout>} />
-                <Route path="/ai-chat" element={<Layout><AiChat /></Layout>} />
-                <Route path="/notifications" element={<Layout><Notifications /></Layout>} />
-                <Route path="/settings" element={<Layout><Settings /></Layout>} />
-                <Route path="/profile" element={<Layout><Profile /></Layout>} />
-                <Route path="/tutorials" element={<Layout><VideoTutorials /></Layout>} />
-                <Route path="/checkout" element={<Layout><Checkout /></Layout>} /> 
+                <ReactRouter.Route path="/" element={<Layout><Dashboard /></Layout>} />
+                <ReactRouter.Route path="/create" element={<Layout><CreateWork /></Layout>} />
+                <ReactRouter.Route path="/work/:id" element={<Layout><WorkDetail /></Layout>} />
+                <ReactRouter.Route path="/ai-chat" element={<Layout><AiChat /></Layout>} />
+                <ReactRouter.Route path="/notifications" element={<Layout><Notifications /></Layout>} />
+                <ReactRouter.Route path="/settings" element={<Layout><Settings /></Layout>} />
+                <ReactRouter.Route path="/profile" element={<Layout><Profile /></Layout>} />
+                <ReactRouter.Route path="/tutorials" element={<Layout><VideoTutorials /></Layout>} />
+                <ReactRouter.Route path="/checkout" element={<Layout><Checkout /></Layout>} /> 
                 
-                <Route path="*" element={<Navigate to="/" replace />} />
-              </Routes>
+                <ReactRouter.Route path="*" element={<ReactRouter.Navigate to="/" replace />} />
+              </ReactRouter.Routes>
             </Suspense>
           </ErrorBoundary>
         </AuthProvider>
       </ThemeProvider>
-    </BrowserRouter>
+    </ReactRouter.BrowserRouter>
   );
 };
 
 export default App;
-    

@@ -12,7 +12,7 @@ interface Message {
   text: string;
 }
 
-const AiChat: React.FC = () => {
+const AiChat = () => {
   const { user, trialDaysRemaining, authLoading } = useAuth(); // Use authLoading
   const navigate = useNavigate();
 

@@ -5,7 +5,7 @@ import { dbService } from '../services/db.ts';
 import { supabase } from '../services/supabase.ts'; // Import supabase directly
 import { type DBNotification } from '../types.ts';
 
-const Notifications: React.FC = () => {
+const Notifications = () => {
   const { user, authLoading, isUserAuthFinished, refreshNotifications } = useAuth();
   const [allNotifications, setAllNotifications] = useState<DBNotification[]>([]);
   const [loading, setLoading] = useState(true);

@@ -16,7 +16,7 @@ const formatCurrency = (value: number | string | undefined): string => {
   });
 };
 
-const Profile: React.FC = () => {
+const Profile = () => {
   const { user, refreshUser, authLoading } = useAuth();
   const [name, setName] = useState('');
   const [whatsapp, setWhatsapp] = useState('');

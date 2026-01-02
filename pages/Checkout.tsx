@@ -19,7 +19,7 @@ const PLAN_LABELS: Record<string, string> = {
   [PlanType.VITALICIO]: 'Acesso Vitalício'
 };
 
-const Checkout: React.FC = () => {
+const Checkout = () => {
   const { user, updatePlan, authLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -134,32 +134,6 @@ const Checkout: React.FC = () => {
     
     // Atualiza o estado
     setCardData(prev => ({ ...prev, [name]: value }));
-  };
-
-  // --- RENDERING ---
-
-  if (loading || authLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[70vh] text-primary dark:text-white">
-        <i className="fa-solid fa-circle-notch fa-spin text-3xl"></i>
-      </div>
-    );
-  }
-
-  if (!user || !planDetails) {
-    return (
-      <div className="text-center text-red-500 py-10">
-        Ocorreu um erro ao carregar os dados de usuário ou plano. Por favor, retorne à página de Configurações.
-      </div>
-    );
-  }
-
-  const handleCopyPix = () => {
-    if (pixData) {
-      navigator.clipboard.writeText(pixData.copy_paste_code);
-      setCopySuccess(true);
-      setTimeout(() => setCopySuccess(false), 2000);
-    }
   };
 
   const handleSimulatePayment = async () => {

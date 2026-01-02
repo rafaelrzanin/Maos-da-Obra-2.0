@@ -1,10 +1,8 @@
 
-
-
 import React from 'react';
 import { LIFETIME_BONUSES } from '../services/standards.ts'; 
 
-const VideoTutorials: React.FC = () => {
+const VideoTutorials = () => {
   const videos = [
     {
       id: 'video1',

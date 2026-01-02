@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, createContext, useContext, useMemo, useCallback } from 'react';
 import { User, PlanType, DBNotification } from '../types.ts';
 import { dbService } from '../services/db.ts';
@@ -19,7 +20,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     localStorage.setItem('maos_theme', theme);
   }, [theme]);
   const toggleTheme = () => setTheme(prev => (prev === 'light' ? 'dark' : 'light'));
-  return <ThemeContext.Provider value={{ theme, toggleTheme }}>{children}</AuthContext.Provider>;
+  return <ThemeContext.Provider value={{ theme, toggleTheme }}>{children}</ThemeContext.Provider>;
 };
 
 // --- Auth Context ---
@@ -352,3 +353,4 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     </AuthContext.Provider>
   );
 };
+    

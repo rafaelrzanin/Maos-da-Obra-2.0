@@ -1,12 +1,12 @@
 
 
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import * as ReactRouter from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import { useAuth } from '../contexts/AuthContext.tsx';
 import { dbService } from '../services/db.ts';
 import { StepStatus, FileCategory, ExpenseCategory, type Work, type Worker, type Supplier, type Material, type Step, type Expense, type WorkPhoto, type WorkFile, type Contract, type Checklist, type ChecklistItem, PlanType } from '../types.ts';
-import { ZeModal } from '../components/ZeModal.tsx';
 import { STANDARD_JOB_ROLES, STANDARD_SUPPLIER_CATEGORIES, ZE_AVATAR, ZE_AVATAR_FALLBACK, CONTRACT_TEMPLATES, CHECKLIST_TEMPLATES } from '../services/standards.ts';
 
 // --- TYPES FOR VIEW STATE ---
@@ -55,9 +55,9 @@ const formatCurrency = (value: number | string | undefined): string => {
   });
 };
 
-const WorkDetail: React.FC = () => {
-    const { id } = useParams<{ id: string }>();
-    const navigate = useNavigate();
+const WorkDetail = () => {
+    const { id } = ReactRouter.useParams<{ id: string }>();
+    const navigate = ReactRouter.useNavigate();
     const { user, authLoading, isUserAuthFinished, isSubscriptionValid } = useAuth();
     
     const [work, setWork] = useState<Work | null>(null);
@@ -799,7 +799,7 @@ const WorkDetail: React.FC = () => {
             step.id === mainMaterialFilterStepId
         );
 
-        const renderedContent: JSX.Element[] = [];
+        const renderedContent: React.JSX.Element[] = [];
 
         // Condição de "nenhum material encontrado" mais abrangente
         if (
