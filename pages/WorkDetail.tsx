@@ -912,7 +912,7 @@ const WorkDetail: React.FC = () => {
     if (authLoading || !isUserAuthFinished || loading) return <div className="h-screen flex items-center justify-center"><i className="fa-solid fa-circle-notch fa-spin text-3xl text-primary"></i></div>;
     if (!work) return <div className="text-center py-10">Obra não encontrada.</div>;
 
-    // FIX: Changed React.FC to a direct functional component with implicit return type
+    // Fix: Changed React.FC to a direct functional component with implicit return type
     // to avoid "Cannot find namespace 'JSX'" when tsconfig.json is not changed.
     const RenderCronogramaReport = () => (
         <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 shadow-md dark:shadow-card-dark-subtle animate-in fade-in">
@@ -945,7 +945,7 @@ const WorkDetail: React.FC = () => {
         </div>
     );
 
-    // FIX: Changed React.FC to a direct functional component with implicit return type
+    // Fix: Changed React.FC to a direct functional component with implicit return type
     // to avoid "Cannot find namespace 'JSX'" when tsconfig.json is not changed.
     const RenderMateriaisReport = () => {
         const filteredMaterials = reportMaterialFilterStepId === 'ALL'
@@ -973,73 +973,983 @@ const WorkDetail: React.FC = () => {
                 </div>
 
                 {filteredMaterials.length === 0 ? (
-                    <p className="text-center text-slate-400 py-8 italic text-sm">Nenhum material encontrado para o filtro selecionado.</p>
+                    <p className="text-center text-slate-400 py-4 italic text-sm">Nenhum material encontrado para o filtro selecionado.</p>
                 ) : (
-                    steps
-                        .filter(step => reportMaterialFilterStepId === 'ALL' || step.id === reportMaterialFilterStepId)
-                        .map(step => {
-                            const stepMats = filteredMaterials.filter(m => m.stepId === step.id);
-                            if (stepMats.length === 0) return null; 
-                            return (
-                                <div key={step.id} className="mb-6 bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm last:mb-0">
-                                    <h4 className="font-black uppercase text-secondary mb-3 border-b border-slate-200 dark:border-slate-700 pb-2 text-base">{step.name}</h4>
-                                    <div className="space-y-3">
-                                        {stepMats.map(m => {
-                                            const statusText = m.purchasedQty >= m.plannedQty ? 'Concluído' : m.purchasedQty > 0 ? 'Parcial' : 'Pendente';
-                                            const statusColor = m.purchasedQty >= m.plannedQty ? 'text-green-600' : m.purchasedQty > 0 ? 'text-orange-600' : 'text-red-500';
-                                            const progress = (m.purchasedQty / m.plannedQty) * 100;
-                                            return (
-                                                <div key={m.id} className="flex flex-col text-sm bg-white dark:bg-slate-900 rounded-xl p-3 border border-slate-100 dark:border-slate-700">
-                                                    <div className="flex justify-between items-center mb-1">
-                                                        <span className="font-bold text-primary dark:text-white">{m.name} {m.brand && `(${m.brand})`}</span>
-                                                        <span className={`font-semibold ${statusColor}`}>{statusText}</span>
-                                                    </div>
-                                                    <div className="h-1 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden mb-1">
-                                                        <div className="h-full bg-secondary" style={{ width: `${Math.min(100, progress)}%` }}></div>
-                                                    </div>
-                                                    <p className="text-xs text-slate-500 dark:text-slate-400 text-right">{m.purchasedQty}/{m.plannedQty} {m.unit}</p>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
+                    <div className="space-y-4">
+                        {filteredMaterials.map(m => (
+                            <div key={m.id} className="mb-4 bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 flex items-start gap-4 shadow-sm">
+                                <div className="flex-1">
+                                    <p className="font-bold text-primary dark:text-white text-base mb-1">{m.name}</p>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400">Planejado: {m.plannedQty} {m.unit} | Comprado: {m.purchasedQty} {m.unit}</p>
+                                    {m.stepId && <p className="text-[10px] text-slate-400 mt-1">Etapa: {steps.find(s => s.id === m.stepId)?.name || 'N/A'}</p>}
                                 </div>
-                            );
-                        })
+                                <span className={`px-3 py-1 rounded-full text-xs font-bold text-white ${m.purchasedQty < m.plannedQty ? 'bg-red-500' : 'bg-green-500'}`}>
+                                    {m.purchasedQty < m.plannedQty ? 'Pendente' : 'Completo'}
+                                </span>
+                            </div>
+                        ))}
+                    </div>
                 )}
             </div>
         );
     };
 
-
     // FIX: Changed React.FC to a direct functional component with implicit return type
     // to avoid "Cannot find namespace 'JSX'" when tsconfig.json is not changed.
     const RenderFinanceiroReport = () => (
         <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-200 dark:border-slate-800 p-6 shadow-md dark:shadow-card-dark-subtle animate-in fade-in">
-            <h3 className="font-bold text-xl text-primary dark:text-white mb-6">Lançamentos Financeiros</h3>
-            {(Object.values(ExpenseCategory) as ExpenseCategory[]).map(category => {
-                const expensesInCategory = (Object.values(groupedExpenses[category].steps) as ExpenseStepGroup[]).flatMap(stepGroup => stepGroup.expenses).concat(groupedExpenses[category].unlinkedExpenses);
-                if (expensesInCategory.length === 0) return null;
+            <h3 className="font-bold text-xl text-primary dark:text-white mb-6">Relatório Financeiro Detalhado</h3>
+            
+            <div className="mb-6 p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 flex justify-between items-center">
+                <div>
+                    <p className="text-sm font-bold text-slate-500 dark:text-slate-400">Total Gasto:</p>
+                    <p className="text-2xl font-black text-primary dark:text-white">{formatCurrency(totalSpent)}</p>
+                </div>
+                <div className="text-right">
+                    <p className="text-sm font-bold text-slate-500 dark:text-slate-400">Orçamento Planejado:</p>
+                    <p className="text-2xl font-black text-primary dark:text-white">{formatCurrency(work?.budgetPlanned)}</p>
+                </div>
+            </div>
 
-                return (
-                    <div key={category} className="mb-8 bg-slate-50 dark:bg-slate-800 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm last:mb-0">
-                        <h4 className="font-black uppercase text-primary dark:text-white mb-4 border-b border-slate-200 dark:border-slate-700 pb-3 text-lg">
-                            {category} <span className="text-secondary">({formatCurrency(groupedExpenses[category].totalCategoryAmount)})</span>
-                        </h4>
-                        <div className="space-y-4">
-                            {(Object.keys(groupedExpenses[category].steps) as string[])
-                                .filter(stepId => (groupedExpenses[category].steps[stepId] as ExpenseStepGroup).expenses.length > 0)
-                                .map(stepId => {
-                                const stepGroup: ExpenseStepGroup = groupedExpenses[category].steps[stepId];
-                                const step = steps.find(s => s.id === stepId); 
-                                if (!step) return null;
-                                
-                                const isStepDelayed = step.status !== StepStatus.COMPLETED && new Date(step.endDate) < new Date(todayString);
-                                const stepStatusBgClass = 
-                                    step.status === StepStatus.COMPLETED ? 'bg-green-500/10' : 
-                                    step.status === StepStatus.IN_PROGRESS ? 'bg-orange-500/10' : 
-                                    isStepDelayed ? 'bg-red-500/10' : 
-                                    'bg-slate-300/10';
-                                const stepStatusTextColorClass =
-                                    step.status === StepStatus.COMPLETED ? 'text-green-600 dark:text-green-300' :
-                                    step.status === StepStatus.IN_PROGRESS ? 'text-orange-600 dark:text-orange-300' :
-                                    isStepDelayed ? 'text-red-600 dark:text-red
+            <div className="mb-8">
+                <h4 className="font-bold text-lg text-primary dark:text-white mb-4">Gastos por Categoria:</h4>
+                <div className="space-y-4">
+                    {Object.entries(groupedExpenses).map(([category, data]) => (
+                        <div key={category} className="bg-slate-50 dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                            <div className="flex justify-between items-center mb-2">
+                                <p className="font-bold text-primary dark:text-white text-base">{category}</p>
+                                <p className="font-bold text-secondary text-base">{formatCurrency(data.totalCategoryAmount)}</p>
+                            </div>
+                            {/* Renderizar despesas não vinculadas primeiro */}
+                            {data.unlinkedExpenses.length > 0 && (
+                                <div className="mt-2 pl-4 border-l-2 border-slate-100 dark:border-slate-700">
+                                    <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2">Sem Etapa Específica:</p>
+                                    <ul className="space-y-1">
+                                        {data.unlinkedExpenses.map(exp => (
+                                            <li key={exp.id} className="flex justify-between text-xs text-slate-600 dark:text-slate-300">
+                                                <span>{exp.description}</span>
+                                                <span>{formatCurrency(exp.amount)}</span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
+                            {/* Renderizar despesas por etapa */}
+                            {Object.values(data.steps).map(stepGroup => (
+                                <div key={stepGroup.stepName} className="mt-4 pl-4 border-l-2 border-slate-100 dark:border-slate-700">
+                                    <div className="flex justify-between items-center mb-2">
+                                        <p className="text-sm font-bold text-slate-700 dark:text-slate-300">Etapa: {stepGroup.stepName}</p>
+                                        <p className="text-sm font-bold text-slate-700 dark:text-slate-300">{formatCurrency(stepGroup.totalStepAmount)}</p>
+                                    </div>
+                                    <ul className="space-y-1">
+                                        {stepGroup.expenses.map(exp => (
+                                            <li key={exp.id} className="flex justify-between text-xs text-slate-600 dark:text-slate-300">
+                                                <span>{exp.description}</span>
+                                                <span>{formatCurrency(exp.amount)}</span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            ))}
+                        </div>
+                    ))}
+                </div>
+            </div>
+        </div>
+    );
+    // END OF FINANCEIRO REPORT
+
+    return (
+        <div className="max-w-4xl mx-auto pb-12 pt-6 px-2 sm:px-4 md:px-0 font-sans">
+            <div className="flex justify-between items-center mb-6">
+                <button onClick={() => navigate('/')} className="text-slate-400 hover:text-primary dark:hover:text-white transition-colors p-2 -ml-2" aria-label="Voltar para o Dashboard">
+                    <i className="fa-solid fa-arrow-left text-xl"></i>
+                </button>
+                <h1 className="text-2xl font-black text-primary dark:text-white text-center flex-1">{work.name}</h1>
+                <div className="w-8"></div> {/* Placeholder */}
+            </div>
+
+            <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 md:p-8 shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800 mb-8">
+                <div className="flex items-center justify-between mb-4">
+                    <div>
+                        <p className="text-sm font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Detalhes da Obra</p>
+                        <h2 className="text-2xl font-black text-primary dark:text-white leading-tight">Progresso & Orçamento</h2>
+                    </div>
+                    <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide bg-primary/10 text-primary dark:bg-slate-800 dark:text-white">
+                        <i className="fa-solid fa-calendar"></i> {parseDateNoTimezone(work.startDate)}
+                    </span>
+                </div>
+                
+                {/* Visual Budget Overview */}
+                <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 mb-6 flex items-center gap-4">
+                    <div className={`w-12 h-12 rounded-full grid place-items-center text-xl text-white shrink-0 ${budgetStatusColor} ${budgetStatusAccent}`}>
+                        <i className={`fa-solid ${budgetStatusIcon}`}></i>
+                    </div>
+                    <div className="flex-1">
+                        <p className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">Status do Orçamento</p>
+                        <p className="text-lg font-black text-primary dark:text-white leading-none mb-1">{formatCurrency(budgetRemaining)} restantes</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">de {formatCurrency(work.budgetPlanned)} planejado ({budgetUsage.toFixed(0)}% utilizado)</p>
+                    </div>
+                </div>
+
+                {/* Main Tabs */}
+                <nav className="flex space-x-2 border-b border-slate-200 dark:border-slate-800 overflow-x-auto whitespace-nowrap mb-6">
+                    {(['ETAPAS', 'MATERIAIS', 'FINANCEIRO', 'FERRAMENTAS'] as MainTab[]).map(tab => (
+                        <button
+                            key={tab}
+                            onClick={() => { setActiveTab(tab); setSubView('NONE'); }}
+                            className={`py-3 px-4 -mb-px border-b-2 text-sm font-bold uppercase tracking-wide transition-colors ${
+                                activeTab === tab
+                                    ? 'border-secondary text-secondary'
+                                    : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-primary dark:hover:text-white'
+                            }`}
+                            aria-selected={activeTab === tab}
+                            role="tab"
+                        >
+                            {tab}
+                        </button>
+                    ))}
+                </nav>
+
+                {/* Tab Content */}
+                <div>
+                    {activeTab === 'ETAPAS' && (
+                        <div className="animate-in fade-in">
+                            <div className="flex justify-between items-center mb-4">
+                                <h3 className="text-xl font-bold text-primary dark:text-white">Cronograma</h3>
+                                <button onClick={() => { setIsStepModalOpen(true); setStepModalMode('ADD'); setStepName(''); setStepStart(new Date().toISOString().split('T')[0]); setStepEnd(new Date().toISOString().split('T')[0]); }} className="px-4 py-2 bg-secondary text-white font-bold rounded-xl text-sm hover:bg-secondary-dark transition-colors" aria-label="Adicionar nova etapa">
+                                    <i className="fa-solid fa-plus mr-2"></i> Nova Etapa
+                                </button>
+                            </div>
+                            <div className="space-y-4">
+                                {steps.length === 0 ? (
+                                    <p className="text-center text-slate-400 py-4 italic text-sm">Nenhuma etapa cadastrada. Adicione uma nova etapa para começar!</p>
+                                ) : (
+                                    steps.map((step, index) => {
+                                        const isDelayed = step.status !== StepStatus.COMPLETED && new Date(step.endDate) < new Date(todayString);
+                                        const statusColor = step.status === StepStatus.COMPLETED ? 'bg-green-500' : (step.status === StepStatus.IN_PROGRESS ? 'bg-orange-500' : (isDelayed ? 'bg-red-500' : 'bg-slate-500'));
+                                        const statusText = step.status === StepStatus.COMPLETED ? 'Concluída' : (step.status === StepStatus.IN_PROGRESS ? 'Em Andamento' : (isDelayed ? 'Atrasada' : 'Pendente'));
+                                        const statusIcon = step.status === StepStatus.COMPLETED ? 'fa-check-circle' : (step.status === StepStatus.IN_PROGRESS ? 'fa-hammer' : (isDelayed ? 'fa-triangle-exclamation' : 'fa-clock'));
+
+                                        return (
+                                            <div key={step.id} className="bg-slate-50 dark:bg-slate-800 rounded-2xl p-4 border border-slate-200 dark:border-slate-700 shadow-sm flex items-start gap-4">
+                                                <div className={`w-10 h-10 rounded-full ${statusColor} text-white flex items-center justify-center text-lg shrink-0`}>
+                                                    <i className={`fa-solid ${statusIcon}`}></i>
+                                                </div>
+                                                <div className="flex-1">
+                                                    <div className="flex justify-between items-center mb-1">
+                                                        <p className="font-bold text-primary dark:text-white text-base">{index + 1}. {step.name}</p>
+                                                        <span className={`px-2 py-0.5 rounded-full text-xs font-bold text-white ${statusColor}`}>{statusText}</span>
+                                                    </div>
+                                                    <p className="text-xs text-slate-500 dark:text-slate-400">Início: {parseDateNoTimezone(step.startDate)} | Fim: {parseDateNoTimezone(step.endDate)}</p>
+                                                    <div className="flex gap-2 mt-3">
+                                                        <button onClick={() => handleStepStatusClick(step)} className="px-3 py-1 bg-primary/10 text-primary dark:bg-slate-700 dark:text-slate-200 text-xs font-bold rounded-lg hover:bg-primary/20 dark:hover:bg-slate-600 transition-colors" aria-label={`Alterar status da etapa ${step.name}`}>
+                                                            Status
+                                                        </button>
+                                                        <button onClick={() => { setIsStepModalOpen(true); setStepModalMode('EDIT'); setStepName(step.name); setStepStart(step.startDate); setStepEnd(step.endDate); setCurrentStepId(step.id); }} className="px-3 py-1 bg-primary/10 text-primary dark:bg-slate-700 dark:text-slate-200 text-xs font-bold rounded-lg hover:bg-primary/20 dark:hover:bg-slate-600 transition-colors" aria-label={`Editar etapa ${step.name}`}>
+                                                            Editar
+                                                        </button>
+                                                        <button onClick={() => handleDeleteStep(step.id)} className="px-3 py-1 bg-red-500/10 text-red-600 dark:bg-red-900/20 dark:text-red-300 text-xs font-bold rounded-lg hover:bg-red-500/20 dark:hover:bg-red-800 transition-colors" aria-label={`Excluir etapa ${step.name}`}>
+                                                            Excluir
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'MATERIAIS' && (
+                        <div className="animate-in fade-in">
+                            <div className="flex justify-between items-center mb-4">
+                                <h3 className="text-xl font-bold text-primary dark:text-white">Lista de Materiais</h3>
+                                <button onClick={() => setAddMatModal(true)} className="px-4 py-2 bg-secondary text-white font-bold rounded-xl text-sm hover:bg-secondary-dark transition-colors" aria-label="Adicionar novo material">
+                                    <i className="fa-solid fa-plus mr-2"></i> Novo Material
+                                </button>
+                            </div>
+                            <div className="mb-6">
+                                <label htmlFor="material-step-filter" className="block text-sm font-medium text-primary dark:text-white mb-2">Filtrar por Etapa:</label>
+                                <select
+                                    id="material-step-filter"
+                                    value={mainMaterialFilterStepId}
+                                    onChange={(e) => setMainMaterialFilterStepId(e.target.value)}
+                                    className="w-full p-3 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white focus:ring-secondary focus:border-secondary outline-none transition-colors"
+                                    aria-label="Filtrar materiais por etapa"
+                                >
+                                    <option value="ALL">Todos os Materiais</option>
+                                    <option value="UNLINKED">Materiais Sem Etapa</option>
+                                    {steps.map(step => (
+                                        <option key={step.id} value={step.id}>{step.name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            {renderMainMaterialList()}
+                        </div>
+                    )}
+
+                    {activeTab === 'FINANCEIRO' && (
+                        <div className="animate-in fade-in">
+                            <div className="flex justify-between items-center mb-4">
+                                <h3 className="text-xl font-bold text-primary dark:text-white">Gastos e Receitas</h3>
+                                <button onClick={openAddExpense} className="px-4 py-2 bg-secondary text-white font-bold rounded-xl text-sm hover:bg-secondary-dark transition-colors" aria-label="Adicionar nova despesa">
+                                    <i className="fa-solid fa-plus mr-2"></i> Nova Despesa
+                                </button>
+                            </div>
+                            <div className="space-y-4">
+                                {expenses.length === 0 ? (
+                                    <p className="text-center text-slate-400 py-4 italic text-sm">Nenhum gasto registrado. Adicione o primeiro!</p>
+                                ) : (
+                                    expenses.map(expense => (
+                                        <div key={expense.id} className="bg-slate-50 dark:bg-slate-800 rounded-2xl p-4 border border-slate-200 dark:border-slate-700 shadow-sm flex justify-between items-center">
+                                            <div>
+                                                <p className="font-bold text-primary dark:text-white text-base">{expense.description}</p>
+                                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                                                    {parseDateNoTimezone(expense.date)} | {expense.category}
+                                                    {expense.stepId && ` | Etapa: ${steps.find(s => s.id === expense.stepId)?.name || 'N/A'}`}
+                                                </p>
+                                            </div>
+                                            <div className="flex flex-col items-end gap-1">
+                                                <p className="font-bold text-red-500 dark:text-red-400 text-lg leading-none">{formatCurrency(expense.amount)}</p>
+                                                <div className="flex gap-2">
+                                                    <button onClick={() => openEditExpense(expense)} className="px-3 py-1 bg-primary/10 text-primary dark:bg-slate-700 dark:text-slate-200 text-xs font-bold rounded-lg hover:bg-primary/20 dark:hover:bg-slate-600 transition-colors" aria-label={`Editar despesa ${expense.description}`}>
+                                                        Editar
+                                                    </button>
+                                                    <button onClick={() => handleDeleteExpense(expense.id)} className="px-3 py-1 bg-red-500/10 text-red-600 dark:bg-red-900/20 dark:text-red-300 text-xs font-bold rounded-lg hover:bg-red-500/20 dark:hover:bg-red-800 transition-colors" aria-label={`Excluir despesa ${expense.description}`}>
+                                                        Excluir
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {activeTab === 'FERRAMENTAS' && (
+                        <div className="animate-in fade-in">
+                            {subView === 'NONE' && (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <button onClick={() => setSubView('WORKERS')} className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center gap-4 hover:shadow-md transition-shadow" aria-label="Gerenciar Profissionais">
+                                        <div className="w-16 h-16 rounded-full bg-secondary/10 text-secondary flex items-center justify-center text-3xl"><i className="fa-solid fa-hard-hat"></i></div>
+                                        <p className="font-bold text-lg text-primary dark:text-white">Profissionais</p>
+                                        <p className="text-sm text-slate-500 dark:text-slate-400 text-center">Cadastre sua equipe da obra.</p>
+                                    </button>
+                                    <button onClick={() => setSubView('SUPPLIERS')} className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center gap-4 hover:shadow-md transition-shadow" aria-label="Gerenciar Fornecedores">
+                                        <div className="w-16 h-16 rounded-full bg-blue-500/10 text-blue-600 flex items-center justify-center text-3xl"><i className="fa-solid fa-truck"></i></div>
+                                        <p className="font-bold text-lg text-primary dark:text-white">Fornecedores</p>
+                                        <p className="text-sm text-slate-500 dark:text-slate-400 text-center">Controle seus parceiros de materiais.</p>
+                                    </button>
+                                    <button onClick={() => setSubView('REPORTS')} className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center gap-4 hover:shadow-md transition-shadow" aria-label="Gerar Relatórios">
+                                        <div className="w-16 h-16 rounded-full bg-green-500/10 text-green-600 flex items-center justify-center text-3xl"><i className="fa-solid fa-chart-line"></i></div>
+                                        <p className="font-bold text-lg text-primary dark:text-white">Relatórios</p>
+                                        <p className="text-sm text-slate-500 dark:text-slate-400 text-center">Acompanhe o desempenho da obra.</p>
+                                    </button>
+                                    <button onClick={() => setSubView('PHOTOS')} className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center gap-4 hover:shadow-md transition-shadow" aria-label="Gerenciar Fotos da Obra">
+                                        <div className="w-16 h-16 rounded-full bg-purple-500/10 text-purple-600 flex items-center justify-center text-3xl"><i className="fa-solid fa-camera"></i></div>
+                                        <p className="font-bold text-lg text-primary dark:text-white">Fotos da Obra</p>
+                                        <p className="text-sm text-slate-500 dark:text-slate-400 text-center">Registre o antes e depois com fotos.</p>
+                                    </button>
+                                    <button onClick={() => setSubView('PROJECTS')} className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center gap-4 hover:shadow-md transition-shadow" aria-label="Gerenciar Projetos e Documentos">
+                                        <div className="w-16 h-16 rounded-full bg-orange-500/10 text-orange-600 flex items-center justify-center text-3xl"><i className="fa-solid fa-file-alt"></i></div>
+                                        <p className="font-bold text-lg text-primary dark:text-white">Projetos & Docs</p>
+                                        <p className="text-sm text-slate-500 dark:text-slate-400 text-center">Mantenha seus arquivos organizados.</p>
+                                    </button>
+                                    <button onClick={() => { if(hasLifetimeAccess) setSubView('CONTRACTS'); else setZeModal({ isOpen: true, title: 'Recurso Premium!', message: 'O Gerador de Contratos é uma funcionalidade exclusiva do Plano Vitalício. Libere acesso ilimitado a todas as ferramentas!', confirmText: 'Entendido', onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })), type: 'WARNING' }); }} className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center gap-4 hover:shadow-md transition-shadow group" aria-label="Gerador de Contratos">
+                                        <div className={`w-16 h-16 rounded-full ${hasLifetimeAccess ? 'bg-amber-500/10 text-amber-600' : 'bg-slate-300/10 text-slate-400'} flex items-center justify-center text-3xl`}>
+                                            <i className="fa-solid fa-file-contract"></i>
+                                            {!hasLifetimeAccess && <span className="absolute top-1 right-1 bg-amber-500 text-white text-xs px-2 py-1 rounded-full animate-bounce">PRO</span>}
+                                        </div>
+                                        <p className={`font-bold text-lg ${hasLifetimeAccess ? 'text-primary dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}>Contratos</p>
+                                        <p className="text-sm text-slate-500 dark:text-slate-400 text-center">Gere contratos e recibos para sua equipe.</p>
+                                    </button>
+                                    <button onClick={() => { if(hasLifetimeAccess) setSubView('CHECKLIST'); else setZeModal({ isOpen: true, title: 'Recurso Premium!', message: 'Os Checklists Inteligentes são uma funcionalidade exclusiva do Plano Vitalício. Libere acesso ilimitado a todas as ferramentas!', confirmText: 'Entendido', onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })), type: 'WARNING' }); }} className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center gap-4 hover:shadow-md transition-shadow group" aria-label="Checklists Inteligentes">
+                                        <div className={`w-16 h-16 rounded-full ${hasLifetimeAccess ? 'bg-emerald-500/10 text-emerald-600' : 'bg-slate-300/10 text-slate-400'} flex items-center justify-center text-3xl`}>
+                                            <i className="fa-solid fa-list-check"></i>
+                                            {!hasLifetimeAccess && <span className="absolute top-1 right-1 bg-amber-500 text-white text-xs px-2 py-1 rounded-full animate-bounce">PRO</span>}
+                                        </div>
+                                        <p className={`font-bold text-lg ${hasLifetimeAccess ? 'text-primary dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}>Checklists</p>
+                                        <p className="text-sm text-slate-500 dark:text-slate-400 text-center">Listas de verificação para cada etapa da obra.</p>
+                                    </button>
+                                    <button onClick={() => { if(hasLifetimeAccess) setSubView('CALCULATORS'); else setZeModal({ isOpen: true, title: 'Recurso Premium!', message: 'As Calculadoras Inteligentes são uma funcionalidade exclusiva do Plano Vitalício. Libere acesso ilimitado a todas as ferramentas!', confirmText: 'Entendido', onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })), type: 'WARNING' }); }} className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center gap-4 hover:shadow-md transition-shadow group" aria-label="Calculadoras Inteligentes">
+                                        <div className={`w-16 h-16 rounded-full ${hasLifetimeAccess ? 'bg-cyan-500/10 text-cyan-600' : 'bg-slate-300/10 text-slate-400'} flex items-center justify-center text-3xl`}>
+                                            <i className="fa-solid fa-calculator"></i>
+                                            {!hasLifetimeAccess && <span className="absolute top-1 right-1 bg-amber-500 text-white text-xs px-2 py-1 rounded-full animate-bounce">PRO</span>}
+                                        </div>
+                                        <p className={`font-bold text-lg ${hasLifetimeAccess ? 'text-primary dark:text-white' : 'text-slate-500 dark:text-slate-400'}`}>Calculadoras</p>
+                                        <p className="text-sm text-slate-500 dark:text-slate-400 text-center">Calcule materiais de forma rápida e precisa.</p>
+                                    </button>
+                                    <button onClick={() => setSubView('AICHAT')} className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center gap-4 hover:shadow-md transition-shadow group" aria-label="Acessar Zé da Obra AI">
+                                        <div className="w-16 h-16 rounded-full bg-rose-500/10 text-rose-600 flex items-center justify-center text-3xl"><i className="fa-solid fa-robot"></i></div>
+                                        <p className="font-bold text-lg text-primary dark:text-white">Zé da Obra AI</p>
+                                        <p className="text-sm text-slate-500 dark:text-slate-400 text-center">Seu engenheiro virtual particular.</p>
+                                    </button>
+                                </div>
+                            )}
+
+                            {subView !== 'NONE' && (
+                                <button onClick={() => setSubView('NONE')} className="mb-6 px-4 py-2 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold rounded-xl text-sm hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors" aria-label="Voltar para ferramentas">
+                                    <i className="fa-solid fa-arrow-left mr-2"></i> Voltar
+                                </button>
+                            )}
+
+                            {subView === 'WORKERS' && (
+                                <div className="animate-in fade-in">
+                                    <div className="flex justify-between items-center mb-4">
+                                        <h3 className="text-xl font-bold text-primary dark:text-white">Profissionais</h3>
+                                        <button onClick={() => openPersonModal('WORKER')} className="px-4 py-2 bg-secondary text-white font-bold rounded-xl text-sm hover:bg-secondary-dark transition-colors" aria-label="Adicionar novo profissional">
+                                            <i className="fa-solid fa-plus mr-2"></i> Novo Profissional
+                                        </button>
+                                    </div>
+                                    <div className="space-y-4">
+                                        {workers.length === 0 ? (
+                                            <p className="text-center text-slate-400 py-4 italic text-sm">Nenhum profissional cadastrado.</p>
+                                        ) : (
+                                            workers.map(worker => (
+                                                <div key={worker.id} className="bg-slate-50 dark:bg-slate-800 rounded-2xl p-4 border border-slate-200 dark:border-slate-700 shadow-sm flex items-center justify-between">
+                                                    <div>
+                                                        <p className="font-bold text-primary dark:text-white text-base">{worker.name}</p>
+                                                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{worker.role} | {worker.phone}</p>
+                                                    </div>
+                                                    <div className="flex gap-2">
+                                                        <button onClick={() => handleGenerateWhatsappLink(worker.phone)} className="px-3 py-1 bg-green-500/10 text-green-600 dark:bg-green-900/20 dark:text-green-300 text-xs font-bold rounded-lg hover:bg-green-500/20 dark:hover:bg-green-800 transition-colors" aria-label={`Enviar mensagem para ${worker.name} no WhatsApp`}>
+                                                            <i className="fa-brands fa-whatsapp"></i>
+                                                        </button>
+                                                        <button onClick={() => openPersonModal('WORKER', worker)} className="px-3 py-1 bg-primary/10 text-primary dark:bg-slate-700 dark:text-slate-200 text-xs font-bold rounded-lg hover:bg-primary/20 dark:hover:bg-slate-600 transition-colors" aria-label={`Editar profissional ${worker.name}`}>
+                                                            Editar
+                                                        </button>
+                                                        <button onClick={() => handleDeletePerson(worker.id, work.id, 'WORKER')} className="px-3 py-1 bg-red-500/10 text-red-600 dark:bg-red-900/20 dark:text-red-300 text-xs font-bold rounded-lg hover:bg-red-500/20 dark:hover:bg-red-800 transition-colors" aria-label={`Excluir profissional ${worker.name}`}>
+                                                            Excluir
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {subView === 'SUPPLIERS' && (
+                                <div className="animate-in fade-in">
+                                    <div className="flex justify-between items-center mb-4">
+                                        <h3 className="text-xl font-bold text-primary dark:text-white">Fornecedores</h3>
+                                        <button onClick={() => openPersonModal('SUPPLIER')} className="px-4 py-2 bg-secondary text-white font-bold rounded-xl text-sm hover:bg-secondary-dark transition-colors" aria-label="Adicionar novo fornecedor">
+                                            <i className="fa-solid fa-plus mr-2"></i> Novo Fornecedor
+                                        </button>
+                                    </div>
+                                    <div className="space-y-4">
+                                        {suppliers.length === 0 ? (
+                                            <p className="text-center text-slate-400 py-4 italic text-sm">Nenhum fornecedor cadastrado.</p>
+                                        ) : (
+                                            suppliers.map(supplier => (
+                                                <div key={supplier.id} className="bg-slate-50 dark:bg-slate-800 rounded-2xl p-4 border border-slate-200 dark:border-slate-700 shadow-sm flex items-center justify-between">
+                                                    <div>
+                                                        <p className="font-bold text-primary dark:text-white text-base">{supplier.name}</p>
+                                                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{supplier.category} | {supplier.phone}</p>
+                                                    </div>
+                                                    <div className="flex gap-2">
+                                                        <button onClick={() => handleGenerateWhatsappLink(supplier.phone)} className="px-3 py-1 bg-green-500/10 text-green-600 dark:bg-green-900/20 dark:text-green-300 text-xs font-bold rounded-lg hover:bg-green-500/20 dark:hover:bg-green-800 transition-colors" aria-label={`Enviar mensagem para ${supplier.name} no WhatsApp`}>
+                                                            <i className="fa-brands fa-whatsapp"></i>
+                                                        </button>
+                                                        <button onClick={() => openPersonModal('SUPPLIER', supplier)} className="px-3 py-1 bg-primary/10 text-primary dark:bg-slate-700 dark:text-slate-200 text-xs font-bold rounded-lg hover:bg-primary/20 dark:hover:bg-slate-600 transition-colors" aria-label={`Editar fornecedor ${supplier.name}`}>
+                                                            Editar
+                                                        </button>
+                                                        <button onClick={() => handleDeletePerson(supplier.id, work.id, 'SUPPLIER')} className="px-3 py-1 bg-red-500/10 text-red-600 dark:bg-red-900/20 dark:text-red-300 text-xs font-bold rounded-lg hover:bg-red-500/20 dark:hover:bg-red-800 transition-colors" aria-label={`Excluir fornecedor ${supplier.name}`}>
+                                                            Excluir
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {subView === 'REPORTS' && (
+                                <div className="animate-in fade-in">
+                                    <h3 className="text-xl font-bold text-primary dark:text-white mb-4">Gerar Relatórios</h3>
+                                    <div className="flex space-x-2 mb-6">
+                                        {(['CRONOGRAMA', 'MATERIAIS', 'FINANCEIRO'] as ReportSubTab[]).map(tab => (
+                                            <button
+                                                key={tab}
+                                                onClick={() => setReportActiveTab(tab)}
+                                                className={`py-2 px-4 rounded-xl text-sm font-bold transition-colors ${
+                                                    reportActiveTab === tab
+                                                        ? 'bg-secondary text-white shadow-md'
+                                                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                                                }`}
+                                                aria-selected={reportActiveTab === tab}
+                                                role="tab"
+                                            >
+                                                {tab}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <div className="flex gap-4 mb-6">
+                                        <button onClick={handleExportExcel} className="flex-1 py-3 bg-green-600 text-white font-bold rounded-xl shadow-lg hover:bg-green-700 transition-colors flex items-center justify-center gap-2" aria-label="Exportar para Excel">
+                                            <i className="fa-solid fa-file-excel"></i> Exportar Excel
+                                        </button>
+                                        <button onClick={handleExportPdf} className="flex-1 py-3 bg-red-600 text-white font-bold rounded-xl shadow-lg hover:bg-red-700 transition-colors flex items-center justify-center gap-2" aria-label="Exportar para PDF">
+                                            <i className="fa-solid fa-file-pdf"></i> Exportar PDF
+                                        </button>
+                                    </div>
+                                    
+                                    {reportActiveTab === 'CRONOGRAMA' && <RenderCronogramaReport />}
+                                    {reportActiveTab === 'MATERIAIS' && <RenderMateriaisReport />}
+                                    {reportActiveTab === 'FINANCEIRO' && <RenderFinanceiroReport />}
+                                </div>
+                            )}
+
+                            {subView === 'PHOTOS' && (
+                                <div className="animate-in fade-in">
+                                    <h3 className="text-xl font-bold text-primary dark:text-white mb-4">Fotos da Obra</h3>
+                                    <label htmlFor="upload-photo" className="w-full flex items-center justify-center py-4 bg-primary/10 text-primary dark:bg-slate-800 dark:text-white font-bold rounded-xl shadow-sm hover:bg-primary/20 dark:hover:bg-slate-700 transition-colors cursor-pointer mb-6" aria-label="Adicionar nova foto">
+                                        {uploading ? <i className="fa-solid fa-circle-notch fa-spin mr-2"></i> : <i className="fa-solid fa-plus mr-2"></i>}
+                                        {uploading ? 'Enviando...' : 'Adicionar Nova Foto'}
+                                        <input id="upload-photo" type="file" accept="image/*" onChange={(e) => handleFileUpload(e, 'PHOTO')} className="hidden" disabled={uploading} />
+                                    </label>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                        {photos.length === 0 ? (
+                                            <p className="col-span-full text-center text-slate-400 py-4 italic text-sm">Nenhuma foto adicionada.</p>
+                                        ) : (
+                                            photos.map(photo => (
+                                                <div key={photo.id} className="bg-slate-50 dark:bg-slate-800 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 shadow-sm">
+                                                    <img src={photo.url} alt={photo.description} className="w-full h-40 object-cover" />
+                                                    <div className="p-3">
+                                                        <p className="font-bold text-primary dark:text-white text-sm">{photo.description}</p>
+                                                        <p className="text-xs text-slate-500 dark:text-slate-400">{parseDateNoTimezone(photo.date)}</p>
+                                                    </div>
+                                                </div>
+                                            ))
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {subView === 'PROJECTS' && (
+                                <div className="animate-in fade-in">
+                                    <h3 className="text-xl font-bold text-primary dark:text-white mb-4">Projetos & Documentos</h3>
+                                    <label htmlFor="upload-file" className="w-full flex items-center justify-center py-4 bg-primary/10 text-primary dark:bg-slate-800 dark:text-white font-bold rounded-xl shadow-sm hover:bg-primary/20 dark:hover:bg-slate-700 transition-colors cursor-pointer mb-6" aria-label="Adicionar novo arquivo">
+                                        {uploading ? <i className="fa-solid fa-circle-notch fa-spin mr-2"></i> : <i className="fa-solid fa-plus mr-2"></i>}
+                                        {uploading ? 'Enviando...' : 'Adicionar Novo Arquivo'}
+                                        <input id="upload-file" type="file" onChange={(e) => handleFileUpload(e, 'FILE')} className="hidden" disabled={uploading} />
+                                    </label>
+                                    <div className="space-y-4">
+                                        {files.length === 0 ? (
+                                            <p className="text-center text-slate-400 py-4 italic text-sm">Nenhum arquivo adicionado.</p>
+                                        ) : (
+                                            files.map(file => (
+                                                <a href={file.url} target="_blank" rel="noopener noreferrer" key={file.id} className="bg-slate-50 dark:bg-slate-800 rounded-2xl p-4 border border-slate-200 dark:border-slate-700 shadow-sm flex items-center gap-4 hover:shadow-md transition-shadow">
+                                                    <div className="w-10 h-10 rounded-full bg-blue-500/10 text-blue-600 flex items-center justify-center text-lg shrink-0">
+                                                        <i className="fa-solid fa-file-alt"></i>
+                                                    </div>
+                                                    <div className="flex-1">
+                                                        <p className="font-bold text-primary dark:text-white text-base">{file.name}</p>
+                                                        <p className="text-xs text-slate-500 dark:text-slate-400">{file.category} | {parseDateNoTimezone(file.date)}</p>
+                                                    </div>
+                                                    <i className="fa-solid fa-download text-slate-400"></i>
+                                                </a>
+                                            ))
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {subView === 'CONTRACTS' && (
+                                <div className="animate-in fade-in">
+                                    <h3 className="text-xl font-bold text-primary dark:text-white mb-4">Gerador de Contratos</h3>
+                                    <p className="text-slate-500 dark:text-slate-400 mb-6 text-sm">Selecione um modelo para preencher e gerar seu contrato ou recibo.</p>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        {CONTRACT_TEMPLATES.map(contract => (
+                                            <button key={contract.id} onClick={() => { setViewContract(contract); setIsContractModalOpen(true); }} className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-4 hover:shadow-md transition-shadow">
+                                                <div className="w-10 h-10 rounded-full bg-amber-500/10 text-amber-600 flex items-center justify-center text-lg shrink-0">
+                                                    <i className="fa-solid fa-file-contract"></i>
+                                                </div>
+                                                <div className="flex-1 text-left">
+                                                    <p className="font-bold text-primary dark:text-white text-base">{contract.title}</p>
+                                                    <p className="text-xs text-slate-500 dark:text-slate-400">{contract.category}</p>
+                                                </div>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {subView === 'CHECKLIST' && (
+                                <div className="animate-in fade-in">
+                                    <div className="flex justify-between items-center mb-4">
+                                        <h3 className="text-xl font-bold text-primary dark:text-white">Checklists da Obra</h3>
+                                        <button onClick={() => handleAddChecklist('Geral')} className="px-4 py-2 bg-secondary text-white font-bold rounded-xl text-sm hover:bg-secondary-dark transition-colors" aria-label="Adicionar novo checklist">
+                                            <i className="fa-solid fa-plus mr-2"></i> Novo Checklist
+                                        </button>
+                                    </div>
+                                    <p className="text-slate-500 dark:text-slate-400 mb-6 text-sm">Crie e gerencie listas de verificação para as etapas da sua obra.</p>
+                                    
+                                    <div className="mb-6">
+                                        <label htmlFor="checklist-category-filter" className="block text-sm font-medium text-primary dark:text-white mb-2">Filtrar por Etapa/Categoria:</label>
+                                        <select
+                                            id="checklist-category-filter"
+                                            value={selectedChecklistCategory}
+                                            onChange={(e) => setSelectedChecklistCategory(e.target.value)}
+                                            className="w-full p-3 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white focus:ring-secondary focus:border-secondary outline-none transition-colors"
+                                            aria-label="Filtrar checklists por categoria"
+                                        >
+                                            <option value="all">Todas as Categorias</option>
+                                            <option value="Geral">Geral</option>
+                                            <option value="Segurança">Segurança</option>
+                                            <option value="Entrega">Entrega</option>
+                                            {steps.map(step => (
+                                                <option key={step.id} value={step.name}>{step.name}</option>
+                                            ))}
+                                        </select>
+                                    </div>
+
+                                    <div className="space-y-4">
+                                        {(allChecklists.length === 0 || 
+                                          (selectedChecklistCategory !== 'all' && 
+                                           !allChecklists.some(cl => cl.workId === work.id && cl.category === selectedChecklistCategory))) ? (
+                                            <p className="text-center text-slate-400 py-4 italic text-sm">Nenhum checklist encontrado para esta obra ou filtro.</p>
+                                        ) : (
+                                            allChecklists
+                                                .filter(cl => cl.workId === work.id && (selectedChecklistCategory === 'all' || cl.category === selectedChecklistCategory))
+                                                .map(checklist => (
+                                                    <div key={checklist.id} className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200 dark:border-slate-800 shadow-sm">
+                                                        <div className="flex justify-between items-center mb-3">
+                                                            <h4 className="font-bold text-primary dark:text-white text-base flex items-center gap-2">
+                                                                <i className="fa-solid fa-list-check text-secondary"></i> {checklist.name}
+                                                            </h4>
+                                                            <button onClick={() => handleEditChecklist(checklist)} className="px-3 py-1 bg-primary/10 text-primary dark:bg-slate-700 dark:text-slate-200 text-xs font-bold rounded-lg hover:bg-primary/20 dark:hover:bg-slate-600 transition-colors" aria-label={`Editar checklist ${checklist.name}`}>
+                                                                Editar
+                                                            </button>
+                                                        </div>
+                                                        <ul className="space-y-2">
+                                                            {checklist.items.map(item => (
+                                                                <li key={item.id} className="flex items-center">
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        checked={item.checked}
+                                                                        onChange={() => handleChecklistItemToggle(checklist.id, item.id)}
+                                                                        className="h-4 w-4 text-secondary rounded border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 focus:ring-secondary mr-2"
+                                                                        aria-label={`Marcar ${item.text}`}
+                                                                    />
+                                                                    <span className={`text-sm ${item.checked ? 'line-through text-slate-400 dark:text-slate-600' : 'text-primary dark:text-white'}`}>
+                                                                        {item.text}
+                                                                    </span>
+                                                                </li>
+                                                            ))}
+                                                        </ul>
+                                                    </div>
+                                                ))
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {subView === 'CALCULATORS' && (
+                                <div className="animate-in fade-in">
+                                    <h3 className="text-xl font-bold text-primary dark:text-white mb-4">Calculadoras Rápidas</h3>
+                                    <p className="text-slate-500 dark:text-slate-400 mb-6 text-sm">Estime quantidades de materiais para pisos, paredes e pintura.</p>
+
+                                    <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 border border-slate-200 dark:border-slate-800 shadow-sm mb-6">
+                                        <div className="flex space-x-2 mb-4">
+                                            {(['PISO', 'PAREDE', 'PINTURA'] as ('PISO'|'PAREDE'|'PINTURA')[])
+                                                .map(calc => (
+                                                    <button
+                                                        key={calc}
+                                                        onClick={() => { setCalcType(calc); setCalcResult([]); }}
+                                                        className={`py-2 px-4 rounded-xl text-sm font-bold transition-colors ${
+                                                            calcType === calc
+                                                                ? 'bg-secondary text-white shadow-md'
+                                                                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                                                        }`}
+                                                        aria-selected={calcType === calc}
+                                                        role="tab"
+                                                    >
+                                                        {calc}
+                                                    </button>
+                                                ))}
+                                        </div>
+                                        <div>
+                                            <label htmlFor="calc-area" className="block text-sm font-medium text-primary dark:text-white mb-2">Área (m²):</label>
+                                            <input
+                                                id="calc-area"
+                                                type="number"
+                                                value={calcArea}
+                                                onChange={(e) => setCalcArea(e.target.value)}
+                                                placeholder="Ex: 25.5"
+                                                className="w-full p-3 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white focus:ring-secondary focus:border-secondary outline-none transition-colors"
+                                                aria-label="Área em metros quadrados para cálculo"
+                                            />
+                                        </div>
+
+                                        {calcResult.length > 0 && (
+                                            <div className="mt-6 p-4 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
+                                                <p className="text-sm font-bold text-primary dark:text-white mb-2">Resultado Estimado:</p>
+                                                <ul className="space-y-1">
+                                                    {calcResult.map((res, i) => (
+                                                        <li key={i} className="text-sm text-slate-700 dark:text-slate-300">
+                                                            <i className="fa-solid fa-check-circle mr-2 text-green-500"></i> {res}
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            {subView === 'AICHAT' && (
+                                <div className="animate-in fade-in">
+                                    <h3 className="text-xl font-bold text-primary dark:text-white mb-4">Zé da Obra AI</h3>
+                                    <p className="text-slate-500 dark:text-slate-400 mb-6 text-sm">Converse com seu engenheiro virtual para tirar dúvidas e obter dicas inteligentes para sua obra.</p>
+                                    <button onClick={() => navigate('/ai-chat')} className="w-full py-3 bg-secondary text-white font-bold rounded-xl shadow-lg hover:bg-secondary-dark transition-colors flex items-center justify-center gap-2" aria-label="Abrir chat com Zé da Obra AI">
+                                        <i className="fa-solid fa-robot mr-2"></i> Abrir Chat com o Zé
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* Step Modal */}
+            <ZeModal
+                isOpen={isStepModalOpen}
+                title={stepModalMode === 'ADD' ? 'Adicionar Etapa' : 'Editar Etapa'}
+                message="" // Message will be rendered by form inputs
+                onCancel={() => setIsStepModalOpen(false)}
+                confirmText={stepModalMode === 'ADD' ? 'Adicionar' : 'Salvar'}
+                onConfirm={() => {}} // Handled by form onSubmit
+                type="INFO"
+            >
+                <form onSubmit={handleSaveStep} className="space-y-4">
+                    <div>
+                        <label htmlFor="step-name" className="block text-sm font-medium text-primary dark:text-white mb-2">Nome da Etapa:</label>
+                        <input id="step-name" type="text" value={stepName} onChange={(e) => setStepName(e.target.value)} className="w-full p-3 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white" required aria-label="Nome da etapa" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label htmlFor="step-start" className="block text-sm font-medium text-primary dark:text-white mb-2">Data Início:</label>
+                            <input id="step-start" type="date" value={stepStart} onChange={(e) => setStepStart(e.target.value)} className="w-full p-3 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white" required aria-label="Data de início da etapa" />
+                        </div>
+                        <div>
+                            <label htmlFor="step-end" className="block text-sm font-medium text-primary dark:text-white mb-2">Data Fim:</label>
+                            <input id="step-end" type="date" value={stepEnd} onChange={(e) => setStepEnd(e.target.value)} className="w-full p-3 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white" required aria-label="Data de término da etapa" />
+                        </div>
+                    </div>
+                    <button type="submit" className="w-full py-3 bg-secondary text-white font-bold rounded-xl hover:bg-secondary-dark transition-colors" aria-label={stepModalMode === 'ADD' ? 'Adicionar etapa' : 'Salvar etapa'}>
+                        {stepModalMode === 'ADD' ? 'Adicionar' : 'Salvar'}
+                    </button>
+                </form>
+            </ZeModal>
+
+            {/* Material Modal (Add/Edit) */}
+            <ZeModal
+                isOpen={addMatModal || materialModal.isOpen}
+                title={addMatModal ? 'Adicionar Material' : 'Detalhes do Material'}
+                message=""
+                onCancel={() => { setAddMatModal(false); setMaterialModal({isOpen: false, material: null}); }}
+                confirmText={addMatModal ? 'Adicionar' : 'Salvar'}
+                onConfirm={() => {}} // Handled by form onSubmit
+                type="INFO"
+            >
+                <form onSubmit={addMatModal ? handleAddMaterial : handleUpdateMaterial} className="space-y-4">
+                    <div>
+                        <label htmlFor="mat-name" className="block text-sm font-medium text-primary dark:text-white mb-2">Nome do Material:</label>
+                        <input id="mat-name" type="text" value={addMatModal ? newMatName : matName} onChange={(e) => addMatModal ? setNewMatName(e.target.value) : setMatName(e.target.value)} className="w-full p-3 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white" required aria-label="Nome do material" />
+                    </div>
+                    <div>
+                        <label htmlFor="mat-brand" className="block text-sm font-medium text-primary dark:text-white mb-2">Marca (Opcional):</label>
+                        <input id="mat-brand" type="text" value={addMatModal ? newMatBrand : matBrand} onChange={(e) => addMatModal ? setNewMatBrand(e.target.value) : setMatBrand(e.target.value)} className="w-full p-3 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white" aria-label="Marca do material (opcional)" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label htmlFor="mat-qty" className="block text-sm font-medium text-primary dark:text-white mb-2">Qtd. Planejada:</label>
+                            <input id="mat-qty" type="number" value={addMatModal ? newMatQty : matPlannedQty} onChange={(e) => addMatModal ? setNewMatQty(e.target.value) : setMatPlannedQty(e.target.value)} className="w-full p-3 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white" required aria-label="Quantidade planejada" />
+                        </div>
+                        <div>
+                            <label htmlFor="mat-unit" className="block text-sm font-medium text-primary dark:text-white mb-2">Unidade:</label>
+                            <input id="mat-unit" type="text" value={addMatModal ? newMatUnit : matUnit} onChange={(e) => addMatModal ? setNewMatUnit(e.target.value) : setMatUnit(e.target.value)} className="w-full p-3 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white" required aria-label="Unidade de medida" />
+                        </div>
+                    </div>
+                    {addMatModal && (
+                        <div>
+                            <label htmlFor="mat-step" className="block text-sm font-medium text-primary dark:text-white mb-2">Vincular à Etapa (Opcional):</label>
+                            <select id="mat-step" value={newMatStepId} onChange={(e) => setNewMatStepId(e.target.value)} className="w-full p-3 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white" aria-label="Vincular material à etapa (opcional)">
+                                <option value="">Nenhuma Etapa</option>
+                                {steps.map(step => (
+                                    <option key={step.id} value={step.id}>{step.name}</option>
+                                ))}
+                            </select>
+                            <div className="flex items-center mt-4">
+                                <input id="buy-now-checkbox" type="checkbox" checked={newMatBuyNow} onChange={(e) => setNewMatBuyNow(e.target.checked)} className="h-4 w-4 text-secondary rounded border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 focus:ring-secondary mr-2" aria-label="Registrar compra agora" />
+                                <label htmlFor="buy-now-checkbox" className="text-sm font-medium text-primary dark:text-white">Registrar compra agora?</label>
+                            </div>
+                            {newMatBuyNow && (
+                                <div className="grid grid-cols-2 gap-4 mt-4">
+                                    <div>
+                                        <label htmlFor="new-mat-buy-qty" className="block text-sm font-medium text-primary dark:text-white mb-2">Qtd. Comprada:</label>
+                                        <input id="new-mat-buy-qty" type="number" value={newMatBuyQty} onChange={(e) => setNewMatBuyQty(e.target.value)} className="w-full p-3 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white" required aria-label="Quantidade comprada" />
+                                    </div>
+                                    <div>
+                                        <label htmlFor="new-mat-buy-cost" className="block text-sm font-medium text-primary dark:text-white mb-2">Custo Total (R$):</label>
+                                        <input id="new-mat-buy-cost" type="number" value={newMatBuyCost} onChange={(e) => setNewMatBuyCost(e.target.value)} className="w-full p-3 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white" required aria-label="Custo total da compra" />
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                    {!addMatModal && materialModal.material && (
+                        <div className="mt-6 pt-4 border-t border-slate-200 dark:border-slate-700">
+                            <p className="font-bold text-primary dark:text-white text-base mb-2">Registrar Nova Compra:</p>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label htmlFor="mat-buy-qty" className="block text-sm font-medium text-primary dark:text-white mb-2">Qtd. Comprada:</label>
+                                    <input id="mat-buy-qty" type="number" value={matBuyQty} onChange={(e) => setMatBuyQty(e.target.value)} className="w-full p-3 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white" aria-label="Quantidade comprada (adicionar)" />
+                                </div>
+                                <div>
+                                    <label htmlFor="mat-buy-cost" className="block text-sm font-medium text-primary dark:text-white mb-2">Custo Total (R$):</label>
+                                    <input id="mat-buy-cost" type="number" value={matBuyCost} onChange={(e) => setMatBuyCost(e.target.value)} className="w-full p-3 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white" aria-label="Custo total da nova compra" />
+                                </div>
+                            </div>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">Atual: {materialModal.material.purchasedQty} {materialModal.material.unit} comprados de {materialModal.material.plannedQty} {materialModal.material.unit} planejados.</p>
+                        </div>
+                    )}
+                    <button type="submit" className="w-full py-3 bg-secondary text-white font-bold rounded-xl hover:bg-secondary-dark transition-colors" aria-label={addMatModal ? 'Adicionar material' : 'Salvar material'}>
+                        {addMatModal ? 'Adicionar Material' : 'Salvar Alterações'}
+                    </button>
+                    {!addMatModal && (
+                        <button onClick={() => {}} className="w-full py-3 mt-2 bg-red-500/10 text-red-600 dark:bg-red-900/20 dark:text-red-300 font-bold rounded-xl hover:bg-red-500/20 dark:hover:bg-red-800 transition-colors" aria-label="Excluir material">
+                            Excluir Material
+                        </button>
+                    )}
+                </form>
+            </ZeModal>
+
+            {/* Expense Modal (Add/Edit) */}
+            <ZeModal
+                isOpen={expenseModal.isOpen}
+                title={expenseModal.mode === 'ADD' ? 'Adicionar Despesa' : `Editar Despesa (Total Pago: ${formatCurrency(expSavedAmount)})`}
+                message=""
+                onCancel={() => setExpenseModal(prev => ({ ...prev, isOpen: false }))}
+                confirmText={expenseModal.mode === 'ADD' ? 'Adicionar' : 'Salvar'}
+                onConfirm={() => {}} // Handled by form onSubmit
+                type="INFO"
+            >
+                <form onSubmit={handleSaveExpense} className="space-y-4">
+                    <div>
+                        <label htmlFor="exp-desc" className="block text-sm font-medium text-primary dark:text-white mb-2">Descrição:</label>
+                        <input id="exp-desc" type="text" value={expDesc} onChange={(e) => setExpDesc(e.target.value)} className="w-full p-3 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white" required aria-label="Descrição da despesa" />
+                    </div>
+                    {expenseModal.mode === 'ADD' && (
+                        <div>
+                            <label htmlFor="exp-amount" className="block text-sm font-medium text-primary dark:text-white mb-2">Valor (R$):</label>
+                            <input id="exp-amount" type="number" value={expAmount} onChange={(e) => setExpAmount(e.target.value)} className="w-full p-3 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white" required aria-label="Valor da despesa" />
+                        </div>
+                    )}
+                    {expenseModal.mode === 'EDIT' && (
+                        <div>
+                            <label htmlFor="exp-amount-add" className="block text-sm font-medium text-primary dark:text-white mb-2">Adicionar Novo Pagamento (R$):</label>
+                            <input id="exp-amount-add" type="number" value={expAmount} onChange={(e) => setExpAmount(e.target.value)} placeholder="0.00" className="w-full p-3 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white" aria-label="Adicionar novo pagamento" />
+                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Total já pago: {formatCurrency(expSavedAmount)}</p>
+                        </div>
+                    )}
+                    <div>
+                        <label htmlFor="exp-total-agreed" className="block text-sm font-medium text-primary dark:text-white mb-2">Valor Total Acordado (Opcional - R$):</label>
+                        <input id="exp-total-agreed" type="number" value={expTotalAgreed} onChange={(e) => setExpTotalAgreed(e.target.value)} placeholder="0.00" className="w-full p-3 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white" aria-label="Valor total acordado (opcional)" />
+                    </div>
+                    <div>
+                        <label htmlFor="exp-category" className="block text-sm font-medium text-primary dark:text-white mb-2">Categoria:</label>
+                        <select id="exp-category" value={expCategory} onChange={(e) => setExpCategory(e.target.value as ExpenseCategory)} className="w-full p-3 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white" aria-label="Categoria da despesa">
+                            {Object.values(ExpenseCategory).map(cat => (
+                                <option key={cat} value={cat}>{cat}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div>
+                        <label htmlFor="exp-step" className="block text-sm font-medium text-primary dark:text-white mb-2">Vincular à Etapa (Opcional):</label>
+                        <select id="exp-step" value={expStepId} onChange={(e) => setExpStepId(e.target.value)} className="w-full p-3 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white" aria-label="Vincular despesa à etapa (opcional)">
+                            <option value="">Nenhuma Etapa</option>
+                            {steps.map(step => (
+                                <option key={step.id} value={step.id}>{step.name}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <button type="submit" className="w-full py-3 bg-secondary text-white font-bold rounded-xl hover:bg-secondary-dark transition-colors" aria-label={expenseModal.mode === 'ADD' ? 'Adicionar despesa' : 'Salvar despesa'}>
+                        {expenseModal.mode === 'ADD' ? 'Adicionar Despesa' : 'Salvar Pagamento'}
+                    </button>
+                    {expenseModal.mode === 'EDIT' && (
+                        <button onClick={() => handleDeleteExpense(expenseModal.id!)} className="w-full py-3 mt-2 bg-red-500/10 text-red-600 dark:bg-red-900/20 dark:text-red-300 font-bold rounded-xl hover:bg-red-500/20 dark:hover:bg-red-800 transition-colors" aria-label="Excluir despesa">
+                            Excluir Despesa
+                        </button>
+                    )}
+                </form>
+            </ZeModal>
+
+            {/* Person Modal (Worker/Supplier) */}
+            <ZeModal
+                isOpen={isPersonModalOpen}
+                title={personMode === 'WORKER' ? 'Profissional' : 'Fornecedor'}
+                message=""
+                onCancel={() => setIsPersonModalOpen(false)}
+                confirmText="Salvar"
+                onConfirm={() => {}} // Handled by form onSubmit
+                isConfirming={isPersonSaving} // Pass loading state to modal
+                type="INFO"
+            >
+                <form onSubmit={handleSavePerson} className="space-y-4">
+                    <div>
+                        <label htmlFor="person-name" className="block text-sm font-medium text-primary dark:text-white mb-2">Nome:</label>
+                        <input id="person-name" type="text" value={personName} onChange={(e) => setPersonName(e.target.value)} className="w-full p-3 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white" required aria-label="Nome da pessoa" />
+                    </div>
+                    <div>
+                        <label htmlFor="person-role" className="block text-sm font-medium text-primary dark:text-white mb-2">{personMode === 'WORKER' ? 'Função:' : 'Categoria:'}</label>
+                        <select id="person-role" value={personRole} onChange={(e) => setPersonRole(e.target.value)} className="w-full p-3 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white" required aria-label={personMode === 'WORKER' ? 'Função do profissional' : 'Categoria do fornecedor'}>
+                            {personMode === 'WORKER' ? (
+                                STANDARD_JOB_ROLES.map(role => <option key={role} value={role}>{role}</option>)
+                            ) : (
+                                STANDARD_SUPPLIER_CATEGORIES.map(category => <option key={category} value={category}>{category}</option>)
+                            )}
+                        </select>
+                    </div>
+                    <div>
+                        <label htmlFor="person-phone" className="block text-sm font-medium text-primary dark:text-white mb-2">Telefone:</label>
+                        <input id="person-phone" type="text" value={personPhone} onChange={(e) => setPersonPhone(e.target.value)} className="w-full p-3 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white" required aria-label="Telefone da pessoa" />
+                    </div>
+                    {personMode === 'WORKER' && (
+                        <div>
+                            <label htmlFor="worker-daily-rate" className="block text-sm font-medium text-primary dark:text-white mb-2">Diária (R$):</label>
+                            <input id="worker-daily-rate" type="number" value={workerDailyRate} onChange={(e) => setWorkerDailyRate(e.target.value)} placeholder="0.00" className="w-full p-3 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white" aria-label="Valor da diária do profissional" />
+                        </div>
+                    )}
+                    {personMode === 'SUPPLIER' && (
+                        <>
+                            <div>
+                                <label htmlFor="supplier-email" className="block text-sm font-medium text-primary dark:text-white mb-2">E-mail (Opcional):</label>
+                                <input id="supplier-email" type="email" value={personEmail} onChange={(e) => setPersonEmail(e.target.value)} className="w-full p-3 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white" aria-label="E-mail do fornecedor (opcional)" />
+                            </div>
+                            <div>
+                                <label htmlFor="supplier-address" className="block text-sm font-medium text-primary dark:text-white mb-2">Endereço (Opcional):</label>
+                                <input id="supplier-address" type="text" value={personAddress} onChange={(e) => setPersonAddress(e.target.value)} className="w-full p-3 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white" aria-label="Endereço do fornecedor (opcional)" />
+                            </div>
+                        </>
+                    )}
+                    <div>
+                        <label htmlFor="person-notes" className="block text-sm font-medium text-primary dark:text-white mb-2">Notas (Opcional):</label>
+                        <textarea id="person-notes" value={personNotes} onChange={(e) => setPersonNotes(e.target.value)} className="w-full p-3 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white min-h-[80px]" aria-label="Notas sobre a pessoa (opcional)"></textarea>
+                    </div>
+                    <button type="submit" className="w-full py-3 bg-secondary text-white font-bold rounded-xl hover:bg-secondary-dark transition-colors flex items-center justify-center gap-2" disabled={isPersonSaving} aria-label="Salvar">
+                        {isPersonSaving ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-save"></i>} Salvar
+                    </button>
+                </form>
+            </ZeModal>
+
+            {/* Contract View Modal */}
+            <ZeModal
+                isOpen={isContractModalOpen}
+                title={viewContract?.title || 'Contrato'}
+                message="" // Content will be rendered by the textarea
+                onCancel={() => { setIsContractModalOpen(false); setViewContract(null); }}
+                confirmText="Fechar"
+                onConfirm={() => { setIsContractModalOpen(false); setViewContract(null); }}
+                type="INFO"
+            >
+                {viewContract && (
+                    <div className="relative">
+                        <textarea
+                            readOnly
+                            value={viewContract.contentTemplate}
+                            className="w-full h-96 p-4 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white font-mono text-xs resize-none leading-relaxed"
+                            aria-label="Conteúdo do contrato"
+                        ></textarea>
+                        <button
+                            onClick={() => navigator.clipboard.writeText(viewContract.contentTemplate)}
+                            className="absolute top-2 right-2 p-2 bg-primary/10 text-primary dark:bg-slate-700 dark:text-white rounded-lg text-sm hover:bg-primary/20 dark:hover:bg-slate-600 transition-colors"
+                            aria-label="Copiar contrato para a área de transferência"
+                        >
+                            <i className="fa-solid fa-copy"></i>
+                        </button>
+                    </div>
+                )}
+            </ZeModal>
+
+            {/* Global ZeModal for confirmations/errors */}
+            <ZeModal
+                isOpen={zeModal.isOpen}
+                title={zeModal.title}
+                message={zeModal.message}
+                confirmText={zeModal.confirmText}
+                cancelText={zeModal.cancelText}
+                onConfirm={zeModal.onConfirm}
+                onCancel={zeModal.onCancel}
+                type={zeModal.type}
+                isConfirming={zeModal.isConfirming}
+            />
+
+            {/* Checklist Edit Modal */}
+            <ZeModal
+                isOpen={isChecklistModalOpen}
+                title={editingChecklist ? `Editar Checklist: ${editingChecklist.name}` : 'Detalhes do Checklist'}
+                message=""
+                onCancel={() => { setIsChecklistModalOpen(false); setEditingChecklist(null); setNewChecklistItemText(''); }}
+                confirmText="Fechar"
+                onConfirm={() => { setIsChecklistModalOpen(false); setEditingChecklist(null); setNewChecklistItemText(''); }}
+                type="INFO"
+            >
+                {editingChecklist && (
+                    <div className="space-y-4">
+                        <div>
+                            <label htmlFor="checklist-name-edit" className="block text-sm font-medium text-primary dark:text-white mb-2">Nome do Checklist:</label>
+                            <input id="checklist-name-edit" type="text" value={editingChecklist.name} onChange={(e) => handleUpdateChecklistName(e.target.value)} className="w-full p-3 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white" aria-label="Nome do checklist" />
+                        </div>
+                        <h4 className="font-bold text-primary dark:text-white text-base">Itens:</h4>
+                        <ul className="space-y-2 max-h-60 overflow-y-auto pr-2">
+                            {editingChecklist.items.length === 0 ? (
+                                <p className="text-center text-slate-400 py-2 italic text-sm">Nenhum item neste checklist.</p>
+                            ) : (
+                                editingChecklist.items.map(item => (
+                                    <li key={item.id} className="flex items-center justify-between bg-slate-50 dark:bg-slate-800 p-2 rounded-lg">
+                                        <label className="flex items-center flex-1 cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                checked={item.checked}
+                                                onChange={() => handleChecklistItemToggle(editingChecklist.id, item.id)}
+                                                className="h-4 w-4 text-secondary rounded border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 focus:ring-secondary mr-2"
+                                                aria-label={`Marcar ${item.text}`}
+                                            />
+                                            <span className={`text-sm ${item.checked ? 'line-through text-slate-400 dark:text-slate-600' : 'text-primary dark:text-white'}`}>
+                                                {item.text}
+                                            </span>
+                                        </label>
+                                        <button onClick={() => handleDeleteChecklistItem(item.id)} className="text-red-500 hover:text-red-700 p-1 rounded-full" aria-label={`Remover item ${item.text}`}>
+                                            <i className="fa-solid fa-trash-alt"></i>
+                                        </button>
+                                    </li>
+                                ))
+                            )}
+                        </ul>
+                        <div className="flex gap-2 mt-4">
+                            <input
+                                type="text"
+                                value={newChecklistItemText}
+                                onChange={(e) => setNewChecklistItemText(e.target.value)}
+                                placeholder="Novo item do checklist"
+                                className="flex-1 p-3 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 text-primary dark:text-white"
+                                aria-label="Adicionar novo item ao checklist"
+                            />
+                            <button onClick={handleAddChecklistItem} className="px-4 py-2 bg-secondary text-white font-bold rounded-xl hover:bg-secondary-dark transition-colors" aria-label="Adicionar item">
+                                <i className="fa-solid fa-plus"></i>
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </ZeModal>
+
+        </div>
+    );
+};
+
+export default WorkDetail;
