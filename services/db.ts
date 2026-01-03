@@ -1,5 +1,4 @@
 
-
 import { PlanType, ExpenseCategory, StepStatus, FileCategory, type User, type Work, type Step, type Material, type Expense, type Worker, type Supplier, type WorkPhoto, type WorkFile, type DBNotification, type PushSubscriptionInfo, type Contract, type Checklist, type ChecklistItem } from '../types.ts';
 import { WORK_TEMPLATES, FULL_MATERIAL_PACKAGES, CONTRACT_TEMPLATES, CHECKLIST_TEMPLATES } from './standards.ts';
 import { supabase } from './supabase.ts';
@@ -1427,10 +1426,10 @@ export const dbService = {
 
     const totalSpent = expensesResult.data.reduce((sum, e) => sum + Number(e.amount), 0);
     const totalSteps = stepsResult.data.length;
-    const completedSteps = stepsResult.data.filter(s => s.status === StepStatus.COMPLETED).length;
+    const completedSteps = stepsResult.data.filter(s => s.status === 'CONCLUIDO').length;
     
     const today = new Date().toISOString().split('T')[0];
-    const delayedSteps = stepsResult.data.filter(s => s.status !== StepStatus.COMPLETED && s.end_date < today).length;
+    const delayedSteps = stepsResult.data.filter(s => s.status !== 'CONCLUIDO' && s.end_date < today).length;
 
     const progress = totalSteps > 0 ? Math.round((completedSteps / totalSteps) * 100) : 0;
 
