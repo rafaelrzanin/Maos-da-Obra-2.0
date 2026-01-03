@@ -1645,7 +1645,8 @@ const WorkDetail = () => {
           step.name,
           step.startDate,
           step.endDate,
-          step.status,
+          // NEW: Use text representation of status
+          new Date(step.endDate) < new Date() && step.status !== StepStatus.COMPLETED ? 'Atrasada' : (step.status === StepStatus.COMPLETED ? 'Concluída' : (step.status === StepStatus.IN_PROGRESS ? 'Em Andamento' : 'Pendente')),
           new Date(step.endDate) < new Date() && step.status !== StepStatus.COMPLETED ? 'Sim' : 'Não' // Corrected isDelayed logic
         ])
       ];
@@ -1656,15 +1657,34 @@ const WorkDetail = () => {
         ["Etapa", "Nome Material", "Unidade", "Planejado", "Comprado", "Status", "Categoria"],
         ...groupedMaterials.flatMap(group => 
           group.materials.map(material => {
-            const status = material.purchasedQty === 0 ? 'Pendente' :
-                           material.purchasedQty >= material.plannedQty ? 'Concluído' : 'Parcial';
+            // isMissing logic for report (same as above for consistency)
+            const linkedStep = steps.find(s => s.id === material.stepId);
+            const stepStartDate = linkedStep ? new Date(linkedStep.startDate) : new Date(0);
+            stepStartDate.setHours(0,0,0,0);
+            const today = new Date();
+            today.setHours(0,0,0,0);
+            const threeDaysFromNow = new Date(today);
+            threeDaysFromNow.setDate(today.getDate() + 3);
+
+            const isStepRelevantForMissing = (stepStartDate >= today && stepStartDate <= threeDaysFromNow) || (stepStartDate < today && linkedStep?.status !== StepStatus.COMPLETED);
+
+            const isMissing = material.plannedQty > 0 && material.purchasedQty < material.plannedQty && isStepRelevantForMissing;
+            const isPartial = material.purchasedQty > 0 && material.purchasedQty < material.plannedQty && !isMissing;
+            const isCompleted = material.purchasedQty >= material.plannedQty;
+            
+            let statusText = 'Pendente';
+
+            if (isMissing) { statusText = 'FALTANDO!'; }
+            else if (isCompleted) { statusText = 'Concluído'; }
+            else if (isPartial) { statusText = 'Parcial'; }
+
             return [
               group.stepName,
               material.name,
               material.unit,
               material.plannedQty,
               material.purchasedQty,
-              status,
+              statusText,
               material.category
             ];
           })
@@ -1836,23 +1856,33 @@ const WorkDetail = () => {
                   steps.map((step, index) => {
                     const isDelayed = new Date(step.endDate) < new Date() && step.status !== StepStatus.COMPLETED;
                     let stepStatusClass = '';
+                    let stepStatusBgClass = '';
+                    let statusText = '';
                     let borderClass = 'border-slate-200 dark:border-slate-800';
                     let shadowClass = 'shadow-card-default';
 
                     if (isDelayed) {
                       stepStatusClass = 'text-red-600 dark:text-red-400';
+                      stepStatusBgClass = 'bg-red-500/10';
+                      statusText = 'Atrasada';
                       borderClass = 'border-red-500/50 dark:border-red-700/50';
                       shadowClass = 'shadow-lg shadow-red-500/20';
                     } else if (step.status === StepStatus.COMPLETED) {
                       stepStatusClass = 'text-green-600 dark:text-green-400';
+                      stepStatusBgClass = 'bg-green-500/10';
+                      statusText = 'Concluída';
                       borderClass = 'border-green-500/50 dark:border-green-700/50';
                       shadowClass = 'shadow-lg shadow-green-500/20';
                     } else if (step.status === StepStatus.IN_PROGRESS) {
-                      stepStatusClass = 'text-status-inprogress dark:text-status-inprogress-light'; // Azul
-                      borderClass = 'border-status-inprogress/50 dark:border-status-inprogress-dark/50'; // Azul
-                      shadowClass = 'shadow-lg shadow-status-inprogress/20'; // Azul
-                    } else { // NOT_STARTED
+                      stepStatusClass = 'text-amber-600 dark:text-amber-400'; // Laranja para Em Andamento
+                      stepStatusBgClass = 'bg-amber-500/10';
+                      statusText = 'Em Andamento';
+                      borderClass = 'border-amber-500/50 dark:border-amber-700/50';
+                      shadowClass = 'shadow-lg shadow-amber-500/20';
+                    } else { // NOT_STARTED (Pendente)
                       stepStatusClass = 'text-slate-500 dark:text-slate-400';
+                      stepStatusBgClass = 'bg-slate-200 dark:bg-slate-700/50'; // Cinza para Pendente
+                      statusText = 'Pendente';
                     }
 
                     return (
@@ -1867,8 +1897,8 @@ const WorkDetail = () => {
                       >
                         <div className="flex items-center justify-between mb-3">
                             <span className="text-sm font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">Etapa {index + 1}</span>
-                            <span className={cx("text-xs font-bold px-3 py-1 rounded-full", stepStatusClass, "bg-current/10")}>
-                                {isDelayed ? 'Atrasada' : (step.status === StepStatus.COMPLETED ? 'Concluída' : (step.status === StepStatus.IN_PROGRESS ? 'Em Andamento' : 'Pendente'))}
+                            <span className={cx("text-xs font-bold px-3 py-1 rounded-full", stepStatusClass, stepStatusBgClass)}>
+                                {statusText}
                             </span>
                         </div>
                         <h3 className="text-xl font-black text-primary dark:text-white leading-tight mb-2">{step.name}</h3>
@@ -1938,26 +1968,34 @@ const WorkDetail = () => {
                         const isCompleted = material.purchasedQty >= material.plannedQty;
                         const progress = (material.plannedQty > 0) ? (material.purchasedQty / material.plannedQty) * 100 : 0;
                         
-                        let materialStatusClass = 'text-slate-500 dark:text-slate-400';
+                        let materialStatusClass = '';
+                        let materialStatusBgClass = '';
+                        let statusText = '';
                         let borderClass = 'border-slate-200 dark:border-slate-800';
                         let shadowClass = 'shadow-card-default';
-                        let statusText = 'Pendente';
 
                         if (isMissing) {
                             materialStatusClass = 'text-red-600 dark:text-red-400';
+                            materialStatusBgClass = 'bg-red-500/10';
+                            statusText = 'FALTANDO!';
                             borderClass = 'border-red-500/50 dark:border-red-700/50';
                             shadowClass = 'shadow-lg shadow-red-500/20';
-                            statusText = 'FALTANDO!';
                         } else if (isCompleted) {
                             materialStatusClass = 'text-green-600 dark:text-green-400';
+                            materialStatusBgClass = 'bg-green-500/10';
+                            statusText = 'Concluído';
                             borderClass = 'border-green-500/50 dark:border-green-700/50';
                             shadowClass = 'shadow-lg shadow-green-500/20';
-                            statusText = 'Concluído';
                         } else if (isPartial) {
                             materialStatusClass = 'text-amber-600 dark:text-amber-400';
+                            materialStatusBgClass = 'bg-amber-500/10';
+                            statusText = 'Parcial';
                             borderClass = 'border-amber-500/50 dark:border-amber-700/50';
                             shadowClass = 'shadow-lg shadow-amber-500/20';
-                            statusText = 'Parcial';
+                        } else { // Pendente (0 purchased)
+                            materialStatusClass = 'text-slate-500 dark:text-slate-400';
+                            materialStatusBgClass = 'bg-slate-200 dark:bg-slate-700/50'; // Cinza para Pendente
+                            statusText = 'Pendente';
                         }
                         
                         return (
@@ -1972,7 +2010,7 @@ const WorkDetail = () => {
                           >
                             <div className="flex justify-between items-center mb-3">
                               <h3 className="text-xl font-black text-primary dark:text-white leading-tight">{material.name}</h3>
-                              <span className={cx("text-xs font-bold px-3 py-1 rounded-full", materialStatusClass, "bg-current/10")}>
+                              <span className={cx("text-xs font-bold px-3 py-1 rounded-full", materialStatusClass, materialStatusBgClass)}>
                                 {statusText}
                               </span>
                             </div>
@@ -2050,26 +2088,32 @@ const WorkDetail = () => {
                                 const balance = total - paid;
 
                                 let statusText = '';
-                                let expenseStatusClass = 'text-slate-500 dark:text-slate-400';
+                                let expenseStatusClass = '';
+                                let expenseStatusBgClass = '';
                                 let borderClass = 'border-slate-200 dark:border-slate-800';
                                 let shadowClass = 'shadow-card-default';
 
                                 if (paid === 0) {
                                     statusText = 'Pendente';
+                                    expenseStatusClass = 'text-slate-500 dark:text-slate-400';
+                                    expenseStatusBgClass = 'bg-slate-200 dark:bg-slate-700/50'; // Cinza para Pendente
                                 } else if (paid < total) {
                                     statusText = 'Parcial';
                                     expenseStatusClass = 'text-amber-600 dark:text-amber-400';
+                                    expenseStatusBgClass = 'bg-amber-500/10';
                                     borderClass = 'border-amber-500/50 dark:border-amber-700/50';
                                     shadowClass = 'shadow-lg shadow-amber-500/20';
                                 } else if (paid >= total) {
                                     statusText = 'Concluído';
                                     expenseStatusClass = 'text-green-600 dark:text-green-400';
+                                    expenseStatusBgClass = 'bg-green-500/10';
                                     borderClass = 'border-green-500/50 dark:border-green-700/50';
                                     shadowClass = 'shadow-lg shadow-green-500/20';
                                 }
                                 if (paid > total) { // Excedeu o valor combinado, indicando prejuízo ou erro
                                     statusText = 'Prejuízo';
                                     expenseStatusClass = 'text-red-600 dark:text-red-400';
+                                    expenseStatusBgClass = 'bg-red-500/10';
                                     borderClass = 'border-red-500/50 dark:border-red-700/50';
                                     shadowClass = 'shadow-lg shadow-red-500/20';
                                 }
@@ -2088,7 +2132,7 @@ const WorkDetail = () => {
                                     >
                                         <div className="flex items-center justify-between mb-3">
                                             <h3 className="text-xl font-black text-primary dark:text-white leading-tight">{expense.description}</h3>
-                                            <span className={cx("text-xs font-bold px-3 py-1 rounded-full", expenseStatusClass, "bg-current/10")}>
+                                            <span className={cx("text-xs font-bold px-3 py-1 rounded-full", expenseStatusClass, expenseStatusBgClass)}>
                                                 {statusText}
                                             </span>
                                         </div>
@@ -2136,97 +2180,83 @@ const WorkDetail = () => {
             </div>
           )}
 
-          {/* Tab Content: FERRAMENTAS - RESTORED ALL TOOLS with VITAL PANEL highlight */}
+          {/* Tab Content: FERRAMENTAS - RESTORED TO ORIGINAL FLAT LIST */}
           {activeTab === 'FERRAMENTAS' && (
             <div className="space-y-6 animate-in fade-in duration-300">
               <h2 className="text-xl font-black text-primary dark:text-white px-2 sm:px-0">Ferramentas de Gestão</h2>
-
-              {/* Seção Ferramentas Vitalícias */}
-              <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-xl border border-amber-500/50 dark:border-amber-700/50 ring-1 ring-amber-500/20 dark:ring-amber-900/20">
-                <h3 className="text-lg font-black text-amber-600 dark:text-amber-400 mb-4 flex items-center gap-2">
-                  <i className="fa-solid fa-crown"></i> Ferramentas Vitalícias
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  <button 
-                    onClick={() => goToSubView('CHECKLIST')} 
-                    className={cx("rounded-3xl p-6 flex flex-col items-center justify-center text-center gap-2 transition-all hover:scale-[1.02] bg-gradient-gold shadow-glow text-white")}
-                    aria-label="Acessar Checklists Inteligentes"
-                  >
-                    <div className="w-12 h-12 bg-white/20 text-white rounded-xl flex items-center justify-center text-xl mb-2"><i className="fa-solid fa-clipboard-check"></i></div>
-                    <h3 className="font-bold text-white">Checklists</h3>
-                    <p className="text-xs text-amber-100">Não esqueça de nada.</p>
-                  </button>
-                  <button 
-                    onClick={() => goToSubView('CONTRACTS')} 
-                    className={cx("rounded-3xl p-6 flex flex-col items-center justify-center text-center gap-2 transition-all hover:scale-[1.02] bg-gradient-gold shadow-glow text-white")}
-                    aria-label="Gerador de Contratos"
-                  >
-                    <div className="w-12 h-12 bg-white/20 text-white rounded-xl flex items-center justify-center text-xl mb-2"><i className="fa-solid fa-file-signature"></i></div>
-                    <h3 className="font-bold text-white">Contratos</h3>
-                    <p className="text-xs text-amber-100">Modelos prontos e personalizáveis.</p>
-                  </button>
-                  <button 
-                    onClick={() => goToSubView('CALCULATORS')} 
-                    className={cx("rounded-3xl p-6 flex flex-col items-center justify-center text-center gap-2 transition-all hover:scale-[1.02] bg-gradient-gold shadow-glow text-white")}
-                    aria-label="Acessar Calculadoras"
-                  >
-                    <div className="w-12 h-12 bg-white/20 text-white rounded-xl flex items-center justify-center text-xl mb-2"><i className="fa-solid fa-calculator"></i></div>
-                    <h3 className="font-bold text-white">Calculadoras</h3>
-                    <p className="text-xs text-amber-100">Calcule materiais e mais.</p>
-                  </button>
-                </div>
-              </div>
-
-              {/* Seção Ferramentas Essenciais */}
-              <div className="mt-8"> {/* Added margin top for separation */}
-                <h3 className="text-lg font-black text-primary dark:text-white mb-4 px-2 sm:px-0">Ferramentas Essenciais</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  <button 
-                    onClick={() => goToSubView('WORKERS')} 
-                    className={cx(surface, "rounded-3xl p-6 flex flex-col items-center justify-center text-center gap-2 transition-all hover:scale-[1.02] hover:border-secondary/50")}
-                    aria-label="Gerenciar Profissionais"
-                  >
-                    <div className="w-12 h-12 bg-secondary/10 text-secondary rounded-xl flex items-center justify-center text-xl mb-2"><i className="fa-solid fa-hard-hat"></i></div>
-                    <h3 className="font-bold text-primary dark:text-white">Profissionais</h3>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">Organize sua equipe.</p>
-                  </button>
-                  <button 
-                    onClick={() => goToSubView('SUPPLIERS')} 
-                    className={cx(surface, "rounded-3xl p-6 flex flex-col items-center justify-center text-center gap-2 transition-all hover:scale-[1.02] hover:border-secondary/50")}
-                    aria-label="Gerenciar Fornecedores"
-                  >
-                    <div className="w-12 h-12 bg-green-500/10 text-green-600 rounded-xl flex items-center justify-center text-xl mb-2"><i className="fa-solid fa-truck-fast"></i></div>
-                    <h3 className="font-bold text-primary dark:text-white">Fornecedores</h3>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">Controle seus parceiros.</p>
-                  </button>
-                  <button 
-                    onClick={() => goToSubView('PHOTOS')} 
-                    className={cx(surface, "rounded-3xl p-6 flex flex-col items-center justify-center text-center gap-2 transition-all hover:scale-[1.02] hover:border-secondary/50")}
-                    aria-label="Ver Fotos da Obra"
-                  >
-                    <div className="w-12 h-12 bg-blue-500/10 text-blue-600 rounded-xl flex items-center justify-center text-xl mb-2"><i className="fa-solid fa-camera"></i></div>
-                    <h3 className="font-bold text-primary dark:text-white">Fotos da Obra</h3>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">Acompanhe o progresso visual.</p>
-                  </button>
-                  <button 
-                    onClick={() => goToSubView('PROJECTS')} 
-                    className={cx(surface, "rounded-3xl p-6 flex flex-col items-center justify-center text-center gap-2 transition-all hover:scale-[1.02] hover:border-secondary/50")}
-                    aria-label="Gerenciar Projetos e Documentos"
-                  >
-                    <div className="w-12 h-12 bg-purple-500/10 text-purple-600 rounded-xl flex items-center justify-center text-xl mb-2"><i className="fa-solid fa-file-alt"></i></div>
-                    <h3 className="font-bold text-primary dark:text-white">Projetos & Docs</h3>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">Centralize seus arquivos.</p>
-                  </button>
-                  <button 
-                    onClick={() => goToSubView('REPORTS')} 
-                    className={cx(surface, "rounded-3xl p-6 flex flex-col items-center justify-center text-center gap-2 transition-all hover:scale-[1.02] hover:border-secondary/50")}
-                    aria-label="Ver Relatórios"
-                  >
-                    <div className="w-12 h-12 bg-red-500/10 text-red-600 rounded-xl flex items-center justify-center text-xl mb-2"><i className="fa-solid fa-chart-line"></i></div>
-                    <h3 className="font-bold text-primary dark:text-white">Relatórios</h3>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">Visão consolidada.</p>
-                  </button>
-                </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <button 
+                  onClick={() => goToSubView('WORKERS')} 
+                  className={cx(surface, "rounded-3xl p-6 flex flex-col items-center justify-center text-center gap-2 transition-all hover:scale-[1.02] hover:border-secondary/50")}
+                  aria-label="Gerenciar Profissionais"
+                >
+                  <div className="w-12 h-12 bg-secondary/10 text-secondary rounded-xl flex items-center justify-center text-xl mb-2"><i className="fa-solid fa-hard-hat"></i></div>
+                  <h3 className="font-bold text-primary dark:text-white">Profissionais</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Organize sua equipe.</p>
+                </button>
+                <button 
+                  onClick={() => goToSubView('SUPPLIERS')} 
+                  className={cx(surface, "rounded-3xl p-6 flex flex-col items-center justify-center text-center gap-2 transition-all hover:scale-[1.02] hover:border-secondary/50")}
+                  aria-label="Gerenciar Fornecedores"
+                >
+                  <div className="w-12 h-12 bg-green-500/10 text-green-600 rounded-xl flex items-center justify-center text-xl mb-2"><i className="fa-solid fa-truck-fast"></i></div>
+                  <h3 className="font-bold text-primary dark:text-white">Fornecedores</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Controle seus parceiros.</p>
+                </button>
+                <button 
+                  onClick={() => goToSubView('PHOTOS')} 
+                  className={cx(surface, "rounded-3xl p-6 flex flex-col items-center justify-center text-center gap-2 transition-all hover:scale-[1.02] hover:border-secondary/50")}
+                  aria-label="Ver Fotos da Obra"
+                >
+                  <div className="w-12 h-12 bg-blue-500/10 text-blue-600 rounded-xl flex items-center justify-center text-xl mb-2"><i className="fa-solid fa-camera"></i></div>
+                  <h3 className="font-bold text-primary dark:text-white">Fotos da Obra</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Acompanhe o progresso visual.</p>
+                </button>
+                <button 
+                  onClick={() => goToSubView('PROJECTS')} 
+                  className={cx(surface, "rounded-3xl p-6 flex flex-col items-center justify-center text-center gap-2 transition-all hover:scale-[1.02] hover:border-secondary/50")}
+                  aria-label="Gerenciar Projetos e Documentos"
+                >
+                  <div className="w-12 h-12 bg-purple-500/10 text-purple-600 rounded-xl flex items-center justify-center text-xl mb-2"><i className="fa-solid fa-file-alt"></i></div>
+                  <h3 className="font-bold text-primary dark:text-white">Projetos & Docs</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Centralize seus arquivos.</p>
+                </button>
+                <button 
+                  onClick={() => goToSubView('CHECKLIST')} 
+                  className={cx(surface, "rounded-3xl p-6 flex flex-col items-center justify-center text-center gap-2 transition-all hover:scale-[1.02] hover:border-secondary/50")}
+                  aria-label="Acessar Checklists Inteligentes"
+                >
+                  <div className="w-12 h-12 bg-teal-500/10 text-teal-600 rounded-xl flex items-center justify-center text-xl mb-2"><i className="fa-solid fa-clipboard-check"></i></div>
+                  <h3 className="font-bold text-primary dark:text-white">Checklists</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Não esqueça de nada.</p>
+                </button>
+                <button 
+                  onClick={() => goToSubView('CONTRACTS')} 
+                  className={cx(surface, "rounded-3xl p-6 flex flex-col items-center justify-center text-center gap-2 transition-all hover:scale-[1.02] hover:border-secondary/50")}
+                  aria-label="Gerador de Contratos"
+                >
+                  <div className="w-12 h-12 bg-amber-500/10 text-amber-600 rounded-xl flex items-center justify-center text-xl mb-2"><i className="fa-solid fa-file-signature"></i></div>
+                  <h3 className="font-bold text-primary dark:text-white">Contratos</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Modelos prontos e personalizáveis.</p>
+                </button>
+                <button 
+                  onClick={() => goToSubView('CALCULATORS')} 
+                  className={cx(surface, "rounded-3xl p-6 flex flex-col items-center justify-center text-center gap-2 transition-all hover:scale-[1.02] hover:border-secondary/50")}
+                  aria-label="Acessar Calculadoras"
+                >
+                  <div className="w-12 h-12 bg-cyan-500/10 text-cyan-600 rounded-xl flex items-center justify-center text-xl mb-2"><i className="fa-solid fa-calculator"></i></div>
+                  <h3 className="font-bold text-primary dark:text-white">Calculadoras</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Calcule materiais e mais.</p>
+                </button>
+                <button 
+                  onClick={() => goToSubView('REPORTS')} 
+                  className={cx(surface, "rounded-3xl p-6 flex flex-col items-center justify-center text-center gap-2 transition-all hover:scale-[1.02] hover:border-secondary/50")}
+                  aria-label="Ver Relatórios"
+                >
+                  <div className="w-12 h-12 bg-red-500/10 text-red-600 rounded-xl flex items-center justify-center text-xl mb-2"><i className="fa-solid fa-chart-line"></i></div>
+                  <h3 className="font-bold text-primary dark:text-white">Relatórios</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Visão consolidada.</p>
+                </button>
               </div>
             </div>
           )}
@@ -2493,7 +2523,7 @@ const WorkDetail = () => {
                   <p className="text-[9px] font-extrabold tracking-widest uppercase text-slate-500">Concluídas</p>
                 </div>
                 <div className={cx(surface, "rounded-3xl p-3 flex flex-col items-start")}>
-                  <p className="text-xl font-black text-status-inprogress leading-none">{inProgressStepsCount}</p>
+                  <p className="text-xl font-black text-amber-600 leading-none">{inProgressStepsCount}</p> {/* Laranja para Em Andamento */}
                   <p className="text-[9px] font-extrabold tracking-widest uppercase text-slate-500">Em Andamento</p>
                 </div>
                 <div className={cx(surface, "rounded-3xl p-3 flex flex-col items-start")}>
@@ -2526,10 +2556,11 @@ const WorkDetail = () => {
                         {steps.map((step, index) => {
                            const isDelayed = new Date(step.endDate) < new Date() && step.status !== StepStatus.COMPLETED;
                            let statusColorClass = '';
-                           if (isDelayed) statusColorClass = 'text-red-600';
-                           else if (step.status === StepStatus.COMPLETED) statusColorClass = 'text-green-600';
-                           else if (step.status === StepStatus.IN_PROGRESS) statusColorClass = 'text-status-inprogress';
-                           else statusColorClass = 'text-slate-500';
+                           let statusText = '';
+                           if (isDelayed) { statusColorClass = 'text-red-600'; statusText = 'Atrasada'; }
+                           else if (step.status === StepStatus.COMPLETED) { statusColorClass = 'text-green-600'; statusText = 'Concluída'; }
+                           else if (step.status === StepStatus.IN_PROGRESS) { statusColorClass = 'text-amber-600'; statusText = 'Em Andamento'; } // Laranja
+                           else { statusColorClass = 'text-slate-500'; statusText = 'Pendente'; }
 
                           return (
                             <tr key={step.id}>
@@ -2538,7 +2569,7 @@ const WorkDetail = () => {
                               <td className="px-4 py-2 whitespace-nowrap text-sm text-slate-700 dark:text-slate-300">{formatDateDisplay(step.startDate)}</td>
                               <td className="px-4 py-2 whitespace-nowrap text-sm text-slate-700 dark:text-slate-300">{formatDateDisplay(step.endDate)}</td>
                               <td className="px-4 py-2 whitespace-nowrap text-sm font-bold">
-                                  <span className={statusColorClass}>{isDelayed ? 'Atrasada' : (step.status === StepStatus.COMPLETED ? 'Concluída' : (step.status === StepStatus.IN_PROGRESS ? 'Em Andamento' : 'Pendente'))}</span>
+                                  <span className={statusColorClass}>{statusText}</span>
                               </td>
                             </tr>
                           );
@@ -2935,9 +2966,9 @@ const WorkDetail = () => {
               {/* NEW: Campo Valor Total Combinado (Contrato) - Apenas para despesas manuais */}
               {!(editExpenseData?.relatedMaterialId || newExpenseCategory === ExpenseCategory.MATERIAL) && (
                 <div>
-                  <label htmlFor="expense-total-agreed" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Valor Total Combinado (Contrato) <span className="text-xs text-slate-400 font-normal">(Se diferente do valor atual)</span></label>
+                  <label htmlFor="expense-total-agreen" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Valor Total Combinado (Contrato) <span className="text-xs text-slate-400 font-normal">(Se diferente do valor atual)</span></label>
                   <input
-                    id="expense-total-agreed"
+                    id="expense-total-agreen"
                     type="number"
                     step="0.01"
                     value={editExpenseData?.totalAgreed?.toString() || newExpenseAmount} // Default to amount if not set
