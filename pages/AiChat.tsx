@@ -17,13 +17,13 @@ const AiChat = () => {
   const navigate = useNavigate();
 
   const [messages, setMessages] = useState<Message[]>([]);
-  const [aiMessage, setAiMessage] = useState(''); // User's typed input OR transcribed speech
+  const [aiMessage, setAiMessage] = useState(''); // User's typed input OR final transcribed speech
   const [aiLoading, setAiLoading] = useState(false);
 
   // NEW: State for Speech Recognition
   const [isListening, setIsListening] = useState(false);
   const [recognizedText, setRecognizedText] = useState(''); // Text from SpeechRecognition during active listening
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const recognitionRef = useRef<any>(null); // Use any for SpeechRecognition to avoid global type issues
 
   const chatMessagesRef = useRef<HTMLDivElement>(null);
 
@@ -34,13 +34,9 @@ const AiChat = () => {
   // Initialize SpeechRecognition
   useEffect(() => {
     if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
-      // Fix: Cast event types to any to resolve TypeScript errors.
-      // This is a workaround because SpeechRecognitionEvent and SpeechRecognitionErrorEvent
-      // are not recognized, likely due to tsconfig.json not including 'dom' library types
-      // or other configuration issues, and we cannot modify tsconfig.json or add d.ts files.
       const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
       const recognition = new SpeechRecognition();
-      recognition.continuous = false; // Stop after each utterance
+      recognition.continuous = true; // Keep listening for continuous speech
       recognition.interimResults = true; // Get interim results
       recognition.lang = 'pt-BR'; // Set language to Brazilian Portuguese
 
@@ -56,17 +52,16 @@ const AiChat = () => {
             interimTranscript += transcript;
           }
         }
-        setRecognizedText(interimTranscript); // Show interim results
-        if (finalTranscript) {
-          setAiMessage(finalTranscript); // Set final text to input field
-          // Auto-send if there's a final transcript
-          if (!aiLoading) { // Avoid double sending if AI is already busy
-            handleAiAsk(null, finalTranscript); // Pass finalTranscript explicitly
-          }
-        }
+        // Always update recognizedText with the latest interim or final part
+        setRecognizedText(prev => prev + finalTranscript + interimTranscript); // Accumulate recognized text
       };
 
       recognition.onend = () => {
+        // When recognition ends (e.g., user clicked stop or browser auto-stopped)
+        // If there's recognized text, move it to aiMessage if not already sent
+        if (recognizedText.trim() && !aiLoading) {
+            setAiMessage(recognizedText.trim());
+        }
         setIsListening(false);
         setRecognizedText('');
         console.log("Speech Recognition ended.");
@@ -90,7 +85,7 @@ const AiChat = () => {
         recognitionRef.current.stop();
       }
     };
-  }, [aiLoading]); // Only re-initialize if aiLoading changes (e.g. to ensure no conflicts)
+  }, [aiLoading, recognizedText]); // Add recognizedText to dependencies to keep onresult updated
 
 
   // Add initial AI welcome message
@@ -109,17 +104,18 @@ const AiChat = () => {
 
   const [errorMsg, setErrorMsg] = useState(''); // NEW: For local errors like speech recognition
 
-  // handleAiAsk now accepts an optional text parameter for transcribed speech
-  const handleAiAsk = async (e?: React.FormEvent, transcribedText?: string) => {
+  // handleAiAsk now accepts an optional text parameter for transcribed speech (used for explicit send)
+  const handleAiAsk = async (e?: React.FormEvent, textToProcess?: string) => {
     e?.preventDefault(); // Only prevent default if event object exists
-    const textToSend = transcribedText?.trim() || aiMessage.trim();
+    const textToSend = textToProcess?.trim() || aiMessage.trim();
 
     if (!textToSend || !hasAiAccess || aiLoading) return;
 
     const userMessage: Message = { id: Date.now().toString(), sender: 'user', text: textToSend };
     setMessages(prevMessages => [...prevMessages, userMessage]);
     setAiLoading(true);
-    setAiMessage(''); // Clear input/recognized text immediately
+    setAiMessage(''); // Clear input after sending
+    setRecognizedText(''); // Clear recognized text too
     setErrorMsg(''); // Clear any previous errors
 
     try {
@@ -136,13 +132,24 @@ const AiChat = () => {
   };
 
   const toggleListening = () => {
+    if (!recognitionRef.current) {
+        setErrorMsg('API de reconhecimento de voz não suportada.');
+        return;
+    }
+
     if (isListening) {
-      recognitionRef.current?.stop();
+      recognitionRef.current.stop(); // This will trigger onend
+      // If there is any recognized text when stopping, send it
+      if (recognizedText.trim() || aiMessage.trim()) {
+        handleAiAsk(null, recognizedText.trim() || aiMessage.trim());
+      }
+      setIsListening(false);
+      setRecognizedText(''); // Clear interim text
+      setAiMessage(''); // Clear final input text
     } else {
-      // Clear current AI message before starting to listen
-      setAiMessage(''); 
-      setRecognizedText('');
-      recognitionRef.current?.start();
+      setAiMessage(''); // Clear any existing text before starting
+      setRecognizedText(''); // Clear previous recognized text
+      recognitionRef.current.start();
       setIsListening(true);
       setErrorMsg(''); // Clear error when starting new input
       console.log("Speech Recognition started.");
@@ -217,11 +224,11 @@ const AiChat = () => {
       {/* Input Bar */}
       <form onSubmit={handleAiAsk} className="flex gap-2">
         <input
-          value={isListening ? recognizedText || 'Ouvindo...' : aiMessage}
+          value={isListening ? (recognizedText || 'Ouvindo...') : aiMessage}
           onChange={(e) => setAiMessage(e.target.value)}
           placeholder={isListening ? 'Ouvindo...' : 'Pergunte ao Zé...'}
           className="flex-1 p-4 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-secondary transition-colors text-primary dark:text-white"
-          disabled={aiLoading || isListening} // Disable typing while listening or AI is loading
+          disabled={aiLoading || isListening} // Disable typing while AI is loading or listening
           aria-label="Caixa de texto para perguntar ao Zé da Obra ou transcrição de voz"
         />
         {/* Toggle button for voice input */}
@@ -232,7 +239,7 @@ const AiChat = () => {
           className={`w-14 text-white rounded-xl flex items-center justify-center shadow-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed
             ${isListening ? 'bg-red-500 hover:bg-red-600 animate-pulse-mic' : 'bg-secondary hover:bg-orange-600'}
           `}
-          aria-label={isListening ? 'Parar gravação de voz' : 'Iniciar gravação de voz'}
+          aria-label={isListening ? 'Parar gravação de voz e enviar' : 'Iniciar gravação de voz'}
         >
           {isListening ? <i className="fa-solid fa-microphone-slash"></i> : <i className="fa-solid fa-microphone"></i>}
         </button>
