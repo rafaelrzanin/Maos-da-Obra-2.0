@@ -1,6 +1,5 @@
 
 
-
 export enum PlanType {
   MENSAL = 'MENSAL',
   SEMESTRAL = 'SEMESTRAL',
@@ -207,6 +206,21 @@ export interface Worker {
   dailyRate?: number; // NEW: Added dailyRate
   notes?: string;
 }
+
+// NEW: Interface para sugestões do Zé da Obra (assistente ativo)
+export interface ZeSuggestion {
+  id: string; // Identificador único da sugestão/alerta
+  type: 'alert' | 'suggestion'; // Tipo: alerta crítico ou sugestão proativa
+  priority: 'critical' | 'high' | 'medium' | 'low'; // Nível de prioridade
+  message: string; // Mensagem principal do Zé
+  aiMessage?: string; // Mensagem mais detalhada gerada pela IA
+  actionText?: string; // Texto do botão de ação (ex: "Ver Materiais")
+  actionCallback?: () => void; // Função a ser executada ao clicar na ação
+  dismissible: boolean; // Se a sugestão pode ser dispensada pelo usuário
+  tag: string; // Uma tag única para deduplicação (ex: material-baixo-{workId}-{materialId})
+  aiContext: string; // Contexto para enviar ao aiService.sendMessage para uma resposta mais detalhada
+}
+
 
 // Add ambient module declarations for import.meta.env AND process.env
 // This resolves TypeScript errors like "Property 'env' does not exist on type 'ImportMeta')"

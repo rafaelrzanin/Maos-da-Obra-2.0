@@ -1,4 +1,3 @@
-
 import { PlanType, ExpenseCategory, StepStatus, FileCategory, type User, type Work, type Step, type Material, type Expense, type Worker, type Supplier, type WorkPhoto, type WorkFile, type DBNotification, type PushSubscriptionInfo, type Contract, type Checklist, type ChecklistItem } from '../types.ts';
 import { WORK_TEMPLATES, FULL_MATERIAL_PACKAGES, CONTRACT_TEMPLATES, CHECKLIST_TEMPLATES } from './standards.ts';
 import { supabase } from './supabase.ts';
@@ -1039,6 +1038,21 @@ export const dbService = {
     return parseMaterialFromDB(updatedMaterialData);
   },
 
+  async deleteMaterial(materialId: string): Promise<void> {
+    // Supabase is guaranteed to be initialized now
+    const { data: deletedMaterial, error: deleteMaterialError } = await supabase.from('materials').delete().eq('id', materialId).select('work_id').single();
+    if (deleteMaterialError) {
+      console.error("Erro ao apagar material:", deleteMaterialError);
+      throw deleteMaterialError;
+    }
+    if (deletedMaterial) {
+      delete _dashboardCache.stats[deletedMaterial.work_id];
+      delete _dashboardCache.summary[deletedMaterial.work_id];
+      _dashboardCache.notifications = null;
+      _dashboardCache.materials[deletedMaterial.work_id] = null;
+    }
+  },
+
   async registerMaterialPurchase(materialId: string, name: string, brand: string | undefined, plannedQty: number, unit: string, qty: number, cost: number): Promise<void> {
     // Supabase is guaranteed to be initialized now
 
@@ -1305,6 +1319,17 @@ export const dbService = {
     return parsePhotoFromDB(newPhotoData);
   },
 
+  async deletePhoto(photoId: string): Promise<void> {
+    // Supabase is guaranteed to be initialized now
+    const { data: deletedPhoto, error: deletePhotoError } = await supabase.from('work_photos').delete().eq('id', photoId).select('work_id').single();
+    if (deletePhotoError) {
+      console.error("Erro ao apagar foto:", deletePhotoError);
+      throw deletePhotoError;
+    }
+    // Optionally invalidate cache if `work_id` is returned and cache relies on photo counts
+    // For now, no specific photo cache, so just ensure deletion.
+  },
+
   // --- WORK FILES ---
   async getFiles(workId: string): Promise<WorkFile[]> {
     // Supabase is guaranteed to be initialized now
@@ -1332,6 +1357,17 @@ export const dbService = {
       throw addFileError;
     }
     return parseFileFromDB(newFileData);
+  },
+
+  async deleteFile(fileId: string): Promise<void> {
+    // Supabase is guaranteed to be initialized now
+    const { data: deletedFile, error: deleteFileError } = await supabase.from('work_files').delete().eq('id', fileId).select('work_id').single();
+    if (deleteFileError) {
+      console.error("Erro ao apagar arquivo:", deleteFileError);
+      throw deleteFileError;
+    }
+    // Optionally invalidate cache if `work_id` is returned and cache relies on file counts
+    // For now, no specific file cache, so just ensure deletion.
   },
 
   // --- NOTIFICATIONS ---

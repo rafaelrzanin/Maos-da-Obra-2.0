@@ -1,4 +1,5 @@
 
+
 import React from 'react';
 import { ZE_AVATAR, ZE_AVATAR_FALLBACK } from '../services/standards.ts';
 
@@ -9,7 +10,7 @@ export interface ZeModalProps {
   confirmText?: string; // Made optional
   cancelText?: string; // Made optional
   type?: 'DANGER' | 'INFO' | 'SUCCESS' | 'WARNING' | 'ERROR';
-  onConfirm?: () => void; // Made optional, but should be handled with a default no-op
+  onConfirm?: () => Promise<void>; // Changed to optional Promise<void>
   onCancel: () => void; // Still required as the primary way to close
   isConfirming?: boolean; // NEW: To disable confirm button during async ops
   // Add children prop explicitly
@@ -23,7 +24,7 @@ export const ZeModal: React.FC<ZeModalProps> = ({
   confirmText = "Confirmar", // Default to "Confirmar" for actions
   cancelText = "Cancelar", 
   type = 'INFO', // Default to INFO
-  onConfirm = () => {}, // Changed to a no-op default to always be a function
+  onConfirm = async () => {}, // Changed to a no-op async function default
   onCancel,
   isConfirming = false, // NEW: Default to false
   children // Destructure children
@@ -34,7 +35,7 @@ export const ZeModal: React.FC<ZeModalProps> = ({
   // A modal é um "alerta simples" se não há uma ação real de `onConfirm` definida,
   // ou seja, se o `onConfirm` passado é o default no-op e o texto é "Entendido".
   // Ou se o type é 'ERROR' (transformado em alerta de erro)
-  const isSimpleAlert = (onConfirm.toString() === (() => {}).toString() && confirmText === "Entendido") || type === 'ERROR';
+  const isSimpleAlert = (onConfirm.toString() === (async () => {}).toString() && confirmText === "Entendido") || type === 'ERROR';
 
   // O handler do botão principal será onConfirm se não for um alerta simples,
   // ou onCancel se for um alerta simples (para fechar o modal).
