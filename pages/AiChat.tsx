@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.tsx';
 import { aiService } from '../services/ai.ts';
@@ -13,12 +13,17 @@ interface Message {
 }
 
 const AiChat = () => {
-  const { user, trialDaysRemaining, authLoading } = useAuth(); // Use authLoading
+  const { user, trialDaysRemaining, authLoading } = useAuth();
   const navigate = useNavigate();
 
   const [messages, setMessages] = useState<Message[]>([]);
-  const [aiMessage, setAiMessage] = useState('');
+  const [aiMessage, setAiMessage] = useState(''); // User's typed input OR transcribed speech
   const [aiLoading, setAiLoading] = useState(false);
+
+  // NEW: State for Speech Recognition
+  const [isListening, setIsListening] = useState(false);
+  const [recognizedText, setRecognizedText] = useState(''); // Text from SpeechRecognition during active listening
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
 
   const chatMessagesRef = useRef<HTMLDivElement>(null);
 
@@ -26,31 +31,98 @@ const AiChat = () => {
   const isAiTrialActive = user?.isTrial && trialDaysRemaining !== null && trialDaysRemaining > 0;
   const hasAiAccess = isVitalicio || isAiTrialActive;
 
+  // Initialize SpeechRecognition
   useEffect(() => {
-    // Add initial AI welcome message
-    if (hasAiAccess && messages.length === 0 && !authLoading) { // Check authLoading
+    if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
+      // Fix: Cast event types to any to resolve TypeScript errors.
+      // This is a workaround because SpeechRecognitionEvent and SpeechRecognitionErrorEvent
+      // are not recognized, likely due to tsconfig.json not including 'dom' library types
+      // or other configuration issues, and we cannot modify tsconfig.json or add d.ts files.
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      const recognition = new SpeechRecognition();
+      recognition.continuous = false; // Stop after each utterance
+      recognition.interimResults = true; // Get interim results
+      recognition.lang = 'pt-BR'; // Set language to Brazilian Portuguese
+
+      recognition.onresult = (event: any /* SpeechRecognitionEvent */) => {
+        let interimTranscript = '';
+        let finalTranscript = '';
+
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          const transcript = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            finalTranscript += transcript;
+          } else {
+            interimTranscript += transcript;
+          }
+        }
+        setRecognizedText(interimTranscript); // Show interim results
+        if (finalTranscript) {
+          setAiMessage(finalTranscript); // Set final text to input field
+          // Auto-send if there's a final transcript
+          if (!aiLoading) { // Avoid double sending if AI is already busy
+            handleAiAsk(null, finalTranscript); // Pass finalTranscript explicitly
+          }
+        }
+      };
+
+      recognition.onend = () => {
+        setIsListening(false);
+        setRecognizedText('');
+        console.log("Speech Recognition ended.");
+      };
+
+      recognition.onerror = (event: any /* SpeechRecognitionErrorEvent */) => {
+        console.error('Speech recognition error:', event.error);
+        setErrorMsg('Erro na gravação de voz. Tente novamente.');
+        setIsListening(false);
+        setRecognizedText('');
+      };
+
+      recognitionRef.current = recognition;
+    } else {
+      console.warn('Speech Recognition API not supported in this browser.');
+      // Optionally disable microphone button or show a message
+    }
+
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+    };
+  }, [aiLoading]); // Only re-initialize if aiLoading changes (e.g. to ensure no conflicts)
+
+
+  // Add initial AI welcome message
+  useEffect(() => {
+    if (hasAiAccess && messages.length === 0 && !authLoading) {
       setMessages([{ id: 'ai-welcome', sender: 'ai', text: 'Opa! Mestre de obras na área. No que posso te ajudar hoje?' }]);
     }
-  }, [hasAiAccess, messages.length, authLoading]); // Add authLoading to dependencies
+  }, [hasAiAccess, messages.length, authLoading]);
 
+  // Scroll to bottom of chat messages whenever messages update
   useEffect(() => {
-    // Scroll to bottom of chat messages whenever messages update
     if (chatMessagesRef.current) {
       chatMessagesRef.current.scrollTop = chatMessagesRef.current.scrollHeight;
     }
   }, [messages]);
 
-  const handleAiAsk = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!aiMessage.trim() || !hasAiAccess) return;
+  const [errorMsg, setErrorMsg] = useState(''); // NEW: For local errors like speech recognition
 
-    const userMessage: Message = { id: Date.now().toString(), sender: 'user', text: aiMessage };
+  // handleAiAsk now accepts an optional text parameter for transcribed speech
+  const handleAiAsk = async (e?: React.FormEvent, transcribedText?: string) => {
+    e?.preventDefault(); // Only prevent default if event object exists
+    const textToSend = transcribedText?.trim() || aiMessage.trim();
+
+    if (!textToSend || !hasAiAccess || aiLoading) return;
+
+    const userMessage: Message = { id: Date.now().toString(), sender: 'user', text: textToSend };
     setMessages(prevMessages => [...prevMessages, userMessage]);
     setAiLoading(true);
-    setAiMessage(''); // Clear input immediately
+    setAiMessage(''); // Clear input/recognized text immediately
+    setErrorMsg(''); // Clear any previous errors
 
     try {
-      // NEW: Use aiService.chat for conversational messages
       const response = await aiService.chat(userMessage.text);
       const aiResponse: Message = { id: (Date.now() + 1).toString(), sender: 'ai', text: response };
       setMessages(prevMessages => [...prevMessages, aiResponse]);
@@ -63,7 +135,21 @@ const AiChat = () => {
     }
   };
 
-  if (authLoading) return ( // Show loading if AuthContext is still loading
+  const toggleListening = () => {
+    if (isListening) {
+      recognitionRef.current?.stop();
+    } else {
+      // Clear current AI message before starting to listen
+      setAiMessage(''); 
+      setRecognizedText('');
+      recognitionRef.current?.start();
+      setIsListening(true);
+      setErrorMsg(''); // Clear error when starting new input
+      console.log("Speech Recognition started.");
+    }
+  };
+
+  if (authLoading) return (
     <div className="flex items-center justify-center min-h-[70vh] text-primary dark:text-white">
         <i className="fa-solid fa-circle-notch fa-spin text-3xl"></i>
     </div>
@@ -131,20 +217,31 @@ const AiChat = () => {
       {/* Input Bar */}
       <form onSubmit={handleAiAsk} className="flex gap-2">
         <input
-          value={aiMessage}
+          value={isListening ? recognizedText || 'Ouvindo...' : aiMessage}
           onChange={(e) => setAiMessage(e.target.value)}
-          placeholder="Pergunte ao Zé..."
+          placeholder={isListening ? 'Ouvindo...' : 'Pergunte ao Zé...'}
           className="flex-1 p-4 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-secondary transition-colors text-primary dark:text-white"
-          disabled={aiLoading}
+          disabled={aiLoading || isListening} // Disable typing while listening or AI is loading
+          aria-label="Caixa de texto para perguntar ao Zé da Obra ou transcrição de voz"
         />
+        {/* Toggle button for voice input */}
         <button
-          type="submit"
-          disabled={aiLoading || !aiMessage.trim()}
-          className="w-14 bg-secondary text-white rounded-xl flex items-center justify-center shadow-lg hover:bg-orange-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          type="button" // Important: type="button" to prevent form submission
+          onClick={toggleListening}
+          disabled={aiLoading || !('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)}
+          className={`w-14 text-white rounded-xl flex items-center justify-center shadow-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed
+            ${isListening ? 'bg-red-500 hover:bg-red-600 animate-pulse-mic' : 'bg-secondary hover:bg-orange-600'}
+          `}
+          aria-label={isListening ? 'Parar gravação de voz' : 'Iniciar gravação de voz'}
         >
-          {aiLoading ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-paper-plane"></i>}
+          {isListening ? <i className="fa-solid fa-microphone-slash"></i> : <i className="fa-solid fa-microphone"></i>}
         </button>
       </form>
+      {errorMsg && (
+        <p className="text-red-500 text-sm mt-2 text-center" role="alert">
+          {errorMsg}
+        </p>
+      )}
     </div>
   );
 };
