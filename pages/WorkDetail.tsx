@@ -2136,83 +2136,97 @@ const WorkDetail = () => {
             </div>
           )}
 
-          {/* Tab Content: FERRAMENTAS - RESTORED ALL TOOLS */}
+          {/* Tab Content: FERRAMENTAS - RESTORED ALL TOOLS with VITAL PANEL highlight */}
           {activeTab === 'FERRAMENTAS' && (
             <div className="space-y-6 animate-in fade-in duration-300">
               <h2 className="text-xl font-black text-primary dark:text-white px-2 sm:px-0">Ferramentas de Gestão</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <button 
-                  onClick={() => goToSubView('WORKERS')} 
-                  className={cx(surface, "rounded-3xl p-6 flex flex-col items-center justify-center text-center gap-2 transition-all hover:scale-[1.02] hover:border-secondary/50")}
-                  aria-label="Gerenciar Profissionais"
-                >
-                  <div className="w-12 h-12 bg-secondary/10 text-secondary rounded-xl flex items-center justify-center text-xl mb-2"><i className="fa-solid fa-hard-hat"></i></div>
-                  <h3 className="font-bold text-primary dark:text-white">Profissionais</h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">Organize sua equipe.</p>
-                </button>
-                <button 
-                  onClick={() => goToSubView('SUPPLIERS')} 
-                  className={cx(surface, "rounded-3xl p-6 flex flex-col items-center justify-center text-center gap-2 transition-all hover:scale-[1.02] hover:border-secondary/50")}
-                  aria-label="Gerenciar Fornecedores"
-                >
-                  <div className="w-12 h-12 bg-green-500/10 text-green-600 rounded-xl flex items-center justify-center text-xl mb-2"><i className="fa-solid fa-truck-fast"></i></div>
-                  <h3 className="font-bold text-primary dark:text-white">Fornecedores</h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">Controle seus parceiros.</p>
-                </button>
-                <button 
-                  onClick={() => goToSubView('PHOTOS')} 
-                  className={cx(surface, "rounded-3xl p-6 flex flex-col items-center justify-center text-center gap-2 transition-all hover:scale-[1.02] hover:border-secondary/50")}
-                  aria-label="Ver Fotos da Obra"
-                >
-                  <div className="w-12 h-12 bg-blue-500/10 text-blue-600 rounded-xl flex items-center justify-center text-xl mb-2"><i className="fa-solid fa-camera"></i></div>
-                  <h3 className="font-bold text-primary dark:text-white">Fotos da Obra</h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">Acompanhe o progresso visual.</p>
-                </button>
-                <button 
-                  onClick={() => goToSubView('PROJECTS')} 
-                  className={cx(surface, "rounded-3xl p-6 flex flex-col items-center justify-center text-center gap-2 transition-all hover:scale-[1.02] hover:border-secondary/50")}
-                  aria-label="Gerenciar Projetos e Documentos"
-                >
-                  <div className="w-12 h-12 bg-purple-500/10 text-purple-600 rounded-xl flex items-center justify-center text-xl mb-2"><i className="fa-solid fa-file-alt"></i></div>
-                  <h3 className="font-bold text-primary dark:text-white">Projetos & Docs</h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">Centralize seus arquivos.</p>
-                </button>
-                <button 
-                  onClick={() => goToSubView('CHECKLIST')} 
-                  className={cx(surface, "rounded-3xl p-6 flex flex-col items-center justify-center text-center gap-2 transition-all hover:scale-[1.02] hover:border-secondary/50")}
-                  aria-label="Acessar Checklists Inteligentes"
-                >
-                  <div className="w-12 h-12 bg-teal-500/10 text-teal-600 rounded-xl flex items-center justify-center text-xl mb-2"><i className="fa-solid fa-clipboard-check"></i></div>
-                  <h3 className="font-bold text-primary dark:text-white">Checklists</h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">Não esqueça de nada.</p>
-                </button>
-                <button 
-                  onClick={() => goToSubView('CONTRACTS')} 
-                  className={cx(surface, "rounded-3xl p-6 flex flex-col items-center justify-center text-center gap-2 transition-all hover:scale-[1.02] hover:border-secondary/50")}
-                  aria-label="Gerador de Contratos"
-                >
-                  <div className="w-12 h-12 bg-amber-500/10 text-amber-600 rounded-xl flex items-center justify-center text-xl mb-2"><i className="fa-solid fa-file-signature"></i></div>
-                  <h3 className="font-bold text-primary dark:text-white">Contratos</h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">Modelos prontos e personalizáveis.</p>
-                </button>
-                <button 
-                  onClick={() => goToSubView('CALCULATORS')} 
-                  className={cx(surface, "rounded-3xl p-6 flex flex-col items-center justify-center text-center gap-2 transition-all hover:scale-[1.02] hover:border-secondary/50")}
-                  aria-label="Acessar Calculadoras"
-                >
-                  <div className="w-12 h-12 bg-cyan-500/10 text-cyan-600 rounded-xl flex items-center justify-center text-xl mb-2"><i className="fa-solid fa-calculator"></i></div>
-                  <h3 className="font-bold text-primary dark:text-white">Calculadoras</h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">Calcule materiais e mais.</p>
-                </button>
-                <button 
-                  onClick={() => goToSubView('REPORTS')} 
-                  className={cx(surface, "rounded-3xl p-6 flex flex-col items-center justify-center text-center gap-2 transition-all hover:scale-[1.02] hover:border-secondary/50")}
-                  aria-label="Ver Relatórios"
-                >
-                  <div className="w-12 h-12 bg-red-500/10 text-red-600 rounded-xl flex items-center justify-center text-xl mb-2"><i className="fa-solid fa-chart-line"></i></div>
-                  <h3 className="font-bold text-primary dark:text-white">Relatórios</h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">Visão consolidada.</p>
-                </button>
+
+              {/* Seção Ferramentas Vitalícias */}
+              <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-xl border border-amber-500/50 dark:border-amber-700/50 ring-1 ring-amber-500/20 dark:ring-amber-900/20">
+                <h3 className="text-lg font-black text-amber-600 dark:text-amber-400 mb-4 flex items-center gap-2">
+                  <i className="fa-solid fa-crown"></i> Ferramentas Vitalícias
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <button 
+                    onClick={() => goToSubView('CHECKLIST')} 
+                    className={cx("rounded-3xl p-6 flex flex-col items-center justify-center text-center gap-2 transition-all hover:scale-[1.02] bg-gradient-gold shadow-glow text-white")}
+                    aria-label="Acessar Checklists Inteligentes"
+                  >
+                    <div className="w-12 h-12 bg-white/20 text-white rounded-xl flex items-center justify-center text-xl mb-2"><i className="fa-solid fa-clipboard-check"></i></div>
+                    <h3 className="font-bold text-white">Checklists</h3>
+                    <p className="text-xs text-amber-100">Não esqueça de nada.</p>
+                  </button>
+                  <button 
+                    onClick={() => goToSubView('CONTRACTS')} 
+                    className={cx("rounded-3xl p-6 flex flex-col items-center justify-center text-center gap-2 transition-all hover:scale-[1.02] bg-gradient-gold shadow-glow text-white")}
+                    aria-label="Gerador de Contratos"
+                  >
+                    <div className="w-12 h-12 bg-white/20 text-white rounded-xl flex items-center justify-center text-xl mb-2"><i className="fa-solid fa-file-signature"></i></div>
+                    <h3 className="font-bold text-white">Contratos</h3>
+                    <p className="text-xs text-amber-100">Modelos prontos e personalizáveis.</p>
+                  </button>
+                  <button 
+                    onClick={() => goToSubView('CALCULATORS')} 
+                    className={cx("rounded-3xl p-6 flex flex-col items-center justify-center text-center gap-2 transition-all hover:scale-[1.02] bg-gradient-gold shadow-glow text-white")}
+                    aria-label="Acessar Calculadoras"
+                  >
+                    <div className="w-12 h-12 bg-white/20 text-white rounded-xl flex items-center justify-center text-xl mb-2"><i className="fa-solid fa-calculator"></i></div>
+                    <h3 className="font-bold text-white">Calculadoras</h3>
+                    <p className="text-xs text-amber-100">Calcule materiais e mais.</p>
+                  </button>
+                </div>
+              </div>
+
+              {/* Seção Ferramentas Essenciais */}
+              <div className="mt-8"> {/* Added margin top for separation */}
+                <h3 className="text-lg font-black text-primary dark:text-white mb-4 px-2 sm:px-0">Ferramentas Essenciais</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <button 
+                    onClick={() => goToSubView('WORKERS')} 
+                    className={cx(surface, "rounded-3xl p-6 flex flex-col items-center justify-center text-center gap-2 transition-all hover:scale-[1.02] hover:border-secondary/50")}
+                    aria-label="Gerenciar Profissionais"
+                  >
+                    <div className="w-12 h-12 bg-secondary/10 text-secondary rounded-xl flex items-center justify-center text-xl mb-2"><i className="fa-solid fa-hard-hat"></i></div>
+                    <h3 className="font-bold text-primary dark:text-white">Profissionais</h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Organize sua equipe.</p>
+                  </button>
+                  <button 
+                    onClick={() => goToSubView('SUPPLIERS')} 
+                    className={cx(surface, "rounded-3xl p-6 flex flex-col items-center justify-center text-center gap-2 transition-all hover:scale-[1.02] hover:border-secondary/50")}
+                    aria-label="Gerenciar Fornecedores"
+                  >
+                    <div className="w-12 h-12 bg-green-500/10 text-green-600 rounded-xl flex items-center justify-center text-xl mb-2"><i className="fa-solid fa-truck-fast"></i></div>
+                    <h3 className="font-bold text-primary dark:text-white">Fornecedores</h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Controle seus parceiros.</p>
+                  </button>
+                  <button 
+                    onClick={() => goToSubView('PHOTOS')} 
+                    className={cx(surface, "rounded-3xl p-6 flex flex-col items-center justify-center text-center gap-2 transition-all hover:scale-[1.02] hover:border-secondary/50")}
+                    aria-label="Ver Fotos da Obra"
+                  >
+                    <div className="w-12 h-12 bg-blue-500/10 text-blue-600 rounded-xl flex items-center justify-center text-xl mb-2"><i className="fa-solid fa-camera"></i></div>
+                    <h3 className="font-bold text-primary dark:text-white">Fotos da Obra</h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Acompanhe o progresso visual.</p>
+                  </button>
+                  <button 
+                    onClick={() => goToSubView('PROJECTS')} 
+                    className={cx(surface, "rounded-3xl p-6 flex flex-col items-center justify-center text-center gap-2 transition-all hover:scale-[1.02] hover:border-secondary/50")}
+                    aria-label="Gerenciar Projetos e Documentos"
+                  >
+                    <div className="w-12 h-12 bg-purple-500/10 text-purple-600 rounded-xl flex items-center justify-center text-xl mb-2"><i className="fa-solid fa-file-alt"></i></div>
+                    <h3 className="font-bold text-primary dark:text-white">Projetos & Docs</h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Centralize seus arquivos.</p>
+                  </button>
+                  <button 
+                    onClick={() => goToSubView('REPORTS')} 
+                    className={cx(surface, "rounded-3xl p-6 flex flex-col items-center justify-center text-center gap-2 transition-all hover:scale-[1.02] hover:border-secondary/50")}
+                    aria-label="Ver Relatórios"
+                  >
+                    <div className="w-12 h-12 bg-red-500/10 text-red-600 rounded-xl flex items-center justify-center text-xl mb-2"><i className="fa-solid fa-chart-line"></i></div>
+                    <h3 className="font-bold text-primary dark:text-white">Relatórios</h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400">Visão consolidada.</p>
+                  </button>
+                </div>
               </div>
             </div>
           )}
