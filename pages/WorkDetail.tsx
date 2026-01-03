@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import * as ReactRouter from 'react-router-dom';
 import * as XLSX from 'xlsx';
@@ -80,6 +79,7 @@ const ZeAssistantCard: React.FC<ZeAssistantCardProps> = ({ suggestion, onDismiss
 
   useEffect(() => {
     // Automatically generate AI message if not already present
+    // Only generate if hasAiAccess. This logic is handled by the caller, WorkDetail.tsx.
     if (!suggestion.aiMessage && !loadingAi) {
       onGenerateAiMessage(suggestion.aiContext, suggestion.id);
     }
@@ -118,22 +118,17 @@ const ZeAssistantCard: React.FC<ZeAssistantCardProps> = ({ suggestion, onDismiss
         </p>
         <p className="text-primary dark:text-white font-bold text-base leading-tight">{suggestion.message}</p>
         
+        {/* Only show AI message and toggle if there's an actual AI message generated */}
         {suggestion.aiMessage && (
           <div className="mt-3 p-3 bg-slate-50 dark:bg-slate-700 rounded-xl text-xs text-slate-700 dark:text-slate-300 shadow-inner border border-slate-100 dark:border-slate-600">
             {loadingAi ? (
               <span className="animate-pulse text-secondary">Zé está pensando...</span>
             ) : (
+              // Display only if showDetails is true, or if no showDetails state (always visible for very short messages)
               <p>{suggestion.aiMessage}</p>
             )}
             
-            {suggestion.aiContext.length > 0 && (
-                <button 
-                  onClick={() => setShowDetails(!showDetails)} 
-                  className="mt-2 text-xs text-secondary hover:underline"
-                >
-                  {showDetails ? 'Esconder detalhes' : 'Mostrar mais detalhes da IA'}
-                </button>
-            )}
+            {/* Removed the 'Mostrar mais detalhes' button if the AI message itself is concise */}
           </div>
         )}
 
@@ -173,7 +168,12 @@ const WorkDetail = () => {
   const { id: workId } = ReactRouter.useParams<{ id: string }>();
   const navigate = ReactRouter.useNavigate();
   // Fix: Destructure `isUserAuthFinished` from `useAuth`
-  const { user, isSubscriptionValid, authLoading, isUserAuthFinished, refreshUser } = useAuth(); // NEW: refreshUser to update AI trial
+  const { user, isSubscriptionValid, authLoading, isUserAuthFinished, refreshUser } = useAuth();
+
+  // AI TRIAL / SUBSCRIPTION CHECK - Moved to appear earlier
+  const isAiTrialActive = user?.isTrial && user.subscriptionExpiresAt && new Date(user.subscriptionExpiresAt) > new Date() && user?.plan !== PlanType.VITALICIO;
+  const hasAiAccess = user?.plan === PlanType.VITALICIO || isAiTrialActive;
+  
   const [work, setWork] = useState<Work | null>(null);
   const [steps, setSteps] = useState<Step[]>([]);
   const [materials, setMaterials] = useState<Material[]>([]);
@@ -460,12 +460,24 @@ const WorkDetail = () => {
         setActiveZeSuggestion(null); // No relevant suggestions
     }
 
-  }, [work, steps, materials, user, getSeenSuggestions, markSuggestionAsSeen]);
+  }, [work, steps, materials, user, getSeenSuggestions, markSuggestionAsSeen, hasAiAccess]);
 
   const generateAiMessageForSuggestion = useCallback(async (context: string, suggestionId: string) => {
+    // Only attempt to generate AI message if user has AI access
+    if (!hasAiAccess) {
+        setActiveZeSuggestion(prev => {
+            if (prev?.id === suggestionId) {
+                return { ...prev, aiMessage: "Assinatura Vitalícia necessária para insights da IA. Acesse Configurações." };
+            }
+            return prev;
+        });
+        return;
+    }
+
     setLoadingAiMessage(true);
     try {
-      const aiResponse = await aiService.sendMessage(context);
+      // NEW: Use aiService.getWorkInsight for short, incisive messages
+      const aiResponse = await aiService.getWorkInsight(context);
       setActiveZeSuggestion(prev => {
         if (prev?.id === suggestionId) {
           return { ...prev, aiMessage: aiResponse };
@@ -483,7 +495,7 @@ const WorkDetail = () => {
     } finally {
       setLoadingAiMessage(false);
     }
-  }, []);
+  }, [hasAiAccess]);
 
 
   // Handler para quando o usuário marca uma etapa como COMPLETED
@@ -502,8 +514,11 @@ const WorkDetail = () => {
             const seenTags = getSeenSuggestions();
 
             if (!seenTags.has(tag)) {
-                // Generate AI message for this specific context
-                const aiResponse = await aiService.sendMessage(`A etapa ${nextLogicalStep.name} da obra ${work?.name} acaba de se tornar a próxima a ser focada. Qual a dica do Zé da Obra para começar bem esta etapa?`);
+                let aiResponse = "Ótimo! Foco total na próxima. O Zé tá de olho!"; // Default if no AI access
+                if (hasAiAccess) {
+                    // Generate AI message for this specific context
+                    aiResponse = await aiService.getWorkInsight(`A etapa ${nextLogicalStep.name} da obra ${work?.name} acaba de se tornar a próxima a ser focada. Dê uma dica útil para começar bem esta etapa.`);
+                }
 
                 setActiveZeSuggestion({
                     id: `ze-sug-${Date.now()}`,
@@ -520,7 +535,7 @@ const WorkDetail = () => {
             }
         }
     }
-  }, [steps, work, getSeenSuggestions, markSuggestionAsSeen]);
+  }, [steps, work, getSeenSuggestions, markSuggestionAsSeen, hasAiAccess]);
 
 
   // =======================================================================
@@ -597,8 +612,8 @@ const WorkDetail = () => {
   // =======================================================================
 
   // STEPS
-  const handleAddStep = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleAddStep = async (e?: React.FormEvent) => {
+    e?.preventDefault();
     if (!workId || !user?.id) return;
     try {
       const newStep = await dbService.addStep({
@@ -612,8 +627,8 @@ const WorkDetail = () => {
     } catch (error) { console.error("Erro ao adicionar etapa:", error); }
   };
 
-  const handleEditStep = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleEditStep = async (e?: React.FormEvent) => {
+    e?.preventDefault();
     if (!editStepData || !workId || !user?.id) return;
     try {
       const updatedStep = await dbService.updateStep(editStepData);
@@ -669,8 +684,8 @@ const WorkDetail = () => {
   };
 
   // MATERIALS
-  const handleAddMaterial = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleAddMaterial = async (e?: React.FormEvent) => {
+    e?.preventDefault();
     if (!workId || !user?.id) return;
     try {
       const newMaterial = await dbService.addMaterial({
@@ -684,8 +699,8 @@ const WorkDetail = () => {
     } catch (error) { console.error("Erro ao adicionar material:", error); }
   };
 
-  const handleEditMaterial = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleEditMaterial = async (e?: React.FormEvent) => {
+    e?.preventDefault();
     if (!editMaterialData || !workId || !user?.id) return;
     try {
       const updatedMaterial = await dbService.updateMaterial(editMaterialData);
@@ -750,8 +765,8 @@ const WorkDetail = () => {
     setPurchaseQty(''); setPurchaseCost('');
   };
 
-  const handleRegisterPurchase = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleRegisterPurchase = async (e?: React.FormEvent) => {
+    e?.preventDefault();
     if (!purchaseMaterialId || !user?.id) return;
 
     const materialToUpdate = materials.find(m => m.id === purchaseMaterialId);
@@ -777,8 +792,8 @@ const WorkDetail = () => {
 
 
   // EXPENSES
-  const handleAddExpense = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleAddExpense = async (e?: React.FormEvent) => {
+    e?.preventDefault();
     if (!workId || !user?.id) return;
     try {
       const newExpense = await dbService.addExpense({
@@ -792,8 +807,8 @@ const WorkDetail = () => {
     } catch (error) { console.error("Erro ao adicionar despesa:", error); }
   };
 
-  const handleEditExpense = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleEditExpense = async (e?: React.FormEvent) => {
+    e?.preventDefault();
     if (!editExpenseData || !workId || !user?.id) return;
     try {
       const updatedExpense = await dbService.updateExpense(editExpenseData);
@@ -847,8 +862,8 @@ const WorkDetail = () => {
   };
 
   // WORKERS
-  const handleAddWorker = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleAddWorker = async (e?: React.FormEvent) => {
+    e?.preventDefault();
     if (!workId || !user?.id) return;
     try {
       const newWorker = await dbService.addWorker({
@@ -862,8 +877,8 @@ const WorkDetail = () => {
     } catch (error) { console.error("Erro ao adicionar profissional:", error); }
   };
 
-  const handleEditWorker = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleEditWorker = async (e?: React.FormEvent) => {
+    e?.preventDefault();
     if (!editWorkerData || !workId || !user?.id) return;
     try {
       const updatedWorker = await dbService.updateWorker(editWorkerData);
@@ -917,8 +932,8 @@ const WorkDetail = () => {
   };
 
   // SUPPLIERS
-  const handleAddSupplier = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleAddSupplier = async (e?: React.FormEvent) => {
+    e?.preventDefault();
     if (!workId || !user?.id) return;
     try {
       const newSupplier = await dbService.addSupplier({
@@ -932,8 +947,8 @@ const WorkDetail = () => {
     } catch (error) { console.error("Erro ao adicionar fornecedor:", error); }
   };
 
-  const handleEditSupplier = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleEditSupplier = async (e?: React.FormEvent) => {
+    e?.preventDefault();
     if (!editSupplierData || !workId || !user?.id) return;
     try {
       const updatedSupplier = await dbService.updateSupplier(editSupplierData);
@@ -989,8 +1004,8 @@ const WorkDetail = () => {
 
 
   // PHOTOS
-  const handleAddPhoto = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleAddPhoto = async (e?: React.FormEvent) => {
+    e?.preventDefault();
     if (!workId || !user?.id || !newPhotoFile) return;
     setUploadingPhoto(true);
     try {
@@ -1042,8 +1057,8 @@ const WorkDetail = () => {
   };
 
   // FILES
-  const handleAddFile = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleAddFile = async (e?: React.FormEvent) => {
+    e?.preventDefault();
     if (!workId || !user?.id || !newUploadFile) return;
     setUploadingFile(true);
     try {
@@ -1097,8 +1112,8 @@ const WorkDetail = () => {
 
 
   // CHECKLISTS (NEW)
-  const handleAddChecklist = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleAddChecklist = async (e?: React.FormEvent) => {
+    e?.preventDefault();
     if (!workId) return;
     try {
       const newChecklist = await dbService.addChecklist({
@@ -1115,8 +1130,8 @@ const WorkDetail = () => {
     } catch (error) { console.error("Erro ao adicionar checklist:", error); }
   };
 
-  const handleEditChecklist = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleEditChecklist = async (e?: React.FormEvent) => {
+    e?.preventDefault();
     if (!editChecklistData) return;
     try {
       const updatedChecklist = await dbService.updateChecklist({
@@ -1280,11 +1295,6 @@ const WorkDetail = () => {
 
     return result;
   }, [expenses, steps]);
-
-
-  // AI TRIAL / SUBSCRIPTION CHECK
-  const isAiTrialActive = user?.isTrial && user.subscriptionExpiresAt && new Date(user.subscriptionExpiresAt) > new Date() && user?.plan !== PlanType.VITALICIO;
-  const hasAiAccess = user?.plan === PlanType.VITALICIO || isAiTrialActive;
 
 
   if (loading || authLoading || !work) {
@@ -1815,7 +1825,7 @@ const WorkDetail = () => {
         message="" // Message is handled by form content
         onCancel={closeStepModal}
         confirmText={editStepData ? 'Salvar Alterações' : 'Adicionar Etapa'}
-        onConfirm={editStepData ? () => handleEditStep(new Event('submit') as React.FormEvent) : () => handleAddStep(new Event('submit') as React.FormEvent)}
+        onConfirm={editStepData ? () => handleEditStep() : () => handleAddStep()}
       >
         <form onSubmit={editStepData ? handleEditStep : handleAddStep} className="space-y-4">
           <div>
@@ -1865,7 +1875,7 @@ const WorkDetail = () => {
         message=""
         onCancel={closeMaterialModal}
         confirmText={editMaterialData ? 'Salvar Alterações' : 'Adicionar Material'}
-        onConfirm={editMaterialData ? () => handleEditMaterial(new Event('submit') as React.FormEvent) : () => handleAddMaterial(new Event('submit') as React.FormEvent)}
+        onConfirm={editMaterialData ? () => handleEditMaterial() : () => handleAddMaterial()}
       >
         <form onSubmit={editMaterialData ? handleEditMaterial : handleAddMaterial} className="space-y-4">
           <div>
@@ -1912,7 +1922,7 @@ const WorkDetail = () => {
         message=""
         onCancel={closePurchaseMaterialModal}
         confirmText="Registrar Compra"
-        onConfirm={() => handleRegisterPurchase(new Event('submit') as React.FormEvent)}
+        onConfirm={() => handleRegisterPurchase()}
       >
         <form onSubmit={handleRegisterPurchase} className="space-y-4">
           <div>
@@ -1922,7 +1932,7 @@ const WorkDetail = () => {
           </div>
           <div>
             <label htmlFor="purchaseCost" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Custo Total da Compra (R$)</label>
-            <input id="purchaseCost" type="number" value={purchaseCost} onChange={(e) => setPurchaseCost(e.target.value)} required
+            <input id="purchaseCost" type="number" step="0.01" value={purchaseCost} onChange={(e) => setPurchaseCost(e.target.value)} required
               className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white" />
           </div>
           <div className="flex justify-end gap-3 mt-6">
@@ -1939,7 +1949,7 @@ const WorkDetail = () => {
         message=""
         onCancel={closeExpenseModal}
         confirmText={editExpenseData ? 'Salvar Alterações' : 'Adicionar Despesa'}
-        onConfirm={editExpenseData ? () => handleEditExpense(new Event('submit') as React.FormEvent) : () => handleAddExpense(new Event('submit') as React.FormEvent)}
+        onConfirm={editExpenseData ? () => handleEditExpense() : () => handleAddExpense()}
       >
         <form onSubmit={editExpenseData ? handleEditExpense : handleAddExpense} className="space-y-4">
           <div>
@@ -1990,7 +2000,7 @@ const WorkDetail = () => {
         message=""
         onCancel={closeWorkerModal}
         confirmText={editWorkerData ? 'Salvar Alterações' : 'Adicionar Profissional'}
-        onConfirm={editWorkerData ? () => handleEditWorker(new Event('submit') as React.FormEvent) : () => handleAddWorker(new Event('submit') as React.FormEvent)}
+        onConfirm={editWorkerData ? () => handleEditWorker() : () => handleAddWorker()}
       >
         <form onSubmit={editWorkerData ? handleEditWorker : handleAddWorker} className="space-y-4">
           <div>
@@ -2035,7 +2045,7 @@ const WorkDetail = () => {
         message=""
         onCancel={closeSupplierModal}
         confirmText={editSupplierData ? 'Salvar Alterações' : 'Adicionar Fornecedor'}
-        onConfirm={editSupplierData ? () => handleEditSupplier(new Event('submit') as React.FormEvent) : () => handleAddSupplier(new Event('submit') as React.FormEvent)}
+        onConfirm={editSupplierData ? () => handleEditSupplier() : () => handleAddSupplier()}
       >
         <form onSubmit={editSupplierData ? handleEditSupplier : handleAddSupplier} className="space-y-4">
           <div>
@@ -2085,7 +2095,7 @@ const WorkDetail = () => {
         message=""
         onCancel={closePhotoModal}
         confirmText="Adicionar Foto"
-        onConfirm={() => handleAddPhoto(new Event('submit') as React.FormEvent)}
+        onConfirm={() => handleAddPhoto()}
         isConfirming={uploadingPhoto}
       >
         <form onSubmit={handleAddPhoto} className="space-y-4">
@@ -2124,7 +2134,7 @@ const WorkDetail = () => {
         message=""
         onCancel={closeFileModal}
         confirmText="Adicionar Arquivo"
-        onConfirm={() => handleAddFile(new Event('submit') as React.FormEvent)}
+        onConfirm={() => handleAddFile()}
         isConfirming={uploadingFile}
       >
         <form onSubmit={handleAddFile} className="space-y-4">
@@ -2163,7 +2173,7 @@ const WorkDetail = () => {
         message=""
         onCancel={() => { setShowAddChecklistModal(false); setEditChecklistData(null); setNewChecklistName(''); setNewChecklistCategory(''); setNewChecklistItems(['']); }}
         confirmText={editChecklistData ? 'Salvar Alterações' : 'Adicionar Checklist'}
-        onConfirm={editChecklistData ? () => handleEditChecklist(new Event('submit') as React.FormEvent) : () => handleAddChecklist(new Event('submit') as React.FormEvent)}
+        onConfirm={editChecklistData ? () => handleEditChecklist() : () => handleAddChecklist()}
       >
         <form onSubmit={editChecklistData ? handleEditChecklist : handleAddChecklist} className="space-y-4">
           <div>

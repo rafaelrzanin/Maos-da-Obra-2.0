@@ -1,6 +1,4 @@
 
-
-
 import { GoogleGenAI } from "@google/genai";
 
 // Helper function to safely get environment variables, checking both process.env and import.meta.env
@@ -10,21 +8,21 @@ const safeGetEnv = (key: string): string | undefined => {
   // Prioriza import.meta.env para ambientes de cliente (Vite)
   if (typeof import.meta !== 'undefined' && import.meta.env && typeof import.meta.env[key] === 'string') {
     value = import.meta.env[key];
-    console.log(`[AI safeGetEnv] Lendo ${key} de import.meta.env. Valor: ${value ? 'CONFIGURADO' : 'UNDEFINED'}`);
+    // console.log(`[AI safeGetEnv] Lendo ${key} de import.meta.env. Valor: ${value ? 'CONFIGURADO' : 'UNDEFINED'}`); // Desativado para reduzir logs
     // FIX: Explicitly check for the string "undefined" which can occur if JSON.stringify(undefined) is used.
     if (value && value !== 'undefined') return value;
   } else {
-    console.log(`[AI safeGetEnv] import.meta.env.${key} não disponível ou não é string.`);
+    // console.log(`[AI safeGetEnv] import.meta.env.${key} não disponível ou não é string.`); // Desativado para reduzir logs
   }
   
   // Fallback to process.env (serverless functions, Node.js)
   if (typeof process !== 'undefined' && process.env && typeof process.env[key] === 'string') {
     value = process.env[key];
-    console.log(`[AI safeGetEnv] Lendo ${key} de process.env. Valor: ${value ? 'CONFIGURADO' : 'UNDEFINED'}`);
+    // console.log(`[AI safeGetEnv] Lendo ${key} de process.env. Valor: ${value ? 'CONFIGURADO' : 'UNDEFINED'}`); // Desativado para reduzir logs
     // FIX: Explicitly check for the string "undefined".
     if (value && value !== 'undefined') return value;
   } else {
-    console.log(`[AI safeGetEnv] process.env.${key} não disponível ou não é string.`);
+    // console.log(`[AI safeGetEnv] process.env.${key} não disponível ou não é string.`); // Desativado para reduzir logs
   }
 
   console.warn(`[AI safeGetEnv] Variável de ambiente '${key}' não encontrada em nenhum contexto.`);
@@ -32,8 +30,7 @@ const safeGetEnv = (key: string): string | undefined => {
 };
 
 // Access API_KEY using the safeGetEnv helper
-// Agora a chave é lida como VITE_GOOGLE_API_KEY diretamente.
-const apiKey = safeGetEnv('VITE_GOOGLE_API_KEY'); // Changed from 'API_KEY'
+const apiKey = safeGetEnv('VITE_GOOGLE_API_KEY');
 
 let ai: GoogleGenAI | null = null;
 
@@ -41,17 +38,16 @@ let ai: GoogleGenAI | null = null;
 if (!apiKey) {
   console.error("ERRO CRÍTICO: Google GenAI API Key (VITE_GOOGLE_API_KEY) não está configurada.");
   console.error("Por favor, adicione sua chave de API nas variáveis de ambiente do seu ambiente de deploy (Vercel, etc.) como 'VITE_GOOGLE_API_KEY' ou no seu arquivo .env local.");
-  // A mensagem no frontend já indicará a falta, mas o console será mais explícito.
-  // Não lançaremos um erro para que o fallback offline possa ser exibido.
 } else {
   ai = new GoogleGenAI({ apiKey: apiKey });
   console.log("Google GenAI inicializado com sucesso.");
 }
 
 export const aiService = {
-  sendMessage: async (message: string): Promise<string> => {
+  // NEW: Função para chat conversacional (com respostas potencialmente mais longas)
+  chat: async (message: string): Promise<string> => {
     if (!ai) {
-      // OFFLINE FALLBACK MODE
+      // OFFLINE FALLBACK MODE (Existing logic)
       const lowerMsg = message.toLowerCase();
       
       await new Promise(r => setTimeout(r, 1000)); 
@@ -83,6 +79,38 @@ export const aiService = {
       console.error("Erro na IA:", error);
       return "Tive um problema de conexão aqui. Tenta de novo em um minutinho.";
     }
+  },
+
+  // NEW: Função para insights curtos e incisivos em contexto de obra
+  getWorkInsight: async (context: string): Promise<string> => {
+    if (!ai) {
+      // OFFLINE FALLBACK MODE for proactive insights
+      await new Promise(r => setTimeout(r, 500)); // Shorter delay for proactive
+      if (context.includes('material em falta')) return "Material crítico em falta pode parar a obra! Verifique a compra já.";
+      if (context.includes('etapa atrasada')) return "Etapa com prazo estourado! Avalie o status para não perder mais tempo e dinheiro.";
+      if (context.includes('estoque baixo')) return "Nível de estoque baixo. Reabasteça para manter o ritmo da etapa.";
+      if (context.includes('próxima etapa')) return "Próxima etapa chegando. Confirme recursos e equipe para um bom início.";
+      if (context.includes('quase concluída')) return "Etapa quase finalizada! Hora de checar a qualidade e planejar o fechamento.";
+      return "Estou sem conexão para dar a dica, mas a atenção ao cronograma é sempre crucial.";
+    }
+
+    try {
+      const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: context,
+        config: {
+          // System instruction rigorosa para respostas curtas e incisivas
+          systemInstruction: "Seu nome é Zé da Obra. Você é um mestre de obras e engenheiro extremamente experiente. \n\n**Seu objetivo:** Fornecer uma **única frase (máximo 20 palavras)**, direta, incisiva e acionável, focada em economia, controle de cronograma ou prevenção de prejuízo. Não divague, vá direto ao ponto como um alerta ou dica essencial.\n\n**Exemplos de tom:**\n- 'Material XYZ em falta para a etapa ABC. Compre agora para evitar atrasos!'\n- 'Etapa X atrasada há 5 dias. Revise o cronograma urgente!'\n- 'Estoque de cimento baixo. Recomendo comprar mais 5 sacos para a próxima semana.'\n- 'Próxima etapa: Fundações. Não pule a impermeabilização do baldrame para evitar umidade futura.'\n- 'Etapa de pintura quase no fim. Faça a vistoria final antes de liberar o pagamento.'",
+          maxOutputTokens: 50, // Limita o tamanho da resposta
+          thinkingConfig: { thinkingBudget: 0 }, // Desabilita o "pensamento" para respostas rápidas e diretas
+        }
+      });
+      
+      const insight = response.text?.trim();
+      return insight || "Não consegui gerar uma dica agora. Tente novamente.";
+    } catch (error) {
+      console.error("Erro na IA ao gerar Work Insight:", error);
+      return "Ops! O Zé está com problemas de comunicação. Tente novamente mais tarde.";
+    }
   }
 };
-    

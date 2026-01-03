@@ -50,7 +50,8 @@ const AiChat = () => {
     setAiMessage(''); // Clear input immediately
 
     try {
-      const response = await aiService.sendMessage(userMessage.text);
+      // NEW: Use aiService.chat for conversational messages
+      const response = await aiService.chat(userMessage.text);
       const aiResponse: Message = { id: (Date.now() + 1).toString(), sender: 'ai', text: response };
       setMessages(prevMessages => [...prevMessages, aiResponse]);
     } catch (error) {
@@ -149,4 +150,3 @@ const AiChat = () => {
 };
 
 export default AiChat;
-    
