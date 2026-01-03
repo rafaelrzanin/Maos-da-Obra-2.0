@@ -23,6 +23,13 @@ export default {
           light: '#F59E0B',   // Amber 500
           dark: '#B45309',    // Amber 700
         },
+        'status-inprogress': { // NEW: Cor para status 'Em Andamento' (AZUL)
+          DEFAULT: '#3B82F6', // Blue 500
+          light: '#60A5FA',   // Blue 400
+          dark: '#1D4ED8',    // Blue 700
+          bg: '#EFF6FF',      // Blue 50 for background
+          darkbg: '#1E3A8A',  // Blue 900 for dark mode background
+        },
         success: {
           DEFAULT: '#059669', // Emerald 600
           light: '#D1FAE5',
@@ -72,4 +79,3 @@ export default {
   },
   plugins: [],
 }
-    

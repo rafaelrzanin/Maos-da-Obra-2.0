@@ -1,5 +1,4 @@
 
-
 import { PlanType, ExpenseCategory, StepStatus, FileCategory, type User, type Work, type Step, type Material, type Expense, type Worker, type Supplier, type WorkPhoto, type WorkFile, type DBNotification, type PushSubscriptionInfo, type Contract, type Checklist, type ChecklistItem } from '../types.ts';
 import { WORK_TEMPLATES, FULL_MATERIAL_PACKAGES, CONTRACT_TEMPLATES, CHECKLIST_TEMPLATES } from './standards.ts';
 import { supabase } from './supabase.ts';
@@ -14,6 +13,8 @@ const _dashboardCache: {
     // NEW: Caching for steps and materials per workId
     steps: Record<string, { data: Step[], timestamp: number }>;
     materials: Record<string, { data: Material[], timestamp: number }>;
+    // NEW: Caching for expenses per workId
+    expenses: Record<string, { data: Expense[], timestamp: number }>;
 } = {
     works: null,
     stats: {},
@@ -21,6 +22,7 @@ const _dashboardCache: {
     notifications: null,
     steps: {}, // Initialize new cache
     materials: {}, // Initialize new cache
+    expenses: {}, // NEW: Initialize new cache
 };
 
 // --- HELPERS ---
@@ -159,8 +161,23 @@ const mapPushSubscriptionFromDB = (data: any): PushSubscriptionInfo => ({
 // NEW: Helper para mapear nome de etapa dinâmica para categoria de material genérica
 const getMaterialCategoryFromStepName = (stepName: string): string => {
   // Regras para etapas dinâmicas
-  if (stepName.includes('Levantamento de paredes')) return 'Levantamento de paredes';
-  if (stepName.includes('Lajes e Vigas')) return 'Lajes e Vigas';
+  if (stepName.includes('Limpeza do terreno')) return 'Limpeza do terreno';
+  if (stepName.includes('Fundações')) return 'Fundações';
+  if (stepName.includes('Levantamento de paredes')) return 'Levantamento de paredes'; // Genérico para dinâmica
+  if (stepName.includes('Lajes e Vigas')) return 'Lajes e Vigas'; // Genérico para dinâmica
+  if (stepName.includes('Telhado')) return 'Telhado';
+  if (stepName.includes('Tubulação de Água/Esgoto Geral')) return 'Tubulação de Água/Esgoto Geral';
+  if (stepName.includes('Fiação Elétrica Geral')) return 'Fiação Elétrica Geral';
+  if (stepName.includes('Chapisco e Reboco')) return 'Chapisco e Reboco';
+  if (stepName.includes('Contrapiso')) return 'Contrapiso';
+  if (stepName.includes('Impermeabilização Geral')) return 'Impermeabilização Geral';
+  if (stepName.includes('Gesso / Forro Geral')) return 'Gesso / Forro Geral';
+  if (stepName.includes('Pisos e Revestimentos Geral')) return 'Pisos e Revestimentos Geral';
+  if (stepName.includes('Esquadrias (Janelas/Portas)')) return 'Esquadrias (Janelas/Portas)';
+  if (stepName.includes('Marmoraria Geral (Bancadas)')) return 'Marmoraria Geral (Bancadas)';
+  if (stepName.includes('Pintura Paredes/Tetos')) return 'Pintura Paredes/Tetos'; 
+  if (stepName.includes('Instalação de Louças e Metais Geral')) return 'Instalação de Louças e Metais Geral';
+  if (stepName.includes('Instalação de Luminárias')) return 'Instalação de Luminárias';
   if (stepName.includes('Demolição de Banheiro')) return 'Demolição de Banheiro';
   if (stepName.includes('Hidráulica de Banheiro')) return 'Hidráulica de Banheiro';
   if (stepName.includes('Elétrica de Banheiro')) return 'Elétrica de Banheiro';
@@ -176,14 +193,11 @@ const getMaterialCategoryFromStepName = (stepName: string): string => {
   if (stepName.includes('Pisos e Revestimentos de Cozinha')) return 'Pisos e Revestimentos de Cozinha';
   if (stepName.includes('Bancada de Cozinha')) return 'Bancada de Cozinha';
   if (stepName.includes('Louças e Metais de Cozinha')) return 'Louças e Metais de Cozinha';
-  if (stepName.includes('Pintura Paredes/Tetos')) return 'Pintura Paredes/Tetos'; 
   if (stepName.includes('Preparação de Superfície (Lixar/Massa)')) return 'Preparação de Superfície (Lixar/Massa)';
   if (stepName.includes('Proteção do Piso para Pintura')) return 'Proteção do Piso para Pintura';
-  
-  // For Telhado, Mantém o nome exact if Telhado is a material category.
-  if (stepName.includes('Telhado')) return 'Telhado';
+  if (stepName.includes('Limpeza Final e Entrega')) return 'Limpeza Final e Entrega'; // Nova etapa geral
 
-  // Outros casos: retorna o próprio nome da etapa (para correspondência exata)
+  // Fallback
   return stepName;
 };
 
@@ -333,6 +347,7 @@ export const dbService = {
             _dashboardCache.notifications = null;
             _dashboardCache.steps = {}; // NEW: Clear steps cache on logout
             _dashboardCache.materials = {}; // NEW: Clear materials cache on logout
+            _dashboardCache.expenses = {}; // NEW: Clear expenses cache on logout
             callback(null);
         }
     });
@@ -396,6 +411,7 @@ export const dbService = {
     _dashboardCache.notifications = null;
     _dashboardCache.steps = {}; // NEW: Clear steps cache on logout
     _dashboardCache.materials = {}; // NEW: Clear materials cache on logout
+    _dashboardCache.expenses = {}; // NEW: Clear expenses cache on logout
   },
 
   async getUserProfile(userId: string): Promise<User | null> {
@@ -571,12 +587,12 @@ export const dbService = {
     return data ? parseWorkFromDB(data) : null;
   },
 
-  // NEW: Method to regenerate materials based on work template and area
-  async regenerateMaterials(workId: string, area: number, createdSteps: Step[]): Promise<void> {
+  // NEW: Method to regenerate materials based on work attributes and steps
+  async regenerateMaterials(work: Work, createdSteps: Step[]): Promise<void> {
     // Supabase is guaranteed to be initialized now
     try {
         // 1. Delete existing materials for this work
-        await supabase.from('materials').delete().eq('work_id', workId);
+        await supabase.from('materials').delete().eq('work_id', work.id);
 
         const materialsToInsert: any[] = [];
         
@@ -587,12 +603,43 @@ export const dbService = {
 
             if (materialCategory) {
                 for (const item of materialCategory.items) {
-                    const multiplier = item.multiplier || 1; 
+                    let calculatedQty = 0;
+
+                    if (item.flat_qty) {
+                        calculatedQty = item.flat_qty;
+                    } else {
+                        // Base calculation (e.g., per m² of area)
+                        calculatedQty = work.area * item.multiplier;
+
+                        // Adjust based on room counts if applicable to this step/category
+                        if (step.name.includes('Banheiro') && work.bathrooms && work.bathrooms > 0) {
+                            calculatedQty *= work.bathrooms;
+                        } else if (step.name.includes('Cozinha') && work.kitchens && work.kitchens > 0) {
+                            calculatedQty *= work.kitchens;
+                        } else if (step.name.includes('Quarto') && work.bedrooms && work.bedrooms > 0) { // Future proofing
+                            calculatedQty *= work.bedrooms;
+                        } else if (step.name.includes('Sala') && work.livingRooms && work.livingRooms > 0) { // Future proofing
+                            calculatedQty *= work.livingRooms;
+                        }
+
+                        // Adjust for floors if applicable (e.g., for slabs, general walls)
+                        if (step.name.includes('Lajes e Vigas') && work.floors && work.floors > 1) { // If multi-floor slab
+                            calculatedQty *= (work.floors -1); // Adjust for intermediate slabs
+                        } else if (step.name.includes('Levantamento de paredes') && work.floors && work.floors > 1) {
+                             // Assuming multiplier is for one floor, scale with floors
+                             calculatedQty *= work.floors;
+                        }
+                    }
+                    
+                    // Ensure min 1 if calculated > 0, and round up
+                    calculatedQty = Math.ceil(Math.max(0, calculatedQty));
+                    if (calculatedQty === 0 && item.multiplier > 0) calculatedQty = 1; // Ensure at least 1 unit if material has a multiplier but calculated to 0
+
                     materialsToInsert.push({
-                        work_id: workId, 
+                        work_id: work.id, 
                         name: item.name,
                         brand: undefined, 
-                        planned_qty: Math.ceil(area * multiplier), 
+                        planned_qty: calculatedQty, 
                         purchased_qty: 0, 
                         unit: item.unit,
                         step_id: step.id, // Link material to the specific step
@@ -614,11 +661,12 @@ export const dbService = {
         }
         
         // Invalidate caches
-        _dashboardCache.materials[workId] = null; 
-        console.log(`[REGEN MATERIAL] Materiais para obra ${workId} regenerados com sucesso.`);
+        _dashboardCache.materials[work.id] = null; 
+        _dashboardCache.expenses[work.id] = null; // NEW: Invalidate expenses cache after regenerating materials
+        console.log(`[REGEN MATERIAL] Materiais para obra ${work.id} regenerados com sucesso.`);
 
     } catch (error: any) {
-        console.error(`[REGEN MATERIAL ERROR] Erro ao regenerar materiais para work ${workId}:`, error);
+        console.error(`[REGEN MATERIAL ERROR] Erro ao regenerar materiais para work ${work.id}:`, error);
         throw error;
     }
   },
@@ -664,6 +712,7 @@ export const dbService = {
     _dashboardCache.notifications = null; 
     _dashboardCache.steps[parsedWork.id] = null;
     _dashboardCache.materials[parsedWork.id] = null;
+    _dashboardCache.expenses[parsedWork.id] = null; // NEW: Invalidate expenses cache
 
 
     const template = WORK_TEMPLATES.find(t => t.id === templateId);
@@ -673,35 +722,105 @@ export const dbService = {
 
     let finalStepNames: string[] = [];
     const numFloors = parsedWork.floors || 1; // Garante pelo menos 1 pavimento
+    const numBathrooms = parsedWork.bathrooms || 0;
+    const numBedrooms = parsedWork.bedrooms || 0;
+    const numKitchens = parsedWork.kitchens || 0;
+    const numLivingRooms = parsedWork.livingRooms || 0;
 
     if (template.id === 'CONSTRUCAO') {
-        // Etapas base que são sempre incluídas
-        const baseStepsExcludingDynamic = template.includedSteps.filter(name => 
-            !name.includes('Limpeza do terreno') &&
-            !name.includes('Fundações') &&
-            !name.includes('Levantamento de paredes') &&
-            !name.includes('Lajes e Vigas') &&
-            !name.includes('Telhado') // Telhado será adicionado dinamicamente no final
-        );
+        const constructionBaseSteps = [
+          'Limpeza do terreno', 
+          'Fundações',
+        ];
+        const interiorSteps = [
+            'Tubulação de Água/Esgoto Geral', 
+            'Fiação Elétrica Geral', 
+            'Chapisco e Reboco', 
+            'Contrapiso',
+            'Impermeabilização Geral', 
+            'Gesso / Forro Geral', 
+            'Pisos e Revestimentos Geral', 
+            'Esquadrias (Janelas/Portas)',
+            'Marmoraria Geral (Bancadas)', 
+            'Pintura Paredes/Tetos', 
+            'Instalação de Louças e Metais Geral', 
+            'Instalação de Luminárias',
+            // Itens de banheiro e cozinha adicionados separadamente se houver cômodos
+        ];
 
-        finalStepNames.push('Limpeza do terreno');
-        finalStepNames.push('Fundações');
-        finalStepNames.push('Levantamento de paredes (Térreo)');
-
-        for (let i = 1; i < numFloors; i++) {
-            finalStepNames.push(`Lajes e Vigas (Piso ${i}º Pavimento)`);
-            finalStepNames.push(`Levantamento de paredes (${i}º Pavimento)`);
+        finalStepNames.push(...constructionBaseSteps);
+        
+        for (let i = 0; i < numFloors; i++) {
+            if (i === 0) {
+                finalStepNames.push('Levantamento de paredes (Térreo)');
+            } else {
+                finalStepNames.push(`Lajes e Vigas (Piso ${i}º Pavimento)`);
+                finalStepNames.push(`Levantamento de paredes (${i}º Pavimento)`);
+            }
         }
-        finalStepNames.push('Lajes e Vigas (Cobertura)');
-        finalStepNames.push('Telhado'); // Adiciona o telhado uma única vez no final
+        if (numFloors > 0) { // Add roof related steps if there's at least one floor (or ground floor)
+            finalStepNames.push('Lajes e Vigas (Cobertura)');
+            finalStepNames.push('Telhado');
+        }
 
-        finalStepNames = [...finalStepNames, ...baseStepsExcludingDynamic];
-        effectiveDefaultDurationDays = finalStepNames.length * 10; // Cerca de 10 dias por etapa
+        finalStepNames.push(...interiorSteps);
+
+        // Adiciona etapas específicas de cômodos se houver
+        for(let i = 0; i < numBathrooms; i++) {
+            finalStepNames.push(`Demolição de Banheiro (B${i+1})`); // Use unique names
+            finalStepNames.push(`Hidráulica de Banheiro (B${i+1})`);
+            finalStepNames.push(`Elétrica de Banheiro (B${i+1})`);
+            finalStepNames.push(`Impermeabilização de Banheiro (B${i+1})`);
+            finalStepNames.push(`Contrapiso de Banheiro (B${i+1})`);
+            finalStepNames.push(`Pisos e Revestimentos de Banheiro (B${i+1})`);
+            finalStepNames.push(`Gesso / Forro de Banheiro (B${i+1})`);
+            finalStepNames.push(`Bancada de Banheiro (B${i+1})`);
+            finalStepNames.push(`Louças e Metais de Banheiro (B${i+1})`);
+        }
+        for(let i = 0; i < numKitchens; i++) {
+            finalStepNames.push(`Demolição de Cozinha (C${i+1})`);
+            finalStepNames.push(`Hidráulica de Cozinha (C${i+1})`);
+            finalStepNames.push(`Elétrica de Cozinha (C${i+1})`);
+            finalStepNames.push(`Pisos e Revestimentos de Cozinha (C${i+1})`);
+            finalStepNames.push(`Bancada de Cozinha (C${i+1})`);
+            finalStepNames.push(`Louças e Metais de Cozinha (C${i+1})`);
+        }
+        
+        finalStepNames.push('Limpeza Final e Entrega'); // Final step
+
+        effectiveDefaultDurationDays = finalStepNames.length * 7; // Cerca de 7 dias por etapa ajustado.
         if (effectiveDefaultDurationDays < template.defaultDurationDays) {
-            effectiveDefaultDurationDays = template.defaultDurationDays; // Garante uma duração mínima
+            effectiveDefaultDurationDays = template.defaultDurationDays;
         }
 
-    } else {
+    } else if (template.id === 'REFORMA_APTO') {
+        finalStepNames = template.includedSteps;
+        // Adiciona etapas de cômodos específicos se houver
+        for(let i = 0; i < numBathrooms; i++) {
+            finalStepNames.push(`Demolição de Banheiro (B${i+1})`);
+            finalStepNames.push(`Hidráulica de Banheiro (B${i+1})`);
+            finalStepNames.push(`Elétrica de Banheiro (B${i+1})`);
+            finalStepNames.push(`Impermeabilização de Banheiro (B${i+1})`);
+            finalStepNames.push(`Contrapiso de Banheiro (B${i+1})`);
+            finalStepNames.push(`Pisos e Revestimentos de Banheiro (B${i+1})`);
+            finalStepNames.push(`Gesso / Forro de Banheiro (B${i+1})`);
+            finalStepNames.push(`Bancada de Banheiro (B${i+1})`);
+            finalStepNames.push(`Louças e Metais de Banheiro (B${i+1})`);
+        }
+        for(let i = 0; i < numKitchens; i++) {
+            finalStepNames.push(`Demolição de Cozinha (C${i+1})`);
+            finalStepNames.push(`Hidráulica de Cozinha (C${i+1})`);
+            finalStepNames.push(`Elétrica de Cozinha (C${i+1})`);
+            finalStepNames.push(`Pisos e Revestimentos de Cozinha (C${i+1})`);
+            finalStepNames.push(`Bancada de Cozinha (C${i+1})`);
+            finalStepNames.push(`Louças e Metais de Cozinha (C${i+1})`);
+        }
+        effectiveDefaultDurationDays = finalStepNames.length * 5; // Menos tempo por etapa para reforma
+        if (effectiveDefaultDurationDays < template.defaultDurationDays) {
+            effectiveDefaultDurationDays = template.defaultDurationDays;
+        }
+    }
+    else { // For single room templates (BANHEIRO, COZINHA, PINTURA)
         finalStepNames = template.includedSteps;
         effectiveDefaultDurationDays = template.defaultDurationDays;
     }
@@ -744,8 +863,8 @@ export const dbService = {
     }
     const createdSteps = (createdStepsData || []).map(parseStepFromDB);
 
-    // FIX: Agora chamando a função regenerateMaterials com a lista real de etapas criadas
-    await this.regenerateMaterials(parsedWork.id, parsedWork.area, createdSteps); 
+    // FIX: Agora chamando a função regenerateMaterials com a lista real de etapas criadas E O OBJETO WORK
+    await this.regenerateMaterials(parsedWork, createdSteps); 
 
     return parsedWork;
   },
@@ -790,6 +909,7 @@ export const dbService = {
         _dashboardCache.notifications = null; // Invalidate global notification cache
         _dashboardCache.steps[workId] = null; // NEW: Invalidate steps cache for this workId
         _dashboardCache.materials[workId] = null; // NEW: Invalidate materials cache for this workId
+        _dashboardCache.expenses[workId] = null; // NEW: Invalidate expenses cache for this workId
         console.log(`[DB DELETE] Caches para workId ${workId} invalidados.`);
 
     } catch (error: unknown) { // Explicitly type as unknown
@@ -842,6 +962,8 @@ export const dbService = {
     delete _dashboardCache.summary[step.workId];
     _dashboardCache.notifications = null; // NEW: Invalidate notifications cache
     _dashboardCache.steps[step.workId] = null; // NEW: Invalidate steps cache for this workId
+    _dashboardCache.materials[step.workId] = null; // NEW: Invalidate materials cache (as they relate to steps)
+    _dashboardCache.expenses[step.workId] = null; // NEW: Invalidate expenses cache (as they relate to steps)
     return parseStepFromDB(newStepData);
   },
 
@@ -864,6 +986,8 @@ export const dbService = {
     delete _dashboardCache.summary[step.workId];
     _dashboardCache.notifications = null; // NEW: Invalidate notifications cache
     _dashboardCache.steps[step.workId] = null; // NEW: Invalidate steps cache for this workId
+    _dashboardCache.materials[step.workId] = null; // NEW: Invalidate materials cache (as they relate to steps)
+    _dashboardCache.expenses[step.workId] = null; // NEW: Invalidate expenses cache (as they relate to steps)
     return parseStepFromDB(updatedStepData);
   },
 
@@ -946,6 +1070,8 @@ export const dbService = {
       _dashboardCache.notifications = null; // Notifications might be tied to steps, invalidate global cache
       _dashboardCache.steps[workId] = null; // NEW: Invalidate steps cache for this workId
       _dashboardCache.materials[workId] = null; // NEW: Invalidate materials cache for this workId
+      _dashboardCache.expenses[workId] = null; // NEW: Invalidate expenses cache for this workId
+
       console.log(`[DB DELETE] Caches para workId ${workId} invalidados após exclusão da etapa.`);
 
     } catch (error: any) {
@@ -1014,6 +1140,7 @@ export const dbService = {
     delete _dashboardCache.summary[material.workId];
     _dashboardCache.notifications = null; // NEW: Invalidate notifications cache
     _dashboardCache.materials[material.workId] = null; // NEW: Invalidate materials cache for this workId
+    _dashboardCache.expenses[material.workId] = null; // NEW: Invalidate expenses cache for this workId
     return parseMaterialFromDB(newMaterialData);
   },
 
@@ -1037,11 +1164,40 @@ export const dbService = {
     delete _dashboardCache.summary[material.workId];
     _dashboardCache.notifications = null; // NEW: Invalidate notifications cache
     _dashboardCache.materials[material.workId] = null; // NEW: Invalidate materials cache for this workId
+    _dashboardCache.expenses[material.workId] = null; // NEW: Invalidate expenses cache for this workId
     return parseMaterialFromDB(updatedMaterialData);
   },
 
   async deleteMaterial(materialId: string): Promise<void> {
     // Supabase is guaranteed to be initialized now
+    const { data: materialToDelete, error: fetchMaterialError } = await supabase
+        .from('materials')
+        .select('work_id')
+        .eq('id', materialId)
+        .single();
+
+    if (fetchMaterialError || !materialToDelete) {
+        console.error(`[DB DELETE] Erro ao buscar material ${materialId}:`, fetchMaterialError || 'Material não encontrado.');
+        throw new Error(`Falha ao buscar material: ${fetchMaterialError?.message || 'Material não encontrado.'}`);
+    }
+
+    // 1. Verificar se existem despesas associadas a este material
+    const { data: expensesCheck, error: expensesCheckError } = await supabase
+      .from('expenses')
+      .select('id')
+      .eq('related_material_id', materialId);
+
+    if (expensesCheckError) {
+      console.error(`[DB DELETE] Erro ao verificar despesas para materialId ${materialId}:`, expensesCheckError);
+      throw new Error(`Falha ao verificar despesas associadas ao material: ${expensesCheckError.message}`);
+    }
+
+    if (expensesCheck && expensesCheck.length > 0) {
+      const expenseCount = expensesCheck.length;
+      throw new Error(`Este material não pode ser excluído pois possui ${expenseCount} lançamento(s) financeiro(s) associado(s). Apague os lançamentos primeiro.`);
+    }
+
+    // Se não há despesas associadas, proceed with deletion
     const { data: deletedMaterial, error: deleteMaterialError } = await supabase.from('materials').delete().eq('id', materialId).select('work_id').single();
     if (deleteMaterialError) {
       console.error("Erro ao apagar material:", deleteMaterialError);
@@ -1052,6 +1208,7 @@ export const dbService = {
       delete _dashboardCache.summary[deletedMaterial.work_id];
       _dashboardCache.notifications = null;
       _dashboardCache.materials[deletedMaterial.work_id] = null;
+      _dashboardCache.expenses[deletedMaterial.work_id] = null; // NEW: Invalidate expenses cache
     }
   },
 
@@ -1086,7 +1243,7 @@ export const dbService = {
       workId: existingMaterial.work_id,
       description: `Compra de ${name} (${qty} ${unit})`,
       amount: cost,
-      date: new Date().toISOString(),
+      date: new Date().toISOString().split('T')[0], // Use YYYY-MM-DD
       category: ExpenseCategory.MATERIAL,
       relatedMaterialId: materialId,
       stepId: existingMaterial.step_id
@@ -1096,18 +1253,26 @@ export const dbService = {
     delete _dashboardCache.summary[existingMaterial.work_id];
     _dashboardCache.notifications = null; // NEW: Invalidate notifications cache
     _dashboardCache.materials[existingMaterial.work_id] = null; // NEW: Invalidate materials cache for this workId
+    _dashboardCache.expenses[existingMaterial.work_id] = null; // NEW: Invalidate expenses cache for this workId
   },
 
   // --- EXPENSES ---
   async getExpenses(workId: string): Promise<Expense[]> {
     // Supabase is guaranteed to be initialized now
+    const now = Date.now();
+    if (_dashboardCache.expenses[workId] && (now - _dashboardCache.expenses[workId].timestamp < CACHE_TTL)) {
+        console.log(`[CACHE HIT] getExpenses for workId ${workId}`);
+        return _dashboardCache.expenses[workId].data;
+    }
     console.log(`[dbService.getExpenses] Fetching expenses for work: ${workId}`); // Log para depuração
     const { data, error: fetchExpensesError } = await supabase.from('expenses').select('*').eq('work_id', workId).order('date', { ascending: false }); // Renamed error
     if (fetchExpensesError) {
       console.error(`[dbService.getExpenses] Erro ao buscar despesas para work ${workId}:`, fetchExpensesError); // Log de erro mais detalhado
       return [];
     }
-    return (data || []).map(parseExpenseFromDB);
+    const parsed = (data || []).map(parseExpenseFromDB);
+    _dashboardCache.expenses[workId] = { data: parsed, timestamp: now }; // Cache the result
+    return parsed;
   },
 
   async addExpense(expense: Omit<Expense, 'id'>): Promise<Expense | null> {
@@ -1116,7 +1281,7 @@ export const dbService = {
       work_id: expense.workId,
       description: expense.description,
       amount: expense.amount,
-      paid_amount: expense.paidAmount || expense.amount, // Ensure paid_amount is set
+      paid_amount: expense.paidAmount || 0, // Inicia com 0 se não for fornecido
       quantity: expense.quantity || 1, // Default quantity
       date: expense.date,
       category: expense.category,
@@ -1124,7 +1289,7 @@ export const dbService = {
       related_material_id: expense.relatedMaterialId, 
       worker_id: expense.workerId, 
       supplier_id: expense.supplierId, // NEW: Added supplier_id
-      total_agreed: expense.totalAgreed // Corrected to total_agreed
+      total_agreed: expense.totalAgreed || expense.amount // total_agreed defaults to amount if not specified
     }).select().single();
     if (addExpenseError) {
       console.error("Erro ao adicionar despesa:", addExpenseError);
@@ -1134,6 +1299,7 @@ export const dbService = {
     delete _dashboardCache.stats[expense.workId];
     delete _dashboardCache.summary[expense.workId];
     _dashboardCache.notifications = null; // NEW: Invalidate notifications cache
+    _dashboardCache.expenses[expense.workId] = null; // NEW: Invalidate expenses cache for this workId
     return parseExpenseFromDB(newExpenseData);
   },
 
@@ -1142,7 +1308,7 @@ export const dbService = {
     const { data: updatedExpenseData, error: updateExpenseError } = await supabase.from('expenses').update({ // Renamed data and error
       description: expense.description,
       amount: expense.amount,
-      paid_amount: expense.paidAmount || expense.amount,
+      paid_amount: expense.paidAmount || 0, // Ensure paid_amount is handled
       quantity: expense.quantity,
       date: expense.date,
       category: expense.category,
@@ -1150,7 +1316,7 @@ export const dbService = {
       related_material_id: expense.relatedMaterialId, 
       worker_id: expense.workerId, 
       supplier_id: expense.supplierId, // NEW: Added supplier_id
-      total_agreed: expense.totalAgreed // Corrected to total_agreed
+      total_agreed: expense.totalAgreed || expense.amount // Corrected to total_agreed
     }).eq('id', expense.id).select().single();
     if (updateExpenseError) {
       console.error("Erro ao atualizar despesa:", updateExpenseError);
@@ -1160,25 +1326,71 @@ export const dbService = {
     delete _dashboardCache.stats[expense.workId];
     delete _dashboardCache.summary[expense.workId];
     _dashboardCache.notifications = null; // NEW: Invalidate notifications cache
+    _dashboardCache.expenses[expense.workId] = null; // NEW: Invalidate expenses cache for this workId
     return parseExpenseFromDB(updatedExpenseData);
   },
 
   async deleteExpense(expenseId: string): Promise<void> {
     // Supabase is guaranteed to be initialized now
-    const response = await supabase.from('expenses').delete().eq('id', expenseId).select('work_id').single();
-    const deletedExpense: { work_id: string } | null = response.data; // Explicitly type to allow for null
+    const response = await supabase.from('expenses').delete().eq('id', expenseId).select('work_id, related_material_id').single();
+    const deletedExpense: { work_id: string, related_material_id?: string } | null = response.data; // Explicitly type to allow for null
     const deleteExpenseError = response.error; // Extract error from response
 
     if (deleteExpenseError) {
       console.error("Erro ao apagar despesa:", deleteExpenseError);
       throw deleteExpenseError;
     }
+
+    if (deletedExpense?.related_material_id) {
+        throw new Error("Esta despesa é de material e não pode ser excluída isoladamente. Apague o material correspondente se necessário.");
+    }
+
     if (deletedExpense) {
         // Invalidate cache for work stats/summary of the work where the expense was deleted
         delete _dashboardCache.stats[deletedExpense.work_id];
         delete _dashboardCache.summary[deletedExpense.work_id];
         _dashboardCache.notifications = null; // NEW: Invalidate notifications cache
+        _dashboardCache.expenses[deletedExpense.work_id] = null; // NEW: Invalidate expenses cache for this workId
     }
+  },
+
+  // NEW: Function to add payment to an existing expense
+  async addPaymentToExpense(expenseId: string, paymentAmount: number, paymentDate: string): Promise<Expense | null> {
+    const { data: existingExpense, error: fetchError } = await supabase
+        .from('expenses')
+        .select('*')
+        .eq('id', expenseId)
+        .single();
+
+    if (fetchError || !existingExpense) {
+        console.error("Erro ao buscar despesa para adicionar pagamento:", fetchError);
+        throw new Error("Despesa não encontrada.");
+    }
+
+    // Update paid_amount
+    const newPaidAmount = (existingExpense.paid_amount || 0) + paymentAmount;
+    
+    const { data: updatedExpenseData, error: updateError } = await supabase
+        .from('expenses')
+        .update({
+            paid_amount: newPaidAmount,
+        })
+        .eq('id', expenseId)
+        .select()
+        .single();
+
+    if (updateError) {
+        console.error("Erro ao registrar pagamento da despesa:", updateError);
+        throw updateError;
+    }
+    
+    // Invalidate caches
+    delete _dashboardCache.stats[existingExpense.work_id];
+    delete _dashboardCache.summary[existingExpense.work_id];
+    _dashboardCache.notifications = null;
+    _dashboardCache.expenses[existingExpense.work_id] = null;
+
+    return parseExpenseFromDB(updatedExpenseData);
   },
 
   // --- WORKERS ---
@@ -1511,7 +1723,7 @@ export const dbService = {
     console.log(`[dbService.getDailySummary] Fetching summary for work: ${workId}`); // Log para depuração
     const [stepsResult, materialsResult] = await Promise.all([
       supabase.from('steps').select('id, status, end_date').eq('work_id', workId),
-      supabase.from('materials').select('id, planned_qty, purchased_qty, step_id, name').eq('work_id', workId) // Fetch name and step_id
+      supabase.from('materials').select('id, planned_qty, purchased_qty, step_id, name') // Fetch name and step_id
     ]);
 
     if (stepsResult.error || materialsResult.error) {

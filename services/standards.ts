@@ -1,5 +1,4 @@
 
-
 // Standard Libraries for Construction Management
 
 // --- AVATAR CONFIG ---
@@ -59,9 +58,9 @@ export const WORK_TEMPLATES: WorkTemplate[] = [
       'Fiação Elétrica Geral', 
       'Chapisco e Reboco', 
       'Contrapiso',
-      'Impermeabilização', 
-      'Gesso / Forro', 
-      'Pisos e Revestimentos', 
+      'Impermeabilização Geral', // Renomeado para diferenciar de "Banheiro"
+      'Gesso / Forro Geral', // Renomeado
+      'Pisos e Revestimentos Geral', // Renomeado
       'Esquadrias (Janelas/Portas)',
       'Marmoraria Geral (Bancadas)', 
       'Pintura Paredes/Tetos', 
@@ -84,8 +83,8 @@ export const WORK_TEMPLATES: WorkTemplate[] = [
       // e os específicos (Banheiro/Cozinha) terão seus próprios.
       'Tubulação de Água/Esgoto Geral', 
       'Fiação Elétrica Geral',
-      'Gesso / Forro', 
-      'Pisos e Revestimentos', 
+      'Gesso / Forro Geral', 
+      'Pisos e Revestimentos Geral', 
       'Marmoraria Geral (Bancadas)', // Usar o geral para reforma completa
       'Pintura Paredes/Tetos', 
       'Instalação de Louças e Metais Geral', // Usar o geral para reforma completa
@@ -143,18 +142,26 @@ export const WORK_TEMPLATES: WorkTemplate[] = [
   }
 ];
 
+export interface MaterialItem {
+  name: string;
+  unit: string;
+  multiplier: number; // Será interpretado por db.ts como por m² ou por cômodo, dependendo da categoria
+  flat_qty?: number; // Quantidade fixa, não dependente de área ou cômodos (ex: caixa d'água)
+}
+
 export interface MaterialCatalog {
   category: string;
-  items: {name: string, unit: string, multiplier?: number}[];
+  items: MaterialItem[];
 }
 
 // CRITICAL: The 'category' key here MUST match the step names in WORK_TEMPLATES above.
+// Multipliers are now a base, to be further adjusted dynamically by `db.ts` `regenerateMaterials`.
 export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
   {
     category: 'Limpeza do terreno',
     items: [
-      { name: 'Sacos de Ráfia (Entulho)', unit: 'un', multiplier: 0.8 },
-      { name: 'Caçamba Estacionária', unit: 'un', multiplier: 0.05 },
+      { name: 'Sacos de Ráfia (Entulho)', unit: 'un', multiplier: 0.8 }, // por m² de área
+      { name: 'Caçamba Estacionária', unit: 'un', multiplier: 0.005, flat_qty: 1 }, // Flat 1 para obras maiores, 0.005 * area
       { name: 'Tapume (Madeirite)', unit: 'chapa', multiplier: 0.05 },
       { name: 'Sarrafo de Madeira (2.5m)', unit: 'dz', multiplier: 0.02 },
       { name: 'Prego 17x21 (Cabeça dupla)', unit: 'kg', multiplier: 0.01 },
@@ -178,7 +185,7 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
     ]
   },
   {
-    category: 'Levantamento de paredes',
+    category: 'Levantamento de paredes (Térreo)', // Dynamic Step Name
     items: [
       { name: 'Bloco Cerâmico (9x19x19cm)', unit: 'un', multiplier: 30 },
       { name: 'Cimento CP-II (Assentamento)', unit: 'sacos', multiplier: 0.2 },
@@ -188,7 +195,28 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
     ]
   },
   {
-    category: 'Lajes e Vigas',
+    category: 'Levantamento de paredes (1º Pavimento)', // Dynamic Step Name
+    items: [
+      { name: 'Bloco Cerâmico (9x19x19cm)', unit: 'un', multiplier: 30 },
+      { name: 'Cimento CP-II (Assentamento)', unit: 'sacos', multiplier: 0.2 },
+      { name: 'Areia Fina (Assentamento)', unit: 'm³', multiplier: 0.03 },
+      { name: 'Cal para Argamassa', unit: 'sacos', multiplier: 0.05 },
+      { name: 'Vergalhão 5/16 (8mm - Cintas)', unit: 'barras', multiplier: 0.2 }
+    ]
+  },
+  {
+    category: 'Lajes e Vigas (Piso 1º Pavimento)', // Dynamic Step Name
+    items: [
+      { name: 'Laje Pré-Fabricada (Lajota)', unit: 'm²', multiplier: 1 },
+      { name: 'Cimento CP-III (Concretagem)', unit: 'sacos', multiplier: 0.3 },
+      { name: 'Areia Média (Concreto)', unit: 'm³', multiplier: 0.05 },
+      { name: 'Brita 1 (Concreto)', unit: 'm³', multiplier: 0.04 },
+      { name: 'Vergalhão 1/2 (12.5mm)', unit: 'barras', multiplier: 0.8 },
+      { name: 'Tábua de Pinus (30cm - Caixaria)', unit: 'dz', multiplier: 0.1 }
+    ]
+  },
+  {
+    category: 'Lajes e Vigas (Cobertura)', // Dynamic Step Name
     items: [
       { name: 'Laje Pré-Fabricada (Lajota)', unit: 'm²', multiplier: 1 },
       { name: 'Cimento CP-III (Concretagem)', unit: 'sacos', multiplier: 0.3 },
@@ -210,11 +238,12 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
   {
     category: 'Tubulação de Água/Esgoto Geral',
     items: [
-      { name: 'Tubos PVC 100mm (Esgoto)', unit: 'barras', multiplier: 0.1 },
-      { name: 'Tubos PVC 50mm (Esgoto)', unit: 'barras', multiplier: 0.15 },
-      { name: 'Tubos PVC 25mm (Água Fria)', unit: 'barras', multiplier: 0.2 },
+      { name: 'Tubos PVC 100mm (Esgoto)', unit: 'barras', multiplier: 0.05 }, // por m²
+      { name: 'Tubos PVC 50mm (Esgoto)', unit: 'barras', multiplier: 0.1 },
+      { name: 'Tubos PVC 25mm (Água Fria)', unit: 'barras', multiplier: 0.15 },
       { name: 'Conexões PVC (Diversas)', unit: 'un', multiplier: 0.5 },
-      { name: 'Caixa D\'água 1000L', unit: 'un', multiplier: 0.001 },
+      // FIX: Added 'multiplier: 0' to satisfy MaterialItem interface, as flat_qty is present.
+      { name: 'Caixa D\'água 1000L', unit: 'un', multiplier: 0, flat_qty: 1 }, // Qty fixa
       { name: 'Cola PVC e Lixa', unit: 'kit', multiplier: 0.02 }
     ]
   },
@@ -246,7 +275,7 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
     ]
   },
   {
-    category: 'Impermeabilização',
+    category: 'Impermeabilização Geral', // Renomeado
     items: [
       { name: 'Manta Asfáltica (1m x 10m)', unit: 'rolos', multiplier: 0.1 },
       { name: 'Asfalto para Manta', unit: 'litros', multiplier: 0.5 },
@@ -254,7 +283,7 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
     ]
   },
   {
-    category: 'Gesso / Forro',
+    category: 'Gesso / Forro Geral', // Renomeado
     items: [
       { name: 'Placa de Gesso Acartonado (1.20x1.80m)', unit: 'chapa', multiplier: 0.6 },
       { name: 'Perfil Metálico (Montante)', unit: 'barra', multiplier: 2 },
@@ -263,7 +292,7 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
     ]
   },
   {
-    category: 'Pisos e Revestimentos',
+    category: 'Pisos e Revestimentos Geral', // Renomeado
     items: [
       { name: 'Piso Cerâmico/Porcelanato (60x60cm)', unit: 'm²', multiplier: 1.1 },
       { name: 'Argamassa AC-II / AC-III', unit: 'sacos', multiplier: 0.3 },
@@ -273,18 +302,18 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
   {
     category: 'Esquadrias (Janelas/Portas)',
     items: [
-      { name: 'Janela de Alumínio (1.20x1.20m)', unit: 'un', multiplier: 0.05 },
-      { name: 'Porta de Madeira (80x210cm)', unit: 'un', multiplier: 0.05 },
-      { name: 'Fechadura e Dobradiças', unit: 'kit', multiplier: 0.05 },
-      { name: 'Cimento para Fixação', unit: 'sacos', multiplier: 0.01 }
+      { name: 'Janela de Alumínio (1.20x1.20m)', unit: 'un', multiplier: 0.02 }, // por m²
+      { name: 'Porta de Madeira (80x210cm)', unit: 'un', multiplier: 0.03 }, // por m²
+      { name: 'Fechadura e Dobradiças', unit: 'kit', multiplier: 0.05 }, // por m²
+      { name: 'Cimento para Fixação', unit: 'sacos', multiplier: 0.01 } // por m²
     ]
   },
   {
     category: 'Marmoraria Geral (Bancadas)',
     items: [
-      { name: 'Granito/Mármore (Verde Ubatuba/Travertino)', unit: 'm²', multiplier: 0.1 },
-      { name: 'Cuba de Inox/Louça', unit: 'un', multiplier: 0.01 },
-      { name: 'Silicones e Colas', unit: 'tubo', multiplier: 0.01 }
+      { name: 'Granito/Mármore (Verde Ubatuba/Travertino)', unit: 'm²', multiplier: 0.1 }, // por m²
+      { name: 'Cuba de Inox/Louça', unit: 'un', multiplier: 0.01 }, // por m²
+      { name: 'Silicones e Colas', unit: 'tubo', multiplier: 0.01 } // por m²
     ]
   },
   {
@@ -301,7 +330,7 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
   {
     category: 'Instalação de Louças e Metais Geral',
     items: [
-      { name: 'Vaso Sanitário com Caixa Acoplada', unit: 'un', multiplier: 0.02 },
+      { name: 'Vaso Sanitário com Caixa Acoplada', unit: 'un', multiplier: 0.02 }, // por m²
       { name: 'Pia/Lavatório com Coluna', unit: 'un', multiplier: 0.02 },
       { name: 'Torneiras (Bancada/Parede)', unit: 'un', multiplier: 0.03 },
       { name: 'Chuveiro Elétrico/a Gás', unit: 'un', multiplier: 0.01 },
@@ -312,7 +341,7 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
   {
     category: 'Instalação de Luminárias',
     items: [
-      { name: 'Luminárias de Teto (Spots/Plafons)', unit: 'un', multiplier: 0.5 },
+      { name: 'Luminárias de Teto (Spots/Plafons)', unit: 'un', multiplier: 0.5 }, // por m²
       { name: 'Lâmpadas LED (Quente/Fria)', unit: 'un', multiplier: 1 },
       { name: 'Fio Flexível 1.5mm', unit: 'm', multiplier: 1 }
     ]
@@ -329,133 +358,133 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
   {
     category: 'Demolição de Banheiro',
     items: [
-      { name: 'Sacos de Ráfia (Entulho)', unit: 'un', multiplier: 5 },
-      { name: 'Marreta/Talhadeira', unit: 'un', multiplier: 0.01 },
-      { name: 'Caçamba Estacionária Pequena', unit: 'un', multiplier: 0.005 }
+      { name: 'Sacos de Ráfia (Entulho)', unit: 'un', multiplier: 5, flat_qty: 5 }, // 5 por banheiro
+      { name: 'Marreta/Talhadeira', unit: 'un', multiplier: 0.01, flat_qty: 0.01 },
+      { name: 'Caçamba Estacionária Pequena', unit: 'un', multiplier: 0.005, flat_qty: 0.005 }
     ]
   },
   {
     category: 'Hidráulica de Banheiro',
     items: [
-      { name: 'Tubos PVC 50mm (Esgoto)', unit: 'barra', multiplier: 0.5 },
-      { name: 'Tubos PPR/CPVC 25mm (Água)', unit: 'barra', multiplier: 0.5 },
-      { name: 'Registros (Pressão/Gaveta)', unit: 'un', multiplier: 3 },
-      { name: 'Joelhos/Conexões (Diversas)', unit: 'un', multiplier: 8 },
-      { name: 'Cola PVC/Termofusão', unit: 'frasco', multiplier: 0.05 }
+      { name: 'Tubos PVC 50mm (Esgoto)', unit: 'barra', multiplier: 0.5, flat_qty: 0.5 },
+      { name: 'Tubos PPR/CPVC 25mm (Água)', unit: 'barra', multiplier: 0.5, flat_qty: 0.5 },
+      { name: 'Registros (Pressão/Gaveta)', unit: 'un', multiplier: 3, flat_qty: 3 },
+      { name: 'Joelhos/Conexões (Diversas)', unit: 'un', multiplier: 8, flat_qty: 8 },
+      { name: 'Cola PVC/Termofusão', unit: 'frasco', multiplier: 0.05, flat_qty: 0.05 }
     ]
   },
   {
     category: 'Elétrica de Banheiro',
     items: [
-      { name: 'Fio Flexível 2.5mm', unit: 'm', multiplier: 10 },
-      { name: 'Fio Flexível 1.5mm', unit: 'm', multiplier: 5 },
-      { name: 'Disjuntor DR (Segurança)', unit: 'un', multiplier: 1 },
-      { name: 'Caixa de Tomada 4x2', unit: 'un', multiplier: 3 },
-      { name: 'Tomada com Proteção', unit: 'un', multiplier: 2 },
-      { name: 'Interruptor Simples', unit: 'un', multiplier: 1 }
+      { name: 'Fio Flexível 2.5mm', unit: 'm', multiplier: 10, flat_qty: 10 },
+      { name: 'Fio Flexível 1.5mm', unit: 'm', multiplier: 5, flat_qty: 5 },
+      { name: 'Disjuntor DR (Segurança)', unit: 'un', multiplier: 1, flat_qty: 1 },
+      { name: 'Caixa de Tomada 4x2', unit: 'un', multiplier: 3, flat_qty: 3 },
+      { name: 'Tomada com Proteção', unit: 'un', multiplier: 2, flat_qty: 2 },
+      { name: 'Interruptor Simples', unit: 'un', multiplier: 1, flat_qty: 1 }
     ]
   },
   {
     category: 'Impermeabilização de Banheiro',
     items: [
-      { name: 'Manta Líquida Acrílica', unit: 'litro', multiplier: 2 },
-      { name: 'Cimento Elástico (Argamassa Polimérica)', unit: 'kg', multiplier: 5 },
-      { name: 'Tela de Poliéster (Reforço)', unit: 'm²', multiplier: 2 }
+      { name: 'Manta Líquida Acrílica', unit: 'litro', multiplier: 2, flat_qty: 2 },
+      { name: 'Cimento Elástico (Argamassa Polimérica)', unit: 'kg', multiplier: 5, flat_qty: 5 },
+      { name: 'Tela de Poliéster (Reforço)', unit: 'm²', multiplier: 2, flat_qty: 2 }
     ]
   },
   {
     category: 'Contrapiso de Banheiro',
     items: [
-      { name: 'Cimento CP-II', unit: 'saco', multiplier: 0.5 },
-      { name: 'Areia Média', unit: 'm³', multiplier: 0.03 }
+      { name: 'Cimento CP-II', unit: 'saco', multiplier: 0.5, flat_qty: 0.5 },
+      { name: 'Areia Média', unit: 'm³', multiplier: 0.03, flat_qty: 0.03 }
     ]
   },
   {
     category: 'Pisos e Revestimentos de Banheiro',
     items: [
-      { name: 'Piso Retificado (60x60cm)', unit: 'm²', multiplier: 1.15 },
-      { name: 'Revestimento de Parede (30x60cm)', unit: 'm²', multiplier: 1.15 },
-      { name: 'Argamassa AC-II / AC-III', unit: 'saco', multiplier: 1 },
-      { name: 'Rejunte Epóxi (Anti-mofo)', unit: 'kg', multiplier: 1 }
+      { name: 'Piso Retificado (60x60cm)', unit: 'm²', multiplier: 1.15, flat_qty: 1.15 * 5 }, // Assumindo ~5m² por banheiro
+      { name: 'Revestimento de Parede (30x60cm)', unit: 'm²', multiplier: 1.15, flat_qty: 1.15 * 15 }, // Assumindo ~15m² por banheiro
+      { name: 'Argamassa AC-II / AC-III', unit: 'saco', multiplier: 1, flat_qty: 1 },
+      { name: 'Rejunte Epóxi (Anti-mofo)', unit: 'kg', multiplier: 1, flat_qty: 1 }
     ]
   },
   {
     category: 'Gesso / Forro de Banheiro',
     items: [
-      { name: 'Placa de Gesso Hidrofugado', unit: 'chapa', multiplier: 0.5 },
-      { name: 'Massa de Gesso', unit: 'kg', multiplier: 1 }
+      { name: 'Placa de Gesso Hidrofugado', unit: 'chapa', multiplier: 0.5, flat_qty: 0.5 },
+      { name: 'Massa de Gesso', unit: 'kg', multiplier: 1, flat_qty: 1 }
     ]
   },
   {
     category: 'Bancada de Banheiro',
     items: [
-      { name: 'Mármore/Granito (Bancada)', unit: 'm', multiplier: 1.2 },
-      { name: 'Cuba de Sobrepor/Encaixe', unit: 'un', multiplier: 1 },
-      { name: 'Válvula de Escoamento', unit: 'un', multiplier: 1 }
+      { name: 'Mármore/Granito (Bancada)', unit: 'm', multiplier: 1.2, flat_qty: 1.2 },
+      { name: 'Cuba de Sobrepor/Encaixe', unit: 'un', multiplier: 1, flat_qty: 1 },
+      { name: 'Válvula de Escoamento', unit: 'un', multiplier: 1, flat_qty: 1 }
     ]
   },
   {
     category: 'Louças e Metais de Banheiro',
     items: [
-      { name: 'Vaso Sanitário com Caixa Acoplada', unit: 'un', multiplier: 1 },
-      { name: 'Torneira (Bancada)', unit: 'un', multiplier: 1 },
-      { name: 'Chuveiro (com ou sem misturador)', unit: 'un', multiplier: 1 },
-      { name: 'Ducha Higiênica', unit: 'un', multiplier: 1 },
-      { name: 'Espelho com Armário', unit: 'un', multiplier: 1 }
+      { name: 'Vaso Sanitário com Caixa Acoplada', unit: 'un', multiplier: 1, flat_qty: 1 },
+      { name: 'Torneira (Bancada)', unit: 'un', multiplier: 1, flat_qty: 1 },
+      { name: 'Chuveiro (com ou sem misturador)', unit: 'un', multiplier: 1, flat_qty: 1 },
+      { name: 'Ducha Higiênica', unit: 'un', multiplier: 1, flat_qty: 1 },
+      { name: 'Espelho com Armário', unit: 'un', multiplier: 1, flat_qty: 1 }
     ]
   },
   {
     category: 'Demolição de Cozinha',
     items: [
-      { name: 'Sacos de Ráfia (Entulho)', unit: 'un', multiplier: 8 },
-      { name: 'Marreta/Talhadeira', unit: 'un', multiplier: 0.01 },
-      { name: 'Caçamba Estacionária Pequena', unit: 'un', multiplier: 0.005 }
+      { name: 'Sacos de Ráfia (Entulho)', unit: 'un', multiplier: 8, flat_qty: 8 },
+      { name: 'Marreta/Talhadeira', unit: 'un', multiplier: 0.01, flat_qty: 0.01 },
+      { name: 'Caçamba Estacionária Pequena', unit: 'un', multiplier: 0.005, flat_qty: 0.005 }
     ]
   },
   {
     category: 'Hidráulica de Cozinha',
     items: [
-      { name: 'Tubos PVC 50mm (Esgoto)', unit: 'barra', multiplier: 0.8 },
-      { name: 'Tubos PPR/CPVC 25mm (Água)', unit: 'barra', multiplier: 0.8 },
-      { name: 'Registros', unit: 'un', multiplier: 2 },
-      { name: 'Joelhos/Conexões (Diversas)', unit: 'un', multiplier: 10 },
-      { name: 'Cola PVC/Termofusão', unit: 'frasco', multiplier: 0.05 }
+      { name: 'Tubos PVC 50mm (Esgoto)', unit: 'barra', multiplier: 0.8, flat_qty: 0.8 },
+      { name: 'Tubos PPR/CPVC 25mm (Água)', unit: 'barra', multiplier: 0.8, flat_qty: 0.8 },
+      { name: 'Registros', unit: 'un', multiplier: 2, flat_qty: 2 },
+      { name: 'Joelhos/Conexões (Diversas)', unit: 'un', multiplier: 10, flat_qty: 10 },
+      { name: 'Cola PVC/Termofusão', unit: 'frasco', multiplier: 0.05, flat_qty: 0.05 }
     ]
   },
   {
     category: 'Elétrica de Cozinha',
     items: [
-      { name: 'Fio Flexível 4.0mm (Eletrodomésticos)', unit: 'm', multiplier: 15 },
-      { name: 'Fio Flexível 2.5mm (Tomadas)', unit: 'm', multiplier: 10 },
-      { name: 'Disjuntores (Cozinha)', unit: 'un', multiplier: 3 },
-      { name: 'Caixa de Tomada 4x2', unit: 'un', multiplier: 6 },
-      { name: 'Tomada 20A', unit: 'un', multiplier: 3 },
-      { name: 'Tomada 10A', unit: 'un', multiplier: 3 }
+      { name: 'Fio Flexível 4.0mm (Eletrodomésticos)', unit: 'm', multiplier: 15, flat_qty: 15 },
+      { name: 'Fio Flexível 2.5mm (Tomadas)', unit: 'm', multiplier: 10, flat_qty: 10 },
+      { name: 'Disjuntores (Cozinha)', unit: 'un', multiplier: 3, flat_qty: 3 },
+      { name: 'Caixa de Tomada 4x2', unit: 'un', multiplier: 6, flat_qty: 6 },
+      { name: 'Tomada 20A', unit: 'un', multiplier: 3, flat_qty: 3 },
+      { name: 'Tomada 10A', unit: 'un', multiplier: 3, flat_qty: 3 }
     ]
   },
   {
     category: 'Pisos e Revestimentos de Cozinha',
     items: [
-      { name: 'Piso Porcelanato (60x60cm)', unit: 'm²', multiplier: 1.15 },
-      { name: 'Revestimento de Parede (30x60cm)', unit: 'm²', multiplier: 1.15 },
-      { name: 'Argamassa AC-III', unit: 'saco', multiplier: 1.2 },
-      { name: 'Rejunte Flexível', unit: 'kg', multiplier: 1 }
+      { name: 'Piso Porcelanato (60x60cm)', unit: 'm²', multiplier: 1.15, flat_qty: 1.15 * 10 }, // Assumindo ~10m² por cozinha
+      { name: 'Revestimento de Parede (30x60cm)', unit: 'm²', multiplier: 1.15, flat_qty: 1.15 * 20 }, // Assumindo ~20m² por cozinha
+      { name: 'Argamassa AC-III', unit: 'saco', multiplier: 1.2, flat_qty: 1.2 },
+      { name: 'Rejunte Flexível', unit: 'kg', multiplier: 1, flat_qty: 1 }
     ]
   },
   {
     category: 'Bancada de Cozinha',
     items: [
-      { name: 'Granito/Quartzo (Bancada)', unit: 'm', multiplier: 3 },
-      { name: 'Cuba de Inox Simples/Dupla', unit: 'un', multiplier: 1 },
-      { name: 'Válvula de Escoamento', unit: 'un', multiplier: 1 }
+      { name: 'Granito/Quartzo (Bancada)', unit: 'm', multiplier: 3, flat_qty: 3 },
+      { name: 'Cuba de Inox Simples/Dupla', unit: 'un', multiplier: 1, flat_qty: 1 },
+      { name: 'Válvula de Escoamento', unit: 'un', multiplier: 1, flat_qty: 1 }
     ]
   },
   {
     category: 'Louças e Metais de Cozinha',
     items: [
-      { name: 'Torneira Gourmet/Misturador', unit: 'un', multiplier: 1 },
-      { name: 'Filtro de Água', unit: 'un', multiplier: 1 },
-      { name: 'Sifões e Engates Flexíveis', unit: 'un', multiplier: 1 }
+      { name: 'Torneira Gourmet/Misturador', unit: 'un', multiplier: 1, flat_qty: 1 },
+      { name: 'Filtro de Água', unit: 'un', multiplier: 1, flat_qty: 1 },
+      { name: 'Sifões e Engates Flexíveis', unit: 'un', multiplier: 1, flat_qty: 1 }
     ]
   },
   {
@@ -812,8 +841,8 @@ export const CHECKLIST_TEMPLATES: Checklist[] = [
   {
     id: 'ckl-impermeabilizacao-1',
     workId: 'mock-work-id',
-    name: 'Impermeabilização de Baldrame',
-    category: 'Impermeabilização',
+    name: 'Impermeabilização Geral', // Atualizado para corresponder
+    category: 'Impermeabilização Geral',
     items: [
       { id: 'item10', text: 'Superfície do baldrame limpa, seca e regularizada', checked: false },
       { id: 'item11', text: 'Aplicação de primer ou promotor de aderência (se necessário)', checked: false },
@@ -847,7 +876,7 @@ export const CHECKLIST_TEMPLATES: Checklist[] = [
   {
     id: 'ckl-hidraulica-banheiro-1',
     workId: 'mock-work-id',
-    name: 'Hidráulica - Instalação de Banheiro',
+    name: 'Hidráulica de Banheiro', // Atualizado para corresponder
     category: 'Hidráulica de Banheiro',
     items: [
       { id: 'item30', text: 'Verificar caimento adequado do esgoto (ralos, vasos, pias)', checked: false },

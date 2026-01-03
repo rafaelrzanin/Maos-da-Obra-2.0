@@ -131,10 +131,10 @@ const KpiCard = ({ onClick, icon, iconClass, value, label, badge, accent, childr
   value: React.ReactNode;
   label: string;
   badge?: React.ReactNode;
-  accent?: "ok" | "warn" | "danger";
+  accent?: "ok" | "warn" | "danger" | "info"; // ADDED 'info'
   children?: React.ReactNode; // Added children prop
 }) => {
-  const ring = accent === "danger" ? "ring-1 ring-red-500/20" : accent === "warn" ? "ring-1 ring-amber-500/20" : "ring-1 ring-emerald-500/10";
+  const ring = accent === "danger" ? "ring-1 ring-red-500/20" : accent === "warn" ? "ring-1 ring-amber-500/20" : accent === "info" ? "ring-1 ring-status-inprogress/20" : "ring-1 ring-emerald-500/10"; // ADDED 'info' ring
   return (
     <div 
       onClick={onClick} 
@@ -614,10 +614,10 @@ const Dashboard = () => {
             />
             <KpiCard
                 icon="fa-hammer"
-                iconClass="bg-orange-500/10 text-orange-600 dark:bg-orange-900/20 dark:text-orange-300"
+                iconClass="bg-status-inprogress/10 text-status-inprogress dark:bg-status-inprogress-darkbg dark:text-status-inprogress-light"
                 value={inProgressStepsCount}
                 label="Etapas Em Andamento"
-                accent={inProgressStepsCount > 0 ? "warn" : "ok"}
+                accent={inProgressStepsCount > 0 ? "info" : "ok"}
                 onClick={() => handleOpenWorkDetail(focusWork.id)}
             />
             <KpiCard

@@ -23,6 +23,14 @@ interface ExpenseStepGroup {
     totalStepAmount: number;
 }
 
+// Define a type for material groups (for Material tab and Reports)
+interface MaterialStepGroup {
+  stepName: string;
+  stepId: string;
+  materials: Material[];
+}
+
+
 /** =========================
  * UI helpers
  * ========================= */
@@ -193,6 +201,10 @@ const WorkDetail = () => {
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<MainTab>('ETAPAS');
   const [activeSubView, setActiveSubView] = useState<SubView>('NONE');
+  const [reportSubTab, setReportSubTab] = useState<ReportSubTab>('CRONOGRAMA'); // NEW: For reports sub-tabs
+  
+  // States for Material Filter
+  const [materialFilterStepId, setMaterialFilterStepId] = useState('all');
 
   // New item states
   const [showAddStepModal, setShowAddStepModal] = useState(false);
@@ -220,6 +232,11 @@ const WorkDetail = () => {
   const [newExpenseDate, setNewExpenseDate] = useState(new Date().toISOString().split('T')[0]);
   const [newExpenseStepId, setNewExpenseStepId] = useState(''); // Added stepId to expense
   const [editExpenseData, setEditExpenseData] = useState<Expense | null>(null);
+  const [showAddPaymentModal, setShowAddPaymentModal] = useState(false); // NEW: For partial payments
+  const [paymentExpenseData, setPaymentExpenseData] = useState<Expense | null>(null); // NEW
+  const [paymentAmount, setPaymentAmount] = useState(''); // NEW
+  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]); // NEW
+
 
   const [showAddWorkerModal, setShowAddWorkerModal] = useState(false);
   const [newWorkerName, setNewWorkerName] = useState('');
@@ -275,10 +292,14 @@ const WorkDetail = () => {
   const goToTab = (tab: MainTab) => {
     setActiveTab(tab);
     setActiveSubView('NONE'); // Reset sub-view on main tab change
+    setMaterialFilterStepId('all'); // Reset material filter
   };
 
   const goToSubView = (subView: SubView) => {
     setActiveSubView(subView);
+    if (subView === 'REPORTS') {
+      setReportSubTab('CRONOGRAMA'); // Default to Cronograma when opening reports
+    }
   };
 
   const getDayDifference = (date1: string, date2: string): number => {
@@ -303,6 +324,73 @@ const WorkDetail = () => {
   const budgetUsage = useMemo(() =>
     work && work.budgetPlanned > 0 ? (calculateTotalExpenses / work.budgetPlanned) * 100 : 0
   , [work, calculateTotalExpenses]);
+
+  // NEW: Grouped and filtered materials for UI
+  const groupedMaterials = useMemo<MaterialStepGroup[]>(() => {
+    // Filter materials by selected step if not 'all'
+    const filteredMaterials = materialFilterStepId === 'all'
+      ? materials
+      : materials.filter(m => m.stepId === materialFilterStepId);
+
+    const groups: { [key: string]: Material[] } = {};
+    const stepOrder: string[] = [];
+
+    // Group materials by step, preserving step order
+    steps.forEach(step => {
+      const materialsForStep = filteredMaterials.filter(m => m.stepId === step.id);
+      if (materialsForStep.length > 0) {
+        groups[step.id] = materialsForStep.sort((a, b) => a.name.localeCompare(b.name));
+        stepOrder.push(step.id);
+      }
+    });
+
+    return stepOrder.map(stepId => ({
+      stepName: steps.find(s => s.id === stepId)?.name || 'Sem Etapa',
+      stepId: stepId,
+      materials: groups[stepId] || [],
+    }));
+  }, [materials, steps, materialFilterStepId]);
+
+  // NEW: Grouped expenses for UI (by step)
+  const groupedExpensesByStep = useMemo<ExpenseStepGroup[]>(() => {
+    const groups: { [key: string]: Expense[] } = {};
+    // Group all expenses first
+    expenses.forEach(expense => {
+      const stepKey = expense.stepId || 'no_step'; // Group by stepId or 'no_step'
+      if (!groups[stepKey]) {
+        groups[stepKey] = [];
+      }
+      groups[stepKey].push(expense);
+    });
+
+    // Create sorted array of groups
+    const expenseGroups: ExpenseStepGroup[] = [];
+    const stepNamesMap = new Map(steps.map(s => [s.id, s.name]));
+
+    // Add expenses linked to steps, in step order
+    steps.forEach(step => {
+      if (groups[step.id]) {
+        expenseGroups.push({
+          stepName: step.name,
+          expenses: groups[step.id].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
+          totalStepAmount: groups[step.id].reduce((sum, exp) => sum + exp.amount, 0)
+        });
+        delete groups[step.id]; // Remove from groups to avoid re-adding
+      }
+    });
+
+    // Add expenses not linked to any step
+    if (groups['no_step']) {
+      expenseGroups.push({
+        stepName: 'Outros Lançamentos',
+        expenses: groups['no_step'].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
+        totalStepAmount: groups['no_step'].reduce((sum, exp) => sum + exp.amount, 0)
+      });
+    }
+
+    return expenseGroups;
+  }, [expenses, steps]);
+
 
   // =======================================================================
   // AI ASSISTANT LOGIC (NEW)
@@ -340,31 +428,39 @@ const WorkDetail = () => {
     // Prioridade CRÍTICA (ZeModal)
     for (const step of steps) {
         // ALERTA: Material essencial ausente para etapa ativa/próxima
-        if (step.status === StepStatus.IN_PROGRESS || (step.status === StepStatus.NOT_STARTED && new Date(step.startDate) <= threeDaysFromNow)) {
+        // Rule: 3 dias antes do início da etapa: Se material não estiver completo → status FALTANDO
+        const stepStartDateObj = new Date(step.startDate);
+        stepStartDateObj.setHours(0, 0, 0, 0);
+
+        const isStepImminentOrActive = (step.status === StepStatus.IN_PROGRESS || (step.status === StepStatus.NOT_STARTED && stepStartDateObj <= threeDaysFromNow));
+
+        if (isStepImminentOrActive) {
             const materialsForStep = materials.filter(m => m.stepId === step.id);
             for (const material of materialsForStep) {
-                if (material.plannedQty > 0 && material.purchasedQty === 0) {
+                if (material.plannedQty > 0 && material.purchasedQty < material.plannedQty) { // Material not fully purchased
                     const tag = `critical-missing-material-${work.id}-${material.id}-${step.id}-${todayString}`;
                     if (!seenTags.has(tag)) {
                         currentSuggestions.push({
                             id: `ze-sug-${Date.now()}`,
                             type: 'alert',
                             priority: 'critical',
-                            message: `ALERTA: Material essencial para a etapa "${step.name}" não foi comprado! A obra pode parar por falta de "${material.name}".`,
+                            message: `ALERTA: Material essencial para a etapa "${step.name}" não foi comprado! A obra pode parar por falta de "${material.name}". (${material.purchasedQty}/${material.plannedQty} ${material.unit})`,
                             actionText: "Ver Materiais",
                             actionCallback: () => { goToTab('MATERIAIS'); markSuggestionAsSeen(tag); },
                             dismissible: true, // Allow dismissing even critical on UI, but action is implied
                             tag: tag,
                             aiContext: `Material ${material.name} essencial para a etapa ${step.name} da obra ${work.name} está em falta. O que fazer para evitar atrasos e qual o risco?`
                         });
-                        break; // Only one critical material alert per step at a time
+                        break; // Only one critical material alert per step at a time to avoid spam
                     }
                 }
             }
         }
 
         // ALERTA: Etapa Atrasada e Parada
-        if ((step.status === StepStatus.NOT_STARTED || step.status === StepStatus.IN_PROGRESS) && new Date(step.endDate) < today) {
+        const stepEndDateObj = new Date(step.endDate);
+        stepEndDateObj.setHours(0, 0, 0, 0);
+        if ((step.status === StepStatus.NOT_STARTED || step.status === StepStatus.IN_PROGRESS) && stepEndDateObj < today) {
             const tag = `critical-stalled-step-${work.id}-${step.id}-${todayString}`;
             if (!seenTags.has(tag)) {
                 currentSuggestions.push({
@@ -404,7 +500,7 @@ const WorkDetail = () => {
                 id: `ze-sug-${Date.now()}`,
                 type: 'suggestion',
                 priority: 'high',
-                message: `DICA: O estoque de "${material.name}" para a etapa "${step.name}" está baixo. Avalie a compra para não atrasar a obra!`,
+                message: `DICA: O estoque de "${material.name}" para a etapa "${step.name}" está baixo. Avalie a compra para não atrasar a obra! (${material.purchasedQty}/${material.plannedQty} ${material.unit})`,
                 actionText: "Ver Materiais",
                 actionCallback: () => goToTab('MATERIAIS'),
                 dismissible: true,
@@ -623,6 +719,25 @@ const WorkDetail = () => {
   const handleAddStep = async (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!workId || !user?.id) return;
+
+    const newErrors: Record<string, string> = {};
+    if (!newStepName.trim()) newErrors.newStepName = "O nome da etapa é obrigatório.";
+    if (!newStepStartDate) newErrors.newStepStartDate = "A data de início é obrigatória.";
+    if (!newStepEndDate) newErrors.newStepEndDate = "A data final é obrigatória.";
+    if (new Date(newStepStartDate) > new Date(newStepEndDate)) newErrors.newStepEndDate = "A data final não pode ser antes da data de início.";
+
+    if (Object.keys(newErrors).length > 0) {
+        setZeModal({
+            isOpen: true,
+            title: "Erro de Validação",
+            message: Object.values(newErrors).join('\n'),
+            confirmText: "Entendido",
+            onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
+            type: 'ERROR'
+        });
+        return;
+    }
+
     try {
       const newStep = await dbService.addStep({
         workId, name: newStepName, startDate: newStepStartDate, endDate: newStepEndDate, status: StepStatus.NOT_STARTED, isDelayed: false
@@ -632,12 +747,41 @@ const WorkDetail = () => {
         setShowAddStepModal(false);
         setNewStepName(''); setNewStepStartDate(new Date().toISOString().split('T')[0]); setNewStepEndDate(new Date().toISOString().split('T')[0]);
       }
-    } catch (error) { console.error("Erro ao adicionar etapa:", error); }
+    } catch (error: any) { 
+        console.error("Erro ao adicionar etapa:", error);
+        setZeModal({
+            isOpen: true,
+            title: "Erro ao Adicionar Etapa",
+            message: `Não foi possível adicionar a etapa: ${error.message || 'Erro desconhecido.'}`,
+            confirmText: "Entendido",
+            onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
+            type: 'ERROR'
+        });
+    }
   };
 
   const handleEditStep = async (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!editStepData || !workId || !user?.id) return;
+
+    const newErrors: Record<string, string> = {};
+    if (!editStepData.name.trim()) newErrors.name = "O nome da etapa é obrigatório.";
+    if (!editStepData.startDate) newErrors.startDate = "A data de início é obrigatória.";
+    if (!editStepData.endDate) newErrors.endDate = "A data final é obrigatória.";
+    if (new Date(editStepData.startDate) > new Date(editStepData.endDate)) newErrors.endDate = "A data final não pode ser antes da data de início.";
+
+    if (Object.keys(newErrors).length > 0) {
+        setZeModal({
+            isOpen: true,
+            title: "Erro de Validação",
+            message: Object.values(newErrors).join('\n'),
+            confirmText: "Entendido",
+            onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
+            type: 'ERROR'
+        });
+        return;
+    }
+
     try {
       const updatedStep = await dbService.updateStep(editStepData);
       if (updatedStep) {
@@ -649,7 +793,17 @@ const WorkDetail = () => {
             handleStepCompletion(updatedStep);
         }
       }
-    } catch (error) { console.error("Erro ao atualizar etapa:", error); }
+    } catch (error: any) { 
+        console.error("Erro ao atualizar etapa:", error);
+        setZeModal({
+            isOpen: true,
+            title: "Erro ao Atualizar Etapa",
+            message: `Não foi possível atualizar a etapa: ${error.message || 'Erro desconhecido.'}`,
+            confirmText: "Entendido",
+            onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
+            type: 'ERROR'
+        });
+    }
   };
 
   const handleDeleteStep = async (stepId: string) => {
@@ -668,7 +822,19 @@ const WorkDetail = () => {
           await loadWorkData();
           setZeModal(prev => ({ ...prev, isOpen: false }));
         } catch (error: any) {
-          setZeModal(prev => ({ ...prev, type: 'ERROR', message: `Erro ao excluir: ${error.message}`, confirmText: 'Entendido', onConfirm: async () => setZeModal({ ...prev, isOpen: false }) })); // Wrap with async function
+          // FIX: Use a state updater or reference the current `zeModal` state to set the new state
+          // to correctly close the error modal after user clicks "Entendido".
+          setZeModal(currentZeModalState => ({ 
+            ...currentZeModalState, 
+            isOpen: true, // Ensure modal stays open for error message
+            title: 'Erro!',
+            message: `Erro ao excluir: ${error.message}`, 
+            confirmText: 'Entendido', 
+            // On confirm of this error modal, *then* close it
+            onConfirm: async () => setZeModal(modalStateToClose => ({ ...modalStateToClose, isOpen: false })),
+            onCancel: () => setZeModal(modalStateToClose => ({ ...modalStateToClose, isOpen: false })), // Also close on cancel for error
+            type: 'ERROR' 
+          }));
         } finally {
           setZeModal(prev => ({ ...prev, isConfirming: false }));
         }
@@ -678,46 +844,106 @@ const WorkDetail = () => {
   };
 
   const openEditStepModal = (step: Step) => {
-    setEditStepData(step);
+    setEditStepData({ ...step });
     setNewStepName(step.name);
     setNewStepStartDate(step.startDate);
     setNewStepEndDate(step.endDate);
     setShowAddStepModal(true);
   };
 
-  const closeStepModal = () => {
-    setShowAddStepModal(false);
-    setEditStepData(null);
-    setNewStepName(''); setNewStepStartDate(new Date().toISOString().split('T')[0]); setNewStepEndDate(new Date().toISOString().split('T')[0]);
+  // MATERIALS
+  const clearMaterialFormAndCloseModal = () => {
+    setShowAddMaterialModal(false);
+    setEditMaterialData(null);
+    setNewMaterialName('');
+    setNewMaterialPlannedQty('');
+    setNewMaterialUnit('');
+    setNewMaterialCategory('');
+    setNewMaterialStepId('');
   };
 
-  // MATERIALS
   const handleAddMaterial = async (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!workId || !user?.id) return;
+
+    const newErrors: Record<string, string> = {};
+    if (!newMaterialName.trim()) newErrors.newMaterialName = "O nome do material é obrigatório.";
+    if (!newMaterialPlannedQty || Number(newMaterialPlannedQty) <= 0) newErrors.newMaterialPlannedQty = "A quantidade planejada deve ser maior que zero.";
+    if (!newMaterialUnit.trim()) newErrors.newMaterialUnit = "A unidade é obrigatória.";
+    if (!newMaterialStepId.trim()) newErrors.newMaterialStepId = "O material deve estar vinculado a uma etapa.";
+
+    if (Object.keys(newErrors).length > 0) {
+        setZeModal({
+            isOpen: true,
+            title: "Erro de Validação",
+            message: Object.values(newErrors).join('\n'),
+            confirmText: "Entendido",
+            onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
+            type: 'ERROR'
+        });
+        return;
+    }
+
     try {
       const newMaterial = await dbService.addMaterial({
-        workId, name: newMaterialName, plannedQty: Number(newMaterialPlannedQty), purchasedQty: 0, unit: newMaterialUnit, category: newMaterialCategory, stepId: newMaterialStepId
+        workId, name: newMaterialName, brand: undefined, plannedQty: Number(newMaterialPlannedQty), purchasedQty: 0, unit: newMaterialUnit, stepId: newMaterialStepId, category: newMaterialCategory
       });
       if (newMaterial) {
         await loadWorkData();
-        setShowAddMaterialModal(false);
-        setNewMaterialName(''); setNewMaterialPlannedQty(''); setNewMaterialUnit(''); setNewMaterialCategory(''); setNewMaterialStepId('');
+        clearMaterialFormAndCloseModal();
       }
-    } catch (error) { console.error("Erro ao adicionar material:", error); }
+    } catch (error: any) { 
+        console.error("Erro ao adicionar material:", error);
+        setZeModal({
+            isOpen: true,
+            title: "Erro ao Adicionar Material",
+            message: `Não foi possível adicionar o material: ${error.message || 'Erro desconhecido.'}`,
+            confirmText: "Entendido",
+            onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
+            type: 'ERROR'
+        });
+    }
   };
 
   const handleEditMaterial = async (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!editMaterialData || !workId || !user?.id) return;
+
+    const newErrors: Record<string, string> = {};
+    if (!editMaterialData.name.trim()) newErrors.name = "O nome do material é obrigatório.";
+    if (!editMaterialData.plannedQty || Number(editMaterialData.plannedQty) <= 0) newErrors.plannedQty = "A quantidade planejada deve ser maior que zero.";
+    if (!editMaterialData.unit.trim()) newErrors.unit = "A unidade é obrigatória.";
+    if (!editMaterialData.stepId.trim()) newErrors.stepId = "O material deve estar vinculado a uma etapa.";
+
+    if (Object.keys(newErrors).length > 0) {
+        setZeModal({
+            isOpen: true,
+            title: "Erro de Validação",
+            message: Object.values(newErrors).join('\n'),
+            confirmText: "Entendido",
+            onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
+            type: 'ERROR'
+        });
+        return;
+    }
+
     try {
       const updatedMaterial = await dbService.updateMaterial(editMaterialData);
       if (updatedMaterial) {
         await loadWorkData();
-        setShowAddMaterialModal(false);
-        setEditMaterialData(null);
+        clearMaterialFormAndCloseModal();
       }
-    } catch (error) { console.error("Erro ao atualizar material:", error); }
+    } catch (error: any) { 
+        console.error("Erro ao atualizar material:", error);
+        setZeModal({
+            isOpen: true,
+            title: "Erro ao Atualizar Material",
+            message: `Não foi possível atualizar o material: ${error.message || 'Erro desconhecido.'}`,
+            confirmText: "Entendido",
+            onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
+            type: 'ERROR'
+        });
+    }
   };
 
   const handleDeleteMaterial = async (materialId: string) => {
@@ -725,19 +951,27 @@ const WorkDetail = () => {
     setZeModal({
       isOpen: true,
       title: 'Excluir Material?',
-      message: 'Tem certeza que deseja excluir este material? Todos os lançamentos financeiros relacionados serão mantidos.',
+      message: 'Tem certeza que deseja excluir este material? Isso não é possível se houver lançamentos financeiros associados a ele.',
       confirmText: 'Sim, Excluir',
       cancelText: 'Cancelar',
       type: 'DANGER',
-      onConfirm: async () => { // Wrap with async function
+      onConfirm: async () => {
         setZeModal(prev => ({ ...prev, isConfirming: true }));
         try {
-          // Fix: Call deleteMaterial from dbService
           await dbService.deleteMaterial(materialId);
           await loadWorkData();
           setZeModal(prev => ({ ...prev, isOpen: false }));
         } catch (error: any) {
-          setZeModal(prev => ({ ...prev, type: 'ERROR', message: `Erro ao excluir: ${error.message}`, confirmText: 'Entendido', onConfirm: async () => setZeModal({ ...prev, isOpen: false }) })); // Wrap with async function
+          setZeModal(currentZeModalState => ({
+            ...currentZeModalState,
+            isOpen: true,
+            title: 'Erro!',
+            message: `Erro ao excluir material: ${error.message}`,
+            confirmText: 'Entendido',
+            onConfirm: async () => setZeModal(modalStateToClose => ({ ...modalStateToClose, isOpen: false })),
+            onCancel: () => setZeModal(modalStateToClose => ({ ...modalStateToClose, isOpen: false })),
+            type: 'ERROR'
+          }));
         } finally {
           setZeModal(prev => ({ ...prev, isConfirming: false }));
         }
@@ -747,85 +981,169 @@ const WorkDetail = () => {
   };
 
   const openEditMaterialModal = (material: Material) => {
-    setEditMaterialData(material);
+    setEditMaterialData({ ...material });
     setNewMaterialName(material.name);
-    setNewMaterialPlannedQty(String(material.plannedQty));
+    setNewMaterialPlannedQty(material.plannedQty.toString());
     setNewMaterialUnit(material.unit);
     setNewMaterialCategory(material.category || '');
     setNewMaterialStepId(material.stepId || '');
     setShowAddMaterialModal(true);
   };
 
-  const openPurchaseMaterialModal = (materialId: string) => {
-    setPurchaseMaterialId(materialId);
-    setShowPurchaseMaterialModal(true);
-  };
-
-  const closeMaterialModal = () => {
-    setShowAddMaterialModal(false);
-    setEditMaterialData(null);
-    setNewMaterialName(''); setNewMaterialPlannedQty(''); setNewMaterialUnit(''); setNewMaterialCategory(''); setNewMaterialStepId('');
-  };
-
-  const closePurchaseMaterialModal = () => {
-    setShowPurchaseMaterialModal(false);
-    setPurchaseMaterialId(null);
-    setPurchaseQty(''); setPurchaseCost('');
-  };
-
   const handleRegisterPurchase = async (e?: React.FormEvent) => {
     e?.preventDefault();
-    if (!purchaseMaterialId || !user?.id) return;
+    if (!purchaseMaterialId || !workId || !user?.id) return;
 
-    const materialToUpdate = materials.find(m => m.id === purchaseMaterialId);
-    if (!materialToUpdate) return;
+    const currentMaterial = materials.find(m => m.id === purchaseMaterialId);
+    if (!currentMaterial) return;
+
+    const newErrors: Record<string, string> = {};
+    if (!purchaseQty || Number(purchaseQty) <= 0) newErrors.purchaseQty = "A quantidade comprada deve ser maior que zero.";
+    if (!purchaseCost || Number(purchaseCost) <= 0) newErrors.purchaseCost = "O custo da compra deve ser maior que zero.";
+    
+    if (Object.keys(newErrors).length > 0) {
+        setZeModal({
+            isOpen: true,
+            title: "Erro de Validação",
+            message: Object.values(newErrors).join('\n'),
+            confirmText: "Entendido",
+            onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
+            type: 'ERROR'
+        });
+        return;
+    }
 
     try {
       await dbService.registerMaterialPurchase(
         purchaseMaterialId,
-        materialToUpdate.name,
-        materialToUpdate.brand,
-        materialToUpdate.plannedQty,
-        materialToUpdate.unit,
+        currentMaterial.name,
+        currentMaterial.brand,
+        currentMaterial.plannedQty,
+        currentMaterial.unit,
         Number(purchaseQty),
         Number(purchaseCost)
       );
       await loadWorkData();
-      closePurchaseMaterialModal();
-    } catch (error) {
-      console.error("Erro ao registrar compra:", error);
-      // Handle error display
+      setShowPurchaseMaterialModal(false);
+      setPurchaseQty('');
+      setPurchaseCost('');
+      setPurchaseMaterialId(null);
+    } catch (error: any) { 
+        console.error("Erro ao registrar compra:", error);
+        setZeModal({
+            isOpen: true,
+            title: "Erro ao Registrar Compra",
+            message: `Não foi possível registrar a compra: ${error.message || 'Erro desconhecido.'}`,
+            confirmText: "Entendido",
+            onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
+            type: 'ERROR'
+        });
     }
   };
 
 
   // EXPENSES
+  const clearExpenseFormAndCloseModal = () => {
+    setShowAddExpenseModal(false);
+    setEditExpenseData(null);
+    setNewExpenseDescription('');
+    setNewExpenseAmount('');
+    setNewExpenseCategory(ExpenseCategory.OTHER);
+    setNewExpenseDate(new Date().toISOString().split('T')[0]);
+    setNewExpenseStepId('');
+  };
+
   const handleAddExpense = async (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!workId || !user?.id) return;
+
+    const newErrors: Record<string, string> = {};
+    if (!newExpenseDescription.trim()) newErrors.newExpenseDescription = "A descrição é obrigatória.";
+    if (!newExpenseAmount || Number(newExpenseAmount) <= 0) newErrors.newExpenseAmount = "O valor deve ser maior que zero.";
+    if (!newExpenseDate) newErrors.newExpenseDate = "A data é obrigatória.";
+    // NEW: Validação para etapa em caso de categoria Material
+    if (newExpenseCategory === ExpenseCategory.MATERIAL && !newExpenseStepId) newErrors.newExpenseStepId = "Selecione a etapa para o material.";
+
+    if (Object.keys(newErrors).length > 0) {
+        setZeModal({
+            isOpen: true,
+            title: "Erro de Validação",
+            message: Object.values(newErrors).join('\n'),
+            confirmText: "Entendido",
+            onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
+            type: 'ERROR'
+        });
+        return;
+    }
+
     try {
       const newExpense = await dbService.addExpense({
-        workId, description: newExpenseDescription, amount: Number(newExpenseAmount), date: newExpenseDate, category: newExpenseCategory, stepId: newExpenseStepId
+        workId,
+        description: newExpenseDescription,
+        amount: Number(newExpenseAmount),
+        date: newExpenseDate,
+        category: newExpenseCategory,
+        stepId: newExpenseStepId || undefined,
+        paidAmount: newExpenseCategory !== ExpenseCategory.MATERIAL ? Number(newExpenseAmount) : 0, // Assume pago integral se não for material
+        totalAgreed: Number(newExpenseAmount)
       });
       if (newExpense) {
         await loadWorkData();
-        setShowAddExpenseModal(false);
-        setNewExpenseDescription(''); setNewExpenseAmount(''); setNewExpenseCategory(ExpenseCategory.OTHER); setNewExpenseDate(new Date().toISOString().split('T')[0]); setNewExpenseStepId('');
+        clearExpenseFormAndCloseModal();
       }
-    } catch (error) { console.error("Erro ao adicionar despesa:", error); }
+    } catch (error: any) { 
+        console.error("Erro ao adicionar despesa:", error);
+        setZeModal({
+            isOpen: true,
+            title: "Erro ao Adicionar Despesa",
+            message: `Não foi possível adicionar a despesa: ${error.message || 'Erro desconhecido.'}`,
+            confirmText: "Entendido",
+            onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
+            type: 'ERROR'
+        });
+    }
   };
 
   const handleEditExpense = async (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!editExpenseData || !workId || !user?.id) return;
+
+    const newErrors: Record<string, string> = {};
+    if (!editExpenseData.description.trim()) newErrors.description = "A descrição é obrigatória.";
+    if (!editExpenseData.amount || Number(editExpenseData.amount) <= 0) newErrors.amount = "O valor total deve ser maior que zero.";
+    if (!editExpenseData.date) newErrors.date = "A data é obrigatória.";
+    // NEW: Validação para etapa em caso de categoria Material
+    if (editExpenseData.category === ExpenseCategory.MATERIAL && !editExpenseData.stepId) newErrors.stepId = "Selecione a etapa para o material.";
+
+    if (Object.keys(newErrors).length > 0) {
+        setZeModal({
+            isOpen: true,
+            title: "Erro de Validação",
+            message: Object.values(newErrors).join('\n'),
+            confirmText: "Entendido",
+            onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
+            type: 'ERROR'
+        });
+        return;
+    }
+
     try {
       const updatedExpense = await dbService.updateExpense(editExpenseData);
       if (updatedExpense) {
         await loadWorkData();
-        setShowAddExpenseModal(false);
-        setEditExpenseData(null);
+        clearExpenseFormAndCloseModal();
       }
-    } catch (error) { console.error("Erro ao atualizar despesa:", error); }
+    } catch (error: any) { 
+        console.error("Erro ao atualizar despesa:", error);
+        setZeModal({
+            isOpen: true,
+            title: "Erro ao Atualizar Despesa",
+            message: `Não foi possível atualizar a despesa: ${error.message || 'Erro desconhecido.'}`,
+            confirmText: "Entendido",
+            onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
+            type: 'ERROR'
+        });
+    }
   };
 
   const handleDeleteExpense = async (expenseId: string) => {
@@ -833,18 +1151,27 @@ const WorkDetail = () => {
     setZeModal({
       isOpen: true,
       title: 'Excluir Despesa?',
-      message: 'Tem certeza que deseja excluir este lançamento financeiro? Esta ação é irreversível.',
+      message: 'Tem certeza que deseja excluir esta despesa? Isso não é possível se for um lançamento automático de material.',
       confirmText: 'Sim, Excluir',
       cancelText: 'Cancelar',
       type: 'DANGER',
-      onConfirm: async () => { // Wrap with async function
+      onConfirm: async () => {
         setZeModal(prev => ({ ...prev, isConfirming: true }));
         try {
           await dbService.deleteExpense(expenseId);
           await loadWorkData();
           setZeModal(prev => ({ ...prev, isOpen: false }));
         } catch (error: any) {
-          setZeModal(prev => ({ ...prev, type: 'ERROR', message: `Erro ao excluir: ${error.message}`, confirmText: 'Entendido', onConfirm: async () => setZeModal({ ...prev, isOpen: false }) })); // Wrap with async function
+          setZeModal(currentZeModalState => ({
+            ...currentZeModalState,
+            isOpen: true,
+            title: 'Erro!',
+            message: `Erro ao excluir despesa: ${error.message}`,
+            confirmText: 'Entendido',
+            onConfirm: async () => setZeModal(modalStateToClose => ({ ...modalStateToClose, isOpen: false })),
+            onCancel: () => setZeModal(modalStateToClose => ({ ...modalStateToClose, isOpen: false })),
+            type: 'ERROR'
+          }));
         } finally {
           setZeModal(prev => ({ ...prev, isConfirming: false }));
         }
@@ -854,147 +1181,234 @@ const WorkDetail = () => {
   };
 
   const openEditExpenseModal = (expense: Expense) => {
-    setEditExpenseData(expense);
+    setEditExpenseData({ ...expense });
     setNewExpenseDescription(expense.description);
-    setNewExpenseAmount(String(expense.amount));
+    setNewExpenseAmount(expense.amount.toString());
     setNewExpenseCategory(expense.category);
     setNewExpenseDate(expense.date);
     setNewExpenseStepId(expense.stepId || '');
     setShowAddExpenseModal(true);
   };
 
-  const closeExpenseModal = () => {
-    setShowAddExpenseModal(false);
-    setEditExpenseData(null);
-    setNewExpenseDescription(''); setNewExpenseAmount(''); setNewExpenseCategory(ExpenseCategory.OTHER); setNewExpenseDate(new Date().toISOString().split('T')[0]); setNewExpenseStepId('');
+  // NEW: Handle Add Payment
+  const handleAddPayment = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (!paymentExpenseData || !paymentAmount || Number(paymentAmount) <= 0) {
+      setZeModal({
+        isOpen: true,
+        title: "Erro de Validação",
+        message: "O valor do pagamento deve ser maior que zero.",
+        confirmText: "Entendido",
+        onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
+        type: 'ERROR'
+      });
+      return;
+    }
+
+    try {
+      await dbService.addPaymentToExpense(paymentExpenseData.id, Number(paymentAmount), paymentDate);
+      await loadWorkData();
+      setShowAddPaymentModal(false);
+      setPaymentAmount('');
+      setPaymentDate(new Date().toISOString().split('T')[0]);
+      setPaymentExpenseData(null);
+    } catch (error: any) {
+      console.error("Erro ao registrar pagamento:", error);
+      setZeModal({
+        isOpen: true,
+        title: "Erro ao Registrar Pagamento",
+        message: `Não foi possível registrar o pagamento: ${error.message || 'Erro desconhecido.'}`,
+        confirmText: "Entendido",
+        onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
+        type: 'ERROR'
+      });
+    }
+  };
+
+  const handleOpenAddPaymentModal = (expense: Expense) => {
+    setPaymentExpenseData(expense);
+    setPaymentAmount(''); // Reset amount for new payment
+    setPaymentDate(new Date().toISOString().split('T')[0]); // Current date
+    setShowAddPaymentModal(true);
   };
 
   // WORKERS
+  const clearWorkerFormAndCloseModal = () => {
+    setShowAddWorkerModal(false);
+    setEditWorkerData(null);
+    setNewWorkerName('');
+    setNewWorkerRole('');
+    setNewWorkerPhone('');
+    setNewWorkerDailyRate('');
+    setNewWorkerNotes('');
+  };
+
   const handleAddWorker = async (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!workId || !user?.id) return;
+    const newErrors: Record<string, string> = {};
+    if (!newWorkerName.trim()) newErrors.newWorkerName = "O nome é obrigatório.";
+    if (!newWorkerRole.trim()) newErrors.newWorkerRole = "O papel é obrigatório.";
+    if (Object.keys(newErrors).length > 0) {
+        setZeModal({ isOpen: true, title: "Erro de Validação", message: Object.values(newErrors).join('\n'), confirmText: "Entendido", onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })), type: 'ERROR' });
+        return;
+    }
     try {
       const newWorker = await dbService.addWorker({
-        userId: user.id, workId, name: newWorkerName, role: newWorkerRole, phone: newWorkerPhone, dailyRate: Number(newWorkerDailyRate), notes: newWorkerNotes
+        userId: user.id, workId, name: newWorkerName, role: newWorkerRole, phone: newWorkerPhone, dailyRate: Number(newWorkerDailyRate) || undefined, notes: newWorkerNotes
       });
       if (newWorker) {
         await loadWorkData();
-        setShowAddWorkerModal(false);
-        setNewWorkerName(''); setNewWorkerRole(''); setNewWorkerPhone(''); setNewWorkerDailyRate(''); setNewWorkerNotes('');
+        clearWorkerFormAndCloseModal();
       }
-    } catch (error) { console.error("Erro ao adicionar profissional:", error); }
+    } catch (error: any) { 
+        console.error("Erro ao adicionar profissional:", error);
+        setZeModal({ isOpen: true, title: "Erro ao Adicionar Profissional", message: `Não foi possível adicionar: ${error.message || 'Erro desconhecido.'}`, confirmText: "Entendido", onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })), type: 'ERROR' });
+    }
   };
 
   const handleEditWorker = async (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!editWorkerData || !workId || !user?.id) return;
+    const newErrors: Record<string, string> = {};
+    if (!editWorkerData.name.trim()) newErrors.name = "O nome é obrigatório.";
+    if (!editWorkerData.role.trim()) newErrors.role = "O papel é obrigatório.";
+    if (Object.keys(newErrors).length > 0) {
+        setZeModal({ isOpen: true, title: "Erro de Validação", message: Object.values(newErrors).join('\n'), confirmText: "Entendido", onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })), type: 'ERROR' });
+        return;
+    }
     try {
       const updatedWorker = await dbService.updateWorker(editWorkerData);
       if (updatedWorker) {
         await loadWorkData();
-        setShowAddWorkerModal(false);
-        setEditWorkerData(null);
+        clearWorkerFormAndCloseModal();
       }
-    } catch (error) { console.error("Erro ao atualizar profissional:", error); }
+    } catch (error: any) { 
+        console.error("Erro ao atualizar profissional:", error);
+        setZeModal({ isOpen: true, title: "Erro ao Atualizar Profissional", message: `Não foi possível atualizar: ${error.message || 'Erro desconhecido.'}`, confirmText: "Entendido", onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })), type: 'ERROR' });
+    }
   };
 
   const handleDeleteWorker = async (workerId: string) => {
     if (!workId || !user?.id) return;
     setZeModal({
-      isOpen: true,
-      title: 'Excluir Profissional?',
-      message: 'Tem certeza que deseja excluir este profissional? Todos os lançamentos financeiros relacionados serão mantidos.',
-      confirmText: 'Sim, Excluir',
-      cancelText: 'Cancelar',
-      type: 'DANGER',
-      onConfirm: async () => { // Wrap with async function
-        setZeModal(prev => ({ ...prev, isConfirming: true }));
-        try {
-          await dbService.deleteWorker(workerId, workId);
-          await loadWorkData();
-          setZeModal(prev => ({ ...prev, isOpen: false }));
-        } catch (error: any) {
-          setZeModal(prev => ({ ...prev, type: 'ERROR', message: `Erro ao excluir: ${error.message}`, confirmText: 'Entendido', onConfirm: async () => setZeModal({ ...prev, isOpen: false }) })); // Wrap with async function
-        } finally {
-          setZeModal(prev => ({ ...prev, isConfirming: false }));
-        }
-      },
-      onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false }))
+        isOpen: true,
+        title: 'Excluir Profissional?',
+        message: 'Tem certeza que deseja excluir este profissional?',
+        confirmText: 'Sim, Excluir',
+        cancelText: 'Cancelar',
+        type: 'DANGER',
+        onConfirm: async () => {
+            setZeModal(prev => ({ ...prev, isConfirming: true }));
+            try {
+                await dbService.deleteWorker(workerId, workId);
+                await loadWorkData();
+                setZeModal(prev => ({ ...prev, isOpen: false }));
+            } catch (error: any) {
+                setZeModal(currentZeModalState => ({ ...currentZeModalState, isOpen: true, title: 'Erro!', message: `Erro ao excluir: ${error.message}`, confirmText: 'Entendido', onConfirm: async () => setZeModal(modalStateToClose => ({ ...modalStateToClose, isOpen: false })), onCancel: () => setZeModal(modalStateToClose => ({ ...modalStateToClose, isOpen: false })), type: 'ERROR' }));
+            } finally {
+                setZeModal(prev => ({ ...prev, isConfirming: false }));
+            }
+        },
+        onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false }))
     });
   };
 
   const openEditWorkerModal = (worker: Worker) => {
-    setEditWorkerData(worker);
+    setEditWorkerData({ ...worker });
     setNewWorkerName(worker.name);
     setNewWorkerRole(worker.role);
     setNewWorkerPhone(worker.phone);
-    setNewWorkerDailyRate(String(worker.dailyRate || ''));
+    setNewWorkerDailyRate(worker.dailyRate?.toString() || '');
     setNewWorkerNotes(worker.notes || '');
     setShowAddWorkerModal(true);
   };
 
-  const closeWorkerModal = () => {
-    setShowAddWorkerModal(false);
-    setEditWorkerData(null);
-    setNewWorkerName(''); setNewWorkerRole(''); setNewWorkerPhone(''); setNewWorkerDailyRate(''); setNewWorkerNotes('');
+  // SUPPLIERS
+  const clearSupplierFormAndCloseModal = () => {
+    setShowAddSupplierModal(false);
+    setEditSupplierData(null);
+    setNewSupplierName('');
+    setNewSupplierCategory('');
+    setNewSupplierPhone('');
+    setNewSupplierEmail('');
+    setNewSupplierAddress('');
+    setNewSupplierNotes('');
   };
 
-  // SUPPLIERS
   const handleAddSupplier = async (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!workId || !user?.id) return;
+    const newErrors: Record<string, string> = {};
+    if (!newSupplierName.trim()) newErrors.newSupplierName = "O nome é obrigatório.";
+    if (!newSupplierCategory.trim()) newErrors.newSupplierCategory = "A categoria é obrigatória.";
+    if (Object.keys(newErrors).length > 0) {
+        setZeModal({ isOpen: true, title: "Erro de Validação", message: Object.values(newErrors).join('\n'), confirmText: "Entendido", onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })), type: 'ERROR' });
+        return;
+    }
     try {
       const newSupplier = await dbService.addSupplier({
         userId: user.id, workId, name: newSupplierName, category: newSupplierCategory, phone: newSupplierPhone, email: newSupplierEmail, address: newSupplierAddress, notes: newSupplierNotes
       });
       if (newSupplier) {
         await loadWorkData();
-        setShowAddSupplierModal(false);
-        setNewSupplierName(''); setNewSupplierCategory(''); setNewSupplierPhone(''); setNewSupplierEmail(''); setNewSupplierAddress(''); setNewSupplierNotes('');
+        clearSupplierFormAndCloseModal();
       }
-    } catch (error) { console.error("Erro ao adicionar fornecedor:", error); }
+    } catch (error: any) { 
+        console.error("Erro ao adicionar fornecedor:", error);
+        setZeModal({ isOpen: true, title: "Erro ao Adicionar Fornecedor", message: `Não foi possível adicionar: ${error.message || 'Erro desconhecido.'}`, confirmText: "Entendido", onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })), type: 'ERROR' });
+    }
   };
 
   const handleEditSupplier = async (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!editSupplierData || !workId || !user?.id) return;
+    const newErrors: Record<string, string> = {};
+    if (!editSupplierData.name.trim()) newErrors.name = "O nome é obrigatório.";
+    if (!editSupplierData.category.trim()) newErrors.category = "A categoria é obrigatória.";
+    if (Object.keys(newErrors).length > 0) {
+        setZeModal({ isOpen: true, title: "Erro de Validação", message: Object.values(newErrors).join('\n'), confirmText: "Entendido", onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })), type: 'ERROR' });
+        return;
+    }
     try {
       const updatedSupplier = await dbService.updateSupplier(editSupplierData);
       if (updatedSupplier) {
         await loadWorkData();
-        setShowAddSupplierModal(false);
-        setEditSupplierData(null);
+        clearSupplierFormAndCloseModal();
       }
-    } catch (error) { console.error("Erro ao atualizar fornecedor:", error); }
+    } catch (error: any) { 
+        console.error("Erro ao atualizar fornecedor:", error);
+        setZeModal({ isOpen: true, title: "Erro ao Atualizar Fornecedor", message: `Não foi possível atualizar: ${error.message || 'Erro desconhecido.'}`, confirmText: "Entendido", onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })), type: 'ERROR' });
+    }
   };
 
   const handleDeleteSupplier = async (supplierId: string) => {
     if (!workId || !user?.id) return;
     setZeModal({
-      isOpen: true,
-      title: 'Excluir Fornecedor?',
-      message: 'Tem certeza que deseja excluir este fornecedor? Todos os lançamentos financeiros relacionados serão mantidos.',
-      confirmText: 'Sim, Excluir',
-      cancelText: 'Cancelar',
-      type: 'DANGER',
-      onConfirm: async () => { // Wrap with async function
-        setZeModal(prev => ({ ...prev, isConfirming: true }));
-        try {
-          await dbService.deleteSupplier(supplierId, workId);
-          await loadWorkData();
-          setZeModal(prev => ({ ...prev, isOpen: false }));
-        } catch (error: any) {
-          setZeModal(prev => ({ ...prev, type: 'ERROR', message: `Erro ao excluir: ${error.message}`, confirmText: 'Entendido', onConfirm: async () => setZeModal({ ...prev, isOpen: false }) })); // Wrap with async function
-        } finally {
-          setZeModal(prev => ({ ...prev, isConfirming: false }));
-        }
-      },
-      onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false }))
+        isOpen: true,
+        title: 'Excluir Fornecedor?',
+        message: 'Tem certeza que deseja excluir este fornecedor?',
+        confirmText: 'Sim, Excluir',
+        cancelText: 'Cancelar',
+        type: 'DANGER',
+        onConfirm: async () => {
+            setZeModal(prev => ({ ...prev, isConfirming: true }));
+            try {
+                await dbService.deleteSupplier(supplierId, workId);
+                await loadWorkData();
+                setZeModal(prev => ({ ...prev, isOpen: false }));
+            } catch (error: any) {
+                setZeModal(currentZeModalState => ({ ...currentZeModalState, isOpen: true, title: 'Erro!', message: `Erro ao excluir: ${error.message}`, confirmText: 'Entendido', onConfirm: async () => setZeModal(modalStateToClose => ({ ...modalStateToClose, isOpen: false })), onCancel: () => setZeModal(modalStateToClose => ({ ...modalStateToClose, isOpen: false })), type: 'ERROR' }));
+            } finally {
+                setZeModal(prev => ({ ...prev, isConfirming: false }));
+            }
+        },
+        onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false }))
     });
   };
 
   const openEditSupplierModal = (supplier: Supplier) => {
-    setEditSupplierData(supplier);
+    setEditSupplierData({ ...supplier });
     setNewSupplierName(supplier.name);
     setNewSupplierCategory(supplier.category);
     setNewSupplierPhone(supplier.phone);
@@ -1004,309 +1418,297 @@ const WorkDetail = () => {
     setShowAddSupplierModal(true);
   };
 
-  const closeSupplierModal = () => {
-    setShowAddSupplierModal(false);
-    setEditSupplierData(null);
-    setNewSupplierName(''); setNewSupplierCategory(''); setNewSupplierPhone(''); setNewSupplierEmail(''); setNewSupplierAddress(''); setNewSupplierNotes('');
-  };
-
-
   // PHOTOS
   const handleAddPhoto = async (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!workId || !user?.id || !newPhotoFile) return;
+
+    // TODO: Implement actual image upload to storage (e.g., Supabase Storage)
+    // For now, simulate upload and use a placeholder URL.
     setUploadingPhoto(true);
     try {
-      // In a real app, you'd upload newPhotoFile to storage (e.g., Supabase Storage)
-      // and get the URL. For now, simulate.
-      await new Promise(r => setTimeout(r, 1500)); // Simulate upload time
-      const imageUrl = `https://picsum.photos/800/600?random=${Date.now()}`; // Mock URL
+      await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate upload delay
+      const mockPhotoUrl = "https://via.placeholder.com/600x400?text=Obra+Photo";
 
       const newPhoto = await dbService.addPhoto({
-        workId, url: imageUrl, description: newPhotoDescription, date: new Date().toISOString().split('T')[0], type: newPhotoType
+        workId, url: mockPhotoUrl, description: newPhotoDescription, date: new Date().toISOString().split('T')[0], type: newPhotoType
       });
       if (newPhoto) {
         await loadWorkData();
         setShowAddPhotoModal(false);
-        setNewPhotoDescription(''); setNewPhotoFile(null); setNewPhotoType('PROGRESS');
+        setNewPhotoDescription('');
+        setNewPhotoFile(null);
       }
-    } catch (error) { console.error("Erro ao adicionar foto:", error); } finally { setUploadingPhoto(false); }
+    } catch (error) { console.error("Erro ao adicionar foto:", error);
+    } finally { setUploadingPhoto(false); }
   };
 
   const handleDeletePhoto = async (photoId: string) => {
     if (!workId || !user?.id) return;
     setZeModal({
-      isOpen: true,
-      title: 'Excluir Foto?',
-      message: 'Tem certeza que deseja excluir esta foto? Esta ação é irreversível.',
-      confirmText: 'Sim, Excluir',
-      cancelText: 'Cancelar',
-      type: 'DANGER',
-      onConfirm: async () => { // Wrap with async function
-        setZeModal(prev => ({ ...prev, isConfirming: true }));
-        try {
-          // Fix: Call deletePhoto from dbService
-          await dbService.deletePhoto(photoId); 
-          await loadWorkData();
-          setZeModal(prev => ({ ...prev, isOpen: false }));
-        } catch (error: any) {
-          setZeModal(prev => ({ ...prev, type: 'ERROR', message: `Erro ao excluir: ${error.message}`, confirmText: 'Entendido', onConfirm: async () => setZeModal({ ...prev, isOpen: false }) })); // Wrap with async function
-        } finally {
-          setZeModal(prev => ({ ...prev, isConfirming: false }));
-        }
-      },
-      onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false }))
+        isOpen: true,
+        title: 'Excluir Foto?',
+        message: 'Tem certeza que deseja excluir esta foto?',
+        confirmText: 'Sim, Excluir',
+        cancelText: 'Cancelar',
+        type: 'DANGER',
+        onConfirm: async () => {
+            setZeModal(prev => ({ ...prev, isConfirming: true }));
+            try {
+                await dbService.deletePhoto(photoId);
+                await loadWorkData();
+                setZeModal(prev => ({ ...prev, isOpen: false }));
+            } catch (error: any) {
+                setZeModal(currentZeModalState => ({ ...currentZeModalState, isOpen: true, title: 'Erro!', message: `Erro ao excluir: ${error.message}`, confirmText: 'Entendido', onConfirm: async () => setZeModal(modalStateToClose => ({ ...modalStateToClose, isOpen: false })), onCancel: () => setZeModal(modalStateToClose => ({ ...modalStateToClose, isOpen: false })), type: 'ERROR' }));
+            } finally {
+                setZeModal(prev => ({ ...prev, isConfirming: false }));
+            }
+        },
+        onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false }))
     });
   };
 
-  const closePhotoModal = () => {
-    setShowAddPhotoModal(false);
-    setNewPhotoDescription(''); setNewPhotoFile(null); setNewPhotoType('PROGRESS');
-  };
 
   // FILES
   const handleAddFile = async (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!workId || !user?.id || !newUploadFile) return;
+
+    // TODO: Implement actual file upload to storage (e.g., Supabase Storage)
+    // For now, simulate upload and use a placeholder URL.
     setUploadingFile(true);
     try {
-      // In a real app, you'd upload newUploadFile to storage (e.g., Supabase Storage)
-      // and get the URL. For now, simulate.
-      await new Promise(r => setTimeout(r, 1500)); // Simulate upload time
-      const fileUrl = `https://docs.google.com/document/d/${Date.now()}/edit`; // Mock URL
-      const fileType = newUploadFile.type || 'application/octet-stream';
+      await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate upload delay
+      const mockFileUrl = "https://via.placeholder.com/600x400?text=Documento+Obra"; // Placeholder
 
       const newFile = await dbService.addFile({
-        workId, name: newFileName, category: newFileCategory, url: fileUrl, type: fileType, date: new Date().toISOString().split('T')[0]
+        workId, name: newFileName, category: newFileCategory, url: mockFileUrl, type: newUploadFile.type, date: new Date().toISOString().split('T')[0]
       });
       if (newFile) {
         await loadWorkData();
         setShowAddFileModal(false);
-        setNewFileName(''); setNewFileCategory(FileCategory.GENERAL); setNewUploadFile(null);
+        setNewFileName('');
+        setNewUploadFile(null);
       }
-    } catch (error) { console.error("Erro ao adicionar arquivo:", error); } finally { setUploadingFile(false); }
+    } catch (error) { console.error("Erro ao adicionar arquivo:", error);
+    } finally { setUploadingFile(false); }
   };
 
   const handleDeleteFile = async (fileId: string) => {
     if (!workId || !user?.id) return;
     setZeModal({
-      isOpen: true,
-      title: 'Excluir Arquivo?',
-      message: 'Tem certeza que deseja excluir este arquivo? Esta ação é irreversível.',
-      confirmText: 'Sim, Excluir',
-      cancelText: 'Cancelar',
-      type: 'DANGER',
-      onConfirm: async () => { // Wrap with async function
-        setZeModal(prev => ({ ...prev, isConfirming: true }));
-        try {
-          // Fix: Call deleteFile from dbService
-          await dbService.deleteFile(fileId); 
-          await loadWorkData();
-          setZeModal(prev => ({ ...prev, isOpen: false }));
-        } catch (error: any) {
-          setZeModal(prev => ({ ...prev, type: 'ERROR', message: `Erro ao excluir: ${error.message}`, confirmText: 'Entendido', onConfirm: async () => setZeModal({ ...prev, isOpen: false }) })); // Wrap with async function
-        } finally {
-          setZeModal(prev => ({ ...prev, isConfirming: false }));
-        }
-      },
-      onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false }))
+        isOpen: true,
+        title: 'Excluir Arquivo?',
+        message: 'Tem certeza que deseja excluir este arquivo?',
+        confirmText: 'Sim, Excluir',
+        cancelText: 'Cancelar',
+        type: 'DANGER',
+        onConfirm: async () => {
+            setZeModal(prev => ({ ...prev, isConfirming: true }));
+            try {
+                await dbService.deleteFile(fileId);
+                await loadWorkData();
+                setZeModal(prev => ({ ...prev, isOpen: false }));
+            } catch (error: any) {
+                setZeModal(currentZeModalState => ({ ...currentZeModalState, isOpen: true, title: 'Erro!', message: `Erro ao excluir: ${error.message}`, confirmText: 'Entendido', onConfirm: async () => setZeModal(modalStateToClose => ({ ...modalStateToClose, isOpen: false })), onCancel: () => setZeModal(modalStateToClose => ({ ...modalStateToClose, isOpen: false })), type: 'ERROR' }));
+            } finally {
+                setZeModal(prev => ({ ...prev, isConfirming: false }));
+            }
+        },
+        onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false }))
     });
   };
 
-  const closeFileModal = () => {
-    setShowAddFileModal(false);
-    setNewFileName(''); setNewFileCategory(FileCategory.GENERAL); setNewUploadFile(null);
+  // CHECKLISTS
+  const clearChecklistFormAndCloseModal = () => {
+    setShowAddChecklistModal(false);
+    setEditChecklistData(null);
+    setNewChecklistName('');
+    setNewChecklistCategory('');
+    setNewChecklistItems(['']);
   };
 
-
-  // CHECKLISTS (NEW)
   const handleAddChecklist = async (e?: React.FormEvent) => {
     e?.preventDefault();
-    if (!workId) return;
+    if (!workId || !user?.id) return;
+
+    const newErrors: Record<string, string> = {};
+    if (!newChecklistName.trim()) newErrors.newChecklistName = "O nome da checklist é obrigatório.";
+    if (!newChecklistCategory.trim()) newErrors.newChecklistCategory = "A categoria é obrigatória.";
+    if (newChecklistItems.every(item => !item.trim())) newErrors.newChecklistItems = "Adicione ao menos um item à checklist.";
+    
+    if (Object.keys(newErrors).length > 0) {
+        setZeModal({ isOpen: true, title: "Erro de Validação", message: Object.values(newErrors).join('\n'), confirmText: "Entendido", onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })), type: 'ERROR' });
+        return;
+    }
+
     try {
-      const newChecklist = await dbService.addChecklist({
+      const checklistToSave: Omit<Checklist, 'id'> = {
         workId,
         name: newChecklistName,
         category: newChecklistCategory,
-        items: newChecklistItems.filter(item => item.trim() !== '').map(text => ({ id: Date.now().toString() + Math.random().toString(36).substring(2, 9), text, checked: false }))
-      });
+        items: newChecklistItems.filter(item => item.trim() !== '').map(text => ({ id: crypto.randomUUID(), text, checked: false }))
+      };
+      const newChecklist = await dbService.addChecklist(checklistToSave); // Mocked service
       if (newChecklist) {
         await loadWorkData();
-        setShowAddChecklistModal(false);
-        setNewChecklistName(''); setNewChecklistCategory(''); setNewChecklistItems(['']);
+        clearChecklistFormAndCloseModal();
       }
-    } catch (error) { console.error("Erro ao adicionar checklist:", error); }
+    } catch (error: any) {
+      console.error("Erro ao adicionar checklist:", error);
+      setZeModal({ isOpen: true, title: "Erro ao Adicionar Checklist", message: `Não foi possível adicionar: ${error.message || 'Erro desconhecido.'}`, confirmText: "Entendido", onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })), type: 'ERROR' });
+    }
   };
 
   const handleEditChecklist = async (e?: React.FormEvent) => {
     e?.preventDefault();
-    if (!editChecklistData) return;
+    if (!editChecklistData || !workId || !user?.id) return;
+    
+    const newErrors: Record<string, string> = {};
+    if (!editChecklistData.name.trim()) newErrors.name = "O nome da checklist é obrigatório.";
+    if (!editChecklistData.category.trim()) newErrors.category = "A categoria é obrigatória.";
+    if (editChecklistData.items.every(item => !item.text.trim())) newErrors.items = "Adicione ao menos um item à checklist.";
+
+    if (Object.keys(newErrors).length > 0) {
+        setZeModal({ isOpen: true, title: "Erro de Validação", message: Object.values(newErrors).join('\n'), confirmText: "Entendido", onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })), type: 'ERROR' });
+        return;
+    }
+
     try {
-      const updatedChecklist = await dbService.updateChecklist({
+      const checklistToUpdate: Checklist = {
         ...editChecklistData,
-        name: newChecklistName,
-        category: newChecklistCategory,
-        items: newChecklistItems.filter(item => item.trim() !== '').map((text, idx) => ({ id: editChecklistData.items[idx]?.id || Date.now().toString() + Math.random().toString(36).substring(2, 9), text, checked: editChecklistData.items[idx]?.checked || false }))
-      });
+        items: editChecklistData.items.filter(item => item.text.trim() !== '')
+      };
+      const updatedChecklist = await dbService.updateChecklist(checklistToUpdate); // Mocked service
       if (updatedChecklist) {
         await loadWorkData();
-        setShowAddChecklistModal(false);
-        setEditChecklistData(null);
+        clearChecklistFormAndCloseModal();
       }
-    } catch (error) { console.error("Erro ao atualizar checklist:", error); }
+    } catch (error: any) {
+      console.error("Erro ao atualizar checklist:", error);
+      setZeModal({ isOpen: true, title: "Erro ao Atualizar Checklist", message: `Não foi possível atualizar: ${error.message || 'Erro desconhecido.'}`, confirmText: "Entendido", onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })), type: 'ERROR' });
+    }
   };
 
   const handleDeleteChecklist = async (checklistId: string) => {
-    if (!workId) return;
+    if (!workId || !user?.id) return;
     setZeModal({
-      isOpen: true,
-      title: 'Excluir Checklist?',
-      message: 'Tem certeza que deseja excluir este checklist? Esta ação é irreversível.',
-      confirmText: 'Sim, Excluir',
-      cancelText: 'Cancelar',
-      type: 'DANGER',
-      onConfirm: async () => { // Wrap with async function
-        setZeModal(prev => ({ ...prev, isConfirming: true }));
-        try {
-          await dbService.deleteChecklist(checklistId);
-          await loadWorkData();
-          setZeModal(prev => ({ ...prev, isOpen: false }));
-        } catch (error: any) {
-          setZeModal(prev => ({ ...prev, type: 'ERROR', message: `Erro ao excluir: ${error.message}`, confirmText: 'Entendido', onConfirm: async () => setZeModal({ ...prev, isOpen: false }) })); // Wrap with async function
-        } finally {
-          setZeModal(prev => ({ ...prev, isConfirming: false }));
-        }
-      },
-      onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false }))
+        isOpen: true,
+        title: 'Excluir Checklist?',
+        message: 'Tem certeza que deseja excluir esta checklist?',
+        confirmText: 'Sim, Excluir',
+        cancelText: 'Cancelar',
+        type: 'DANGER',
+        onConfirm: async () => {
+            setZeModal(prev => ({ ...prev, isConfirming: true }));
+            try {
+                await dbService.deleteChecklist(checklistId); // Mocked service
+                await loadWorkData();
+                setZeModal(prev => ({ ...prev, isOpen: false }));
+            } catch (error: any) {
+                setZeModal(currentZeModalState => ({ ...currentZeModalState, isOpen: true, title: 'Erro!', message: `Erro ao excluir: ${error.message}`, confirmText: 'Entendido', onConfirm: async () => setZeModal(modalStateToClose => ({ ...modalStateToClose, isOpen: false })), onCancel: () => setZeModal(modalStateToClose => ({ ...modalStateToClose, isOpen: false })), type: 'ERROR' }));
+            } finally {
+                setZeModal(prev => ({ ...prev, isConfirming: false }));
+            }
+        },
+        onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false }))
     });
   };
 
-  const openAddChecklistModal = () => {
-    setEditChecklistData(null);
-    setNewChecklistName('');
-    // FIX: Correct useState initialization for newChecklistCategory
-    setNewChecklistCategory(activeTab === 'ETAPAS' && steps.length > 0 ? steps.find(s => s.status !== StepStatus.COMPLETED)?.name || '' : '');
-    setNewChecklistItems(['']);
-    setShowAddChecklistModal(true);
-  };
-
   const openEditChecklistModal = (checklist: Checklist) => {
-    setEditChecklistData(checklist);
+    setEditChecklistData({ ...checklist });
     setNewChecklistName(checklist.name);
     setNewChecklistCategory(checklist.category);
     setNewChecklistItems(checklist.items.map(item => item.text));
     setShowAddChecklistModal(true);
   };
 
-  const handleChecklistItemChange = (index: number, checked: boolean) => {
-    if (editChecklistData) {
-      const updatedItems = [...editChecklistData.items];
-      updatedItems[index].checked = checked;
-      setEditChecklistData({ ...editChecklistData, items: updatedItems });
-      // NEW: Update checklist in DB immediately for persistence
-      dbService.updateChecklist({ ...editChecklistData, items: updatedItems })
-        .then(() => console.log('Checklist item updated in DB'))
-        .catch(err => console.error('Error updating checklist item:', err));
+
+  // --- EXPORT FUNCTIONS (REPORTS) ---
+  const handleExportToExcel = (reportType: ReportSubTab) => {
+    if (!work) return;
+
+    let ws_data: any[][] = [];
+    let ws_name = "";
+    let filename = "";
+
+    if (reportType === 'CRONOGRAMA') {
+      ws_name = "Cronograma";
+      filename = `Cronograma-${work.name}.xlsx`;
+      ws_data = [
+        ["Número", "Etapa", "Data Início", "Data Fim", "Status", "Atrasada?"],
+        ...steps.map((step, index) => [
+          index + 1,
+          step.name,
+          step.startDate,
+          step.endDate,
+          step.status,
+          step.isDelayed ? 'Sim' : 'Não'
+        ])
+      ];
+    } else if (reportType === 'MATERIAIS') {
+      ws_name = "Materiais";
+      filename = `Materiais-${work.name}.xlsx`;
+      ws_data = [
+        ["Etapa", "Nome Material", "Unidade", "Planejado", "Comprado", "Status", "Categoria"],
+        ...groupedMaterials.flatMap(group => 
+          group.materials.map(material => {
+            const status = material.purchasedQty === 0 ? 'Pendente' :
+                           material.purchasedQty >= material.plannedQty ? 'Concluído' : 'Parcial';
+            return [
+              group.stepName,
+              material.name,
+              material.unit,
+              material.plannedQty,
+              material.purchasedQty,
+              status,
+              material.category
+            ];
+          })
+        )
+      ];
+    } else if (reportType === 'FINANCEIRO') {
+      ws_name = "Financeiro";
+      filename = `Financeiro-${work.name}.xlsx`;
+      ws_data = [
+        ["Data", "Descrição", "Categoria", "Valor Total", "Valor Pago", "Saldo a Pagar", "Status", "Etapa", "Profissional/Fornecedor"],
+        ...expenses.map(expense => {
+          const total = expense.totalAgreed || expense.amount;
+          const paid = expense.paidAmount || 0;
+          const balance = total - paid;
+          let statusText = '';
+          if (paid === 0) statusText = 'Pendente';
+          else if (paid < total) statusText = 'Parcial';
+          else if (paid >= total) statusText = 'Concluído';
+          if (paid > total) statusText = 'Prejuízo';
+
+          const stepName = steps.find(s => s.id === expense.stepId)?.name || '';
+          const workerOrSupplier = workers.find(w => w.id === expense.workerId)?.name || suppliers.find(s => s.id === expense.supplierId)?.name || '';
+
+          return [
+            expense.date,
+            expense.description,
+            expense.category,
+            expense.amount,
+            paid,
+            balance,
+            statusText,
+            stepName,
+            workerOrSupplier
+          ];
+        })
+      ];
     }
-  };
 
-  const handleNewChecklistItemTextChange = (index: number, value: string) => {
-    const updatedItems = [...newChecklistItems];
-    updatedItems[index] = value;
-    setNewChecklistItems(updatedItems);
-  };
-
-  const addNewChecklistItemField = () => {
-    setNewChecklistItems([...newChecklistItems, '']);
-  };
-
-  const removeChecklistItemField = (index: number) => {
-    setNewChecklistItems(newChecklistItems.filter((_, i) => i !== index));
-  };
-
-
-  // EXCEL / PDF EXPORTS
-  const exportToExcel = (data: any[], fileName: string) => {
-    const ws = XLSX.utils.json_to_sheet(data);
+    const ws = XLSX.utils.aoa_to_sheet(ws_data);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Dados");
-    XLSX.writeFile(wb, `${fileName}.xlsx`);
-  };
-
-  const handleExportSteps = () => {
-    const dataToExport = steps.map(s => ({
-      ID: s.id,
-      Etapa: s.name,
-      'Data Início': s.startDate,
-      'Data Fim Prevista': s.endDate,
-      'Data Real Fim': s.realDate || '',
-      Status: s.status,
-      Atrasada: s.isDelayed ? 'Sim' : 'Não'
-    }));
-    exportToExcel(dataToExport, `Cronograma_${work?.name.replace(/\s/g, '_')}`);
-  };
-
-  const handleExportMaterials = () => {
-    const dataToExport = materials.map(m => ({
-      ID: m.id,
-      Material: m.name,
-      Marca: m.brand || '',
-      'Qtd. Planejada': m.plannedQty,
-      'Qtd. Comprada': m.purchasedQty,
-      Unidade: m.unit,
-      Categoria: m.category || '',
-      Etapa: steps.find(s => s.id === m.stepId)?.name || 'N/A'
-    }));
-    exportToExcel(dataToExport, `Materiais_${work?.name.replace(/\s/g, '_')}`);
-  };
-
-  const handleExportExpenses = () => {
-    const dataToExport = expenses.map(e => ({
-      ID: e.id,
-      Descrição: e.description,
-      Valor: e.amount,
-      'Valor Pago': e.paidAmount || e.amount,
-      Quantidade: e.quantity || 1,
-      Data: e.date,
-      Categoria: e.category,
-      Etapa: steps.find(s => s.id === e.stepId)?.name || 'N/A',
-      Material: materials.find(m => m.id === e.relatedMaterialId)?.name || 'N/A',
-      Profissional: workers.find(w => w.id === e.workerId)?.name || 'N/A',
-      Fornecedor: suppliers.find(s => s.id === e.supplierId)?.name || 'N/A',
-    }));
-    exportToExcel(dataToExport, `Financeiro_${work?.name.replace(/\s/g, '_')}`);
+    XLSX.utils.book_append_sheet(wb, ws, ws_name);
+    XLSX.writeFile(wb, filename);
   };
 
 
-  // REPORT CALCULATIONS (Financeiro tab)
-  const expensesGroupedByStep = useMemo(() => {
-    const grouped: { [key: string]: Expense[] } = {};
-    expenses.forEach(expense => {
-      const stepName = expense.stepId ? steps.find(s => s.id === expense.stepId)?.name || 'Sem Etapa' : 'Sem Etapa';
-      if (!grouped[stepName]) {
-        grouped[stepName] = [];
-      }
-      grouped[stepName].push(expense);
-    });
-
-    const result: ExpenseStepGroup[] = Object.keys(grouped).map(stepName => ({
-      stepName,
-      expenses: grouped[stepName],
-      totalStepAmount: grouped[stepName].reduce((sum, e) => sum + e.amount, 0),
-    })).sort((a, b) => {
-      const aIndex = steps.findIndex(s => s.name === a.stepName);
-      const bIndex = steps.findIndex(s => s.name === b.stepName);
-      if (aIndex === -1 && bIndex === -1) return 0;
-      if (aIndex === -1) return 1;
-      if (bIndex === -1) return -1;
-      return aIndex - bIndex;
-    });
-
-    return result;
-  }, [expenses, steps]);
-
-
-  if (loading || authLoading || !work) {
+  // If AuthContext is still loading OR work data is loading, show a simple spinner.
+  if (authLoading || loading) {
     return (
       <div className="flex items-center justify-center min-h-[80vh] text-primary dark:text-white">
         <i className="fa-solid fa-circle-notch fa-spin text-3xl"></i>
@@ -1314,721 +1716,1435 @@ const WorkDetail = () => {
     );
   }
 
-  // Render the WorkDetail
-  return (
-    <div className="max-w-4xl mx-auto pb-12 pt-4 px-4 md:px-0 font-sans">
-      <div className="flex items-center gap-3 mb-6">
-        <button onClick={() => navigate('/')} className="text-slate-400 hover:text-primary dark:hover:text-white transition-colors p-2 -ml-2" aria-label="Voltar para o Dashboard">
-          <i className="fa-solid fa-arrow-left text-xl"></i>
-        </button>
-        <div>
-          <h1 className="text-2xl font-black text-primary dark:text-white">{work.name}</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400">{work.address}</p>
-        </div>
+  // If no work is loaded (e.g., direct access to /work/:id with invalid ID or before data is fetched)
+  if (!work) {
+    return (
+      <div className="flex items-center justify-center min-h-[80vh] text-red-500">
+        <p className="text-xl font-bold">Obra não encontrada ou você não tem permissão para acessá-la.</p>
       </div>
+    );
+  }
 
-      {/* NEW: Zé da Obra Assistant Card */}
+  // Calculate stats for reports dashboard
+  const totalBudget = work.budgetPlanned;
+  const totalSpent = expenses.reduce((sum, exp) => sum + (exp.paidAmount || 0), 0);
+  const totalAmount = expenses.reduce((sum, exp) => sum + exp.amount, 0);
+  const balance = totalBudget - totalSpent;
+  const pendingToPay = totalAmount - totalSpent;
+
+  // KPIs for Report Cronograma
+  const totalStepsCount = steps.length;
+  const completedStepsCount = steps.filter(s => s.status === StepStatus.COMPLETED).length;
+  const inProgressStepsCount = steps.filter(s => s.status === StepStatus.IN_PROGRESS).length;
+  const todayDateString = new Date().toISOString().split('T')[0];
+  const delayedStepsCount = steps.filter(s => s.status !== StepStatus.COMPLETED && s.endDate < todayDateString).length;
+  const notStartedStepsCount = totalStepsCount - completedStepsCount - inProgressStepsCount - delayedStepsCount; // Simpler calculation
+
+  // KPIs for Report Materiais
+  const materialsTotal = materials.length;
+  const materialsMissing = materials.filter(m => {
+    const linkedStep = steps.find(s => s.id === m.stepId);
+    if (!linkedStep) return false; // Must be linked to a step
+    const stepStartDate = new Date(linkedStep.startDate);
+    stepStartDate.setHours(0,0,0,0);
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    const threeDaysFromNow = new Date(today);
+    threeDaysFromNow.setDate(today.getDate() + 3);
+
+    const isUpcomingOrActive = (stepStartDate >= today && stepStartDate <= threeDaysFromNow) || (stepStartDate <= today && linkedStep.status !== StepStatus.COMPLETED);
+
+    return m.purchasedQty < m.plannedQty && isUpcomingOrActive;
+  }).length;
+  const materialsPartial = materials.filter(m => m.purchasedQty > 0 && m.purchasedQty < m.plannedQty).length;
+  const materialsCompleted = materials.filter(m => m.purchasedQty >= m.plannedQty).length;
+
+
+  return (
+    <div className="max-w-4xl mx-auto pb-12 pt-4 px-2 sm:px-4 md:px-0 font-sans">
+      {/* Active Zé da Obra Suggestion Card */}
       {activeZeSuggestion && (
-        <ZeAssistantCard 
-          suggestion={activeZeSuggestion} 
-          onDismiss={markSuggestionAsSeen} 
-          onAction={(callback) => { callback && callback(); markSuggestionAsSeen(activeZeSuggestion.tag); }}
+        <ZeAssistantCard
+          suggestion={activeZeSuggestion}
+          onDismiss={markSuggestionAsSeen}
+          onAction={(callback) => {
+            if (callback) callback();
+            markSuggestionAsSeen(activeZeSuggestion.tag); // Dismiss after action
+          }}
           onGenerateAiMessage={generateAiMessageForSuggestion}
           loadingAi={loadingAiMessage}
         />
       )}
 
-      {/* TABS NAVEGAÇÃO PRINCIPAL */}
-      <nav className="flex justify-around items-center bg-white dark:bg-slate-900 rounded-3xl p-3 shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800 mb-8 mx-2 sm:mx-0">
-        <button onClick={() => goToTab('ETAPAS')} className={`py-2 px-4 rounded-xl text-sm font-bold transition-colors flex items-center gap-2 ${activeTab === 'ETAPAS' ? 'bg-secondary text-white shadow-md' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}`} aria-current={activeTab === 'ETAPAS' ? 'page' : undefined}>
-          <i className="fa-solid fa-list-check"></i> Etapas
+      {/* Header with Work Name and Back Button */}
+      <div className="flex items-center gap-4 mb-6 px-2 sm:px-0">
+        <button
+          onClick={() => {
+            if (activeSubView !== 'NONE') {
+              setActiveSubView('NONE'); // Go back from sub-view to main tabs
+            } else {
+              navigate('/'); // Go back to dashboard from main tabs
+            }
+          }}
+          className="text-slate-400 hover:text-primary dark:hover:text-white transition-colors p-2 -ml-2"
+          aria-label="Voltar"
+        >
+          <i className="fa-solid fa-arrow-left text-xl"></i>
         </button>
-        <button onClick={() => goToTab('MATERIAIS')} className={`py-2 px-4 rounded-xl text-sm font-bold transition-colors flex items-center gap-2 ${activeTab === 'MATERIAIS' ? 'bg-secondary text-white shadow-md' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}`} aria-current={activeTab === 'MATERIAIS' ? 'page' : undefined}>
-          <i className="fa-solid fa-boxes-stacked"></i> Materiais
-        </button>
-        <button onClick={() => goToTab('FINANCEIRO')} className={`py-2 px-4 rounded-xl text-sm font-bold transition-colors flex items-center gap-2 ${activeTab === 'FINANCEIRO' ? 'bg-secondary text-white shadow-md' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}`} aria-current={activeTab === 'FINANCEIRO' ? 'page' : undefined}>
-          <i className="fa-solid fa-dollar-sign"></i> Financeiro
-        </button>
-        <button onClick={() => goToTab('FERRAMENTAS')} className={`py-2 px-4 rounded-xl text-sm font-bold transition-colors flex items-center gap-2 ${activeTab === 'FERRAMENTAS' ? 'bg-secondary text-white shadow-md' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}`} aria-current={activeTab === 'FERRAMENTAS' ? 'page' : undefined}>
-          <i className="fa-solid fa-toolbox"></i> Ferramentas
-        </button>
-      </nav>
-
-      {/* CONTEÚDO DAS TABS */}
-      {activeTab === 'ETAPAS' && (
-        <div className="animate-in fade-in">
-          <div className="flex items-center justify-between mb-4 px-2 sm:px-0">
-            <h2 className="text-xl font-bold text-primary dark:text-white">Cronograma</h2>
-            <button onClick={() => { setEditStepData(null); setShowAddStepModal(true); }} className="px-4 py-2 bg-primary text-white rounded-xl text-sm font-bold hover:bg-primary-light transition-colors flex items-center gap-2">
-              <i className="fa-solid fa-plus"></i> Nova Etapa
-            </button>
-          </div>
-          {steps.length === 0 ? (
-            <div className="text-center text-slate-400 py-10 italic text-lg">Nenhuma etapa cadastrada.</div>
-          ) : (
-            <div className="space-y-4">
-              {steps.map(step => (
-                <div key={step.id} className="bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800">
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="font-bold text-primary dark:text-white">{step.name}</h3>
-                    <div className="flex items-center gap-2">
-                      {step.status === StepStatus.COMPLETED && (
-                        <span className="text-green-600 text-xs font-bold flex items-center gap-1">
-                          <i className="fa-solid fa-check-circle"></i> Concluída
-                        </span>
-                      )}
-                      {step.isDelayed && step.status !== StepStatus.COMPLETED && (
-                        <span className="text-red-600 text-xs font-bold flex items-center gap-1">
-                          <i className="fa-solid fa-triangle-exclamation"></i> Atrasada
-                        </span>
-                      )}
-                      {step.status === StepStatus.IN_PROGRESS && !step.isDelayed && (
-                        <span className="text-orange-600 text-xs font-bold flex items-center gap-1">
-                          <i className="fa-solid fa-hammer"></i> Em Andamento
-                        </span>
-                      )}
-                      {step.status === StepStatus.NOT_STARTED && !step.isDelayed && (
-                        <span className="text-slate-500 text-xs font-bold flex items-center gap-1">
-                          <i className="fa-solid fa-clock"></i> Pendente
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">
-                    Início: {step.startDate ? new Date(step.startDate).toLocaleDateString('pt-BR') : 'N/A'} - Fim Previsto: {step.endDate ? new Date(step.endDate).toLocaleDateString('pt-BR') : 'N/A'}
-                  </p>
-                  {/* Progress Bar for Step Materials */}
-                  <div className="h-1 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden mb-2">
-                    <div className="h-full bg-secondary" style={{ width: `${calculateStepProgress(step.id)}%` }}></div>
-                  </div>
-                  <p className="text-[10px] text-right text-slate-500 dark:text-slate-400">
-                    Materiais: {calculateStepProgress(step.id).toFixed(0)}% comprados
-                  </p>
-                  <div className="flex justify-end gap-2 mt-4">
-                    <button onClick={() => openEditStepModal(step)} className="px-3 py-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-md text-xs font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
-                      <i className="fa-solid fa-edit mr-1"></i> Editar
-                    </button>
-                    <button onClick={() => handleDeleteStep(step.id)} className="px-3 py-1 bg-red-500 text-white rounded-md text-xs font-bold hover:bg-red-600 transition-colors">
-                      <i className="fa-solid fa-trash-alt mr-1"></i> Excluir
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-          <div className="flex justify-center mt-6">
-            <button onClick={handleExportSteps} className="px-4 py-2 bg-slate-100 dark:bg-slate-800 text-primary dark:text-white rounded-xl text-sm font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors flex items-center gap-2">
-              <i className="fa-solid fa-file-excel"></i> Exportar Cronograma
-            </button>
-          </div>
+        <div>
+          <h1 className="text-3xl font-black text-primary dark:text-white mb-1 tracking-tight">{work.name}</h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">Gestão Completa da sua obra</p>
         </div>
-      )}
+      </div>
 
-      {activeTab === 'MATERIAIS' && (
-        <div className="animate-in fade-in">
-          <div className="flex items-center justify-between mb-4 px-2 sm:px-0">
-            <h2 className="text-xl font-bold text-primary dark:text-white">Materiais</h2>
-            <button onClick={() => { setEditMaterialData(null); setShowAddMaterialModal(true); }} className="px-4 py-2 bg-primary text-white rounded-xl text-sm font-bold hover:bg-primary-light transition-colors flex items-center gap-2">
-              <i className="fa-solid fa-plus"></i> Novo Material
+      {activeSubView === 'NONE' && (
+        <>
+          {/* Main Tabs Navigation */}
+          <div className="bg-white dark:bg-slate-900 rounded-2xl p-2 flex justify-around items-center mb-6 shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800">
+            <button onClick={() => goToTab('ETAPAS')} className={`flex-1 py-3 px-2 text-center text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2 ${activeTab === 'ETAPAS' ? 'bg-primary text-white shadow-md' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}`} aria-pressed={activeTab === 'ETAPAS'} aria-label="Aba Etapas">
+              <i className="fa-solid fa-list-check"></i> <span className="hidden sm:inline">Etapas</span>
             </button>
-          </div>
-          {materials.length === 0 ? (
-            <div className="text-center text-slate-400 py-10 italic text-lg">Nenhum material cadastrado.</div>
-          ) : (
-            <div className="space-y-4">
-              {materials.map(material => (
-                <div key={material.id} className="bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800">
-                  <div className="flex items-center justify-between mb-2">
-                    <h3 className="font-bold text-primary dark:text-white">{material.name}</h3>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                        {material.category || 'Geral'}
-                      </span>
-                      {material.stepId && (
-                        <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-                          Etapa: {steps.find(s => s.id === material.stepId)?.name || 'N/A'}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <p className="text-sm text-slate-600 dark:text-slate-300 mb-3">
-                    Planejado: {material.plannedQty} {material.unit} | Comprado: {material.purchasedQty} {material.unit}
-                  </p>
-                  <div className="h-1 bg-slate-100 dark:bg-slate-700 rounded-full overflow-hidden mb-2">
-                    <div className="h-full bg-secondary" style={{ width: `${Math.min(100, (material.purchasedQty / material.plannedQty) * 100)}%` }}></div>
-                  </div>
-                  <p className="text-[10px] text-right text-slate-500 dark:text-slate-400">
-                    {(material.purchasedQty / material.plannedQty * 100).toFixed(0)}% comprados
-                  </p>
-                  <div className="flex justify-end gap-2 mt-4">
-                    <button onClick={() => openPurchaseMaterialModal(material.id)} className="px-3 py-1 bg-green-500 text-white rounded-md text-xs font-bold hover:bg-green-600 transition-colors">
-                      <i className="fa-solid fa-cash-register mr-1"></i> Comprar
-                    </button>
-                    <button onClick={() => openEditMaterialModal(material)} className="px-3 py-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-md text-xs font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
-                      <i className="fa-solid fa-edit mr-1"></i> Editar
-                    </button>
-                    <button onClick={() => handleDeleteMaterial(material.id)} className="px-3 py-1 bg-red-500 text-white rounded-md text-xs font-bold hover:bg-red-600 transition-colors">
-                      <i className="fa-solid fa-trash-alt mr-1"></i> Excluir
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-          <div className="flex justify-center mt-6">
-            <button onClick={handleExportMaterials} className="px-4 py-2 bg-slate-100 dark:bg-slate-800 text-primary dark:text-white rounded-xl text-sm font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors flex items-center gap-2">
-              <i className="fa-solid fa-file-excel"></i> Exportar Materiais
+            <button onClick={() => goToTab('MATERIAIS')} className={`flex-1 py-3 px-2 text-center text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2 ${activeTab === 'MATERIAIS' ? 'bg-primary text-white shadow-md' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}`} aria-pressed={activeTab === 'MATERIAIS'} aria-label="Aba Materiais">
+              <i className="fa-solid fa-boxes-stacked"></i> <span className="hidden sm:inline">Materiais</span>
             </button>
-          </div>
-        </div>
-      )}
-
-      {activeTab === 'FINANCEIRO' && (
-        <div className="animate-in fade-in">
-          <div className="flex items-center justify-between mb-4 px-2 sm:px-0">
-            <h2 className="text-xl font-bold text-primary dark:text-white">Financeiro</h2>
-            <button onClick={() => { setEditExpenseData(null); setShowAddExpenseModal(true); }} className="px-4 py-2 bg-primary text-white rounded-xl text-sm font-bold hover:bg-primary-light transition-colors flex items-center gap-2">
-              <i className="fa-solid fa-plus"></i> Nova Despesa
+            <button onClick={() => goToTab('FINANCEIRO')} className={`flex-1 py-3 px-2 text-center text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2 ${activeTab === 'FINANCEIRO' ? 'bg-primary text-white shadow-md' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}`} aria-pressed={activeTab === 'FINANCEIRO'} aria-label="Aba Financeiro">
+              <i className="fa-solid fa-dollar-sign"></i> <span className="hidden sm:inline">Financeiro</span>
+            </button>
+            <button onClick={() => goToTab('FERRAMENTAS')} className={`flex-1 py-3 px-2 text-center text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2 ${activeTab === 'FERRAMENTAS' ? 'bg-primary text-white shadow-md' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}`} aria-pressed={activeTab === 'FERRAMENTAS'} aria-label="Aba Ferramentas">
+              <i className="fa-solid fa-screwdriver-wrench"></i> <span className="hidden sm:inline">Ferramentas</span>
             </button>
           </div>
 
-          <div className="bg-white dark:bg-slate-900 rounded-3xl p-6 shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800 mb-6">
-            <div className="flex justify-between items-center mb-4">
-              <p className="text-lg font-bold text-primary dark:text-white">Orçamento Planejado</p>
-              <span className="text-lg font-bold text-secondary">{formatCurrency(work.budgetPlanned)}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <p className="text-lg font-bold text-primary dark:text-white">Gasto Total</p>
-              <span className="text-lg font-bold text-red-500">{formatCurrency(calculateTotalExpenses)}</span>
-            </div>
-            <div className="h-2 bg-slate-200 dark:bg-slate-700 rounded-full mt-4 overflow-hidden">
-              <div 
-                className={`h-full rounded-full ${budgetUsage > 100 ? 'bg-red-500' : budgetUsage > 80 ? 'bg-orange-500' : 'bg-green-500'}`} 
-                style={{ width: `${Math.min(100, budgetUsage)}%` }}
-              ></div>
-            </div>
-            <p className="text-xs text-slate-500 dark:text-slate-400 text-right mt-2">{budgetUsage.toFixed(0)}% do orçamento ({formatCurrency(calculateTotalExpenses)} / {formatCurrency(work.budgetPlanned)})</p>
-          </div>
-
-          {expensesGroupedByStep.length === 0 ? (
-            <div className="text-center text-slate-400 py-10 italic text-lg">Nenhuma despesa cadastrada.</div>
-          ) : (
-            <div className="space-y-6">
-              {expensesGroupedByStep.map(group => (
-                <div key={group.stepName} className="bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800">
-                  <div className="flex justify-between items-center mb-4 pb-3 border-b border-slate-100 dark:border-slate-700">
-                    <h3 className="font-bold text-primary dark:text-white text-md flex items-center gap-2">
-                        <i className="fa-solid fa-calendar-alt text-secondary text-sm"></i> {group.stepName}
-                    </h3>
-                    <span className="font-bold text-lg text-red-500">{formatCurrency(group.totalStepAmount)}</span>
-                  </div>
-                  <div className="space-y-3">
-                    {group.expenses.map(expense => (
-                      <div key={expense.id} className="flex items-center justify-between bg-slate-50 dark:bg-slate-800 p-3 rounded-lg border border-slate-100 dark:border-slate-700">
-                        <div>
-                          <p className="font-semibold text-primary dark:text-white text-sm">{expense.description}</p>
-                          <p className="text-xs text-slate-500 dark:text-slate-400">{expense.category} - {new Date(expense.date).toLocaleDateString('pt-BR')}</p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span className="font-bold text-red-500 text-sm">{formatCurrency(expense.amount)}</span>
-                          <button onClick={() => openEditExpenseModal(expense)} className="text-slate-400 hover:text-primary dark:hover:text-white transition-colors p-1" aria-label="Editar despesa"><i className="fa-solid fa-edit"></i></button>
-                          <button onClick={() => handleDeleteExpense(expense.id)} className="text-red-400 hover:text-red-600 transition-colors p-1" aria-label="Excluir despesa"><i className="fa-solid fa-trash-alt"></i></button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-          <div className="flex justify-center mt-6">
-            <button onClick={handleExportExpenses} className="px-4 py-2 bg-slate-100 dark:bg-slate-800 text-primary dark:text-white rounded-xl text-sm font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors flex items-center gap-2">
-              <i className="fa-solid fa-file-excel"></i> Exportar Financeiro
-            </button>
-          </div>
-        </div>
-      )}
-
-      {activeTab === 'FERRAMENTAS' && (
-        <div className="animate-in fade-in">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <button onClick={() => goToSubView('WORKERS')} className={`p-6 rounded-3xl border-2 transition-all ${activeSubView === 'WORKERS' ? 'border-secondary bg-secondary/5 shadow-md' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-secondary/50'} flex flex-col items-center gap-4 group`}>
-              <div className={`w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-3xl transition-colors ${activeSubView === 'WORKERS' ? 'text-secondary' : 'text-slate-400 group-hover:text-secondary'}`}><i className="fa-solid fa-users"></i></div>
-              <h3 className="font-bold text-primary dark:text-white text-lg">Equipe</h3>
-              <p className="text-sm text-slate-500 dark:text-slate-400 text-center">Gerencie seus profissionais e contatos.</p>
-            </button>
-            <button onClick={() => goToSubView('SUPPLIERS')} className={`p-6 rounded-3xl border-2 transition-all ${activeSubView === 'SUPPLIERS' ? 'border-secondary bg-secondary/5 shadow-md' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-secondary/50'} flex flex-col items-center gap-4 group`}>
-              <div className={`w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-3xl transition-colors ${activeSubView === 'SUPPLIERS' ? 'text-secondary' : 'text-slate-400 group-hover:text-secondary'}`}><i className="fa-solid fa-truck"></i></div>
-              <h3 className="font-bold text-primary dark:text-white text-lg">Fornecedores</h3>
-              <p className="text-sm text-slate-500 dark:text-slate-400 text-center">Organize seus fornecedores e materiais.</p>
-            </button>
-            <button onClick={() => goToSubView('PHOTOS')} className={`p-6 rounded-3xl border-2 transition-all ${activeSubView === 'PHOTOS' ? 'border-secondary bg-secondary/5 shadow-md' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-secondary/50'} flex flex-col items-center gap-4 group`}>
-              <div className={`w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-3xl transition-colors ${activeSubView === 'PHOTOS' ? 'text-secondary' : 'text-slate-400 group-hover:text-secondary'}`}><i className="fa-solid fa-camera"></i></div>
-              <h3 className="font-bold text-primary dark:text-white text-lg">Fotos</h3>
-              <p className="text-sm text-slate-500 dark:text-slate-400 text-center">Registre o progresso da sua obra.</p>
-            </button>
-            <button onClick={() => goToSubView('PROJECTS')} className={`p-6 rounded-3xl border-2 transition-all ${activeSubView === 'PROJECTS' ? 'border-secondary bg-secondary/5 shadow-md' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-secondary/50'} flex flex-col items-center gap-4 group`}>
-              <div className={`w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-3xl transition-colors ${activeSubView === 'PROJECTS' ? 'text-secondary' : 'text-slate-400 group-hover:text-secondary'}`}><i className="fa-solid fa-file-alt"></i></div>
-              <h3 className="font-bold text-primary dark:text-white text-lg">Arquivos</h3>
-              <p className="text-sm text-slate-500 dark:text-slate-400 text-center">Armazene projetos, notas e documentos.</p>
-            </button>
-            {/* NEW: Contracts & Checklists */}
-            <button onClick={() => goToSubView('CONTRACTS')} className={`p-6 rounded-3xl border-2 transition-all ${activeSubView === 'CONTRACTS' ? 'border-secondary bg-secondary/5 shadow-md' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-secondary/50'} flex flex-col items-center gap-4 group`}>
-              <div className={`w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-3xl transition-colors ${activeSubView === 'CONTRACTS' ? 'text-secondary' : 'text-slate-400 group-hover:text-secondary'}`}><i className="fa-solid fa-file-contract"></i></div>
-              <h3 className="font-bold text-primary dark:text-white text-lg">Contratos</h3>
-              <p className="text-sm text-slate-500 dark:text-slate-400 text-center">Modelos de contrato para sua equipe e fornecedores.</p>
-            </button>
-            <button onClick={() => goToSubView('CHECKLIST')} className={`p-6 rounded-3xl border-2 transition-all ${activeSubView === 'CHECKLIST' ? 'border-secondary bg-secondary/5 shadow-md' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-secondary/50'} flex flex-col items-center gap-4 group`}>
-              <div className={`w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-3xl transition-colors ${activeSubView === 'CHECKLIST' ? 'text-secondary' : 'text-slate-400 group-hover:text-secondary'}`}><i className="fa-solid fa-list-check"></i></div>
-              <h3 className="font-bold text-primary dark:text-white text-lg">Checklists</h3>
-              <p className="text-sm text-slate-500 dark:text-slate-400 text-center">Listas de verificação para cada etapa da obra.</p>
-            </button>
-          </div>
-          <div className="flex justify-center mt-6">
-            <button onClick={() => goToSubView('AICHAT')} className={`px-6 py-3 rounded-2xl border-2 transition-all ${activeSubView === 'AICHAT' ? 'border-secondary bg-secondary/5 shadow-md' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-secondary/50'} flex items-center gap-3 group`}>
-                <div className={`w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-2xl transition-colors ${activeSubView === 'AICHAT' ? 'text-secondary' : 'text-slate-400 group-hover:text-secondary'}`}><i className="fa-solid fa-robot"></i></div>
-                <div>
-                  <h3 className="font-bold text-primary dark:text-white text-lg">Zé da Obra AI</h3>
-                  <p className="text-sm text-slate-500 dark:text-slate-400 text-center">Seu assistente de IA para dúvidas rápidas.</p>
-                </div>
-            </button>
-          </div>
-        </div>
-      )}
-      
-      {/* ======================= SUB-VIEWS ======================= */}
-      {activeSubView !== 'NONE' && (
-        <div className="mt-8 animate-in fade-in slide-in-from-bottom-4">
-          <div className="flex items-center justify-between mb-4 px-2 sm:px-0">
-            <h2 className="text-xl font-bold text-primary dark:text-white">{activeSubView === 'WORKERS' ? 'Profissionais da Obra' : activeSubView === 'SUPPLIERS' ? 'Fornecedores' : activeSubView === 'PHOTOS' ? 'Fotos da Obra' : activeSubView === 'PROJECTS' ? 'Arquivos da Obra' : activeSubView === 'CONTRACTS' ? 'Modelos de Contrato' : activeSubView === 'CHECKLIST' ? 'Checklists' : activeSubView === 'AICHAT' ? 'Chat com Zé da Obra AI' : ''}</h2>
-            <div className="flex gap-2">
-              {(activeSubView === 'WORKERS' || activeSubView === 'SUPPLIERS' || activeSubView === 'PHOTOS' || activeSubView === 'PROJECTS' || activeSubView === 'CHECKLIST') && (
-                <button onClick={() => { 
-                  if (activeSubView === 'WORKERS') setShowAddWorkerModal(true);
-                  else if (activeSubView === 'SUPPLIERS') setShowAddSupplierModal(true);
-                  else if (activeSubView === 'PHOTOS') setShowAddPhotoModal(true);
-                  else if (activeSubView === 'PROJECTS') setShowAddFileModal(true);
-                  else if (activeSubView === 'CHECKLIST') openAddChecklistModal(); // NEW
-                }} className="px-4 py-2 bg-primary text-white rounded-xl text-sm font-bold hover:bg-primary-light transition-colors flex items-center gap-2">
-                  <i className="fa-solid fa-plus"></i> Adicionar
+          {/* Tab Content: ETAPAS */}
+          {activeTab === 'ETAPAS' && (
+            <div className="space-y-4 animate-in fade-in duration-300">
+              <div className="flex justify-between items-center px-2 sm:px-0">
+                <h2 className="text-xl font-black text-primary dark:text-white">Cronograma da Obra</h2>
+                <button onClick={() => setShowAddStepModal(true)} className="px-4 py-2 bg-secondary text-white text-sm font-bold rounded-xl hover:bg-secondary-dark transition-colors flex items-center gap-2" aria-label="Adicionar nova etapa">
+                  <i className="fa-solid fa-plus-circle"></i> Nova Etapa
                 </button>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {steps.length === 0 ? (
+                  <div className="col-span-full text-center text-slate-400 py-8 italic">Nenhuma etapa cadastrada ainda.</div>
+                ) : (
+                  steps.map((step, index) => {
+                    const isDelayed = new Date(step.endDate) < new Date() && step.status !== StepStatus.COMPLETED;
+                    let stepStatusClass = '';
+                    let borderClass = 'border-slate-200 dark:border-slate-800';
+                    let shadowClass = 'shadow-card-default';
+
+                    if (isDelayed) {
+                      stepStatusClass = 'text-red-600 dark:text-red-400';
+                      borderClass = 'border-red-500/50 dark:border-red-700/50';
+                      shadowClass = 'shadow-lg shadow-red-500/20';
+                    } else if (step.status === StepStatus.COMPLETED) {
+                      stepStatusClass = 'text-green-600 dark:text-green-400';
+                      borderClass = 'border-green-500/50 dark:border-green-700/50';
+                      shadowClass = 'shadow-lg shadow-green-500/20';
+                    } else if (step.status === StepStatus.IN_PROGRESS) {
+                      stepStatusClass = 'text-status-inprogress dark:text-status-inprogress-light'; // Azul
+                      borderClass = 'border-status-inprogress/50 dark:border-status-inprogress-dark/50'; // Azul
+                      shadowClass = 'shadow-lg shadow-status-inprogress/20'; // Azul
+                    } else { // NOT_STARTED
+                      stepStatusClass = 'text-slate-500 dark:text-slate-400';
+                    }
+
+                    return (
+                      <div 
+                        key={step.id} 
+                        onClick={() => openEditStepModal(step)}
+                        className={cx(surface, card, "flex flex-col cursor-pointer transition-all hover:scale-[1.01] hover:border-secondary/50", borderClass, shadowClass)}
+                        role="button"
+                        tabIndex={0}
+                        aria-label={`Editar etapa ${step.name}`}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') openEditStepModal(step); }}
+                      >
+                        <div className="flex items-center justify-between mb-3">
+                            <span className="text-sm font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">Etapa {index + 1}</span>
+                            <span className={cx("text-xs font-bold px-3 py-1 rounded-full", stepStatusClass, "bg-current/10")}>
+                                {isDelayed ? 'Atrasada' : (step.status === StepStatus.COMPLETED ? 'Concluída' : (step.status === StepStatus.IN_PROGRESS ? 'Em Andamento' : 'Pendente'))}
+                            </span>
+                        </div>
+                        <h3 className="text-xl font-black text-primary dark:text-white leading-tight mb-2">{step.name}</h3>
+                        <div className="flex items-center gap-3 text-sm text-slate-600 dark:text-slate-300">
+                          <span><i className="fa-regular fa-calendar-alt mr-2"></i>{formatDateDisplay(step.startDate)}</span>
+                          <span>-</span>
+                          <span>{formatDateDisplay(step.endDate)}</span>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Tab Content: MATERIAIS */}
+          {activeTab === 'MATERIAIS' && (
+            <div className="space-y-4 animate-in fade-in duration-300">
+              <div className="flex justify-between items-center px-2 sm:px-0">
+                <h2 className="text-xl font-black text-primary dark:text-white">Materiais da Obra</h2>
+                <button onClick={() => setShowAddMaterialModal(true)} className="px-4 py-2 bg-secondary text-white text-sm font-bold rounded-xl hover:bg-secondary-dark transition-colors flex items-center gap-2" aria-label="Adicionar novo material">
+                  <i className="fa-solid fa-plus-circle"></i> Novo Material
+                </button>
+              </div>
+
+              {/* Material Filter by Step */}
+              <div className="bg-white dark:bg-slate-900 rounded-2xl p-3 shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800">
+                <label htmlFor="material-filter-step" className="block text-xs font-black text-slate-700 dark:text-slate-300 uppercase mb-2 tracking-widest pl-1">Filtrar por Etapa:</label>
+                <select
+                  id="material-filter-step"
+                  value={materialFilterStepId}
+                  onChange={(e) => setMaterialFilterStepId(e.target.value)}
+                  className="w-full px-4 py-2 text-base border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white rounded-xl focus:outline-none focus:ring-secondary focus:border-secondary transition-colors cursor-pointer"
+                  aria-label="Filtrar materiais por etapa"
+                >
+                  <option value="all">Todas as Etapas</option>
+                  {steps.map(step => (
+                    <option key={step.id} value={step.id}>{step.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {groupedMaterials.length === 0 ? (
+                <div className="text-center text-slate-400 py-8 italic">Nenhum material cadastrado ou corresponde ao filtro.</div>
+              ) : (
+                groupedMaterials.map(stepGroup => (
+                  <div key={stepGroup.stepId} className="mb-6 last:mb-0">
+                    <h3 className="text-lg font-black text-primary dark:text-white mb-3 px-2 sm:px-0 flex items-center gap-2">
+                        <span className="text-secondary text-sm">Etapa {steps.findIndex(s => s.id === stepGroup.stepId) + 1}:</span> {stepGroup.stepName}
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {stepGroup.materials.map(material => {
+                        const isMissing = material.purchasedQty < material.plannedQty && (new Date(steps.find(s => s.id === material.stepId)?.startDate || '') <= new Date(new Date().setDate(new Date().getDate() + 3)));
+                        const isPartial = material.purchasedQty > 0 && material.purchasedQty < material.plannedQty;
+                        const isCompleted = material.purchasedQty >= material.plannedQty;
+                        const progress = (material.purchasedQty / material.plannedQty) * 100;
+                        
+                        let materialStatusClass = 'text-slate-500 dark:text-slate-400';
+                        let borderClass = 'border-slate-200 dark:border-slate-800';
+                        let shadowClass = 'shadow-card-default';
+                        let statusText = 'Pendente';
+
+                        if (isMissing) {
+                            materialStatusClass = 'text-red-600 dark:text-red-400';
+                            borderClass = 'border-red-500/50 dark:border-red-700/50';
+                            shadowClass = 'shadow-lg shadow-red-500/20';
+                            statusText = 'FALTANDO!';
+                        } else if (isCompleted) {
+                            materialStatusClass = 'text-green-600 dark:text-green-400';
+                            borderClass = 'border-green-500/50 dark:border-green-700/50';
+                            shadowClass = 'shadow-lg shadow-green-500/20';
+                            statusText = 'Concluído';
+                        } else if (isPartial) {
+                            materialStatusClass = 'text-amber-600 dark:text-amber-400';
+                            borderClass = 'border-amber-500/50 dark:border-amber-700/50';
+                            shadowClass = 'shadow-lg shadow-amber-500/20';
+                            statusText = 'Parcial';
+                        }
+                        
+                        return (
+                          <div 
+                            key={material.id} 
+                            onClick={() => openEditMaterialModal(material)}
+                            className={cx(surface, card, "flex flex-col cursor-pointer transition-all hover:scale-[1.01] hover:border-secondary/50", borderClass, shadowClass)}
+                            role="button"
+                            tabIndex={0}
+                            aria-label={`Editar material ${material.name}`}
+                            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') openEditMaterialModal(material); }}
+                          >
+                            <div className="flex justify-between items-center mb-3">
+                              <h3 className="text-xl font-black text-primary dark:text-white leading-tight">{material.name}</h3>
+                              <span className={cx("text-xs font-bold px-3 py-1 rounded-full", materialStatusClass, "bg-current/10")}>
+                                {statusText}
+                              </span>
+                            </div>
+                            <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-2">{material.brand || 'Marca não informada'}</p>
+                            
+                            {/* Tripé de controle de material */}
+                            <div className="mb-4">
+                                <p className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1">Planejado: <span className="text-primary dark:text-white">{material.plannedQty} {material.unit}</span></p>
+                                <p className="text-sm font-black text-green-600 dark:text-green-400 flex items-center gap-2">
+                                    <i className="fa-solid fa-check-double"></i>
+                                    Comprado: {material.purchasedQty} de {material.plannedQty} {material.unit}
+                                </p>
+                            </div>
+
+                            {/* Progress bar */}
+                            <div className="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-2 overflow-hidden mb-3" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100}>
+                                <div 
+                                    className={`h-full rounded-full ${isMissing ? 'bg-red-500' : isCompleted ? 'bg-green-500' : 'bg-amber-500'}`} 
+                                    style={{ width: `${Math.min(100, progress)}%` }}
+                                ></div>
+                            </div>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 text-right">{progress.toFixed(0)}% comprado</p>
+
+                            <div className="mt-4 flex justify-end gap-2">
+                                {(material.purchasedQty < material.plannedQty) && (
+                                    <button 
+                                        onClick={(e) => { e.stopPropagation(); setPurchaseMaterialId(material.id); setShowPurchaseMaterialModal(true); }} 
+                                        className="px-4 py-2 bg-secondary text-white text-xs font-bold rounded-xl hover:bg-secondary-dark transition-colors"
+                                        aria-label={`Registrar compra para ${material.name}`}
+                                    >
+                                        <i className="fa-solid fa-cart-shopping mr-2"></i> Comprar
+                                    </button>
+                                )}
+                                <button 
+                                    onClick={(e) => { e.stopPropagation(); handleDeleteMaterial(material.id); }} 
+                                    className="px-4 py-2 bg-red-500 text-white text-xs font-bold rounded-xl hover:bg-red-700 transition-colors"
+                                    aria-label={`Excluir material ${material.name}`}
+                                >
+                                    <i className="fa-solid fa-trash-alt"></i>
+                                </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))
               )}
-              <button onClick={() => setActiveSubView('NONE')} className="px-4 py-2 bg-slate-100 dark:bg-slate-800 text-primary dark:text-white rounded-xl text-sm font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors flex items-center gap-2">
-                <i className="fa-solid fa-times"></i> Fechar
-              </button>
+            </div>
+          )}
+
+          {/* Tab Content: FINANCEIRO */}
+          {activeTab === 'FINANCEIRO' && (
+            <div className="space-y-4 animate-in fade-in duration-300">
+              <div className="flex justify-between items-center px-2 sm:px-0">
+                <h2 className="text-xl font-black text-primary dark:text-white">Controle Financeiro</h2>
+                <button onClick={() => setShowAddExpenseModal(true)} className="px-4 py-2 bg-secondary text-white text-sm font-bold rounded-xl hover:bg-secondary-dark transition-colors flex items-center gap-2" aria-label="Adicionar nova despesa">
+                  <i className="fa-solid fa-plus-circle"></i> Nova Despesa
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {groupedExpensesByStep.length === 0 ? (
+                    <div className="col-span-full text-center text-slate-400 py-8 italic">Nenhuma despesa cadastrada ainda.</div>
+                ) : (
+                    groupedExpensesByStep.map(stepGroup => (
+                        <React.Fragment key={stepGroup.stepName}>
+                            <h3 className="col-span-full text-lg font-black text-primary dark:text-white mb-2 px-2 sm:px-0 flex items-center gap-2">
+                                <span className="text-secondary text-sm">Etapa:</span> {stepGroup.stepName}
+                                <span className="ml-auto text-base text-slate-500 dark:text-slate-400">Total: {formatCurrency(stepGroup.totalStepAmount)}</span>
+                            </h3>
+                            {stepGroup.expenses.map(expense => {
+                                const total = expense.totalAgreed || expense.amount;
+                                const paid = expense.paidAmount || 0;
+                                const balance = total - paid;
+
+                                let statusText = '';
+                                let expenseStatusClass = 'text-slate-500 dark:text-slate-400';
+                                let borderClass = 'border-slate-200 dark:border-slate-800';
+                                let shadowClass = 'shadow-card-default';
+
+                                if (paid === 0) {
+                                    statusText = 'Pendente';
+                                } else if (paid < total) {
+                                    statusText = 'Parcial';
+                                    expenseStatusClass = 'text-amber-600 dark:text-amber-400';
+                                    borderClass = 'border-amber-500/50 dark:border-amber-700/50';
+                                    shadowClass = 'shadow-lg shadow-amber-500/20';
+                                } else if (paid >= total) {
+                                    statusText = 'Concluído';
+                                    expenseStatusClass = 'text-green-600 dark:text-green-400';
+                                    borderClass = 'border-green-500/50 dark:border-green-700/50';
+                                    shadowClass = 'shadow-lg shadow-green-500/20';
+                                }
+                                if (paid > total) { // Excedeu o valor combinado, indicando prejuízo ou erro
+                                    statusText = 'Prejuízo';
+                                    expenseStatusClass = 'text-red-600 dark:text-red-400';
+                                    borderClass = 'border-red-500/50 dark:border-red-700/50';
+                                    shadowClass = 'shadow-lg shadow-red-500/20';
+                                }
+
+                                const progress = total > 0 ? (paid / total) * 100 : 0;
+
+                                return (
+                                    <div 
+                                        key={expense.id}
+                                        onClick={() => openEditExpenseModal(expense)}
+                                        className={cx(surface, card, "flex flex-col cursor-pointer transition-all hover:scale-[1.01] hover:border-secondary/50", borderClass, shadowClass)}
+                                        role="button"
+                                        tabIndex={0}
+                                        aria-label={`Editar despesa ${expense.description}`}
+                                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') openEditExpenseModal(expense); }}
+                                    >
+                                        <div className="flex items-center justify-between mb-3">
+                                            <h3 className="text-xl font-black text-primary dark:text-white leading-tight">{expense.description}</h3>
+                                            <span className={cx("text-xs font-bold px-3 py-1 rounded-full", expenseStatusClass, "bg-current/10")}>
+                                                {statusText}
+                                            </span>
+                                        </div>
+                                        <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-2">{expense.category}</p>
+                                        <div className="flex justify-between items-center text-sm font-bold mb-2">
+                                            <span className="text-slate-700 dark:text-slate-300">Total: {formatCurrency(expense.amount)}</span>
+                                            <span className="text-green-600 dark:text-green-400">Pago: {formatCurrency(paid)}</span>
+                                        </div>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 text-right">Saldo a pagar: {formatCurrency(balance)}</p>
+                                        
+                                        {/* Progress bar for payments */}
+                                        <div className="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-2 overflow-hidden mt-3 mb-3" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100}>
+                                            <div 
+                                                className={`h-full rounded-full ${paid > total ? 'bg-red-500' : paid >= total ? 'bg-green-500' : 'bg-amber-500'}`} 
+                                                style={{ width: `${Math.min(100, progress)}%` }}
+                                            ></div>
+                                        </div>
+                                        <p className="text-xs text-slate-500 dark:text-slate-400 text-right">{progress.toFixed(0)}% pago</p>
+
+                                        <div className="mt-4 flex justify-end gap-2">
+                                            {expense.category !== ExpenseCategory.MATERIAL && paid < total && (
+                                                <button 
+                                                    onClick={(e) => { e.stopPropagation(); handleOpenAddPaymentModal(expense); }} 
+                                                    className="px-4 py-2 bg-secondary text-white text-xs font-bold rounded-xl hover:bg-secondary-dark transition-colors"
+                                                    aria-label={`Registrar pagamento para ${expense.description}`}
+                                                >
+                                                    <i className="fa-solid fa-money-bill-wave mr-2"></i> Pagar
+                                                </button>
+                                            )}
+                                            <button 
+                                                onClick={(e) => { e.stopPropagation(); handleDeleteExpense(expense.id); }} 
+                                                className="px-4 py-2 bg-red-500 text-white text-xs font-bold rounded-xl hover:bg-red-700 transition-colors"
+                                                aria-label={`Excluir despesa ${expense.description}`}
+                                            >
+                                                <i className="fa-solid fa-trash-alt"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </React.Fragment>
+                    ))
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Tab Content: FERRAMENTAS */}
+          {activeTab === 'FERRAMENTAS' && (
+            <div className="space-y-6 animate-in fade-in duration-300">
+              <h2 className="text-xl font-black text-primary dark:text-white px-2 sm:px-0">Ferramentas de Gestão</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <button 
+                  onClick={() => goToSubView('WORKERS')} 
+                  className={cx(surface, "rounded-3xl p-6 flex flex-col items-center justify-center text-center gap-2 transition-all hover:scale-[1.02] hover:border-secondary/50")}
+                  aria-label="Gerenciar Profissionais"
+                >
+                  <div className="w-12 h-12 bg-secondary/10 text-secondary rounded-xl flex items-center justify-center text-xl mb-2"><i className="fa-solid fa-hard-hat"></i></div>
+                  <h3 className="font-bold text-primary dark:text-white">Profissionais</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Organize sua equipe.</p>
+                </button>
+                <button 
+                  onClick={() => goToSubView('SUPPLIERS')} 
+                  className={cx(surface, "rounded-3xl p-6 flex flex-col items-center justify-center text-center gap-2 transition-all hover:scale-[1.02] hover:border-secondary/50")}
+                  aria-label="Gerenciar Fornecedores"
+                >
+                  <div className="w-12 h-12 bg-green-500/10 text-green-600 rounded-xl flex items-center justify-center text-xl mb-2"><i className="fa-solid fa-truck-fast"></i></div>
+                  <h3 className="font-bold text-primary dark:text-white">Fornecedores</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Controle seus parceiros.</p>
+                </button>
+                <button 
+                  onClick={() => goToSubView('PHOTOS')} 
+                  className={cx(surface, "rounded-3xl p-6 flex flex-col items-center justify-center text-center gap-2 transition-all hover:scale-[1.02] hover:border-secondary/50")}
+                  aria-label="Ver Fotos da Obra"
+                >
+                  <div className="w-12 h-12 bg-blue-500/10 text-blue-600 rounded-xl flex items-center justify-center text-xl mb-2"><i className="fa-solid fa-camera"></i></div>
+                  <h3 className="font-bold text-primary dark:text-white">Fotos da Obra</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Acompanhe o progresso visual.</p>
+                </button>
+                <button 
+                  onClick={() => goToSubView('PROJECTS')} 
+                  className={cx(surface, "rounded-3xl p-6 flex flex-col items-center justify-center text-center gap-2 transition-all hover:scale-[1.02] hover:border-secondary/50")}
+                  aria-label="Gerenciar Projetos e Documentos"
+                >
+                  <div className="w-12 h-12 bg-purple-500/10 text-purple-600 rounded-xl flex items-center justify-center text-xl mb-2"><i className="fa-solid fa-file-alt"></i></div>
+                  <h3 className="font-bold text-primary dark:text-white">Projetos & Docs</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Centralize seus arquivos.</p>
+                </button>
+                <button 
+                  onClick={() => goToSubView('CHECKLIST')} 
+                  className={cx(surface, "rounded-3xl p-6 flex flex-col items-center justify-center text-center gap-2 transition-all hover:scale-[1.02] hover:border-secondary/50")}
+                  aria-label="Acessar Checklists Inteligentes"
+                >
+                  <div className="w-12 h-12 bg-teal-500/10 text-teal-600 rounded-xl flex items-center justify-center text-xl mb-2"><i className="fa-solid fa-clipboard-check"></i></div>
+                  <h3 className="font-bold text-primary dark:text-white">Checklists</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Não esqueça de nada.</p>
+                </button>
+                <button 
+                  onClick={() => goToSubView('CONTRACTS')} 
+                  className={cx(surface, "rounded-3xl p-6 flex flex-col items-center justify-center text-center gap-2 transition-all hover:scale-[1.02] hover:border-secondary/50")}
+                  aria-label="Gerador de Contratos"
+                >
+                  <div className="w-12 h-12 bg-amber-500/10 text-amber-600 rounded-xl flex items-center justify-center text-xl mb-2"><i className="fa-solid fa-file-signature"></i></div>
+                  <h3 className="font-bold text-primary dark:text-white">Contratos</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Modelos prontos e personalizáveis.</p>
+                </button>
+                <button 
+                  onClick={() => goToSubView('CALCULATORS')} 
+                  className={cx(surface, "rounded-3xl p-6 flex flex-col items-center justify-center text-center gap-2 transition-all hover:scale-[1.02] hover:border-secondary/50")}
+                  aria-label="Acessar Calculadoras"
+                >
+                  <div className="w-12 h-12 bg-cyan-500/10 text-cyan-600 rounded-xl flex items-center justify-center text-xl mb-2"><i className="fa-solid fa-calculator"></i></div>
+                  <h3 className="font-bold text-primary dark:text-white">Calculadoras</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Calcule materiais e mais.</p>
+                </button>
+                <button 
+                  onClick={() => goToSubView('REPORTS')} 
+                  className={cx(surface, "rounded-3xl p-6 flex flex-col items-center justify-center text-center gap-2 transition-all hover:scale-[1.02] hover:border-secondary/50")}
+                  aria-label="Ver Relatórios"
+                >
+                  <div className="w-12 h-12 bg-red-500/10 text-red-600 rounded-xl flex items-center justify-center text-xl mb-2"><i className="fa-solid fa-chart-line"></i></div>
+                  <h3 className="font-bold text-primary dark:text-white">Relatórios</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Visão consolidada.</p>
+                </button>
+                {/* Add other tool buttons here */}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Sub-View: WORKERS */}
+      {activeSubView === 'WORKERS' && (
+        <div className="space-y-4 animate-in fade-in duration-300">
+          <div className="flex justify-between items-center px-2 sm:px-0">
+            <h2 className="text-xl font-black text-primary dark:text-white">Profissionais da Obra</h2>
+            <button onClick={() => setShowAddWorkerModal(true)} className="px-4 py-2 bg-secondary text-white text-sm font-bold rounded-xl hover:bg-secondary-dark transition-colors flex items-center gap-2" aria-label="Adicionar novo profissional">
+              <i className="fa-solid fa-plus-circle"></i> Novo Profissional
+            </button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {workers.length === 0 ? (
+              <div className="col-span-full text-center text-slate-400 py-8 italic">Nenhum profissional cadastrado ainda.</div>
+            ) : (
+              workers.map(worker => (
+                <div key={worker.id} onClick={() => openEditWorkerModal(worker)} className={cx(surface, card, "flex flex-col cursor-pointer transition-all hover:scale-[1.01] hover:border-secondary/50")} role="button" tabIndex={0} aria-label={`Editar profissional ${worker.name}`} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') openEditWorkerModal(worker); }}>
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-xl font-black text-primary dark:text-white leading-tight">{worker.name}</h3>
+                    <span className="text-xs font-bold px-3 py-1 rounded-full bg-secondary/10 text-secondary">{worker.role}</span>
+                  </div>
+                  <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-2">Tel: {worker.phone || 'Não informado'}</p>
+                  {worker.dailyRate && <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-2">Diária: {formatCurrency(worker.dailyRate)}</p>}
+                  <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2">{worker.notes || 'Sem anotações.'}</p>
+                  <div className="mt-4 flex justify-end">
+                    <button onClick={(e) => { e.stopPropagation(); handleDeleteWorker(worker.id); }} className="px-4 py-2 bg-red-500 text-white text-xs font-bold rounded-xl hover:bg-red-700 transition-colors" aria-label={`Excluir profissional ${worker.name}`}>
+                      <i className="fa-solid fa-trash-alt"></i>
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Sub-View: SUPPLIERS */}
+      {activeSubView === 'SUPPLIERS' && (
+        <div className="space-y-4 animate-in fade-in duration-300">
+          <div className="flex justify-between items-center px-2 sm:px-0">
+            <h2 className="text-xl font-black text-primary dark:text-white">Fornecedores</h2>
+            <button onClick={() => setShowAddSupplierModal(true)} className="px-4 py-2 bg-secondary text-white text-sm font-bold rounded-xl hover:bg-secondary-dark transition-colors flex items-center gap-2" aria-label="Adicionar novo fornecedor">
+              <i className="fa-solid fa-plus-circle"></i> Novo Fornecedor
+            </button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {suppliers.length === 0 ? (
+              <div className="col-span-full text-center text-slate-400 py-8 italic">Nenhum fornecedor cadastrado ainda.</div>
+            ) : (
+              suppliers.map(supplier => (
+                <div key={supplier.id} onClick={() => openEditSupplierModal(supplier)} className={cx(surface, card, "flex flex-col cursor-pointer transition-all hover:scale-[1.01] hover:border-secondary/50")} role="button" tabIndex={0} aria-label={`Editar fornecedor ${supplier.name}`} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') openEditSupplierModal(supplier); }}>
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-xl font-black text-primary dark:text-white leading-tight">{supplier.name}</h3>
+                    <span className="text-xs font-bold px-3 py-1 rounded-full bg-green-500/10 text-green-600">{supplier.category}</span>
+                  </div>
+                  <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-2">Tel: {supplier.phone || 'Não informado'}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2">{supplier.notes || 'Sem anotações.'}</p>
+                  <div className="mt-4 flex justify-end">
+                    <button onClick={(e) => { e.stopPropagation(); handleDeleteSupplier(supplier.id); }} className="px-4 py-2 bg-red-500 text-white text-xs font-bold rounded-xl hover:bg-red-700 transition-colors" aria-label={`Excluir fornecedor ${supplier.name}`}>
+                      <i className="fa-solid fa-trash-alt"></i>
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Sub-View: PHOTOS */}
+      {activeSubView === 'PHOTOS' && (
+        <div className="space-y-4 animate-in fade-in duration-300">
+          <div className="flex justify-between items-center px-2 sm:px-0">
+            <h2 className="text-xl font-black text-primary dark:text-white">Fotos da Obra</h2>
+            <button onClick={() => setShowAddPhotoModal(true)} className="px-4 py-2 bg-secondary text-white text-sm font-bold rounded-xl hover:bg-secondary-dark transition-colors flex items-center gap-2" aria-label="Adicionar nova foto">
+              <i className="fa-solid fa-plus-circle"></i> Nova Foto
+            </button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {photos.length === 0 ? (
+              <div className="col-span-full text-center text-slate-400 py-8 italic">Nenhuma foto cadastrada ainda.</div>
+            ) : (
+              photos.map(photo => (
+                <div key={photo.id} className={cx(surface, card, "flex flex-col")} role="figure">
+                  <img src={photo.url} alt={photo.description} className="w-full h-48 object-cover rounded-xl mb-3" />
+                  <h3 className="text-lg font-bold text-primary dark:text-white mb-1">{photo.description}</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">{formatDateDisplay(photo.date)} - {photo.type}</p>
+                  <div className="mt-4 flex justify-end">
+                    <button onClick={() => handleDeletePhoto(photo.id)} className="px-4 py-2 bg-red-500 text-white text-xs font-bold rounded-xl hover:bg-red-700 transition-colors" aria-label={`Excluir foto ${photo.description}`}>
+                      <i className="fa-solid fa-trash-alt"></i>
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Sub-View: PROJECTS (Files) */}
+      {activeSubView === 'PROJECTS' && (
+        <div className="space-y-4 animate-in fade-in duration-300">
+          <div className="flex justify-between items-center px-2 sm:px-0">
+            <h2 className="text-xl font-black text-primary dark:text-white">Projetos & Documentos</h2>
+            <button onClick={() => setShowAddFileModal(true)} className="px-4 py-2 bg-secondary text-white text-sm font-bold rounded-xl hover:bg-secondary-dark transition-colors flex items-center gap-2" aria-label="Adicionar novo arquivo">
+              <i className="fa-solid fa-plus-circle"></i> Novo Arquivo
+            </button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {files.length === 0 ? (
+              <div className="col-span-full text-center text-slate-400 py-8 italic">Nenhum arquivo cadastrado ainda.</div>
+            ) : (
+              files.map(file => (
+                <div key={file.id} className={cx(surface, card, "flex flex-col")} role="document">
+                  <h3 className="text-lg font-bold text-primary dark:text-white mb-1">{file.name}</h3>
+                  <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">{file.category}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">{formatDateDisplay(file.date)}</p>
+                  <div className="mt-4 flex justify-end gap-2">
+                    <a href={file.url} target="_blank" rel="noopener noreferrer" className="px-4 py-2 bg-primary text-white text-xs font-bold rounded-xl hover:bg-primary-light transition-colors" aria-label={`Ver arquivo ${file.name}`}>
+                      <i className="fa-solid fa-eye"></i>
+                    </a>
+                    <button onClick={() => handleDeleteFile(file.id)} className="px-4 py-2 bg-red-500 text-white text-xs font-bold rounded-xl hover:bg-red-700 transition-colors" aria-label={`Excluir arquivo ${file.name}`}>
+                      <i className="fa-solid fa-trash-alt"></i>
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Sub-View: CHECKLIST */}
+      {activeSubView === 'CHECKLIST' && (
+        <div className="space-y-4 animate-in fade-in duration-300">
+          <div className="flex justify-between items-center px-2 sm:px-0">
+            <h2 className="text-xl font-black text-primary dark:text-white">Checklists Inteligentes</h2>
+            <button onClick={() => setShowAddChecklistModal(true)} className="px-4 py-2 bg-secondary text-white text-sm font-bold rounded-xl hover:bg-secondary-dark transition-colors flex items-center gap-2" aria-label="Adicionar nova checklist">
+              <i className="fa-solid fa-plus-circle"></i> Nova Checklist
+            </button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {checklists.length === 0 ? (
+              <div className="col-span-full text-center text-slate-400 py-8 italic">Nenhuma checklist cadastrada ainda.</div>
+            ) : (
+              checklists.map(checklist => (
+                <div key={checklist.id} onClick={() => openEditChecklistModal(checklist)} className={cx(surface, card, "flex flex-col cursor-pointer transition-all hover:scale-[1.01] hover:border-secondary/50")} role="button" tabIndex={0} aria-label={`Editar checklist ${checklist.name}`} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') openEditChecklistModal(checklist); }}>
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-xl font-black text-primary dark:text-white leading-tight">{checklist.name}</h3>
+                    <span className="text-xs font-bold px-3 py-1 rounded-full bg-teal-500/10 text-teal-600">{checklist.category}</span>
+                  </div>
+                  <ul className="space-y-1 text-sm text-slate-700 dark:text-slate-300">
+                    {checklist.items.slice(0, 3).map(item => (
+                      <li key={item.id} className="flex items-center gap-2">
+                        <i className={`fa-solid ${item.checked ? 'fa-check-square text-green-500' : 'fa-square text-slate-400'}`}></i>
+                        <span className={item.checked ? 'line-through text-slate-400' : ''}>{item.text}</span>
+                      </li>
+                    ))}
+                    {checklist.items.length > 3 && <li className="text-xs text-slate-500 italic">+ {checklist.items.length - 3} mais itens...</li>}
+                  </ul>
+                  <div className="mt-4 flex justify-end">
+                    <button onClick={(e) => { e.stopPropagation(); handleDeleteChecklist(checklist.id); }} className="px-4 py-2 bg-red-500 text-white text-xs font-bold rounded-xl hover:bg-red-700 transition-colors" aria-label={`Excluir checklist ${checklist.name}`}>
+                      <i className="fa-solid fa-trash-alt"></i>
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Sub-View: CONTRACTS */}
+      {activeSubView === 'CONTRACTS' && (
+        <div className="space-y-4 animate-in fade-in duration-300">
+          <div className="flex justify-between items-center px-2 sm:px-0">
+            <h2 className="text-xl font-black text-primary dark:text-white">Gerador de Contratos</h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {contracts.length === 0 ? (
+              <div className="col-span-full text-center text-slate-400 py-8 italic">Nenhum modelo de contrato encontrado.</div>
+            ) : (
+              contracts.map(contract => (
+                <div key={contract.id} className={cx(surface, card, "flex flex-col")} role="article">
+                  <h3 className="text-lg font-bold text-primary dark:text-white mb-1">{contract.title}</h3>
+                  <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">{contract.category}</p>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-3">{contract.contentTemplate.substring(0, 150)}...</p>
+                  <div className="mt-4 flex justify-end">
+                    <button onClick={() => alert("Funcionalidade de edição de contrato em breve!")} className="px-4 py-2 bg-primary text-white text-xs font-bold rounded-xl hover:bg-primary-light transition-colors" aria-label={`Gerar contrato ${contract.title}`}>
+                      <i className="fa-solid fa-file-pdf"></i> Gerar
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Sub-View: CALCULATORS */}
+      {activeSubView === 'CALCULATORS' && (
+        <div className="space-y-4 animate-in fade-in duration-300">
+          <div className="flex justify-between items-center px-2 sm:px-0">
+            <h2 className="text-xl font-black text-primary dark:text-white">Calculadoras</h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Mock Calculator Card */}
+            <div className={cx(surface, card, "flex flex-col")} role="article">
+              <h3 className="text-lg font-bold text-primary dark:text-white mb-1">Calculadora de Materiais Básicos</h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">Calcule cimento, areia, brita, tijolos e mais.</p>
+              <div className="mt-4 flex justify-end">
+                <button onClick={() => alert("Calculadora em breve!")} className="px-4 py-2 bg-primary text-white text-xs font-bold rounded-xl hover:bg-primary-light transition-colors" aria-label="Acessar calculadora de materiais">
+                  Acessar <i className="fa-solid fa-arrow-right ml-2"></i>
+                </button>
+              </div>
+            </div>
+            {/* Add more calculator cards here */}
+          </div>
+        </div>
+      )}
+
+
+      {/* NEW: Sub-View: REPORTS */}
+      {activeSubView === 'REPORTS' && (
+        <div className="space-y-4 animate-in fade-in duration-300">
+          <div className="flex justify-between items-center px-2 sm:px-0">
+            <h2 className="text-xl font-black text-primary dark:text-white">Relatórios da Obra</h2>
+            {/* Export buttons for the current report sub-tab */}
+            <div className="flex gap-2">
+                <button onClick={() => handleExportToExcel(reportSubTab)} className="px-4 py-2 bg-green-600 text-white text-sm font-bold rounded-xl hover:bg-green-700 transition-colors flex items-center gap-2" aria-label={`Exportar ${reportSubTab} para Excel`}>
+                    <i className="fa-solid fa-file-excel"></i> Excel
+                </button>
+                <button disabled className="px-4 py-2 bg-red-400 text-white text-sm font-bold rounded-xl cursor-not-allowed opacity-50 flex items-center gap-2" aria-label="Exportar para PDF (em breve)">
+                    <i className="fa-solid fa-file-pdf"></i> PDF (Em Breve)
+                </button>
             </div>
           </div>
 
-          {/* SUBVIEW CONTENT */}
-          {activeSubView === 'WORKERS' && (
-            <div className="space-y-4">
-              {workers.length === 0 ? (
-                <div className="text-center text-slate-400 py-10 italic text-lg">Nenhum profissional cadastrado.</div>
-              ) : (
-                workers.map(worker => (
-                  <div key={worker.id} className="bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800">
-                    <div className="flex items-center justify-between mb-2">
-                      <h3 className="font-bold text-primary dark:text-white">{worker.name}</h3>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">{worker.role}</span>
-                      </div>
-                    </div>
-                    <p className="text-sm text-slate-600 dark:text-slate-300 mb-1">Telefone: {worker.phone}</p>
-                    {worker.dailyRate && <p className="text-sm text-slate-600 dark:text-slate-300 mb-1">Diária: {formatCurrency(worker.dailyRate)}</p>}
-                    {worker.notes && <p className="text-xs text-slate-500 dark:text-slate-400 italic mt-2">{worker.notes}</p>}
-                    <div className="flex justify-end gap-2 mt-4">
-                      <button onClick={() => openEditWorkerModal(worker)} className="px-3 py-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-md text-xs font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
-                        <i className="fa-solid fa-edit mr-1"></i> Editar
-                      </button>
-                      <button onClick={() => handleDeleteWorker(worker.id)} className="px-3 py-1 bg-red-500 text-white rounded-md text-xs font-bold hover:bg-red-600 transition-colors">
-                        <i className="fa-solid fa-trash-alt mr-1"></i> Excluir
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          )}
+          {/* Report Sub-Tabs Navigation */}
+          <div className="bg-white dark:bg-slate-900 rounded-2xl p-2 flex justify-around items-center mb-6 shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800">
+            <button onClick={() => setReportSubTab('CRONOGRAMA')} className={`flex-1 py-3 px-2 text-center text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2 ${reportSubTab === 'CRONOGRAMA' ? 'bg-primary text-white shadow-md' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}`} aria-pressed={reportSubTab === 'CRONOGRAMA'} aria-label="Relatório de Cronograma">
+              <i className="fa-solid fa-calendar-alt"></i> Cronograma
+            </button>
+            <button onClick={() => setReportSubTab('MATERIAIS')} className={`flex-1 py-3 px-2 text-center text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2 ${reportSubTab === 'MATERIAIS' ? 'bg-primary text-white shadow-md' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}`} aria-pressed={reportSubTab === 'MATERIAIS'} aria-label="Relatório de Materiais">
+              <i className="fa-solid fa-boxes-stacked"></i> Materiais
+            </button>
+            <button onClick={() => setReportSubTab('FINANCEIRO')} className={`flex-1 py-3 px-2 text-center text-sm font-bold rounded-xl transition-colors flex items-center justify-center gap-2 ${reportSubTab === 'FINANCEIRO' ? 'bg-primary text-white shadow-md' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}`} aria-pressed={reportSubTab === 'FINANCEIRO'} aria-label="Relatório Financeiro">
+              <i className="fa-solid fa-dollar-sign"></i> Financeiro
+            </button>
+          </div>
 
-          {activeSubView === 'SUPPLIERS' && (
-            <div className="space-y-4">
-              {suppliers.length === 0 ? (
-                <div className="text-center text-slate-400 py-10 italic text-lg">Nenhum fornecedor cadastrado.</div>
-              ) : (
-                suppliers.map(supplier => (
-                  <div key={supplier.id} className="bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800">
-                    <div className="flex items-center justify-between mb-2">
-                      <h3 className="font-bold text-primary dark:text-white">{supplier.name}</h3>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">{supplier.category}</span>
-                      </div>
-                    </div>
-                    <p className="text-sm text-slate-600 dark:text-slate-300 mb-1">Telefone: {supplier.phone}</p>
-                    {supplier.email && <p className="text-sm text-slate-600 dark:text-slate-300 mb-1">Email: {supplier.email}</p>}
-                    {supplier.address && <p className="text-sm text-slate-600 dark:text-slate-300 mb-1">Endereço: {supplier.address}</p>}
-                    {supplier.notes && <p className="text-xs text-slate-500 dark:text-slate-400 italic mt-2">{supplier.notes}</p>}
-                    <div className="flex justify-end gap-2 mt-4">
-                      <button onClick={() => openEditSupplierModal(supplier)} className="px-3 py-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-md text-xs font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors">
-                        <i className="fa-solid fa-edit mr-1"></i> Editar
-                      </button>
-                      <button onClick={() => handleDeleteSupplier(supplier.id)} className="px-3 py-1 bg-red-500 text-white rounded-md text-xs font-bold hover:bg-red-600 transition-colors">
-                        <i className="fa-solid fa-trash-alt mr-1"></i> Excluir
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          )}
-
-          {activeSubView === 'PHOTOS' && (
-            <div className="space-y-4">
-              {photos.length === 0 ? (
-                <div className="text-center text-slate-400 py-10 italic text-lg">Nenhuma foto cadastrada.</div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                  {photos.map(photo => (
-                    <div key={photo.id} className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800 overflow-hidden group">
-                      <img src={photo.url} alt={photo.description} className="w-full h-40 object-cover" />
-                      <div className="p-3">
-                        <p className="font-semibold text-primary dark:text-white text-sm">{photo.description}</p>
-                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{new Date(photo.date).toLocaleDateString('pt-BR')} - {photo.type}</p>
-                        <div className="flex justify-end mt-3">
-                          <button onClick={() => handleDeletePhoto(photo.id)} className="px-3 py-1 bg-red-500 text-white rounded-md text-xs font-bold hover:bg-red-600 transition-colors">
-                            <i className="fa-solid fa-trash-alt mr-1"></i> Excluir
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+          {/* Report Content: CRONOGRAMA */}
+          {reportSubTab === 'CRONOGRAMA' && (
+            <div className="animate-in fade-in duration-300">
+              <h3 className="text-lg font-black text-primary dark:text-white mb-4 px-2 sm:px-0">Visão Geral do Cronograma</h3>
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+                <div className={cx(surface, "rounded-3xl p-3 flex flex-col items-start")}>
+                  <p className="text-xl font-black text-green-600 leading-none">{completedStepsCount}</p>
+                  <p className="text-[9px] font-extrabold tracking-widest uppercase text-slate-500">Concluídas</p>
                 </div>
-              )}
-            </div>
-          )}
+                <div className={cx(surface, "rounded-3xl p-3 flex flex-col items-start")}>
+                  <p className="text-xl font-black text-status-inprogress leading-none">{inProgressStepsCount}</p>
+                  <p className="text-[9px] font-extrabold tracking-widest uppercase text-slate-500">Em Andamento</p>
+                </div>
+                <div className={cx(surface, "rounded-3xl p-3 flex flex-col items-start")}>
+                  <p className="text-xl font-black text-slate-500 leading-none">{notStartedStepsCount}</p>
+                  <p className="text-[9px] font-extrabold tracking-widest uppercase text-slate-500">Pendentes</p>
+                </div>
+                <div className={cx(surface, "rounded-3xl p-3 flex flex-col items-start")}>
+                  <p className="text-xl font-black text-red-600 leading-none">{delayedStepsCount}</p>
+                  <p className="text-[9px] font-extrabold tracking-widest uppercase text-slate-500">Atrasadas</p>
+                </div>
+              </div>
 
-          {activeSubView === 'PROJECTS' && (
-            <div className="space-y-4">
-              {files.length === 0 ? (
-                <div className="text-center text-slate-400 py-10 italic text-lg">Nenhum arquivo cadastrado.</div>
-              ) : (
-                files.map(file => (
-                  <div key={file.id} className="bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800 flex items-center justify-between">
-                    <div>
-                      <p className="font-semibold text-primary dark:text-white text-sm">{file.name}</p>
-                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{file.category} - {new Date(file.date).toLocaleDateString('pt-BR')}</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <a href={file.url} target="_blank" rel="noopener noreferrer" className="px-3 py-1 bg-secondary text-white rounded-md text-xs font-bold hover:bg-secondary-dark transition-colors">
-                        <i className="fa-solid fa-eye mr-1"></i> Ver
-                      </a>
-                      <button onClick={() => handleDeleteFile(file.id)} className="px-3 py-1 bg-red-500 text-white rounded-md text-xs font-bold hover:bg-red-600 transition-colors">
-                        <i className="fa-solid fa-trash-alt mr-1"></i> Excluir
-                      </button>
-                    </div>
+              <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800 p-4">
+                <h4 className="font-bold text-primary dark:text-white mb-3">Lista de Etapas</h4>
+                {steps.length === 0 ? (
+                  <p className="text-center text-slate-400 py-4 italic">Nenhuma etapa para o relatório.</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
+                      <thead>
+                        <tr>
+                          <th className="px-4 py-2 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Número</th>
+                          <th className="px-4 py-2 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Etapa</th>
+                          <th className="px-4 py-2 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Início</th>
+                          <th className="px-4 py-2 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Fim</th>
+                          <th className="px-4 py-2 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                        {steps.map((step, index) => {
+                           const isDelayed = new Date(step.endDate) < new Date() && step.status !== StepStatus.COMPLETED;
+                           let statusColorClass = '';
+                           if (isDelayed) statusColorClass = 'text-red-600';
+                           else if (step.status === StepStatus.COMPLETED) statusColorClass = 'text-green-600';
+                           else if (step.status === StepStatus.IN_PROGRESS) statusColorClass = 'text-status-inprogress';
+                           else statusColorClass = 'text-slate-500';
+
+                          return (
+                            <tr key={step.id}>
+                              <td className="px-4 py-2 whitespace-nowrap text-sm text-primary dark:text-white">{index + 1}</td>
+                              <td className="px-4 py-2 whitespace-nowrap text-sm text-primary dark:text-white">{step.name}</td>
+                              <td className="px-4 py-2 whitespace-nowrap text-sm text-slate-700 dark:text-slate-300">{formatDateDisplay(step.startDate)}</td>
+                              <td className="px-4 py-2 whitespace-nowrap text-sm text-slate-700 dark:text-slate-300">{formatDateDisplay(step.endDate)}</td>
+                              <td className="px-4 py-2 whitespace-nowrap text-sm font-bold">
+                                  <span className={statusColorClass}>{isDelayed ? 'Atrasada' : (step.status === StepStatus.COMPLETED ? 'Concluída' : (step.status === StepStatus.IN_PROGRESS ? 'Em Andamento' : 'Pendente'))}</span>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
                   </div>
-                ))
-              )}
+                )}
+              </div>
             </div>
           )}
 
-          {activeSubView === 'CONTRACTS' && ( // NEW: Contracts SubView
-            <div className="space-y-4">
-              {contracts.length === 0 ? (
-                <div className="text-center text-slate-400 py-10 italic text-lg">Nenhum modelo de contrato encontrado.</div>
-              ) : (
-                contracts.map(contract => (
-                  <div key={contract.id} className="bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800">
-                    <div className="flex items-center justify-between mb-2">
-                      <h3 className="font-bold text-primary dark:text-white text-lg">{contract.title}</h3>
-                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">{contract.category}</span>
-                    </div>
-                    <p className="text-sm text-slate-600 dark:text-slate-300 mt-1 max-h-20 overflow-hidden text-ellipsis line-clamp-3">{contract.contentTemplate.substring(0, 150)}...</p>
-                    <div className="flex justify-end gap-2 mt-4">
-                      <button onClick={() => alert('Gerar PDF/Preencher: Funcionalidade em breve!')} className="px-3 py-1 bg-secondary text-white rounded-md text-xs font-bold hover:bg-secondary-dark transition-colors">
-                        <i className="fa-solid fa-file-pdf mr-1"></i> Gerar
-                      </button>
-                    </div>
+          {/* Report Content: MATERIAIS */}
+          {reportSubTab === 'MATERIAIS' && (
+            <div className="animate-in fade-in duration-300">
+              <h3 className="text-lg font-black text-primary dark:text-white mb-4 px-2 sm:px-0">Visão Geral dos Materiais</h3>
+              <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
+                <div className={cx(surface, "rounded-3xl p-3 flex flex-col items-start")}>
+                  <p className="text-xl font-black text-red-600 leading-none">{materialsMissing}</p>
+                  <p className="text-[9px] font-extrabold tracking-widest uppercase text-slate-500">Faltando</p>
+                </div>
+                <div className={cx(surface, "rounded-3xl p-3 flex flex-col items-start")}>
+                  <p className="text-xl font-black text-amber-600 leading-none">{materialsPartial}</p>
+                  <p className="text-[9px] font-extrabold tracking-widest uppercase text-slate-500">Parcial</p>
+                </div>
+                <div className={cx(surface, "rounded-3xl p-3 flex flex-col items-start")}>
+                  <p className="text-xl font-black text-green-600 leading-none">{materialsCompleted}</p>
+                  <p className="text-[9px] font-extrabold tracking-widest uppercase text-slate-500">Concluído</p>
+                </div>
+              </div>
+
+              {/* Material Filter by Step for Reports */}
+              <div className="bg-white dark:bg-slate-900 rounded-2xl p-3 shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800 mb-6">
+                <label htmlFor="report-material-filter-step" className="block text-xs font-black text-slate-700 dark:text-slate-300 uppercase mb-2 tracking-widest pl-1">Filtrar por Etapa:</label>
+                <select
+                  id="report-material-filter-step"
+                  value={materialFilterStepId}
+                  onChange={(e) => setMaterialFilterStepId(e.target.value)}
+                  className="w-full px-4 py-2 text-base border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white rounded-xl focus:outline-none focus:ring-secondary focus:border-secondary transition-colors cursor-pointer"
+                  aria-label="Filtrar materiais por etapa no relatório"
+                >
+                  <option value="all">Todas as Etapas</option>
+                  {steps.map(step => (
+                    <option key={step.id} value={step.id}>{step.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800 p-4">
+                <h4 className="font-bold text-primary dark:text-white mb-3">Lista de Materiais</h4>
+                {groupedMaterials.length === 0 ? (
+                  <p className="text-center text-slate-400 py-4 italic">Nenhum material para o relatório ou corresponde ao filtro.</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
+                      <thead>
+                        <tr>
+                          <th className="px-4 py-2 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Etapa</th>
+                          <th className="px-4 py-2 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Material</th>
+                          <th className="px-4 py-2 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Un.</th>
+                          <th className="px-4 py-2 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Planejado</th>
+                          <th className="px-4 py-2 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Comprado</th>
+                          <th className="px-4 py-2 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                        {groupedMaterials.flatMap(group => 
+                          group.materials.map(material => {
+                            const isMissing = material.purchasedQty < material.plannedQty && (new Date(steps.find(s => s.id === material.stepId)?.startDate || '') <= new Date(new Date().setDate(new Date().getDate() + 3)));
+                            const isPartial = material.purchasedQty > 0 && material.purchasedQty < material.plannedQty;
+                            const isCompleted = material.purchasedQty >= material.plannedQty;
+                            
+                            let statusText = 'Pendente';
+                            let statusColorClass = 'text-slate-500';
+
+                            if (isMissing) { statusText = 'FALTANDO!'; statusColorClass = 'text-red-600'; }
+                            else if (isCompleted) { statusText = 'Concluído'; statusColorClass = 'text-green-600'; }
+                            else if (isPartial) { statusText = 'Parcial'; statusColorClass = 'text-amber-600'; }
+
+                            return (
+                              <tr key={material.id}>
+                                <td className="px-4 py-2 whitespace-nowrap text-sm text-primary dark:text-white">{group.stepName}</td>
+                                <td className="px-4 py-2 whitespace-nowrap text-sm text-primary dark:text-white">{material.name}</td>
+                                <td className="px-4 py-2 whitespace-nowrap text-sm text-slate-700 dark:text-slate-300">{material.unit}</td>
+                                <td className="px-4 py-2 whitespace-nowrap text-sm text-slate-700 dark:text-slate-300">{material.plannedQty}</td>
+                                <td className="px-4 py-2 whitespace-nowrap text-sm text-slate-700 dark:text-slate-300">{material.purchasedQty}</td>
+                                <td className="px-4 py-2 whitespace-nowrap text-sm font-bold">
+                                    <span className={statusColorClass}>{statusText}</span>
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                    </table>
                   </div>
-                ))
-              )}
+                )}
+              </div>
             </div>
           )}
 
-          {activeSubView === 'CHECKLIST' && ( // NEW: Checklists SubView
-            <div className="space-y-4">
-              {checklists.length === 0 ? (
-                <div className="text-center text-slate-400 py-10 italic text-lg">Nenhum checklist cadastrado.</div>
-              ) : (
-                checklists.map(checklist => (
-                  <div key={checklist.id} className="bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800">
-                    <div className="flex items-center justify-between mb-2">
-                      <h3 className="font-bold text-primary dark:text-white text-lg">{checklist.name}</h3>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">{checklist.category}</span>
-                        <button onClick={() => openEditChecklistModal(checklist)} className="text-slate-400 hover:text-primary dark:hover:text-white transition-colors p-1" aria-label="Editar checklist"><i className="fa-solid fa-edit"></i></button>
-                        <button onClick={() => handleDeleteChecklist(checklist.id)} className="text-red-400 hover:text-red-600 transition-colors p-1" aria-label="Excluir checklist"><i className="fa-solid fa-trash-alt"></i></button>
-                      </div>
-                    </div>
-                    <ul className="space-y-2 mt-3">
-                      {checklist.items.map((item, index) => (
-                        <li key={item.id} className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
-                          <input
-                            type="checkbox"
-                            checked={item.checked}
-                            onChange={(e) => handleChecklistItemChange(index, e.target.checked)}
-                            className="form-checkbox h-4 w-4 text-secondary rounded border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 focus:ring-secondary"
-                          />
-                          <span className={`${item.checked ? 'line-through text-slate-400' : ''}`}>{item.text}</span>
-                        </li>
-                      ))}
-                    </ul>
+          {/* Report Content: FINANCEIRO */}
+          {reportSubTab === 'FINANCEIRO' && (
+            <div className="animate-in fade-in duration-300">
+              <h3 className="text-lg font-black text-primary dark:text-white mb-4 px-2 sm:px-0">Visão Geral Financeira</h3>
+              <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
+                <div className={cx(surface, "rounded-3xl p-3 flex flex-col items-start")}>
+                  <p className="text-xl font-black text-primary dark:text-white leading-none">{formatCurrency(totalBudget)}</p>
+                  <p className="text-[9px] font-extrabold tracking-widest uppercase text-slate-500">Orçado</p>
+                </div>
+                <div className={cx(surface, "rounded-3xl p-3 flex flex-col items-start")}>
+                  <p className="text-xl font-black text-red-600 leading-none">{formatCurrency(totalSpent)}</p>
+                  <p className="text-[9px] font-extrabold tracking-widest uppercase text-slate-500">Gasto Total</p>
+                </div>
+                <div className={cx(surface, "rounded-3xl p-3 flex flex-col items-start")}>
+                  <p className="text-xl font-black text-green-600 leading-none">{formatCurrency(balance)}</p>
+                  <p className="text-[9px] font-extrabold tracking-widest uppercase text-slate-500">Saldo Orçamento</p>
+                </div>
+              </div>
+
+              <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800 p-4">
+                <h4 className="font-bold text-primary dark:text-white mb-3">Lista de Lançamentos</h4>
+                {expenses.length === 0 ? (
+                  <p className="text-center text-slate-400 py-4 italic">Nenhum lançamento financeiro para o relatório.</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
+                      <thead>
+                        <tr>
+                          <th className="px-4 py-2 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Data</th>
+                          <th className="px-4 py-2 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Descrição</th>
+                          <th className="px-4 py-2 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Categoria</th>
+                          <th className="px-4 py-2 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Valor Total</th>
+                          <th className="px-4 py-2 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Valor Pago</th>
+                          <th className="px-4 py-2 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                        {expenses.map(expense => {
+                           const total = expense.totalAgreed || expense.amount;
+                           const paid = expense.paidAmount || 0;
+                           let statusText = '';
+                           let statusColorClass = 'text-slate-500';
+
+                           if (paid === 0) statusText = 'Pendente';
+                           else if (paid < total) { statusText = 'Parcial'; statusColorClass = 'text-amber-600'; }
+                           else if (paid >= total) { statusText = 'Concluído'; statusColorClass = 'text-green-600'; }
+                           if (paid > total) { statusText = 'Prejuízo'; statusColorClass = 'text-red-600'; }
+
+                           return (
+                             <tr key={expense.id}>
+                               <td className="px-4 py-2 whitespace-nowrap text-sm text-primary dark:text-white">{formatDateDisplay(expense.date)}</td>
+                               <td className="px-4 py-2 whitespace-nowrap text-sm text-primary dark:text-white">{expense.description}</td>
+                               <td className="px-4 py-2 whitespace-nowrap text-sm text-slate-700 dark:text-slate-300">{expense.category}</td>
+                               <td className="px-4 py-2 whitespace-nowrap text-sm text-slate-700 dark:text-slate-300">{formatCurrency(expense.amount)}</td>
+                               <td className="px-4 py-2 whitespace-nowrap text-sm text-slate-700 dark:text-slate-300">{formatCurrency(paid)}</td>
+                               <td className="px-4 py-2 whitespace-nowrap text-sm font-bold">
+                                   <span className={statusColorClass}>{statusText}</span>
+                               </td>
+                             </tr>
+                           );
+                        })}
+                      </tbody>
+                    </table>
                   </div>
-                ))
-              )}
-            </div>
-          )}
-
-          {activeSubView === 'AICHAT' && ( // NEW: AI Chat SubView
-            <div className="bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800">
-              <p className="text-slate-600 dark:text-slate-300 text-sm">
-                Aqui você pode conversar com o Zé da Obra AI para tirar dúvidas rápidas sobre a sua obra.
-              </p>
-              <button onClick={() => navigate('/ai-chat')} className="mt-4 px-4 py-2 bg-secondary text-white rounded-xl text-sm font-bold hover:bg-secondary-dark transition-colors flex items-center gap-2">
-                <i className="fa-solid fa-robot mr-1"></i> Ir para o Chat AI
-              </button>
+                )}
+              </div>
             </div>
           )}
         </div>
       )}
 
-      {/* MODALS */}
+
+      {/* Modals for Add/Edit */}
       {/* Add/Edit Step Modal */}
-      {showAddStepModal && (
+      {(showAddStepModal || editStepData) && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl w-full max-w-md shadow-2xl relative border border-slate-200 dark:border-slate-800">
-            <button onClick={closeStepModal} className="absolute top-4 right-4 text-slate-400 hover:text-primary dark:hover:text-white" aria-label="Fechar modal"><i className="fa-solid fa-xmark text-xl"></i></button>
-            <h3 className="text-xl font-bold text-primary dark:text-white mb-4">{editStepData ? 'Editar Etapa' : 'Adicionar Nova Etapa'}</h3>
+          <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-md p-6 shadow-2xl border border-slate-200 dark:border-slate-800">
+            <h2 className="text-xl font-bold text-primary dark:text-white mb-4">{editStepData ? 'Editar Etapa' : 'Nova Etapa'}</h2>
             <form onSubmit={editStepData ? handleEditStep : handleAddStep} className="space-y-4">
               <div>
-                <label htmlFor="stepName" className="block text-sm font-bold text-slate-500 dark:text-slate-400 mb-1">Nome da Etapa</label>
-                <input id="stepName" type="text" value={newStepName} onChange={(e) => setNewStepName(e.target.value)} required className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" />
+                <label htmlFor="step-name" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Nome da Etapa</label>
+                <input
+                  id="step-name"
+                  type="text"
+                  value={editStepData?.name || newStepName}
+                  onChange={(e) => editStepData ? setEditStepData({ ...editStepData, name: e.target.value }) : setNewStepName(e.target.value)}
+                  className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
+                  required
+                />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label htmlFor="stepStartDate" className="block text-sm font-bold text-slate-500 dark:text-slate-400 mb-1">Data de Início</label>
-                  <input id="stepStartDate" type="date" value={newStepStartDate} onChange={(e) => setNewStepStartDate(e.target.value)} required className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" />
+                  <label htmlFor="step-start-date" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Data Início</label>
+                  <input
+                    id="step-start-date"
+                    type="date"
+                    value={editStepData?.startDate || newStepStartDate}
+                    onChange={(e) => editStepData ? setEditStepData({ ...editStepData, startDate: e.target.value }) : setNewStepStartDate(e.target.value)}
+                    className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
+                    required
+                  />
                 </div>
                 <div>
-                  <label htmlFor="stepEndDate" className="block text-sm font-bold text-slate-500 dark:text-slate-400 mb-1">Data de Fim Prevista</label>
-                  <input id="stepEndDate" type="date" value={newStepEndDate} onChange={(e) => setNewStepEndDate(e.target.value)} required className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" />
+                  <label htmlFor="step-end-date" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Data Fim</label>
+                  <input
+                    id="step-end-date"
+                    type="date"
+                    value={editStepData?.endDate || newStepEndDate}
+                    onChange={(e) => editStepData ? setEditStepData({ ...editStepData, endDate: e.target.value }) : setNewStepEndDate(e.target.value)}
+                    className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
+                    required
+                  />
                 </div>
               </div>
-              {editStepData && (
+              {editStepData && ( // Only show status for editing
                 <div>
-                  <label htmlFor="stepStatus" className="block text-sm font-bold text-slate-500 dark:text-slate-400 mb-1">Status</label>
-                  <select id="stepStatus" value={editStepData.status} onChange={(e) => setEditStepData({...editStepData, status: e.target.value as StepStatus})} className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all">
-                    {Object.values(StepStatus).map(status => (
-                      <option key={status} value={status}>{status.replace(/_/g, ' ')}</option>
-                    ))}
+                  <label htmlFor="step-status" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Status</label>
+                  <select
+                    id="step-status"
+                    value={editStepData.status}
+                    onChange={(e) => setEditStepData({ ...editStepData, status: e.target.value as StepStatus })}
+                    className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
+                  >
+                    <option value={StepStatus.NOT_STARTED}>Não Iniciado</option>
+                    <option value={StepStatus.IN_PROGRESS}>Em Andamento</option>
+                    <option value={StepStatus.COMPLETED}>Concluído</option>
                   </select>
                 </div>
               )}
-              <button type="submit" className="w-full py-3 bg-primary hover:bg-primary-light text-white font-bold rounded-xl shadow-lg shadow-primary/20 transition-all">
-                {editStepData ? 'Salvar Alterações' : 'Adicionar Etapa'}
-              </button>
+              <div className="flex justify-end gap-3">
+                <button type="button" onClick={() => { setShowAddStepModal(false); setEditStepData(null); }} className="px-4 py-2 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors">Cancelar</button>
+                <button type="submit" className="px-4 py-2 bg-primary text-white rounded-xl hover:bg-primary-light transition-colors">{editStepData ? 'Salvar' : 'Adicionar'}</button>
+              </div>
             </form>
           </div>
         </div>
       )}
 
       {/* Add/Edit Material Modal */}
-      {showAddMaterialModal && (
+      {(showAddMaterialModal || editMaterialData) && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl w-full max-w-md shadow-2xl relative border border-slate-200 dark:border-slate-800">
-            <button onClick={closeMaterialModal} className="absolute top-4 right-4 text-slate-400 hover:text-primary dark:hover:text-white" aria-label="Fechar modal"><i className="fa-solid fa-xmark text-xl"></i></button>
-            <h3 className="text-xl font-bold text-primary dark:text-white mb-4">{editMaterialData ? 'Editar Material' : 'Adicionar Novo Material'}</h3>
+          <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-md p-6 shadow-2xl border border-slate-200 dark:border-slate-800">
+            <h2 className="text-xl font-bold text-primary dark:text-white mb-4">{editMaterialData ? 'Editar Material' : 'Novo Material'}</h2>
             <form onSubmit={editMaterialData ? handleEditMaterial : handleAddMaterial} className="space-y-4">
               <div>
-                <label htmlFor="materialName" className="block text-sm font-bold text-slate-500 dark:text-slate-400 mb-1">Nome do Material</label>
-                <input id="materialName" type="text" value={newMaterialName} onChange={(e) => setNewMaterialName(e.target.value)} required className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" />
+                <label htmlFor="material-name" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Nome do Material</label>
+                <input
+                  id="material-name"
+                  type="text"
+                  value={editMaterialData?.name || newMaterialName}
+                  onChange={(e) => editMaterialData ? setEditMaterialData({ ...editMaterialData, name: e.target.value }) : setNewMaterialName(e.target.value)}
+                  className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
+                  required
+                />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label htmlFor="plannedQty" className="block text-sm font-bold text-slate-500 dark:text-slate-400 mb-1">Quantidade Planejada</label>
-                  <input id="plannedQty" type="number" value={newMaterialPlannedQty} onChange={(e) => setNewMaterialPlannedQty(e.target.value)} required className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" />
+                  <label htmlFor="material-qty" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Quantidade Planejada</label>
+                  <input
+                    id="material-qty"
+                    type="number"
+                    value={editMaterialData?.plannedQty.toString() || newMaterialPlannedQty}
+                    onChange={(e) => editMaterialData ? setEditMaterialData({ ...editMaterialData, plannedQty: Number(e.target.value) }) : setNewMaterialPlannedQty(e.target.value)}
+                    className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
+                    required
+                  />
                 </div>
                 <div>
-                  <label htmlFor="materialUnit" className="block text-sm font-bold text-slate-500 dark:text-slate-400 mb-1">Unidade</label>
-                  <input id="materialUnit" type="text" value={newMaterialUnit} onChange={(e) => setNewMaterialUnit(e.target.value)} required className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" />
+                  <label htmlFor="material-unit" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Unidade</label>
+                  <input
+                    id="material-unit"
+                    type="text"
+                    value={editMaterialData?.unit || newMaterialUnit}
+                    onChange={(e) => editMaterialData ? setEditMaterialData({ ...editMaterialData, unit: e.target.value }) : setNewMaterialUnit(e.target.value)}
+                    className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
+                    required
+                  />
                 </div>
               </div>
               <div>
-                <label htmlFor="materialCategory" className="block text-sm font-bold text-slate-500 dark:text-slate-400 mb-1">Categoria</label>
-                <input id="materialCategory" type="text" value={newMaterialCategory} onChange={(e) => setNewMaterialCategory(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" />
+                <label htmlFor="material-category" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Categoria (Opcional)</label>
+                <input
+                  id="material-category"
+                  type="text"
+                  value={editMaterialData?.category || newMaterialCategory}
+                  onChange={(e) => editMaterialData ? setEditMaterialData({ ...editMaterialData, category: e.target.value }) : setNewMaterialCategory(e.target.value)}
+                  className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
+                />
               </div>
               <div>
-                <label htmlFor="materialStep" className="block text-sm font-bold text-slate-500 dark:text-slate-400 mb-1">Etapa</label>
-                <select id="materialStep" value={newMaterialStepId} onChange={(e) => setNewMaterialStepId(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all">
-                  <option value="">-- Selecione uma Etapa --</option>
+                <label htmlFor="material-step" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Vincular à Etapa</label>
+                <select
+                  id="material-step"
+                  value={editMaterialData?.stepId || newMaterialStepId}
+                  onChange={(e) => editMaterialData ? setEditMaterialData({ ...editMaterialData, stepId: e.target.value }) : setNewMaterialStepId(e.target.value)}
+                  className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
+                  required
+                >
+                  <option value="">Selecione uma etapa</option>
                   {steps.map(step => (
                     <option key={step.id} value={step.id}>{step.name}</option>
                   ))}
                 </select>
               </div>
-              <button type="submit" className="w-full py-3 bg-primary hover:bg-primary-light text-white font-bold rounded-xl shadow-lg shadow-primary/20 transition-all">
-                {editMaterialData ? 'Salvar Alterações' : 'Adicionar Material'}
-              </button>
+              <div className="flex justify-end gap-3">
+                <button type="button" onClick={clearMaterialFormAndCloseModal} className="px-4 py-2 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors">Cancelar</button>
+                <button type="submit" className="px-4 py-2 bg-primary text-white rounded-xl hover:bg-primary-light transition-colors">{editMaterialData ? 'Salvar' : 'Adicionar'}</button>
+              </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* Register Material Purchase Modal */}
+      {/* Purchase Material Modal */}
       {showPurchaseMaterialModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl w-full max-w-md shadow-2xl relative border border-slate-200 dark:border-slate-800">
-            <button onClick={closePurchaseMaterialModal} className="absolute top-4 right-4 text-slate-400 hover:text-primary dark:hover:text-white" aria-label="Fechar modal"><i className="fa-solid fa-xmark text-xl"></i></button>
-            <h3 className="text-xl font-bold text-primary dark:text-white mb-4">Registrar Compra</h3>
+          <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-md p-6 shadow-2xl border border-slate-200 dark:border-slate-800">
+            <h2 className="text-xl font-bold text-primary dark:text-white mb-4">Registrar Compra</h2>
+            <p className="text-slate-700 dark:text-slate-300 text-sm mb-4">Material: {materials.find(m => m.id === purchaseMaterialId)?.name}</p>
             <form onSubmit={handleRegisterPurchase} className="space-y-4">
               <div>
-                <label htmlFor="purchaseQty" className="block text-sm font-bold text-slate-500 dark:text-slate-400 mb-1">Quantidade Comprada</label>
-                <input id="purchaseQty" type="number" value={purchaseQty} onChange={(e) => setPurchaseQty(e.target.value)} required className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" />
+                <label htmlFor="purchase-qty" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Quantidade Comprada</label>
+                <input
+                  id="purchase-qty"
+                  type="number"
+                  value={purchaseQty}
+                  onChange={(e) => setPurchaseQty(e.target.value)}
+                  className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
+                  required
+                />
               </div>
               <div>
-                <label htmlFor="purchaseCost" className="block text-sm font-bold text-slate-500 dark:text-slate-400 mb-1">Custo Total (R$)</label>
-                <input id="purchaseCost" type="number" step="0.01" value={purchaseCost} onChange={(e) => setPurchaseCost(e.target.value)} required className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" />
+                <label htmlFor="purchase-cost" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Custo Total da Compra (R$)</label>
+                <input
+                  id="purchase-cost"
+                  type="number"
+                  step="0.01"
+                  value={purchaseCost}
+                  onChange={(e) => setPurchaseCost(e.target.value)}
+                  className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
+                  required
+                />
               </div>
-              <button type="submit" className="w-full py-3 bg-primary hover:bg-primary-light text-white font-bold rounded-xl shadow-lg shadow-primary/20 transition-all">
-                Registrar Compra
-              </button>
+              <div className="flex justify-end gap-3">
+                <button type="button" onClick={() => setShowPurchaseMaterialModal(false)} className="px-4 py-2 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors">Cancelar</button>
+                <button type="submit" className="px-4 py-2 bg-primary text-white rounded-xl hover:bg-primary-light transition-colors">Registrar</button>
+              </div>
             </form>
           </div>
         </div>
       )}
 
       {/* Add/Edit Expense Modal */}
-      {showAddExpenseModal && (
+      {(showAddExpenseModal || editExpenseData) && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl w-full max-w-md shadow-2xl relative border border-slate-200 dark:border-slate-800">
-            <button onClick={closeExpenseModal} className="absolute top-4 right-4 text-slate-400 hover:text-primary dark:hover:text-white" aria-label="Fechar modal"><i className="fa-solid fa-xmark text-xl"></i></button>
-            <h3 className="text-xl font-bold text-primary dark:text-white mb-4">{editExpenseData ? 'Editar Despesa' : 'Adicionar Nova Despesa'}</h3>
+          <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-md p-6 shadow-2xl border border-slate-200 dark:border-slate-800">
+            <h2 className="text-xl font-bold text-primary dark:text-white mb-4">{editExpenseData ? 'Editar Despesa' : 'Nova Despesa'}</h2>
             <form onSubmit={editExpenseData ? handleEditExpense : handleAddExpense} className="space-y-4">
               <div>
-                <label htmlFor="expenseDescription" className="block text-sm font-bold text-slate-500 dark:text-slate-400 mb-1">Descrição</label>
-                <input id="expenseDescription" type="text" value={newExpenseDescription} onChange={(e) => setNewExpenseDescription(e.target.value)} required className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" />
+                <label htmlFor="expense-description" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Descrição</label>
+                <input
+                  id="expense-description"
+                  type="text"
+                  value={editExpenseData?.description || newExpenseDescription}
+                  onChange={(e) => editExpenseData ? setEditExpenseData({ ...editExpenseData, description: e.target.value }) : setNewExpenseDescription(e.target.value)}
+                  className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
+                  required
+                />
               </div>
               <div>
-                <label htmlFor="expenseAmount" className="block text-sm font-bold text-slate-500 dark:text-slate-400 mb-1">Valor (R$)</label>
-                <input id="expenseAmount" type="number" step="0.01" value={newExpenseAmount} onChange={(e) => setNewExpenseAmount(e.target.value)} required className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" />
+                <label htmlFor="expense-amount" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Valor Total (R$)</label>
+                <input
+                  id="expense-amount"
+                  type="number"
+                  step="0.01"
+                  value={editExpenseData?.amount.toString() || newExpenseAmount}
+                  onChange={(e) => editExpenseData ? setEditExpenseData({ ...editExpenseData, amount: Number(e.target.value), totalAgreed: Number(e.target.value) }) : setNewExpenseAmount(e.target.value)}
+                  className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
+                  required
+                />
               </div>
+              {/* NEW: Campo Valor Total Combinado (Contrato) - Apenas para despesas manuais */}
+              {!(editExpenseData?.relatedMaterialId || newExpenseCategory === ExpenseCategory.MATERIAL) && (
+                <div>
+                  <label htmlFor="expense-total-agreed" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Valor Total Combinado (Contrato) <span className="text-xs text-slate-400 font-normal">(Se diferente do valor atual)</span></label>
+                  <input
+                    id="expense-total-agreed"
+                    type="number"
+                    step="0.01"
+                    value={editExpenseData?.totalAgreed?.toString() || newExpenseAmount} // Default to amount if not set
+                    onChange={(e) => editExpenseData ? setEditExpenseData({ ...editExpenseData, totalAgreed: Number(e.target.value) }) : null} // Only update if editing
+                    className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
+                  />
+                </div>
+              )}
               <div>
-                <label htmlFor="expenseCategory" className="block text-sm font-bold text-slate-500 dark:text-slate-400 mb-1">Categoria</label>
-                <select id="expenseCategory" value={newExpenseCategory} onChange={(e) => setNewExpenseCategory(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all">
-                  {Object.values(ExpenseCategory).map(cat => (
-                    <option key={cat} value={cat}>{cat}</option>
+                <label htmlFor="expense-category" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Categoria</label>
+                <select
+                  id="expense-category"
+                  value={editExpenseData?.category || newExpenseCategory}
+                  onChange={(e) => editExpenseData ? setEditExpenseData({ ...editExpenseData, category: e.target.value }) : setNewExpenseCategory(e.target.value)}
+                  className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
+                >
+                  {Object.values(ExpenseCategory).map(category => (
+                    <option key={category} value={category}>{category}</option>
                   ))}
                 </select>
               </div>
+              {/* NEW: Campo Etapa obrigatório se categoria Material */}
+              {(editExpenseData?.category === ExpenseCategory.MATERIAL || newExpenseCategory === ExpenseCategory.MATERIAL) && (
+                 <div>
+                    <label htmlFor="expense-step" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Vincular à Etapa <span className="text-red-500">*</span></label>
+                    <select
+                      id="expense-step"
+                      value={editExpenseData?.stepId || newExpenseStepId}
+                      onChange={(e) => editExpenseData ? setEditExpenseData({ ...editExpenseData, stepId: e.target.value }) : setNewExpenseStepId(e.target.value)}
+                      className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
+                      required // Mark as required
+                    >
+                      <option value="">Selecione uma etapa</option>
+                      {steps.map(step => (
+                        <option key={step.id} value={step.id}>{step.name}</option>
+                      ))}
+                    </select>
+                 </div>
+              )}
               <div>
-                <label htmlFor="expenseDate" className="block text-sm font-bold text-slate-500 dark:text-slate-400 mb-1">Data</label>
-                <input id="expenseDate" type="date" value={newExpenseDate} onChange={(e) => setNewExpenseDate(e.target.value)} required className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" />
+                <label htmlFor="expense-date" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Data</label>
+                <input
+                  id="expense-date"
+                  type="date"
+                  value={editExpenseData?.date || newExpenseDate}
+                  onChange={(e) => editExpenseData ? setEditExpenseData({ ...editExpenseData, date: e.target.value }) : setNewExpenseDate(e.target.value)}
+                  className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
+                  required
+                />
               </div>
-              <div>
-                <label htmlFor="expenseStep" className="block text-sm font-bold text-slate-500 dark:text-slate-400 mb-1">Etapa (Opcional)</label>
-                <select id="expenseStep" value={newExpenseStepId} onChange={(e) => setNewExpenseStepId(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all">
-                  <option value="">-- Sem Etapa --</option>
-                  {steps.map(step => (
-                    <option key={step.id} value={step.id}>{step.name}</option>
-                  ))}
-                </select>
+              <div className="flex justify-end gap-3">
+                <button type="button" onClick={clearExpenseFormAndCloseModal} className="px-4 py-2 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors">Cancelar</button>
+                <button type="submit" className="px-4 py-2 bg-primary text-white rounded-xl hover:bg-primary-light transition-colors">{editExpenseData ? 'Salvar' : 'Adicionar'}</button>
               </div>
-              <button type="submit" className="w-full py-3 bg-primary hover:bg-primary-light text-white font-bold rounded-xl shadow-lg shadow-primary/20 transition-all">
-                {editExpenseData ? 'Salvar Alterações' : 'Adicionar Despesa'}
-              </button>
             </form>
           </div>
         </div>
       )}
 
-      {/* Add/Edit Worker Modal */}
-      {showAddWorkerModal && (
+      {/* NEW: Add Payment Modal */}
+      {showAddPaymentModal && paymentExpenseData && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl w-full max-w-md shadow-2xl relative border border-slate-200 dark:border-slate-800">
-            <button onClick={closeWorkerModal} className="absolute top-4 right-4 text-slate-400 hover:text-primary dark:hover:text-white" aria-label="Fechar modal"><i className="fa-solid fa-xmark text-xl"></i></button>
-            <h3 className="text-xl font-bold text-primary dark:text-white mb-4">{editWorkerData ? 'Editar Profissional' : 'Adicionar Novo Profissional'}</h3>
-            <form onSubmit={editWorkerData ? handleEditWorker : handleAddWorker} className="space-y-4">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-md p-6 shadow-2xl border border-slate-200 dark:border-slate-800">
+            <h2 className="text-xl font-bold text-primary dark:text-white mb-4">Registrar Pagamento</h2>
+            <p className="text-slate-700 dark:text-slate-300 text-sm mb-2">Despesa: <span className="font-semibold">{paymentExpenseData.description}</span></p>
+            <p className="text-slate-700 dark:text-slate-300 text-sm mb-4">Total: {formatCurrency(paymentExpenseData.totalAgreed || paymentExpenseData.amount)} | Pago: {formatCurrency(paymentExpenseData.paidAmount)} | Saldo: {formatCurrency((paymentExpenseData.totalAgreed || paymentExpenseData.amount) - (paymentExpenseData.paidAmount || 0))}</p>
+            <form onSubmit={handleAddPayment} className="space-y-4">
               <div>
-                <label htmlFor="workerName" className="block text-sm font-bold text-slate-500 dark:text-slate-400 mb-1">Nome</label>
-                <input id="workerName" type="text" value={newWorkerName} onChange={(e) => setNewWorkerName(e.target.value)} required className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" />
+                <label htmlFor="payment-amount" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Valor do Pagamento (R$)</label>
+                <input
+                  id="payment-amount"
+                  type="number"
+                  step="0.01"
+                  value={paymentAmount}
+                  onChange={(e) => setPaymentAmount(e.target.value)}
+                  className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
+                  required
+                />
               </div>
               <div>
-                <label htmlFor="workerRole" className="block text-sm font-bold text-slate-500 dark:text-slate-400 mb-1">Função</label>
-                <select id="workerRole" value={newWorkerRole} onChange={(e) => setNewWorkerRole(e.target.value)} required className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all">
-                  <option value="">-- Selecione uma Função --</option>
+                <label htmlFor="payment-date" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Data do Pagamento</label>
+                <input
+                  id="payment-date"
+                  type="date"
+                  value={paymentDate}
+                  onChange={(e) => setPaymentDate(e.target.value)}
+                  className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
+                  required
+                />
+              </div>
+              <div className="flex justify-end gap-3">
+                <button type="button" onClick={() => setShowAddPaymentModal(false)} className="px-4 py-2 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors">Cancelar</button>
+                <button type="submit" className="px-4 py-2 bg-primary text-white rounded-xl hover:bg-primary-light transition-colors">Registrar Pagamento</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+
+      {/* Add/Edit Worker Modal */}
+      {(showAddWorkerModal || editWorkerData) && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-md p-6 shadow-2xl border border-slate-200 dark:border-slate-800">
+            <h2 className="text-xl font-bold text-primary dark:text-white mb-4">{editWorkerData ? 'Editar Profissional' : 'Novo Profissional'}</h2>
+            <form onSubmit={editWorkerData ? handleEditWorker : handleAddWorker} className="space-y-4">
+              <div>
+                <label htmlFor="worker-name" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Nome</label>
+                <input
+                  id="worker-name"
+                  type="text"
+                  value={editWorkerData?.name || newWorkerName}
+                  onChange={(e) => editWorkerData ? setEditWorkerData({ ...editWorkerData, name: e.target.value }) : setNewWorkerName(e.target.value)}
+                  className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
+                  required
+                />
+              </div>
+              <div>
+                <label htmlFor="worker-role" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Função</label>
+                <select
+                  id="worker-role"
+                  value={editWorkerData?.role || newWorkerRole}
+                  onChange={(e) => editWorkerData ? setEditWorkerData({ ...editWorkerData, role: e.target.value }) : setNewWorkerRole(e.target.value)}
+                  className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
+                  required
+                >
+                  <option value="">Selecione uma função</option>
                   {STANDARD_JOB_ROLES.map(role => (
                     <option key={role} value={role}>{role}</option>
                   ))}
                 </select>
               </div>
               <div>
-                <label htmlFor="workerPhone" className="block text-sm font-bold text-slate-500 dark:text-slate-400 mb-1">Telefone</label>
-                <input id="workerPhone" type="text" value={newWorkerPhone} onChange={(e) => setNewWorkerPhone(e.target.value)} required className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" />
+                <label htmlFor="worker-phone" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Telefone</label>
+                <input
+                  id="worker-phone"
+                  type="tel"
+                  value={editWorkerData?.phone || newWorkerPhone}
+                  onChange={(e) => editWorkerData ? setEditWorkerData({ ...editWorkerData, phone: e.target.value }) : setNewWorkerPhone(e.target.value)}
+                  className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
+                />
               </div>
               <div>
-                <label htmlFor="workerDailyRate" className="block text-sm font-bold text-slate-500 dark:text-slate-400 mb-1">Diária (R$)</label>
-                <input id="workerDailyRate" type="number" step="0.01" value={newWorkerDailyRate} onChange={(e) => setNewWorkerDailyRate(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" />
+                <label htmlFor="worker-daily-rate" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Diária (R$)</label>
+                <input
+                  id="worker-daily-rate"
+                  type="number"
+                  step="0.01"
+                  value={editWorkerData?.dailyRate?.toString() || newWorkerDailyRate}
+                  onChange={(e) => editWorkerData ? setEditWorkerData({ ...editWorkerData, dailyRate: Number(e.target.value) }) : setNewWorkerDailyRate(e.target.value)}
+                  className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
+                />
               </div>
               <div>
-                <label htmlFor="workerNotes" className="block text-sm font-bold text-slate-500 dark:text-slate-400 mb-1">Observações</label>
-                <textarea id="workerNotes" value={newWorkerNotes} onChange={(e) => setNewWorkerNotes(e.target.value)} rows={3} className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"></textarea>
+                <label htmlFor="worker-notes" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Anotações</label>
+                <textarea
+                  id="worker-notes"
+                  value={editWorkerData?.notes || newWorkerNotes}
+                  onChange={(e) => editWorkerData ? setEditWorkerData({ ...editWorkerData, notes: e.target.value }) : setNewWorkerNotes(e.target.value)}
+                  className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
+                  rows={3}
+                ></textarea>
               </div>
-              <button type="submit" className="w-full py-3 bg-primary hover:bg-primary-light text-white font-bold rounded-xl shadow-lg shadow-primary/20 transition-all">
-                {editWorkerData ? 'Salvar Alterações' : 'Adicionar Profissional'}
-              </button>
+              <div className="flex justify-end gap-3">
+                <button type="button" onClick={clearWorkerFormAndCloseModal} className="px-4 py-2 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors">Cancelar</button>
+                <button type="submit" className="px-4 py-2 bg-primary text-white rounded-xl hover:bg-primary-light transition-colors">{editWorkerData ? 'Salvar' : 'Adicionar'}</button>
+              </div>
             </form>
           </div>
         </div>
       )}
 
       {/* Add/Edit Supplier Modal */}
-      {showAddSupplierModal && (
+      {(showAddSupplierModal || editSupplierData) && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl w-full max-w-md shadow-2xl relative border border-slate-200 dark:border-slate-800">
-            <button onClick={closeSupplierModal} className="absolute top-4 right-4 text-slate-400 hover:text-primary dark:hover:text-white" aria-label="Fechar modal"><i className="fa-solid fa-xmark text-xl"></i></button>
-            <h3 className="text-xl font-bold text-primary dark:text-white mb-4">{editSupplierData ? 'Editar Fornecedor' : 'Adicionar Novo Fornecedor'}</h3>
+          <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-md p-6 shadow-2xl border border-slate-200 dark:border-slate-800">
+            <h2 className="text-xl font-bold text-primary dark:text-white mb-4">{editSupplierData ? 'Editar Fornecedor' : 'Novo Fornecedor'}</h2>
             <form onSubmit={editSupplierData ? handleEditSupplier : handleAddSupplier} className="space-y-4">
               <div>
-                <label htmlFor="supplierName" className="block text-sm font-bold text-slate-500 dark:text-slate-400 mb-1">Nome do Fornecedor</label>
-                <input id="supplierName" type="text" value={newSupplierName} onChange={(e) => setNewSupplierName(e.target.value)} required className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" />
+                <label htmlFor="supplier-name" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Nome</label>
+                <input
+                  id="supplier-name"
+                  type="text"
+                  value={editSupplierData?.name || newSupplierName}
+                  onChange={(e) => editSupplierData ? setEditSupplierData({ ...editSupplierData, name: e.target.value }) : setNewSupplierName(e.target.value)}
+                  className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
+                  required
+                />
               </div>
               <div>
-                <label htmlFor="supplierCategory" className="block text-sm font-bold text-slate-500 dark:text-slate-400 mb-1">Categoria</label>
-                <select id="supplierCategory" value={newSupplierCategory} onChange={(e) => setNewSupplierCategory(e.target.value)} required className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all">
-                  <option value="">-- Selecione uma Categoria --</option>
-                  {STANDARD_SUPPLIER_CATEGORIES.map(cat => (
-                    <option key={cat} value={cat}>{cat}</option>
+                <label htmlFor="supplier-category" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Categoria</label>
+                <select
+                  id="supplier-category"
+                  value={editSupplierData?.category || newSupplierCategory}
+                  onChange={(e) => editSupplierData ? setEditSupplierData({ ...editSupplierData, category: e.target.value }) : setNewSupplierCategory(e.target.value)}
+                  className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
+                  required
+                >
+                  <option value="">Selecione uma categoria</option>
+                  {STANDARD_SUPPLIER_CATEGORIES.map(category => (
+                    <option key={category} value={category}>{category}</option>
                   ))}
                 </select>
               </div>
               <div>
-                <label htmlFor="supplierPhone" className="block text-sm font-bold text-slate-500 dark:text-slate-400 mb-1">Telefone</label>
-                <input id="supplierPhone" type="text" value={newSupplierPhone} onChange={(e) => setNewSupplierPhone(e.target.value)} required className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" />
+                <label htmlFor="supplier-phone" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Telefone</label>
+                <input
+                  id="supplier-phone"
+                  type="tel"
+                  value={editSupplierData?.phone || newSupplierPhone}
+                  onChange={(e) => editSupplierData ? setEditSupplierData({ ...editSupplierData, phone: e.target.value }) : setNewSupplierPhone(e.target.value)}
+                  className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
+                />
               </div>
               <div>
-                <label htmlFor="supplierEmail" className="block text-sm font-bold text-slate-500 dark:text-slate-400 mb-1">E-mail (Opcional)</label>
-                <input id="supplierEmail" type="email" value={newSupplierEmail} onChange={(e) => setNewSupplierEmail(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" />
+                <label htmlFor="supplier-email" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Email</label>
+                <input
+                  id="supplier-email"
+                  type="email"
+                  value={editSupplierData?.email || newSupplierEmail}
+                  onChange={(e) => editSupplierData ? setEditSupplierData({ ...editSupplierData, email: e.target.value }) : setNewSupplierEmail(e.target.value)}
+                  className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
+                />
               </div>
               <div>
-                <label htmlFor="supplierAddress" className="block text-sm font-bold text-slate-500 dark:text-slate-400 mb-1">Endereço (Opcional)</label>
-                <input id="supplierAddress" type="text" value={newSupplierAddress} onChange={(e) => setNewSupplierAddress(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" />
+                <label htmlFor="supplier-address" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Endereço</label>
+                <input
+                  id="supplier-address"
+                  type="text"
+                  value={editSupplierData?.address || newSupplierAddress}
+                  onChange={(e) => editSupplierData ? setEditSupplierData({ ...editSupplierData, address: e.target.value }) : setNewSupplierAddress(e.target.value)}
+                  className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
+                />
               </div>
               <div>
-                <label htmlFor="supplierNotes" className="block text-sm font-bold text-slate-500 dark:text-slate-400 mb-1">Observações</label>
-                <textarea id="supplierNotes" value={newSupplierNotes} onChange={(e) => setNewSupplierNotes(e.target.value)} rows={3} className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"></textarea>
+                <label htmlFor="supplier-notes" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Anotações</label>
+                <textarea
+                  id="supplier-notes"
+                  value={editSupplierData?.notes || newSupplierNotes}
+                  onChange={(e) => editSupplierData ? setEditSupplierData({ ...editSupplierData, notes: e.target.value }) : setNewSupplierNotes(e.target.value)}
+                  className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
+                  rows={3}
+                ></textarea>
               </div>
-              <button type="submit" className="w-full py-3 bg-primary hover:bg-primary-light text-white font-bold rounded-xl shadow-lg shadow-primary/20 transition-all">
-                {editSupplierData ? 'Salvar Alterações' : 'Adicionar Fornecedor'}
-              </button>
+              <div className="flex justify-end gap-3">
+                <button type="button" onClick={clearSupplierFormAndCloseModal} className="px-4 py-2 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors">Cancelar</button>
+                <button type="submit" className="px-4 py-2 bg-primary text-white rounded-xl hover:bg-primary-light transition-colors">{editSupplierData ? 'Salvar' : 'Adicionar'}</button>
+              </div>
             </form>
           </div>
         </div>
@@ -2037,30 +3153,51 @@ const WorkDetail = () => {
       {/* Add Photo Modal */}
       {showAddPhotoModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl w-full max-w-md shadow-2xl relative border border-slate-200 dark:border-slate-800">
-            <button onClick={closePhotoModal} className="absolute top-4 right-4 text-slate-400 hover:text-primary dark:hover:text-white" aria-label="Fechar modal"><i className="fa-solid fa-xmark text-xl"></i></button>
-            <h3 className="text-xl font-bold text-primary dark:text-white mb-4">Adicionar Nova Foto</h3>
+          <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-md p-6 shadow-2xl border border-slate-200 dark:border-slate-800">
+            <h2 className="text-xl font-bold text-primary dark:text-white mb-4">Nova Foto</h2>
             <form onSubmit={handleAddPhoto} className="space-y-4">
               <div>
-                <label htmlFor="photoDescription" className="block text-sm font-bold text-slate-500 dark:text-slate-400 mb-1">Descrição</label>
-                <input id="photoDescription" type="text" value={newPhotoDescription} onChange={(e) => setNewPhotoDescription(e.target.value)} required className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" />
+                <label htmlFor="photo-file" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Arquivo da Foto</label>
+                <input
+                  id="photo-file"
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => setNewPhotoFile(e.target.files ? e.target.files[0] : null)}
+                  className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-white hover:file:bg-primary-light"
+                  required
+                />
               </div>
               <div>
-                <label htmlFor="photoFile" className="block text-sm font-bold text-slate-500 dark:text-slate-400 mb-1">Arquivo da Foto</label>
-                <input id="photoFile" type="file" accept="image/*" onChange={(e) => setNewPhotoFile(e.target.files ? e.target.files[0] : null)} required className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-secondary file:text-white hover:file:bg-secondary-dark" />
+                <label htmlFor="photo-description" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Descrição</label>
+                <input
+                  id="photo-description"
+                  type="text"
+                  value={newPhotoDescription}
+                  onChange={(e) => setNewPhotoDescription(e.target.value)}
+                  className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
+                  required
+                />
               </div>
               <div>
-                <label htmlFor="photoType" className="block text-sm font-bold text-slate-500 dark:text-slate-400 mb-1">Tipo</label>
-                <select id="photoType" value={newPhotoType} onChange={(e) => setNewPhotoType(e.target.value as 'BEFORE' | 'AFTER' | 'PROGRESS')} className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all">
+                <label htmlFor="photo-type" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Tipo</label>
+                <select
+                  id="photo-type"
+                  value={newPhotoType}
+                  onChange={(e) => setNewPhotoType(e.target.value as 'BEFORE' | 'AFTER' | 'PROGRESS')}
+                  className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
+                  required
+                >
                   <option value="PROGRESS">Progresso</option>
                   <option value="BEFORE">Antes</option>
                   <option value="AFTER">Depois</option>
                 </select>
               </div>
-              <button type="submit" disabled={uploadingPhoto} className="w-full py-3 bg-primary hover:bg-primary-light text-white font-bold rounded-xl shadow-lg shadow-primary/20 transition-all disabled:opacity-70 flex items-center justify-center gap-2">
-                {uploadingPhoto ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-upload"></i>}
-                {uploadingPhoto ? 'Enviando...' : 'Adicionar Foto'}
-              </button>
+              <div className="flex justify-end gap-3">
+                <button type="button" onClick={() => setShowAddPhotoModal(false)} className="px-4 py-2 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors">Cancelar</button>
+                <button type="submit" disabled={uploadingPhoto} className="px-4 py-2 bg-primary text-white rounded-xl hover:bg-primary-light transition-colors flex items-center gap-2">
+                  {uploadingPhoto ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-upload"></i>} {uploadingPhoto ? 'Enviando...' : 'Adicionar'}
+                </button>
+              </div>
             </form>
           </div>
         </div>
@@ -2069,87 +3206,140 @@ const WorkDetail = () => {
       {/* Add File Modal */}
       {showAddFileModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl w-full max-w-md shadow-2xl relative border border-slate-200 dark:border-slate-800">
-            <button onClick={closeFileModal} className="absolute top-4 right-4 text-slate-400 hover:text-primary dark:hover:text-white" aria-label="Fechar modal"><i className="fa-solid fa-xmark text-xl"></i></button>
-            <h3 className="text-xl font-bold text-primary dark:text-white mb-4">Adicionar Novo Arquivo</h3>
+          <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-md p-6 shadow-2xl border border-slate-200 dark:border-slate-800">
+            <h2 className="text-xl font-bold text-primary dark:text-white mb-4">Novo Arquivo</h2>
             <form onSubmit={handleAddFile} className="space-y-4">
               <div>
-                <label htmlFor="fileName" className="block text-sm font-bold text-slate-500 dark:text-slate-400 mb-1">Nome do Arquivo</label>
-                <input id="fileName" type="text" value={newFileName} onChange={(e) => setNewFileName(e.target.value)} required className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" />
+                <label htmlFor="file-upload" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Selecionar Arquivo</label>
+                <input
+                  id="file-upload"
+                  type="file"
+                  onChange={(e) => setNewUploadFile(e.target.files ? e.target.files[0] : null)}
+                  className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-white hover:file:bg-primary-light"
+                  required
+                />
               </div>
               <div>
-                <label htmlFor="fileCategory" className="block text-sm font-bold text-slate-500 dark:text-slate-400 mb-1">Categoria</label>
-                <select id="fileCategory" value={newFileCategory} onChange={(e) => setNewFileCategory(e.target.value as FileCategory)} className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all">
-                  {Object.values(FileCategory).map(cat => (
-                    <option key={cat} value={cat}>{cat}</option>
+                <label htmlFor="file-name" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Nome do Arquivo</label>
+                <input
+                  id="file-name"
+                  type="text"
+                  value={newFileName}
+                  onChange={(e) => setNewFileName(e.target.value)}
+                  className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
+                  required
+                />
+              </div>
+              <div>
+                <label htmlFor="file-category" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Categoria</label>
+                <select
+                  id="file-category"
+                  value={newFileCategory}
+                  onChange={(e) => setNewFileCategory(e.target.value as FileCategory)}
+                  className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
+                  required
+                >
+                  {Object.values(FileCategory).map(category => (
+                    <option key={category} value={category}>{category}</option>
                   ))}
                 </select>
               </div>
-              <div>
-                <label htmlFor="uploadFile" className="block text-sm font-bold text-slate-500 dark:text-slate-400 mb-1">Arquivo</label>
-                <input id="uploadFile" type="file" onChange={(e) => setNewUploadFile(e.target.files ? e.target.files[0] : null)} required className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-secondary file:text-white hover:file:bg-secondary-dark" />
+              <div className="flex justify-end gap-3">
+                <button type="button" onClick={() => setShowAddFileModal(false)} className="px-4 py-2 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors">Cancelar</button>
+                <button type="submit" disabled={uploadingFile} className="px-4 py-2 bg-primary text-white rounded-xl hover:bg-primary-light transition-colors flex items-center gap-2">
+                  {uploadingFile ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-upload"></i>} {uploadingFile ? 'Enviando...' : 'Adicionar'}
+                </button>
               </div>
-              <button type="submit" disabled={uploadingFile} className="w-full py-3 bg-primary hover:bg-primary-light text-white font-bold rounded-xl shadow-lg shadow-primary/20 transition-all disabled:opacity-70 flex items-center justify-center gap-2">
-                {uploadingFile ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-upload"></i>}
-                {uploadingFile ? 'Enviando...' : 'Adicionar Arquivo'}
-              </button>
             </form>
           </div>
         </div>
       )}
 
       {/* Add/Edit Checklist Modal */}
-      {showAddChecklistModal && (
+      {(showAddChecklistModal || editChecklistData) && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl w-full max-w-md shadow-2xl relative border border-slate-200 dark:border-slate-800">
-            <button onClick={() => setShowAddChecklistModal(false)} className="absolute top-4 right-4 text-slate-400 hover:text-primary dark:hover:text-white" aria-label="Fechar modal"><i className="fa-solid fa-xmark text-xl"></i></button>
-            <h3 className="text-xl font-bold text-primary dark:text-white mb-4">{editChecklistData ? 'Editar Checklist' : 'Adicionar Novo Checklist'}</h3>
+          <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-md p-6 shadow-2xl border border-slate-200 dark:border-slate-800">
+            <h2 className="text-xl font-bold text-primary dark:text-white mb-4">{editChecklistData ? 'Editar Checklist' : 'Nova Checklist'}</h2>
             <form onSubmit={editChecklistData ? handleEditChecklist : handleAddChecklist} className="space-y-4">
               <div>
-                <label htmlFor="checklistName" className="block text-sm font-bold text-slate-500 dark:text-slate-400 mb-1">Nome do Checklist</label>
-                <input id="checklistName" type="text" value={newChecklistName} onChange={(e) => setNewChecklistName(e.target.value)} required className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" />
+                <label htmlFor="checklist-name" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Nome da Checklist</label>
+                <input
+                  id="checklist-name"
+                  type="text"
+                  value={editChecklistData?.name || newChecklistName}
+                  onChange={(e) => editChecklistData ? setEditChecklistData({ ...editChecklistData, name: e.target.value }) : setNewChecklistName(e.target.value)}
+                  className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
+                  required
+                />
               </div>
               <div>
-                <label htmlFor="checklistCategory" className="block text-sm font-bold text-slate-500 dark:text-slate-400 mb-1">Categoria (Etapa)</label>
-                <select id="checklistCategory" value={newChecklistCategory} onChange={(e) => setNewChecklistCategory(e.target.value)} className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all">
-                  <option value="">-- Selecione uma Categoria (Etapa) --</option>
+                <label htmlFor="checklist-category" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Vincular à Etapa/Categoria</label>
+                <select
+                  id="checklist-category"
+                  value={editChecklistData?.category || newChecklistCategory}
+                  onChange={(e) => editChecklistData ? setEditChecklistData({ ...editChecklistData, category: e.target.value }) : setNewChecklistCategory(e.target.value)}
+                  className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
+                  required
+                >
+                  <option value="">Selecione uma categoria</option>
                   {steps.map(step => (
                     <option key={step.id} value={step.name}>{step.name}</option>
                   ))}
-                  <option value="Geral">Geral</option> {/* Option for general checklists */}
-                  <option value="Segurança">Segurança</option> {/* Option for safety checklists */}
-                  <option value="Entrega">Entrega</option> {/* Option for delivery checklists */}
+                  <option value="Geral">Geral</option>
+                  <option value="Segurança">Segurança</option>
+                  <option value="Entrega">Entrega Final</option>
                 </select>
               </div>
               <div className="space-y-2">
-                <label className="block text-sm font-bold text-slate-500 dark:text-slate-400 mb-1">Itens do Checklist</label>
-                {newChecklistItems.map((item, index) => (
+                <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Itens da Checklist</label>
+                {(editChecklistData?.items || newChecklistItems).map((item, index) => (
                   <div key={index} className="flex items-center gap-2">
                     <input
                       type="text"
-                      value={item}
-                      onChange={(e) => handleNewChecklistItemTextChange(index, e.target.value)}
+                      value={typeof item === 'string' ? item : item.text}
+                      onChange={(e) => {
+                        const updatedItems = editChecklistData ? 
+                          editChecklistData.items.map((i, idx) => idx === index ? { ...i, text: e.target.value } : i) :
+                          newChecklistItems.map((text, idx) => idx === index ? e.target.value : text);
+                        editChecklistData ? setEditChecklistData({ ...editChecklistData, items: updatedItems as ChecklistItem[] }) : setNewChecklistItems(updatedItems as string[]);
+                      }}
+                      className="flex-1 p-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white text-sm"
                       placeholder={`Item ${index + 1}`}
-                      className="flex-1 px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white text-sm"
                     />
-                    {newChecklistItems.length > 1 && (
-                      <button type="button" onClick={() => removeChecklistItemField(index)} className="text-red-500 hover:text-red-600 p-1" aria-label="Remover item"><i className="fa-solid fa-trash-alt"></i></button>
-                    )}
+                    <button 
+                      type="button" 
+                      onClick={() => {
+                        const updatedItems = editChecklistData ? 
+                          editChecklistData.items.filter((_, idx) => idx !== index) :
+                          newChecklistItems.filter((_, idx) => idx !== index);
+                        editChecklistData ? setEditChecklistData({ ...editChecklistData, items: updatedItems as ChecklistItem[] }) : setNewChecklistItems(updatedItems as string[]);
+                      }}
+                      className="text-red-500 hover:text-red-700"
+                      aria-label={`Remover item ${index + 1}`}
+                    >
+                      <i className="fa-solid fa-trash-alt"></i>
+                    </button>
                   </div>
                 ))}
-                <button type="button" onClick={addNewChecklistItemField} className="mt-2 px-3 py-1 bg-slate-100 dark:bg-slate-800 text-primary dark:text-white rounded-md text-xs font-bold hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors flex items-center gap-1">
-                  <i className="fa-solid fa-plus"></i> Adicionar Item
+                <button 
+                  type="button" 
+                  onClick={() => editChecklistData ? setEditChecklistData({ ...editChecklistData, items: [...editChecklistData.items, { id: crypto.randomUUID(), text: '', checked: false }] }) : setNewChecklistItems([...newChecklistItems, ''])} 
+                  className="px-3 py-1 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-xs hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors"
+                  aria-label="Adicionar novo item à checklist"
+                >
+                  <i className="fa-solid fa-plus mr-1"></i> Adicionar Item
                 </button>
               </div>
-              <button type="submit" className="w-full py-3 bg-primary hover:bg-primary-light text-white font-bold rounded-xl shadow-lg shadow-primary/20 transition-all">
-                {editChecklistData ? 'Salvar Alterações' : 'Adicionar Checklist'}
-              </button>
+              <div className="flex justify-end gap-3">
+                <button type="button" onClick={clearChecklistFormAndCloseModal} className="px-4 py-2 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors">Cancelar</button>
+                <button type="submit" className="px-4 py-2 bg-primary text-white rounded-xl hover:bg-primary-light transition-colors">{editChecklistData ? 'Salvar' : 'Adicionar'}</button>
+              </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* General Purpose ZeModal (for delete confirmations, errors, etc.) */}
+      {/* General Purpose Modal for Delete Confirmation / Errors */}
       <ZeModal
         isOpen={zeModal.isOpen}
         title={zeModal.title}
@@ -2161,6 +3351,7 @@ const WorkDetail = () => {
         type={zeModal.type}
         isConfirming={zeModal.isConfirming}
       />
+
     </div>
   );
 };
