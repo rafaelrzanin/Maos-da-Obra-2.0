@@ -15,6 +15,13 @@ const _dashboardCache: {
     materials: Record<string, { data: Material[], timestamp: number }>;
     // NEW: Caching for expenses per workId
     expenses: Record<string, { data: Expense[], timestamp: number }>;
+    // NEW: Caching for other related entities
+    workers: Record<string, { data: Worker[], timestamp: number }>;
+    suppliers: Record<string, { data: Supplier[], timestamp: number }>;
+    photos: Record<string, { data: WorkPhoto[], timestamp: number }>;
+    files: Record<string, { data: WorkFile[], timestamp: number }>;
+    contracts: { data: Contract[], timestamp: number } | null; // Contracts are global
+    checklists: Record<string, { data: Checklist[], timestamp: number }>;
 } = {
     works: null,
     stats: {},
@@ -23,6 +30,12 @@ const _dashboardCache: {
     steps: {}, // Initialize new cache
     materials: {}, // Initialize new cache
     expenses: {}, // NEW: Initialize new cache
+    workers: {}, // NEW
+    suppliers: {}, // NEW
+    photos: {}, // NEW
+    files: {}, // NEW
+    contracts: null, // NEW
+    checklists: {}, // NEW
 };
 
 // --- HELPERS ---
@@ -78,7 +91,8 @@ const parseMaterialFromDB = (data: any): Material => ({
     purchasedQty: Number(data.purchased_qty || 0),
     unit: data.unit,
     stepId: data.step_id,
-    category: data.category
+    category: data.category,
+    totalCost: Number(data.total_cost || 0) // NEW: Parse total_cost
 });
 
 const parseExpenseFromDB = (data: any): Expense => ({
@@ -156,6 +170,29 @@ const mapPushSubscriptionFromDB = (data: any): PushSubscriptionInfo => ({
   userId: data.user_id,
   subscription: data.subscription,
   endpoint: data.endpoint,
+});
+
+// NEW: Parser for Contract
+const parseContractFromDB = (data: any): Contract => ({
+    id: data.id,
+    title: data.title,
+    category: data.category,
+    contentTemplate: data.content_template,
+});
+
+// NEW: Parser for Checklist and ChecklistItem
+const parseChecklistItemFromDB = (data: any): ChecklistItem => ({
+    id: data.id,
+    text: data.text,
+    checked: data.checked,
+});
+
+const parseChecklistFromDB = (data: any): Checklist => ({
+    id: data.id,
+    workId: data.work_id,
+    name: data.name,
+    category: data.category,
+    items: data.items ? data.items.map(parseChecklistItemFromDB) : [], // items is a JSONB column
 });
 
 // NEW: Helper para mapear nome de etapa dinâmica para categoria de material genérica
@@ -348,6 +385,12 @@ export const dbService = {
             _dashboardCache.steps = {}; // NEW: Clear steps cache on logout
             _dashboardCache.materials = {}; // NEW: Clear materials cache on logout
             _dashboardCache.expenses = {}; // NEW: Clear expenses cache on logout
+            _dashboardCache.workers = {}; // NEW
+            _dashboardCache.suppliers = {}; // NEW
+            _dashboardCache.photos = {}; // NEW
+            _dashboardCache.files = {}; // NEW
+            _dashboardCache.contracts = null; // NEW
+            _dashboardCache.checklists = {}; // NEW
             callback(null);
         }
     });
@@ -412,6 +455,12 @@ export const dbService = {
     _dashboardCache.steps = {}; // NEW: Clear steps cache on logout
     _dashboardCache.materials = {}; // NEW: Clear materials cache on logout
     _dashboardCache.expenses = {}; // NEW: Clear expenses cache on logout
+    _dashboardCache.workers = {}; // NEW
+    _dashboardCache.suppliers = {}; // NEW
+    _dashboardCache.photos = {}; // NEW
+    _dashboardCache.files = {}; // NEW
+    _dashboardCache.contracts = null; // NEW
+    _dashboardCache.checklists = {}; // NEW
   },
 
   async getUserProfile(userId: string): Promise<User | null> {
@@ -643,7 +692,8 @@ export const dbService = {
                         purchased_qty: 0, 
                         unit: item.unit,
                         step_id: step.id, // Link material to the specific step
-                        category: materialCategory.category
+                        category: materialCategory.category,
+                        total_cost: 0 // Initialize total_cost
                     });
                 }
             } else {
@@ -723,106 +773,179 @@ export const dbService = {
     let finalStepNames: string[] = [];
     const numFloors = parsedWork.floors || 1; // Garante pelo menos 1 pavimento
     const numBathrooms = parsedWork.bathrooms || 0;
-    const numBedrooms = parsedWork.bedrooms || 0;
     const numKitchens = parsedWork.kitchens || 0;
-    const numLivingRooms = parsedWork.livingRooms || 0;
 
     if (template.id === 'CONSTRUCAO') {
-        const constructionBaseSteps = [
-          'Limpeza do terreno', 
-          'Fundações',
-        ];
-        const interiorSteps = [
-            'Tubulação de Água/Esgoto Geral', 
-            'Fiação Elétrica Geral', 
-            'Chapisco e Reboco', 
-            'Contrapiso',
-            'Impermeabilização Geral', 
-            'Gesso / Forro Geral', 
-            'Pisos e Revestimentos Geral', 
-            'Esquadrias (Janelas/Portas)',
-            'Marmoraria Geral (Bancadas)', 
-            'Pintura Paredes/Tetos', 
-            'Instalação de Louças e Metais Geral', 
-            'Instalação de Luminárias',
-            // Itens de banheiro e cozinha adicionados separadamente se houver cômodos
-        ];
+        // Base steps for construction, explicitly excluding demolition
+        finalStepNames.push('Limpeza do terreno', 'Fundações');
 
-        finalStepNames.push(...constructionBaseSteps);
-        
+        // Dynamic floor/wall steps
         for (let i = 0; i < numFloors; i++) {
-            if (i === 0) {
+            if (i === 0) { // Ground floor
                 finalStepNames.push('Levantamento de paredes (Térreo)');
-            } else {
-                finalStepNames.push(`Lajes e Vigas (Piso ${i}º Pavimento)`);
-                finalStepNames.push(`Levantamento de paredes (${i}º Pavimento)`);
+            } else { // Intermediate floors
+                finalStepNames.push(`Lajes e Vigas (Piso ${i + 1}º Pavimento)`); 
+                finalStepNames.push(`Levantamento de paredes (${i + 1}º Pavimento)`);
             }
         }
-        if (numFloors > 0) { // Add roof related steps if there's at least one floor (or ground floor)
+        if (numFloors > 0) { // Roof slab/structure always after walls
             finalStepNames.push('Lajes e Vigas (Cobertura)');
             finalStepNames.push('Telhado');
         }
 
-        finalStepNames.push(...interiorSteps);
+        // Interior steps - filter out general ones if specific room steps will cover them
+        const generalInteriorSteps = [
+            'Tubulação de Água/Esgoto Geral',
+            'Fiação Elétrica Geral',
+            'Chapisco e Reboco',
+            'Contrapiso',
+            'Impermeabilização Geral',
+            'Gesso / Forro Geral',
+            'Pisos e Revestimentos Geral',
+            'Esquadrias (Janelas/Portas)',
+            'Marmoraria Geral (Bancadas)',
+            'Pintura Paredes/Tetos',
+            'Instalação de Louças e Metais Geral',
+            'Instalação de Luminárias',
+        ];
 
-        // Adiciona etapas específicas de cômodos se houver
-        for(let i = 0; i < numBathrooms; i++) {
-            finalStepNames.push(`Demolição de Banheiro (B${i+1})`); // Use unique names
-            finalStepNames.push(`Hidráulica de Banheiro (B${i+1})`);
-            finalStepNames.push(`Elétrica de Banheiro (B${i+1})`);
-            finalStepNames.push(`Impermeabilização de Banheiro (B${i+1})`);
-            finalStepNames.push(`Contrapiso de Banheiro (B${i+1})`);
-            finalStepNames.push(`Pisos e Revestimentos de Banheiro (B${i+1})`);
-            finalStepNames.push(`Gesso / Forro de Banheiro (B${i+1})`);
-            finalStepNames.push(`Bancada de Banheiro (B${i+1})`);
-            finalStepNames.push(`Louças e Metais de Banheiro (B${i+1})`);
-        }
-        for(let i = 0; i < numKitchens; i++) {
-            finalStepNames.push(`Demolição de Cozinha (C${i+1})`);
-            finalStepNames.push(`Hidráulica de Cozinha (C${i+1})`);
-            finalStepNames.push(`Elétrica de Cozinha (C${i+1})`);
-            finalStepNames.push(`Pisos e Revestimentos de Cozinha (C${i+1})`);
-            finalStepNames.push(`Bancada de Cozinha (C${i+1})`);
-            finalStepNames.push(`Louças e Metais de Cozinha (C${i+1})`);
-        }
-        
-        finalStepNames.push('Limpeza Final e Entrega'); // Final step
+        // Flags to check if specific room steps are being added
+        const willHaveSpecificBathroomPlumbing = numBathrooms > 0;
+        const willHaveSpecificKitchenPlumbing = numKitchens > 0;
 
-        effectiveDefaultDurationDays = finalStepNames.length * 7; // Cerca de 7 dias por etapa ajustado.
-        if (effectiveDefaultDurationDays < template.defaultDurationDays) {
-            effectiveDefaultDurationDays = template.defaultDurationDays;
+        generalInteriorSteps.forEach(stepName => {
+            let shouldAdd = true;
+            // If specific bathrooms exist, don't add general plumbing/electrical/finishing/countertops/fixtures that would be covered
+            if (willHaveSpecificBathroomPlumbing) {
+                if (stepName.includes('Tubulação de Água/Esgoto Geral') || stepName.includes('Fiação Elétrica Geral') ||
+                    stepName.includes('Pisos e Revestimentos Geral') || stepName.includes('Marmoraria Geral (Bancadas)') ||
+                    stepName.includes('Instalação de Louças e Metais Geral') || stepName.includes('Gesso / Forro Geral') || 
+                    stepName.includes('Contrapiso') || stepName.includes('Impermeabilização Geral')) { // Add general waterproofing/gypsum/subfloor to filter
+                    shouldAdd = false;
+                }
+            }
+            // If specific kitchens exist, don't add general plumbing/electrical/finishing/countertops/fixtures that would be covered
+            if (willHaveSpecificKitchenPlumbing) {
+                 if (stepName.includes('Tubulação de Água/Esgoto Geral') || stepName.includes('Fiação Elétrica Geral') ||
+                    stepName.includes('Pisos e Revestimentos Geral') || stepName.includes('Marmoraria Geral (Bancadas)') ||
+                    stepName.includes('Instalação de Louças e Metais Geral') || stepName.includes('Gesso / Forro Geral') ||
+                    stepName.includes('Contrapiso')) { // Add general gypsum/subfloor to filter
+                    shouldAdd = false;
+                }
+            }
+            if (shouldAdd) {
+                finalStepNames.push(stepName);
+            }
+        });
+
+        // Add specific room steps
+        for (let i = 0; i < numBathrooms; i++) {
+            finalStepNames.push(
+                // Demolition is for renovation, not new construction
+                `Hidráulica de Banheiro (B${i + 1})`,
+                `Elétrica de Banheiro (B${i + 1})`,
+                `Impermeabilização de Banheiro (B${i + 1})`,
+                `Contrapiso de Banheiro (B${i + 1})`,
+                `Pisos e Revestimentos de Banheiro (B${i + 1})`,
+                `Gesso / Forro de Banheiro (B${i + 1})`,
+                `Bancada de Banheiro (B${i + 1})`,
+                `Louças e Metais de Banheiro (B${i + 1})`
+            );
         }
+        for (let i = 0; i < numKitchens; i++) {
+            finalStepNames.push(
+                // Demolition is for renovation, not new construction
+                `Hidráulica de Cozinha (C${i + 1})`,
+                `Elétrica de Cozinha (C${i + 1})`,
+                `Pisos e Revestimentos de Cozinha (C${i + 1})`,
+                `Bancada de Cozinha (C${i + 1})`,
+                `Louças e Metais de Cozinha (C${i + 1})`
+            );
+        }
+
+        finalStepNames.push('Limpeza Final e Entrega');
+
+        // Calculate effective default duration based on dynamic elements
+        effectiveDefaultDurationDays = template.defaultDurationDays;
+        effectiveDefaultDurationDays += (numFloors > 1 ? numFloors - 1 : 0) * 20; // 20 days per additional floor (after ground)
+        effectiveDefaultDurationDays += numBathrooms * 10; // 10 days per bathroom
+        effectiveDefaultDurationDays += numKitchens * 10; // 10 days per kitchen
 
     } else if (template.id === 'REFORMA_APTO') {
-        finalStepNames = template.includedSteps;
-        // Adiciona etapas de cômodos específicos se houver
-        for(let i = 0; i < numBathrooms; i++) {
-            finalStepNames.push(`Demolição de Banheiro (B${i+1})`);
-            finalStepNames.push(`Hidráulica de Banheiro (B${i+1})`);
-            finalStepNames.push(`Elétrica de Banheiro (B${i+1})`);
-            finalStepNames.push(`Impermeabilização de Banheiro (B${i+1})`);
-            finalStepNames.push(`Contrapiso de Banheiro (B${i+1})`);
-            finalStepNames.push(`Pisos e Revestimentos de Banheiro (B${i+1})`);
-            finalStepNames.push(`Gesso / Forro de Banheiro (B${i+1})`);
-            finalStepNames.push(`Bancada de Banheiro (B${i+1})`);
-            finalStepNames.push(`Louças e Metais de Banheiro (B${i+1})`);
+        finalStepNames.push('Demolição', 'Retirada de entulho'); // Base for renovation, includes demolition
+
+        // Interior steps - similar filtering as construction if specific rooms exist
+        const generalInteriorRenovationSteps = [
+            'Tubulação de Água/Esgoto Geral',
+            'Fiação Elétrica Geral',
+            'Gesso / Forro Geral',
+            'Pisos e Revestimentos Geral',
+            'Marmoraria Geral (Bancadas)',
+            'Pintura Paredes/Tetos',
+            'Instalação de Louças e Metais Geral',
+            'Instalação de Luminárias',
+        ];
+
+        // Flags to check if specific room steps are being added
+        const willHaveSpecificBathroomRenovation = numBathrooms > 0;
+        const willHaveSpecificKitchenRenovation = numKitchens > 0;
+
+        generalInteriorRenovationSteps.forEach(stepName => {
+            let shouldAdd = true;
+            if (willHaveSpecificBathroomRenovation) {
+                if (stepName.includes('Tubulação de Água/Esgoto Geral') || stepName.includes('Fiação Elétrica Geral') ||
+                    stepName.includes('Pisos e Revestimentos Geral') || stepName.includes('Marmoraria Geral (Bancadas)') ||
+                    stepName.includes('Instalação de Louças e Metais Geral') || stepName.includes('Gesso / Forro Geral')) {
+                    shouldAdd = false;
+                }
+            }
+            if (willHaveSpecificKitchenRenovation) {
+                 if (stepName.includes('Tubulação de Água/Esgoto Geral') || stepName.includes('Fiação Elétrica Geral') ||
+                    stepName.includes('Pisos e Revestimentos Geral') || stepName.includes('Marmoraria Geral (Bancadas)') ||
+                    stepName.includes('Instalação de Louças e Metais Geral') || stepName.includes('Gesso / Forro Geral')) {
+                    shouldAdd = false;
+                }
+            }
+            if (shouldAdd) {
+                finalStepNames.push(stepName);
+            }
+        });
+
+        // Add specific room steps
+        for (let i = 0; i < numBathrooms; i++) {
+            finalStepNames.push(
+                `Demolição de Banheiro (B${i + 1})`,
+                `Hidráulica de Banheiro (B${i + 1})`,
+                `Elétrica de Banheiro (B${i + 1})`,
+                `Impermeabilização de Banheiro (B${i + 1})`,
+                `Contrapiso de Banheiro (B${i + 1})`,
+                `Pisos e Revestimentos de Banheiro (B${i + 1})`,
+                `Gesso / Forro de Banheiro (B${i + 1})`,
+                `Bancada de Banheiro (B${i + 1})`,
+                `Louças e Metais de Banheiro (B${i + 1})`
+            );
         }
-        for(let i = 0; i < numKitchens; i++) {
-            finalStepNames.push(`Demolição de Cozinha (C${i+1})`);
-            finalStepNames.push(`Hidráulica de Cozinha (C${i+1})`);
-            finalStepNames.push(`Elétrica de Cozinha (C${i+1})`);
-            finalStepNames.push(`Pisos e Revestimentos de Cozinha (C${i+1})`);
-            finalStepNames.push(`Bancada de Cozinha (C${i+1})`);
-            finalStepNames.push(`Louças e Metais de Cozinha (C${i+1})`);
+        for (let i = 0; i < numKitchens; i++) {
+            finalStepNames.push(
+                `Demolição de Cozinha (C${i + 1})`,
+                `Hidráulica de Cozinha (C${i + 1})`,
+                `Elétrica de Cozinha (C${i + 1})`,
+                `Pisos e Revestimentos de Cozinha (C${i + 1})`,
+                `Bancada de Cozinha (C${i + 1})`,
+                `Louças e Metais de Cozinha (C${i + 1})`
+            );
         }
-        effectiveDefaultDurationDays = finalStepNames.length * 5; // Menos tempo por etapa para reforma
-        if (effectiveDefaultDurationDays < template.defaultDurationDays) {
-            effectiveDefaultDurationDays = template.defaultDurationDays;
-        }
-    }
-    else { // For single room templates (BANHEIRO, COZINHA, PINTURA)
-        finalStepNames = template.includedSteps;
+        finalStepNames.push('Limpeza Final e Entrega'); // Final step
+
+        // Calculate effective default duration based on dynamic elements
         effectiveDefaultDurationDays = template.defaultDurationDays;
+        effectiveDefaultDurationDays += numBathrooms * 7; // 7 days per bathroom
+        effectiveDefaultDurationDays += numKitchens * 7; // 7 days per kitchen
+
+    } else { // For single room templates (BANHEIRO, COZINHA, PINTURA, etc.)
+        finalStepNames = [...template.includedSteps]; 
+        effectiveDefaultDurationDays = template.defaultDurationDays;
+        // No additional duration for rooms/floors as it's a specific, confined template
     }
 
     // Calcula a endDate com base nas etapas generadas
@@ -841,25 +964,34 @@ export const dbService = {
     parsedWork.endDate = finalEndDate;
 
 
+    // CRITICAL: Ensure step start/end dates are calculated correctly AND consecutively
+    let currentStepStartDate = new Date(workData.startDate!);
     const stepsToInsert = finalStepNames.map((stepName, idx) => {
-        const start = new Date(workData.startDate!);
-        start.setDate(start.getDate() + (idx * (effectiveDefaultDurationDays / finalStepNames.length))); // Distribui o tempo
-        const end = new Date(start);
-        end.setDate(end.getDate() + (effectiveDefaultDurationDays / finalStepNames.length) -1); // Define a duração da etapa
+        // Calculate duration for this specific step (average distribution)
+        const stepDuration = Math.round(effectiveDefaultDurationDays / finalStepNames.length); 
+        
+        const stepEndDate = new Date(currentStepStartDate);
+        stepEndDate.setDate(currentStepStartDate.getDate() + Math.max(1, stepDuration) -1); // Ensure at least 1 day, subtract 1 for inclusive end date
 
-        return {
+        const stepToInsert = {
             work_id: parsedWork.id,
             name: stepName,
-            start_date: start.toISOString().split('T')[0],
-            end_date: end.toISOString().split('T')[0],
+            start_date: currentStepStartDate.toISOString().split('T')[0],
+            end_date: stepEndDate.toISOString().split('T')[0],
             status: StepStatus.NOT_STARTED,
             is_delayed: false
         };
+
+        // Set start date for the next step to be the day after the current step's end date
+        currentStepStartDate.setDate(stepEndDate.getDate() + 1); 
+
+        return stepToInsert;
     });
     
     const { data: createdStepsData, error: stepsError } = await supabase.from('steps').insert(stepsToInsert).select('*');
     if (stepsError) {
       console.error("Erro ao inserir etapas:", stepsError);
+      // Even if steps fail, try to proceed with materials to avoid blocking entirely
     }
     const createdSteps = (createdStepsData || []).map(parseStepFromDB);
 
@@ -910,6 +1042,11 @@ export const dbService = {
         _dashboardCache.steps[workId] = null; // NEW: Invalidate steps cache for this workId
         _dashboardCache.materials[workId] = null; // NEW: Invalidate materials cache for this workId
         _dashboardCache.expenses[workId] = null; // NEW: Invalidate expenses cache for this workId
+        _dashboardCache.workers[workId] = null; // NEW
+        _dashboardCache.suppliers[workId] = null; // NEW
+        _dashboardCache.photos[workId] = null; // NEW
+        _dashboardCache.files[workId] = null; // NEW
+        _dashboardCache.checklists[workId] = null; // NEW
         console.log(`[DB DELETE] Caches para workId ${workId} invalidados.`);
 
     } catch (error: unknown) { // Explicitly type as unknown
@@ -923,6 +1060,56 @@ export const dbService = {
     }
   },
 
+  // --- DASHBOARD STATS ---
+  async calculateWorkStats(workId: string): Promise<{ totalSpent: number; progress: number; delayedSteps: number }> {
+    const now = Date.now();
+    const cacheKey = `stats-${workId}`;
+    if (_dashboardCache.stats[cacheKey] && (now - _dashboardCache.stats[cacheKey].timestamp < CACHE_TTL)) {
+      return _dashboardCache.stats[cacheKey].data;
+    }
+
+    const [steps, expenses] = await Promise.all([
+      this.getSteps(workId),
+      this.getExpenses(workId),
+    ]);
+
+    const totalSpent = expenses.reduce((sum, expense) => sum + (expense.paidAmount || 0), 0);
+    const completedSteps = steps.filter(s => s.status === StepStatus.COMPLETED).length;
+    const totalSteps = steps.length;
+    const progress = totalSteps > 0 ? (completedSteps / totalSteps) * 100 : 0;
+
+    const today = new Date().toISOString().split('T')[0];
+    const delayedSteps = steps.filter(s => s.status !== StepStatus.COMPLETED && s.endDate < today).length;
+
+    const stats = { totalSpent, progress, delayedSteps };
+    _dashboardCache.stats[cacheKey] = { data: stats, timestamp: now };
+    return stats;
+  },
+
+  async getDailySummary(workId: string): Promise<{ completedSteps: number; delayedSteps: number; pendingMaterials: number; totalSteps: number }> {
+    const now = Date.now();
+    const cacheKey = `summary-${workId}`;
+    if (_dashboardCache.summary[cacheKey] && (now - _dashboardCache.summary[cacheKey].timestamp < CACHE_TTL)) {
+      return _dashboardCache.summary[cacheKey].data;
+    }
+
+    const [steps, materials] = await Promise.all([
+      this.getSteps(workId),
+      this.getMaterials(workId),
+    ]);
+
+    const totalSteps = steps.length;
+    const completedSteps = steps.filter(s => s.status === StepStatus.COMPLETED).length;
+    const today = new Date().toISOString().split('T')[0];
+    const delayedSteps = steps.filter(s => s.status !== StepStatus.COMPLETED && s.endDate < today).length;
+    const pendingMaterials = materials.filter(m => m.purchasedQty < m.plannedQty).length;
+
+    const summary = { completedSteps, delayedSteps, pendingMaterials, totalSteps };
+    _dashboardCache.summary[cacheKey] = { data: summary, timestamp: now };
+    return summary;
+  },
+
+
   // --- STEPS ---
   async getSteps(workId: string): Promise<Step[]> {
     // Supabase is guaranteed to be initialized now
@@ -933,972 +1120,627 @@ export const dbService = {
     }
 
     console.log(`[dbService.getSteps] Fetching steps for work: ${workId}`); // Log para depuração
-    const { data, error: fetchStepsError } = await supabase.from('steps').select('*').eq('work_id', workId).order('start_date', { ascending: true }); // Renamed error
+    const { data, error: fetchStepsError } = await supabase.from('steps').select('*').eq('work_id', workId).order('start_date', { ascending: true });
+        
     if (fetchStepsError) {
-      console.error(`[dbService.getSteps] Erro ao buscar etapas para work ${workId}:`, fetchStepsError); // Log de erro mais detalhado
-      return [];
+        console.error(`[dbService.getSteps] Erro ao buscar etapas para work ${workId}:`, fetchStepsError);
+        return [];
     }
     const parsed = (data || []).map(parseStepFromDB);
-    _dashboardCache.steps[workId] = { data: parsed, timestamp: now }; // Cache the result
+    _dashboardCache.steps[workId] = { data: parsed, timestamp: now };
     return parsed;
   },
 
-  async addStep(step: Omit<Step, 'id'>): Promise<Step | null> {
-    // Supabase is guaranteed to be initialized now
-    const { data: newStepData, error: addStepError } = await supabase.from('steps').insert({ // Renamed data and error
-      work_id: step.workId,
-      name: step.name,
-      start_date: step.startDate, 
-      end_date: step.endDate, 
-      status: step.status,
-      is_delayed: step.isDelayed
-    }).select().single();
-    if (addStepError) {
-      console.error("Erro ao adicionar etapa:", addStepError);
-      throw addStepError;
+  async getStepById(stepId: string): Promise<Step | null> {
+    // Check cache first
+    for (const workId in _dashboardCache.steps) {
+      if (_dashboardCache.steps[workId]?.data) {
+        const cached = _dashboardCache.steps[workId].data.find(s => s.id === stepId);
+        if (cached) return cached;
+      }
     }
-    // Invalidate cache for work stats/summary
-    delete _dashboardCache.stats[step.workId];
-    delete _dashboardCache.summary[step.workId];
-    _dashboardCache.notifications = null; // NEW: Invalidate notifications cache
-    _dashboardCache.steps[step.workId] = null; // NEW: Invalidate steps cache for this workId
-    _dashboardCache.materials[step.workId] = null; // NEW: Invalidate materials cache (as they relate to steps)
-    _dashboardCache.expenses[step.workId] = null; // NEW: Invalidate expenses cache (as they relate to steps)
-    return parseStepFromDB(newStepData);
+    const { data, error } = await supabase.from('steps').select('*').eq('id', stepId).single();
+    if (error) return null;
+    return data ? parseStepFromDB(data) : null;
   },
 
-  async updateStep(step: Step): Promise<Step | null> {
-    // Supabase is guaranteed to be initialized now
-    const { data: updatedStepData, error: updateStepError } = await supabase.from('steps').update({ // Renamed data and error
-      name: step.name,
-      start_date: step.startDate,
-      end_date: step.endDate,
-      status: step.status,
-      real_date: step.realDate, // Added real_date parsing
-      is_delayed: step.isDelayed
-    }).eq('id', step.id).select().single();
-    if (updateStepError) {
-      console.error("Erro ao atualizar etapa:", updateStepError);
-      throw updateStepError;
-    }
-    // Invalidate cache for work stats/summary
-    delete _dashboardCache.stats[step.workId];
-    delete _dashboardCache.summary[step.workId];
-    _dashboardCache.notifications = null; // NEW: Invalidate notifications cache
-    _dashboardCache.steps[step.workId] = null; // NEW: Invalidate steps cache for this workId
-    _dashboardCache.materials[step.workId] = null; // NEW: Invalidate materials cache (as they relate to steps)
-    _dashboardCache.expenses[step.workId] = null; // NEW: Invalidate expenses cache (as they relate to steps)
-    return parseStepFromDB(updatedStepData);
+  async addStep(stepData: Omit<Step, 'id'>): Promise<Step> {
+    const { data, error } = await supabase.from('steps').insert({
+      work_id: stepData.workId,
+      name: stepData.name,
+      start_date: stepData.startDate,
+      end_date: stepData.endDate,
+      status: stepData.status,
+      is_delayed: stepData.isDelayed
+    }).select().single();
+    if (error) throw error;
+    _dashboardCache.steps[stepData.workId] = null; // Invalidate cache
+    _dashboardCache.stats[stepData.workId] = null; // Invalidate stats cache
+    _dashboardCache.summary[stepData.workId] = null; // Invalidate summary cache
+    return parseStepFromDB(data);
+  },
+
+  async updateStep(stepData: Step): Promise<Step> {
+    const { data, error } = await supabase.from('steps').update({
+      name: stepData.name,
+      start_date: stepData.startDate,
+      end_date: stepData.endDate,
+      real_date: stepData.realDate || null,
+      status: stepData.status,
+      is_delayed: stepData.isDelayed
+    }).eq('id', stepData.id).select().single();
+    if (error) throw error;
+    _dashboardCache.steps[stepData.workId] = null; // Invalidate cache
+    _dashboardCache.stats[stepData.workId] = null; // Invalidate stats cache
+    _dashboardCache.summary[stepData.workId] = null; // Invalidate summary cache
+    return parseStepFromDB(data);
   },
 
   async deleteStep(stepId: string, workId: string): Promise<void> {
-    console.log(`[DB DELETE] Iniciando exclusão para stepId: ${stepId} na workId: ${workId}`);
-
-    // Fetch the step details first to get its name for checklist deletion
-    const { data: stepToDelete, error: fetchStepError } = await supabase
-        .from('steps')
-        .select('*')
-        .eq('id', stepId)
-        .single();
-
-    if (fetchStepError || !stepToDelete) {
-        console.error(`[DB DELETE] Erro ao buscar etapa ${stepId}:`, fetchStepError || 'Etapa não encontrada.');
-        throw new Error(`Falha ao buscar etapa: ${fetchStepError?.message || 'Etapa não encontrada.'}`);
-    }
-
-    // 1. Obter todos os materiais associados a esta etapa
-    const { data: materialsToDelete, error: materialsFetchError } = await supabase
-      .from('materials')
-      .select('id')
-      .eq('step_id', stepId);
-
-    if (materialsFetchError) {
-      console.error(`[DB DELETE] Erro ao buscar materiais para stepId ${stepId}:`, materialsFetchError);
-      throw new Error(`Falha ao verificar materiais associados à etapa: ${materialsFetchError.message}`);
-    }
-
-    const materialIds = materialsToDelete ? materialsToDelete.map(m => m.id) : [];
-
-    // 2. Verificar se existem despesas associadas à etapa ou aos materiais
-    const { data: expensesCheck, error: expensesCheckError } = await supabase
-      .from('expenses')
-      .select('id')
-      .or(`step_id.eq.${stepId},related_material_id.in.(${materialIds.join(',')})`);
-
-    if (expensesCheckError) {
-      console.error(`[DB DELETE] Erro ao verificar despesas para stepId ${stepId}:`, expensesCheckError);
-      throw new Error(`Falha ao verificar despesas associadas à etapa: ${expensesCheckError.message}`);
-    }
-
-    if (expensesCheck && expensesCheck.length > 0) {
-      const expenseCount = expensesCheck.length;
-      throw new Error(`Esta etapa não pode ser excluída pois possui ${expenseCount} lançamento(s) financeiro(s) associado(s). Apague os lançamentos primeiro.`);
-    }
-
-    // Se não há despesas associadas, proceed with deletion
-    try {
-      // 3. Deletar materiais associados (agora sabemos que não há despesas vinculadas a eles)
-      if (materialIds.length > 0) {
-        const { error: matError } = await supabase.from('materials').delete().in('id', materialIds);
-        if (matError) {
-          console.error(`[DB DELETE] Erro ao deletar materiais para stepId ${stepId}:`, matError);
-          // throw matError; // Decide if you want to be strict or log and continue
-        } else {
-          console.log(`[DB DELETE] Materiais para stepId ${stepId} deletados.`);
-        }
-      }
-
-      // NEW: Delete checklists associated with this step
-      const { error: checklistDeleteError } = await supabase.from('checklists').delete().eq('work_id', workId).eq('category', stepToDelete.name); // Assuming category links to step name
-      if (checklistDeleteError) {
-          console.error(`[DB DELETE] Erro ao deletar checklists para stepId ${stepId}:`, checklistDeleteError);
-      } else {
-          console.log(`[DB DELETE] Checklists para stepId ${stepId} deletados.`);
-      }
-
-      // 4. Deletar a própria etapa
-      const { error: deleteStepError } = await supabase.from('steps').delete().eq('id', stepId);
-      if (deleteStepError) {
-        console.error(`[DB DELETE] Erro ao deletar etapa ${stepId}:`, deleteStepError);
-        throw deleteStepError;
-      }
-      console.log(`[DB DELETE] Etapa ${stepId} deletada com sucesso.`);
-
-      // Invalidate caches for the affected work
-      delete _dashboardCache.stats[workId];
-      delete _dashboardCache.summary[workId];
-      _dashboardCache.notifications = null; // Notifications might be tied to steps, invalidate global cache
-      _dashboardCache.steps[workId] = null; // NEW: Invalidate steps cache for this workId
-      _dashboardCache.materials[workId] = null; // NEW: Invalidate materials cache for this workId
-      _dashboardCache.expenses[workId] = null; // NEW: Invalidate expenses cache for this workId
-
-      console.log(`[DB DELETE] Caches para workId ${workId} invalidados após exclusão da etapa.`);
-
-    } catch (error: any) {
-      console.error(`[DB DELETE ERROR] Erro ao apagar etapa ${stepId} e dados relacionados:`, error);
-      throw new Error(`Falha ao apagar etapa: ${error.message}`);
-    }
+    // Delete associated materials first
+    await supabase.from('materials').delete().eq('step_id', stepId);
+    // Delete associated expenses
+    await supabase.from('expenses').delete().eq('step_id', stepId);
+    // Delete associated checklists
+    await supabase.from('checklists').delete().eq('category', (await this.getStepById(stepId))?.name || ''); // Use step name as category
+    
+    const { error } = await supabase.from('steps').delete().eq('id', stepId);
+    if (error) throw error;
+    _dashboardCache.steps[workId] = null; // Invalidate cache
+    _dashboardCache.materials[workId] = null; // Invalidate materials cache
+    _dashboardCache.expenses[workId] = null; // Invalidate expenses cache
+    _dashboardCache.stats[workId] = null; // Invalidate stats cache
+    _dashboardCache.summary[workId] = null; // Invalidate summary cache
+    _dashboardCache.checklists[workId] = null; // Invalidate checklists cache
   },
 
   // --- MATERIALS ---
   async getMaterials(workId: string): Promise<Material[]> {
-    // Supabase is guaranteed to be initialized now
     const now = Date.now();
     if (_dashboardCache.materials[workId] && (now - _dashboardCache.materials[workId].timestamp < CACHE_TTL)) {
-        console.log(`[CACHE HIT] getMaterials for workId ${workId}`);
-        return _dashboardCache.materials[workId].data;
+      return _dashboardCache.materials[workId].data;
     }
-
-    console.log(`[dbService.getMaterials] Fetching materials for work: ${workId}`); // Log para depuração
-    const { data, error: fetchMaterialsError } = await supabase.from('materials').select('*').eq('work_id', workId).order('category', { ascending: true }).order('name', { ascending: true }); // Renamed error
-    if (fetchMaterialsError) {
-      console.error(`[dbService.getMaterials] Erro ao buscar materiais para work ${workId}:`, fetchMaterialsError); // Log de erro mais detalhado
-      return [];
-    }
+    const { data, error } = await supabase.from('materials').select('*').eq('work_id', workId).order('created_at', { ascending: false });
+    if (error) return [];
     const parsed = (data || []).map(parseMaterialFromDB);
-    _dashboardCache.materials[workId] = { data: parsed, timestamp: now }; // Cache the result
+    _dashboardCache.materials[workId] = { data: parsed, timestamp: now };
     return parsed;
   },
 
-  async addMaterial(material: Omit<Material, 'id'>, purchaseInfo?: {qty: number, cost: number, date: string}): Promise<Material | null> {
-    // Supabase is guaranteed to be initialized now
-    
-    // Fix: Safely destructure data and error from the response object
-    const response = await supabase.from('materials').insert({ 
-      work_id: material.workId,
-      name: material.name,
-      brand: material.brand,
-      planned_qty: material.plannedQty,
-      purchased_qty: purchaseInfo?.qty || 0,
-      unit: material.unit,
-      step_id: material.stepId, // FIX: Changed to snake_case
-      category: material.category
+  async addMaterial(materialData: Omit<Material, 'id'>): Promise<Material> {
+    const { data, error } = await supabase.from('materials').insert({
+      work_id: materialData.workId,
+      name: materialData.name,
+      brand: materialData.brand,
+      planned_qty: materialData.plannedQty,
+      purchased_qty: materialData.purchasedQty,
+      unit: materialData.unit,
+      step_id: materialData.stepId,
+      category: materialData.category,
+      total_cost: materialData.totalCost || 0 // Initialize total_cost
     }).select().single();
-
-    const newMaterialData = response.data;
-    const addMaterialError = response.error;
-
-    if (addMaterialError) {
-      console.error("Erro ao adicionar material:", addMaterialError);
-      throw addMaterialError;
-    }
-
-    if (purchaseInfo && newMaterialData) { // Used newMaterialData
-      // Also record as an expense
-      await this.addExpense({
-        workId: material.workId,
-        description: `Compra de ${material.name}`,
-        amount: purchaseInfo.cost,
-        date: new Date().toISOString(),
-        category: ExpenseCategory.MATERIAL,
-        relatedMaterialId: newMaterialData.id, // Used newMaterialData
-        stepId: material.stepId
-      });
-    }
-    // Invalidate cache for work stats/summary
-    delete _dashboardCache.stats[material.workId];
-    delete _dashboardCache.summary[material.workId];
-    _dashboardCache.notifications = null; // NEW: Invalidate notifications cache
-    _dashboardCache.materials[material.workId] = null; // NEW: Invalidate materials cache for this workId
-    _dashboardCache.expenses[material.workId] = null; // NEW: Invalidate expenses cache for this workId
-    return parseMaterialFromDB(newMaterialData);
+    if (error) throw error;
+    _dashboardCache.materials[materialData.workId] = null; // Invalidate cache
+    _dashboardCache.summary[materialData.workId] = null; // Invalidate summary cache
+    return parseMaterialFromDB(data);
   },
 
-  async updateMaterial(material: Material): Promise<Material | null> {
-    // Supabase is guaranteed to be initialized now
-    const { data: updatedMaterialData, error: updateMaterialError } = await supabase.from('materials').update({ // Renamed data and error
-      name: material.name,
-      brand: material.brand,
-      planned_qty: material.plannedQty,
-      purchased_qty: material.purchasedQty,
-      unit: material.unit,
-      step_id: material.stepId, // This is already snake_case
-      category: material.category
-    }).eq('id', material.id).select().single();
-    if (updateMaterialError) {
-      console.error("Erro ao atualizar material:", updateMaterialError);
-      throw updateMaterialError;
-    }
-    // Invalidate cache for work stats/summary
-    delete _dashboardCache.stats[material.workId];
-    delete _dashboardCache.summary[material.workId];
-    _dashboardCache.notifications = null; // NEW: Invalidate notifications cache
-    _dashboardCache.materials[material.workId] = null; // NEW: Invalidate materials cache for this workId
-    _dashboardCache.expenses[material.workId] = null; // NEW: Invalidate expenses cache for this workId
-    return parseMaterialFromDB(updatedMaterialData);
+  async updateMaterial(materialData: Material): Promise<Material> {
+    const { data, error } = await supabase.from('materials').update({
+      name: materialData.name,
+      brand: materialData.brand,
+      planned_qty: materialData.plannedQty,
+      purchased_qty: materialData.purchasedQty,
+      unit: materialData.unit,
+      step_id: materialData.stepId,
+      category: materialData.category,
+      total_cost: materialData.totalCost || 0 // Ensure total_cost is updated
+    }).eq('id', materialData.id).select().single();
+    if (error) throw error;
+    _dashboardCache.materials[materialData.workId] = null; // Invalidate cache
+    _dashboardCache.summary[materialData.workId] = null; // Invalidate summary cache
+    return parseMaterialFromDB(data);
   },
 
   async deleteMaterial(materialId: string): Promise<void> {
-    // Supabase is guaranteed to be initialized now
-    const { data: materialToDelete, error: fetchMaterialError } = await supabase
-        .from('materials')
-        .select('work_id')
-        .eq('id', materialId)
-        .single();
-
-    if (fetchMaterialError || !materialToDelete) {
-        console.error(`[DB DELETE] Erro ao buscar material ${materialId}:`, fetchMaterialError || 'Material não encontrado.');
-        throw new Error(`Falha ao buscar material: ${fetchMaterialError?.message || 'Material não encontrado.'}`);
+    // Check if there are any expenses associated with this material
+    const { data: expenses, error: expenseCheckError } = await supabase.from('expenses').select('id').eq('related_material_id', materialId);
+    if (expenseCheckError) throw expenseCheckError;
+    if (expenses && expenses.length > 0) {
+      throw new Error("Não é possível excluir o material pois existem despesas financeiras associadas a ele. Exclua as despesas primeiro.");
     }
-
-    // 1. Verificar se existem despesas associadas a este material
-    const { data: expensesCheck, error: expensesCheckError } = await supabase
-      .from('expenses')
-      .select('id')
-      .eq('related_material_id', materialId);
-
-    if (expensesCheckError) {
-      console.error(`[DB DELETE] Erro ao verificar despesas para materialId ${materialId}:`, expensesCheckError);
-      throw new Error(`Falha ao verificar despesas associadas ao material: ${expensesCheckError.message}`);
-    }
-
-    if (expensesCheck && expensesCheck.length > 0) {
-      const expenseCount = expensesCheck.length;
-      throw new Error(`Este material não pode ser excluído pois possui ${expenseCount} lançamento(s) financeiro(s) associado(s). Apague os lançamentos primeiro.`);
-    }
-
-    // Se não há despesas associadas, proceed with deletion
-    const { data: deletedMaterial, error: deleteMaterialError } = await supabase.from('materials').delete().eq('id', materialId).select('work_id').single();
-    if (deleteMaterialError) {
-      console.error("Erro ao apagar material:", deleteMaterialError);
-      throw deleteMaterialError;
-    }
+    
+    const { data: deletedMaterial, error } = await supabase.from('materials').delete().eq('id', materialId).select().single();
+    if (error) throw error;
     if (deletedMaterial) {
-      delete _dashboardCache.stats[deletedMaterial.work_id];
-      delete _dashboardCache.summary[deletedMaterial.work_id];
-      _dashboardCache.notifications = null;
-      _dashboardCache.materials[deletedMaterial.work_id] = null;
-      _dashboardCache.expenses[deletedMaterial.work_id] = null; // NEW: Invalidate expenses cache
+      _dashboardCache.materials[deletedMaterial.work_id] = null; // Invalidate cache
+      _dashboardCache.summary[deletedMaterial.work_id] = null; // Invalidate summary cache
     }
   },
 
-  async registerMaterialPurchase(materialId: string, name: string, brand: string | undefined, plannedQty: number, unit: string, qty: number, cost: number): Promise<void> {
-    // Supabase is guaranteed to be initialized now
+  async registerMaterialPurchase(
+    materialId: string, 
+    materialName: string, 
+    brand: string | undefined, 
+    plannedQty: number, 
+    unit: string, 
+    purchasedQty: number, 
+    purchaseCost: number
+  ): Promise<Expense> {
+    const { data: currentMaterial, error: fetchError } = await supabase
+      .from('materials')
+      .select('*')
+      .eq('id', materialId)
+      .single();
 
-    // 1. Update material's purchased quantity
-    const { data: existingMaterial, error: fetchError } = await supabase
-        .from('materials')
-        .select('purchased_qty, work_id, step_id')
-        .eq('id', materialId)
-        .single();
+    if (fetchError || !currentMaterial) throw fetchError || new Error("Material not found.");
 
-    if (fetchError || !existingMaterial) {
-        console.error("Erro ao buscar material para compra:", fetchError);
-        throw fetchError;
-    }
+    const newPurchasedQty = currentMaterial.purchased_qty + purchasedQty;
+    const newTotalCost = (currentMaterial.total_cost || 0) + purchaseCost;
 
-    const newPurchasedQty = existingMaterial.purchased_qty + qty;
-    const { error: updateError } = await supabase
-        .from('materials')
-        .update({ purchased_qty: newPurchasedQty })
-        .eq('id', materialId);
-    
-    if (updateError) {
-        console.error("Erro ao atualizar qtd comprada de material:", updateError);
-        throw updateError;
-    }
+    // Update material's purchased quantity and total cost
+    const { data: updatedMaterial, error: updateMaterialError } = await supabase
+      .from('materials')
+      .update({
+        purchased_qty: newPurchasedQty,
+        total_cost: newTotalCost 
+      })
+      .eq('id', materialId)
+      .select().single();
 
-    // 2. Record as an expense
-    await this.addExpense({
-      workId: existingMaterial.work_id,
-      description: `Compra de ${name} (${qty} ${unit})`,
-      amount: cost,
-      date: new Date().toISOString().split('T')[0], // Use YYYY-MM-DD
-      category: ExpenseCategory.MATERIAL,
-      relatedMaterialId: materialId,
-      stepId: existingMaterial.step_id
-    });
-    // Invalidate cache for work stats/summary after purchase
-    delete _dashboardCache.stats[existingMaterial.work_id];
-    delete _dashboardCache.summary[existingMaterial.work_id];
-    _dashboardCache.notifications = null; // NEW: Invalidate notifications cache
-    _dashboardCache.materials[existingMaterial.work_id] = null; // NEW: Invalidate materials cache for this workId
-    _dashboardCache.expenses[existingMaterial.work_id] = null; // NEW: Invalidate expenses cache for this workId
+    if (updateMaterialError || !updatedMaterial) throw updateMaterialError || new Error("Failed to update material after purchase.");
+
+    // Create an expense entry for this purchase
+    const { data: newExpense, error: addExpenseError } = await supabase
+      .from('expenses')
+      .insert({
+        work_id: updatedMaterial.work_id,
+        description: `Compra de ${materialName} (${purchasedQty} ${unit})`,
+        amount: purchaseCost,
+        paid_amount: purchaseCost,
+        quantity: purchasedQty,
+        date: new Date().toISOString().split('T')[0],
+        category: ExpenseCategory.MATERIAL,
+        related_material_id: materialId,
+        step_id: updatedMaterial.step_id,
+        total_agreed: purchaseCost // For material purchases, total_agreed usually equals amount
+      })
+      .select().single();
+
+    if (addExpenseError) throw addExpenseError;
+
+    _dashboardCache.materials[updatedMaterial.work_id] = null; // Invalidate cache
+    _dashboardCache.expenses[updatedMaterial.work_id] = null; // Invalidate cache
+    _dashboardCache.stats[updatedMaterial.work_id] = null; // Invalidate stats cache
+    return parseExpenseFromDB(newExpense);
   },
 
   // --- EXPENSES ---
   async getExpenses(workId: string): Promise<Expense[]> {
-    // Supabase is guaranteed to be initialized now
     const now = Date.now();
     if (_dashboardCache.expenses[workId] && (now - _dashboardCache.expenses[workId].timestamp < CACHE_TTL)) {
-        console.log(`[CACHE HIT] getExpenses for workId ${workId}`);
-        return _dashboardCache.expenses[workId].data;
+      return _dashboardCache.expenses[workId].data;
     }
-    console.log(`[dbService.getExpenses] Fetching expenses for work: ${workId}`); // Log para depuração
-    const { data, error: fetchExpensesError } = await supabase.from('expenses').select('*').eq('work_id', workId).order('date', { ascending: false }); // Renamed error
-    if (fetchExpensesError) {
-      console.error(`[dbService.getExpenses] Erro ao buscar despesas para work ${workId}:`, fetchExpensesError); // Log de erro mais detalhado
-      return [];
-    }
+    const { data, error } = await supabase.from('expenses').select('*').eq('work_id', workId).order('date', { ascending: false });
+    if (error) return [];
     const parsed = (data || []).map(parseExpenseFromDB);
-    _dashboardCache.expenses[workId] = { data: parsed, timestamp: now }; // Cache the result
+    _dashboardCache.expenses[workId] = { data: parsed, timestamp: now };
     return parsed;
   },
 
-  async addExpense(expense: Omit<Expense, 'id'>): Promise<Expense | null> {
-    // Supabase is guaranteed to be initialized now
-    const { data: newExpenseData, error: addExpenseError } = await supabase.from('expenses').insert({ // Renamed data and error
-      work_id: expense.workId,
-      description: expense.description,
-      amount: expense.amount,
-      paid_amount: expense.paidAmount || 0, // Inicia com 0 se não for fornecido
-      quantity: expense.quantity || 1, // Default quantity
-      date: expense.date,
-      category: expense.category,
-      step_id: expense.stepId, 
-      related_material_id: expense.relatedMaterialId, 
-      worker_id: expense.workerId, 
-      supplier_id: expense.supplierId, // NEW: Added supplier_id
-      total_agreed: expense.totalAgreed || expense.amount // total_agreed defaults to amount if not specified
+  async addExpense(expenseData: Omit<Expense, 'id'>): Promise<Expense> {
+    const { data, error } = await supabase.from('expenses').insert({
+      work_id: expenseData.workId,
+      description: expenseData.description,
+      amount: expenseData.amount,
+      paid_amount: expenseData.paidAmount || 0,
+      quantity: expenseData.quantity || 1,
+      date: expenseData.date,
+      category: expenseData.category,
+      related_material_id: expenseData.relatedMaterialId,
+      step_id: expenseData.stepId,
+      worker_id: expenseData.workerId,
+      supplier_id: expenseData.supplierId,
+      total_agreed: expenseData.totalAgreed || expenseData.amount
     }).select().single();
-    if (addExpenseError) {
-      console.error("Erro ao adicionar despesa:", addExpenseError);
-      throw addExpenseError;
-    }
-    // Invalidate cache for work stats/summary
-    delete _dashboardCache.stats[expense.workId];
-    delete _dashboardCache.summary[expense.workId];
-    _dashboardCache.notifications = null; // NEW: Invalidate notifications cache
-    _dashboardCache.expenses[expense.workId] = null; // NEW: Invalidate expenses cache for this workId
-    return parseExpenseFromDB(newExpenseData);
+    if (error) throw error;
+    _dashboardCache.expenses[expenseData.workId] = null; // Invalidate cache
+    _dashboardCache.stats[expenseData.workId] = null; // Invalidate stats cache
+    return parseExpenseFromDB(data);
   },
 
-  async updateExpense(expense: Expense): Promise<Expense | null> {
-    // Supabase is guaranteed to be initialized now
-    const { data: updatedExpenseData, error: updateExpenseError } = await supabase.from('expenses').update({ // Renamed data and error
-      description: expense.description,
-      amount: expense.amount,
-      paid_amount: expense.paidAmount || 0, // Ensure paid_amount is handled
-      quantity: expense.quantity,
-      date: expense.date,
-      category: expense.category,
-      step_id: expense.stepId, 
-      related_material_id: expense.relatedMaterialId, 
-      worker_id: expense.workerId, 
-      supplier_id: expense.supplierId, // NEW: Added supplier_id
-      total_agreed: expense.totalAgreed || expense.amount // Corrected to total_agreed
-    }).eq('id', expense.id).select().single();
-    if (updateExpenseError) {
-      console.error("Erro ao atualizar despesa:", updateExpenseError);
-      throw updateExpenseError;
-    }
-    // Invalidate cache for work stats/summary
-    delete _dashboardCache.stats[expense.workId];
-    delete _dashboardCache.summary[expense.workId];
-    _dashboardCache.notifications = null; // NEW: Invalidate notifications cache
-    _dashboardCache.expenses[expense.workId] = null; // NEW: Invalidate expenses cache for this workId
-    return parseExpenseFromDB(updatedExpenseData);
+  async updateExpense(expenseData: Expense): Promise<Expense> {
+    const { data, error } = await supabase.from('expenses').update({
+      description: expenseData.description,
+      amount: expenseData.amount,
+      paid_amount: expenseData.paidAmount || 0,
+      quantity: expenseData.quantity || 1,
+      date: expenseData.date,
+      category: expenseData.category,
+      related_material_id: expenseData.relatedMaterialId,
+      step_id: expenseData.stepId,
+      worker_id: expenseData.workerId,
+      supplier_id: expenseData.supplierId,
+      total_agreed: expenseData.totalAgreed || expenseData.amount
+    }).eq('id', expenseData.id).select().single();
+    if (error) throw error;
+    _dashboardCache.expenses[expenseData.workId] = null; // Invalidate cache
+    _dashboardCache.stats[expenseData.workId] = null; // Invalidate stats cache
+    return parseExpenseFromDB(data);
   },
 
   async deleteExpense(expenseId: string): Promise<void> {
-    // Supabase is guaranteed to be initialized now
-    const response = await supabase.from('expenses').delete().eq('id', expenseId).select('work_id, related_material_id').single();
-    const deletedExpense: { work_id: string, related_material_id?: string } | null = response.data; // Explicitly type to allow for null
-    const deleteExpenseError = response.error; // Extract error from response
-
-    if (deleteExpenseError) {
-      console.error("Erro ao apagar despesa:", deleteExpenseError);
-      throw deleteExpenseError;
+    const { data: expenseToDelete, error: fetchError } = await supabase.from('expenses').select('work_id, related_material_id').eq('id', expenseId).single();
+    if (fetchError) throw fetchError;
+    if (expenseToDelete?.related_material_id) {
+      throw new Error("Não é possível excluir esta despesa, pois ela é um lançamento automático de compra de material. Edite a compra do material para ajustar o valor.");
     }
-
-    if (deletedExpense?.related_material_id) {
-        throw new Error("Esta despesa é de material e não pode ser excluída isoladamente. Apague o material correspondente se necessário.");
-    }
-
-    if (deletedExpense) {
-        // Invalidate cache for work stats/summary of the work where the expense was deleted
-        delete _dashboardCache.stats[deletedExpense.work_id];
-        delete _dashboardCache.summary[deletedExpense.work_id];
-        _dashboardCache.notifications = null; // NEW: Invalidate notifications cache
-        _dashboardCache.expenses[deletedExpense.work_id] = null; // NEW: Invalidate expenses cache for this workId
-    }
+    const { error } = await supabase.from('expenses').delete().eq('id', expenseId);
+    if (error) throw error;
+    _dashboardCache.expenses[expenseToDelete.work_id] = null; // Invalidate cache
+    _dashboardCache.stats[expenseToDelete.work_id] = null; // Invalidate stats cache
   },
 
-  // NEW: Function to add payment to an existing expense
-  async addPaymentToExpense(expenseId: string, paymentAmount: number, paymentDate: string): Promise<Expense | null> {
-    const { data: existingExpense, error: fetchError } = await supabase
-        .from('expenses')
-        .select('*')
-        .eq('id', expenseId)
-        .single();
+  async addPaymentToExpense(expenseId: string, paymentAmount: number, paymentDate: string): Promise<Expense> {
+    const { data: currentExpense, error: fetchError } = await supabase
+      .from('expenses')
+      .select('work_id, amount, paid_amount, total_agreed')
+      .eq('id', expenseId)
+      .single();
+    
+    if (fetchError || !currentExpense) throw fetchError || new Error("Despesa não encontrada.");
 
-    if (fetchError || !existingExpense) {
-        console.error("Erro ao buscar despesa para adicionar pagamento:", fetchError);
-        throw new Error("Despesa não encontrada.");
+    const newPaidAmount = (currentExpense.paid_amount || 0) + paymentAmount;
+    const totalAgreed = currentExpense.total_agreed || currentExpense.amount;
+
+    if (newPaidAmount > totalAgreed) {
+        throw new Error(`O valor do pagamento excede o saldo a pagar. Saldo: ${totalAgreed - (currentExpense.paid_amount || 0)}`);
     }
 
-    // Update paid_amount
-    const newPaidAmount = (existingExpense.paid_amount || 0) + paymentAmount;
+    const { data: updatedExpense, error: updateError } = await supabase
+      .from('expenses')
+      .update({
+        paid_amount: newPaidAmount,
+        // No need to update date here, as paymentDate is for the payment transaction, not the original expense date
+      })
+      .eq('id', expenseId)
+      .select().single();
     
-    const { data: updatedExpenseData, error: updateError } = await supabase
-        .from('expenses')
-        .update({
-            paid_amount: newPaidAmount,
-        })
-        .eq('id', expenseId)
-        .select()
-        .single();
+    if (updateError) throw updateError;
 
-    if (updateError) {
-        console.error("Erro ao registrar pagamento da despesa:", updateError);
-        throw updateError;
-    }
-    
-    // Invalidate caches
-    delete _dashboardCache.stats[existingExpense.work_id];
-    delete _dashboardCache.summary[existingExpense.work_id];
-    _dashboardCache.notifications = null;
-    _dashboardCache.expenses[existingExpense.work_id] = null;
+    // Optionally, you might want to record individual payment transactions in a separate table.
+    // For simplicity, we are just updating the `paid_amount` on the expense itself.
 
-    return parseExpenseFromDB(updatedExpenseData);
+    _dashboardCache.expenses[currentExpense.work_id] = null; // Invalidate cache
+    _dashboardCache.stats[currentExpense.work_id] = null; // Invalidate stats cache
+    return parseExpenseFromDB(updatedExpense);
   },
 
   // --- WORKERS ---
-  async getWorkers(workId: string): Promise<Worker[]> { // NEW: Accepts workId
-    // Supabase is guaranteed to be initialized now
-    console.log(`[dbService.getWorkers] Fetching workers for work: ${workId}`); // Log para depuração
-    const { data, error: fetchWorkersError } = await supabase.from('workers').select('*').eq('work_id', workId).order('name', { ascending: true }); // NEW: Filter by work_id // Renamed error
-    if (fetchWorkersError) {
-      console.error(`[dbService.getWorkers] Erro ao buscar profissionais para work ${workId}:`, fetchWorkersError); // Log de erro mais detalhado
-      return [];
+  async getWorkers(workId: string): Promise<Worker[]> {
+    const now = Date.now();
+    if (_dashboardCache.workers[workId] && (now - _dashboardCache.workers[workId].timestamp < CACHE_TTL)) {
+      return _dashboardCache.workers[workId].data;
     }
-    return (data || []).map(parseWorkerFromDB);
+    const { data, error } = await supabase.from('workers').select('*').eq('work_id', workId).order('name', { ascending: true });
+    if (error) return [];
+    const parsed = (data || []).map(parseWorkerFromDB);
+    _dashboardCache.workers[workId] = { data: parsed, timestamp: now };
+    return parsed;
   },
 
-  async addWorker(worker: Omit<Worker, 'id'>): Promise<Worker | null> {
-    // Supabase is guaranteed to be initialized now
-    const { data: newWorkerData, error: addWorkerError } = await supabase.from('workers').insert({ // Renamed data and error
-      user_id: worker.userId,
-      work_id: worker.workId, // NEW: Include work_id
-      name: worker.name,
-      role: worker.role,
-      phone: worker.phone,
-      daily_rate: worker.dailyRate, // NEW: Include daily_rate
-      notes: worker.notes
+  async addWorker(workerData: Omit<Worker, 'id'>): Promise<Worker> {
+    const { data, error } = await supabase.from('workers').insert({
+      user_id: workerData.userId,
+      work_id: workerData.workId,
+      name: workerData.name,
+      role: workerData.role,
+      phone: workerData.phone,
+      daily_rate: workerData.dailyRate,
+      notes: workerData.notes
     }).select().single();
-    if (addWorkerError) {
-      console.error("Erro ao adicionar profissional:", addWorkerError);
-      throw addWorkerError;
-    }
-    return parseWorkerFromDB(newWorkerData);
+    if (error) throw error;
+    _dashboardCache.workers[workerData.workId] = null; // Invalidate cache
+    return parseWorkerFromDB(data);
   },
 
-  async updateWorker(worker: Worker): Promise<Worker | null> {
-    // Supabase is guaranteed to be initialized now
-    const { data: updatedWorkerData, error: updateWorkerError } = await supabase.from('workers').update({ // Renamed data and error
-      name: worker.name,
-      role: worker.role,
-      phone: worker.phone,
-      daily_rate: worker.dailyRate, // NEW: Include daily_rate
-      notes: worker.notes
-    }).eq('id', worker.id).eq('work_id', worker.workId).select().single(); // NEW: Filter by work_id
-    if (updateWorkerError) {
-      console.error("Erro ao atualizar profissional:", updateWorkerError);
-      throw updateWorkerError;
-    }
-    return parseWorkerFromDB(updatedWorkerData);
+  async updateWorker(workerData: Worker): Promise<Worker> {
+    const { data, error } = await supabase.from('workers').update({
+      name: workerData.name,
+      role: workerData.role,
+      phone: workerData.phone,
+      daily_rate: workerData.dailyRate,
+      notes: workerData.notes
+    }).eq('id', workerData.id).select().single();
+    if (error) throw error;
+    _dashboardCache.workers[workerData.workId] = null; // Invalidate cache
+    return parseWorkerFromDB(data);
   },
 
-  async deleteWorker(workerId: string, workId: string): Promise<void> { // NEW: Accepts workId
-    // Supabase is guaranteed to be initialized now
-    const { error: deleteWorkerError } = await supabase.from('workers').delete().eq('id', workerId).eq('work_id', workId); // NEW: Filter by work_id // Renamed error
-    if (deleteWorkerError) {
-      console.error("Erro ao apagar profissional:", deleteWorkerError);
-      throw deleteWorkerError;
-    }
+  async deleteWorker(workerId: string, workId: string): Promise<void> {
+    const { error } = await supabase.from('workers').delete().eq('id', workerId);
+    if (error) throw error;
+    _dashboardCache.workers[workId] = null; // Invalidate cache
   },
 
   // --- SUPPLIERS ---
-  async getSuppliers(workId: string): Promise<Supplier[]> { // NEW: Accepts workId
-    // Supabase is guaranteed to be initialized now
-    console.log(`[dbService.getSuppliers] Fetching suppliers for work: ${workId}`); // Log para depuração
-    const { data, error: fetchSuppliersError } = await supabase.from('suppliers').select('*').eq('work_id', workId).order('name', { ascending: true }); // NEW: Filter by work_id // Renamed error
-    if (fetchSuppliersError) {
-      console.error(`[dbService.getSuppliers] Erro ao buscar fornecedores para work ${workId}:`, fetchSuppliersError); // Log de erro mais detalhado
-      return [];
+  async getSuppliers(workId: string): Promise<Supplier[]> {
+    const now = Date.now();
+    if (_dashboardCache.suppliers[workId] && (now - _dashboardCache.suppliers[workId].timestamp < CACHE_TTL)) {
+      return _dashboardCache.suppliers[workId].data;
     }
-    return (data || []).map(parseSupplierFromDB);
+    const { data, error } = await supabase.from('suppliers').select('*').eq('work_id', workId).order('name', { ascending: true });
+    if (error) return [];
+    const parsed = (data || []).map(parseSupplierFromDB);
+    _dashboardCache.suppliers[workId] = { data: parsed, timestamp: now };
+    return parsed;
   },
 
-  async addSupplier(supplier: Omit<Supplier, 'id'>): Promise<Supplier | null> {
-    // Supabase is guaranteed to be initialized now
-    const { data: newSupplierData, error: addSupplierError } = await supabase.from('suppliers').insert({ // Renamed data and error
-      user_id: supplier.userId,
-      work_id: supplier.workId, // NEW: Include work_id
-      name: supplier.name,
-      category: supplier.category,
-      phone: supplier.phone,
-      email: supplier.email, // NEW: Include email
-      address: supplier.address, // NEW: Include address
-      notes: supplier.notes
+  async addSupplier(supplierData: Omit<Supplier, 'id'>): Promise<Supplier> {
+    const { data, error } = await supabase.from('suppliers').insert({
+      user_id: supplierData.userId,
+      work_id: supplierData.workId,
+      name: supplierData.name,
+      category: supplierData.category,
+      phone: supplierData.phone,
+      email: supplierData.email,
+      address: supplierData.address,
+      notes: supplierData.notes
     }).select().single();
-    if (addSupplierError) {
-      console.error("Erro ao adicionar fornecedor:", addSupplierError);
-      throw addSupplierError;
-    }
-    return parseSupplierFromDB(newSupplierData);
+    if (error) throw error;
+    _dashboardCache.suppliers[supplierData.workId] = null; // Invalidate cache
+    return parseSupplierFromDB(data);
   },
 
-  async updateSupplier(supplier: Supplier): Promise<Supplier | null> {
-    // Supabase is guaranteed to be initialized now
-    const { data: updatedSupplierData, error: updateSupplierError } = await supabase.from('suppliers').update({ // Renamed data and error
-      name: supplier.name,
-      category: supplier.category,
-      phone: supplier.phone,
-      email: supplier.email, // NEW: Include email
-      address: supplier.address, // NEW: Include address
-      notes: supplier.notes
-    }).eq('id', supplier.id).eq('work_id', supplier.workId).select().single(); // NEW: Filter by work_id
-    if (updateSupplierError) {
-      console.error("Erro ao atualizar fornecedor:", updateSupplierError);
-      throw updateSupplierError;
-    }
-    return parseSupplierFromDB(updatedSupplierData);
+  async updateSupplier(supplierData: Supplier): Promise<Supplier> {
+    const { data, error } = await supabase.from('suppliers').update({
+      name: supplierData.name,
+      category: supplierData.category,
+      phone: supplierData.phone,
+      email: supplierData.email,
+      address: supplierData.address,
+      notes: supplierData.notes
+    }).eq('id', supplierData.id).select().single();
+    if (error) throw error;
+    _dashboardCache.suppliers[supplierData.workId] = null; // Invalidate cache
+    return parseSupplierFromDB(data);
   },
 
-  async deleteSupplier(supplierId: string, workId: string): Promise<void> { // NEW: Accepts workId
-    // Supabase is guaranteed to be initialized now
-    const { error: deleteSupplierError } = await supabase.from('suppliers').delete().eq('id', supplierId).eq('work_id', workId); // NEW: Filter by work_id // Renamed error
-    if (deleteSupplierError) {
-      console.error("Erro ao apagar fornecedor:", deleteSupplierError);
-      throw deleteSupplierError;
-    }
+  async deleteSupplier(supplierId: string, workId: string): Promise<void> {
+    const { error } = await supabase.from('suppliers').delete().eq('id', supplierId);
+    if (error) throw error;
+    _dashboardCache.suppliers[workId] = null; // Invalidate cache
   },
 
   // --- WORK PHOTOS ---
   async getPhotos(workId: string): Promise<WorkPhoto[]> {
-    // Supabase is guaranteed to be initialized now
-    console.log(`[dbService.getPhotos] Fetching photos for work: ${workId}`); // Log para depuração
-    const { data, error: fetchPhotosError } = await supabase.from('work_photos').select('*').eq('work_id', workId).order('date', { ascending: false }); // Renamed error
-    if (fetchPhotosError) {
-      console.error(`[dbService.getPhotos] Erro ao buscar fotos para work ${workId}:`, fetchPhotosError); // Log de erro mais detalhado
-      return [];
+    const now = Date.now();
+    if (_dashboardCache.photos[workId] && (now - _dashboardCache.photos[workId].timestamp < CACHE_TTL)) {
+      return _dashboardCache.photos[workId].data;
     }
-    return (data || []).map(parsePhotoFromDB);
+    const { data, error } = await supabase.from('work_photos').select('*').eq('work_id', workId).order('date', { ascending: false });
+    if (error) return [];
+    const parsed = (data || []).map(parsePhotoFromDB);
+    _dashboardCache.photos[workId] = { data: parsed, timestamp: now };
+    return parsed;
   },
 
-  async addPhoto(photo: Omit<WorkPhoto, 'id'>): Promise<WorkPhoto | null> {
-    // Supabase is guaranteed to be initialized now
-    const { data: newPhotoData, error: addPhotoError } = await supabase.from('work_photos').insert({ // Renamed data and error
-      work_id: photo.workId,
-      url: photo.url,
-      description: photo.description,
-      date: photo.date,
-      type: photo.type
+  async addPhoto(photoData: Omit<WorkPhoto, 'id'>): Promise<WorkPhoto> {
+    const { data, error } = await supabase.from('work_photos').insert({
+      work_id: photoData.workId,
+      url: photoData.url,
+      description: photoData.description,
+      date: photoData.date,
+      type: photoData.type
     }).select().single();
-    if (addPhotoError) {
-      console.error("Erro ao adicionar foto:", addPhotoError);
-      throw addPhotoError;
-    }
-    return parsePhotoFromDB(newPhotoData);
+    if (error) throw error;
+    _dashboardCache.photos[photoData.workId] = null; // Invalidate cache
+    return parsePhotoFromDB(data);
   },
 
   async deletePhoto(photoId: string): Promise<void> {
-    // Supabase is guaranteed to be initialized now
-    const { data: deletedPhoto, error: deletePhotoError } = await supabase.from('work_photos').delete().eq('id', photoId).select('work_id').single();
-    if (deletePhotoError) {
-      console.error("Erro ao apagar foto:", deletePhotoError);
-      throw deletePhotoError;
+    const { data: deletedPhoto, error } = await supabase.from('work_photos').delete().eq('id', photoId).select().single();
+    if (error) throw error;
+    if (deletedPhoto) {
+      _dashboardCache.photos[deletedPhoto.work_id] = null; // Invalidate cache
     }
-    // Optionally invalidate cache if `work_id` is returned and cache relies on photo counts
-    // For now, no specific photo cache, so just ensure deletion.
   },
 
   // --- WORK FILES ---
   async getFiles(workId: string): Promise<WorkFile[]> {
-    // Supabase is guaranteed to be initialized now
-    console.log(`[dbService.getFiles] Fetching files for work: ${workId}`); // Log para depuração
-    const { data, error: fetchFilesError } = await supabase.from('work_files').select('*').eq('work_id', workId).order('date', { ascending: false }); // Renamed error
-    if (fetchFilesError) {
-      console.error(`[dbService.getFiles] Erro ao buscar arquivos para work ${workId}:`, fetchFilesError); // Log de erro mais detalhado
-      return [];
+    const now = Date.now();
+    if (_dashboardCache.files[workId] && (now - _dashboardCache.files[workId].timestamp < CACHE_TTL)) {
+      return _dashboardCache.files[workId].data;
     }
-    return (data || []).map(parseFileFromDB);
+    const { data, error } = await supabase.from('work_files').select('*').eq('work_id', workId).order('date', { ascending: false });
+    if (error) return [];
+    const parsed = (data || []).map(parseFileFromDB);
+    _dashboardCache.files[workId] = { data: parsed, timestamp: now };
+    return parsed;
   },
 
-  async addFile(file: Omit<WorkFile, 'id'>): Promise<WorkFile | null> {
-    // Supabase is guaranteed to be initialized now
-    const { data: newFileData, error: addFileError } = await supabase.from('work_files').insert({ // Renamed data and error
-      work_id: file.workId,
-      name: file.name,
-      category: file.category,
-      url: file.url,
-      type: file.type,
-      date: file.date
+  async addFile(fileData: Omit<WorkFile, 'id'>): Promise<WorkFile> {
+    const { data, error } = await supabase.from('work_files').insert({
+      work_id: fileData.workId,
+      name: fileData.name,
+      category: fileData.category,
+      url: fileData.url,
+      type: fileData.type,
+      date: fileData.date
     }).select().single();
-    if (addFileError) {
-      console.error("Erro ao adicionar arquivo:", addFileError);
-      throw addFileError;
-    }
-    return parseFileFromDB(newFileData);
+    if (error) throw error;
+    _dashboardCache.files[fileData.workId] = null; // Invalidate cache
+    return parseFileFromDB(data);
   },
 
   async deleteFile(fileId: string): Promise<void> {
-    // Supabase is guaranteed to be initialized now
-    const { data: deletedFile, error: deleteFileError } = await supabase.from('work_files').delete().eq('id', fileId).select('work_id').single();
-    if (deleteFileError) {
-      console.error("Erro ao apagar arquivo:", deleteFileError);
-      throw deleteFileError;
+    const { data: deletedFile, error } = await supabase.from('work_files').delete().eq('id', fileId).select().single();
+    if (error) throw error;
+    if (deletedFile) {
+      _dashboardCache.files[deletedFile.work_id] = null; // Invalidate cache
     }
-    // Optionally invalidate cache if `work_id` is returned and cache relies on file counts
-    // For now, no specific file cache, so just ensure deletion.
   },
 
-  // --- NOTIFICATIONS ---
+  // --- CONTRACTS ---
+  async getContractTemplates(): Promise<Contract[]> {
+    // This uses a static list of templates, no DB fetching needed.
+    // However, we cache it for consistency with other `get` methods.
+    const now = Date.now();
+    if (_dashboardCache.contracts && (now - _dashboardCache.contracts.timestamp < CACHE_TTL)) {
+      return _dashboardCache.contracts.data;
+    }
+    // Deep copy to prevent accidental modification of the standard templates
+    const templates = CONTRACT_TEMPLATES.map(template => parseContractFromDB(template)); // Parse the mock data
+    _dashboardCache.contracts = { data: templates, timestamp: now };
+    return templates;
+  },
+
+  // --- CHECKLISTS ---
+  async getChecklists(workId: string): Promise<Checklist[]> {
+    const now = Date.now();
+    if (_dashboardCache.checklists[workId] && (now - _dashboardCache.checklists[workId].timestamp < CACHE_TTL)) {
+      return _dashboardCache.checklists[workId].data;
+    }
+    const { data, error } = await supabase.from('checklists').select('*').eq('work_id', workId).order('name', { ascending: true });
+    if (error) return [];
+    const parsed = (data || []).map(parseChecklistFromDB);
+    _dashboardCache.checklists[workId] = { data: parsed, timestamp: now };
+    return parsed;
+  },
+
+  async addChecklist(checklistData: Omit<Checklist, 'id'>): Promise<Checklist> {
+    const { data, error } = await supabase.from('checklists').insert({
+      work_id: checklistData.workId,
+      name: checklistData.name,
+      category: checklistData.category,
+      items: checklistData.items // Direct insert of JSON array
+    }).select().single();
+    if (error) throw error;
+    _dashboardCache.checklists[checklistData.workId] = null; // Invalidate cache
+    return parseChecklistFromDB(data);
+  },
+
+  async updateChecklist(checklistData: Checklist): Promise<Checklist> {
+    const { data, error } = await supabase.from('checklists').update({
+      name: checklistData.name,
+      category: checklistData.category,
+      items: checklistData.items
+    }).eq('id', checklistData.id).select().single();
+    if (error) throw error;
+    _dashboardCache.checklists[checklistData.workId] = null; // Invalidate cache
+    return parseChecklistFromDB(data);
+  },
+
+  async deleteChecklist(checklistId: string): Promise<void> {
+    const { data: deletedChecklist, error } = await supabase.from('checklists').delete().eq('id', checklistId).select().single();
+    if (error) throw error;
+    if (deletedChecklist) {
+      _dashboardCache.checklists[deletedChecklist.work_id] = null; // Invalidate cache
+    }
+  },
+
+  // --- NOTIFICATIONS & PUSH SUBSCRIPTIONS ---
   async getNotifications(userId: string): Promise<DBNotification[]> {
-    // Supabase is guaranteed to be initialized now
-    
+    const now = Date.now();
+    // For the main notifications page, we fetch all notifications, not just unread.
+    // The filter for 'unread' is handled by the UI component itself.
+    // For consistency with AuthContext, we use 'notifications' cache, but for count it's different.
+    // Let's create a separate cache key or always re-fetch for the actual page.
+    // For now, disabling cache for full list for simplicity, AuthContext will use its own filtered cached version.
+
+    const { data, error } = await supabase
+      .from('notifications')
+      .select('*')
+      .eq('user_id', userId)
+      .order('date', { ascending: false });
+
+    if (error) {
+      console.error("Erro ao buscar notificações não lidas:", error);
+      return [];
+    }
+    const parsed = (data || []).map(parseNotificationFromDB);
+    // This cache is specifically for the UNREAD count in AuthContext.
+    // For the full list on the Notifications page, we just return the fetched data.
+    return parsed;
+  },
+  
+  // Method to get UNREAD notifications for the count in AuthContext, with caching.
+  async getUnreadNotifications(userId: string): Promise<DBNotification[]> {
     const now = Date.now();
     if (_dashboardCache.notifications && (now - _dashboardCache.notifications.timestamp < CACHE_TTL)) {
         return _dashboardCache.notifications.data;
     }
 
-    console.log(`[dbService.getNotifications] Fetching notifications for user: ${userId}`); // Log para depuração
-    const { data, error: fetchNotificationsError } = await supabase.from('notifications') // Renamed error
+    const { data, error } = await supabase
+      .from('notifications')
       .select('*')
       .eq('user_id', userId)
-      .eq('read', false)
+      .eq('read', false) // Only fetch unread for the dashboard count
       .order('date', { ascending: false });
 
-    if (fetchNotificationsError) {
-      console.error(`[dbService.getNotifications] Erro ao buscar notificações para user ${userId}:`, fetchNotificationsError); // Log de erro mais detalhado
+    if (error) {
+      console.error("Erro ao buscar notificações não lidas para o contador:", error);
       return [];
     }
     const parsed = (data || []).map(parseNotificationFromDB);
     _dashboardCache.notifications = { data: parsed, timestamp: now };
     return parsed;
   },
-  
-  // NEW: getExistingNotificationByTag for client-side
-  async getExistingNotificationByTag(userId: string, workId: string | undefined, tag: string): Promise<DBNotification | null> {
-      const query = supabase
-          .from('notifications')
-          .select('*')
-          .eq('user_id', userId)
-          .eq('tag', tag)
-          .eq('read', false);
 
-      // Only add work_id filter if it's provided
-      if (workId) {
-          query.eq('work_id', workId);
-      }
+  async savePushSubscription(userId: string, subscription: PushSubscriptionJSON): Promise<void> {
+    // Check if subscription already exists for this endpoint
+    const { data: existingSubscription, error: fetchError } = await supabase
+      .from('user_subscriptions')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('endpoint', subscription.endpoint)
+      .maybeSingle();
 
-      const { data, error } = await query.maybeSingle();
-
-      if (error) {
-          console.error(`Error checking existing notification for tag ${tag}:`, error);
-          return null;
-      }
-      return data ? parseNotificationFromDB(data) : null;
-  },
-
-  async addNotification(notification: Omit<DBNotification, 'id'>): Promise<DBNotification | null> {
-    // Supabase is guaranteed to be initialized now
-    const { data: newNotificationData, error: addNotificationError } = await supabase.from('notifications').insert({ // Renamed data and error
-      user_id: notification.userId,
-      work_id: notification.workId, // NEW: Include work_id
-      title: notification.title,
-      message: notification.message,
-      date: notification.date,
-      read: notification.read,
-      type: notification.type,
-      tag: notification.tag // NEW: Save the tag to DB
-    }).select().single();
-    if (addNotificationError) {
-      console.error("Erro ao adicionar notificação:", addNotificationError.message, addNotificationError.details, addNotificationError.code, "Full Error Object:", addNotificationError); // Log more details
-      throw addNotificationError;
+    if (fetchError) {
+      console.error("Error checking existing subscription:", fetchError);
+      throw fetchError;
     }
-    _dashboardCache.notifications = null; // Invalidate cache
-    return parseNotificationFromDB(newNotificationData);
+
+    if (existingSubscription) {
+      console.log("Subscription already exists for this user and endpoint.");
+      return; // No need to save again
+    }
+
+    // If not existing, insert new subscription
+    const { error } = await supabase
+      .from('user_subscriptions')
+      .insert({
+        user_id: userId,
+        subscription: subscription,
+        endpoint: subscription.endpoint,
+      });
+
+    if (error) {
+      console.error("Error saving push subscription:", error);
+      throw error;
+    }
+    console.log("Push subscription saved successfully.");
   },
 
   async dismissNotification(notificationId: string): Promise<void> {
-    // Supabase is guaranteed to be initialized now
-    const { error: dismissNotificationError } = await supabase.from('notifications') // Renamed error
+    const { data: updatedNotification, error } = await supabase
+      .from('notifications')
       .update({ read: true })
-      .eq('id', notificationId);
-    if (dismissNotificationError) {
-      console.error("Erro ao dispensar notificação:", dismissNotificationError);
-      throw dismissNotificationError;
+      .eq('id', notificationId)
+      .select().single();
+    if (error) throw error;
+    if (updatedNotification) {
+      _dashboardCache.notifications = null; // Invalidate global notification cache for unread count
     }
-    _dashboardCache.notifications = null; // Invalidate cache
   },
 
   async clearAllNotifications(userId: string): Promise<void> {
-    // Supabase is guaranteed to be initialized now
-    const { error: clearNotificationsError } = await supabase.from('notifications') // Renamed error
+    const { error } = await supabase
+      .from('notifications')
       .update({ read: true })
-      .eq('user_id', userId);
-    if (clearNotificationsError) {
-      console.error("Erro ao limpar notificações:", clearNotificationsError);
-      throw clearNotificationsError;
-    }
-    _dashboardCache.notifications = null; // Invalidate cache
-  },
-
-  // --- DASHBOARD STATS ---
-  async calculateWorkStats(workId: string): Promise<{ totalSpent: number, progress: number, delayedSteps: number }> {
-    // Supabase is guaranteed to be initialized now
-
-    const now = Date.now();
-    if (_dashboardCache.stats[workId] && (now - _dashboardCache.stats[workId].timestamp < CACHE_TTL)) {
-        return _dashboardCache.stats[workId].data;
-    }
-
-    console.log(`[dbService.calculateWorkStats] Fetching stats for work: ${workId}`); // Log para depuração
-    const [expensesResult, stepsResult, workResult] = await Promise.all([
-      supabase.from('expenses').select('amount').eq('work_id', workId),
-      supabase.from('steps').select('id, status, end_date').eq('work_id', workId),
-      supabase.from('works').select('budget_planned').eq('id', workId).single()
-    ]);
-
-    if (expensesResult.error || stepsResult.error || workResult.error) {
-      console.error(`[dbService.calculateWorkStats] Erro ao calcular stats para work ${workId}:`, expensesResult.error || stepsResult.error || workResult.error); // Log de erro mais detalhado
-      return { totalSpent: 0, progress: 0, delayedSteps: 0 };
-    }
-
-    const totalSpent = expensesResult.data.reduce((sum, e) => sum + Number(e.amount), 0);
-    const totalSteps = stepsResult.data.length;
-    const completedSteps = stepsResult.data.filter(s => s.status === 'CONCLUIDO').length;
-    
-    const today = new Date().toISOString().split('T')[0];
-    const delayedSteps = stepsResult.data.filter(s => s.status !== 'CONCLUIDO' && s.end_date < today).length;
-
-    const progress = totalSteps > 0 ? Math.round((completedSteps / totalSteps) * 100) : 0;
-
-    const stats = { totalSpent, progress, delayedSteps };
-    _dashboardCache.stats[workId] = { data: stats, timestamp: now };
-    return stats;
-  },
-
-  async getDailySummary(workId: string): Promise<{ completedSteps: number, delayedSteps: number, pendingMaterials: number, totalSteps: number }> {
-    // Supabase is guaranteed to be initialized now
-
-    // Fix: Changed Date.Now() to Date.now()
-    const now = Date.now();
-    if (_dashboardCache.summary[workId] && (now - _dashboardCache.summary[workId].timestamp < CACHE_TTL)) {
-        return _dashboardCache.summary[workId].data;
-    }
-
-    console.log(`[dbService.getDailySummary] Fetching summary for work: ${workId}`); // Log para depuração
-    const [stepsResult, materialsResult] = await Promise.all([
-      supabase.from('steps').select('id, status, end_date').eq('work_id', workId),
-      supabase.from('materials').select('id, planned_qty, purchased_qty, step_id, name') // Fetch name and step_id
-    ]);
-
-    if (stepsResult.error || materialsResult.error) {
-      console.error(`[dbService.getDailySummary] Erro ao buscar summary para work ${workId}:`, stepsResult.error || materialsResult.error); // Log de erro mais detalhado
-      return { completedSteps: 0, delayedSteps: 0, pendingMaterials: 0, totalSteps: 0 };
-    }
-
-    const totalSteps = stepsResult.data.length;
-    const completedSteps = stepsResult.data.filter(s => s.status === 'CONCLUIDO').length;
-    
-    const today = new Date().toISOString().split('T')[0];
-    const delayedSteps = stepsResult.data.filter(s => s.status !== 'CONCLUIDO' && s.end_date < today).length;
-
-    const pendingMaterials = materialsResult.data.filter(m => m.purchased_qty < m.planned_qty).length;
-
-    const summary = { completedSteps, delayedSteps, pendingMaterials, totalSteps };
-    _dashboardCache.summary[workId] = { data: summary, timestamp: now };
-    return summary;
-  },
-
-  // generateSmartNotifications logic MOVED TO SERVERLESS FUNCTION api/send-daily-notifications.js
-
-
-  // --- NEW: PWA Push Notification Management ---
-  async getPushSubscription(userId: string): Promise<PushSubscriptionInfo | null> {
-    const { data: subscriptionData, error: fetchSubscriptionError } = await supabase // Renamed data and error
-      .from('user_subscriptions')
-      .select('subscription') // Select only subscription data
       .eq('user_id', userId)
-      .single();
-
-    if (fetchSubscriptionError && fetchSubscriptionError.code !== 'PGRST116') { // PGRST116 = no rows found
-      console.error("Erro ao buscar PushSubscription:", fetchSubscriptionError);
-      return null;
-    }
-    // FIX: Parse subscription data correctly to PushSubscriptionInfo
-    return subscriptionData ? { id: 'ignored', userId: userId, subscription: subscriptionData.subscription as PushSubscriptionJSON, endpoint: (subscriptionData.subscription as PushSubscriptionJSON).endpoint } : null;
+      .eq('read', false); // Only update unread ones
+    if (error) throw error;
+    _dashboardCache.notifications = null; // Invalidate global notification cache for unread count
   },
-
-  async savePushSubscription(userId: string, subscription: PushSubscriptionJSON): Promise<void> {
-    // Chamada para o endpoint serverless que salvará a subscription no Supabase.
-    // Isso evita expor a chave VAPID_PUBLIC_KEY no cliente para fins de subscribe.
-    try {
-        const response = await fetch('/api/subscribe-push', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ userId, subscription }),
-        });
-
-        if (!response.ok) {
-            let errorData = { error: 'Unknown error', message: 'Failed to parse error response' };
-            try {
-                errorData = await response.json();
-            } catch (e: any) { // Explicitly type e as any
-                const textError = await response.text();
-                errorData.message = textError; // Fallback to raw text
-            }
-            throw new Error(errorData.error || errorData.message || 'Falha ao salvar a assinatura de push.');
-        }
-        console.log("PushSubscription salva com sucesso!");
-    } catch (error: any) {
-        console.error("Erro ao salvar PushSubscription:", error);
-        throw error;
-    }
-  },
-
-  async deletePushSubscription(userId: string, endpoint: string): Promise<void> {
-    try {
-        const response = await fetch('/api/subscribe-push', {
-            method: 'DELETE',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ userId, endpoint }),
-        });
-
-        if (!response.ok) {
-            let errorData = { error: 'Unknown error', message: 'Failed to parse error response' };
-            try {
-                errorData = await response.json();
-            } catch (e: any) { // Explicitly type e as any
-                const textError = await response.text();
-                errorData.message = textError; // Fallback to raw text
-            }
-            throw new Error(errorData.error || errorData.message || 'Falha ao remover a assinatura de push.');
-        }
-        console.log("PushSubscription removida com sucesso!");
-    } catch (error: any) {
-        console.error("Erro ao remover PushSubscription:", error);
-        throw error;
-    }
-  },
-
-  // REMOVED: This function is now handled server-side in api/send-event-notification.js
-  // async sendPushNotification(userId: string, notificationPayload: { title: string, body: string, url?: string, tag?: string }): Promise<void> {
-  //   const APP_URL = process.env.VITE_APP_URL || window.location.origin; // Fallback to window.location.origin
-
-  //   try {
-  //       const response = await fetch('/api/send-event-notification', {
-  //           method: 'POST',
-  //           headers: {
-  //               'Content-Type': 'application/json',
-  //           },
-  //           body: JSON.stringify({ userId, ...notificationPayload, url: notificationPayload.url || APP_URL }), // Ensure URL is passed to server
-  //       });
-
-  //       if (!response.ok) {
-  //           let errorData = { error: 'Unknown error', message: 'Failed to parse error response' };
-  //           // Adicionado log do rawText para melhor diagnóstico
-  //           const textResponse = await response.text(); 
-  //           try {
-  //               errorData = JSON.parse(textResponse); // Tentar parsear o texto se for JSON
-  //           } catch (e: any) { // Explicitly type e as any
-  //               errorData.message = `API returned non-JSON or unparseable text: "${textResponse}"`; // Fallback to raw text
-  //           }
-  //           throw new Error(errorData.error || errorData.message || 'Falha ao enviar push notification de evento.');
-  //       }
-  //       console.log("Push notification de evento enviada para o usuário:", userId);
-  //   } catch (error: any) {
-  //       console.error("Erro ao enviar push notification de evento:", error);
-  //       // Não relança o erro, pois a falha na notificação não deve impedir a funcionalidade principal
-  //   }
-  // },
-
-  // --- NEW: CONTRACTS (MOCK/TEMPLATE) ---
-  async getContractTemplates(): Promise<Contract[]> {
-    // In a real app, this would fetch from a 'contracts' table in Supabase
-    // For now, it returns the static templates from standards.ts
-    await new Promise(r => setTimeout(r, 200)); // Simulate API call
-    return CONTRACT_TEMPLATES;
-  },
-
-  // --- NEW: CHECKLISTS (MOCK/LOCAL DB) ---
-  async getChecklists(workId: string, category?: string): Promise<Checklist[]> {
-    // In a real app, this would fetch from a 'checklists' table in Supabase
-    // For now, it returns the static templates from standards.ts and filters them
-    await new Promise(r => setTimeout(r, 200)); // Simulate API call
-    // Filter by workId (mocked) and category
-    const filtered = CHECKLIST_TEMPLATES.filter(c => 
-        (c.workId === 'mock-work-id' || c.workId === workId) && // Allow general mock or specific work
-        (!category || category === 'all' || c.category === category)
-    );
-    // Simulate deep copy to prevent direct state mutation
-    return filtered.map(c => ({
-      ...c,
-      items: c.items.map(item => ({...item}))
-    }));
-  },
-
-  async addChecklist(checklist: Omit<Checklist, 'id'>): Promise<Checklist> {
-    await new Promise(r => setTimeout(r, 200)); // Simulate API call
-    const newId = `ckl-${Date.now()}`;
-    // FIX: Explicitly type newChecklist as Checklist to ensure stricter type checking.
-    const newChecklist: Checklist = { ...checklist, id: newId }; 
-    CHECKLIST_TEMPLATES.push(newChecklist); // Add to mock DB
-    return newChecklist;
-  },
-
-  async updateChecklist(checklist: Checklist): Promise<Checklist> {
-    await new Promise(r => setTimeout(r, 200)); // Simulate API call
-    const index = CHECKLIST_TEMPLATES.findIndex(c => c.id === checklist.id);
-    if (index !== -1) {
-      CHECKLIST_TEMPLATES[index] = checklist; // Update mock DB
-    }
-    return checklist;
-  },
-
-  async deleteChecklist(checklistId: string): Promise<void> {
-    await new Promise(r => setTimeout(r, 200)); // Simulate API call
-    const index = CHECKLIST_TEMPLATES.findIndex(c => c.id === checklistId);
-    if (index !== -1) {
-      CHECKLIST_TEMPLATES.splice(index, 1); // Delete from mock DB
-    }
-  }
-
 };

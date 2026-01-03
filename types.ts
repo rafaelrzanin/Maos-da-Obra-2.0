@@ -113,6 +113,7 @@ export interface Material {
   unit: string;
   stepId?: string; 
   category?: string; 
+  totalCost?: number; // NEW: Added for tracking total cost of material
 }
 
 export interface StandardMaterial {
@@ -173,7 +174,7 @@ export interface Checklist {
   workId: string; // NEW: Associate checklist with a work
   name: string; // Ex: "Fundações - Pré-Concretagem"
   category: string; // Ex: "Fundações", "Elétrica"
-  items: ChecklistItem[];
+  items: ChecklistItem[]; // NEW: Defined items as an array of ChecklistItem
 }
 
 export interface Contract { // Changed ContractTemplate to Contract

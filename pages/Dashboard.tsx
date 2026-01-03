@@ -265,11 +265,11 @@ const MaterialsNeeded = ({
       const [yearS, monthS, dayS] = linkedStep.startDate.split('-').map(Number);
       const stepStartDate = new Date(yearS, monthS - 1, dayS, 0, 0, 0, 0);
 
-      // Rule 1: Step starts in up to 3 days (inclusive)
+      // Rule 1: Step starts today or in up to 3 days (inclusive)
       const isUpcoming = stepStartDate >= today && stepStartDate <= threeDaysFromNow;
 
       // Rule 2: Step has already started (or is today) AND material is pending/partial
-      const hasStartedAndPending = stepStartDate <= today && mat.purchasedQty < mat.plannedQty;
+      const hasStartedAndPending = stepStartDate <= today && linkedStep.status !== StepStatus.COMPLETED && mat.purchasedQty < mat.plannedQty;
       
       return isUpcoming || hasStartedAndPending;
     });
@@ -348,8 +348,9 @@ const Dashboard = () => {
   const [focusWork, setFocusWork] = useState<Work | null>(null);
   const [stats, setStats] = useState<{ totalSpent: number, progress: number, delayedSteps: number } | null>(null);
   const [dailySummary, setDailySummary] = useState<{ completedSteps: number, delayedSteps: number, pendingMaterials: number, totalSteps: number } | null>(null);
-  const [materials, setMaterials] = useState<Material[]>([]);
+  // REMOVIDO: const [materials, setMaterials] = useState<Material[]>([]);
   const [steps, setSteps] = useState<Step[]>([]); 
+  const [materialsForNextSteps, setMaterialsForNextSteps] = useState<Material[]>([]); // NEW: Only fetch relevant materials for the NextSteps component
   // REMOVIDO: expenses state and chartData useMemo as per request.
 
   const [zeTip, setZeTip] = useState<ZeTip | null>(null);
@@ -388,20 +389,21 @@ const Dashboard = () => {
         setFocusWork(primaryWork);
 
         const [workStats, summary, materialsList, stepsList] = await Promise.all([
+          // NEW: dbService methods
           dbService.calculateWorkStats(primaryWork.id),
           dbService.getDailySummary(primaryWork.id),
-          dbService.getMaterials(primaryWork.id),
+          dbService.getMaterials(primaryWork.id), // Ensure materials are still fetched for MaterialsNeeded component
           dbService.getSteps(primaryWork.id),
         ]);
         setStats(workStats);
         setDailySummary(summary);
-        setMaterials(materialsList);
+        setMaterialsForNextSteps(materialsList); // Use a new state for materials specific to these components
         setSteps(stepsList);
       } else {
         setFocusWork(null);
         setStats(null);
         setDailySummary(null);
-        setMaterials([]);
+        setMaterialsForNextSteps([]);
         setSteps([]);
       }
       // setZeTip(getRandomZeTip()); // Removed here to be in its own useEffect
@@ -684,9 +686,9 @@ const Dashboard = () => {
       )}
 
       {/* NEW: Materials Needed for Purchase (Intelligent) */}
-      {focusWork && materials && steps && (
+      {focusWork && materialsForNextSteps && steps && (
         <div className="mb-8 mx-2 sm:mx-0">
-          <MaterialsNeeded focusWork={focusWork} materials={materials} steps={steps} onOpenWork={() => handleOpenWorkDetail(focusWork.id)} />
+          <MaterialsNeeded focusWork={focusWork} materials={materialsForNextSteps} steps={steps} onOpenWork={() => handleOpenWorkDetail(focusWork.id)} />
         </div>
       )}
 
