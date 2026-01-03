@@ -1,5 +1,4 @@
 
-
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import * as ReactRouter from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.tsx';
@@ -354,8 +353,8 @@ const Dashboard = () => {
   // REMOVIDO: expenses state and chartData useMemo as per request.
 
   const [zeTip, setZeTip] = useState<ZeTip | null>(null);
-  // NEW: State to track if the current tip has been dismissed by the user in this session.
-  const [hasDismissedCurrentTip, setHasDismissedCurrentTip] = useState(false);
+  // NEW: Ref to track if the current tip has been dismissed by the user in this session.
+  const hasDismissedTipRef = useRef(false);
 
   // General Purpose Modal for Delete Confirmation
   const [zeModal, setZeModal] = useState<ZeModalProps & { id?: string, isConfirming?: boolean }>({
@@ -371,8 +370,8 @@ const Dashboard = () => {
     console.log("[Dashboard] loadDashboardData: Fetching data from DB...");
 
     setLoading(true);
-    // NEW: Reset hasDismissedCurrentTip on new data load (implies fresh view)
-    setHasDismissedCurrentTip(false); 
+    // NEW: Reset hasDismissedTipRef on new data load (implies fresh view)
+    hasDismissedTipRef.current = false; 
     try {
       const fetchedWorks = await dbService.getWorks(user.id);
       setWorks(fetchedWorks);
@@ -431,10 +430,10 @@ const Dashboard = () => {
   // NEW: Effect to manage Zé Tip independently
   useEffect(() => {
     // Only set a new tip if auth is finished, user exists, no tip is currently displayed, AND the user hasn't just dismissed the current tip.
-    if (isUserAuthFinished && user && !zeTip && !hasDismissedCurrentTip) {
+    if (isUserAuthFinished && user && !zeTip && !hasDismissedTipRef.current) {
       setZeTip(getRandomZeTip());
     }
-  }, [isUserAuthFinished, user, zeTip, hasDismissedCurrentTip]);
+  }, [isUserAuthFinished, user, zeTip]);
 
 
   const handleWorkSelect = async (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -554,7 +553,7 @@ const Dashboard = () => {
               <button 
                 onClick={() => {
                   setZeTip(null); // Make the card disappear
-                  setHasDismissedCurrentTip(true); // Mark that user dismissed it
+                  hasDismissedTipRef.current = true; // Mark that user dismissed it (using ref)
                 }} 
                 className="text-slate-400 hover:text-primary dark:hover:text-white transition-colors p-1 -mt-2 -mr-2"
                 aria-label="Dispensar dica"
