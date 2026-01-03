@@ -196,14 +196,14 @@ const WorkDetail = () => {
   const [workers, setWorkers] = useState<Worker[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [photos, setPhotos] = useState<WorkPhoto[]>([]);
-  const [files, setFiles] = useState<WorkFile[]>([]); // CORRECTED SYNTAX: Removed extra parentheses
-  const [contracts, setContracts] = useState<Contract[]>([]); // NEW: Contracts
-  const [checklists, setChecklists] = useState<Checklist[]>([]); // NEW: Checklists
+  const [files, setFiles] = useState<WorkFile[]>([]); 
+  const [contracts, setContracts] = useState<Contract[]>([]); 
+  const [checklists, setChecklists] = useState<Checklist[]>([]); 
 
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<MainTab>('ETAPAS');
   const [activeSubView, setActiveSubView] = useState<SubView>('NONE'); 
-  const [reportSubTab, setReportSubTab] = useState<ReportSubTab>('CRONOGRAMA'); // NEW: For reports sub-tabs
+  const [reportSubTab, setReportSubTab] = useState<ReportSubTab>('CRONOGRAMA'); 
   
   // States for Material Filter
   const [materialFilterStepId, setMaterialFilterStepId] = useState('all');
@@ -232,12 +232,12 @@ const WorkDetail = () => {
   const [newExpenseAmount, setNewExpenseAmount] = useState('');
   const [newExpenseCategory, setNewExpenseCategory] = useState<ExpenseCategory | string>(ExpenseCategory.OTHER);
   const [newExpenseDate, setNewExpenseDate] = useState(new Date().toISOString().split('T')[0]);
-  const [newExpenseStepId, setNewExpenseStepId] = useState(''); // Added stepId to expense
+  const [newExpenseStepId, setNewExpenseStepId] = useState(''); 
   const [editExpenseData, setEditExpenseData] = useState<Expense | null>(null);
-  const [showAddPaymentModal, setShowAddPaymentModal] = useState(false); // NEW: For partial payments
-  const [paymentExpenseData, setPaymentExpenseData] = useState<Expense | null>(null); // NEW
-  const [paymentAmount, setPaymentAmount] = useState(''); // NEW
-  const [paymentDate, setNewPaymentDate] = useState(new Date().toISOString().split('T')[0]); // NEW - Renamed for clarity in modal, used for form
+  const [showAddPaymentModal, setShowAddPaymentModal] = useState(false); 
+  const [paymentExpenseData, setPaymentExpenseData] = useState<Expense | null>(null); 
+  const [paymentAmount, setPaymentAmount] = useState(''); 
+  const [paymentDate, setNewPaymentDate] = useState(new Date().toISOString().split('T')[0]); 
 
   // RESTORED states for Worker, Supplier, Photo, File, Checklist modals
   const [showAddWorkerModal, setShowAddWorkerModal] = useState(false);
@@ -269,7 +269,7 @@ const WorkDetail = () => {
   const [newUploadFile, setNewUploadFile] = useState<File | null>(null);
   const [uploadingFile, setUploadingFile] = useState(false);
 
-  const [showAddChecklistModal, setShowAddChecklistModal] = useState(false); // NEW: Checklist modal state
+  const [showAddChecklistModal, setShowAddChecklistModal] = useState(false); 
   const [newChecklistName, setNewChecklistName] = useState('');
   const [newChecklistCategory, setNewChecklistCategory] = useState('');
   const [newChecklistItems, setNewChecklistItems] = useState<string[]>(['']);
@@ -279,10 +279,10 @@ const WorkDetail = () => {
     isOpen: false, title: '', message: '', onCancel: () => { }, isConfirming: false
   });
 
-  const [activeZeSuggestion, setActiveZeSuggestion] = useState<ZeSuggestion | null>(null); // NEW: State for active Zé suggestion
-  const [loadingAiMessage, setLoadingAiMessage] = useState(false); // NEW: Loading state for AI message generation
+  const [activeZeSuggestion, setActiveZeSuggestion] = useState<ZeSuggestion | null>(null); 
+  const [loadingAiMessage, setLoadingAiMessage] = useState(false); 
 
-  const seenSuggestionsRef = React.useRef<Set<string>>(new Set()); // Store seen suggestions for current session
+  const seenSuggestionsRef = React.useRef<Set<string>>(new Set()); 
   
   // =======================================================================
   // AUXILIARY FUNCTIONS
@@ -290,14 +290,14 @@ const WorkDetail = () => {
 
   const goToTab = (tab: MainTab) => {
     setActiveTab(tab);
-    setActiveSubView('NONE'); // Reset sub-view on main tab change
-    setMaterialFilterStepId('all'); // Reset material filter
+    setActiveSubView('NONE'); 
+    setMaterialFilterStepId('all'); 
   };
 
   const goToSubView = (subView: SubView) => {
     setActiveSubView(subView);
     if (subView === 'REPORTS') {
-      setReportSubTab('CRONOGRAMA'); // Default to Cronograma when opening reports
+      setReportSubTab('CRONOGRAMA'); 
     }
   };
 
@@ -364,7 +364,7 @@ const WorkDetail = () => {
 
     // Create sorted array of groups
     const expenseGroups: ExpenseStepGroup[] = [];
-    // const stepNamesMap = new Map(steps.map(s => [s.id, s.name])); // Removed as not directly used
+    // const stepNamesMap = new Map(steps.map(s => [s.id, s.name])); 
 
     // Add expenses linked to steps, in step order
     steps.forEach(step => {
@@ -406,8 +406,8 @@ const WorkDetail = () => {
     const currentSeen = getSeenSuggestions();
     currentSeen.add(tag);
     sessionStorage.setItem(`ze_suggestions_seen_${user.id}_${workId}`, JSON.stringify(Array.from(currentSeen)));
-    seenSuggestionsRef.current = currentSeen; // Update ref immediately
-    setActiveZeSuggestion(null); // Dismiss current suggestion
+    seenSuggestionsRef.current = currentSeen; 
+    setActiveZeSuggestion(null); 
   }, [workId, user, getSeenSuggestions]);
 
   const generateZeSuggestion = useCallback(async () => {
@@ -1607,7 +1607,7 @@ const WorkDetail = () => {
         items: newChecklistItems.filter(item => item.trim() !== '').map(text => ({ id: crypto.randomUUID(), text, checked: false }))
       };
       // NEW: Call dbService.addChecklist
-      const newChecklist = await dbService.addChecklist(checklistToSave); // Mocked service
+      const newChecklist = await dbService.addChecklist(checklistToSave); 
       if (newChecklist) {
         await loadWorkData();
         clearChecklistFormAndCloseModal();
@@ -1638,7 +1638,7 @@ const WorkDetail = () => {
         items: editChecklistData.items.filter(item => item.text.trim() !== '')
       };
       // NEW: Call dbService.updateChecklist
-      const updatedChecklist = await dbService.updateChecklist(checklistToUpdate); // Mocked service
+      const updatedChecklist = await dbService.updateChecklist(checklistToUpdate); 
       if (updatedChecklist) {
         await loadWorkData();
         clearChecklistFormAndCloseModal();
@@ -1662,7 +1662,7 @@ const WorkDetail = () => {
             setZeModal(prev => ({ ...prev, isConfirming: true }));
             try {
                 // NEW: Call dbService.deleteChecklist
-                await dbService.deleteChecklist(checklistId); // Mocked service
+                await dbService.deleteChecklist(checklistId); 
                 await loadWorkData();
                 setZeModal(prev => ({ ...prev, isOpen: false }));
             } catch (error: any) {
@@ -1724,7 +1724,7 @@ const WorkDetail = () => {
             const threeDaysFromNow = new Date(today);
             threeDaysFromNow.setDate(today.getDate() + 3);
 
-            const isStepRelevantForMissing = (stepStartDate >= today && stepStartDate <= threeDaysFromNow) || (stepStartDate < today && linkedStep?.status !== StepStatus.COMPLETED);
+            const isStepRelevantForMissing = (stepStartDate >= today && stepStartDate <= threeDaysFromNow) || (stepStartDate <= today && linkedStep?.status !== StepStatus.COMPLETED); // Fix: <= today, not < today
 
             const isMissing = material.plannedQty > 0 && material.purchasedQty < material.plannedQty && isStepRelevantForMissing;
             const isPartial = material.purchasedQty > 0 && material.purchasedQty < material.plannedQty && !isMissing; // Partial, but not critical missing
@@ -1812,7 +1812,7 @@ const WorkDetail = () => {
   const totalSpent = expenses.reduce((sum, exp) => sum + (exp.paidAmount || 0), 0);
   const totalAmount = expenses.reduce((sum, exp) => sum + exp.amount, 0);
   const balance = totalBudget - totalSpent;
-  // const pendingToPay = totalAmount - totalSpent; // Removed as not directly used in KPI
+  // const pendingToPay = totalAmount - totalSpent; 
 
   // KPIs for Report Cronograma
   const totalStepsCount = steps.length;
@@ -1824,10 +1824,10 @@ const WorkDetail = () => {
   const notStartedStepsCount = steps.filter(s => s.status === StepStatus.NOT_STARTED && new Date(s.endDate) >= new Date(todayDateString)).length;
 
   // KPIs for Report Materiais
-  // const materialsTotal = materials.length; // Removed as not directly used in KPI
+  // const materialsTotal = materials.length; 
   const materialsMissing = materials.filter(m => {
     const linkedStep = steps.find(s => s.id === m.stepId);
-    if (!linkedStep) return false; // Must be linked to a step
+    if (!linkedStep) return false; 
     const stepStartDate = new Date(linkedStep.startDate);
     stepStartDate.setHours(0,0,0,0);
     const today = new Date();
@@ -1835,9 +1835,9 @@ const WorkDetail = () => {
     const threeDaysFromNow = new Date(today);
     threeDaysFromNow.setDate(today.getDate() + 3);
 
-    const isUpcomingOrActive = (stepStartDate >= today && stepStartDate <= threeDaysFromNow) || (stepStartDate <= today && linkedStep.status !== StepStatus.COMPLETED);
+    const isUpcomingOrActive = (stepStartDate >= today && stepStartDate <= threeDaysFromNow) || (stepStartDate <= today && linkedStep.status !== StepStatus.COMPLETED); // Fix: <= today
 
-    return m.purchasedQty < m.plannedQty && isUpcomingOrActive;
+    return m.plannedQty > 0 && m.purchasedQty < m.plannedQty && isUpcomingOrActive;
   }).length;
   const materialsPartial = materials.filter(m => m.purchasedQty > 0 && m.purchasedQty < m.plannedQty).length;
   const materialsCompleted = materials.filter(m => m.purchasedQty >= m.plannedQty).length;
@@ -2025,7 +2025,7 @@ const WorkDetail = () => {
                         const threeDaysFromNow = new Date(today);
                         threeDaysFromNow.setDate(today.getDate() + 3);
 
-                        const isStepRelevantForMissing = (stepStartDate >= today && stepStartDate <= threeDaysFromNow) || (stepStartDate < today && linkedStep?.status !== StepStatus.COMPLETED);
+                        const isStepRelevantForMissing = (stepStartDate >= today && stepStartDate <= threeDaysFromNow) || (stepStartDate <= today && linkedStep?.status !== StepStatus.COMPLETED); // Fix: <= today, not < today
 
                         const isMissing = material.plannedQty > 0 && material.purchasedQty < material.plannedQty && isStepRelevantForMissing;
                         const isPartial = material.purchasedQty > 0 && material.purchasedQty < material.plannedQty && !isMissing; // Partial, but not critical missing
@@ -2276,3 +2276,65 @@ const WorkDetail = () => {
                   <h3 className="font-bold text-primary dark:text-white">Fotos da Obra</h3>
                   <p className="text-xs text-slate-500 dark:text-slate-400">Acompanhe o progresso visual.</p>
                 </button>
+                <button 
+                  onClick={() => goToSubView('PROJECTS')} 
+                  className={cx(surface, "rounded-3xl p-6 flex flex-col items-center justify-center text-center gap-2 transition-all hover:scale-[1.02] hover:border-secondary/50")}
+                  aria-label="Gerenciar Projetos e Documentos"
+                >
+                  <div className="w-12 h-12 bg-purple-500/10 text-purple-600 rounded-xl flex items-center justify-center text-xl mb-2"><i className="fa-solid fa-file-alt"></i></div>
+                  <h3 className="font-bold text-primary dark:text-white">Projetos & Docs</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Centralize seus arquivos.</p>
+                </button>
+                <button 
+                  onClick={() => goToSubView('CHECKLIST')} 
+                  className={cx(surface, "rounded-3xl p-6 flex flex-col items-center justify-center text-center gap-2 transition-all hover:scale-[1.02] hover:border-secondary/50")}
+                  aria-label="Acessar Checklists Inteligentes"
+                >
+                  <div className="w-12 h-12 bg-teal-500/10 text-teal-600 rounded-xl flex items-center justify-center text-xl mb-2"><i className="fa-solid fa-clipboard-check"></i></div>
+                  <h3 className="font-bold text-primary dark:text-white">Checklists</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Não esqueça de nada.</p>
+                </button>
+                <button 
+                  onClick={() => goToSubView('CONTRACTS')} 
+                  className={cx(surface, "rounded-3xl p-6 flex flex-col items-center justify-center text-center gap-2 transition-all hover:scale-[1.02] hover:border-secondary/50")}
+                  aria-label="Gerador de Contratos"
+                >
+                  <div className="w-12 h-12 bg-amber-500/10 text-amber-600 rounded-xl flex items-center justify-center text-xl mb-2"><i className="fa-solid fa-file-signature"></i></div>
+                  <h3 className="font-bold text-primary dark:text-white">Contratos</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Modelos prontos e personalizáveis.</p>
+                </button>
+                <button 
+                  onClick={() => goToSubView('CALCULATORS')} 
+                  className={cx(surface, "rounded-3xl p-6 flex flex-col items-center justify-center text-center gap-2 transition-all hover:scale-[1.02] hover:border-secondary/50")}
+                  aria-label="Acessar Calculadoras"
+                >
+                  <div className="w-12 h-12 bg-cyan-500/10 text-cyan-600 rounded-xl flex items-center justify-center text-xl mb-2"><i className="fa-solid fa-calculator"></i></div>
+                  <h3 className="font-bold text-primary dark:text-white">Calculadoras</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Calcule materiais e mais.</p>
+                </button>
+                <button 
+                  onClick={() => goToSubView('REPORTS')} 
+                  className={cx(surface, "rounded-3xl p-6 flex flex-col items-center justify-center text-center gap-2 transition-all hover:scale-[1.02] hover:border-secondary/50")}
+                  aria-label="Ver Relatórios"
+                >
+                  <div className="w-12 h-12 bg-red-500/10 text-red-600 rounded-xl flex items-center justify-center text-xl mb-2"><i className="fa-solid fa-chart-line"></i></div>
+                  <h3 className="font-bold text-primary dark:text-white">Relatórios</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Visão consolidada.</p>
+                </button>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* RESTORED all sub-views rendering logic */}
+      {/* Sub-View: WORKERS */}
+      {activeSubView === 'WORKERS' && (
+        <div className="space-y-4 animate-in fade-in duration-300">
+          <div className="flex justify-between items-center px-2 sm:px-0">
+            <h2 className="text-xl font-black text-primary dark:text-white">Profissionais da Obra</h2>
+            <button onClick={() => setShowAddWorkerModal(true)} className="px-4 py-2 bg-secondary text-white text-sm font-bold rounded-xl hover:bg-secondary-dark transition-colors flex items-center gap-2" aria-label="Adicionar novo profissional">
+              <i className="fa-solid fa-plus-circle"></i> Novo Profissional
+            </button>
+          </div>
+          <div className="grid grid-cols-1 md:

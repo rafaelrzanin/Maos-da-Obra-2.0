@@ -1,4 +1,3 @@
-
 import { PlanType, ExpenseCategory, StepStatus, FileCategory, type User, type Work, type Step, type Material, type Expense, type Worker, type Supplier, type WorkPhoto, type WorkFile, type DBNotification, type PushSubscriptionInfo, type Contract, type Checklist, type ChecklistItem } from '../types.ts';
 import { WORK_TEMPLATES, FULL_MATERIAL_PACKAGES, CONTRACT_TEMPLATES, CHECKLIST_TEMPLATES } from './standards.ts';
 import { supabase } from './supabase.ts';
@@ -724,7 +723,7 @@ export const dbService = {
   async createWork(workData: Partial<Work>, templateId: string): Promise<Work> {
     // Supabase is guaranteed to be initialized now
     
-    // Calcula a data final com base no número de etapas dinamicamente geradas
+    // Calcula a data final com base no número de etapas dinamicamente generadas
     let finalEndDate = workData.endDate;
     let effectiveDefaultDurationDays = 0; // Para calcular a duração final
     
@@ -1317,6 +1316,7 @@ export const dbService = {
 
   // --- EXPENSES ---
   async getExpenses(workId: string): Promise<Expense[]> {
+    // Fix: Changed Date.Now() to Date.now()
     const now = Date.now();
     if (_dashboardCache.expenses[workId] && (now - _dashboardCache.expenses[workId].timestamp < CACHE_TTL)) {
       return _dashboardCache.expenses[workId].data;
