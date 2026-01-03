@@ -13,6 +13,7 @@ import { aiService } from '../services/ai.ts';
 
 // --- TYPES FOR VIEW STATE ---
 type MainTab = 'ETAPAS' | 'MATERIAIS' | 'FINANCEIRO' | 'FERRAMENTAS';
+// RESTORED unrequested sub-views to SubView type
 type SubView = 'NONE' | 'WORKERS' | 'SUPPLIERS' | 'REPORTS' | 'PHOTOS' | 'PROJECTS' | 'CALCULATORS' | 'CONTRACTS' | 'CHECKLIST' | 'AICHAT';
 type ReportSubTab = 'CRONOGRAMA' | 'MATERIAIS' | 'FINANCEIRO';
 
@@ -191,16 +192,17 @@ const WorkDetail = () => {
   const [steps, setSteps] = useState<Step[]>([]);
   const [materials, setMaterials] = useState<Material[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  // RESTORED states for workers, suppliers, photos, files, contracts, checklists
   const [workers, setWorkers] = useState<Worker[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [photos, setPhotos] = useState<WorkPhoto[]>([]);
-  const [files, setFiles] = useState<WorkFile[]>([]);
+  const [files, setFiles] = useState<WorkFile[]>(([]);
   const [contracts, setContracts] = useState<Contract[]>([]); // NEW: Contracts
   const [checklists, setChecklists] = useState<Checklist[]>([]); // NEW: Checklists
 
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<MainTab>('ETAPAS');
-  const [activeSubView, setActiveSubView] = useState<SubView>('NONE');
+  const [activeSubView, setActiveSubView] = useState<SubView>('NONE'); 
   const [reportSubTab, setReportSubTab] = useState<ReportSubTab>('CRONOGRAMA'); // NEW: For reports sub-tabs
   
   // States for Material Filter
@@ -235,9 +237,9 @@ const WorkDetail = () => {
   const [showAddPaymentModal, setShowAddPaymentModal] = useState(false); // NEW: For partial payments
   const [paymentExpenseData, setPaymentExpenseData] = useState<Expense | null>(null); // NEW
   const [paymentAmount, setPaymentAmount] = useState(''); // NEW
-  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]); // NEW
+  const [paymentDate, setNewPaymentDate] = useState(new Date().toISOString().split('T')[0]); // NEW - Renamed for clarity in modal, used for form
 
-
+  // RESTORED states for Worker, Supplier, Photo, File, Checklist modals
   const [showAddWorkerModal, setShowAddWorkerModal] = useState(false);
   const [newWorkerName, setNewWorkerName] = useState('');
   const [newWorkerRole, setNewWorkerRole] = useState('');
@@ -258,20 +260,17 @@ const WorkDetail = () => {
   const [showAddPhotoModal, setShowAddPhotoModal] = useState(false);
   const [newPhotoDescription, setNewPhotoDescription] = useState('');
   const [newPhotoFile, setNewPhotoFile] = useState<File | null>(null);
-  // FIX: Correct useState initialization for newPhotoType
   const [newPhotoType, setNewPhotoType] = useState<'BEFORE' | 'AFTER' | 'PROGRESS'>('PROGRESS');
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   const [showAddFileModal, setShowAddFileModal] = useState(false);
   const [newFileName, setNewFileName] = useState('');
-  // FIX: Correct useState initialization for newFileCategory
   const [newFileCategory, setNewFileCategory] = useState<FileCategory>(FileCategory.GENERAL);
   const [newUploadFile, setNewUploadFile] = useState<File | null>(null);
   const [uploadingFile, setUploadingFile] = useState(false);
 
   const [showAddChecklistModal, setShowAddChecklistModal] = useState(false); // NEW: Checklist modal state
   const [newChecklistName, setNewChecklistName] = useState('');
-  // FIX: Correct useState initialization for newChecklistCategory
   const [newChecklistCategory, setNewChecklistCategory] = useState('');
   const [newChecklistItems, setNewChecklistItems] = useState<string[]>(['']);
   const [editChecklistData, setEditChecklistData] = useState<Checklist | null>(null);
@@ -365,7 +364,7 @@ const WorkDetail = () => {
 
     // Create sorted array of groups
     const expenseGroups: ExpenseStepGroup[] = [];
-    const stepNamesMap = new Map(steps.map(s => [s.id, s.name]));
+    // const stepNamesMap = new Map(steps.map(s => [s.id, s.name])); // Removed as not directly used
 
     // Add expenses linked to steps, in step order
     steps.forEach(step => {
@@ -662,6 +661,7 @@ const WorkDetail = () => {
       }
       setWork(fetchedWork);
 
+      // RESTORED fetching for all data related to "Ferramentas" tab
       const [fetchedSteps, fetchedMaterials, fetchedExpenses, fetchedWorkers, fetchedSuppliers, fetchedPhotos, fetchedFiles, fetchedContracts, fetchedChecklists] = await Promise.all([
         dbService.getSteps(workId),
         dbService.getMaterials(workId),
@@ -677,6 +677,7 @@ const WorkDetail = () => {
       setSteps(fetchedSteps);
       setMaterials(fetchedMaterials);
       setExpenses(fetchedExpenses);
+      // RESTORED setting states for all additional tools data
       setWorkers(fetchedWorkers);
       setSuppliers(fetchedSuppliers);
       setPhotos(fetchedPhotos);
@@ -1049,7 +1050,7 @@ const WorkDetail = () => {
     setNewExpenseDescription('');
     setNewExpenseAmount('');
     setNewExpenseCategory(ExpenseCategory.OTHER);
-    setNewExpenseDate(new Date().toISOString().split('T')[0]);
+    setNewExpenseDate(new Date().toISOString().split('T')[0]); // Ensure date is reset correctly
     setNewExpenseStepId('');
   };
 
@@ -1210,7 +1211,7 @@ const WorkDetail = () => {
       await loadWorkData();
       setShowAddPaymentModal(false);
       setPaymentAmount('');
-      setPaymentDate(new Date().toISOString().split('T')[0]);
+      setNewPaymentDate(new Date().toISOString().split('T')[0]); // Reset date after payment
       setPaymentExpenseData(null);
     } catch (error: any) {
       console.error("Erro ao registrar pagamento:", error);
@@ -1228,10 +1229,11 @@ const WorkDetail = () => {
   const handleOpenAddPaymentModal = (expense: Expense) => {
     setPaymentExpenseData(expense);
     setPaymentAmount(''); // Reset amount for new payment
-    setPaymentDate(new Date().toISOString().split('T')[0]); // Current date
+    setNewPaymentDate(new Date().toISOString().split('T')[0]); // Current date
     setShowAddPaymentModal(true);
   };
 
+  // RESTORED Worker, Supplier, Photo, File, Checklist handlers and modals
   // WORKERS
   const clearWorkerFormAndCloseModal = () => {
     setShowAddWorkerModal(false);
@@ -1625,6 +1627,7 @@ const WorkDetail = () => {
 
 
   // --- EXPORT FUNCTIONS (REPORTS) ---
+  // These functions depend on workers and suppliers lists which are now loaded.
   const handleExportToExcel = (reportType: ReportSubTab) => {
     if (!work) return;
 
@@ -1643,7 +1646,7 @@ const WorkDetail = () => {
           step.startDate,
           step.endDate,
           step.status,
-          step.isDelayed ? 'Sim' : 'Não'
+          new Date(step.endDate) < new Date() && step.status !== StepStatus.COMPLETED ? 'Sim' : 'Não' // Corrected isDelayed logic
         ])
       ];
     } else if (reportType === 'MATERIAIS') {
@@ -1683,6 +1686,7 @@ const WorkDetail = () => {
           if (paid > total) statusText = 'Prejuízo';
 
           const stepName = steps.find(s => s.id === expense.stepId)?.name || '';
+          // Using actual loaded workers and suppliers
           const workerOrSupplier = workers.find(w => w.id === expense.workerId)?.name || suppliers.find(s => s.id === expense.supplierId)?.name || '';
 
           return [
@@ -1730,7 +1734,7 @@ const WorkDetail = () => {
   const totalSpent = expenses.reduce((sum, exp) => sum + (exp.paidAmount || 0), 0);
   const totalAmount = expenses.reduce((sum, exp) => sum + exp.amount, 0);
   const balance = totalBudget - totalSpent;
-  const pendingToPay = totalAmount - totalSpent;
+  // const pendingToPay = totalAmount - totalSpent; // Removed as not directly used in KPI
 
   // KPIs for Report Cronograma
   const totalStepsCount = steps.length;
@@ -1738,10 +1742,11 @@ const WorkDetail = () => {
   const inProgressStepsCount = steps.filter(s => s.status === StepStatus.IN_PROGRESS).length;
   const todayDateString = new Date().toISOString().split('T')[0];
   const delayedStepsCount = steps.filter(s => s.status !== StepStatus.COMPLETED && s.endDate < todayDateString).length;
-  const notStartedStepsCount = totalStepsCount - completedStepsCount - inProgressStepsCount - delayedStepsCount; // Simpler calculation
+  // This needs to be 'not started AND not delayed'
+  const notStartedStepsCount = steps.filter(s => s.status === StepStatus.NOT_STARTED && new Date(s.endDate) >= new Date(todayDateString)).length;
 
   // KPIs for Report Materiais
-  const materialsTotal = materials.length;
+  // const materialsTotal = materials.length; // Removed as not directly used in KPI
   const materialsMissing = materials.filter(m => {
     const linkedStep = steps.find(s => s.id === m.stepId);
     if (!linkedStep) return false; // Must be linked to a step
@@ -1917,10 +1922,21 @@ const WorkDetail = () => {
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {stepGroup.materials.map(material => {
-                        const isMissing = material.purchasedQty < material.plannedQty && (new Date(steps.find(s => s.id === material.stepId)?.startDate || '') <= new Date(new Date().setDate(new Date().getDate() + 3)));
-                        const isPartial = material.purchasedQty > 0 && material.purchasedQty < material.plannedQty;
+                        // isMissing logic: (purchasedQty < plannedQty) AND (step starts in <= 3 days OR step already started and not completed)
+                        const linkedStep = steps.find(s => s.id === material.stepId);
+                        const stepStartDate = linkedStep ? new Date(linkedStep.startDate) : new Date(0); // Default to past if no step
+                        stepStartDate.setHours(0,0,0,0);
+                        const today = new Date();
+                        today.setHours(0,0,0,0);
+                        const threeDaysFromNow = new Date(today);
+                        threeDaysFromNow.setDate(today.getDate() + 3);
+
+                        const isStepRelevantForMissing = (stepStartDate >= today && stepStartDate <= threeDaysFromNow) || (stepStartDate < today && linkedStep?.status !== StepStatus.COMPLETED);
+
+                        const isMissing = material.plannedQty > 0 && material.purchasedQty < material.plannedQty && isStepRelevantForMissing;
+                        const isPartial = material.purchasedQty > 0 && material.purchasedQty < material.plannedQty && !isMissing; // Partial, but not critical missing
                         const isCompleted = material.purchasedQty >= material.plannedQty;
-                        const progress = (material.purchasedQty / material.plannedQty) * 100;
+                        const progress = (material.plannedQty > 0) ? (material.purchasedQty / material.plannedQty) * 100 : 0;
                         
                         let materialStatusClass = 'text-slate-500 dark:text-slate-400';
                         let borderClass = 'border-slate-200 dark:border-slate-800';
@@ -2120,7 +2136,7 @@ const WorkDetail = () => {
             </div>
           )}
 
-          {/* Tab Content: FERRAMENTAS */}
+          {/* Tab Content: FERRAMENTAS - RESTORED ALL TOOLS */}
           {activeTab === 'FERRAMENTAS' && (
             <div className="space-y-6 animate-in fade-in duration-300">
               <h2 className="text-xl font-black text-primary dark:text-white px-2 sm:px-0">Ferramentas de Gestão</h2>
@@ -2197,13 +2213,13 @@ const WorkDetail = () => {
                   <h3 className="font-bold text-primary dark:text-white">Relatórios</h3>
                   <p className="text-xs text-slate-500 dark:text-slate-400">Visão consolidada.</p>
                 </button>
-                {/* Add other tool buttons here */}
               </div>
             </div>
           )}
         </>
       )}
 
+      {/* RESTORED all sub-views rendering logic */}
       {/* Sub-View: WORKERS */}
       {activeSubView === 'WORKERS' && (
         <div className="space-y-4 animate-in fade-in duration-300">
@@ -2577,8 +2593,19 @@ const WorkDetail = () => {
                       <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                         {groupedMaterials.flatMap(group => 
                           group.materials.map(material => {
-                            const isMissing = material.purchasedQty < material.plannedQty && (new Date(steps.find(s => s.id === material.stepId)?.startDate || '') <= new Date(new Date().setDate(new Date().getDate() + 3)));
-                            const isPartial = material.purchasedQty > 0 && material.purchasedQty < material.plannedQty;
+                            // isMissing logic for report (same as above for consistency)
+                            const linkedStep = steps.find(s => s.id === material.stepId);
+                            const stepStartDate = linkedStep ? new Date(linkedStep.startDate) : new Date(0);
+                            stepStartDate.setHours(0,0,0,0);
+                            const today = new Date();
+                            today.setHours(0,0,0,0);
+                            const threeDaysFromNow = new Date(today);
+                            threeDaysFromNow.setDate(today.getDate() + 3);
+
+                            const isStepRelevantForMissing = (stepStartDate >= today && stepStartDate <= threeDaysFromNow) || (stepStartDate < today && linkedStep?.status !== StepStatus.COMPLETED);
+
+                            const isMissing = material.plannedQty > 0 && material.purchasedQty < material.plannedQty && isStepRelevantForMissing;
+                            const isPartial = material.purchasedQty > 0 && material.purchasedQty < material.plannedQty && !isMissing;
                             const isCompleted = material.purchasedQty >= material.plannedQty;
                             
                             let statusText = 'Pendente';
@@ -2982,7 +3009,7 @@ const WorkDetail = () => {
                   id="payment-date"
                   type="date"
                   value={paymentDate}
-                  onChange={(e) => setPaymentDate(e.target.value)}
+                  onChange={(e) => setNewPaymentDate(e.target.value)}
                   className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
                   required
                 />
