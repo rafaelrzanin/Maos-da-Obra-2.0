@@ -196,7 +196,7 @@ const WorkDetail = () => {
   const [workers, setWorkers] = useState<Worker[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [photos, setPhotos] = useState<WorkPhoto[]>([]);
-  const [files, setFiles] = useState<WorkFile[]>(([]);
+  const [files, setFiles] = useState<WorkFile[]>([]); // CORRECTED SYNTAX: Removed extra parentheses
   const [contracts, setContracts] = useState<Contract[]>([]); // NEW: Contracts
   const [checklists, setChecklists] = useState<Checklist[]>([]); // NEW: Checklists
 
@@ -1034,7 +1034,7 @@ const WorkDetail = () => {
         setZeModal({
             isOpen: true,
             title: "Erro ao Registrar Compra",
-            message: `Não foi possível registrar a compra: ${error.message || 'Erro desconhecido.'}`,
+            message: `Não foi possível registrar o pagamento: ${error.message || 'Erro desconhecido.'}`,
             confirmText: "Entendido",
             onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
             type: 'ERROR'
