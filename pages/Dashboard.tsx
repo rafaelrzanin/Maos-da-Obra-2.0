@@ -289,8 +289,7 @@ const MaterialsNeeded = ({
         </div>
         <button onClick={onOpenWork} className="text-xs font-extrabold text-secondary hover:opacity-80 px-3 py-1.5 rounded-lg bg-secondary/5 transition-colors" aria-label="Ver todos os materiais">
           Ver todos os materiais →
-        </button>
-      </div>
+        </button>      </div>
 
       <div className="space-y-3">
         {relevantMaterials.map(mat => {
@@ -402,7 +401,7 @@ const Dashboard = () => {
         setMaterials([]);
         setSteps([]);
       }
-      setZeTip(getRandomZeTip());
+      // setZeTip(getRandomZeTip()); // Removed here to be in its own useEffect
     } catch (error: any) {
       console.error("Erro ao carregar dados do dashboard:", error);
     } finally {
@@ -424,6 +423,14 @@ const Dashboard = () => {
         }
     }
   }, [loadDashboardData, focusWork, works, isUserAuthFinished, user, requestPushNotificationPermission, pushSubscriptionStatus]);
+
+  // NEW: Effect to manage Zé Tip independently
+  useEffect(() => {
+    if (isUserAuthFinished && user && !zeTip) { // Only set a new tip if auth is finished and no tip is currently displayed
+      setZeTip(getRandomZeTip());
+    }
+  }, [isUserAuthFinished, user, zeTip]);
+
 
   const handleWorkSelect = async (e: React.ChangeEvent<HTMLSelectElement>) => {
     const selectedWorkId = e.target.value;
@@ -531,11 +538,22 @@ const Dashboard = () => {
           <div className="w-14 h-14 rounded-full p-1 bg-gradient-to-br from-secondary to-orange-400 shadow-lg shrink-0 animate-float">
             <img src={ZE_AVATAR} className="w-full h-full object-cover rounded-full border-2 border-white dark:border-slate-800" onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK} alt="Zé da Obra Avatar" />
           </div>
-          <div>
-            <p className="text-xs font-black uppercase tracking-widest text-secondary mb-1">DICAS DO ZÉ DA OBRA</p>
-            {zeTip.tag && (
-              <p className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-2">{zeTip.tag}</p>
-            )}
+          <div className="flex-1"> {/* NEW: Add flex-1 to allow content to grow */}
+            <div className="flex justify-between items-center mb-1"> {/* NEW: Container for title and dismiss button */}
+              <div>
+                <p className="text-xs font-black uppercase tracking-widest text-secondary mb-1">DICAS DO ZÉ DA OBRA</p>
+                {zeTip.tag && (
+                  <p className="text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-2">{zeTip.tag}</p>
+                )}
+              </div>
+              <button 
+                onClick={() => setZeTip(getRandomZeTip())} 
+                className="text-slate-400 hover:text-primary dark:hover:text-white transition-colors p-1 -mt-2 -mr-2"
+                aria-label="Dispensar dica"
+              >
+                <i className="fa-solid fa-xmark text-lg"></i>
+              </button>
+            </div>
             <p className="text-sm font-medium text-slate-700 dark:text-slate-300 leading-relaxed">{zeTip.text}</p>
           </div>
         </div>

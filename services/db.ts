@@ -1,3 +1,5 @@
+
+
 import { PlanType, ExpenseCategory, StepStatus, FileCategory, type User, type Work, type Step, type Material, type Expense, type Worker, type Supplier, type WorkPhoto, type WorkFile, type DBNotification, type PushSubscriptionInfo, type Contract, type Checklist, type ChecklistItem } from '../types.ts';
 import { WORK_TEMPLATES, FULL_MATERIAL_PACKAGES, CONTRACT_TEMPLATES, CHECKLIST_TEMPLATES } from './standards.ts';
 import { supabase } from './supabase.ts';
@@ -1394,6 +1396,29 @@ export const dbService = {
     _dashboardCache.notifications = { data: parsed, timestamp: now };
     return parsed;
   },
+  
+  // NEW: getExistingNotificationByTag for client-side
+  async getExistingNotificationByTag(userId: string, workId: string | undefined, tag: string): Promise<DBNotification | null> {
+      const query = supabase
+          .from('notifications')
+          .select('*')
+          .eq('user_id', userId)
+          .eq('tag', tag)
+          .eq('read', false);
+
+      // Only add work_id filter if it's provided
+      if (workId) {
+          query.eq('work_id', workId);
+      }
+
+      const { data, error } = await query.maybeSingle();
+
+      if (error) {
+          console.error(`Error checking existing notification for tag ${tag}:`, error);
+          return null;
+      }
+      return data ? parseNotificationFromDB(data) : null;
+  },
 
   async addNotification(notification: Omit<DBNotification, 'id'>): Promise<DBNotification | null> {
     // Supabase is guaranteed to be initialized now
@@ -1477,6 +1502,7 @@ export const dbService = {
   async getDailySummary(workId: string): Promise<{ completedSteps: number, delayedSteps: number, pendingMaterials: number, totalSteps: number }> {
     // Supabase is guaranteed to be initialized now
 
+    // Fix: Changed Date.Now() to Date.now()
     const now = Date.now();
     if (_dashboardCache.summary[workId] && (now - _dashboardCache.summary[workId].timestamp < CACHE_TTL)) {
         return _dashboardCache.summary[workId].data;
@@ -1581,35 +1607,36 @@ export const dbService = {
     }
   },
 
-  async sendPushNotification(userId: string, notificationPayload: { title: string, body: string, url?: string, tag?: string }): Promise<void> {
-    const APP_URL = process.env.VITE_APP_URL || window.location.origin; // Fallback to window.location.origin
+  // REMOVED: This function is now handled server-side in api/send-event-notification.js
+  // async sendPushNotification(userId: string, notificationPayload: { title: string, body: string, url?: string, tag?: string }): Promise<void> {
+  //   const APP_URL = process.env.VITE_APP_URL || window.location.origin; // Fallback to window.location.origin
 
-    try {
-        const response = await fetch('/api/send-event-notification', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ userId, ...notificationPayload, url: notificationPayload.url || APP_URL }), // Ensure URL is passed to server
-        });
+  //   try {
+  //       const response = await fetch('/api/send-event-notification', {
+  //           method: 'POST',
+  //           headers: {
+  //               'Content-Type': 'application/json',
+  //           },
+  //           body: JSON.stringify({ userId, ...notificationPayload, url: notificationPayload.url || APP_URL }), // Ensure URL is passed to server
+  //       });
 
-        if (!response.ok) {
-            let errorData = { error: 'Unknown error', message: 'Failed to parse error response' };
-            // Adicionado log do rawText para melhor diagnóstico
-            const textResponse = await response.text(); 
-            try {
-                errorData = JSON.parse(textResponse); // Tentar parsear o texto se for JSON
-            } catch (e: any) { // Explicitly type e as any
-                errorData.message = `API returned non-JSON or unparseable text: "${textResponse}"`; // Fallback to raw text
-            }
-            throw new Error(errorData.error || errorData.message || 'Falha ao enviar push notification de evento.');
-        }
-        console.log("Push notification de evento enviada para o usuário:", userId);
-    } catch (error: any) {
-        console.error("Erro ao enviar push notification de evento:", error);
-        // Não relança o erro, pois a falha na notificação não deve impedir a funcionalidade principal
-    }
-  },
+  //       if (!response.ok) {
+  //           let errorData = { error: 'Unknown error', message: 'Failed to parse error response' };
+  //           // Adicionado log do rawText para melhor diagnóstico
+  //           const textResponse = await response.text(); 
+  //           try {
+  //               errorData = JSON.parse(textResponse); // Tentar parsear o texto se for JSON
+  //           } catch (e: any) { // Explicitly type e as any
+  //               errorData.message = `API returned non-JSON or unparseable text: "${textResponse}"`; // Fallback to raw text
+  //           }
+  //           throw new Error(errorData.error || errorData.message || 'Falha ao enviar push notification de evento.');
+  //       }
+  //       console.log("Push notification de evento enviada para o usuário:", userId);
+  //   } catch (error: any) {
+  //       console.error("Erro ao enviar push notification de evento:", error);
+  //       // Não relança o erro, pois a falha na notificação não deve impedir a funcionalidade principal
+  //   }
+  // },
 
   // --- NEW: CONTRACTS (MOCK/TEMPLATE) ---
   async getContractTemplates(): Promise<Contract[]> {

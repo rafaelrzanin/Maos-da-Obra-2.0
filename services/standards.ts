@@ -1,4 +1,5 @@
 
+
 // Standard Libraries for Construction Management
 
 // --- AVATAR CONFIG ---
@@ -23,7 +24,8 @@ export const ZE_TIPS: ZeTip[] = [
   { tag: 'Acabamento', text: 'Tinta boa em parede mal lixada não faz milagre. O segredo da pintura perfeita é 80% preparação (lixa/massa) e 20% tinta.' },
   { tag: 'Pintura', text: 'Tinta boa em parede mal lixada não faz milagre. O segredo da pintura perfeita é 80% preparação (lixa/massa) e 20% tinta.' },
   { tag: 'Caimento', text: 'Antes de pagar o azulejista, jogue um balde de água no banheiro e na sacada. A água tem que correr sozinha para o ralo, sem empoçar.' },
-  { tag: 'Entulho', text: 'Mantenha a obra limpa. Entulho acumulado esconde ferramentas, causa acidentes e passa a impressão de desorganização para a equipe.' }
+  { tag: 'Entulho', text: 'Mantenha a obra limpa. Entulho acumulado esconde ferramentas, causa acidentes e passa a impressão de desorganização para a equipe.' },
+  { tag: 'Mão de Obra', text: 'Pague sua equipe em dia e com contrato. Um time feliz e seguro produz mais e evita problemas trabalhistas. O barato pode sair bem caro!' } // NEW: Added tip
 ];
 
 export const getRandomZeTip = (): ZeTip => {
@@ -804,6 +806,7 @@ export const CHECKLIST_TEMPLATES: Checklist[] = [
       { id: 'item6', text: 'Verificar rufos e calhas (alinhamento, caimento, vedação)', checked: false },
       { id: 'item7', text: 'Cumeeiras e espigões bem vedados', checked: false },
       { id: 'item8', text: 'Proteção contra ventos (teste de estanqueidade)', checked: false },
+      { id: 'item9', text: 'Limpeza dos excessos de argamassa', checked: false },
     ],
   },
   {
