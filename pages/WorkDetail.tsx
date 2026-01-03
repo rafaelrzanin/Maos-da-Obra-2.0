@@ -1913,7 +1913,7 @@ const WorkDetail = () => {
                 ) : (
                   steps.map((step, index) => {
                     const today = new Date().toISOString().split('T')[0];
-                    const isDelayed = new Date(step.endDate) < new Date(today) && step.status !== StepStatus.COMPLETED;
+                    const isDelayed = (step.status === StepStatus.NOT_STARTED || step.status === StepStatus.IN_PROGRESS) && new Date(step.endDate) < new Date(today);
                     let stepStatusClass = '';
                     let stepStatusBgClass = '';
                     let statusText = '';
@@ -1958,9 +1958,10 @@ const WorkDetail = () => {
                         <div className="flex items-center justify-between mb-3">
                             <span className="text-sm font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">Etapa {index + 1}</span>
                             <button 
-                                onClick={(e) => { e.stopPropagation(); handleToggleStepStatus(step); }}
-                                className={cx("text-xs font-bold px-3 py-1 rounded-full hover:brightness-90 active:scale-95 transition-all", stepStatusClass, stepStatusBgClass)}
+                                onClick={(e) => { e.stopPropagation(); if (!isDelayed) handleToggleStepStatus(step); }}
+                                className={cx("text-xs font-bold px-3 py-1 rounded-full transition-all", stepStatusClass, stepStatusBgClass, isDelayed ? 'cursor-not-allowed opacity-70' : 'hover:brightness-90 active:scale-95')}
                                 aria-label={`Alterar status da etapa ${step.name}. Status atual: ${statusText}`}
+                                disabled={isDelayed}
                             >
                                 {statusText}
                             </button>
@@ -2025,10 +2026,12 @@ const WorkDetail = () => {
                         const threeDaysFromNow = new Date(today);
                         threeDaysFromNow.setDate(today.getDate() + 3);
 
-                        const isStepRelevantForMissing = (stepStartDate >= today && stepStartDate <= threeDaysFromNow) || (stepStartDate <= today && linkedStep?.status !== StepStatus.COMPLETED); // Fix: <= today, not < today
-
-                        const isMissing = material.plannedQty > 0 && material.purchasedQty < material.plannedQty && isStepRelevantForMissing;
-                        const isPartial = material.purchasedQty > 0 && material.purchasedQty < material.plannedQty && !isMissing; // Partial, but not critical missing
+                        // Atrasado: material não comprado e etapa iminente ou já ativa/atrasada
+                        const isDelayedMaterial = material.plannedQty > 0 && material.purchasedQty < material.plannedQty && (
+                          (stepStartDate >= today && stepStartDate <= threeDaysFromNow) || // Etapa inicia nos próximos 3 dias (inclusive)
+                          (stepStartDate < today && linkedStep?.status !== StepStatus.COMPLETED) // Etapa já deveria ter começado e não está concluída
+                        );
+                        const isPartial = material.purchasedQty > 0 && material.purchasedQty < material.plannedQty && !isDelayedMaterial;
                         const isCompleted = material.purchasedQty >= material.plannedQty;
                         const progress = (material.plannedQty > 0) ? (material.purchasedQty / material.plannedQty) * 100 : 0;
                         
@@ -2038,10 +2041,10 @@ const WorkDetail = () => {
                         let borderClass = 'border-slate-200 dark:border-slate-800';
                         let shadowClass = 'shadow-card-default';
 
-                        if (isMissing) {
+                        if (isDelayedMaterial) {
                             materialStatusClass = 'text-red-600 dark:text-red-400';
                             materialStatusBgClass = 'bg-red-500/10';
-                            statusText = 'FALTANDO!';
+                            statusText = 'ATRASADO!';
                             borderClass = 'border-red-500/50 dark:border-red-700/50';
                             shadowClass = 'shadow-lg shadow-red-500/20';
                         } else if (isCompleted) {
@@ -2056,7 +2059,7 @@ const WorkDetail = () => {
                             statusText = 'Parcial';
                             borderClass = 'border-amber-500/50 dark:border-amber-700/50';
                             shadowClass = 'shadow-lg shadow-amber-500/20';
-                        } else { // Pendente (0 purchased)
+                        } else { // Pendente (0 purchased) and not delayed
                             materialStatusClass = 'text-slate-500 dark:text-slate-400';
                             materialStatusBgClass = 'bg-slate-200 dark:bg-slate-700/50'; // Cinza para Pendente
                             statusText = 'Pendente';
@@ -2092,7 +2095,7 @@ const WorkDetail = () => {
                             {/* Progress bar */}
                             <div className="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-2 overflow-hidden mb-3" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100}>
                                 <div 
-                                    className={`h-full rounded-full ${isMissing ? 'bg-red-500' : isCompleted ? 'bg-green-500' : 'bg-amber-500'}`} 
+                                    className={`h-full rounded-full ${isDelayedMaterial ? 'bg-red-500' : isCompleted ? 'bg-green-500' : 'bg-amber-500'}`} 
                                     style={{ width: `${Math.min(100, progress)}%` }}
                                 ></div>
                             </div>
@@ -2652,7 +2655,7 @@ const WorkDetail = () => {
                       <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                         {steps.map((step, index) => {
                            const today = new Date().toISOString().split('T')[0];
-                           const isDelayed = new Date(step.endDate) < new Date(today) && step.status !== StepStatus.COMPLETED;
+                           const isDelayed = (step.status === StepStatus.NOT_STARTED || step.status === StepStatus.IN_PROGRESS) && new Date(step.endDate) < new Date(today);
                            let statusColorClass = '';
                            let statusText = '';
                            if (isDelayed) { statusColorClass = 'text-red-600'; statusText = 'Atrasada'; }
@@ -2754,7 +2757,7 @@ const WorkDetail = () => {
                             let statusText = 'Pendente';
                             let statusColorClass = 'text-slate-500';
 
-                            if (isMissing) { statusText = 'FALTANDO!'; statusColorClass = 'text-red-600'; }
+                            if (isMissing) { statusText = 'ATRASADO!'; statusColorClass = 'text-red-600'; }
                             else if (isCompleted) { statusText = 'Concluído'; statusColorClass = 'text-green-600'; }
                             else if (isPartial) { statusText = 'Parcial'; statusColorClass = 'text-amber-600'; }
 
