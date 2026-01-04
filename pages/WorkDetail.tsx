@@ -86,11 +86,12 @@ interface ZeAssistantCardProps {
 
 const ZeAssistantCard: React.FC<ZeAssistantCardProps> = ({ suggestion, onDismiss, onAction, onGenerateAiMessage, loadingAi }) => {
   
+  // Conditionally generate AI message only if there's no existing aiMessage
   useEffect(() => {
-    if (!suggestion.aiMessage && !loadingAi) {
+    if (suggestion.aiContext && !suggestion.aiMessage && !loadingAi) {
       onGenerateAiMessage(suggestion.aiContext, suggestion.id);
     }
-  }, [suggestion.aiMessage, suggestion.aiContext, suggestion.id, onGenerateAiMessage, loadingAi]);
+  }, [suggestion.aiContext, suggestion.aiMessage, suggestion.id, onGenerateAiMessage, loadingAi]);
 
   const cardClasses = cx(
     surface,
@@ -203,6 +204,10 @@ const WorkDetail = () => {
   const [newStepStartDate, setNewStepStartDate] = useState(new Date().toISOString().split('T')[0]);
   const [newStepEndDate, setNewStepEndDate] = useState(new Date().toISOString().split('T')[0]);
   const [editStepData, setEditStepData] = useState<Step | null>(null);
+  // State for drag and drop
+  const [draggedStepId, setDraggedStepId] = useState<string | null>(null);
+  const [dragOverStepId, setDragOverStepId] = useState<string | null>(null);
+
 
   const [showAddMaterialModal, setShowAddMaterialModal] = useState(false);
   const [newMaterialName, setNewMaterialName] = useState('');
@@ -397,16 +402,19 @@ const WorkDetail = () => {
     currentSeen.add(tag);
     sessionStorage.setItem(`ze_suggestions_seen_${user.id}_${workId}`, JSON.stringify(Array.from(currentSeen)));
     seenSuggestionsRef.current = currentSeen; 
-    setActiveZeSuggestion(null); 
+    setActiveZeSuggestion(null); // Dismiss active suggestion immediately
   }, [workId, user, getSeenSuggestions]);
 
   const generateZeSuggestion = useCallback(async () => {
-    if (!work || !steps.length || !materials.length || !user?.id) return;
+    if (!work || !steps.length || !materials.length || !user?.id) {
+        setActiveZeSuggestion(null);
+        return;
+    }
     
     console.log("[Zé da Obra] Avaliando contexto para sugestões...");
     
     const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    today.setHours(0, 0, 0, 0); // Normalize to local midnight
     const todayString = today.toISOString().split('T')[0];
     const threeDaysFromNow = new Date(today);
     threeDaysFromNow.setDate(today.getDate() + 3);
@@ -438,7 +446,7 @@ const WorkDetail = () => {
                             actionCallback: () => { goToTab('MATERIAIS'); markSuggestionAsSeen(tag); },
                             dismissible: true, // Allow dismissing even critical on UI, but action is implied
                             tag: tag,
-                            aiContext: `Material ${material.name} essencial para a etapa ${step.name} da obra ${work.name} está em falta. O que fazer para evitar atrasos e qual o risco?`
+                            aiContext: `O material ${material.name} (quantidade planejada: ${material.plannedQty} ${material.unit}, comprado: ${material.purchasedQty} ${material.unit}) é essencial para a etapa ${step.name} da obra ${work.name}. A etapa começa em ${step.startDate}. O que devo fazer para evitar atrasos e qual o risco atual?`
                         });
                         break; // Only one critical material alert per step at a time to avoid spam
                     }
@@ -461,7 +469,7 @@ const WorkDetail = () => {
                     actionCallback: () => { setEditStepData(step); setShowAddStepModal(true); markSuggestionAsSeen(tag); },
                     dismissible: true, // Allow dismissing even critical on UI, but action is implied
                     tag: tag,
-                    aiContext: `A etapa ${step.name} da obra ${work.name} está atrasada. Qual o impacto no cronograma e como posso resolver ou atualizar o status?`
+                    aiContext: `A etapa ${step.name} da obra ${work.name} (início: ${step.startDate}, fim: ${step.endDate}) está atrasada. Qual o impacto no cronograma geral e como posso resolver ou atualizar o status?`
                 });
             }
         }
@@ -491,12 +499,12 @@ const WorkDetail = () => {
                 priority: 'high',
                 message: `DICA: O estoque de "${material.name}" para a etapa "${step.name}" está baixo. Avalie a compra para não atrasar a obra! (${material.purchasedQty}/${material.plannedQty} ${material.unit})`,
                 actionText: "Ver Materiais",
-                actionCallback: () => goToTab('MATERIAIS'),
+                actionCallback: () => { goToTab('MATERIAIS'); markSuggestionAsSeen(tag); },
                 dismissible: true,
                 tag: tag,
-                aiContext: `O material ${material.name} para a etapa ${step.name} da obra ${work.name} está acabando. Qual a melhor forma de reabastecer e se há alternativas?`
+                aiContext: `O material ${material.name} (quantidade planejada: ${material.plannedQty} ${material.unit}, comprado: ${material.purchasedQty} ${material.unit}) para a etapa ${step.name} da obra ${work.name} está acabando. Qual a melhor forma de reabastecer e se há alternativas mais econômicas ou rápidas?`
               });
-              break; // Only one low material suggestion per step at a time
+              // Não quebra, para que mais de uma sugestão de baixo estoque possa aparecer por vez
             }
           }
         }
@@ -514,10 +522,10 @@ const WorkDetail = () => {
                 priority: 'medium',
                 message: `PREPARE-SE: A etapa "${upcomingStep.name}" começa em breve! Verifique se tudo está pronto.`,
                 actionText: "Ver Cronograma",
-                actionCallback: () => goToTab('ETAPAS'),
+                actionCallback: () => { goToTab('ETAPAS'); markSuggestionAsSeen(tag); },
                 dismissible: true,
                 tag: tag,
-                aiContext: `A etapa ${upcomingStep.name} da obra ${work.name} está prestes a começar. Quais são os pontos críticos de atenção antes de iniciar?`
+                aiContext: `A etapa ${upcomingStep.name} da obra ${work.name} (início: ${upcomingStep.startDate}) está prestes a começar. Quais são os pontos críticos de atenção, documentos ou materiais para verificar antes de iniciar?`
             });
         }
     }
@@ -533,10 +541,10 @@ const WorkDetail = () => {
                 priority: 'medium',
                 message: `FIM DA ETAPA: A etapa "${finishingStep.name}" está quase lá! Considere a verificação final e o fechamento.`,
                 actionText: "Editar Etapa",
-                actionCallback: () => { setEditStepData(finishingStep); setShowAddStepModal(true); },
+                actionCallback: () => { setEditStepData(finishingStep); setShowAddStepModal(true); markSuggestionAsSeen(tag); },
                 dismissible: true,
                 tag: tag,
-                aiContext: `A etapa ${finishingStep.name} da obra ${work.name} está quase concluída. Como posso fazer a checagem final de qualidade?`
+                aiContext: `A etapa ${finishingStep.name} da obra ${work.name} (fim: ${finishingStep.endDate}) está quase concluída. Como posso fazer a checagem final de qualidade e quais os próximos passos de fechamento ou transição?`
             });
         }
     }
@@ -597,7 +605,7 @@ const WorkDetail = () => {
     console.log(`[Zé da Obra] Etapa ${completedStep.name} marcada como concluída.`);
     
     // Tenta encontrar a próxima etapa lógica na sequência original
-    const sortedSteps = [...steps].sort((a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime());
+    const sortedSteps = [...steps].sort((a, b) => a.orderIndex - b.orderIndex); // Sort by orderIndex
     const completedStepIndex = sortedSteps.findIndex(s => s.id === completedStep.id);
     
     if (completedStepIndex !== -1 && completedStepIndex < sortedSteps.length - 1) {
@@ -607,10 +615,10 @@ const WorkDetail = () => {
             const seenTags = getSeenSuggestions();
 
             if (!seenTags.has(tag)) {
-                let aiResponse = "Ótimo! Foco total na próxima. O Zé tá de olho!"; // Default if no AI access
+                let aiMessageContent = "Ótimo! Foco total na próxima. O Zé tá de olho!"; // Default if no AI access
                 if (hasAiAccess) {
                     // Generate AI message for this specific context
-                    aiResponse = await aiService.getWorkInsight(`A etapa ${nextLogicalStep.name} da obra ${work?.name} acaba de se tornar a próxima a ser focada. Dê uma dica útil para começar bem esta etapa.`);
+                    aiMessageContent = await aiService.getWorkInsight(`A etapa ${nextLogicalStep.name} da obra ${work?.name} acaba de se tornar a próxima a ser focada (início: ${nextLogicalStep.startDate}). Dê uma dica útil e incisiva para começar bem esta etapa, focando em otimização ou prevenção de problemas.`);
                 }
 
                 setActiveZeSuggestion({
@@ -618,10 +626,10 @@ const WorkDetail = () => {
                     type: 'suggestion',
                     priority: 'low',
                     message: `BOA! Etapa "${completedStep.name}" concluída. Agora foco na "${nextLogicalStep.name}"!`,
-                    aiMessage: aiResponse,
+                    aiMessage: aiMessageContent,
                     dismissible: true,
                     tag: tag,
-                    aiContext: `A etapa ${nextLogicalStep.name} acaba de iniciar. Dê uma dica útil para começar bem.` // Re-use general context
+                    aiContext: `A etapa ${nextLogicalStep.name} da obra ${work?.name} acaba de ser liberada. Dê uma dica útil para começar bem esta etapa.` // Re-use general context
                 });
                 markSuggestionAsSeen(tag);
             }
@@ -671,6 +679,7 @@ const WorkDetail = () => {
       setContracts(fetchedContracts);
       setChecklists(fetchedChecklists);
 
+      // Trigger suggestion generation after all data is loaded
       generateZeSuggestion();
 
     } catch (error) {
@@ -687,11 +696,14 @@ const WorkDetail = () => {
     }
   }, [isUserAuthFinished, authLoading, loadWorkData]);
 
+  // If a suggestion is dismissed or actioned, refresh suggestions.
+  // This might be redundant with loadWorkData(), but explicitly calling it ensures reactive updates.
   useEffect(() => {
-    if (!loading && work && steps.length > 0 && materials.length > 0) {
+    if (activeZeSuggestion === null && !loading) {
       generateZeSuggestion();
     }
-  }, [loading, work, steps, materials, expenses, generateZeSuggestion]);
+  }, [activeZeSuggestion, loading, generateZeSuggestion]);
+
 
   // =======================================================================
   // UI ACTIONS
@@ -792,7 +804,7 @@ const WorkDetail = () => {
     setZeModal({
       isOpen: true,
       title: 'Excluir Etapa?',
-      message: 'Tem certeza que deseja excluir esta etapa e todos os materiais associados? Despesas financeiras devem ser excluídas separadamente.',
+      message: 'Tem certeza que deseja excluir esta etapa? Isso irá remover também os materiais e despesas associadas a ela.',
       confirmText: 'Sim, Excluir',
       cancelText: 'Cancelar',
       type: 'DANGER',
@@ -831,12 +843,16 @@ const WorkDetail = () => {
 
   const handleToggleStepStatus = useCallback(async (step: Step) => {
     let nextStatus: StepStatus;
+    // Determine the new status based on current and rules
     if (step.status === StepStatus.NOT_STARTED) {
         nextStatus = StepStatus.IN_PROGRESS;
     } else if (step.status === StepStatus.IN_PROGRESS) {
         nextStatus = StepStatus.COMPLETED;
-    } else { // Currently COMPLETED, toggle back to NOT_STARTED
+    } else if (step.status === StepStatus.COMPLETED) { // If completed, toggle back to NOT_STARTED
         nextStatus = StepStatus.NOT_STARTED;
+    } else { // Handle 'Atrasada' or other unexpected status gracefully
+        console.warn(`Attempted to toggle status for step ${step.name} with unsupported status: ${step.status}`);
+        return; // Do nothing for unsupported status
     }
 
     try {
@@ -859,6 +875,76 @@ const WorkDetail = () => {
         });
     }
 }, [loadWorkData, handleStepCompletion]);
+
+  // DRAG AND DROP HANDLERS FOR STEPS
+  const handleDragStart = (e: React.DragEvent, stepId: string) => {
+    setDraggedStepId(stepId);
+    e.dataTransfer.effectAllowed = 'move';
+    // Optional: Add a class for visual feedback during drag
+    e.currentTarget.classList.add('opacity-50'); 
+  };
+
+  const handleDragOver = (e: React.DragEvent, stepId: string) => {
+    e.preventDefault(); // Necessary to allow drop
+    if (draggedStepId !== stepId) {
+      setDragOverStepId(stepId);
+    }
+  };
+
+  const handleDragLeave = () => {
+    setDragOverStepId(null);
+  };
+
+  const handleDrop = async (e: React.DragEvent, targetStepId: string) => {
+    e.preventDefault();
+    if (!draggedStepId || draggedStepId === targetStepId || !workId) return;
+
+    const draggedIndex = steps.findIndex(s => s.id === draggedStepId);
+    const targetIndex = steps.findIndex(s => s.id === targetStepId);
+
+    if (draggedIndex === -1 || targetIndex === -1) return;
+
+    const newStepsOrder = [...steps];
+    const [removed] = newStepsOrder.splice(draggedIndex, 1);
+    newStepsOrder.splice(targetIndex, 0, removed);
+
+    // Update orderIndex for all affected steps
+    const updates = newStepsOrder.map((step, index) => ({
+      ...step,
+      orderIndex: index + 1 // Start order from 1
+    }));
+
+    setSteps(updates); // Optimistic UI update
+
+    // Persist changes to the database
+    try {
+      await Promise.all(updates.map(step => dbService.updateStep(step)));
+      console.log("Steps reordered and updated in DB.");
+    } catch (error: any) {
+      console.error("Failed to update step order in DB:", error);
+      // Revert UI if DB update fails (or refetch to resync)
+      await loadWorkData(); 
+      setZeModal({
+        isOpen: true,
+        title: "Erro ao Reordenar",
+        message: `Não foi possível salvar a nova ordem das etapas: ${error.message || 'Erro desconhecido.'}`,
+        confirmText: "Entendido",
+        onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
+        type: 'ERROR'
+      });
+    } finally {
+      setDraggedStepId(null);
+      setDragOverStepId(null);
+      // Remove temporary drag class from all elements
+      e.currentTarget.classList.remove('opacity-50');
+    }
+  };
+
+  const handleDragEnd = (e: React.DragEvent) => {
+    setDraggedStepId(null);
+    setDragOverStepId(null);
+    e.currentTarget.classList.remove('opacity-50');
+  };
 
 
   // MATERIALS
@@ -1475,7 +1561,9 @@ const WorkDetail = () => {
         setNewPhotoDescription('');
         setNewPhotoFile(null);
       }
-    } catch (error) { console.error("Erro ao adicionar foto:", error);
+    } catch (error: any) { 
+        console.error("Erro ao adicionar foto:", error);
+        setZeModal({ isOpen: true, title: "Erro ao Adicionar Foto", message: `Não foi possível adicionar: ${error.message || 'Erro desconhecido.'}`, confirmText: "Entendido", onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })), type: 'ERROR' });
     } finally { setUploadingPhoto(false); }
   };
 
@@ -1524,7 +1612,9 @@ const WorkDetail = () => {
         setNewFileName('');
         setNewUploadFile(null);
       }
-    } catch (error) { console.error("Erro ao adicionar arquivo:", error);
+    } catch (error: any) { 
+        console.error("Erro ao adicionar arquivo:", error);
+        setZeModal({ isOpen: true, title: "Erro ao Adicionar Arquivo", message: `Não foi possível adicionar: ${error.message || 'Erro desconhecido.'}`, confirmText: "Entendido", onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })), type: 'ERROR' });
     } finally { setUploadingFile(false); }
   };
 
@@ -1742,9 +1832,11 @@ const WorkDetail = () => {
                 {steps.length === 0 ? (
                   <div className="col-span-full text-center text-slate-400 py-8 italic">Nenhuma etapa cadastrada ainda.</div>
                 ) : (
-                  steps.map((step, index) => {
-                    const today = new Date().toISOString().split('T')[0];
-                    const isDelayed = (step.status === StepStatus.NOT_STARTED || step.status === StepStatus.IN_PROGRESS) && new Date(step.endDate) < new Date(today);
+                  // Sort steps by orderIndex for display
+                  steps.sort((a, b) => a.orderIndex - b.orderIndex).map((step, index) => {
+                    const today = new Date();
+                    today.setHours(0,0,0,0); // Normalize to local midnight
+                    const isDelayed = (step.status === StepStatus.NOT_STARTED || step.status === StepStatus.IN_PROGRESS) && new Date(step.endDate) < today;
                     let stepStatusClass = '';
                     let stepStatusBgClass = '';
                     let statusText = '';
@@ -1766,7 +1858,7 @@ const WorkDetail = () => {
                     } else if (step.status === StepStatus.IN_PROGRESS) {
                       stepStatusClass = 'text-amber-600 dark:text-amber-400';
                       stepStatusBgClass = 'bg-amber-500/10';
-                      statusText = 'Parcial'; // CORREÇÃO: De "Em Andamento" para "Parcial"
+                      statusText = 'Parcial';
                       borderClass = 'border-amber-500/50 dark:border-amber-700/50';
                       shadowClass = 'shadow-lg shadow-amber-500/20';
                     } else { // NOT_STARTED (Pendente)
@@ -1776,18 +1868,30 @@ const WorkDetail = () => {
                       // No specific shadow for Pendente, uses default card-default
                     }
 
+                    // Determine if the current step is being dragged over
+                    const isDragOver = dragOverStepId === step.id && draggedStepId !== step.id;
+                    const dragOverClass = isDragOver ? 'border-dashed border-secondary-darker transform scale-[1.02] bg-slate-50 dark:bg-slate-800' : '';
+
+
                     return (
                       <div 
                         key={step.id} 
+                        // Drag and Drop attributes
+                        draggable
+                        onDragStart={(e) => handleDragStart(e, step.id)}
+                        onDragOver={(e) => handleDragOver(e, step.id)}
+                        onDragLeave={handleDragLeave}
+                        onDrop={(e) => handleDrop(e, step.id)}
+                        onDragEnd={handleDragEnd}
                         onClick={() => openEditStepModal(step)}
-                        className={cx(surface, card, "flex flex-col cursor-pointer transition-all hover:scale-[1.01] hover:border-secondary/50", borderClass, shadowClass)}
+                        className={cx(surface, card, "flex flex-col cursor-pointer transition-all hover:scale-[1.01] hover:border-secondary/50", borderClass, shadowClass, dragOverClass)}
                         role="button"
                         tabIndex={0}
                         aria-label={`Editar etapa ${step.name}`}
                         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') openEditStepModal(step); }}
                       >
                         <div className="flex items-center justify-between mb-3">
-                            <span className="text-sm font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">Etapa {index + 1}</span>
+                            <span className="text-sm font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">Etapa {step.orderIndex}</span> {/* Display orderIndex */}
                             <button 
                                 onClick={(e) => { e.stopPropagation(); if (!isDelayed) handleToggleStepStatus(step); }}
                                 className={cx("text-xs font-bold px-3 py-1 rounded-full transition-all", stepStatusClass, stepStatusBgClass, isDelayed ? 'cursor-not-allowed opacity-70' : 'hover:brightness-90 active:scale-95')}
@@ -1832,7 +1936,7 @@ const WorkDetail = () => {
                   aria-label="Filtrar materiais por etapa"
                 >
                   <option value="all">Todas as Etapas</option>
-                  {steps.map(step => (
+                  {steps.sort((a,b) => a.orderIndex - b.orderIndex).map(step => ( // Sort steps for filter too
                     <option key={step.id} value={step.id}>{step.name}</option>
                   ))}
                 </select>
@@ -1844,7 +1948,7 @@ const WorkDetail = () => {
                 groupedMaterials.map(stepGroup => (
                   <div key={stepGroup.stepId} className="mb-6 last:mb-0">
                     <h3 className="text-lg font-black text-primary dark:text-white mb-3 px-2 sm:px-0 flex items-center gap-2">
-                        <span className="text-secondary text-sm">Etapa {steps.findIndex(s => s.id === stepGroup.stepId) + 1}:</span> {stepGroup.stepName}
+                        <span className="text-secondary text-sm">Etapa {steps.find(s => s.id === stepGroup.stepId)?.orderIndex}:</span> {stepGroup.stepName} {/* Display orderIndex */}
                     </h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {stepGroup.materials.map(material => {
@@ -2026,8 +2130,11 @@ const WorkDetail = () => {
                                             </span>
                                         </div>
                                         <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-2">{expense.category}</p>
+                                        {/* Display linked worker/supplier if available */}
+                                        {expense.workerId && <p className="text-xs text-slate-500 dark:text-slate-400">Profissional: {workers.find(w => w.id === expense.workerId)?.name}</p>}
+                                        {expense.supplierId && <p className="text-xs text-slate-500 dark:text-slate-400">Fornecedor: {suppliers.find(s => s.id === expense.supplierId)?.name}</p>}
                                         <div className="flex justify-between items-center text-sm font-bold mb-2">
-                                            <span className="text-slate-700 dark:text-slate-300">Total: {formatCurrency(expense.amount)}</span>
+                                            <span className="text-slate-700 dark:text-slate-300">Total: {formatCurrency(total)}</span>
                                             <span className="text-green-600 dark:text-green-400">Pago: {formatCurrency(paid)}</span>
                                         </div>
                                         <p className="text-xs text-slate-500 dark:text-slate-400 text-right">Saldo a pagar: {formatCurrency(balance)}</p>
@@ -2468,49 +2575,38 @@ const WorkDetail = () => {
               </div>
               <div>
                 <label htmlFor="materialStepId" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Vincular à Etapa</label>
-                <select id="materialStepId" value={editMaterialData ? editMaterialData.stepId || '' : newMaterialStepId} onChange={(e) => editMaterialData ? setEditMaterialData({ ...editMaterialData, stepId: e.target.value }) : setNewMaterialStepId(e.target.value)}
+                <select id="materialStepId" value={editMaterialData ? editMaterialData.stepId : newMaterialStepId} onChange={(e) => editMaterialData ? setEditMaterialData({ ...editMaterialData, stepId: e.target.value }) : setNewMaterialStepId(e.target.value)}
                   className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" required aria-label="Vincular material à etapa">
-                  <option value="">Selecione uma etapa</option>
-                  {steps.map(step => (
-                    <option key={step.id} value={step.id}>{step.name}</option>
-                  ))}
-                </select>
+                    <option value="">Selecione uma etapa</option>
+                    {steps.sort((a,b) => a.orderIndex - b.orderIndex).map(step => (
+                      <option key={step.id} value={step.id}>{step.name}</option>
+                    ))}
+                  </select>
               </div>
-
-              {/* NEW: Purchase section for existing materials */}
-              {editMaterialData && (
-                <div className="pt-4 border-t border-slate-100 dark:border-slate-800 mt-6">
-                  <h3 className="text-lg font-black text-primary dark:text-white mb-4">Registrar Compra</h3>
-                  <div className="flex justify-between items-center text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">
-                    <span>Já Comprado:</span>
-                    <span className="text-green-600 dark:text-green-400">{editMaterialData.purchasedQty} {editMaterialData.unit}</span>
-                  </div>
-                  <div className="flex justify-between items-center text-sm font-bold text-slate-700 dark:text-slate-300 mb-4">
-                    <span>Custo Total:</span>
-                    <span className="text-green-600 dark:text-green-400">{formatCurrency(editMaterialData.totalCost)}</span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4 mb-4">
-                    <div>
-                      <label htmlFor="currentPurchaseQty" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Quantidade a Comprar</label>
-                      <input id="currentPurchaseQty" type="number" value={currentPurchaseQty} onChange={(e) => setCurrentPurchaseQty(e.target.value)}
-                        className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" placeholder="0" aria-label="Quantidade de material a comprar" />
-                    </div>
-                    <div>
-                      <label htmlFor="currentPurchaseCost" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Custo da Compra (R$)</label>
-                      <input id="currentPurchaseCost" type="number" value={currentPurchaseCost} onChange={(e) => setCurrentPurchaseCost(e.target.value)}
-                        className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" placeholder="0,00" aria-label="Custo total da compra" />
-                    </div>
-                  </div>
-                  <button type="button" onClick={handleInternalRegisterPurchase} disabled={!currentPurchaseQty || !currentPurchaseCost} className="w-full py-4 bg-secondary hover:bg-secondary-dark text-white font-bold rounded-xl shadow-lg shadow-secondary/20 transition-all flex items-center justify-center gap-2">
-                    <i className="fa-solid fa-cart-shopping"></i> Registrar Compra
-                  </button>
-                </div>
-              )}
-
               <button type="submit" className="w-full py-4 bg-primary hover:bg-primary-dark text-white font-bold rounded-xl shadow-lg shadow-primary/20 transition-all flex items-center justify-center gap-2">
                 <i className="fa-solid fa-save"></i> {editMaterialData ? 'Salvar Alterações' : 'Adicionar Material'}
               </button>
             </form>
+            {editMaterialData && (
+                <div className="mt-8 pt-6 border-t border-slate-100 dark:border-slate-800">
+                    <h3 className="text-xl font-black text-primary dark:text-white mb-4">Registrar Compra</h3>
+                    <form onSubmit={handleInternalRegisterPurchase} className="space-y-4">
+                        <div>
+                            <label htmlFor="currentPurchaseQty" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Quantidade Comprada</label>
+                            <input id="currentPurchaseQty" type="number" value={currentPurchaseQty} onChange={(e) => setCurrentPurchaseQty(e.target.value)}
+                                className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" required aria-label="Quantidade de material comprada" />
+                        </div>
+                        <div>
+                            <label htmlFor="currentPurchaseCost" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Custo Total da Compra (R$)</label>
+                            <input id="currentPurchaseCost" type="number" step="0.01" value={currentPurchaseCost} onChange={(e) => setCurrentPurchaseCost(e.target.value)}
+                                className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" required aria-label="Custo total da compra" />
+                        </div>
+                        <button type="submit" className="w-full py-4 bg-secondary hover:bg-secondary-dark text-white font-bold rounded-xl shadow-lg shadow-secondary/20 transition-all flex items-center justify-center gap-2">
+                            <i className="fa-solid fa-receipt"></i> Registrar Compra
+                        </button>
+                    </form>
+                </div>
+            )}
           </div>
         </div>
       )}
@@ -2525,62 +2621,60 @@ const WorkDetail = () => {
               <div>
                 <label htmlFor="expenseDescription" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Descrição</label>
                 <input id="expenseDescription" type="text" value={editExpenseData ? editExpenseData.description : newExpenseDescription} onChange={(e) => editExpenseData ? setEditExpenseData({ ...editExpenseData, description: e.target.value }) : setNewExpenseDescription(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" required aria-label="Descrição da Despesa" />
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" required aria-label="Descrição da despesa" />
               </div>
               <div>
-                <label htmlFor="expenseAmount" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Valor Total (R$)</label>
-                <input id="expenseAmount" type="number" value={editExpenseData ? editExpenseData.amount.toString() : newExpenseAmount} onChange={(e) => editExpenseData ? setEditExpenseData({ ...editExpenseData, amount: Number(e.target.value) }) : setNewExpenseAmount(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" required aria-label="Valor total da despesa" />
+                <label htmlFor="expenseAmount" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Valor Combinado (R$)</label>
+                <input id="expenseAmount" type="number" step="0.01" value={editExpenseData ? editExpenseData.amount.toString() : newExpenseAmount} onChange={(e) => editExpenseData ? setEditExpenseData({ ...editExpenseData, amount: Number(e.target.value) }) : setNewExpenseAmount(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" required aria-label="Valor combinado da despesa" />
               </div>
               <div>
                 <label htmlFor="expenseCategory" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Categoria</label>
-                <select id="expenseCategory" value={editExpenseData ? editExpenseData.category : newExpenseCategory} onChange={(e) => editExpenseData ? setEditExpenseData({ ...editExpenseData, category: e.target.value }) : setNewExpenseCategory(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" required aria-label="Categoria da Despesa">
+                <select id="expenseCategory" value={editExpenseData ? editExpenseData.category : newExpenseCategory} onChange={(e) => editExpenseData ? setEditExpenseData({ ...editExpenseData, category: e.target.value as ExpenseCategory | string }) : setNewExpenseCategory(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" required aria-label="Categoria da despesa">
                   {Object.values(ExpenseCategory).map(cat => (
                     <option key={cat} value={cat}>{cat}</option>
                   ))}
-                  {/* Option for custom category if needed */}
-                  <option value="Outros">Outros</option>
-                </select>
-              </div>
-              {(editExpenseData?.category === ExpenseCategory.MATERIAL || newExpenseCategory === ExpenseCategory.MATERIAL) && (
-                <div>
-                  <label htmlFor="expenseStepId" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Vincular à Etapa</label>
-                  <select id="expenseStepId" value={editExpenseData ? editExpenseData.stepId || '' : newExpenseStepId} onChange={(e) => editExpenseData ? setEditExpenseData({ ...editExpenseData, stepId: e.target.value }) : setNewExpenseStepId(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" aria-label="Vincular despesa à etapa">
-                    <option value="">Selecione uma etapa (Opcional)</option>
-                    {steps.map(step => (
-                      <option key={step.id} value={step.id}>{step.name}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
-              {/* NEW: Dropdown for Workers */}
-              <div>
-                <label htmlFor="expenseWorkerId" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Vincular a Profissional</label>
-                <select id="expenseWorkerId" value={editExpenseData ? editExpenseData.workerId || '' : newExpenseWorkerId} onChange={(e) => editExpenseData ? setEditExpenseData({ ...editExpenseData, workerId: e.target.value }) : setNewExpenseWorkerId(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" aria-label="Vincular despesa a um profissional">
-                  <option value="">Nenhum Profissional</option>
-                  {workers.map(worker => (
-                    <option key={worker.id} value={worker.id}>{worker.name} ({worker.role})</option>
-                  ))}
-                </select>
-              </div>
-              {/* NEW: Dropdown for Suppliers */}
-              <div>
-                <label htmlFor="expenseSupplierId" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Vincular a Fornecedor</label>
-                <select id="expenseSupplierId" value={editExpenseData ? editExpenseData.supplierId || '' : newExpenseSupplierId} onChange={(e) => editExpenseData ? setEditExpenseData({ ...editExpenseData, supplierId: e.target.value }) : setNewExpenseSupplierId(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" aria-label="Vincular despesa a um fornecedor">
-                  <option value="">Nenhum Fornecedor</option>
-                  {suppliers.map(supplier => (
-                    <option key={supplier.id} value={supplier.id}>{supplier.name} ({supplier.category})</option>
-                  ))}
+                  {/* Add more custom categories if needed */}
+                  <option value="Serviços Gerais">Serviços Gerais</option>
+                  <option value="Equipamentos">Equipamentos</option>
+                  <option value="Transporte">Transporte</option>
                 </select>
               </div>
               <div>
                 <label htmlFor="expenseDate" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Data</label>
                 <input id="expenseDate" type="date" value={editExpenseData ? editExpenseData.date : newExpenseDate} onChange={(e) => editExpenseData ? setEditExpenseData({ ...editExpenseData, date: e.target.value }) : setNewExpenseDate(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" required aria-label="Data da Despesa" />
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" required aria-label="Data da despesa" />
+              </div>
+              <div>
+                <label htmlFor="expenseStepId" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Vincular à Etapa</label>
+                <select id="expenseStepId" value={editExpenseData ? editExpenseData.stepId || '' : newExpenseStepId} onChange={(e) => editExpenseData ? setEditExpenseData({ ...editExpenseData, stepId: e.target.value || undefined }) : setNewExpenseStepId(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" aria-label="Vincular despesa à etapa">
+                    <option value="">Nenhuma etapa</option>
+                    {steps.sort((a,b) => a.orderIndex - b.orderIndex).map(step => (
+                      <option key={step.id} value={step.id}>{step.name}</option>
+                    ))}
+                  </select>
+              </div>
+              <div>
+                <label htmlFor="expenseWorkerId" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Vincular Profissional</label>
+                <select id="expenseWorkerId" value={editExpenseData ? editExpenseData.workerId || '' : newExpenseWorkerId} onChange={(e) => editExpenseData ? setEditExpenseData({ ...editExpenseData, workerId: e.target.value || undefined }) : setNewExpenseWorkerId(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" aria-label="Vincular despesa a um profissional">
+                    <option value="">Nenhum profissional</option>
+                    {workers.map(worker => (
+                      <option key={worker.id} value={worker.id}>{worker.name} ({worker.role})</option>
+                    ))}
+                  </select>
+              </div>
+              <div>
+                <label htmlFor="expenseSupplierId" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Vincular Fornecedor</label>
+                <select id="expenseSupplierId" value={editExpenseData ? editExpenseData.supplierId || '' : newExpenseSupplierId} onChange={(e) => editExpenseData ? setEditExpenseData({ ...editExpenseData, supplierId: e.target.value || undefined }) : setNewExpenseSupplierId(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" aria-label="Vincular despesa a um fornecedor">
+                    <option value="">Nenhum fornecedor</option>
+                    {suppliers.map(supplier => (
+                      <option key={supplier.id} value={supplier.id}>{supplier.name} ({supplier.category})</option>
+                    ))}
+                  </select>
               </div>
               <button type="submit" className="w-full py-4 bg-primary hover:bg-primary-dark text-white font-bold rounded-xl shadow-lg shadow-primary/20 transition-all flex items-center justify-center gap-2">
                 <i className="fa-solid fa-save"></i> {editExpenseData ? 'Salvar Alterações' : 'Adicionar Despesa'}
@@ -2595,22 +2689,22 @@ const WorkDetail = () => {
         <div className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-primary/80 backdrop-blur-sm animate-in fade-in duration-300">
           <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-md p-6 shadow-2xl border border-white/20 relative">
             <button onClick={() => setShowAddPaymentModal(false)} className="absolute top-4 right-4 text-slate-400 hover:text-primary dark:hover:text-white" aria-label="Fechar modal"><i className="fa-solid fa-xmark text-xl"></i></button>
-            <h2 className="text-xl font-black text-primary dark:text-white mb-4">Registrar Pagamento</h2>
-            <p className="text-slate-500 dark:text-slate-400 mb-4">Despesa: <span className="font-bold">{paymentExpenseData.description}</span></p>
-            <p className="text-slate-500 dark:text-slate-400 mb-6">Saldo a pagar: <span className="font-bold text-secondary">{formatCurrency((paymentExpenseData.totalAgreed || paymentExpenseData.amount) - (paymentExpenseData.paidAmount || 0))}</span></p>
+            <h2 className="text-xl font-black text-primary dark:text-white mb-6">Registrar Pagamento</h2>
+            <p className="text-slate-700 dark:text-slate-300 mb-4">Despesa: <span className="font-bold">{paymentExpenseData.description}</span></p>
+            <p className="text-slate-700 dark:text-slate-300 mb-4">Saldo a pagar: <span className="font-bold">{formatCurrency((paymentExpenseData.totalAgreed || paymentExpenseData.amount) - (paymentExpenseData.paidAmount || 0))}</span></p>
             <form onSubmit={handleAddPayment} className="space-y-4">
               <div>
                 <label htmlFor="paymentAmount" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Valor do Pagamento (R$)</label>
-                <input id="paymentAmount" type="number" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" required aria-label="Valor do pagamento" />
+                <input id="paymentAmount" type="number" step="0.01" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" required aria-label="Valor do pagamento a ser registrado" />
               </div>
               <div>
                 <label htmlFor="paymentDate" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Data do Pagamento</label>
                 <input id="paymentDate" type="date" value={paymentDate} onChange={(e) => setNewPaymentDate(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" required aria-label="Data do Pagamento" />
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" required aria-label="Data do pagamento" />
               </div>
               <button type="submit" className="w-full py-4 bg-primary hover:bg-primary-dark text-white font-bold rounded-xl shadow-lg shadow-primary/20 transition-all flex items-center justify-center gap-2">
-                <i className="fa-solid fa-money-bill-wave"></i> Registrar Pagamento
+                <i className="fa-solid fa-money-bill-transfer"></i> Registrar Pagamento
               </button>
             </form>
           </div>
@@ -2627,32 +2721,30 @@ const WorkDetail = () => {
               <div>
                 <label htmlFor="workerName" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Nome</label>
                 <input id="workerName" type="text" value={editWorkerData ? editWorkerData.name : newWorkerName} onChange={(e) => editWorkerData ? setEditWorkerData({ ...editWorkerData, name: e.target.value }) : setNewWorkerName(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" required aria-label="Nome do Profissional" />
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" required aria-label="Nome do profissional" />
               </div>
               <div>
                 <label htmlFor="workerRole" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Função</label>
                 <select id="workerRole" value={editWorkerData ? editWorkerData.role : newWorkerRole} onChange={(e) => editWorkerData ? setEditWorkerData({ ...editWorkerData, role: e.target.value }) : setNewWorkerRole(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" required aria-label="Função do Profissional">
-                  <option value="">Selecione a Função</option>
-                  {STANDARD_JOB_ROLES.map(role => (
-                    <option key={role} value={role}>{role}</option>
-                  ))}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" required aria-label="Função do profissional">
+                  <option value="">Selecione a função</option>
+                  {STANDARD_JOB_ROLES.map(role => <option key={role} value={role}>{role}</option>)}
                 </select>
               </div>
               <div>
                 <label htmlFor="workerPhone" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Telefone</label>
                 <input id="workerPhone" type="text" value={editWorkerData ? editWorkerData.phone : newWorkerPhone} onChange={(e) => editWorkerData ? setEditWorkerData({ ...editWorkerData, phone: e.target.value }) : setNewWorkerPhone(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" aria-label="Telefone do Profissional" />
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" aria-label="Telefone do profissional" />
               </div>
               <div>
                 <label htmlFor="workerDailyRate" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Diária (R$)</label>
-                <input id="workerDailyRate" type="number" value={editWorkerData ? editWorkerData.dailyRate?.toString() || '' : newWorkerDailyRate} onChange={(e) => editWorkerData ? setEditWorkerData({ ...editWorkerData, dailyRate: Number(e.target.value) }) : setNewWorkerDailyRate(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" placeholder="0,00" aria-label="Valor da Diária" />
+                <input id="workerDailyRate" type="number" step="0.01" value={editWorkerData ? editWorkerData.dailyRate?.toString() || '' : newWorkerDailyRate} onChange={(e) => editWorkerData ? setEditWorkerData({ ...editWorkerData, dailyRate: Number(e.target.value) }) : setNewWorkerDailyRate(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" aria-label="Valor da diária do profissional" />
               </div>
               <div>
                 <label htmlFor="workerNotes" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Anotações</label>
                 <textarea id="workerNotes" value={editWorkerData ? editWorkerData.notes || '' : newWorkerNotes} onChange={(e) => editWorkerData ? setEditWorkerData({ ...editWorkerData, notes: e.target.value }) : setNewWorkerNotes(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all h-24 resize-none" aria-label="Anotações sobre o Profissional"></textarea>
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" rows={3} aria-label="Anotações sobre o profissional"></textarea>
               </div>
               <button type="submit" className="w-full py-4 bg-primary hover:bg-primary-dark text-white font-bold rounded-xl shadow-lg shadow-primary/20 transition-all flex items-center justify-center gap-2">
                 <i className="fa-solid fa-save"></i> {editWorkerData ? 'Salvar Alterações' : 'Adicionar Profissional'}
@@ -2672,37 +2764,35 @@ const WorkDetail = () => {
               <div>
                 <label htmlFor="supplierName" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Nome</label>
                 <input id="supplierName" type="text" value={editSupplierData ? editSupplierData.name : newSupplierName} onChange={(e) => editSupplierData ? setEditSupplierData({ ...editSupplierData, name: e.target.value }) : setNewSupplierName(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" required aria-label="Nome do Fornecedor" />
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" required aria-label="Nome do fornecedor" />
               </div>
               <div>
                 <label htmlFor="supplierCategory" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Categoria</label>
                 <select id="supplierCategory" value={editSupplierData ? editSupplierData.category : newSupplierCategory} onChange={(e) => editSupplierData ? setEditSupplierData({ ...editSupplierData, category: e.target.value }) : setNewSupplierCategory(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" required aria-label="Categoria do Fornecedor">
-                  <option value="">Selecione a Categoria</option>
-                  {STANDARD_SUPPLIER_CATEGORIES.map(category => (
-                    <option key={category} value={category}>{category}</option>
-                  ))}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" required aria-label="Categoria do fornecedor">
+                  <option value="">Selecione a categoria</option>
+                  {STANDARD_SUPPLIER_CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
                 </select>
               </div>
               <div>
                 <label htmlFor="supplierPhone" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Telefone</label>
                 <input id="supplierPhone" type="text" value={editSupplierData ? editSupplierData.phone : newSupplierPhone} onChange={(e) => editSupplierData ? setEditSupplierData({ ...editSupplierData, phone: e.target.value }) : setNewSupplierPhone(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" aria-label="Telefone do Fornecedor" />
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" aria-label="Telefone do fornecedor" />
               </div>
               <div>
                 <label htmlFor="supplierEmail" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">E-mail</label>
                 <input id="supplierEmail" type="email" value={editSupplierData ? editSupplierData.email || '' : newSupplierEmail} onChange={(e) => editSupplierData ? setEditSupplierData({ ...editSupplierData, email: e.target.value }) : setNewSupplierEmail(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" aria-label="E-mail do Fornecedor" />
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" aria-label="E-mail do fornecedor" />
               </div>
               <div>
                 <label htmlFor="supplierAddress" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Endereço</label>
                 <input id="supplierAddress" type="text" value={editSupplierData ? editSupplierData.address || '' : newSupplierAddress} onChange={(e) => editSupplierData ? setEditSupplierData({ ...editSupplierData, address: e.target.value }) : setNewSupplierAddress(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" aria-label="Endereço do Fornecedor" />
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" aria-label="Endereço do fornecedor" />
               </div>
               <div>
                 <label htmlFor="supplierNotes" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Anotações</label>
                 <textarea id="supplierNotes" value={editSupplierData ? editSupplierData.notes || '' : newSupplierNotes} onChange={(e) => editSupplierData ? setEditSupplierData({ ...editSupplierData, notes: e.target.value }) : setNewSupplierNotes(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all h-24 resize-none" aria-label="Anotações sobre o Fornecedor"></textarea>
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" rows={3} aria-label="Anotações sobre o fornecedor"></textarea>
               </div>
               <button type="submit" className="w-full py-4 bg-primary hover:bg-primary-dark text-white font-bold rounded-xl shadow-lg shadow-primary/20 transition-all flex items-center justify-center gap-2">
                 <i className="fa-solid fa-save"></i> {editSupplierData ? 'Salvar Alterações' : 'Adicionar Fornecedor'}
@@ -2717,29 +2807,30 @@ const WorkDetail = () => {
         <div className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-primary/80 backdrop-blur-sm animate-in fade-in duration-300">
           <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-md p-6 shadow-2xl border border-white/20 relative">
             <button onClick={() => setShowAddPhotoModal(false)} className="absolute top-4 right-4 text-slate-400 hover:text-primary dark:hover:text-white" aria-label="Fechar modal"><i className="fa-solid fa-xmark text-xl"></i></button>
-            <h2 className="text-xl font-black text-primary dark:text-white mb-6">Nova Foto</h2>
+            <h2 className="text-xl font-black text-primary dark:text-white mb-6">Nova Foto da Obra</h2>
             <form onSubmit={handleAddPhoto} className="space-y-4">
               <div>
                 <label htmlFor="photoDescription" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Descrição</label>
                 <input id="photoDescription" type="text" value={newPhotoDescription} onChange={(e) => setNewPhotoDescription(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" required aria-label="Descrição da Foto" />
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" required aria-label="Descrição da foto" />
+              </div>
+              <div>
+                <label htmlFor="photoFile" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Arquivo da Imagem</label>
+                <input id="photoFile" type="file" onChange={(e) => e.target.files && setNewPhotoFile(e.target.files[0])}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-secondary file:text-white hover:file:bg-secondary-dark" required aria-label="Selecionar arquivo de imagem" />
               </div>
               <div>
                 <label htmlFor="photoType" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Tipo</label>
                 <select id="photoType" value={newPhotoType} onChange={(e) => setNewPhotoType(e.target.value as 'BEFORE' | 'AFTER' | 'PROGRESS')}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" required aria-label="Tipo de Foto">
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" aria-label="Tipo de foto">
                   <option value="PROGRESS">Progresso</option>
                   <option value="BEFORE">Antes</option>
                   <option value="AFTER">Depois</option>
                 </select>
               </div>
-              <div>
-                <label htmlFor="photoFile" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Arquivo da Foto</label>
-                <input id="photoFile" type="file" accept="image/*" onChange={(e) => setNewPhotoFile(e.target.files ? e.target.files[0] : null)}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" required aria-label="Arquivo da Foto" />
-              </div>
               <button type="submit" disabled={uploadingPhoto} className="w-full py-4 bg-primary hover:bg-primary-dark text-white font-bold rounded-xl shadow-lg shadow-primary/20 transition-all flex items-center justify-center gap-2">
-                {uploadingPhoto ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-upload"></i>} {uploadingPhoto ? 'Enviando...' : 'Adicionar Foto'}
+                {uploadingPhoto ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-upload"></i>}
+                {uploadingPhoto ? 'Enviando...' : 'Adicionar Foto'}
               </button>
             </form>
           </div>
@@ -2751,29 +2842,28 @@ const WorkDetail = () => {
         <div className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-primary/80 backdrop-blur-sm animate-in fade-in duration-300">
           <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-md p-6 shadow-2xl border border-white/20 relative">
             <button onClick={() => setShowAddFileModal(false)} className="absolute top-4 right-4 text-slate-400 hover:text-primary dark:hover:text-white" aria-label="Fechar modal"><i className="fa-solid fa-xmark text-xl"></i></button>
-            <h2 className="text-xl font-black text-primary dark:text-white mb-6">Novo Arquivo</h2>
+            <h2 className="text-xl font-black text-primary dark:text-white mb-6">Novo Arquivo / Documento</h2>
             <form onSubmit={handleAddFile} className="space-y-4">
               <div>
                 <label htmlFor="fileName" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Nome do Arquivo</label>
                 <input id="fileName" type="text" value={newFileName} onChange={(e) => setNewFileName(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" required aria-label="Nome do Arquivo" />
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" required aria-label="Nome do arquivo" />
               </div>
               <div>
                 <label htmlFor="fileCategory" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Categoria</label>
                 <select id="fileCategory" value={newFileCategory} onChange={(e) => setNewFileCategory(e.target.value as FileCategory)}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" required aria-label="Categoria do Arquivo">
-                  {Object.values(FileCategory).map(cat => (
-                    <option key={cat} value={cat}>{cat}</option>
-                  ))}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" aria-label="Categoria do arquivo">
+                  {Object.values(FileCategory).map(cat => <option key={cat} value={cat}>{cat}</option>)}
                 </select>
               </div>
               <div>
-                <label htmlFor="uploadFile" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Selecionar Arquivo</label>
-                <input id="uploadFile" type="file" onChange={(e) => setNewUploadFile(e.target.files ? e.target.files[0] : null)}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" required aria-label="Selecionar Arquivo para Upload" />
+                <label htmlFor="uploadFile" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Arquivo</label>
+                <input id="uploadFile" type="file" onChange={(e) => e.target.files && setNewUploadFile(e.target.files[0])}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-secondary file:text-white hover:file:bg-secondary-dark" required aria-label="Selecionar arquivo para upload" />
               </div>
               <button type="submit" disabled={uploadingFile} className="w-full py-4 bg-primary hover:bg-primary-dark text-white font-bold rounded-xl shadow-lg shadow-primary/20 transition-all flex items-center justify-center gap-2">
-                {uploadingFile ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-upload"></i>} {uploadingFile ? 'Enviando...' : 'Adicionar Arquivo'}
+                {uploadingFile ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-upload"></i>}
+                {uploadingFile ? 'Enviando...' : 'Adicionar Arquivo'}
               </button>
             </form>
           </div>
@@ -2790,17 +2880,17 @@ const WorkDetail = () => {
               <div>
                 <label htmlFor="checklistName" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Nome da Checklist</label>
                 <input id="checklistName" type="text" value={editChecklistData ? editChecklistData.name : newChecklistName} onChange={(e) => editChecklistData ? setEditChecklistData({ ...editChecklistData, name: e.target.value }) : setNewChecklistName(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" required aria-label="Nome da Checklist" />
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" required aria-label="Nome da checklist" />
               </div>
               <div>
-                <label htmlFor="checklistCategory" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Categoria (Etapa da Obra)</label>
+                <label htmlFor="checklistCategory" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Categoria (Etapa)</label>
                 <select id="checklistCategory" value={editChecklistData ? editChecklistData.category : newChecklistCategory} onChange={(e) => editChecklistData ? setEditChecklistData({ ...editChecklistData, category: e.target.value }) : setNewChecklistCategory(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" required aria-label="Categoria da Checklist (Etapa da Obra)">
-                  <option value="">Selecione uma categoria</option>
-                  {steps.map(step => (
-                    <option key={step.id} value={step.name}>{step.name}</option>
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" required aria-label="Categoria da checklist (etapa)">
+                  <option value="">Selecione uma categoria/etapa</option>
+                  {steps.sort((a,b) => a.orderIndex - b.orderIndex).map(step => ( // Sort steps for category too
+                    <option key={step.id} value={step.name}>{step.name}</option> // Use step name as category for linking
                   ))}
-                  {/* Option for general checklists not tied to a specific step */}
+                  {/* Additional general categories if needed */}
                   <option value="Geral">Geral</option>
                   <option value="Segurança">Segurança</option>
                   <option value="Entrega">Entrega</option>
@@ -2808,54 +2898,27 @@ const WorkDetail = () => {
               </div>
               <div>
                 <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Itens da Checklist</label>
-                {editChecklistData?.items.map((item, idx) => (
-                  <div key={item.id} className="flex items-center gap-2 mb-2">
-                    <input type="checkbox" checked={item.checked} onChange={(e) => {
-                      if (editChecklistData) {
-                        const updatedItems = [...editChecklistData.items];
-                        updatedItems[idx] = { ...updatedItems[idx], checked: e.target.checked };
-                        setEditChecklistData({ ...editChecklistData, items: updatedItems });
-                      }
-                    }} className="form-checkbox h-5 w-5 text-secondary rounded border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-slate-700" aria-label={`Marcar item ${item.text}`} />
-                    <input type="text" value={item.text} onChange={(e) => {
-                      if (editChecklistData) {
-                        const updatedItems = [...editChecklistData.items];
-                        updatedItems[idx] = { ...updatedItems[idx], text: e.target.value };
-                        setEditChecklistData({ ...editChecklistData, items: updatedItems });
-                      }
-                    }}
-                      className="flex-1 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" placeholder="Novo item" aria-label="Descrição do item da checklist" />
-                    <button type="button" onClick={() => {
-                      if (editChecklistData) {
-                        const updatedItems = editChecklistData.items.filter((_, i) => i !== idx);
-                        setEditChecklistData({ ...editChecklistData, items: updatedItems });
-                      }
-                    }} className="text-red-500 hover:text-red-700" aria-label="Remover item"><i className="fa-solid fa-trash-alt"></i></button>
-                  </div>
-                ))}
-                {!editChecklistData && newChecklistItems.map((item, idx) => (
-                  <div key={idx} className="flex items-center gap-2 mb-2">
-                    <input type="text" value={item} onChange={(e) => {
-                      const updatedItems = [...newChecklistItems];
-                      updatedItems[idx] = e.target.value;
-                      setNewChecklistItems(updatedItems);
-                    }}
-                      className="flex-1 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" placeholder="Novo item" aria-label="Descrição do item da checklist" />
-                    <button type="button" onClick={() => {
-                      const updatedItems = newChecklistItems.filter((_, i) => i !== idx);
-                      setNewChecklistItems(updatedItems);
-                    }} className="text-red-500 hover:text-red-700" aria-label="Remover item"><i className="fa-solid fa-trash-alt"></i></button>
-                  </div>
-                ))}
-                <button type="button" onClick={() => {
-                  if (editChecklistData) {
-                    setEditChecklistData({ ...editChecklistData, items: [...editChecklistData.items, { id: crypto.randomUUID(), text: '', checked: false }] });
-                  } else {
-                    setNewChecklistItems([...newChecklistItems, '']);
-                  }
-                }} className="mt-2 px-4 py-2 bg-slate-100 dark:bg-slate-800 text-primary dark:text-white text-sm font-bold rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors flex items-center justify-center gap-2" aria-label="Adicionar outro item">
-                  <i className="fa-solid fa-plus-circle"></i> Adicionar Item
-                </button>
+                {editChecklistData ? (
+                  editChecklistData.items.map((item, index) => (
+                    <div key={item.id} className="flex gap-2 mb-2">
+                      <input type="text" value={item.text} onChange={(e) => setEditChecklistData(prev => prev ? ({ ...prev, items: prev.items.map(i => i.id === item.id ? { ...i, text: e.target.value } : i) }) : null)}
+                        className="flex-1 px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" placeholder="Novo item" aria-label={`Item ${index + 1} da checklist`} />
+                      <button type="button" onClick={() => setEditChecklistData(prev => prev ? ({ ...prev, items: prev.items.filter(i => i.id !== item.id) }) : null)}
+                        className="p-3 rounded-xl bg-red-500 text-white hover:bg-red-700 transition-colors" aria-label={`Remover item ${index + 1}`}><i className="fa-solid fa-trash-alt"></i></button>
+                    </div>
+                  ))
+                ) : (
+                  newChecklistItems.map((item, index) => (
+                    <div key={index} className="flex gap-2 mb-2">
+                      <input type="text" value={item} onChange={(e) => setNewChecklistItems(prev => prev.map((val, idx) => idx === index ? e.target.value : val))}
+                        className="flex-1 px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" placeholder="Novo item" aria-label={`Item ${index + 1} da checklist`} />
+                      <button type="button" onClick={() => setNewChecklistItems(prev => prev.filter((_, idx) => idx !== index))}
+                        className="p-3 rounded-xl bg-red-500 text-white hover:bg-red-700 transition-colors" aria-label={`Remover item ${index + 1}`}><i className="fa-solid fa-trash-alt"></i></button>
+                    </div>
+                  ))
+                )}
+                <button type="button" onClick={() => editChecklistData ? setEditChecklistData(prev => prev ? ({ ...prev, items: [...prev.items, { id: crypto.randomUUID(), text: '', checked: false }] }) : null) : setNewChecklistItems(prev => [...prev, ''])}
+                  className="w-full py-3 mt-2 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors" aria-label="Adicionar outro item"><i className="fa-solid fa-plus mr-2"></i> Adicionar Item</button>
               </div>
               <button type="submit" className="w-full py-4 bg-primary hover:bg-primary-dark text-white font-bold rounded-xl shadow-lg shadow-primary/20 transition-all flex items-center justify-center gap-2">
                 <i className="fa-solid fa-save"></i> {editChecklistData ? 'Salvar Alterações' : 'Adicionar Checklist'}
@@ -2864,6 +2927,19 @@ const WorkDetail = () => {
           </div>
         </div>
       )}
+
+      {/* ZeModal - Common for all confirmations/errors */}
+      <ZeModal
+        isOpen={zeModal.isOpen}
+        title={zeModal.title}
+        message={zeModal.message}
+        confirmText={zeModal.confirmText}
+        cancelText={zeModal.cancelText}
+        type={zeModal.type}
+        onConfirm={zeModal.onConfirm}
+        onCancel={zeModal.onCancel}
+        isConfirming={zeModal.isConfirming}
+      />
     </div>
   );
 };

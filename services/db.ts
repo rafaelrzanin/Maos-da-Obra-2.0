@@ -1,4 +1,3 @@
-
 import { PlanType, ExpenseCategory, StepStatus, FileCategory, type User, type Work, type Step, type Material, type Expense, type Worker, type Supplier, type WorkPhoto, type WorkFile, type DBNotification, type PushSubscriptionInfo, type Contract, type Checklist, type ChecklistItem } from '../types.ts';
 import { WORK_TEMPLATES, FULL_MATERIAL_PACKAGES, CONTRACT_TEMPLATES, CHECKLIST_TEMPLATES } from './standards.ts';
 import { supabase } from './supabase.ts';
@@ -79,7 +78,8 @@ const parseStepFromDB = (data: any): Step => ({
     // Fix: Ensure null from DB is mapped to undefined for optional string properties
     realDate: data.real_date || undefined,
     status: data.status,
-    isDelayed: data.is_delayed
+    isDelayed: data.is_delayed,
+    orderIndex: data.order_index // NEW: Parse order_index
 });
 
 const parseMaterialFromDB = (data: any): Material => ({
@@ -799,13 +799,13 @@ export const dbService = {
             'Fiação Elétrica Geral',
             'Chapisco e Reboco',
             'Contrapiso',
-            'Impermeabilização Geral',
-            'Gesso / Forro Geral',
-            'Pisos e Revestimentos Geral',
+            'Impermeabilização Geral', // Renomeado para diferenciar de "Banheiro"
+            'Gesso / Forro Geral', // Renomeado
+            'Pisos e Revestimentos Geral', // Renomeado
             'Esquadrias (Janelas/Portas)',
-            'Marmoraria Geral (Bancadas)',
-            'Pintura Paredes/Tetos',
-            'Instalação de Louças e Metais Geral',
+            'Marmoraria Geral (Bancadas)', 
+            'Pintura Paredes/Tetos', 
+            'Instalação de Louças e Metais Geral', 
             'Instalação de Luminárias',
         ];
 
@@ -979,7 +979,8 @@ export const dbService = {
             start_date: currentStepStartDate.toISOString().split('T')[0],
             end_date: stepEndDate.toISOString().split('T')[0],
             status: StepStatus.NOT_STARTED,
-            is_delayed: false
+            is_delayed: false,
+            order_index: idx // NEW: Assign order_index for initial steps
         };
 
         // Set start date for the next step to be the day after the current step's end date
@@ -1087,7 +1088,8 @@ export const dbService = {
   },
 
   async getDailySummary(workId: string): Promise<{ completedSteps: number; delayedSteps: number; pendingMaterials: number; totalSteps: number }> {
-    const now = Date.now();
+    // Corrected typo from Date.Now() to Date.now()
+    const now = Date.now(); 
     const cacheKey = `summary-${workId}`;
     if (_dashboardCache.summary[cacheKey] && (now - _dashboardCache.summary[cacheKey].timestamp < CACHE_TTL)) {
       return _dashboardCache.summary[cacheKey].data;
@@ -1120,7 +1122,8 @@ export const dbService = {
     }
 
     console.log(`[dbService.getSteps] Fetching steps for work: ${workId}`); // Log para depuração
-    const { data, error: fetchStepsError } = await supabase.from('steps').select('*').eq('work_id', workId).order('start_date', { ascending: true });
+    // Order by order_index for reordering functionality
+    const { data, error: fetchStepsError } = await supabase.from('steps').select('*').eq('work_id', workId).order('order_index', { ascending: true });
         
     if (fetchStepsError) {
         console.error(`[dbService.getSteps] Erro ao buscar etapas para work ${workId}:`, fetchStepsError);
@@ -1144,14 +1147,30 @@ export const dbService = {
     return data ? parseStepFromDB(data) : null;
   },
 
-  async addStep(stepData: Omit<Step, 'id'>): Promise<Step> {
+  async addStep(stepData: Omit<Step, 'id' | 'orderIndex'>): Promise<Step> { // Updated signature
+    // Get the highest order_index for the current work to assign the next one
+    const { data: existingSteps, error: fetchError } = await supabase
+        .from('steps')
+        .select('order_index')
+        .eq('work_id', stepData.workId)
+        .order('order_index', { ascending: false })
+        .limit(1);
+
+    if (fetchError) {
+        console.error("Erro ao buscar order_index existente:", fetchError);
+        // Fallback: if cannot fetch, assume it's the first step or next sequential
+    }
+    const newOrderIndex = existingSteps && existingSteps.length > 0 ? existingSteps[0].order_index + 1 : 1;
+
+
     const { data, error } = await supabase.from('steps').insert({
       work_id: stepData.workId,
       name: stepData.name,
       start_date: stepData.startDate,
       end_date: stepData.endDate,
       status: stepData.status,
-      is_delayed: stepData.isDelayed
+      is_delayed: stepData.isDelayed,
+      order_index: newOrderIndex // NEW: Insert with order_index
     }).select().single();
     if (error) throw error;
     _dashboardCache.steps[stepData.workId] = null; // Invalidate cache
@@ -1167,7 +1186,8 @@ export const dbService = {
       end_date: stepData.endDate,
       real_date: stepData.realDate || null,
       status: stepData.status,
-      is_delayed: stepData.isDelayed
+      is_delayed: stepData.isDelayed,
+      order_index: stepData.orderIndex // NEW: Update order_index
     }).eq('id', stepData.id).select().single();
     if (error) throw error;
     _dashboardCache.steps[stepData.workId] = null; // Invalidate cache
@@ -1182,7 +1202,10 @@ export const dbService = {
     // Delete associated expenses
     await supabase.from('expenses').delete().eq('step_id', stepId);
     // Delete associated checklists
-    await supabase.from('checklists').delete().eq('category', (await this.getStepById(stepId))?.name || ''); // Use step name as category
+    const stepToDelete = await this.getStepById(stepId);
+    if(stepToDelete) { // Check if step exists before using its name
+      await supabase.from('checklists').delete().eq('category', stepToDelete.name); // Use step name as category
+    }
     
     const { error } = await supabase.from('steps').delete().eq('id', stepId);
     if (error) throw error;

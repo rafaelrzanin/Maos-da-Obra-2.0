@@ -72,6 +72,7 @@ export interface Step {
   realDate?: string;
   status: StepStatus;
   isDelayed: boolean;
+  orderIndex: number; // NEW: Added orderIndex for step reordering
 }
 
 export enum ExpenseCategory {
