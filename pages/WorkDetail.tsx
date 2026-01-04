@@ -1081,7 +1081,10 @@ const WorkDetail = () => {
 
     const newErrors: Record<string, string> = {};
     if (!newExpenseDescription.trim()) newErrors.newExpenseDescription = "A descrição é obrigatória.";
-    if (!newExpenseAmount || Number(newExpenseAmount) <= 0) newErrors.newExpenseAmount = "O valor deve ser maior que zero.";
+    // Modificação da validação: permite 0, mas impede negativos ou vazio
+    if (newExpenseAmount.trim() === '' || Number(newExpenseAmount) < 0) {
+      newErrors.newExpenseAmount = "O valor combinado não pode ser negativo ou vazio.";
+    }
     if (!newExpenseDate) newErrors.newExpenseDate = "A data é obrigatória.";
     if (newExpenseCategory === ExpenseCategory.MATERIAL && !newExpenseStepId) newErrors.newExpenseStepId = "Selecione a etapa para o material.";
 
@@ -1131,7 +1134,10 @@ const WorkDetail = () => {
 
     const newErrors: Record<string, string> = {};
     if (!editExpenseData.description.trim()) newErrors.description = "A descrição é obrigatória.";
-    if (!editExpenseData.amount || Number(editExpenseData.amount) <= 0) newErrors.amount = "O valor total deve ser maior que zero.";
+    // Modificação da validação: permite 0, mas impede negativos ou vazio
+    if (String(editExpenseData.amount).trim() === '' || Number(editExpenseData.amount) < 0) {
+        newErrors.amount = "O valor combinado não pode ser negativo ou vazio.";
+    }
     if (!editExpenseData.date) newErrors.date = "A data é obrigatória.";
     if (editExpenseData.category === ExpenseCategory.MATERIAL && !editExpenseData.stepId) newErrors.stepId = "Selecione a etapa para o material.";
 
@@ -2287,7 +2293,7 @@ const WorkDetail = () => {
               <div className="col-span-full text-center text-slate-400 py-8 italic">Nenhuma checklist cadastrada ainda.</div>
             ) : (
               checklists.map(checklist => (
-                <div key={checklist.id} onClick={() => openEditChecklistModal(checklist)} className={cx(surface, card, "flex flex-col cursor-pointer transition-all hover:scale-[1.01] hover:border-secondary/50")} role="button" tabIndex={0} aria-label={`Editar checklist ${checklist.name}`} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') openEditChecklistModal(checklist); }}>
+                <div key={checklist.id} onClick={() => openEditChecklistModal(checklist)} className={cx(surface, card, "flex flex-col cursor-pointer transition-all hover:scale-[1.01] hover:border-secondary/50")} role="button" tabIndex={0} aria-label={`Editar checklist ${checklist.name}`} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') openEditChecklistModal(checklist); }} >
                   <div className="flex items-center justify-between mb-3">
                     <h3 className="text-xl font-black text-primary dark:text-white leading-tight">{checklist.name}</h3>
                     <span className="text-xs font-bold px-3 py-1 rounded-full bg-teal-500/10 text-teal-600">{checklist.category}</span>
