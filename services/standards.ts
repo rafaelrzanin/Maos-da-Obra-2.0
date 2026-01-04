@@ -5,32 +5,7 @@
 export const ZE_AVATAR = './ze.png';
 export const ZE_AVATAR_FALLBACK = 'https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/People/Construction%20Worker.png';
 
-// --- DICAS DINÂMICAS DO ZÉ ---
-export interface ZeTip {
-  text: string;
-  tag: string;
-}
-
-export const ZE_TIPS: ZeTip[] = [
-  { tag: 'Financeiro', text: 'Evite adiantamentos integrais de mão de obra. Estabeleça um cronograma físico-financeiro e realize pagamentos mediante medição de serviço executado.' },
-  { tag: 'Gestão', text: 'Material faltando para a obra mais que chuva. Verifique o estoque 2 dias antes da próxima etapa começar para não pagar diária de pedreiro parado.' },
-  { tag: 'Contrato', text: 'O combinado não sai caro. Sempre faça um contrato escrito descrevendo exatamente o que será feito e o que NÃO está incluso no orçamento.' },
-  { tag: 'Economia', text: 'Comprar tudo de uma vez pode parecer bom, mas o cimento empedra e o piso quebra. Compre materiais brutos conforme a demanda da etapa.' },
-  { tag: 'Estrutura', text: 'Para garantir a durabilidade, respeite a cura do concreto. Molhe a laje ou pilares por pelo menos 7 dias (cura úmida) para evitar trincas.' },
-  { tag: 'Instalações', text: 'Tire fotos das paredes com a tubulação hidráulica e elétrica antes de rebocar. Isso é um mapa do tesouro para evitar furar canos no futuro.' },
-  { tag: 'Impermeabilização', text: 'Não economize na impermeabilização dos baldrames e áreas molhadas. Resolver infiltração depois de pronto custa 5x mais caro.' },
-  { tag: 'Elétrica', text: 'Nunca use fio mais fino que o especificado para o chuveiro (geralmente 6mm ou 10mm). Fio fino esquenta, gasta mais energia e pode causar incêndio.' },
-  { tag: 'Acabamento', text: 'Tinta boa em parede mal lixada não faz milagre. O segredo da pintura perfeita é 80% preparação (lixa/massa) e 20% tinta.' },
-  { tag: 'Pintura', text: 'Tinta boa em parede mal lixada não faz milagre. O segredo da pintura perfeita é 80% preparação (lixa/massa) e 20% tinta.' },
-  { tag: 'Caimento', text: 'Antes de pagar o azulejista, jogue um balde de água no banheiro e na sacada. A água tem que correr sozinha para o ralo, sem empoçar.' },
-  { tag: 'Entulho', text: 'Mantenha a obra limpa. Entulho acumulado esconde ferramentas, causa acidentes e passa a impressão de desorganização para a equipe.' },
-  { tag: 'Mão de Obra', text: 'Pague sua equipe em dia e com contrato. Um time feliz e seguro produz mais e evita problemas trabalhistas. O barato pode sair bem caro!' } // NEW: Added tip
-];
-
-export const getRandomZeTip = (): ZeTip => {
-  const randomIndex = Math.floor(Math.random() * ZE_TIPS.length);
-  return ZE_TIPS[randomIndex];
-};
+// REMOVED: ZE_TIPS and getRandomZeTip as Zé Assistant card is removed.
 
 export interface WorkTemplate {
   id: string;
@@ -53,18 +28,20 @@ export const WORK_TEMPLATES: WorkTemplate[] = [
     includedSteps: [
       'Limpeza do terreno', 
       'Fundações', 
-      // 'Levantamento de paredes', 'Lajes e Vigas' e 'Telhado' serão gerenciados dinamicamente
-      'Tubulação de Água/Esgoto Geral', 
-      'Fiação Elétrica Geral', 
+      'Estrutura (Lajes e Vigas)', // Generalizado para a estrutura
+      'Alvenaria (Paredes)', // Generalizado
+      'Cobertura e Telhado', // Generalizado
+      'Instalações Hidráulicas Gerais', // Generalizado
+      'Instalações Elétricas Gerais', // Generalizado
       'Chapisco e Reboco', 
       'Contrapiso',
-      'Impermeabilização Geral', // Renomeado para diferenciar de "Banheiro"
-      'Gesso / Forro Geral', // Renomeado
-      'Pisos e Revestimentos Geral', // Renomeado
-      'Esquadrias (Janelas/Portas)',
-      'Marmoraria Geral (Bancadas)', 
-      'Pintura Paredes/Tetos', 
-      'Instalação de Louças e Metais Geral', 
+      'Impermeabilização Geral', 
+      'Gesso e Forro', 
+      'Pisos e Revestimentos', 
+      'Esquadrias (Janelas e Portas)',
+      'Bancadas e Marmoraria', 
+      'Pintura Interna e Externa', 
+      'Instalação de Louças e Metais', 
       'Instalação de Luminárias',
       'Limpeza Final e Entrega'
     ]
@@ -76,68 +53,67 @@ export const WORK_TEMPLATES: WorkTemplate[] = [
     description: 'Geral: pisos, pintura, gesso e elétrica.',
     defaultDurationDays: 60,
     includedSteps: [
-      'Demolição', 
-      'Retirada de entulho', 
-      // Para reforma completa, ainda podemos usar os gerais, mas o ideal seria ter um "Reforma Elétrica Geral" etc.
-      // Por enquanto, mantenho os nomes das etapas para que busquem materiais genéricos ou mais amplos,
-      // e os específicos (Banheiro/Cozinha) terão seus próprios.
-      'Tubulação de Água/Esgoto Geral', 
-      'Fiação Elétrica Geral',
-      'Gesso / Forro Geral', 
-      'Pisos e Revestimentos Geral', 
-      'Marmoraria Geral (Bancadas)', // Usar o geral para reforma completa
-      'Pintura Paredes/Tetos', 
-      'Instalação de Louças e Metais Geral', // Usar o geral para reforma completa
+      'Demolição e Retirada de Entulho Geral', // Modificado para ser genérico
+      'Instalações Hidráulicas Gerais', 
+      'Instalações Elétricas Gerais',
+      'Gesso e Forro', 
+      'Contrapiso',
+      'Impermeabilização Geral',
+      'Pisos e Revestimentos', 
+      'Esquadrias (Janelas e Portas)',
+      'Bancadas e Marmoraria', 
+      'Pintura Interna e Externa', 
+      'Instalação de Louças e Metais', 
       'Instalação de Luminárias', 
       'Limpeza Final e Entrega'
     ]
   },
   {
     id: 'BANHEIRO',
-    label: 'Só o Banheiro',
+    label: 'Reforma de Banheiro',
     icon: 'fa-bath',
     description: 'Troca de piso, louças e impermeabilização.',
     defaultDurationDays: 15,
     includedSteps: [
-      'Demolição de Banheiro', 
+      'Demolição e Retirada de Entulho (Banheiro)', 
       'Hidráulica de Banheiro', 
-      'Elétrica de Banheiro', // Nova etapa específica
+      'Elétrica de Banheiro', 
       'Impermeabilização de Banheiro', 
       'Contrapiso de Banheiro', 
       'Pisos e Revestimentos de Banheiro', 
-      'Gesso / Forro de Banheiro', 
-      'Bancada de Banheiro', // Nova etapa específica
-      'Louças e Metais de Banheiro', // Nova etapa específica
-      'Limpeza Final e Entrega'
+      'Gesso e Forro de Banheiro', 
+      'Bancada de Banheiro', 
+      'Louças e Metais de Banheiro', 
+      'Limpeza Final e Entrega (Banheiro)'
     ]
   },
   {
     id: 'COZINHA',
-    label: 'Só a Cozinha',
+    label: 'Reforma de Cozinha',
     icon: 'fa-kitchen-set',
     description: 'Azulejos, bancadas e instalações.',
     defaultDurationDays: 20,
     includedSteps: [
-      'Demolição de Cozinha', 
+      'Demolição e Retirada de Entulho (Cozinha)', 
       'Hidráulica de Cozinha', 
-      'Elétrica de Cozinha', // Nova etapa específica
+      'Elétrica de Cozinha', 
       'Pisos e Revestimentos de Cozinha', 
-      'Bancada de Cozinha', // Nova etapa específica
-      'Louças e Metais de Cozinha', // Nova etapa específica
-      'Limpeza Final e Entrega'
+      'Bancada de Cozinha', 
+      'Louças e Metais de Cozinha', 
+      'Limpeza Final e Entrega (Cozinha)'
     ]
   },
   {
     id: 'PINTURA',
-    label: 'Só Pintura',
+    label: 'Serviço de Pintura',
     icon: 'fa-paint-roller',
     description: 'Renovar as paredes e tetos.',
     defaultDurationDays: 10,
     includedSteps: [
-      'Proteção do Piso para Pintura', // Etapa específica de preparação para pintura
-      'Preparação de Superfície (Lixar/Massa)', // Nova etapa específica
-      'Pintura Paredes/Tetos', 
-      'Limpeza Final e Entrega'
+      'Proteção e Preparação (Pintura)', 
+      'Lixamento e Massa (Pintura)', 
+      'Pintura Paredes e Tetos', 
+      'Limpeza Final e Entrega (Pintura)'
     ]
   }
 ];
@@ -185,29 +161,9 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
     ]
   },
   {
-    category: 'Levantamento de paredes (Térreo)', // Dynamic Step Name
+    category: 'Estrutura (Lajes e Vigas)', // Generalizado
     items: [
-      { name: 'Bloco Cerâmico (9x19x19cm)', unit: 'un', multiplier: 30 },
-      { name: 'Cimento CP-II (Assentamento)', unit: 'sacos', multiplier: 0.2 },
-      { name: 'Areia Fina (Assentamento)', unit: 'm³', multiplier: 0.03 },
-      { name: 'Cal para Argamassa', unit: 'sacos', multiplier: 0.05 },
-      { name: 'Vergalhão 5/16 (8mm - Cintas)', unit: 'barras', multiplier: 0.2 }
-    ]
-  },
-  {
-    category: 'Levantamento de paredes (1º Pavimento)', // Dynamic Step Name
-    items: [
-      { name: 'Bloco Cerâmico (9x19x19cm)', unit: 'un', multiplier: 30 },
-      { name: 'Cimento CP-II (Assentamento)', unit: 'sacos', multiplier: 0.2 },
-      { name: 'Areia Fina (Assentamento)', unit: 'm³', multiplier: 0.03 },
-      { name: 'Cal para Argamassa', unit: 'sacos', multiplier: 0.05 },
-      { name: 'Vergalhão 5/16 (8mm - Cintas)', unit: 'barras', multiplier: 0.2 }
-    ]
-  },
-  {
-    category: 'Lajes e Vigas (Piso 1º Pavimento)', // Dynamic Step Name
-    items: [
-      { name: 'Laje Pré-Fabricada (Lajota)', unit: 'm²', multiplier: 1 },
+      { name: 'Laje Pré-Fabricada (Lajota)', unit: 'm²', multiplier: 1.05 }, // 5% de perda
       { name: 'Cimento CP-III (Concretagem)', unit: 'sacos', multiplier: 0.3 },
       { name: 'Areia Média (Concreto)', unit: 'm³', multiplier: 0.05 },
       { name: 'Brita 1 (Concreto)', unit: 'm³', multiplier: 0.04 },
@@ -216,39 +172,37 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
     ]
   },
   {
-    category: 'Lajes e Vigas (Cobertura)', // Dynamic Step Name
+    category: 'Alvenaria (Paredes)', // Generalizado
     items: [
-      { name: 'Laje Pré-Fabricada (Lajota)', unit: 'm²', multiplier: 1 },
-      { name: 'Cimento CP-III (Concretagem)', unit: 'sacos', multiplier: 0.3 },
-      { name: 'Areia Média (Concreto)', unit: 'm³', multiplier: 0.05 },
-      { name: 'Brita 1 (Concreto)', unit: 'm³', multiplier: 0.04 },
-      { name: 'Vergalhão 1/2 (12.5mm)', unit: 'barras', multiplier: 0.8 },
-      { name: 'Tábua de Pinus (30cm - Caixaria)', unit: 'dz', multiplier: 0.1 }
+      { name: 'Bloco Cerâmico (9x19x19cm)', unit: 'un', multiplier: 30 }, // por m²
+      { name: 'Cimento CP-II (Assentamento)', unit: 'sacos', multiplier: 0.2 },
+      { name: 'Areia Fina (Assentamento)', unit: 'm³', multiplier: 0.03 },
+      { name: 'Cal para Argamassa', unit: 'sacos', multiplier: 0.05 },
+      { name: 'Vergalhão 5/16 (8mm - Cintas)', unit: 'barras', multiplier: 0.2 }
     ]
   },
   {
-    category: 'Telhado',
+    category: 'Cobertura e Telhado', // Generalizado
     items: [
-      { name: 'Telha Cerâmica Romana', unit: 'un', multiplier: 16 },
-      { name: 'Madeira para Estrutura (Peroba)', unit: 'm', multiplier: 2 },
+      { name: 'Telha Cerâmica Romana', unit: 'un', multiplier: 16 }, // por m²
+      { name: 'Madeira para Estrutura (Caibro/Ripa)', unit: 'm', multiplier: 2 },
       { name: 'Parafusos para Telhado', unit: 'caixa', multiplier: 0.05 },
       { name: 'Manta Sub-Telha', unit: 'm²', multiplier: 1 }
     ]
   },
   {
-    category: 'Tubulação de Água/Esgoto Geral',
+    category: 'Instalações Hidráulicas Gerais', // Generalizado
     items: [
       { name: 'Tubos PVC 100mm (Esgoto)', unit: 'barras', multiplier: 0.05 }, // por m²
       { name: 'Tubos PVC 50mm (Esgoto)', unit: 'barras', multiplier: 0.1 },
       { name: 'Tubos PVC 25mm (Água Fria)', unit: 'barras', multiplier: 0.15 },
       { name: 'Conexões PVC (Diversas)', unit: 'un', multiplier: 0.5 },
-      // FIX: Added 'multiplier: 0' to satisfy MaterialItem interface, as flat_qty is present.
-      { name: 'Caixa D\'água 1000L', unit: 'un', multiplier: 0, flat_qty: 1 }, // Qty fixa
+      { name: 'Caixa D\'água 1000L', unit: 'un', multiplier: 0, flat_qty: 1 }, 
       { name: 'Cola PVC e Lixa', unit: 'kit', multiplier: 0.02 }
     ]
   },
   {
-    category: 'Fiação Elétrica Geral',
+    category: 'Instalações Elétricas Gerais', // Generalizado
     items: [
       { name: 'Fio Flexível 2.5mm (Tomadas)', unit: 'm', multiplier: 10 },
       { name: 'Fio Flexível 1.5mm (Iluminação)', unit: 'm', multiplier: 8 },
@@ -275,7 +229,7 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
     ]
   },
   {
-    category: 'Impermeabilização Geral', // Renomeado
+    category: 'Impermeabilização Geral', 
     items: [
       { name: 'Manta Asfáltica (1m x 10m)', unit: 'rolos', multiplier: 0.1 },
       { name: 'Asfalto para Manta', unit: 'litros', multiplier: 0.5 },
@@ -283,7 +237,7 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
     ]
   },
   {
-    category: 'Gesso / Forro Geral', // Renomeado
+    category: 'Gesso e Forro', // Generalizado
     items: [
       { name: 'Placa de Gesso Acartonado (1.20x1.80m)', unit: 'chapa', multiplier: 0.6 },
       { name: 'Perfil Metálico (Montante)', unit: 'barra', multiplier: 2 },
@@ -292,7 +246,7 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
     ]
   },
   {
-    category: 'Pisos e Revestimentos Geral', // Renomeado
+    category: 'Pisos e Revestimentos', // Generalizado
     items: [
       { name: 'Piso Cerâmico/Porcelanato (60x60cm)', unit: 'm²', multiplier: 1.1 },
       { name: 'Argamassa AC-II / AC-III', unit: 'sacos', multiplier: 0.3 },
@@ -300,7 +254,7 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
     ]
   },
   {
-    category: 'Esquadrias (Janelas/Portas)',
+    category: 'Esquadrias (Janelas e Portas)', // Generalizado
     items: [
       { name: 'Janela de Alumínio (1.20x1.20m)', unit: 'un', multiplier: 0.02 }, // por m²
       { name: 'Porta de Madeira (80x210cm)', unit: 'un', multiplier: 0.03 }, // por m²
@@ -309,7 +263,7 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
     ]
   },
   {
-    category: 'Marmoraria Geral (Bancadas)',
+    category: 'Bancadas e Marmoraria', // Generalizado
     items: [
       { name: 'Granito/Mármore (Verde Ubatuba/Travertino)', unit: 'm²', multiplier: 0.1 }, // por m²
       { name: 'Cuba de Inox/Louça', unit: 'un', multiplier: 0.01 }, // por m²
@@ -317,7 +271,7 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
     ]
   },
   {
-    category: 'Pintura Paredes/Tetos',
+    category: 'Pintura Interna e Externa', // Generalizado
     items: [
       { name: 'Tinta Acrílica Premium (Branco/Cor)', unit: 'galão', multiplier: 0.2 },
       { name: 'Massa Corrida/Acrílica', unit: 'lata', multiplier: 0.1 },
@@ -328,7 +282,7 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
     ]
   },
   {
-    category: 'Instalação de Louças e Metais Geral',
+    category: 'Instalação de Louças e Metais', // Generalizado
     items: [
       { name: 'Vaso Sanitário com Caixa Acoplada', unit: 'un', multiplier: 0.02 }, // por m²
       { name: 'Pia/Lavatório com Coluna', unit: 'un', multiplier: 0.02 },
@@ -356,7 +310,7 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
   },
   // --- ITENS ESPECÍFICOS PARA REFORMA DE BANHEIRO ---
   {
-    category: 'Demolição de Banheiro',
+    category: 'Demolição e Retirada de Entulho (Banheiro)',
     items: [
       { name: 'Sacos de Ráfia (Entulho)', unit: 'un', multiplier: 5, flat_qty: 5 }, // 5 por banheiro
       { name: 'Marreta/Talhadeira', unit: 'un', multiplier: 0.01, flat_qty: 0.01 },
@@ -409,7 +363,7 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
     ]
   },
   {
-    category: 'Gesso / Forro de Banheiro',
+    category: 'Gesso e Forro de Banheiro', // Generalizado
     items: [
       { name: 'Placa de Gesso Hidrofugado', unit: 'chapa', multiplier: 0.5, flat_qty: 0.5 },
       { name: 'Massa de Gesso', unit: 'kg', multiplier: 1, flat_qty: 1 }
@@ -434,7 +388,7 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
     ]
   },
   {
-    category: 'Demolição de Cozinha',
+    category: 'Demolição e Retirada de Entulho (Cozinha)',
     items: [
       { name: 'Sacos de Ráfia (Entulho)', unit: 'un', multiplier: 8, flat_qty: 8 },
       { name: 'Marreta/Talhadeira', unit: 'un', multiplier: 0.01, flat_qty: 0.01 },
@@ -488,7 +442,7 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
     ]
   },
   {
-    category: 'Proteção do Piso para Pintura',
+    category: 'Proteção e Preparação (Pintura)', // Generalizado
     items: [
       { name: 'Lona Plástica Grossa', unit: 'm²', multiplier: 1.1 },
       { name: 'Fita Crepe Larga', unit: 'rolo', multiplier: 0.5 },
@@ -496,13 +450,29 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
     ]
   },
   {
-    category: 'Preparação de Superfície (Lixar/Massa)',
+    category: 'Lixamento e Massa (Pintura)', // Generalizado
     items: [
       { name: 'Massa Corrida (Interna) / Acrílica (Externa)', unit: 'lata', multiplier: 0.15 },
       { name: 'Lixas (Grana 150/220)', unit: 'folha', multiplier: 5 },
-      { name: 'Desempenadeira de Aço', unit: 'un', multiplier: 0.05 } // Corrected line
+      { name: 'Desempenadeira de Aço', unit: 'un', multiplier: 0.05 } 
     ]
-  }
+  },
+  {
+    category: 'Pintura Paredes e Tetos', // Generalizado
+    items: [
+      { name: 'Tinta Acrílica Premium (Branco/Cor)', unit: 'galão', multiplier: 0.2 },
+      { name: 'Rolos e Pincéis', unit: 'kit', multiplier: 0.01 },
+      { name: 'Bandeja para Tinta', unit: 'un', multiplier: 0.01 }
+    ]
+  },
+  {
+    category: 'Demolição e Retirada de Entulho Geral', // NEW: Genérico
+    items: [
+      { name: 'Sacos de Ráfia (Entulho)', unit: 'un', multiplier: 1, flat_qty: 20 }, // Baseado em 20 sacos para uma reforma média
+      { name: 'Caçamba Estacionária', unit: 'un', multiplier: 0.005, flat_qty: 1 },
+      { name: 'Marreta/Talhadeira', unit: 'un', multiplier: 0.01, flat_qty: 0.01 }
+    ]
+  },
 ];
 
 export interface LifetimeBonus {
@@ -790,8 +760,8 @@ export const CHECKLIST_TEMPLATES: Checklist[] = [
   {
     id: 'ckl-levantamento-paredes-1',
     workId: 'mock-work-id',
-    name: 'Levantamento de Paredes - Alvenaria',
-    category: 'Levantamento de paredes',
+    name: 'Alvenaria - Levantamento de Paredes',
+    category: 'Alvenaria (Paredes)',
     items: [
       { id: 'item1', text: 'Conferir primeira fiada com nível e prumo (fundação seca)', checked: false },
       { id: 'item2', text: 'Utilizar gabarito e linhas para alinhamento das fiadas', checked: false },
@@ -807,8 +777,8 @@ export const CHECKLIST_TEMPLATES: Checklist[] = [
   {
     id: 'ckl-lajes-vigas-1',
     workId: 'mock-work-id',
-    name: 'Lajes e Vigas - Concretagem',
-    category: 'Lajes e Vigas',
+    name: 'Estrutura - Concretagem',
+    category: 'Estrutura (Lajes e Vigas)',
     items: [
       { id: 'item1', text: 'Conferir escoramento e formas (prumo e nível)', checked: false },
       { id: 'item2', text: 'Verificar ferragem (bitolas, espaçamentos, cobrimento)', checked: false },
@@ -824,8 +794,8 @@ export const CHECKLIST_TEMPLATES: Checklist[] = [
   {
     id: 'ckl-telhado-1',
     workId: 'mock-work-id',
-    name: 'Telhado - Estrutura e Cobertura',
-    category: 'Telhado',
+    name: 'Cobertura e Telhado - Estrutura e Cobertura',
+    category: 'Cobertura e Telhado',
     items: [
       { id: 'item1', text: 'Conferir estrutura de madeira (dimensões, fixação, escoramento)', checked: false },
       { id: 'item2', text: 'Tratamento da madeira (cupinicida, impermeabilizante)', checked: false },
@@ -841,7 +811,7 @@ export const CHECKLIST_TEMPLATES: Checklist[] = [
   {
     id: 'ckl-impermeabilizacao-1',
     workId: 'mock-work-id',
-    name: 'Impermeabilização Geral', // Atualizado para corresponder
+    name: 'Impermeabilização Geral', 
     category: 'Impermeabilização Geral',
     items: [
       { id: 'item10', text: 'Superfície do baldrame limpa, seca e regularizada', checked: false },
@@ -852,14 +822,14 @@ export const CHECKLIST_TEMPLATES: Checklist[] = [
       { id: 'item15', text: 'Execução da proteção mecânica (regularização com argamassa)', checked: false },
       { id: 'item16', text: 'Verificar rodapés e cantos (arredondamento/reforço)', checked: false },
       { id: 'item17', text: 'Conferir sobreposição das mantas (se for o caso)', checked: false },
-      { id: 'item18', text: 'Remover bolhas de ar na aplicação da manta', checked: false },
+      { id: 'item18', text: 'Remover bolhas de air na aplicação da manta', checked: false },
     ],
   },
   {
     id: 'ckl-eletrica-geral-1',
     workId: 'mock-work-id',
-    name: 'Elétrica - Antes do Reboco',
-    category: 'Fiação Elétrica Geral',
+    name: 'Instalações Elétricas Gerais',
+    category: 'Instalações Elétricas Gerais',
     items: [
       { id: 'item20', text: 'Passagem e fixação de todos os conduítes (garantir sem amassados)', checked: false },
       { id: 'item21', text: 'Fixação das caixas 4x2, 4x4 e de teto (alinhamento e prumo)', checked: false },
@@ -876,7 +846,7 @@ export const CHECKLIST_TEMPLATES: Checklist[] = [
   {
     id: 'ckl-hidraulica-banheiro-1',
     workId: 'mock-work-id',
-    name: 'Hidráulica de Banheiro', // Atualizado para corresponder
+    name: 'Hidráulica de Banheiro', 
     category: 'Hidráulica de Banheiro',
     items: [
       { id: 'item30', text: 'Verificar caimento adequado do esgoto (ralos, vasos, pias)', checked: false },
@@ -893,8 +863,8 @@ export const CHECKLIST_TEMPLATES: Checklist[] = [
   {
     id: 'ckl-pintura-1',
     workId: 'mock-work-id',
-    name: 'Pintura - Preparação de Superfície',
-    category: 'Preparação de Superfície (Lixar/Massa)',
+    name: 'Lixamento e Massa (Pintura)',
+    category: 'Lixamento e Massa (Pintura)',
     items: [
       { id: 'item40', text: 'Lixamento completo da parede (lixa fina para acabamento)', checked: false },
       { id: 'item41', text: 'Remoção total do pó e resíduos (pano úmido)', checked: false },
@@ -949,8 +919,8 @@ export const CHECKLIST_TEMPLATES: Checklist[] = [
   {
     id: 'ckl-entrega-1',
     workId: 'mock-work-id',
-    name: 'Entrega Final da Obra',
-    category: 'Entrega',
+    name: 'Limpeza Final e Entrega',
+    category: 'Limpeza Final e Entrega',
     items: [
       { id: 'item70', text: 'Limpeza geral pós-obra (vidros, pisos, paredes)', checked: false },
       { id: 'item71', text: 'Teste de todas as tomadas e interruptores', checked: false },
@@ -964,6 +934,23 @@ export const CHECKLIST_TEMPLATES: Checklist[] = [
       { id: 'item79', text: 'Documento de entrega e quitação assinado por ambas as partes', checked: false },
       { id: 'item80', text: 'Registro fotográfico da obra finalizada', checked: false },
       { id: 'item81', text: 'Avaliação da satisfação do cliente', checked: false },
+    ],
+  },
+  {
+    id: 'ckl-demolicao-entulho-geral',
+    workId: 'mock-work-id',
+    name: 'Demolição e Retirada de Entulho Geral', // Modificado
+    category: 'Demolição e Retirada de Entulho Geral', // Modificado
+    items: [
+        { id: 'item1', text: 'Planejar sequência de demolição (evitar desabamentos)', checked: false },
+        { id: 'item2', text: 'Desligar e isolar instalações elétricas e hidráulicas', checked: false },
+        { id: 'item3', text: 'Proteção de áreas e elementos a serem preservados', checked: false },
+        { id: 'item4', text: 'Uso obrigatório de EPIs (capacete, óculos, luvas, máscara, botas)', checked: false },
+        { id: 'item5', text: 'Isolamento e sinalização da área de trabalho', checked: false },
+        { id: 'item6', text: 'Alugar caçamba estacionária com antecedência', checked: false },
+        { id: 'item7', text: 'Remoção constante do entulho para evitar acúmulo e acidentes', checked: false },
+        { id: 'item8', text: 'Separar materiais recicláveis (madeira, metal) para descarte adequado', checked: false },
+        { id: 'item9', text: 'Verificar estruturas vizinhas após demolição', checked: false },
     ],
   },
 ];

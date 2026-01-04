@@ -1,6 +1,6 @@
 
-import { GoogleGenAI, Type } from "@google/genai";
-import { Work, AIWorkPlan } from "../types.ts"; // NEW: Import Work and AIWorkPlan types
+import { GoogleGenAI } from "@google/genai"; // Removed Type as it's no longer used
+import { Work, AIWorkPlan } from "../types.ts"; // Re-added AIWorkPlan
 
 // Helper function to safely get environment variables, checking both process.env and import.meta.env
 const safeGetEnv = (key: string): string | undefined => {
@@ -86,6 +86,7 @@ export const aiService = {
   },
 
   // NEW: Função para insights curtos e incisivos em contexto de obra
+  // Adaptei para ser mais conciso e adequado para notificações
   getWorkInsight: async (context: string): Promise<string> => {
     if (!ai) {
       // OFFLINE FALLBACK MODE for proactive insights
@@ -103,8 +104,8 @@ export const aiService = {
         model: "gemini-2.5-flash",
         contents: context,
         config: {
-          // System instruction rigorosa para respostas curtas e incisivas
-          systemInstruction: "Seu nome é Zé da Obra. Você é um mestre de obras e engenheiro extremamente experiente. \n\n**Seu objetivo:** Fornecer uma **única frase (máximo 20 palavras)**, direta, incisiva e acionável, focada em economia, controle de cronograma ou prevenção de prejuízo. Não divague, vá direto ao ponto como um alerta ou dica essencial.\n\n**Exemplos de tom:**\n- 'Material XYZ em falta para a etapa ABC. Compre agora para evitar atrasos!'\n- 'Etapa X atrasada há 5 dias. Revise o cronograma urgente!'\n- 'Estoque de cimento baixo. Recomendo comprar mais 5 sacos para a próxima semana.'\n- 'Próxima etapa: Fundações. Não pule a impermeabilização do baldrame para evitar umidade futura.'\n- 'Etapa de pintura quase no fim. Faça a vistoria final antes de liberar o pagamento.'",
+          // System instruction ajustada para respostas curtas e incisivas para notificações
+          systemInstruction: "Seu nome é Zé da Obra. Você é um mestre de obras e engenheiro experiente. \n\n**Seu objetivo:** Fornecer uma **única frase (máximo 25 palavras)**, direta, incisiva e acionável, focada em economia, controle de cronograma ou prevenção de prejuízo. Não divague, vá direto ao ponto como um alerta ou dica essencial para ser usada em uma notificação.\n\n**Exemplos de tom:**\n- 'Material XYZ em falta para a etapa ABC. Compre agora para evitar atrasos!'\n- 'Etapa X atrasada há 5 dias. Revise o cronograma urgente!'\n- 'Estoque de cimento baixo. Recomendo comprar mais 5 sacos para a próxima semana.'\n- 'Próxima etapa: Fundações. Não pule a impermeabilização do baldrame para evitar umidade futura.'\n- 'Etapa de pintura quase no fim. Faça a vistoria final antes de liberar o pagamento.'",
           maxOutputTokens: 50, // Limita o tamanho da resposta
           thinkingConfig: { thinkingBudget: 0 }, // Desabilita o "pensamento" para respostas rápidas e diretas
         }
@@ -118,106 +119,78 @@ export const aiService = {
     }
   },
 
-  // NEW: Função para gerar um plano de obra estruturado e avaliação de riscos
+  // NEW: Função para gerar um plano de obra detalhado e análise de risco (Re-adicionada)
   generateWorkPlanAndRisk: async (work: Work): Promise<AIWorkPlan> => {
     if (!ai) {
-      // OFFLINE FALLBACK MODE
+      // OFFLINE FALLBACK MODE for plan generation
       await new Promise(r => setTimeout(r, 2000));
       return {
-        timelineSummary: "Funcionalidade de Planejamento AI offline. Por favor, configure sua chave de API.",
-        detailedSteps: [{ name: "Erro: AI Offline", estimatedDurationDays: 0, notes: "Recarregue a página ou configure a chave API." }],
-        potentialRisks: [{ description: "Sem conexão com a IA", likelihood: 'high', mitigation: "Verifique a internet e a configuração da chave API." }],
-        materialSuggestions: [],
-        generalAdvice: "Conecte-se para obter um plano completo!"
+        workId: work.id,
+        generalAdvice: "A IA está offline. Não foi possível gerar um plano detalhado. Verifique suas anotações e contatos para gerenciar a obra.",
+        timelineSummary: "Plano offline. Organize suas etapas manualmente.",
+        detailedSteps: [{ name: "Fase 1: Preparação", estimatedDurationDays: 10, notes: "Defina seus materiais." }],
+        potentialRisks: [{ description: "Risco de atraso.", likelihood: "high", mitigation: "A IA está offline." }],
+        materialSuggestions: [{ item: "Cimento", priority: "medium", reason: "Sempre essencial." }],
       };
     }
 
-    const prompt = `
-      Crie um plano de obra detalhado, avaliação de riscos e sugestões de materiais para o seguinte projeto.
-      O nome da obra é "${work.name}", localizada em ${work.address || 'local não especificado'}, com área de ${work.area} m².
-      A data de início planejada é ${work.startDate}.
-      O orçamento planejado é de R$ ${work.budgetPlanned}.
-      Possui ${work.floors || 1} pavimento(s), ${work.bedrooms || 0} quarto(s), ${work.bathrooms || 0} banheiro(s), ${work.kitchens || 0} cozinha(s) e ${work.livingRooms || 0} sala(s).
-      ${work.hasLeisureArea ? 'Possui área de lazer/piscina.' : 'Não possui área de lazer/piscina.'}
-      Notas adicionais: ${work.notes || 'Nenhuma nota adicional.'}
-
-      Considere os dados acima para gerar um plano realista, identificando etapas-chave, durações estimadas, riscos comuns para este tipo de projeto e sugestões de materiais relevantes.
-      Apresente a resposta estritamente no formato JSON, conforme o schema fornecido.
-    `;
-
     try {
+      const prompt = `Gere um plano de obra inteligente para o projeto "${work.name}" localizado em "${work.address}".
+        O orçamento planejado é de R$${work.budgetPlanned}, com área de ${work.area}m².
+        Detalhes da construção: ${work.floors} pavimento(s), ${work.bedrooms} quarto(s), ${work.bathrooms} banheiro(s), ${work.kitchens} cozinha(s).
+        Início da obra: ${work.startDate}.
+        Considere estes campos e gere um JSON com as seguintes seções:
+        1. "generalAdvice": Um conselho geral, incisivo e profissional, como um mestre de obras daria, focado em economia e eficiência. (1 frase)
+        2. "timelineSummary": Um resumo conciso da duração e dos marcos principais da obra. (2-3 frases)
+        3. "detailedSteps": Uma lista de 5-8 etapas macro da obra, com "name", "estimatedDurationDays" e "notes" (dica sobre a etapa). Evite subdivisões por cômodo; generalize as etapas.
+        4. "potentialRisks": 2-3 riscos potenciais relevantes para a obra, com "description", "likelihood" ('low', 'medium', 'high'), e "mitigation" (como evitar/resolver).
+        5. "materialSuggestions": 2-3 sugestões de materiais chave, com "item", "priority" ('low', 'medium', 'high'), e "reason" (por que é importante).
+        
+        O JSON deve ser formatado estritamente como o tipo AIWorkPlan:
+        interface AIWorkPlan {
+          workId: string;
+          generalAdvice: string;
+          timelineSummary: string;
+          detailedSteps: {
+            name: string;
+            estimatedDurationDays: number;
+            notes: string;
+          }[];
+          potentialRisks: {
+            description: string;
+            likelihood: 'low' | 'medium' | 'high';
+            mitigation: string;
+          }[];
+          materialSuggestions: {
+            item: string;
+            priority: 'low' | 'medium' | 'high';
+            reason: string;
+          }[];
+        }
+        Certifique-se de que o workId seja '${work.id}'.`;
+
       const response = await ai.models.generateContent({
-        model: "gemini-3-pro-preview", // Modelo para tarefas complexas
+        model: "gemini-3-pro-preview", // Usar modelo mais capaz para planos complexos
         contents: prompt,
         config: {
-          systemInstruction: "Você é o Zé da Obra AI, um engenheiro e planejador de obras experiente. Sua tarefa é fornecer um plano de obra completo, incluindo cronograma, riscos e materiais, de forma estruturada e realista para o usuário. Foque na prevenção de problemas e otimização de recursos. A resposta deve ser um JSON válido e seguir o schema estritamente. Evite gírias e seja profissional.",
           responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              timelineSummary: { type: Type.STRING, description: 'Um resumo conciso do cronograma geral da obra, incluindo a duração total estimada.' },
-              detailedSteps: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    name: { type: Type.STRING, description: 'Nome da etapa (ex: Fundações, Alvenaria, Elétrica).' },
-                    estimatedDurationDays: { type: Type.NUMBER, description: 'Duração estimada em dias para esta etapa.' },
-                    notes: { type: Type.STRING, description: 'Breves notas ou dicas importantes para a etapa.' },
-                  },
-                  required: ['name', 'estimatedDurationDays', 'notes'],
-                },
-                description: 'Lista detalhada das principais etapas da obra com duração e notas.',
-              },
-              potentialRisks: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    description: { type: Type.STRING, description: 'Descrição do risco potencial (ex: Atraso na entrega de materiais, Chuvas excessivas).' },
-                    likelihood: { type: Type.STRING, enum: ['low', 'medium', 'high'], description: 'Probabilidade de ocorrência do risco.' },
-                    mitigation: { type: Type.STRING, description: 'Estratégias para mitigar ou evitar o risco.' },
-                  },
-                  required: ['description', 'likelihood', 'mitigation'],
-                },
-                description: 'Lista de riscos potenciais da obra e como mitigá-los.',
-              },
-              materialSuggestions: {
-                type: Type.ARRAY,
-                items: {
-                  type: Type.OBJECT,
-                  properties: {
-                    item: { type: Type.STRING, description: 'Nome do material sugerido (ex: Cimento CP-III, Tijolo Cerâmico).' },
-                    reason: { type: Type.STRING, description: 'Motivo da sugestão ou benefício.' },
-                    priority: { type: Type.STRING, enum: ['low', 'medium', 'high'], description: 'Prioridade da compra/consideração deste material.' },
-                  },
-                  required: ['item', 'reason', 'priority'],
-                },
-                description: 'Sugestões de materiais relevantes para o projeto, com foco em qualidade/custo-benefício.',
-              },
-              generalAdvice: { type: Type.STRING, description: 'Um conselho geral final sobre a gestão da obra.' },
-            },
-            required: ['timelineSummary', 'detailedSteps', 'potentialRisks', 'materialSuggestions', 'generalAdvice'],
-          },
-        },
+          temperature: 0.7,
+          maxOutputTokens: 1024,
+          thinkingConfig: { thinkingBudget: 100 }, // Permitir mais "pensamento" para planos complexos
+        }
       });
-
+      
       const jsonStr = response.text?.trim();
-      if (!jsonStr) {
-        throw new Error("A IA não retornou um plano de obra. Tente novamente.");
-      }
-      return JSON.parse(jsonStr) as AIWorkPlan;
+      if (!jsonStr) throw new Error("A IA não retornou um plano válido.");
+
+      const parsedPlan: AIWorkPlan = JSON.parse(jsonStr);
+      // Ensure workId is correctly set as per current work (override if AI gets it wrong)
+      parsedPlan.workId = work.id; 
+      return parsedPlan;
 
     } catch (error) {
       console.error("Erro na IA ao gerar plano de obra:", error);
-      // Retorna uma estrutura de fallback em caso de erro da IA
-      return {
-        timelineSummary: "Erro ao gerar plano de obra. Verifique sua conexão e tente novamente.",
-        detailedSteps: [{ name: "Erro na Geração", estimatedDurationDays: 0, notes: "Não foi possível obter o plano detalhado." }],
-        potentialRisks: [{ description: "Falha na comunicação com a IA", likelihood: 'high', mitigation: "Verifique sua chave de API e conexão de internet." }],
-        materialSuggestions: [],
-        generalAdvice: "O Zé está com problemas técnicos. Tente mais tarde."
-      };
+      throw new Error(`Falha na comunicação com a IA: ${error.message || 'Erro desconhecido.'}`);
     }
   }
 };

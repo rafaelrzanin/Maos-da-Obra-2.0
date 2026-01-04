@@ -198,42 +198,48 @@ const parseChecklistFromDB = (data: any): Checklist => ({
 
 // NEW: Helper para mapear nome de etapa dinâmica para categoria de material genérica
 const getMaterialCategoryFromStepName = (stepName: string): string => {
-  // Regras para etapas dinâmicas
+  // Regras para etapas dinâmicas (generalizadas)
   if (stepName.includes('Limpeza do terreno')) return 'Limpeza do terreno';
   if (stepName.includes('Fundações')) return 'Fundações';
-  if (stepName.includes('Levantamento de paredes')) return 'Levantamento de paredes'; // Genérico para dinâmica
-  if (stepName.includes('Lajes e Vigas')) return 'Lajes e Vigas'; // Genérico para dinâmica
-  if (stepName.includes('Telhado')) return 'Telhado';
-  if (stepName.includes('Tubulação de Água/Esgoto Geral')) return 'Tubulação de Água/Esgoto Geral';
-  if (stepName.includes('Fiação Elétrica Geral')) return 'Fiação Elétrica Geral';
+  if (stepName.includes('Estrutura (Lajes e Vigas)')) return 'Estrutura (Lajes e Vigas)'; 
+  if (stepName.includes('Alvenaria (Paredes)')) return 'Alvenaria (Paredes)'; 
+  if (stepName.includes('Cobertura e Telhado')) return 'Cobertura e Telhado';
+  if (stepName.includes('Instalações Hidráulicas Gerais')) return 'Instalações Hidráulicas Gerais';
+  if (stepName.includes('Instalações Elétricas Gerais')) return 'Instalações Elétricas Gerais';
   if (stepName.includes('Chapisco e Reboco')) return 'Chapisco e Reboco';
   if (stepName.includes('Contrapiso')) return 'Contrapiso';
   if (stepName.includes('Impermeabilização Geral')) return 'Impermeabilização Geral';
-  if (stepName.includes('Gesso / Forro Geral')) return 'Gesso / Forro Geral';
-  if (stepName.includes('Pisos e Revestimentos Geral')) return 'Pisos e Revestimentos Geral';
-  if (stepName.includes('Esquadrias (Janelas/Portas)')) return 'Esquadrias (Janelas/Portas)';
-  if (stepName.includes('Marmoraria Geral (Bancadas)')) return 'Marmoraria Geral (Bancadas)';
-  if (stepName.includes('Pintura Paredes/Tetos')) return 'Pintura Paredes/Tetos'; 
-  if (stepName.includes('Instalação de Louças e Metais Geral')) return 'Instalação de Louças e Metais Geral';
+  if (stepName.includes('Gesso e Forro')) return 'Gesso e Forro'; 
+  if (stepName.includes('Pisos e Revestimentos')) return 'Pisos e Revestimentos'; 
+  if (stepName.includes('Esquadrias (Janelas e Portas)')) return 'Esquadrias (Janelas e Portas)';
+  if (stepName.includes('Bancadas e Marmoraria')) return 'Bancadas e Marmoraria';
+  if (stepName.includes('Pintura Interna e Externa')) return 'Pintura Interna e Externa'; 
+  if (stepName.includes('Instalação de Louças e Metais')) return 'Instalação de Louças e Metais'; 
   if (stepName.includes('Instalação de Luminárias')) return 'Instalação de Luminárias';
-  if (stepName.includes('Demolição de Banheiro')) return 'Demolição de Banheiro';
+  if (stepName.includes('Limpeza Final e Entrega')) return 'Limpeza Final e Entrega';
+
+  // Etapas específicas de Reforma
+  if (stepName.includes('Demolição e Retirada de Entulho Geral')) return 'Demolição e Retirada de Entulho Geral'; // Modificado
+  if (stepName.includes('Demolição e Retirada de Entulho (Banheiro)')) return 'Demolição e Retirada de Entulho (Banheiro)';
   if (stepName.includes('Hidráulica de Banheiro')) return 'Hidráulica de Banheiro';
   if (stepName.includes('Elétrica de Banheiro')) return 'Elétrica de Banheiro';
   if (stepName.includes('Impermeabilização de Banheiro')) return 'Impermeabilização de Banheiro';
   if (stepName.includes('Contrapiso de Banheiro')) return 'Contrapiso de Banheiro';
   if (stepName.includes('Pisos e Revestimentos de Banheiro')) return 'Pisos e Revestimentos de Banheiro';
-  if (stepName.includes('Gesso / Forro de Banheiro')) return 'Gesso / Forro de Banheiro';
+  if (stepName.includes('Gesso e Forro de Banheiro')) return 'Gesso e Forro de Banheiro';
   if (stepName.includes('Bancada de Banheiro')) return 'Bancada de Banheiro';
   if (stepName.includes('Louças e Metais de Banheiro')) return 'Louças e Metais de Banheiro';
-  if (stepName.includes('Demolição de Cozinha')) return 'Demolição de Cozinha';
+
+  if (stepName.includes('Demolição e Retirada de Entulho (Cozinha)')) return 'Demolição e Retirada de Entulho (Cozinha)';
   if (stepName.includes('Hidráulica de Cozinha')) return 'Hidráulica de Cozinha';
   if (stepName.includes('Elétrica de Cozinha')) return 'Elétrica de Cozinha';
   if (stepName.includes('Pisos e Revestimentos de Cozinha')) return 'Pisos e Revestimentos de Cozinha';
   if (stepName.includes('Bancada de Cozinha')) return 'Bancada de Cozinha';
   if (stepName.includes('Louças e Metais de Cozinha')) return 'Louças e Metais de Cozinha';
-  if (stepName.includes('Preparação de Superfície (Lixar/Massa)')) return 'Preparação de Superfície (Lixar/Massa)';
-  if (stepName.includes('Proteção do Piso para Pintura')) return 'Proteção do Piso para Pintura';
-  if (stepName.includes('Limpeza Final e Entrega')) return 'Limpeza Final e Entrega'; // Nova etapa geral
+
+  if (stepName.includes('Proteção e Preparação (Pintura)')) return 'Proteção e Preparação (Pintura)';
+  if (stepName.includes('Lixamento e Massa (Pintura)')) return 'Lixamento e Massa (Pintura)';
+  if (stepName.includes('Pintura Paredes e Tetos')) return 'Pintura Paredes e Tetos'; 
 
   // Fallback
   return stepName;
@@ -661,7 +667,7 @@ export const dbService = {
                         // Base calculation (e.g., per m² of area)
                         calculatedQty = work.area * item.multiplier;
 
-                        // Adjust based on room counts if applicable to this step/category
+                        // Adjust based on room counts IF applicable (for generic steps)
                         if (step.name.includes('Banheiro') && work.bathrooms && work.bathrooms > 0) {
                             calculatedQty *= work.bathrooms;
                         } else if (step.name.includes('Cozinha') && work.kitchens && work.kitchens > 0) {
@@ -673,9 +679,9 @@ export const dbService = {
                         }
 
                         // Adjust for floors if applicable (e.g., for slabs, general walls)
-                        if (step.name.includes('Lajes e Vigas') && work.floors && work.floors > 1) { // If multi-floor slab
+                        if (step.name.includes('Estrutura') && work.floors && work.floors > 1) { // If multi-floor slab
                             calculatedQty *= (work.floors -1); // Adjust for intermediate slabs
-                        } else if (step.name.includes('Levantamento de paredes') && work.floors && work.floors > 1) {
+                        } else if (step.name.includes('Alvenaria') && work.floors && work.floors > 1) {
                              // Assuming multiplier is for one floor, scale with floors
                              calculatedQty *= work.floors;
                         }
@@ -772,193 +778,34 @@ export const dbService = {
     }
 
     let finalStepNames: string[] = [];
-    const numFloors = parsedWork.floors || 1; // Garante pelo menos 1 pavimento
+    const numFloors = parsedWork.floors || 1; 
     const numBathrooms = parsedWork.bathrooms || 0;
     const numKitchens = parsedWork.kitchens || 0;
 
+    // Use a base set of steps and adjust duration based on complexity
+    finalStepNames = [...template.includedSteps];
+    effectiveDefaultDurationDays = template.defaultDurationDays;
+
+    // Adjust duration based on complex factors for CONSTRUCTION/REFORMA_APTO
+    // Note: These multipliers are estimates and can be fine-tuned.
     if (template.id === 'CONSTRUCAO') {
-        // Base steps for construction, explicitly excluding demolition
-        finalStepNames.push('Limpeza do terreno', 'Fundações');
-
-        // Dynamic floor/wall steps
-        for (let i = 0; i < numFloors; i++) {
-            if (i === 0) { // Ground floor
-                finalStepNames.push('Levantamento de paredes (Térreo)');
-            } else { // Intermediate floors
-                finalStepNames.push(`Lajes e Vigas (Piso ${i + 1}º Pavimento)`); 
-                finalStepNames.push(`Levantamento de paredes (${i + 1}º Pavimento)`);
-            }
+        effectiveDefaultDurationDays += (numFloors > 1 ? (numFloors - 1) * 30 : 0); // More days per additional floor for construction
+        effectiveDefaultDurationDays += numBathrooms * 15; // More days per bathroom for construction
+        effectiveDefaultDurationDays += numKitchens * 15; // More days per kitchen for construction
+        if (parsedWork.area > 0) {
+            effectiveDefaultDurationDays += Math.ceil(parsedWork.area / 20) * 7; // Add 7 days per 20m²
         }
-        if (numFloors > 0) { // Roof slab/structure always after walls
-            finalStepNames.push('Lajes e Vigas (Cobertura)');
-            finalStepNames.push('Telhado');
-        }
-
-        // Interior steps - filter out general ones if specific room steps will cover them
-        const generalInteriorSteps = [
-            'Tubulação de Água/Esgoto Geral',
-            'Fiação Elétrica Geral',
-            'Chapisco e Reboco',
-            'Contrapiso',
-            'Impermeabilização Geral', // Renomeado para diferenciar de "Banheiro"
-            'Gesso / Forro Geral', // Renomeado
-            'Pisos e Revestimentos Geral', // Renomeado
-            'Esquadrias (Janelas/Portas)',
-            'Marmoraria Geral (Bancadas)', 
-            'Pintura Paredes/Tetos', 
-            'Instalação de Louças e Metais Geral', 
-            'Instalação de Luminárias',
-        ];
-
-        // Flags to check if specific room steps are being added
-        const willHaveSpecificBathroomPlumbing = numBathrooms > 0;
-        const willHaveSpecificKitchenPlumbing = numKitchens > 0;
-
-        generalInteriorSteps.forEach(stepName => {
-            let shouldAdd = true;
-            // If specific bathrooms exist, don't add general plumbing/electrical/finishing/countertops/fixtures that would be covered
-            if (willHaveSpecificBathroomPlumbing) {
-                if (stepName.includes('Tubulação de Água/Esgoto Geral') || stepName.includes('Fiação Elétrica Geral') ||
-                    stepName.includes('Pisos e Revestimentos Geral') || stepName.includes('Marmoraria Geral (Bancadas)') ||
-                    stepName.includes('Instalação de Louças e Metais Geral') || stepName.includes('Gesso / Forro Geral') || 
-                    stepName.includes('Contrapiso') || stepName.includes('Impermeabilização Geral')) { // Add general waterproofing/gypsum/subfloor to filter
-                    shouldAdd = false;
-                }
-            }
-            // If specific kitchens exist, don't add general plumbing/electrical/finishing/countertops/fixtures that would be covered
-            if (willHaveSpecificKitchenPlumbing) {
-                 if (stepName.includes('Tubulação de Água/Esgoto Geral') || stepName.includes('Fiação Elétrica Geral') ||
-                    stepName.includes('Pisos e Revestimentos Geral') || stepName.includes('Marmoraria Geral (Bancadas)') ||
-                    stepName.includes('Instalação de Louças e Metais Geral') || stepName.includes('Gesso / Forro Geral') ||
-                    stepName.includes('Contrapiso')) { // Add general gypsum/subfloor to filter
-                    shouldAdd = false;
-                }
-            }
-            if (shouldAdd) {
-                finalStepNames.push(stepName);
-            }
-        });
-
-        // Add specific room steps
-        for (let i = 0; i < numBathrooms; i++) {
-            finalStepNames.push(
-                // Demolition is for renovation, not new construction
-                `Hidráulica de Banheiro (B${i + 1})`,
-                `Elétrica de Banheiro (B${i + 1})`,
-                `Impermeabilização de Banheiro (B${i + 1})`,
-                `Contrapiso de Banheiro (B${i + 1})`,
-                `Pisos e Revestimentos de Banheiro (B${i + 1})`,
-                `Gesso / Forro de Banheiro (B${i + 1})`,
-                `Bancada de Banheiro (B${i + 1})`,
-                `Louças e Metais de Banheiro (B${i + 1})`
-            );
-        }
-        for (let i = 0; i < numKitchens; i++) {
-            finalStepNames.push(
-                // Demolition is for renovation, not new construction
-                `Hidráulica de Cozinha (C${i + 1})`,
-                `Elétrica de Cozinha (C${i + 1})`,
-                `Pisos e Revestimentos de Cozinha (C${i + 1})`,
-                `Bancada de Cozinha (C${i + 1})`,
-                `Louças e Metais de Cozinha (C${i + 1})`
-            );
-        }
-
-        finalStepNames.push('Limpeza Final e Entrega');
-
-        // Calculate effective default duration based on dynamic elements
-        effectiveDefaultDurationDays = template.defaultDurationDays;
-        effectiveDefaultDurationDays += (numFloors > 1 ? numFloors - 1 : 0) * 20; // 20 days per additional floor (after ground)
-        effectiveDefaultDurationDays += numBathrooms * 10; // 10 days per bathroom
-        effectiveDefaultDurationDays += numKitchens * 10; // 10 days per kitchen
-
     } else if (template.id === 'REFORMA_APTO') {
-        finalStepNames.push('Demolição', 'Retirada de entulho'); // Base for renovation, includes demolition
-
-        // Interior steps - similar filtering as construction if specific rooms exist
-        const generalInteriorRenovationSteps = [
-            'Tubulação de Água/Esgoto Geral',
-            'Fiação Elétrica Geral',
-            'Gesso / Forro Geral',
-            'Contrapiso',
-            'Impermeabilização Geral',
-            'Pisos e Revestimentos Geral',
-            'Esquadrias (Janelas/Portas)',
-            'Marmoraria Geral (Bancadas)',
-            'Pintura Paredes/Tetos',
-            'Instalação de Louças e Metais Geral',
-            'Instalação de Luminárias',
-        ];
-
-        const willHaveSpecificBathroomSteps = numBathrooms > 0;
-        const willHaveSpecificKitchenSteps = numKitchens > 0;
-
-        generalInteriorRenovationSteps.forEach(stepName => {
-            let shouldAdd = true;
-            if (willHaveSpecificBathroomSteps) {
-                if (stepName.includes('Tubulação de Água/Esgoto Geral') || stepName.includes('Fiação Elétrica Geral') ||
-                    stepName.includes('Gesso / Forro Geral') || stepName.includes('Contrapiso') ||
-                    stepName.includes('Impermeabilização Geral') || stepName.includes('Pisos e Revestimentos Geral') ||
-                    stepName.includes('Marmoraria Geral (Bancadas)') || stepName.includes('Instalação de Louças e Metais Geral')) {
-                    shouldAdd = false;
-                }
-            }
-            if (willHaveSpecificKitchenSteps) {
-                 if (stepName.includes('Tubulação de Água/Esgoto Geral') || stepName.includes('Fiação Elétrica Geral') ||
-                    stepName.includes('Gesso / Forro Geral') || stepName.includes('Contrapiso') ||
-                    stepName.includes('Pisos e Revestimentos Geral') || stepName.includes('Marmoraria Geral (Bancadas)') ||
-                    stepName.includes('Instalação de Louças e Metais Geral')) {
-                    shouldAdd = false;
-                }
-            }
-            if (shouldAdd) {
-                finalStepNames.push(stepName);
-            }
-        });
-        
-        for (let i = 0; i < numBathrooms; i++) {
-            finalStepNames.push(
-                `Demolição de Banheiro (B${i + 1})`,
-                `Hidráulica de Banheiro (B${i + 1})`,
-                `Elétrica de Banheiro (B${i + 1})`,
-                `Impermeabilização de Banheiro (B${i + 1})`,
-                `Contrapiso de Banheiro (B${i + 1})`,
-                `Pisos e Revestimentos de Banheiro (B${i + 1})`,
-                `Gesso / Forro de Banheiro (B${i + 1})`,
-                `Bancada de Banheiro (B${i + 1})`,
-                `Louças e Metais de Banheiro (B${i + 1})`
-            );
+        effectiveDefaultDurationDays += numBathrooms * 7; // 7 days per bathroom for apartment renovation
+        effectiveDefaultDurationDays += numKitchens * 7; // 7 days per kitchen for apartment renovation
+        if (parsedWork.area > 0) {
+            effectiveDefaultDurationDays += Math.ceil(parsedWork.area / 15) * 4; // Add 4 days per 15m²
         }
-        for (let i = 0; i < numKitchens; i++) {
-            finalStepNames.push(
-                `Demolição de Cozinha (C${i + 1})`,
-                `Hidráulica de Cozinha (C${i + 1})`,
-                `Elétrica de Cozinha (C${i + 1})`,
-                `Pisos e Revestimentos de Cozinha (C${i + 1})`,
-                `Bancada de Cozinha (C${i + 1})`,
-                `Louças e Metais de Cozinha (C${i + 1})`
-            );
-        }
-        finalStepNames.push('Limpeza Final e Entrega');
-        effectiveDefaultDurationDays = template.defaultDurationDays;
-        effectiveDefaultDurationDays += numBathrooms * 7;
-        effectiveDefaultDurationDays += numKitchens * 7;
-
-    } else if (template.id === 'BANHEIRO') {
-        finalStepNames = template.includedSteps;
-        effectiveDefaultDurationDays = template.defaultDurationDays;
-    } else if (template.id === 'COZINHA') {
-        finalStepNames = template.includedSteps;
-        effectiveDefaultDurationDays = template.defaultDurationDays;
-    } else if (template.id === 'PINTURA') {
-        finalStepNames = template.includedSteps;
-        effectiveDefaultDurationDays = template.defaultDurationDays;
-    } else {
-        // Fallback for unhandled templates
-        console.warn(`[createWork] Template ID '${template.id}' not specifically handled. Using default includedSteps.`);
-        finalStepNames = template.includedSteps;
-        effectiveDefaultDurationDays = template.defaultDurationDays;
+    } else { // For smaller, specific projects like BANHEIRO, COZINHA, PINTURA
+        effectiveDefaultDurationDays += numBathrooms * 5; 
+        effectiveDefaultDurationDays += numKitchens * 5;
     }
+
 
     // Adjust endDate based on calculated duration
     if (effectiveDefaultDurationDays > 0) {
@@ -977,7 +824,10 @@ export const dbService = {
     }
 
     const stepsToInsert = finalStepNames.map((stepName, index) => {
-        const baseDurationDays = Math.max(1, Math.ceil(effectiveDefaultDurationDays / finalStepNames.length)); // At least 1 day
+        // Distribute total duration among steps, ensuring at least 1 day per step
+        const baseDurationDays = Math.max(1, Math.ceil(effectiveDefaultDurationDays / finalStepNames.length));
+        
+        // Calculate start and end dates for each step
         const stepStartDate = new Date(parsedWork.startDate);
         stepStartDate.setDate(stepStartDate.getDate() + (index * baseDurationDays));
         
@@ -1054,7 +904,7 @@ export const dbService = {
 
     const totalSteps = steps.length;
     const completedSteps = steps.filter(s => s.status === StepStatus.COMPLETED).length;
-    const delayedSteps = steps.filter(s => (s.status === StepStatus.NOT_STARTED || s.status === StepStatus.IN_PROGRESS) && s.endDate < today).length;
+    const delayedSteps = steps.filter(s => (s.status === StepStatus.NOT_STARTED || s.status === StepStatus.IN_PROGRESS) && new Date(s.endDate).getTime() < new Date(today).getTime()).length; // Ensure proper date comparison
     const pendingMaterials = materials.filter(m => m.purchasedQty < m.plannedQty).length;
 
     const summary = {
@@ -1537,6 +1387,7 @@ export const dbService = {
 
   // --- FILES (PROJETOS & DOCS) ---
   async getFiles(workId: string): Promise<WorkFile[]> {
+    // Fix: Changed Date.Now() to Date.now()
     const now = Date.now();
     if (_dashboardCache.files[workId] && (now - _dashboardCache.files[workId].timestamp < CACHE_TTL)) {
       return _dashboardCache.files[workId].data;
@@ -1691,6 +1542,36 @@ export const dbService = {
     const { error } = await supabase.from('notifications').update({ read: true }).eq('user_id', userId).eq('read', false);
     if (error) throw error;
     _dashboardCache.notifications = null; // Invalidate cache to recount
+  },
+
+  // NEW: Method to add a notification
+  async addNotification(notification: Omit<DBNotification, 'id'>): Promise<DBNotification> {
+    const { data, error } = await supabase.from('notifications').insert(notification).select().single();
+    if (error) throw error;
+    _dashboardCache.notifications = null; // Invalidate cache
+    return parseNotificationFromDB(data);
+  },
+
+  // NEW: Method to check for existing unread notification by tag
+  async getExistingNotificationByTag(userId: string, workId: string | undefined, tag: string): Promise<DBNotification | null> {
+    let query = supabase
+      .from('notifications')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('tag', tag)
+      .eq('read', false); // Only consider unread notifications
+
+    if (workId) {
+      query = query.eq('work_id', workId);
+    }
+    
+    const { data, error } = await query.maybeSingle();
+
+    if (error) {
+        console.error(`Error checking existing notification for tag ${tag}:`, error);
+        return null;
+    }
+    return data ? parseNotificationFromDB(data) : null;
   },
 
   // --- PUSH NOTIFICATIONS ---

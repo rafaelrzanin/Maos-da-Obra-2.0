@@ -1,6 +1,6 @@
 
 
-import React, { useState, useEffect, Suspense, lazy } from 'react';
+import React, { useState, useEffect, Suspense, lazy, Fragment } from 'react';
 import * as ReactRouter from 'react-router-dom';
 import { PlanType } from './types.ts';
 import { AuthProvider, ThemeProvider, useAuth, useTheme } from './contexts/AuthContext.tsx';
@@ -17,10 +17,10 @@ const Profile = lazy(() => import('./pages/Profile.tsx').then(module => ({ defau
 const VideoTutorials = lazy(() => import('./pages/VideoTutorials.tsx').then(module => ({ default: (module as any).default })));
 const Checkout = lazy(() => import('./pages/Checkout.tsx').then(module => ({ default: (module as any).default })));
 const AiChat = lazy(() => import('./pages/AiChat.tsx').then(module => ({ default: (module as any).default }))); // Lazy load AiChat page
-// const Register = lazy(() => import('./pages/Register.tsx').then(module => ({ default: (module as any).default }))); // REMOVED: Register absorbed into Login
 const Notifications = lazy(() => import('./pages/Notifications.tsx')); // NEW: Lazy load Notifications page
-const AiWorkPlanner = lazy(() => import('./pages/AiWorkPlanner.tsx')); // NEW: Lazy load AiWorkPlanner page
-
+// NEW: AiWorkPlanner lazy load, as it is a premium feature
+const AiWorkPlanner = lazy(() => import('./pages/AiWorkPlanner.tsx'));
+const ReportsView = lazy(() => import('./components/ReportsView.tsx')); // NEW: Lazy load ReportsView
 
 // --- Componente de Carregamento ---
 const LoadingScreen = () => (
@@ -99,6 +99,45 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
   }
 }
 
+// NEW: Bottom Navigation Bar Component
+const BottomNavBar = ({ workId, activeTab, onTabClick }: { workId: string, activeTab: string, onTabClick: (tab: string) => void }) => {
+  const navigate = ReactRouter.useNavigate();
+
+  const navItems = [
+    { name: 'ETAPAS', label: 'Cronograma', icon: 'fa-list-check' },
+    { name: 'MATERIAIS', label: 'Materiais', icon: 'fa-boxes-stacked' },
+    { name: 'FINANCEIRO', label: 'Financeiro', icon: 'fa-dollar-sign' },
+    { name: 'FERRAMENTAS', label: 'Ferramentas', icon: 'fa-screwdriver-wrench' },
+  ];
+
+  const handleNavClick = (tabName: string) => {
+    // This will either update the tab if already on WorkDetail, or navigate to WorkDetail with the tab parameter
+    navigate(`/work/${workId}?tab=${tabName}`);
+    onTabClick(tabName); // Also update local state
+  };
+
+  return (
+    <div className="fixed bottom-0 left-0 right-0 z-50 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 shadow-lg md:hidden">
+      <nav className="flex justify-around h-16">
+        {navItems.map(item => (
+          <button
+            key={item.name}
+            onClick={() => handleNavClick(item.name)}
+            className={`flex flex-col items-center justify-center flex-1 text-xs font-bold transition-colors ${
+              activeTab === item.name ? 'text-secondary' : 'text-slate-500 dark:text-slate-400 hover:text-primary dark:hover:text-white'
+            }`}
+            aria-current={activeTab === item.name ? 'page' : undefined}
+          >
+            <i className={`fa-solid ${item.icon} text-lg mb-1`}></i>
+            <span>{item.label}</span>
+          </button>
+        ))}
+      </nav>
+    </div>
+  );
+};
+
+
 // Layout Component - Only applies to authenticated, subscribed areas of the app
 const Layout = ({ children }: { children: React.ReactNode }) => {
   const { user, authLoading, isUserAuthFinished, isSubscriptionValid, trialDaysRemaining, updatePlan, unreadNotificationsCount, logout } = useAuth(); // NEW: Get unreadNotificationsCount, logout
@@ -106,6 +145,8 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
   const navigate = ReactRouter.useNavigate();
   const location = ReactRouter.useLocation();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Sidebar state
+  // NEW: State to control WorkDetail's active tab when navigated via BottomNavBar
+  const [activeWorkDetailTab, setActiveWorkDetailTab] = useState('ETAPAS'); 
 
   // Log Auth State for debugging
   useEffect(() => {
@@ -117,7 +158,16 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     window.scrollTo(0, 0);
     setIsSidebarOpen(false); // Close sidebar on route change
-  }, [location.pathname]);
+
+    // NEW: Update activeWorkDetailTab from URL query params
+    const params = new URLSearchParams(location.search);
+    const tabFromUrl = params.get('tab');
+    if (tabFromUrl) {
+      setActiveWorkDetailTab(tabFromUrl);
+    } else {
+      setActiveWorkDetailTab('ETAPAS'); // Default if no tab param
+    }
+  }, [location.pathname, location.search]);
 
   // Handle plan update from checkout success
   useEffect(() => {
@@ -174,8 +224,13 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
     { path: '/settings', icon: 'fa-gear', label: 'Configurações' },
   ];
 
+  // Determine if current route is a WorkDetail page (to show bottom nav)
+  const match = ReactRouter.useMatch('/work/:id');
+  const isWorkDetailPage = !!match;
+  const workIdForBottomNav = match?.params.id || '';
+
   return (
-    <div className="min-h-screen bg-surface dark:bg-slate-950 transition-colors"> {/* Removed pb-20 */}
+    <div className="min-h-screen bg-surface dark:bg-slate-950 transition-colors"> 
       {/* Top Header */}
       <header className="bg-primary text-white p-4 flex items-center justify-between shadow-md print:hidden">
         <button onClick={() => setIsSidebarOpen(true)} className="text-xl p-2 -ml-2" aria-label="Abrir menu principal">
@@ -263,9 +318,18 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
       )}
 
       {/* Main Content Area */}
-      <main className="p-4 max-w-7xl mx-auto">
+      <main className={`p-4 max-w-7xl mx-auto ${isWorkDetailPage ? 'pb-20' : ''}`}> {/* Added pb-20 to main content if WorkDetail */}
         {children}
       </main>
+
+      {/* NEW: Bottom Navigation Bar */}
+      {isWorkDetailPage && workIdForBottomNav && (
+        <BottomNavBar 
+          workId={workIdForBottomNav} 
+          activeTab={activeWorkDetailTab} 
+          onTabClick={setActiveWorkDetailTab} 
+        />
+      )}
     </div>
   );
 };
@@ -285,6 +349,7 @@ const App = () => {
                 {/* Protected Routes - Wrapped by Layout */}
                 <ReactRouter.Route path="/" element={<Layout><Dashboard /></Layout>} />
                 <ReactRouter.Route path="/create" element={<Layout><CreateWork /></Layout>} />
+                {/* Modified WorkDetail route to include optional 'tab' parameter */}
                 <ReactRouter.Route path="/work/:id" element={<Layout><WorkDetail /></Layout>} />
                 <ReactRouter.Route path="/ai-chat" element={<Layout><AiChat /></Layout>} />
                 <ReactRouter.Route path="/notifications" element={<Layout><Notifications /></Layout>} />
@@ -292,8 +357,10 @@ const App = () => {
                 <ReactRouter.Route path="/profile" element={<Layout><Profile /></Layout>} />
                 <ReactRouter.Route path="/tutorials" element={<Layout><VideoTutorials /></Layout>} />
                 <ReactRouter.Route path="/checkout" element={<Layout><Checkout /></Layout>} /> 
-                {/* NEW: Route for AI Work Planner */}
+                {/* NEW: Route for AI Planner */}
                 <ReactRouter.Route path="/work/:id/ai-planner" element={<Layout><AiWorkPlanner /></Layout>} />
+                {/* NEW: Route for ReportsView */}
+                <ReactRouter.Route path="/work/:id/reports" element={<Layout><ReportsView /></Layout>} />
                 
                 <ReactRouter.Route path="*" element={<ReactRouter.Navigate to="/login" replace />} /> {/* Redirects to login if route not found */}
               </ReactRouter.Routes>

@@ -5,7 +5,7 @@ import * as ReactRouter from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.tsx';
 import { dbService } from '../services/db.ts';
 import { StepStatus, PlanType, WorkStatus, type Work, type DBNotification, type Step, type Material } from '../types.ts';
-import { ZE_AVATAR, ZE_AVATAR_FALLBACK, getRandomZeTip, ZeTip } from '../services/standards.ts';
+import { ZE_AVATAR, ZE_AVATAR_FALLBACK } from '../services/standards.ts'; // REMOVED: ZeTip, getRandomZeTip
 import { ZeModal, ZeModalProps } from '../components/ZeModal.tsx'; 
 // REMOVIDO: import { Recharts } from '../components/RechartsWrapper.tsx';
 
@@ -102,7 +102,7 @@ const SegmentedProgressBar = ({ steps }: { steps: Step[] }) => {
   const inProgress = steps.filter(s => s.status === StepStatus.IN_PROGRESS);
   // Fix: Renamed 'notStarted' to 'initialNotStartedSteps' to avoid redeclaration issues.
   const initialNotStartedSteps = steps.filter(s => s.status === StepStatus.NOT_STARTED); 
-  const delayed = steps.filter(s => s.status !== StepStatus.COMPLETED && s.endDate < today);
+  const delayed = steps.filter(s => s.status !== StepStatus.COMPLETED && new Date(s.endDate).getTime() < new Date(today).getTime()); // Ensure proper date comparison
 
   // Remove delayed steps from inProgress and initialNotStartedSteps to avoid double counting for accurate segment widths
   const actualInProgress = inProgress.filter(s => !delayed.some(d => d.id === s.id));
@@ -258,10 +258,9 @@ const WorkCard = ({ work, userId, onDeleteSuccess }: { work: Work; userId: strin
           title="Confirmar Exclusão"
           message={`Tem certeza que deseja excluir a obra "${work.name}"? Esta ação é irreversível e removerá todos os dados associados.`}
           confirmText="Sim, Excluir Obra"
-          cancelText="Cancelar"
-          type="DANGER"
           onConfirm={handleDeleteWork}
           onCancel={() => setShowDeleteModal(false)}
+          type="DANGER"
           isConfirming={isDeleting}
         >
           {deleteError && (
@@ -283,7 +282,7 @@ const Dashboard = () => {
   const [loadingWorks, setLoadingWorks] = useState(true);
   const [dailySummary, setDailySummary] = useState<{ completedSteps: number; delayedSteps: number; pendingMaterials: number; totalSteps: number } | null>(null);
   const [loadingSummary, setLoadingSummary] = useState(true);
-  const [zeTip, setZeTip] = useState<ZeTip | null>(null);
+  // REMOVED: zeTip state as the card is removed.
 
   // Debugging user and auth status
   useEffect(() => {
@@ -305,7 +304,23 @@ const Dashboard = () => {
       setWorks(fetchedWorks);
 
       const summaries = await Promise.all(
-        fetchedWorks.map(work => dbService.getDailySummary(work.id))
+        fetchedWorks.map(async work => { // Made inner map async
+          const steps = await dbService.getSteps(work.id);
+          const materials = await dbService.getMaterials(work.id);
+          const today = new Date().toISOString().split('T')[0];
+
+          const totalSteps = steps.length;
+          const completedSteps = steps.filter(s => s.status === StepStatus.COMPLETED).length;
+          const delayedSteps = steps.filter(s => (s.status === StepStatus.NOT_STARTED || s.status === StepStatus.IN_PROGRESS) && new Date(s.endDate).getTime() < new Date(today).getTime()).length;
+          const pendingMaterials = materials.filter(m => m.purchasedQty < m.plannedQty).length;
+
+          return {
+            totalSteps,
+            completedSteps,
+            delayedSteps,
+            pendingMaterials,
+          };
+        })
       );
 
       const combinedSummary = summaries.reduce(
@@ -339,10 +354,7 @@ const Dashboard = () => {
     loadWorksData();
   }, [loadWorksData]); // Recarrega dados ao mudar user ou após finalização de auth
 
-  // Zé da Obra Tip
-  useEffect(() => {
-    setZeTip(getRandomZeTip());
-  }, []); // Only once on mount
+  // REMOVED: Zé da Obra Tip useEffect as the card is removed.
 
   // Refresh data when notifications are dismissed (as notification status can affect dashboard metrics)
   const notificationCountRef = useRef(unreadNotificationsCount);
@@ -380,23 +392,7 @@ const Dashboard = () => {
         </button>
       </div>
 
-      {/* Zé da Obra Tip Card */}
-      {zeTip && (
-        <div className={cx(surface, "rounded-3xl p-4 md:p-5 flex items-start gap-4 mb-8 transition-all duration-300 transform animate-in fade-in slide-in-from-top-4")} role="status">
-          <div className="w-12 h-12 rounded-full p-1 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-800 shadow-lg shrink-0">
-            <img 
-              src={ZE_AVATAR} 
-              alt="Zé da Obra" 
-              className="w-full h-full object-cover rounded-full border-2 border-white dark:border-slate-800"
-              onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK}
-            />
-          </div>
-          <div className="flex-1">
-            <p className="text-sm font-black uppercase tracking-widest mb-1 text-secondary">Dica do Zé!</p>
-            <p className="text-primary dark:text-white font-bold text-base leading-tight">{zeTip.text}</p>
-          </div>
-        </div>
-      )}
+      {/* REMOVED: Zé da Obra Tip Card */}
 
       {/* Daily Summary Card */}
       {dailySummary && (

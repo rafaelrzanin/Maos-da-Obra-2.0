@@ -208,47 +208,30 @@ export interface Worker {
   notes?: string;
 }
 
-// NEW: Interface para sugestões do Zé da Obra (assistente ativo)
-export interface ZeSuggestion {
-  id: string; // Identificador único da sugestão/alerta
-  type: 'alert' | 'suggestion'; // Tipo: alerta crítico ou sugestão proativa
-  priority: 'critical' | 'high' | 'medium' | 'low'; // Nível de prioridade
-  message: string; // Mensagem principal do Zé
-  aiMessage?: string; // Mensagem mais detalhada gerada pela IA
-  actionText?: string; // Texto do botão de ação (ex: "Ver Materiais")
-  actionCallback?: () => void; // Função a ser executada ao clicar na ação
-  dismissible: boolean; // Se a sugestão pode ser dispensada pelo usuário
-  tag: string; // Uma tag única para deduplicação (ex: material-baixo-{workId}-{materialId})
-  aiContext: string; // Contexto para enviar ao aiService.sendMessage para uma resposta mais detalhada
-}
-
-// NEW: Interfaces para a resposta estruturada da IA de planejamento de obras
-export interface AIPlanStep {
-  name: string;
-  estimatedDurationDays: number;
-  notes: string;
-}
-
-export interface AIPlanRisk {
-  description: string;
-  likelihood: 'low' | 'medium' | 'high';
-  mitigation: string;
-}
-
-export interface AIPlanMaterialSuggestion {
-  item: string;
-  reason: string;
-  priority: 'low' | 'medium' | 'high';
-}
-
+// NEW: Interfaces for AI Work Plan (Re-added)
 export interface AIWorkPlan {
-  timelineSummary: string;
-  detailedSteps: AIPlanStep[];
-  potentialRisks: AIPlanRisk[];
-  materialSuggestions: AIPlanMaterialSuggestion[];
+  workId: string;
   generalAdvice: string;
+  timelineSummary: string;
+  detailedSteps: {
+    name: string;
+    estimatedDurationDays: number;
+    notes: string;
+  }[];
+  potentialRisks: {
+    description: string;
+    likelihood: 'low' | 'medium' | 'high';
+    mitigation: string;
+  }[];
+  materialSuggestions: {
+    item: string;
+    priority: 'low' | 'medium' | 'high';
+    reason: string;
+  }[];
 }
 
+// Removed ZeSuggestion as the card UI is removed.
+// Removed AI-related interfaces as AI Planner will handle structured responses differently.
 
 // Add ambient module declarations for import.meta.env AND process.env
 // This resolves TypeScript errors like "Property 'env' does not exist on type 'ImportMeta')"
