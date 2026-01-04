@@ -23,13 +23,7 @@ export default {
           light: '#F59E0B',   // Amber 500
           dark: '#B45309',    // Amber 700
         },
-        'status-inprogress': { // NEW: Cor para status 'Em Andamento' (AZUL)
-          DEFAULT: '#3B82F6', // Blue 500
-          light: '#60A5FA',   // Blue 400
-          dark: '#1D4ED8',    // Blue 700
-          bg: '#EFF6FF',      // Blue 50 for background
-          darkbg: '#1E3A8A',  // Blue 900 for dark mode background
-        },
+        // REMOVIDO: status-inprogress
         success: {
           DEFAULT: '#059669', // Emerald 600
           light: '#D1FAE5',
@@ -65,8 +59,7 @@ export default {
         'gradient-premium': 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)',
         'gradient-gold': 'linear-gradient(135deg, #F59E0B 0%, #B45309 100%)',
         'gradient-dark-gold': 'linear-gradient(135deg, #451a03 0%, #78350f 100%)',
-        // NEW: Specific gradient for the vitalício bonus container
-        'gradient-vitalicio-blue': 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)', // Similar to primary dark but distinct
+        // REMOVIDO: 'gradient-vitalicio-blue'
       },
       boxShadow: {
         'glass': '0 8px 32px 0 rgba(31, 38, 135, 0.07)',

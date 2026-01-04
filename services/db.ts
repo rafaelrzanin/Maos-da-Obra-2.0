@@ -1,3 +1,4 @@
+
 import { PlanType, ExpenseCategory, StepStatus, FileCategory, type User, type Work, type Step, type Material, type Expense, type Worker, type Supplier, type WorkPhoto, type WorkFile, type DBNotification, type PushSubscriptionInfo, type Contract, type Checklist, type ChecklistItem } from '../types.ts';
 import { WORK_TEMPLATES, FULL_MATERIAL_PACKAGES, CONTRACT_TEMPLATES, CHECKLIST_TEMPLATES } from './standards.ts';
 import { supabase } from './supabase.ts';
@@ -1242,19 +1243,33 @@ export const dbService = {
   },
 
   async deleteMaterial(materialId: string): Promise<void> {
-    // Check if there are any expenses associated with this material
-    const { data: expenses, error: expenseCheckError } = await supabase.from('expenses').select('id').eq('related_material_id', materialId);
-    if (expenseCheckError) throw expenseCheckError;
-    if (expenses && expenses.length > 0) {
-      throw new Error("Não é possível excluir o material pois existem despesas financeiras associadas a ele. Exclua as despesas primeiro.");
+    const { data: materialToDelete, error: fetchError } = await supabase.from('materials').select('work_id').eq('id', materialId).single();
+    if (fetchError || !materialToDelete) {
+      console.error(`Material with ID ${materialId} not found for deletion.`);
+      throw fetchError || new Error("Material not found.");
     }
-    
-    const { data: deletedMaterial, error } = await supabase.from('materials').delete().eq('id', materialId).select().single();
-    if (error) throw error;
-    if (deletedMaterial) {
-      _dashboardCache.materials[deletedMaterial.work_id] = null; // Invalidate cache
-      _dashboardCache.summary[deletedMaterial.work_id] = null; // Invalidate summary cache
+
+    // 1. Excluir lançamentos financeiros correspondentes a este material
+    const { error: deleteExpensesError } = await supabase
+      .from('expenses')
+      .delete()
+      .eq('related_material_id', materialId);
+
+    if (deleteExpensesError) {
+      console.error(`Erro ao excluir despesas relacionadas ao material ${materialId}:`, deleteExpensesError);
+      throw new Error(`Falha ao excluir despesas vinculadas: ${deleteExpensesError.message}`);
     }
+
+    // 2. Excluir o material
+    const { error } = await supabase.from('materials').delete().eq('id', materialId);
+    if (error) {
+      console.error(`Erro ao excluir material ${materialId}:`, error);
+      throw error;
+    }
+
+    _dashboardCache.materials[materialToDelete.work_id] = null; // Invalidate cache
+    _dashboardCache.summary[materialToDelete.work_id] = null; // Invalidate summary cache
+    _dashboardCache.expenses[materialToDelete.work_id] = null; // Invalidate expenses cache (since some might be deleted)
   },
 
   async registerMaterialPurchase(
@@ -1370,15 +1385,45 @@ export const dbService = {
   },
 
   async deleteExpense(expenseId: string): Promise<void> {
-    const { data: expenseToDelete, error: fetchError } = await supabase.from('expenses').select('work_id, related_material_id').eq('id', expenseId).single();
+    const { data: expenseToDelete, error: fetchError } = await supabase.from('expenses').select('work_id, related_material_id, quantity, amount').eq('id', expenseId).single();
     if (fetchError) throw fetchError;
+    
+    // Se a despesa veio de um material, atualiza o material primeiro
     if (expenseToDelete?.related_material_id) {
-      throw new Error("Não é possível excluir esta despesa, pois ela é um lançamento automático de compra de material. Edite a compra do material para ajustar o valor.");
+      const { data: currentMaterial, error: materialFetchError } = await supabase
+        .from('materials')
+        .select('purchased_qty, total_cost')
+        .eq('id', expenseToDelete.related_material_id)
+        .single();
+
+      if (materialFetchError || !currentMaterial) {
+        console.warn(`Material vinculado à despesa ${expenseId} não encontrado. Procedendo com a exclusão da despesa.`);
+      } else {
+        const newPurchasedQty = currentMaterial.purchased_qty - (expenseToDelete.quantity || 0);
+        const newTotalCost = currentMaterial.total_cost - (expenseToDelete.amount || 0);
+
+        const { error: updateMaterialError } = await supabase
+          .from('materials')
+          .update({
+            purchased_qty: Math.max(0, newPurchasedQty), // Garante que não fica negativo
+            total_cost: Math.max(0, newTotalCost) // Garante que não fica negativo
+          })
+          .eq('id', expenseToDelete.related_material_id);
+        
+        if (updateMaterialError) {
+          console.error(`Erro ao atualizar material ${expenseToDelete.related_material_id} após exclusão de despesa:`, updateMaterialError);
+          // Não lançar erro crítico aqui, para que a despesa possa ser excluída.
+        }
+      }
     }
+
     const { error } = await supabase.from('expenses').delete().eq('id', expenseId);
     if (error) throw error;
     _dashboardCache.expenses[expenseToDelete.work_id] = null; // Invalidate cache
     _dashboardCache.stats[expenseToDelete.work_id] = null; // Invalidate stats cache
+    if (expenseToDelete?.related_material_id) {
+      _dashboardCache.materials[expenseToDelete.work_id] = null; // Invalidate materials cache too
+    }
   },
 
   async addPaymentToExpense(expenseId: string, paymentAmount: number, paymentDate: string): Promise<Expense> {
