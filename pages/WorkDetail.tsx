@@ -223,6 +223,9 @@ const WorkDetail = () => {
   const [newExpenseCategory, setNewExpenseCategory] = useState<ExpenseCategory | string>(ExpenseCategory.OTHER);
   const [newExpenseDate, setNewExpenseDate] = useState(new Date().toISOString().split('T')[0]);
   const [newExpenseStepId, setNewExpenseStepId] = useState(''); 
+  // NEW: States for worker and supplier linking in expense modal
+  const [newExpenseWorkerId, setNewExpenseWorkerId] = useState('');
+  const [newExpenseSupplierId, setNewExpenseSupplierId] = useState('');
   const [editExpenseData, setEditExpenseData] = useState<Expense | null>(null);
   const [showAddPaymentModal, setShowAddPaymentModal] = useState(false); 
   const [paymentExpenseData, setPaymentExpenseData] = useState<Expense | null>(null); 
@@ -1073,6 +1076,8 @@ const WorkDetail = () => {
     setNewExpenseCategory(ExpenseCategory.OTHER);
     setNewExpenseDate(new Date().toISOString().split('T')[0]);
     setNewExpenseStepId('');
+    setNewExpenseWorkerId(''); // Clear worker ID
+    setNewExpenseSupplierId(''); // Clear supplier ID
   };
 
   const handleAddExpense = async (e?: React.FormEvent) => {
@@ -1109,7 +1114,9 @@ const WorkDetail = () => {
         category: newExpenseCategory,
         stepId: newExpenseStepId || undefined,
         paidAmount: newExpenseCategory !== ExpenseCategory.MATERIAL ? Number(newExpenseAmount) : 0,
-        totalAgreed: Number(newExpenseAmount)
+        totalAgreed: Number(newExpenseAmount),
+        workerId: newExpenseWorkerId || undefined, // Add workerId
+        supplierId: newExpenseSupplierId || undefined, // Add supplierId
       });
       if (newExpense) {
         await loadWorkData();
@@ -1154,7 +1161,11 @@ const WorkDetail = () => {
     }
 
     try {
-      const updatedExpense = await dbService.updateExpense(editExpenseData);
+      const updatedExpense = await dbService.updateExpense({
+        ...editExpenseData,
+        workerId: newExpenseWorkerId || undefined, // Update workerId
+        supplierId: newExpenseSupplierId || undefined, // Update supplierId
+      });
       if (updatedExpense) {
         await loadWorkData();
         clearExpenseFormAndCloseModal();
@@ -1213,6 +1224,8 @@ const WorkDetail = () => {
     setNewExpenseCategory(expense.category);
     setNewExpenseDate(expense.date);
     setNewExpenseStepId(expense.stepId || '');
+    setNewExpenseWorkerId(expense.workerId || ''); // Set worker ID
+    setNewExpenseSupplierId(expense.supplierId || ''); // Set supplier ID
     setShowAddExpenseModal(true);
   };
 
@@ -2542,6 +2555,28 @@ const WorkDetail = () => {
                   </select>
                 </div>
               )}
+              {/* NEW: Dropdown for Workers */}
+              <div>
+                <label htmlFor="expenseWorkerId" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Vincular a Profissional</label>
+                <select id="expenseWorkerId" value={editExpenseData ? editExpenseData.workerId || '' : newExpenseWorkerId} onChange={(e) => editExpenseData ? setEditExpenseData({ ...editExpenseData, workerId: e.target.value }) : setNewExpenseWorkerId(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" aria-label="Vincular despesa a um profissional">
+                  <option value="">Nenhum Profissional</option>
+                  {workers.map(worker => (
+                    <option key={worker.id} value={worker.id}>{worker.name} ({worker.role})</option>
+                  ))}
+                </select>
+              </div>
+              {/* NEW: Dropdown for Suppliers */}
+              <div>
+                <label htmlFor="expenseSupplierId" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Vincular a Fornecedor</label>
+                <select id="expenseSupplierId" value={editExpenseData ? editExpenseData.supplierId || '' : newExpenseSupplierId} onChange={(e) => editExpenseData ? setEditExpenseData({ ...editExpenseData, supplierId: e.target.value }) : setNewExpenseSupplierId(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" aria-label="Vincular despesa a um fornecedor">
+                  <option value="">Nenhum Fornecedor</option>
+                  {suppliers.map(supplier => (
+                    <option key={supplier.id} value={supplier.id}>{supplier.name} ({supplier.category})</option>
+                  ))}
+                </select>
+              </div>
               <div>
                 <label htmlFor="expenseDate" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Data</label>
                 <input id="expenseDate" type="date" value={editExpenseData ? editExpenseData.date : newExpenseDate} onChange={(e) => editExpenseData ? setEditExpenseData({ ...editExpenseData, date: e.target.value }) : setNewExpenseDate(e.target.value)}
