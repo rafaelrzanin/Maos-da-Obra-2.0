@@ -221,56 +221,51 @@ const getMaterialCategoriesFromStepName = (stepName: string, work: Work): string
   if (stepName.includes('Limpeza Final e Entrega')) categories.push('Limpeza Final e Entrega');
   
   // Mapeamento para etapas generalizadas de REFORMA_APTO
-  if (stepName.includes('Demolição e Retirada de Entulho')) categories.push('Demolição e Retirada de Entulho');
-  if (stepName.includes('Revisão Hidráulica e Esgoto')) categories.push('Revisão Hidráulica e Esgoto');
-  if (stepName.includes('Revisão Elétrica e Lógica')) categories.push('Revisão Elétrica e Lógica');
+  if (stepName.includes('Demolição e Retirada de Entulho') && !stepName.includes('(Banheiro)') && !stepName.includes('(Cozinha)')) categories.push('Demolição e Retirada de Entulho'); // Genérica para reforma geral
+  if (stepName.includes('Revisão Hidráulica e Esgoto') && !stepName.includes('(Banheiro)') && !stepName.includes('(Cozinha)')) categories.push('Revisão Hidráulica e Esgoto'); // Genérica para reforma geral
+  if (stepName.includes('Revisão Elétrica e Lógica') && !stepName.includes('(Banheiro)') && !stepName.includes('(Cozinha)')) categories.push('Revisão Elétrica e Lógica'); // Genérica para reforma geral
   if (stepName.includes('Regularização de Contrapisos')) categories.push('Regularização de Contrapisos');
-  if (stepName.includes('Impermeabilização')) categories.push('Impermeabilização'); // Categoria genérica para reforma
+  if (stepName.includes('Impermeabilização') && !stepName.includes('(Banheiro)')) categories.push('Impermeabilização'); // Categoria genérica para reforma
 
 
-  // Lógica para inferir categorias específicas de cômodos a partir de etapas generalizadas
-  if (stepName.includes('Instalações Hidráulicas e Esgoto') || stepName.includes('Revisão Hidráulica e Esgoto')) {
+  // Lógica para inferir categorias específicas de cômodos a partir de etapas generalizadas ou específicas
+  // Para Instalações Hidráulicas/Revisão Hidráulica
+  if (stepName.includes('Instalações Hidráulicas') || stepName.includes('Revisão Hidráulica') || stepName.includes('Hidráulica de Banheiro')) {
     if (numBathrooms > 0) categories.push('Hidráulica de Banheiro');
     if (numKitchens > 0) categories.push('Hidráulica de Cozinha');
   }
-  if (stepName.includes('Instalações Elétricas e Lógica') || stepName.includes('Revisão Elétrica e Lógica')) {
+  // Para Instalações Elétricas/Revisão Elétrica
+  if (stepName.includes('Instalações Elétricas') || stepName.includes('Revisão Elétrica') || stepName.includes('Elétrica de Banheiro')) {
     if (numBathrooms > 0) categories.push('Elétrica de Banheiro');
     if (numKitchens > 0) categories.push('Elétrica de Cozinha');
   }
-  if (stepName.includes('Pisos e Revestimentos')) {
+  // Para Pisos e Revestimentos
+  if (stepName.includes('Pisos e Revestimentos')) { // Isso abrange tanto o genérico quanto o específico de cômodos
     if (numBathrooms > 0) categories.push('Pisos e Revestimentos de Banheiro');
     if (numKitchens > 0) categories.push('Pisos e Revestimentos de Cozinha');
   }
-  if (stepName.includes('Gesso e Forros')) { // Considerar forro de banheiro separadamente
-    if (numBathrooms > 0) categories.push('Gesso e Forro de Banheiro');
+  // Para Gesso e Forros
+  if (stepName.includes('Gesso e Forros')) { 
+    if (numBathrooms > 0) categories.push('Gesso e Forro de Banheiro'); // Ex: gesso hidrofugado para banheiro
   }
+  // Para Bancadas e Marmoraria
   if (stepName.includes('Bancadas e Marmoraria')) {
     if (numBathrooms > 0) categories.push('Bancada de Banheiro');
     if (numKitchens > 0) categories.push('Bancada de Cozinha');
   }
+  // Para Louças e Metais Finais
   if (stepName.includes('Louças e Metais Finais')) {
     if (numBathrooms > 0) categories.push('Louças e Metais de Banheiro');
     if (numKitchens > 0) categories.push('Louças e Metais de Cozinha');
   }
 
-  // Mapeamento para etapas específicas de projetos (Banheiro, Cozinha, Pintura)
+  // Mapeamento para etapas específicas de projetos (Banheiro, Cozinha, Pintura) que não foram pegas acima
   if (stepName === 'Demolição e Retirada de Entulho (Banheiro)') categories.push('Demolição e Retirada de Entulho (Banheiro)');
-  if (stepName === 'Hidráulica de Banheiro') categories.push('Hidráulica de Banheiro');
-  if (stepName === 'Elétrica de Banheiro') categories.push('Elétrica de Banheiro');
   if (stepName === 'Impermeabilização de Banheiro') categories.push('Impermeabilização de Banheiro');
   if (stepName === 'Contrapiso de Banheiro') categories.push('Contrapiso de Banheiro');
-  if (stepName === 'Pisos e Revestimentos de Banheiro') categories.push('Pisos e Revestimentos de Banheiro');
-  if (stepName === 'Gesso e Forro de Banheiro') categories.push('Gesso e Forro de Banheiro');
-  if (stepName === 'Bancada de Banheiro') categories.push('Bancada de Banheiro');
-  if (stepName === 'Louças e Metais de Banheiro') categories.push('Louças e Metais de Banheiro');
   if (stepName === 'Limpeza Final e Entrega (Banheiro)') categories.push('Limpeza Final e Entrega'); // Mapeia para categoria genérica de limpeza
 
   if (stepName === 'Demolição e Retirada de Entulho (Cozinha)') categories.push('Demolição e Retirada de Entulho (Cozinha)');
-  if (stepName === 'Hidráulica de Cozinha') categories.push('Hidráulica de Cozinha');
-  if (stepName === 'Elétrica de Cozinha') categories.push('Elétrica de Cozinha');
-  if (stepName === 'Pisos e Revestimentos de Cozinha') categories.push('Pisos e Revestimentos de Cozinha');
-  if (stepName === 'Bancada de Cozinha') categories.push('Bancada de Cozinha');
-  if (stepName === 'Louças e Metais de Cozinha') categories.push('Louças e Metais de Cozinha');
   if (stepName === 'Limpeza Final e Entrega (Cozinha)') categories.push('Limpeza Final e Entrega'); // Mapeia para categoria genérica de limpeza
 
   if (stepName === 'Proteção e Preparação (Pintura)') categories.push('Proteção e Preparação (Pintura)');
@@ -278,7 +273,7 @@ const getMaterialCategoriesFromStepName = (stepName: string, work: Work): string
   if (stepName === 'Pintura Paredes e Tetos') categories.push('Pintura Paredes e Tetos');
   if (stepName === 'Limpeza Final e Entrega (Pintura)') categories.push('Limpeza Final e Entrega'); // Mapeia para categoria genérica de limpeza
   
-  // Filtrar categorias duplicadas
+  // Filtrar categorias duplicadas e garantir que 'Limpeza Final e Entrega' genérica seja a única se houver sobreposição
   return Array.from(new Set(categories));
 };
 
@@ -708,10 +703,11 @@ export const dbService = {
                             calculatedQty = work.area * item.multiplier;
 
                             // Adjust based on room counts IF applicable (for specific room material categories)
+                            // This ensures correct scaling for room-specific items
                             if (materialCategoryName.includes('Banheiro') && work.bathrooms && work.bathrooms > 0) {
-                                calculatedQty *= work.bathrooms;
+                                calculatedQty = item.flat_qty !== undefined ? item.flat_qty * work.bathrooms : item.multiplier * work.area * work.bathrooms;
                             } else if (materialCategoryName.includes('Cozinha') && work.kitchens && work.kitchens > 0) {
-                                calculatedQty *= work.kitchens;
+                                calculatedQty = item.flat_qty !== undefined ? item.flat_qty * work.kitchens : item.multiplier * work.area * work.kitchens;
                             } else if (materialCategoryName.includes('Quarto') && work.bedrooms && work.bedrooms > 0) {
                                 calculatedQty *= work.bedrooms;
                             } else if (materialCategoryName.includes('Sala') && work.livingRooms && work.livingRooms > 0) {
@@ -1656,4 +1652,3 @@ export const dbService = {
     }
   },
 };
-    
