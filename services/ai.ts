@@ -128,21 +128,27 @@ export const aiService = {
         workId: work.id,
         generalAdvice: "A IA está offline. Não foi possível gerar um plano detalhado. Verifique suas anotações e contatos para gerenciar a obra.",
         timelineSummary: "Plano offline. Organize suas etapas manualmente.",
-        detailedSteps: [{ name: "Fase 1: Preparação", estimatedDurationDays: 10, notes: "Defina seus materiais." }],
+        detailedSteps: [{ orderIndex: 1, name: "Fase 1: Preparação", estimatedDurationDays: 10, notes: "Defina seus materiais." }],
         potentialRisks: [{ description: "Risco de atraso.", likelihood: "high", mitigation: "A IA está offline." }],
         materialSuggestions: [{ item: "Cimento", priority: "medium", reason: "Sempre essencial." }],
       };
     }
 
     try {
-      const prompt = `Gere um plano de obra inteligente para o projeto "${work.name}" localizado em "${work.address}".
+      const prompt = `Você é o Zé da Obra AI, um mestre de obras experiente e engenheiro. Gere um plano de obra detalhado e inteligente para o projeto "${work.name}" localizado em "${work.address}".
         O orçamento planejado é de R$${work.budgetPlanned}, com área de ${work.area}m².
         Detalhes da construção: ${work.floors} pavimento(s), ${work.bedrooms} quarto(s), ${work.bathrooms} banheiro(s), ${work.kitchens} cozinha(s).
         Início da obra: ${work.startDate}.
-        Considere estes campos e gere um JSON com as seguintes seções:
+        
+        Gere um JSON com as seguintes seções, seguindo estritamente o formato AIWorkPlan e focando em um cronograma LÓGICO, NUMÉRICO e GENERALIZADO por etapas, sem detalhar por cômodos (ex: não crie 'Banheiro 1', use 'Instalações Hidráulicas'):
+
         1. "generalAdvice": Um conselho geral, incisivo e profissional, como um mestre de obras daria, focado em economia e eficiência. (1 frase)
-        2. "timelineSummary": Um resumo conciso da duração e dos marcos principais da obra. (2-3 frases)
-        3. "detailedSteps": Uma lista de 5-8 etapas macro da obra, com "name", "estimatedDurationDays" e "notes" (dica sobre a etapa). Evite subdivisões por cômodo; generalize as etapas.
+        2. "timelineSummary": Um resumo conciso da duração e dos marcos principais da obra, considerando os detalhes fornecidos. (2-3 frases)
+        3. "detailedSteps": Uma lista de 5-8 etapas macro da obra, em ordem LÓGICA e NUMÉRICA. Para cada etapa, inclua:
+           - "orderIndex": Número da etapa (1, 2, 3...).
+           - "name": Nome da etapa generalizada (ex: "Fundações", "Instalações Hidráulicas", "Acabamentos Internos"). NÃO detalhe por cômodos (ex: "Hidráulica do Banheiro 1" é PROIBIDO).
+           - "estimatedDurationDays": Duração estimada em dias, considerando a complexidade da obra (área, número de pavimentos, banheiros, cozinhas, etc.).
+           - "notes": Uma dica prática ou observação importante para essa etapa, relacionada à economia, segurança ou qualidade, e que reflita a complexidade dos detalhes da obra (ex: para "Instalações Hidráulicas", mencionar a complexidade devido aos X banheiros e Y cozinhas).
         4. "potentialRisks": 2-3 riscos potenciais relevantes para a obra, com "description", "likelihood" ('low', 'medium', 'high'), e "mitigation" (como evitar/resolver).
         5. "materialSuggestions": 2-3 sugestões de materiais chave, com "item", "priority" ('low', 'medium', 'high'), e "reason" (por que é importante).
         
@@ -152,6 +158,7 @@ export const aiService = {
           generalAdvice: string;
           timelineSummary: string;
           detailedSteps: {
+            orderIndex?: number; 
             name: string;
             estimatedDurationDays: number;
             notes: string;
@@ -167,7 +174,8 @@ export const aiService = {
             reason: string;
           }[];
         }
-        Certifique-se de que o workId seja '${work.id}'.`;
+        Certifique-se de que o workId seja '${work.id}'.
+        Apresente SOMENTE o JSON.`;
 
       const response = await ai.models.generateContent({
         model: "gemini-3-pro-preview", // Usar modelo mais capaz para planos complexos
@@ -194,3 +202,4 @@ export const aiService = {
     }
   }
 };
+    

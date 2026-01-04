@@ -196,53 +196,90 @@ const parseChecklistFromDB = (data: any): Checklist => ({
     items: data.items ? data.items.map(parseChecklistItemFromDB) : [], // items is a JSONB column
 });
 
-// NEW: Helper para mapear nome de etapa dinâmica para categoria de material genérica
-const getMaterialCategoryFromStepName = (stepName: string): string => {
-  // Regras para etapas dinâmicas (generalizadas)
-  if (stepName.includes('Limpeza do terreno')) return 'Limpeza do terreno';
-  if (stepName.includes('Fundações')) return 'Fundações';
-  if (stepName.includes('Estrutura (Lajes e Vigas)')) return 'Estrutura (Lajes e Vigas)'; 
-  if (stepName.includes('Alvenaria (Paredes)')) return 'Alvenaria (Paredes)'; 
-  if (stepName.includes('Cobertura e Telhado')) return 'Cobertura e Telhado';
-  if (stepName.includes('Instalações Hidráulicas Gerais')) return 'Instalações Hidráulicas Gerais';
-  if (stepName.includes('Instalações Elétricas Gerais')) return 'Instalações Elétricas Gerais';
-  if (stepName.includes('Chapisco e Reboco')) return 'Chapisco e Reboco';
-  if (stepName.includes('Contrapiso')) return 'Contrapiso';
-  if (stepName.includes('Impermeabilização Geral')) return 'Impermeabilização Geral';
-  if (stepName.includes('Gesso e Forro')) return 'Gesso e Forro'; 
-  if (stepName.includes('Pisos e Revestimentos')) return 'Pisos e Revestimentos'; 
-  if (stepName.includes('Esquadrias (Janelas e Portas)')) return 'Esquadrias (Janelas e Portas)';
-  if (stepName.includes('Bancadas e Marmoraria')) return 'Bancadas e Marmoraria';
-  if (stepName.includes('Pintura Interna e Externa')) return 'Pintura Interna e Externa'; 
-  if (stepName.includes('Instalação de Louças e Metais')) return 'Instalação de Louças e Metais'; 
-  if (stepName.includes('Instalação de Luminárias')) return 'Instalação de Luminárias';
-  if (stepName.includes('Limpeza Final e Entrega')) return 'Limpeza Final e Entrega';
+// NEW: Helper para mapear nomes de etapas generalizadas para categorias de materiais específicas
+// Esta função agora retorna um ARRAY de categorias de materiais relevantes
+const getMaterialCategoriesFromStepName = (stepName: string, work: Work): string[] => {
+  const categories: string[] = [];
+  const numBathrooms = work.bathrooms || 0;
+  const numKitchens = work.kitchens || 0;
 
-  // Etapas específicas de Reforma
-  if (stepName.includes('Demolição e Retirada de Entulho Geral')) return 'Demolição e Retirada de Entulho Geral'; // Modificado
-  if (stepName.includes('Demolição e Retirada de Entulho (Banheiro)')) return 'Demolição e Retirada de Entulho (Banheiro)';
-  if (stepName.includes('Hidráulica de Banheiro')) return 'Hidráulica de Banheiro';
-  if (stepName.includes('Elétrica de Banheiro')) return 'Elétrica de Banheiro';
-  if (stepName.includes('Impermeabilização de Banheiro')) return 'Impermeabilização de Banheiro';
-  if (stepName.includes('Contrapiso de Banheiro')) return 'Contrapiso de Banheiro';
-  if (stepName.includes('Pisos e Revestimentos de Banheiro')) return 'Pisos e Revestimentos de Banheiro';
-  if (stepName.includes('Gesso e Forro de Banheiro')) return 'Gesso e Forro de Banheiro';
-  if (stepName.includes('Bancada de Banheiro')) return 'Bancada de Banheiro';
-  if (stepName.includes('Louças e Metais de Banheiro')) return 'Louças e Metais de Banheiro';
+  // Mapeamento para etapas generalizadas de CONSTRUCAO e REFORMA_APTO
+  if (stepName.includes('Limpeza do Terreno e Gabarito')) categories.push('Limpeza do Terreno e Gabarito');
+  if (stepName.includes('Fundações')) categories.push('Fundações');
+  if (stepName.includes('Estrutura e Lajes')) categories.push('Estrutura e Lajes');
+  if (stepName.includes('Alvenaria e Vedação')) categories.push('Alvenaria e Vedação');
+  if (stepName.includes('Cobertura e Telhado')) categories.push('Cobertura e Telhado');
+  if (stepName.includes('Reboco e Regularização')) categories.push('Reboco e Regularização');
+  if (stepName.includes('Impermeabilização Principal')) categories.push('Impermeabilização Principal');
+  if (stepName.includes('Gesso e Forros')) categories.push('Gesso e Forros');
+  if (stepName.includes('Pisos e Revestimentos')) categories.push('Pisos e Revestimentos');
+  if (stepName.includes('Esquadrias (Portas e Janelas)')) categories.push('Esquadrias (Portas e Janelas)');
+  if (stepName.includes('Bancadas e Marmoraria')) categories.push('Bancadas e Marmoraria');
+  if (stepName.includes('Pintura Interna e Externa')) categories.push('Pintura Interna e Externa');
+  if (stepName.includes('Louças e Metais Finais')) categories.push('Louças e Metais Finais');
+  if (stepName.includes('Luminotécnica')) categories.push('Luminotécnica');
+  if (stepName.includes('Limpeza Final e Entrega')) categories.push('Limpeza Final e Entrega');
+  
+  // Mapeamento para etapas generalizadas de REFORMA_APTO
+  if (stepName.includes('Demolição e Retirada de Entulho')) categories.push('Demolição e Retirada de Entulho');
+  if (stepName.includes('Revisão Hidráulica e Esgoto')) categories.push('Revisão Hidráulica e Esgoto');
+  if (stepName.includes('Revisão Elétrica e Lógica')) categories.push('Revisão Elétrica e Lógica');
+  if (stepName.includes('Regularização de Contrapisos')) categories.push('Regularização de Contrapisos');
+  if (stepName.includes('Impermeabilização')) categories.push('Impermeabilização'); // Categoria genérica para reforma
 
-  if (stepName.includes('Demolição e Retirada de Entulho (Cozinha)')) return 'Demolição e Retirada de Entulho (Cozinha)';
-  if (stepName.includes('Hidráulica de Cozinha')) return 'Hidráulica de Cozinha';
-  if (stepName.includes('Elétrica de Cozinha')) return 'Elétrica de Cozinha';
-  if (stepName.includes('Pisos e Revestimentos de Cozinha')) return 'Pisos e Revestimentos de Cozinha';
-  if (stepName.includes('Bancada de Cozinha')) return 'Bancada de Cozinha';
-  if (stepName.includes('Louças e Metais de Cozinha')) return 'Louças e Metais de Cozinha';
 
-  if (stepName.includes('Proteção e Preparação (Pintura)')) return 'Proteção e Preparação (Pintura)';
-  if (stepName.includes('Lixamento e Massa (Pintura)')) return 'Lixamento e Massa (Pintura)';
-  if (stepName.includes('Pintura Paredes e Tetos')) return 'Pintura Paredes e Tetos'; 
+  // Lógica para inferir categorias específicas de cômodos a partir de etapas generalizadas
+  if (stepName.includes('Instalações Hidráulicas e Esgoto') || stepName.includes('Revisão Hidráulica e Esgoto')) {
+    if (numBathrooms > 0) categories.push('Hidráulica de Banheiro');
+    if (numKitchens > 0) categories.push('Hidráulica de Cozinha');
+  }
+  if (stepName.includes('Instalações Elétricas e Lógica') || stepName.includes('Revisão Elétrica e Lógica')) {
+    if (numBathrooms > 0) categories.push('Elétrica de Banheiro');
+    if (numKitchens > 0) categories.push('Elétrica de Cozinha');
+  }
+  if (stepName.includes('Pisos e Revestimentos')) {
+    if (numBathrooms > 0) categories.push('Pisos e Revestimentos de Banheiro');
+    if (numKitchens > 0) categories.push('Pisos e Revestimentos de Cozinha');
+  }
+  if (stepName.includes('Gesso e Forros')) { // Considerar forro de banheiro separadamente
+    if (numBathrooms > 0) categories.push('Gesso e Forro de Banheiro');
+  }
+  if (stepName.includes('Bancadas e Marmoraria')) {
+    if (numBathrooms > 0) categories.push('Bancada de Banheiro');
+    if (numKitchens > 0) categories.push('Bancada de Cozinha');
+  }
+  if (stepName.includes('Louças e Metais Finais')) {
+    if (numBathrooms > 0) categories.push('Louças e Metais de Banheiro');
+    if (numKitchens > 0) categories.push('Louças e Metais de Cozinha');
+  }
 
-  // Fallback
-  return stepName;
+  // Mapeamento para etapas específicas de projetos (Banheiro, Cozinha, Pintura)
+  if (stepName === 'Demolição e Retirada de Entulho (Banheiro)') categories.push('Demolição e Retirada de Entulho (Banheiro)');
+  if (stepName === 'Hidráulica de Banheiro') categories.push('Hidráulica de Banheiro');
+  if (stepName === 'Elétrica de Banheiro') categories.push('Elétrica de Banheiro');
+  if (stepName === 'Impermeabilização de Banheiro') categories.push('Impermeabilização de Banheiro');
+  if (stepName === 'Contrapiso de Banheiro') categories.push('Contrapiso de Banheiro');
+  if (stepName === 'Pisos e Revestimentos de Banheiro') categories.push('Pisos e Revestimentos de Banheiro');
+  if (stepName === 'Gesso e Forro de Banheiro') categories.push('Gesso e Forro de Banheiro');
+  if (stepName === 'Bancada de Banheiro') categories.push('Bancada de Banheiro');
+  if (stepName === 'Louças e Metais de Banheiro') categories.push('Louças e Metais de Banheiro');
+  if (stepName === 'Limpeza Final e Entrega (Banheiro)') categories.push('Limpeza Final e Entrega'); // Mapeia para categoria genérica de limpeza
+
+  if (stepName === 'Demolição e Retirada de Entulho (Cozinha)') categories.push('Demolição e Retirada de Entulho (Cozinha)');
+  if (stepName === 'Hidráulica de Cozinha') categories.push('Hidráulica de Cozinha');
+  if (stepName === 'Elétrica de Cozinha') categories.push('Elétrica de Cozinha');
+  if (stepName === 'Pisos e Revestimentos de Cozinha') categories.push('Pisos e Revestimentos de Cozinha');
+  if (stepName === 'Bancada de Cozinha') categories.push('Bancada de Cozinha');
+  if (stepName === 'Louças e Metais de Cozinha') categories.push('Louças e Metais de Cozinha');
+  if (stepName === 'Limpeza Final e Entrega (Cozinha)') categories.push('Limpeza Final e Entrega'); // Mapeia para categoria genérica de limpeza
+
+  if (stepName === 'Proteção e Preparação (Pintura)') categories.push('Proteção e Preparação (Pintura)');
+  if (stepName === 'Lixamento e Massa (Pintura)') categories.push('Lixamento e Massa (Pintura)');
+  if (stepName === 'Pintura Paredes e Tetos') categories.push('Pintura Paredes e Tetos');
+  if (stepName === 'Limpeza Final e Entrega (Pintura)') categories.push('Limpeza Final e Entrega'); // Mapeia para categoria genérica de limpeza
+  
+  // Filtrar categorias duplicadas
+  return Array.from(new Set(categories));
 };
 
 
@@ -652,59 +689,71 @@ export const dbService = {
 
         const materialsToInsert: any[] = [];
         
-        // Iterate through the actual created steps
+        // Iterate through the actual created steps (now generalized)
         for (const step of createdSteps) {
-            const materialCategoryName = getMaterialCategoryFromStepName(step.name);
-            const materialCategory = FULL_MATERIAL_PACKAGES.find(p => p.category === materialCategoryName);
+            // Use the new function to get an array of relevant material categories
+            const materialCategories = getMaterialCategoriesFromStepName(step.name, work);
 
-            if (materialCategory) {
-                for (const item of materialCategory.items) {
-                    let calculatedQty = 0;
+            for (const materialCategoryName of materialCategories) {
+                const materialCatalog = FULL_MATERIAL_PACKAGES.find(p => p.category === materialCategoryName);
 
-                    if (item.flat_qty) {
-                        calculatedQty = item.flat_qty;
-                    } else {
-                        // Base calculation (e.g., per m² of area)
-                        calculatedQty = work.area * item.multiplier;
+                if (materialCatalog) {
+                    for (const item of materialCatalog.items) {
+                        let calculatedQty = 0;
 
-                        // Adjust based on room counts IF applicable (for generic steps)
-                        if (step.name.includes('Banheiro') && work.bathrooms && work.bathrooms > 0) {
-                            calculatedQty *= work.bathrooms;
-                        } else if (step.name.includes('Cozinha') && work.kitchens && work.kitchens > 0) {
-                            calculatedQty *= work.kitchens;
-                        } else if (step.name.includes('Quarto') && work.bedrooms && work.bedrooms > 0) { // Future proofing
-                            calculatedQty *= work.bedrooms;
-                        } else if (step.name.includes('Sala') && work.livingRooms && work.livingRooms > 0) { // Future proofing
-                            calculatedQty *= work.livingRooms;
+                        if (item.flat_qty !== undefined) { // Check for explicit flat_qty
+                            calculatedQty = item.flat_qty;
+                        } else if (item.multiplier !== undefined) {
+                            // Base calculation (e.g., per m² of area)
+                            calculatedQty = work.area * item.multiplier;
+
+                            // Adjust based on room counts IF applicable (for specific room material categories)
+                            if (materialCategoryName.includes('Banheiro') && work.bathrooms && work.bathrooms > 0) {
+                                calculatedQty *= work.bathrooms;
+                            } else if (materialCategoryName.includes('Cozinha') && work.kitchens && work.kitchens > 0) {
+                                calculatedQty *= work.kitchens;
+                            } else if (materialCategoryName.includes('Quarto') && work.bedrooms && work.bedrooms > 0) {
+                                calculatedQty *= work.bedrooms;
+                            } else if (materialCategoryName.includes('Sala') && work.livingRooms && work.livingRooms > 0) {
+                                calculatedQty *= work.livingRooms;
+                            }
+
+                            // Adjust for floors if applicable (e.g., for slabs, general walls)
+                            // This logic applies to generic construction stages that scale with floors
+                            if (step.name.includes('Estrutura') && work.floors && work.floors > 1) { 
+                                calculatedQty *= (work.floors - 1); // Adjust for intermediate slabs
+                            } else if (step.name.includes('Alvenaria') && work.floors && work.floors > 1) {
+                                calculatedQty *= work.floors; // Assuming multiplier is for one floor, scale with floors
+                            } else if (step.name.includes('Reboco') && work.floors && work.floors > 1) {
+                                calculatedQty *= work.floors;
+                            } else if (step.name.includes('Pisos') && work.floors && work.floors > 1) {
+                                calculatedQty *= work.floors;
+                            } else if (step.name.includes('Pintura') && work.floors && work.floors > 1) {
+                                calculatedQty *= work.floors;
+                            }
                         }
+                        
+                        // Ensure min 1 if calculated > 0, and round up
+                        calculatedQty = Math.ceil(Math.max(0, calculatedQty));
+                        if (calculatedQty === 0 && item.multiplier > 0) calculatedQty = 1; // Ensure at least 1 unit if material has a multiplier but calculated to 0
 
-                        // Adjust for floors if applicable (e.g., for slabs, general walls)
-                        if (step.name.includes('Estrutura') && work.floors && work.floors > 1) { // If multi-floor slab
-                            calculatedQty *= (work.floors -1); // Adjust for intermediate slabs
-                        } else if (step.name.includes('Alvenaria') && work.floors && work.floors > 1) {
-                             // Assuming multiplier is for one floor, scale with floors
-                             calculatedQty *= work.floors;
+                        if (calculatedQty > 0) { // Only insert if quantity is positive
+                          materialsToInsert.push({
+                              work_id: work.id, 
+                              name: item.name,
+                              brand: undefined, 
+                              planned_qty: calculatedQty, 
+                              purchased_qty: 0, 
+                              unit: item.unit,
+                              step_id: step.id, // Link material to the specific step
+                              category: materialCategoryName, // Use the inferred specific category
+                              total_cost: 0 // Initialize total_cost
+                          });
                         }
                     }
-                    
-                    // Ensure min 1 if calculated > 0, and round up
-                    calculatedQty = Math.ceil(Math.max(0, calculatedQty));
-                    if (calculatedQty === 0 && item.multiplier > 0) calculatedQty = 1; // Ensure at least 1 unit if material has a multiplier but calculated to 0
-
-                    materialsToInsert.push({
-                        work_id: work.id, 
-                        name: item.name,
-                        brand: undefined, 
-                        planned_qty: calculatedQty, 
-                        purchased_qty: 0, 
-                        unit: item.unit,
-                        step_id: step.id, // Link material to the specific step
-                        category: materialCategory.category,
-                        total_cost: 0 // Initialize total_cost
-                    });
+                } else {
+                    console.warn(`[REGEN MATERIAL] Pacote de material para categoria inferida "${materialCategoryName}" (baseado na etapa "${step.name}" da obra "${work.name}") não encontrado.`);
                 }
-            } else {
-                console.warn(`[REGEN MATERIAL] Pacote de material para categoria "${materialCategoryName}" (baseado na etapa "${step.name}") não encontrado.`);
             }
         }
         
@@ -1585,8 +1634,7 @@ export const dbService = {
     const { data, error } = await supabase
       .from('user_subscriptions')
       .upsert(dbSubscription, { onConflict: 'endpoint' }) // Update if endpoint already exists
-      .select()
-      .single();
+      .select();
 
     if (error) {
       console.error("Error saving push subscription:", error);
@@ -1608,3 +1656,4 @@ export const dbService = {
     }
   },
 };
+    

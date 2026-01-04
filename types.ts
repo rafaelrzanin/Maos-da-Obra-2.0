@@ -214,6 +214,7 @@ export interface AIWorkPlan {
   generalAdvice: string;
   timelineSummary: string;
   detailedSteps: {
+    orderIndex?: number; // NEW: Added orderIndex for explicit ordering
     name: string;
     estimatedDurationDays: number;
     notes: string;
@@ -269,3 +270,4 @@ declare global {
     }
   }
 }
+    

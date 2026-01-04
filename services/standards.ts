@@ -5,8 +5,6 @@
 export const ZE_AVATAR = './ze.png';
 export const ZE_AVATAR_FALLBACK = 'https://raw.githubusercontent.com/Tarikul-Islam-Anik/Animated-Fluent-Emojis/master/Emojis/People/Construction%20Worker.png';
 
-// REMOVED: ZE_TIPS and getRandomZeTip as Zé Assistant card is removed.
-
 export interface WorkTemplate {
   id: string;
   label: string;
@@ -16,7 +14,8 @@ export interface WorkTemplate {
   includedSteps: string[];
 }
 
-// NOTE: The steps here must MATCH the category names in FULL_MATERIAL_PACKAGES exactly for linking to work.
+// NOTE: The steps here must be generalized, and the `db.ts` `getMaterialCategoriesFromStepName`
+// will be responsible for mapping these generic steps to specific material categories.
 export const WORK_TEMPLATES: WorkTemplate[] = [
   {
     id: 'CONSTRUCAO',
@@ -24,25 +23,24 @@ export const WORK_TEMPLATES: WorkTemplate[] = [
     icon: 'fa-house-chimney',
     description: 'Começar do terreno vazio até a mudança.',
     defaultDurationDays: 180, // Será ajustado dinamicamente
-    // Estas são as etapas BASE que serão combinadas com as etapas dinâmicas por pavimento
+    // Etapas BASE GENERALIZADAS para Construção
     includedSteps: [
-      'Limpeza do terreno', 
+      'Limpeza do Terreno e Gabarito', 
       'Fundações', 
-      'Estrutura (Lajes e Vigas)', // Generalizado para a estrutura
-      'Alvenaria (Paredes)', // Generalizado
-      'Cobertura e Telhado', // Generalizado
-      'Instalações Hidráulicas Gerais', // Generalizado
-      'Instalações Elétricas Gerais', // Generalizado
-      'Chapisco e Reboco', 
-      'Contrapiso',
-      'Impermeabilização Geral', 
-      'Gesso e Forro', 
+      'Estrutura e Lajes', 
+      'Alvenaria e Vedação', 
+      'Cobertura e Telhado', 
+      'Instalações Hidráulicas e Esgoto', 
+      'Instalações Elétricas e Lógica', 
+      'Reboco e Regularização', 
+      'Impermeabilização Principal', 
+      'Gesso e Forros', 
       'Pisos e Revestimentos', 
-      'Esquadrias (Janelas e Portas)',
+      'Esquadrias (Portas e Janelas)',
       'Bancadas e Marmoraria', 
       'Pintura Interna e Externa', 
-      'Instalação de Louças e Metais', 
-      'Instalação de Luminárias',
+      'Louças e Metais Finais', 
+      'Luminotécnica',
       'Limpeza Final e Entrega'
     ]
   },
@@ -52,19 +50,20 @@ export const WORK_TEMPLATES: WorkTemplate[] = [
     icon: 'fa-house-user',
     description: 'Geral: pisos, pintura, gesso e elétrica.',
     defaultDurationDays: 60,
+    // Etapas BASE GENERALIZADAS para Reforma Completa
     includedSteps: [
-      'Demolição e Retirada de Entulho Geral', // Modificado para ser genérico
-      'Instalações Hidráulicas Gerais', 
-      'Instalações Elétricas Gerais',
-      'Gesso e Forro', 
-      'Contrapiso',
-      'Impermeabilização Geral',
+      'Demolição e Retirada de Entulho', 
+      'Revisão Hidráulica e Esgoto', 
+      'Revisão Elétrica e Lógica',
+      'Gesso e Forros', 
+      'Regularização de Contrapisos',
+      'Impermeabilização',
       'Pisos e Revestimentos', 
-      'Esquadrias (Janelas e Portas)',
+      'Esquadrias (Portas e Janelas)',
       'Bancadas e Marmoraria', 
       'Pintura Interna e Externa', 
-      'Instalação de Louças e Metais', 
-      'Instalação de Luminárias', 
+      'Louças e Metais Finais', 
+      'Luminotécnica', 
       'Limpeza Final e Entrega'
     ]
   },
@@ -74,6 +73,7 @@ export const WORK_TEMPLATES: WorkTemplate[] = [
     icon: 'fa-bath',
     description: 'Troca de piso, louças e impermeabilização.',
     defaultDurationDays: 15,
+    // Etapas específicas para Reforma de Banheiro (projeto específico)
     includedSteps: [
       'Demolição e Retirada de Entulho (Banheiro)', 
       'Hidráulica de Banheiro', 
@@ -93,6 +93,7 @@ export const WORK_TEMPLATES: WorkTemplate[] = [
     icon: 'fa-kitchen-set',
     description: 'Azulejos, bancadas e instalações.',
     defaultDurationDays: 20,
+    // Etapas específicas para Reforma de Cozinha (projeto específico)
     includedSteps: [
       'Demolição e Retirada de Entulho (Cozinha)', 
       'Hidráulica de Cozinha', 
@@ -109,6 +110,7 @@ export const WORK_TEMPLATES: WorkTemplate[] = [
     icon: 'fa-paint-roller',
     description: 'Renovar as paredes e tetos.',
     defaultDurationDays: 10,
+    // Etapas específicas para Serviço de Pintura (projeto específico)
     includedSteps: [
       'Proteção e Preparação (Pintura)', 
       'Lixamento e Massa (Pintura)', 
@@ -130,11 +132,12 @@ export interface MaterialCatalog {
   items: MaterialItem[];
 }
 
-// CRITICAL: The 'category' key here MUST match the step names in WORK_TEMPLATES above.
+// CRITICAL: The 'category' key here MUST match the category names that
+// `getMaterialCategoriesFromStepName` in `db.ts` will return.
 // Multipliers are now a base, to be further adjusted dynamically by `db.ts` `regenerateMaterials`.
 export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
   {
-    category: 'Limpeza do terreno',
+    category: 'Limpeza do Terreno e Gabarito', // Corresponde à etapa CONSTRUCAO
     items: [
       { name: 'Sacos de Ráfia (Entulho)', unit: 'un', multiplier: 0.8 }, // por m² de área
       { name: 'Caçamba Estacionária', unit: 'un', multiplier: 0.005, flat_qty: 1 }, // Flat 1 para obras maiores, 0.005 * area
@@ -146,7 +149,7 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
     ]
   },
   {
-    category: 'Fundações',
+    category: 'Fundações', // Corresponde à etapa CONSTRUCAO
     items: [
       { name: 'Cimento CP-II (Estrutural)', unit: 'sacos', multiplier: 0.4 },
       { name: 'Areia Média (Lavada)', unit: 'm³', multiplier: 0.06 },
@@ -161,7 +164,7 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
     ]
   },
   {
-    category: 'Estrutura (Lajes e Vigas)', // Generalizado
+    category: 'Estrutura e Lajes', // Corresponde à etapa CONSTRUCAO
     items: [
       { name: 'Laje Pré-Fabricada (Lajota)', unit: 'm²', multiplier: 1.05 }, // 5% de perda
       { name: 'Cimento CP-III (Concretagem)', unit: 'sacos', multiplier: 0.3 },
@@ -172,7 +175,7 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
     ]
   },
   {
-    category: 'Alvenaria (Paredes)', // Generalizado
+    category: 'Alvenaria e Vedação', // Corresponde à etapa CONSTRUCAO
     items: [
       { name: 'Bloco Cerâmico (9x19x19cm)', unit: 'un', multiplier: 30 }, // por m²
       { name: 'Cimento CP-II (Assentamento)', unit: 'sacos', multiplier: 0.2 },
@@ -182,7 +185,7 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
     ]
   },
   {
-    category: 'Cobertura e Telhado', // Generalizado
+    category: 'Cobertura e Telhado', // Corresponde à etapa CONSTRUCAO
     items: [
       { name: 'Telha Cerâmica Romana', unit: 'un', multiplier: 16 }, // por m²
       { name: 'Madeira para Estrutura (Caibro/Ripa)', unit: 'm', multiplier: 2 },
@@ -191,7 +194,7 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
     ]
   },
   {
-    category: 'Instalações Hidráulicas Gerais', // Generalizado
+    category: 'Instalações Hidráulicas e Esgoto', // Corresponde à etapa CONSTRUCAO e REFORMA_APTO
     items: [
       { name: 'Tubos PVC 100mm (Esgoto)', unit: 'barras', multiplier: 0.05 }, // por m²
       { name: 'Tubos PVC 50mm (Esgoto)', unit: 'barras', multiplier: 0.1 },
@@ -202,7 +205,7 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
     ]
   },
   {
-    category: 'Instalações Elétricas Gerais', // Generalizado
+    category: 'Instalações Elétricas e Lógica', // Corresponde à etapa CONSTRUCAO e REFORMA_APTO
     items: [
       { name: 'Fio Flexível 2.5mm (Tomadas)', unit: 'm', multiplier: 10 },
       { name: 'Fio Flexível 1.5mm (Iluminação)', unit: 'm', multiplier: 8 },
@@ -213,23 +216,17 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
     ]
   },
   {
-    category: 'Chapisco e Reboco',
+    category: 'Reboco e Regularização', // Corresponde à etapa CONSTRUCAO e REFORMA_APTO
     items: [
       { name: 'Cimento CP-II', unit: 'sacos', multiplier: 0.3 },
       { name: 'Areia Média', unit: 'm³', multiplier: 0.05 },
-      { name: 'Cal Hidratada', unit: 'sacos', multiplier: 0.08 }
+      { name: 'Cal Hidratada', unit: 'sacos', multiplier: 0.08 },
+      { name: 'Areia Grossa (Contrapiso)', unit: 'm³', multiplier: 0.07 },
+      { name: 'Brita Zero (Contrapiso)', unit: 'm³', multiplier: 0.03 }
     ]
   },
   {
-    category: 'Contrapiso',
-    items: [
-      { name: 'Cimento CP-II', unit: 'sacos', multiplier: 0.2 },
-      { name: 'Areia Grossa', unit: 'm³', multiplier: 0.07 },
-      { name: 'Brita Zero', unit: 'm³', multiplier: 0.03 }
-    ]
-  },
-  {
-    category: 'Impermeabilização Geral', 
+    category: 'Impermeabilização Principal', // Corresponde à etapa CONSTRUCAO
     items: [
       { name: 'Manta Asfáltica (1m x 10m)', unit: 'rolos', multiplier: 0.1 },
       { name: 'Asfalto para Manta', unit: 'litros', multiplier: 0.5 },
@@ -237,7 +234,7 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
     ]
   },
   {
-    category: 'Gesso e Forro', // Generalizado
+    category: 'Gesso e Forros', // Corresponde à etapa CONSTRUCAO e REFORMA_APTO
     items: [
       { name: 'Placa de Gesso Acartonado (1.20x1.80m)', unit: 'chapa', multiplier: 0.6 },
       { name: 'Perfil Metálico (Montante)', unit: 'barra', multiplier: 2 },
@@ -246,7 +243,7 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
     ]
   },
   {
-    category: 'Pisos e Revestimentos', // Generalizado
+    category: 'Pisos e Revestimentos', // Corresponde à etapa CONSTRUCAO e REFORMA_APTO
     items: [
       { name: 'Piso Cerâmico/Porcelanato (60x60cm)', unit: 'm²', multiplier: 1.1 },
       { name: 'Argamassa AC-II / AC-III', unit: 'sacos', multiplier: 0.3 },
@@ -254,7 +251,7 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
     ]
   },
   {
-    category: 'Esquadrias (Janelas e Portas)', // Generalizado
+    category: 'Esquadrias (Portas e Janelas)', // Corresponde à etapa CONSTRUCAO e REFORMA_APTO
     items: [
       { name: 'Janela de Alumínio (1.20x1.20m)', unit: 'un', multiplier: 0.02 }, // por m²
       { name: 'Porta de Madeira (80x210cm)', unit: 'un', multiplier: 0.03 }, // por m²
@@ -263,7 +260,7 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
     ]
   },
   {
-    category: 'Bancadas e Marmoraria', // Generalizado
+    category: 'Bancadas e Marmoraria', // Corresponde à etapa CONSTRUCAO e REFORMA_APTO
     items: [
       { name: 'Granito/Mármore (Verde Ubatuba/Travertino)', unit: 'm²', multiplier: 0.1 }, // por m²
       { name: 'Cuba de Inox/Louça', unit: 'un', multiplier: 0.01 }, // por m²
@@ -271,7 +268,7 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
     ]
   },
   {
-    category: 'Pintura Interna e Externa', // Generalizado
+    category: 'Pintura Interna e Externa', // Corresponde à etapa CONSTRUCAO e REFORMA_APTO
     items: [
       { name: 'Tinta Acrílica Premium (Branco/Cor)', unit: 'galão', multiplier: 0.2 },
       { name: 'Massa Corrida/Acrílica', unit: 'lata', multiplier: 0.1 },
@@ -282,7 +279,7 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
     ]
   },
   {
-    category: 'Instalação de Louças e Metais', // Generalizado
+    category: 'Louças e Metais Finais', // Corresponde à etapa CONSTRUCAO e REFORMA_APTO
     items: [
       { name: 'Vaso Sanitário com Caixa Acoplada', unit: 'un', multiplier: 0.02 }, // por m²
       { name: 'Pia/Lavatório com Coluna', unit: 'un', multiplier: 0.02 },
@@ -293,7 +290,7 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
     ]
   },
   {
-    category: 'Instalação de Luminárias',
+    category: 'Luminotécnica', // Corresponde à etapa CONSTRUCAO e REFORMA_APTO
     items: [
       { name: 'Luminárias de Teto (Spots/Plafons)', unit: 'un', multiplier: 0.5 }, // por m²
       { name: 'Lâmpadas LED (Quente/Fria)', unit: 'un', multiplier: 1 },
@@ -301,14 +298,15 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
     ]
   },
   {
-    category: 'Limpeza Final e Entrega',
+    category: 'Limpeza Final e Entrega', // Corresponde à etapa CONSTRUCAO e REFORMA_APTO
     items: [
       { name: 'Sacos de Lixo Reforçados', unit: 'rolos', multiplier: 0.1 },
       { name: 'Produtos de Limpeza (Desinfetante/Detergente)', unit: 'litros', multiplier: 0.05 },
       { name: 'Panos e Rodos', unit: 'un', multiplier: 0.01 }
     ]
   },
-  // --- ITENS ESPECÍFICOS PARA REFORMA DE BANHEIRO ---
+  // --- ITENS ESPECÍFICOS PARA REFORMA DE BANHEIRO (CATEGORIA ESPECÍFICA) ---
+  // Estas categorias ainda existem e serão mapeadas pela função dbService
   {
     category: 'Demolição e Retirada de Entulho (Banheiro)',
     items: [
@@ -387,6 +385,7 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
       { name: 'Espelho com Armário', unit: 'un', multiplier: 1, flat_qty: 1 }
     ]
   },
+  // --- ITENS ESPECÍFICOS PARA REFORMA DE COZINHA (CATEGORIA ESPECÍFICA) ---
   {
     category: 'Demolição e Retirada de Entulho (Cozinha)',
     items: [
@@ -441,8 +440,9 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
       { name: 'Sifões e Engates Flexíveis', unit: 'un', multiplier: 1, flat_qty: 1 }
     ]
   },
+  // --- ITENS ESPECÍFICOS PARA PINTURA (CATEGORIA ESPECÍFICA) ---
   {
-    category: 'Proteção e Preparação (Pintura)', // Generalizado
+    category: 'Proteção e Preparação (Pintura)', 
     items: [
       { name: 'Lona Plástica Grossa', unit: 'm²', multiplier: 1.1 },
       { name: 'Fita Crepe Larga', unit: 'rolo', multiplier: 0.5 },
@@ -450,7 +450,7 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
     ]
   },
   {
-    category: 'Lixamento e Massa (Pintura)', // Generalizado
+    category: 'Lixamento e Massa (Pintura)', 
     items: [
       { name: 'Massa Corrida (Interna) / Acrílica (Externa)', unit: 'lata', multiplier: 0.15 },
       { name: 'Lixas (Grana 150/220)', unit: 'folha', multiplier: 5 },
@@ -458,19 +458,57 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
     ]
   },
   {
-    category: 'Pintura Paredes e Tetos', // Generalizado
+    category: 'Pintura Paredes e Tetos', 
     items: [
       { name: 'Tinta Acrílica Premium (Branco/Cor)', unit: 'galão', multiplier: 0.2 },
       { name: 'Rolos e Pincéis', unit: 'kit', multiplier: 0.01 },
       { name: 'Bandeja para Tinta', unit: 'un', multiplier: 0.01 }
     ]
   },
+  // --- ITENS ESPECÍFICOS PARA REFORMA GERAL (CATEGORIA ESPECÍFICA) ---
+  // Estes são usados nas etapas generalizadas de REFORMA_APTO
   {
-    category: 'Demolição e Retirada de Entulho Geral', // NEW: Genérico
+    category: 'Demolição e Retirada de Entulho', 
     items: [
-      { name: 'Sacos de Ráfia (Entulho)', unit: 'un', multiplier: 1, flat_qty: 20 }, // Baseado em 20 sacos para uma reforma média
-      { name: 'Caçamba Estacionária', unit: 'un', multiplier: 0.005, flat_qty: 1 },
-      { name: 'Marreta/Talhadeira', unit: 'un', multiplier: 0.01, flat_qty: 0.01 }
+        { name: 'Sacos de Ráfia (Entulho)', unit: 'un', multiplier: 1, flat_qty: 20 }, // Baseado em 20 sacos para uma reforma média
+        { name: 'Caçamba Estacionária', unit: 'un', multiplier: 0.005, flat_qty: 1 },
+        { name: 'Marreta/Talhadeira', unit: 'un', multiplier: 0.01, flat_qty: 0.01 }
+    ]
+  },
+  {
+    category: 'Revisão Hidráulica e Esgoto',
+    items: [
+      { name: 'Tubos PVC 50mm (Esgoto)', unit: 'barra', multiplier: 0.05 },
+      { name: 'Tubos PPR/CPVC 25mm (Água)', unit: 'barra', multiplier: 0.05 },
+      { name: 'Conexões e Registros (Diversos)', unit: 'un', multiplier: 0.2 },
+      { name: 'Cola PVC e Lixa', unit: 'kit', multiplier: 0.01 }
+    ]
+  },
+  {
+    category: 'Revisão Elétrica e Lógica',
+    items: [
+      { name: 'Fio Flexível 2.5mm', unit: 'm', multiplier: 5 },
+      { name: 'Fio Flexível 1.5mm', unit: 'm', multiplier: 3 },
+      { name: 'Disjuntores e DRs', unit: 'un', multiplier: 0.1 },
+      { name: 'Caixas de Tomada 4x2', unit: 'un', multiplier: 0.5 },
+      { name: 'Tomadas e Interruptores', unit: 'un', multiplier: 0.5 },
+      { name: 'Conduítes Flexíveis 3/4', unit: 'm', multiplier: 2 }
+    ]
+  },
+  {
+    category: 'Regularização de Contrapisos',
+    items: [
+      { name: 'Cimento CP-II', unit: 'sacos', multiplier: 0.15 },
+      { name: 'Areia Média', unit: 'm³', multiplier: 0.05 }
+    ]
+  },
+  // Re-map "Impermeabilização Principal" for general renovation purposes if needed, or rely on specific ones
+  // For renovation, "Impermeabilização Principal" could just be a general purpose one, or we map to specific room ones below
+  {
+    category: 'Impermeabilização', // Nova categoria genérica para reforma, se for o caso
+    items: [
+      { name: 'Manta Líquida Acrílica (Geral)', unit: 'litro', multiplier: 0.5 }, // por m²
+      { name: 'Argamassa Polimérica (Geral)', unit: 'kg', multiplier: 0.2 } // por m²
     ]
   },
 ];
@@ -761,7 +799,7 @@ export const CHECKLIST_TEMPLATES: Checklist[] = [
     id: 'ckl-levantamento-paredes-1',
     workId: 'mock-work-id',
     name: 'Alvenaria - Levantamento de Paredes',
-    category: 'Alvenaria (Paredes)',
+    category: 'Alvenaria e Vedação', // Updated category
     items: [
       { id: 'item1', text: 'Conferir primeira fiada com nível e prumo (fundação seca)', checked: false },
       { id: 'item2', text: 'Utilizar gabarito e linhas para alinhamento das fiadas', checked: false },
@@ -778,7 +816,7 @@ export const CHECKLIST_TEMPLATES: Checklist[] = [
     id: 'ckl-lajes-vigas-1',
     workId: 'mock-work-id',
     name: 'Estrutura - Concretagem',
-    category: 'Estrutura (Lajes e Vigas)',
+    category: 'Estrutura e Lajes', // Updated category
     items: [
       { id: 'item1', text: 'Conferir escoramento e formas (prumo e nível)', checked: false },
       { id: 'item2', text: 'Verificar ferragem (bitolas, espaçamentos, cobrimento)', checked: false },
@@ -812,7 +850,7 @@ export const CHECKLIST_TEMPLATES: Checklist[] = [
     id: 'ckl-impermeabilizacao-1',
     workId: 'mock-work-id',
     name: 'Impermeabilização Geral', 
-    category: 'Impermeabilização Geral',
+    category: 'Impermeabilização Principal', // Updated category
     items: [
       { id: 'item10', text: 'Superfície do baldrame limpa, seca e regularizada', checked: false },
       { id: 'item11', text: 'Aplicação de primer ou promotor de aderência (se necessário)', checked: false },
@@ -829,13 +867,13 @@ export const CHECKLIST_TEMPLATES: Checklist[] = [
     id: 'ckl-eletrica-geral-1',
     workId: 'mock-work-id',
     name: 'Instalações Elétricas Gerais',
-    category: 'Instalações Elétricas Gerais',
+    category: 'Instalações Elétricas e Lógica', // Updated category
     items: [
       { id: 'item20', text: 'Passagem e fixação de todos os conduítes (garantir sem amassados)', checked: false },
       { id: 'item21', text: 'Fixação das caixas 4x2, 4x4 e de teto (alinhamento e prumo)', checked: false },
       { id: 'item22', text: 'Passagem de fios com bitolas corretas (iluminação, tomadas, chuveiro)', checked: false },
       { id: 'item23', text: 'Identificação e etiquetagem dos circuitos (tomadas, iluminação, DRs)', checked: false },
-      { id: 'item24', text: 'Conexão provisória para teste de continuidade (segurança)', checked: false },
+      { id: 'item24', 'text': 'Conexão provisória para teste de continuidade (segurança)', checked: false },
       { id: 'item25', text: 'Instalação do sistema de aterramento (hastes, malha, caixa de inspeção)', checked: false },
       { id: 'item26', text: 'Verificar passagem para ar condicionado, aquecedores, etc.', checked: false },
       { id: 'item27', text: 'Posicionamento do quadro de distribuição (altura e acesso)', checked: false },
@@ -847,12 +885,12 @@ export const CHECKLIST_TEMPLATES: Checklist[] = [
     id: 'ckl-hidraulica-banheiro-1',
     workId: 'mock-work-id',
     name: 'Hidráulica de Banheiro', 
-    category: 'Hidráulica de Banheiro',
+    category: 'Hidráulica de Banheiro', // Specific category, handled by inference
     items: [
       { id: 'item30', text: 'Verificar caimento adequado do esgoto (ralos, vasos, pias)', checked: false },
       { id: 'item31', text: 'Instalação e alinhamento dos registros (chuveiro, gaveta, pressão)', checked: false },
       { id: 'item32', text: 'Teste de estanqueidade (pressão) da tubulação de água fria/quente', checked: false },
-      { id: 'item33', text: 'Eliminar bolsões de ar na tubulação para evitar ruídos e golpes de aríete', checked: false },
+      { id: 'item33', text: 'Eliminar bolsões de air na tubulação para evitar ruídos e golpes de aríete', checked: false },
       { id: 'item34', text: 'Fixação segura e no nível correto dos pontos de água quente/fria', checked: false },
       { id: 'item35', text: 'Posicionamento e diâmetro correto dos pontos de esgoto', checked: false },
       { id: 'item36', text: 'Proteção das tubulações contra danos durante o reboco', checked: false },
@@ -940,7 +978,7 @@ export const CHECKLIST_TEMPLATES: Checklist[] = [
     id: 'ckl-demolicao-entulho-geral',
     workId: 'mock-work-id',
     name: 'Demolição e Retirada de Entulho Geral', // Modificado
-    category: 'Demolição e Retirada de Entulho Geral', // Modificado
+    category: 'Demolição e Retirada de Entulho', // Updated category for general renovation
     items: [
         { id: 'item1', text: 'Planejar sequência de demolição (evitar desabamentos)', checked: false },
         { id: 'item2', text: 'Desligar e isolar instalações elétricas e hidráulicas', checked: false },
