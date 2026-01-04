@@ -37,7 +37,6 @@ interface MaterialStepGroup {
  * ========================= */
 const cx = (...c: Array<string | false | undefined>) => c.filter(Boolean).join(' ');
 
-// Updated to use new shadow classes
 const surface =
   "bg-white border border-slate-200/90 shadow-card-default ring-1 ring-black/5 " +
   "dark:bg-slate-900/70 dark:border-slate-800 dark:shadow-card-dark-subtle dark:ring-0";
@@ -258,13 +257,13 @@ const WorkDetail = () => {
   const [newPhotoDescription, setNewPhotoDescription] = useState('');
   const [newPhotoFile, setNewPhotoFile] = useState<File | null>(null);
   const [newPhotoType, setNewPhotoType] = useState<'BEFORE' | 'AFTER' | 'PROGRESS'>('PROGRESS');
-  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [uploadingPhoto, setLoadingPhoto] = useState(false); // Renamed to avoid conflict
 
   const [showAddFileModal, setShowAddFileModal] = useState(false);
   const [newFileName, setNewFileName] = useState('');
   const [newFileCategory, setNewFileCategory] = useState<FileCategory>(FileCategory.GENERAL);
   const [newUploadFile, setNewUploadFile] = useState<File | null>(null);
-  const [uploadingFile, setUploadingFile] = useState(false);
+  const [uploadingFile, setLoadingFile] = useState(false); // Renamed to avoid conflict
 
   const [showAddChecklistModal, setShowAddChecklistModal] = useState(false); 
   const [newChecklistName, setNewChecklistName] = useState('');
@@ -733,8 +732,9 @@ const WorkDetail = () => {
     }
 
     try {
+      // Fix: Removed 'isDelayed: false' as it's handled by dbService.addStep internally.
       const newStep = await dbService.addStep({
-        workId, name: newStepName, startDate: newStepStartDate, endDate: newStepEndDate, status: StepStatus.NOT_STARTED, isDelayed: false
+        workId, name: newStepName, startDate: newStepStartDate, endDate: newStepEndDate, status: StepStatus.NOT_STARTED
       });
       if (newStep) {
         await loadWorkData();
@@ -842,17 +842,24 @@ const WorkDetail = () => {
   };
 
   const handleToggleStepStatus = useCallback(async (step: Step) => {
+    const today = new Date();
+    today.setHours(0,0,0,0);
+    const isDelayed = (step.status === StepStatus.NOT_STARTED || step.status === StepStatus.IN_PROGRESS) && new Date(step.endDate) < today;
+
+    if (isDelayed || step.status === StepStatus.COMPLETED) {
+        // If delayed or already completed, the button is not clickable (disabled).
+        // This ensures the "Pendente -> Parcial -> Concluído" cycle is respected and not reverted.
+        return; 
+    }
+
     let nextStatus: StepStatus;
-    // Determine the new status based on current and rules
     if (step.status === StepStatus.NOT_STARTED) {
         nextStatus = StepStatus.IN_PROGRESS;
     } else if (step.status === StepStatus.IN_PROGRESS) {
         nextStatus = StepStatus.COMPLETED;
-    } else if (step.status === StepStatus.COMPLETED) { // If completed, toggle back to NOT_STARTED
-        nextStatus = StepStatus.NOT_STARTED;
-    } else { // Handle 'Atrasada' or other unexpected status gracefully
+    } else { // Should not happen for a clickable button due to checks above
         console.warn(`Attempted to toggle status for step ${step.name} with unsupported status: ${step.status}`);
-        return; // Do nothing for unsupported status
+        return;
     }
 
     try {
@@ -1093,8 +1100,8 @@ const WorkDetail = () => {
     setNewMaterialName(material.name);
     setNewMaterialPlannedQty(material.plannedQty.toString());
     setNewMaterialUnit(material.unit);
-    setNewMaterialCategory(material.category || '');
-    setNewMaterialStepId(material.stepId || '');
+    setNewMaterialCategory(material.category || ''); // Default to empty string for category
+    setNewMaterialStepId(material.stepId || ''); // Default to empty string for stepId
     setCurrentPurchaseQty(''); // Reset purchase fields when opening modal
     setCurrentPurchaseCost('');
     setShowAddMaterialModal(true);
@@ -1547,7 +1554,7 @@ const WorkDetail = () => {
     e?.preventDefault();
     if (!workId || !user?.id || !newPhotoFile) return;
 
-    setUploadingPhoto(true);
+    setLoadingPhoto(true);
     try {
       await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate upload delay
       const mockPhotoUrl = "https://via.placeholder.com/600x400?text=Obra+Photo";
@@ -1564,7 +1571,7 @@ const WorkDetail = () => {
     } catch (error: any) { 
         console.error("Erro ao adicionar foto:", error);
         setZeModal({ isOpen: true, title: "Erro ao Adicionar Foto", message: `Não foi possível adicionar: ${error.message || 'Erro desconhecido.'}`, confirmText: "Entendido", onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })), type: 'ERROR' });
-    } finally { setUploadingPhoto(false); }
+    } finally { setLoadingPhoto(false); }
   };
 
   const handleDeletePhoto = async (photoId: string) => {
@@ -1598,7 +1605,7 @@ const WorkDetail = () => {
     e?.preventDefault();
     if (!workId || !user?.id || !newUploadFile) return;
 
-    setUploadingFile(true);
+    setLoadingFile(true);
     try {
       await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate upload delay
       const mockFileUrl = "https://via.placeholder.com/600x400?text=Documento+Obra"; // Placeholder
@@ -1615,7 +1622,7 @@ const WorkDetail = () => {
     } catch (error: any) { 
         console.error("Erro ao adicionar arquivo:", error);
         setZeModal({ isOpen: true, title: "Erro ao Adicionar Arquivo", message: `Não foi possível adicionar: ${error.message || 'Erro desconhecido.'}`, confirmText: "Entendido", onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })), type: 'ERROR' });
-    } finally { setUploadingFile(false); }
+    } finally { setLoadingFile(false); }
   };
 
   const handleDeleteFile = async (fileId: string) => {
@@ -1748,7 +1755,7 @@ const WorkDetail = () => {
   };
 
 
-  // --- EXPORT FUNCTIONS (REPORTS) - REMOVED ---
+  // --- EXPORT FUNCTIONS (REPORTS) - REMOVIDO ---
   // The handleExportToExcel and related report logic are removed as per the prompt.
 
   if (authLoading || loading) {
@@ -1843,35 +1850,46 @@ const WorkDetail = () => {
                     let borderClass = 'border-slate-200 dark:border-slate-800';
                     let shadowClass = 'shadow-card-default';
 
+                    // NEW: Combined status logic
+                    const isCompleted = step.status === StepStatus.COMPLETED;
+                    const isInProgress = step.status === StepStatus.IN_PROGRESS;
+                    const isNotStarted = step.status === StepStatus.NOT_STARTED;
+
                     if (isDelayed) {
                       stepStatusClass = 'text-red-600 dark:text-red-400';
                       stepStatusBgClass = 'bg-red-500/10';
                       statusText = 'Atrasada';
                       borderClass = 'border-red-500/50 dark:border-red-700/50';
                       shadowClass = 'shadow-lg shadow-red-500/20';
-                    } else if (step.status === StepStatus.COMPLETED) {
+                    } else if (isCompleted) {
                       stepStatusClass = 'text-green-600 dark:text-green-400';
                       stepStatusBgClass = 'bg-green-500/10';
                       statusText = 'Concluída';
                       borderClass = 'border-green-500/50 dark:border-green-700/50';
                       shadowClass = 'shadow-lg shadow-green-500/20';
-                    } else if (step.status === StepStatus.IN_PROGRESS) {
+                    } else if (isInProgress) {
                       stepStatusClass = 'text-amber-600 dark:text-amber-400';
                       stepStatusBgClass = 'bg-amber-500/10';
                       statusText = 'Parcial';
                       borderClass = 'border-amber-500/50 dark:border-amber-700/50';
                       shadowClass = 'shadow-lg shadow-amber-500/20';
-                    } else { // NOT_STARTED (Pendente)
+                    } else if (isNotStarted) { // NOT_STARTED (Pendente)
                       stepStatusClass = 'text-slate-500 dark:text-slate-400';
                       stepStatusBgClass = 'bg-slate-200 dark:bg-slate-700/50';
                       statusText = 'Pendente';
                       // No specific shadow for Pendente, uses default card-default
+                    } else { // Fallback for any other unexpected status
+                        stepStatusClass = 'text-slate-500 dark:text-slate-400';
+                        stepStatusBgClass = 'bg-slate-200 dark:bg-slate-700/50';
+                        statusText = 'Desconhecido';
                     }
 
                     // Determine if the current step is being dragged over
                     const isDragOver = dragOverStepId === step.id && draggedStepId !== step.id;
                     const dragOverClass = isDragOver ? 'border-dashed border-secondary-darker transform scale-[1.02] bg-slate-50 dark:bg-slate-800' : '';
 
+                    // Disable button if delayed OR completed, as per cycle rule
+                    const isStatusButtonDisabled = isDelayed || isCompleted;
 
                     return (
                       <div 
@@ -1893,10 +1911,10 @@ const WorkDetail = () => {
                         <div className="flex items-center justify-between mb-3">
                             <span className="text-sm font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">Etapa {step.orderIndex}</span> {/* Display orderIndex */}
                             <button 
-                                onClick={(e) => { e.stopPropagation(); if (!isDelayed) handleToggleStepStatus(step); }}
-                                className={cx("text-xs font-bold px-3 py-1 rounded-full transition-all", stepStatusClass, stepStatusBgClass, isDelayed ? 'cursor-not-allowed opacity-70' : 'hover:brightness-90 active:scale-95')}
+                                onClick={(e) => { e.stopPropagation(); handleToggleStepStatus(step); }}
+                                className={cx("text-xs font-bold px-3 py-1 rounded-full transition-all", stepStatusClass, stepStatusBgClass, isStatusButtonDisabled ? 'cursor-not-allowed opacity-70' : 'hover:brightness-90 active:scale-95')}
                                 aria-label={`Alterar status da etapa ${step.name}. Status atual: ${statusText}`}
-                                disabled={isDelayed}
+                                disabled={isStatusButtonDisabled}
                             >
                                 {statusText}
                             </button>
@@ -2086,7 +2104,13 @@ const WorkDetail = () => {
                                 let borderClass = 'border-slate-200 dark:border-slate-800';
                                 let shadowClass = 'shadow-card-default';
 
-                                if (paid === 0) {
+                                if (paid === 0 && total === 0) { // If total is 0, it's considered concluded
+                                    statusText = 'Concluído';
+                                    expenseStatusClass = 'text-green-600 dark:text-green-400';
+                                    expenseStatusBgClass = 'bg-green-500/10';
+                                    borderClass = 'border-green-500/50 dark:border-green-700/50';
+                                    shadowClass = 'shadow-lg shadow-green-500/20';
+                                } else if (paid === 0 && total > 0) {
                                     statusText = 'Pendente';
                                     expenseStatusClass = 'text-slate-500 dark:text-slate-400';
                                     expenseStatusBgClass = 'bg-slate-200 dark:bg-slate-700/50';
@@ -2103,7 +2127,7 @@ const WorkDetail = () => {
                                     borderClass = 'border-green-500/50 dark:border-green-700/50';
                                     shadowClass = 'shadow-lg shadow-green-500/20';
                                 }
-                                if (paid > total) { // Excedeu o valor combinado, indicando prejuízo ou erro
+                                if (paid > total && total > 0) { // Excedeu o valor combinado, indicando prejuízo ou erro
                                     statusText = 'Prejuízo';
                                     expenseStatusClass = 'text-red-600 dark:text-red-400';
                                     expenseStatusBgClass = 'bg-red-500/10';
@@ -2142,7 +2166,7 @@ const WorkDetail = () => {
                                         {/* Progress bar for payments */}
                                         <div className="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-2 overflow-hidden mt-3 mb-3" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100}>
                                             <div 
-                                                className={`h-full rounded-full ${paid > total ? 'bg-red-500' : paid >= total ? 'bg-green-500' : 'bg-amber-500'}`} 
+                                                className={`h-full rounded-full ${paid > total && total > 0 ? 'bg-red-500' : paid >= total ? 'bg-green-500' : 'bg-amber-500'}`} 
                                                 style={{ width: `${Math.min(100, progress)}%` }}
                                             ></div>
                                         </div>
@@ -2575,7 +2599,7 @@ const WorkDetail = () => {
               </div>
               <div>
                 <label htmlFor="materialStepId" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Vincular à Etapa</label>
-                <select id="materialStepId" value={editMaterialData ? editMaterialData.stepId : newMaterialStepId} onChange={(e) => editMaterialData ? setEditMaterialData({ ...editMaterialData, stepId: e.target.value }) : setNewMaterialStepId(e.target.value)}
+                <select id="materialStepId" value={editMaterialData ? editMaterialData.stepId || '' : newMaterialStepId} onChange={(e) => editMaterialData ? setEditMaterialData({ ...editMaterialData, stepId: e.target.value || '' }) : setNewMaterialStepId(e.target.value)}
                   className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" required aria-label="Vincular material à etapa">
                     <option value="">Selecione uma etapa</option>
                     {steps.sort((a,b) => a.orderIndex - b.orderIndex).map(step => (
@@ -2743,6 +2767,7 @@ const WorkDetail = () => {
               </div>
               <div>
                 <label htmlFor="workerNotes" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Anotações</label>
+                {/* Corrected typo: editExpertData -> editWorkerData */}
                 <textarea id="workerNotes" value={editWorkerData ? editWorkerData.notes || '' : newWorkerNotes} onChange={(e) => editWorkerData ? setEditWorkerData({ ...editWorkerData, notes: e.target.value }) : setNewWorkerNotes(e.target.value)}
                   className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" rows={3} aria-label="Anotações sobre o profissional"></textarea>
               </div>

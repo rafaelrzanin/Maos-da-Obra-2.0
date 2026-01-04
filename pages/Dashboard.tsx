@@ -1,4 +1,5 @@
 
+
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import * as ReactRouter from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.tsx';
@@ -51,7 +52,7 @@ const formatCurrency = (value: number | string | undefined): string => {
 
 /** =========================
  * Skeleton
- * ========================= */
+ *========================= */
 const DashboardSkeleton = () => (
   <div className="max-w-4xl mx-auto pb-28 pt-6 px-4 md:px-0 animate-pulse">
     <div className="flex justify-between items-end mb-8">
@@ -159,6 +160,7 @@ const SegmentedProgressBar = ({ steps }: { steps: Step[] }) => {
 const WorkCard = ({ work, userId, onDeleteSuccess }: { work: Work; userId: string; onDeleteSuccess: () => void }) => {
   const navigate = ReactRouter.useNavigate();
   const [stats, setStats] = useState({ totalSpent: 0, progress: 0, delayedSteps: 0 });
+  const [steps, setSteps] = useState<Step[]>([]); // State for steps specific to this work
   const [loadingStats, setLoadingStats] = useState(true);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -166,22 +168,26 @@ const WorkCard = ({ work, userId, onDeleteSuccess }: { work: Work; userId: strin
 
   useEffect(() => {
     let isMounted = true;
-    const fetchStats = async () => {
+    const fetchWorkData = async () => {
       setLoadingStats(true);
       try {
-        const fetchedStats = await dbService.calculateWorkStats(work.id);
+        const [fetchedStats, fetchedSteps] = await Promise.all([
+          dbService.calculateWorkStats(work.id),
+          dbService.getSteps(work.id), // Fetch steps for the progress bar
+        ]);
         if (isMounted) {
           setStats(fetchedStats);
+          setSteps(fetchedSteps);
         }
       } catch (error) {
-        console.error(`Erro ao buscar estatísticas para a obra ${work.name}:`, error);
+        console.error(`Erro ao buscar estatísticas ou etapas para a obra ${work.name}:`, error);
       } finally {
         if (isMounted) {
           setLoadingStats(false);
         }
       }
     };
-    fetchStats();
+    fetchWorkData();
 
     return () => {
       isMounted = false;
@@ -228,7 +234,7 @@ const WorkCard = ({ work, userId, onDeleteSuccess }: { work: Work; userId: strin
       {loadingStats ? (
         <div className="h-3 w-full bg-slate-200 dark:bg-slate-700 rounded-full my-1 animate-pulse"></div>
       ) : (
-        <SegmentedProgressBar steps={work.id ? [] : []} /> // Placeholder, actual steps from state later
+        <SegmentedProgressBar steps={steps} />
       )}
 
       <div className="flex items-center justify-between text-sm mt-3">
