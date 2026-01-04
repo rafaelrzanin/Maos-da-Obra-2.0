@@ -70,12 +70,9 @@ const DashboardSkeleton = () => (
     </div>
 
     {/* Work Selector & Actions */}
-    <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-8">
-      <div className="h-12 w-full md:w-1/2 bg-slate-200 dark:bg-slate-800 rounded-xl"></div>
-      <div className="flex gap-4 w-full md:w-auto">
-        <div className="h-12 w-1/2 md:w-32 bg-slate-200 dark:bg-slate-800 rounded-xl"></div>
-        <div className="h-12 w-1/2 md:w-12 bg-slate-200 dark:bg-slate-800 rounded-xl"></div>
-      </div>
+    <div className="flex items-center gap-4 mb-8">
+      <div className="h-12 flex-1 bg-slate-200 dark:bg-slate-800 rounded-xl"></div>
+      <div className="h-12 w-12 bg-slate-200 dark:bg-slate-800 rounded-xl"></div>
     </div>
 
     {/* Daily Summary Skeleton */}
@@ -104,11 +101,14 @@ const DashboardSkeleton = () => (
     </div>
 
     {/* Budget Overview Skeleton */}
-    <div className={cx(surface, "rounded-3xl p-6")}>
+    <div className={cx(surface, "rounded-3xl p-6 mb-8")}> {/* Added mb-8 for spacing */}
       <div className="h-6 w-1/4 bg-slate-200 dark:bg-slate-800 rounded-lg mb-4"></div>
       <div className="h-4 w-full bg-slate-200 dark:bg-slate-700 rounded-full mb-2"></div>
       <div className="h-4 w-2/3 bg-slate-200 dark:bg-slate-700 rounded-full"></div>
     </div>
+
+    {/* Access Work Button Skeleton */}
+    <div className="h-14 w-full bg-secondary rounded-2xl"></div> {/* Skeleton for the access button */}
   </div>
 );
 
@@ -466,8 +466,8 @@ const Dashboard = () => {
             </div>
         </div>
 
-      {/* Work Selector & Actions */}
-      <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-8">
+      {/* Work Selector & Delete Action */}
+      <div className="flex items-center gap-3 mb-8">
         {allWorks.length > 1 && (
           <label htmlFor="work-select" className="sr-only">Selecionar Obra</label>
         )}
@@ -475,31 +475,21 @@ const Dashboard = () => {
           id="work-select"
           value={selectedWork?.id || ''}
           onChange={handleWorkSelectChange}
-          className="w-full md:w-auto flex-1 px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-primary dark:text-white focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
+          className="flex-1 px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-primary dark:text-white focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
           aria-label="Selecionar obra para visualizar dashboard"
         >
           {allWorks.map((workOption) => (
             <option key={workOption.id} value={workOption.id}>{workOption.name}</option>
           ))}
         </select>
-        <div className="flex gap-3 w-full md:w-auto">
-          <button 
-            onClick={() => selectedWork && navigate(`/work/${selectedWork.id}`)} 
-            disabled={!selectedWork}
-            className="flex-1 md:flex-none px-6 py-3 bg-primary text-white font-bold rounded-xl hover:bg-primary-light transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
-            aria-label={`Acessar obra ${selectedWork?.name || ''}`}
-          >
-            <i className="fa-solid fa-arrow-right"></i> Acessar Obra
-          </button>
-          <button
-            onClick={() => setShowDeleteModal(true)}
-            disabled={!selectedWork}
-            className="flex-none w-12 h-12 bg-red-500 text-white rounded-xl flex items-center justify-center hover:bg-red-600 transition-colors disabled:opacity-50"
-            aria-label={`Excluir obra ${selectedWork?.name || ''}`}
-          >
-            <i className="fa-solid fa-trash-alt text-lg"></i>
-          </button>
-        </div>
+        <button
+          onClick={() => setShowDeleteModal(true)}
+          disabled={!selectedWork}
+          className="flex-none w-12 h-12 bg-red-500 text-white rounded-xl flex items-center justify-center hover:bg-red-600 transition-colors disabled:opacity-50"
+          aria-label={`Excluir obra ${selectedWork?.name || ''}`}
+        >
+          <i className="fa-solid fa-trash-alt text-lg"></i>
+        </button>
       </div>
 
       {selectedWork && workSummary && (
@@ -544,7 +534,7 @@ const Dashboard = () => {
           </div>
 
           {/* Financeiro Overview */}
-          <div className={cx(surface, "rounded-3xl p-6")}>
+          <div className={cx(surface, "rounded-3xl p-6 mb-8")}>
             <h2 className="text-xl font-black text-primary dark:text-white mb-4">Orçamento</h2>
             <div className="flex items-center justify-between text-lg font-bold mb-2">
               <span className="text-slate-700 dark:text-slate-300">Planejado:</span>
@@ -563,6 +553,16 @@ const Dashboard = () => {
               </span>
             </div>
           </div>
+
+          {/* Access Work Button - Moved to bottom */}
+          <button 
+            onClick={() => selectedWork && navigate(`/work/${selectedWork.id}`)} 
+            disabled={!selectedWork}
+            className="w-full py-4 bg-gradient-gold text-white font-black rounded-2xl shadow-lg hover:shadow-orange-500/30 hover:scale-105 transition-all flex items-center justify-center gap-3 disabled:opacity-70 disabled:scale-100"
+            aria-label={`Acessar obra ${selectedWork?.name || ''}`}
+          >
+            <i className="fa-solid fa-arrow-right"></i> Acessar Obra
+          </button>
         </>
       )}
 
