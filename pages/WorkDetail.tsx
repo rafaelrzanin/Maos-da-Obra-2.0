@@ -1,10 +1,11 @@
 
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import * as ReactRouter from 'react-router-dom';
 import * as XLSX from 'xlsx';
 import { useAuth } from '../contexts/AuthContext.tsx';
 import { dbService } from '../services/db.ts';
-import { StepStatus, FileCategory, ExpenseCategory, type Work, type Worker, type Supplier, type Material, type Step, type Expense, type WorkPhoto, type WorkFile, type Contract, type Checklist, type ChecklistItem, PlanType, ZeSuggestion } from '../types.ts';
+import { StepStatus, FileCategory, ExpenseCategory, type Work, type Worker, type Supplier, type Material, type Step, type Expense, type WorkPhoto, type WorkFile, type Contract, type Checklist, type ChecklistItem, PlanType, ZeSuggestion, AIWorkPlan } from '../types.ts'; // NEW: Import AIWorkPlan
 import { STANDARD_JOB_ROLES, STANDARD_SUPPLIER_CATEGORIES, ZE_AVATAR, ZE_AVATAR_FALLBACK, CONTRACT_TEMPLATES, CHECKLIST_TEMPLATES } from '../services/standards.ts';
 // NEW: Import ZeModal
 import { ZeModal, ZeModalProps } from '../components/ZeModal.tsx';
@@ -14,7 +15,7 @@ import { aiService } from '../services/ai.ts';
 // --- TYPES FOR VIEW STATE ---
 type MainTab = 'ETAPAS' | 'MATERIAIS' | 'FINANCEIRO' | 'FERRAMENTAS';
 // RESTORED unrequested sub-views to SubView type, REMOVED 'REPORTS'
-type SubView = 'NONE' | 'WORKERS' | 'SUPPLIERS' | 'PHOTOS' | 'PROJECTS' | 'CALCULATORS' | 'CONTRACTS' | 'CHECKLIST' | 'AICHAT';
+type SubView = 'NONE' | 'WORKERS' | 'SUPPLIERS' | 'PHOTOS' | 'PROJECTS' | 'CALCULATORS' | 'CONTRACTS' | 'CHECKLIST' | 'AICHAT' | 'AIPLANNER'; // NEW: Added AIPLANNER
 // REMOVED ReportSubTab type
 
 // Define a type for a single step group inside expenses
@@ -170,9 +171,10 @@ const ZeAssistantCard: React.FC<ZeAssistantCardProps> = ({ suggestion, onDismiss
 const WorkDetail = () => {
   const { id: workId } = ReactRouter.useParams<{ id: string }>();
   const navigate = ReactRouter.useNavigate();
-  const { user, isSubscriptionValid, authLoading, isUserAuthFinished, refreshUser, pushSubscriptionStatus } = useAuth();
-
-  const isAiTrialActive = user?.isTrial && user.subscriptionExpiresAt && new Date(user.subscriptionExpiresAt) > new Date() && user?.plan !== PlanType.VITALICIO;
+  const { user, isSubscriptionValid, authLoading, isUserAuthFinished, refreshUser, pushSubscriptionStatus, trialDaysRemaining } = useAuth(); // NEW: trialDaysRemaining
+  
+  // NEW: Calculate AI access
+  const isAiTrialActive = user?.isTrial && trialDaysRemaining !== null && trialDaysRemaining > 0 && user?.plan !== PlanType.VITALICIO;
   const hasAiAccess = user?.plan === PlanType.VITALICIO || isAiTrialActive;
   
   const [work, setWork] = useState<Work | null>(null);
@@ -2116,6 +2118,16 @@ const WorkDetail = () => {
                   <div className="w-12 h-12 bg-violet-500/10 text-violet-600 rounded-xl flex items-center justify-center text-xl mb-2"><i className="fa-solid fa-robot"></i></div>
                   <h3 className="font-bold text-primary dark:text-white">Zé da Obra AI</h3>
                   <p className="text-xs text-slate-500 dark:text-slate-400">Seu especialista sempre à mão.</p>
+                </button>
+                {/* NEW: AI Work Planner Button */}
+                <button 
+                  onClick={() => navigate(`/work/${workId}/ai-planner`)} 
+                  className={cx(surface, "rounded-3xl p-6 flex flex-col items-center justify-center text-center gap-2 transition-all hover:scale-[1.02] hover:border-secondary/50")}
+                  aria-label="Planejamento Inteligente com IA"
+                >
+                  <div className="w-12 h-12 bg-blue-500/10 text-blue-600 rounded-xl flex items-center justify-center text-xl mb-2"><i className="fa-solid fa-brain"></i></div>
+                  <h3 className="font-bold text-primary dark:text-white">Planejamento Inteligente AI</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">O Zé da Obra te ajuda a planejar.</p>
                 </button>
               </div>
             </div>

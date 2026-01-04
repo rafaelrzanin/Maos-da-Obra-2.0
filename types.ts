@@ -221,6 +221,33 @@ export interface ZeSuggestion {
   aiContext: string; // Contexto para enviar ao aiService.sendMessage para uma resposta mais detalhada
 }
 
+// NEW: Interfaces para a resposta estruturada da IA de planejamento de obras
+export interface AIPlanStep {
+  name: string;
+  estimatedDurationDays: number;
+  notes: string;
+}
+
+export interface AIPlanRisk {
+  description: string;
+  likelihood: 'low' | 'medium' | 'high';
+  mitigation: string;
+}
+
+export interface AIPlanMaterialSuggestion {
+  item: string;
+  reason: string;
+  priority: 'low' | 'medium' | 'high';
+}
+
+export interface AIWorkPlan {
+  timelineSummary: string;
+  detailedSteps: AIPlanStep[];
+  potentialRisks: AIPlanRisk[];
+  materialSuggestions: AIPlanMaterialSuggestion[];
+  generalAdvice: string;
+}
+
 
 // Add ambient module declarations for import.meta.env AND process.env
 // This resolves TypeScript errors like "Property 'env' does not exist on type 'ImportMeta')"

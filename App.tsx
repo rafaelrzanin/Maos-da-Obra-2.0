@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, Suspense, lazy } from 'react';
 import * as ReactRouter from 'react-router-dom';
 import { PlanType } from './types.ts';
@@ -18,6 +19,7 @@ const Checkout = lazy(() => import('./pages/Checkout.tsx').then(module => ({ def
 const AiChat = lazy(() => import('./pages/AiChat.tsx').then(module => ({ default: (module as any).default }))); // Lazy load AiChat page
 // const Register = lazy(() => import('./pages/Register.tsx').then(module => ({ default: (module as any).default }))); // REMOVED: Register absorbed into Login
 const Notifications = lazy(() => import('./pages/Notifications.tsx')); // NEW: Lazy load Notifications page
+const AiWorkPlanner = lazy(() => import('./pages/AiWorkPlanner.tsx')); // NEW: Lazy load AiWorkPlanner page
 
 
 // --- Componente de Carregamento ---
@@ -290,6 +292,8 @@ const App = () => {
                 <ReactRouter.Route path="/profile" element={<Layout><Profile /></Layout>} />
                 <ReactRouter.Route path="/tutorials" element={<Layout><VideoTutorials /></Layout>} />
                 <ReactRouter.Route path="/checkout" element={<Layout><Checkout /></Layout>} /> 
+                {/* NEW: Route for AI Work Planner */}
+                <ReactRouter.Route path="/work/:id/ai-planner" element={<Layout><AiWorkPlanner /></Layout>} />
                 
                 <ReactRouter.Route path="*" element={<ReactRouter.Navigate to="/login" replace />} /> {/* Redirects to login if route not found */}
               </ReactRouter.Routes>

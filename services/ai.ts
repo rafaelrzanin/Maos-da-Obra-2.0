@@ -1,5 +1,6 @@
 
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, Type } from "@google/genai";
+import { Work, AIWorkPlan } from "../types.ts"; // NEW: Import Work and AIWorkPlan types
 
 // Helper function to safely get environment variables, checking both process.env and import.meta.env
 const safeGetEnv = (key: string): string | undefined => {
@@ -114,6 +115,109 @@ export const aiService = {
     } catch (error) {
       console.error("Erro na IA ao gerar Work Insight:", error);
       return "Ops! O Zé está com problemas de comunicação. Tente novamente mais tarde.";
+    }
+  },
+
+  // NEW: Função para gerar um plano de obra estruturado e avaliação de riscos
+  generateWorkPlanAndRisk: async (work: Work): Promise<AIWorkPlan> => {
+    if (!ai) {
+      // OFFLINE FALLBACK MODE
+      await new Promise(r => setTimeout(r, 2000));
+      return {
+        timelineSummary: "Funcionalidade de Planejamento AI offline. Por favor, configure sua chave de API.",
+        detailedSteps: [{ name: "Erro: AI Offline", estimatedDurationDays: 0, notes: "Recarregue a página ou configure a chave API." }],
+        potentialRisks: [{ description: "Sem conexão com a IA", likelihood: 'high', mitigation: "Verifique a internet e a configuração da chave API." }],
+        materialSuggestions: [],
+        generalAdvice: "Conecte-se para obter um plano completo!"
+      };
+    }
+
+    const prompt = `
+      Crie um plano de obra detalhado, avaliação de riscos e sugestões de materiais para o seguinte projeto.
+      O nome da obra é "${work.name}", localizada em ${work.address || 'local não especificado'}, com área de ${work.area} m².
+      A data de início planejada é ${work.startDate}.
+      O orçamento planejado é de R$ ${work.budgetPlanned}.
+      Possui ${work.floors || 1} pavimento(s), ${work.bedrooms || 0} quarto(s), ${work.bathrooms || 0} banheiro(s), ${work.kitchens || 0} cozinha(s) e ${work.livingRooms || 0} sala(s).
+      ${work.hasLeisureArea ? 'Possui área de lazer/piscina.' : 'Não possui área de lazer/piscina.'}
+      Notas adicionais: ${work.notes || 'Nenhuma nota adicional.'}
+
+      Considere os dados acima para gerar um plano realista, identificando etapas-chave, durações estimadas, riscos comuns para este tipo de projeto e sugestões de materiais relevantes.
+      Apresente a resposta estritamente no formato JSON, conforme o schema fornecido.
+    `;
+
+    try {
+      const response = await ai.models.generateContent({
+        model: "gemini-3-pro-preview", // Modelo para tarefas complexas
+        contents: prompt,
+        config: {
+          systemInstruction: "Você é o Zé da Obra AI, um engenheiro e planejador de obras experiente. Sua tarefa é fornecer um plano de obra completo, incluindo cronograma, riscos e materiais, de forma estruturada e realista para o usuário. Foque na prevenção de problemas e otimização de recursos. A resposta deve ser um JSON válido e seguir o schema estritamente. Evite gírias e seja profissional.",
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              timelineSummary: { type: Type.STRING, description: 'Um resumo conciso do cronograma geral da obra, incluindo a duração total estimada.' },
+              detailedSteps: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    name: { type: Type.STRING, description: 'Nome da etapa (ex: Fundações, Alvenaria, Elétrica).' },
+                    estimatedDurationDays: { type: Type.NUMBER, description: 'Duração estimada em dias para esta etapa.' },
+                    notes: { type: Type.STRING, description: 'Breves notas ou dicas importantes para a etapa.' },
+                  },
+                  required: ['name', 'estimatedDurationDays', 'notes'],
+                },
+                description: 'Lista detalhada das principais etapas da obra com duração e notas.',
+              },
+              potentialRisks: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    description: { type: Type.STRING, description: 'Descrição do risco potencial (ex: Atraso na entrega de materiais, Chuvas excessivas).' },
+                    likelihood: { type: Type.STRING, enum: ['low', 'medium', 'high'], description: 'Probabilidade de ocorrência do risco.' },
+                    mitigation: { type: Type.STRING, description: 'Estratégias para mitigar ou evitar o risco.' },
+                  },
+                  required: ['description', 'likelihood', 'mitigation'],
+                },
+                description: 'Lista de riscos potenciais da obra e como mitigá-los.',
+              },
+              materialSuggestions: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    item: { type: Type.STRING, description: 'Nome do material sugerido (ex: Cimento CP-III, Tijolo Cerâmico).' },
+                    reason: { type: Type.STRING, description: 'Motivo da sugestão ou benefício.' },
+                    priority: { type: Type.STRING, enum: ['low', 'medium', 'high'], description: 'Prioridade da compra/consideração deste material.' },
+                  },
+                  required: ['item', 'reason', 'priority'],
+                },
+                description: 'Sugestões de materiais relevantes para o projeto, com foco em qualidade/custo-benefício.',
+              },
+              generalAdvice: { type: Type.STRING, description: 'Um conselho geral final sobre a gestão da obra.' },
+            },
+            required: ['timelineSummary', 'detailedSteps', 'potentialRisks', 'materialSuggestions', 'generalAdvice'],
+          },
+        },
+      });
+
+      const jsonStr = response.text?.trim();
+      if (!jsonStr) {
+        throw new Error("A IA não retornou um plano de obra. Tente novamente.");
+      }
+      return JSON.parse(jsonStr) as AIWorkPlan;
+
+    } catch (error) {
+      console.error("Erro na IA ao gerar plano de obra:", error);
+      // Retorna uma estrutura de fallback em caso de erro da IA
+      return {
+        timelineSummary: "Erro ao gerar plano de obra. Verifique sua conexão e tente novamente.",
+        detailedSteps: [{ name: "Erro na Geração", estimatedDurationDays: 0, notes: "Não foi possível obter o plano detalhado." }],
+        potentialRisks: [{ description: "Falha na comunicação com a IA", likelihood: 'high', mitigation: "Verifique sua chave de API e conexão de internet." }],
+        materialSuggestions: [],
+        generalAdvice: "O Zé está com problemas técnicos. Tente mais tarde."
+      };
     }
   }
 };
