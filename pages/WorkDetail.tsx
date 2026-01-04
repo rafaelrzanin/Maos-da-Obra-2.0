@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import * as ReactRouter from 'react-router-dom';
 import * as XLSX from 'xlsx';
@@ -174,8 +173,9 @@ const WorkDetail = () => {
   const { user, isSubscriptionValid, authLoading, isUserAuthFinished, refreshUser, pushSubscriptionStatus, trialDaysRemaining } = useAuth(); // NEW: trialDaysRemaining
   
   // NEW: Calculate AI access
-  const isAiTrialActive = user?.isTrial && trialDaysRemaining !== null && trialDaysRemaining > 0 && user?.plan !== PlanType.VITALICIO;
-  const hasAiAccess = user?.plan === PlanType.VITALICIO || isAiTrialActive;
+  const isVitalicio = user?.plan === PlanType.VITALICIO;
+  const isAiTrialActive = user?.isTrial && trialDaysRemaining !== null && trialDaysRemaining > 0;
+  const hasAiAccess = isVitalicio || isAiTrialActive;
   
   const [work, setWork] = useState<Work | null>(null);
   const [steps, setSteps] = useState<Step[]>([]);
@@ -211,10 +211,11 @@ const WorkDetail = () => {
   const [newMaterialCategory, setNewMaterialCategory] = useState('');
   const [newMaterialStepId, setNewMaterialStepId] = useState('');
   const [editMaterialData, setEditMaterialData] = useState<Material | null>(null);
-  const [showPurchaseMaterialModal, setShowPurchaseMaterialModal] = useState(false);
-  const [purchaseMaterialId, setPurchaseMaterialId] = useState<string | null>(null);
-  const [purchaseQty, setPurchaseQty] = useState('');
-  const [purchaseCost, setPurchaseCost] = useState('');
+  // REMOVED: showPurchaseMaterialModal, purchaseMaterialId, purchaseQty, purchaseCost
+  // NEW: States for material purchase within the edit modal
+  const [currentPurchaseQty, setCurrentPurchaseQty] = useState('');
+  const [currentPurchaseCost, setCurrentPurchaseCost] = useState('');
+
 
   const [showAddExpenseModal, setShowAddExpenseModal] = useState(false);
   const [newExpenseDescription, setNewExpenseDescription] = useState('');
@@ -866,6 +867,9 @@ const WorkDetail = () => {
     setNewMaterialUnit('');
     setNewMaterialCategory('');
     setNewMaterialStepId('');
+    // Clear purchase-related states
+    setCurrentPurchaseQty('');
+    setCurrentPurchaseCost('');
   };
 
   const handleAddMaterial = async (e?: React.FormEvent) => {
@@ -934,7 +938,16 @@ const WorkDetail = () => {
     }
 
     try {
-      const updatedMaterial = await dbService.updateMaterial(editMaterialData);
+      // Only update editable fields, purchasedQty and totalCost are updated by registerMaterialPurchase
+      const updatedMaterial = await dbService.updateMaterial({
+        ...editMaterialData,
+        name: editMaterialData.name,
+        brand: editMaterialData.brand,
+        plannedQty: editMaterialData.plannedQty,
+        unit: editMaterialData.unit,
+        stepId: editMaterialData.stepId,
+        category: editMaterialData.category,
+      });
       if (updatedMaterial) {
         await loadWorkData();
         clearMaterialFormAndCloseModal();
@@ -993,19 +1006,22 @@ const WorkDetail = () => {
     setNewMaterialUnit(material.unit);
     setNewMaterialCategory(material.category || '');
     setNewMaterialStepId(material.stepId || '');
+    setCurrentPurchaseQty(''); // Reset purchase fields when opening modal
+    setCurrentPurchaseCost('');
     setShowAddMaterialModal(true);
   };
 
-  const handleRegisterPurchase = async (e?: React.FormEvent) => {
+  // NEW: handleInternalRegisterPurchase (replaces old handleRegisterPurchase)
+  const handleInternalRegisterPurchase = async (e?: React.FormEvent) => {
     e?.preventDefault();
-    if (!purchaseMaterialId || !workId || !user?.id) return;
+    if (!editMaterialData || !workId || !user?.id) return;
 
-    const currentMaterial = materials.find(m => m.id === purchaseMaterialId);
+    const currentMaterial = materials.find(m => m.id === editMaterialData.id);
     if (!currentMaterial) return;
 
     const newErrors: Record<string, string> = {};
-    if (!purchaseQty || Number(purchaseQty) <= 0) newErrors.purchaseQty = "A quantidade comprada deve ser maior que zero.";
-    if (!purchaseCost || Number(purchaseCost) <= 0) newErrors.purchaseCost = "O custo da compra deve ser maior que zero.";
+    if (!currentPurchaseQty || Number(currentPurchaseQty) <= 0) newErrors.currentPurchaseQty = "A quantidade comprada deve ser maior que zero.";
+    if (!currentPurchaseCost || Number(currentPurchaseCost) <= 0) newErrors.currentPurchaseCost = "O custo da compra deve ser maior que zero.";
     
     if (Object.keys(newErrors).length > 0) {
         setZeModal({
@@ -1021,19 +1037,19 @@ const WorkDetail = () => {
 
     try {
       await dbService.registerMaterialPurchase(
-        purchaseMaterialId,
+        currentMaterial.id,
         currentMaterial.name,
         currentMaterial.brand,
         currentMaterial.plannedQty,
         currentMaterial.unit,
-        Number(purchaseQty),
-        Number(purchaseCost)
+        Number(currentPurchaseQty),
+        Number(currentPurchaseCost)
       );
       await loadWorkData();
-      setShowPurchaseMaterialModal(false);
-      setPurchaseQty('');
-      setPurchaseCost('');
-      setPurchaseMaterialId(null);
+      // Keep modal open, just clear purchase fields and show success? Or close?
+      // For now, close and reload for simplicity.
+      clearMaterialFormAndCloseModal(); 
+      // If we wanted to keep modal open, we'd only clear purchase fields and update editMaterialData with new purchasedQty/totalCost
     } catch (error: any) { 
         console.error("Erro ao registrar compra:", error);
         setZeModal({
@@ -1731,7 +1747,7 @@ const WorkDetail = () => {
                     } else if (step.status === StepStatus.IN_PROGRESS) {
                       stepStatusClass = 'text-amber-600 dark:text-amber-400';
                       stepStatusBgClass = 'bg-amber-500/10';
-                      statusText = 'Em Andamento';
+                      statusText = 'Parcial'; // CORREÇÃO: De "Em Andamento" para "Parcial"
                       borderClass = 'border-amber-500/50 dark:border-amber-700/50';
                       shadowClass = 'shadow-lg shadow-amber-500/20';
                     } else { // NOT_STARTED (Pendente)
@@ -1880,7 +1896,7 @@ const WorkDetail = () => {
                             
                             {/* Tripé de controle de material */}
                             <div className="mb-4">
-                                <p className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1">Planejado: <span className="text-primary dark:text-white">{material.plannedQty} {material.unit}</span></p>
+                                <p className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1">Sugerida: <span className="text-primary dark:text-white">{material.plannedQty} {material.unit}</span></p> {/* CORREÇÃO: "Planejado:" para "Sugerida:" */}
                                 <p className="text-sm font-black text-green-600 dark:text-green-400 flex items-center gap-2">
                                     <i className="fa-solid fa-check-double"></i>
                                     Comprado: {material.purchasedQty} de {material.plannedQty} {material.unit}
@@ -1897,15 +1913,7 @@ const WorkDetail = () => {
                             <p className="text-xs text-slate-500 dark:text-slate-400 text-right">{progress.toFixed(0)}% comprado</p>
 
                             <div className="mt-4 flex justify-end gap-2">
-                                {(material.purchasedQty < material.plannedQty) && (
-                                    <button 
-                                        onClick={(e) => { e.stopPropagation(); setPurchaseMaterialId(material.id); setShowPurchaseMaterialModal(true); }} 
-                                        className="px-4 py-2 bg-secondary text-white text-xs font-bold rounded-xl hover:bg-secondary-dark transition-colors"
-                                        aria-label={`Registrar compra para ${material.name}`}
-                                    >
-                                        <i className="fa-solid fa-cart-shopping mr-2"></i> Comprar
-                                    </button>
-                                )}
+                                {/* REMOVIDO: Botão "Comprar" separado */}
                                 <button 
                                     onClick={(e) => { e.stopPropagation(); handleDeleteMaterial(material.id); }} 
                                     className="px-4 py-2 bg-red-500 text-white text-xs font-bold rounded-xl hover:bg-red-700 transition-colors"
@@ -2372,6 +2380,446 @@ const WorkDetail = () => {
             >
               <i className="fa-solid fa-arrow-right"></i> Ir para o Chat
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modals for Add/Edit */}
+
+      {/* Add/Edit Step Modal */}
+      {showAddStepModal && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-primary/80 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-md p-6 shadow-2xl border border-white/20 relative">
+            <button onClick={() => setShowAddStepModal(false)} className="absolute top-4 right-4 text-slate-400 hover:text-primary dark:hover:text-white" aria-label="Fechar modal"><i className="fa-solid fa-xmark text-xl"></i></button>
+            <h2 className="text-xl font-black text-primary dark:text-white mb-6">{editStepData ? 'Editar Etapa' : 'Nova Etapa'}</h2>
+            <form onSubmit={editStepData ? handleEditStep : handleAddStep} className="space-y-4">
+              <div>
+                <label htmlFor="stepName" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Nome da Etapa</label>
+                <input id="stepName" type="text" value={editStepData ? editStepData.name : newStepName} onChange={(e) => editStepData ? setEditStepData({ ...editStepData, name: e.target.value }) : setNewStepName(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" required aria-label="Nome da Etapa" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="stepStartDate" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Data de Início</label>
+                  <input id="stepStartDate" type="date" value={editStepData ? editStepData.startDate : newStepStartDate} onChange={(e) => editStepData ? setEditStepData({ ...editStepData, startDate: e.target.value }) : setNewStepStartDate(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" required aria-label="Data de Início da Etapa" />
+                </div>
+                <div>
+                  <label htmlFor="stepEndDate" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Data Final</label>
+                  <input id="stepEndDate" type="date" value={editStepData ? editStepData.endDate : newStepEndDate} onChange={(e) => editStepData ? setEditStepData({ ...editStepData, endDate: e.target.value }) : setNewStepEndDate(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" required aria-label="Data Final da Etapa" />
+                </div>
+              </div>
+              <button type="submit" className="w-full py-4 bg-primary hover:bg-primary-dark text-white font-bold rounded-xl shadow-lg shadow-primary/20 transition-all flex items-center justify-center gap-2">
+                <i className="fa-solid fa-save"></i> {editStepData ? 'Salvar Alterações' : 'Adicionar Etapa'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Add/Edit Material Modal (now also handles purchase) */}
+      {showAddMaterialModal && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-primary/80 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-md p-6 shadow-2xl border border-white/20 relative">
+            <button onClick={clearMaterialFormAndCloseModal} className="absolute top-4 right-4 text-slate-400 hover:text-primary dark:hover:text-white" aria-label="Fechar modal"><i className="fa-solid fa-xmark text-xl"></i></button>
+            <h2 className="text-xl font-black text-primary dark:text-white mb-6">{editMaterialData ? 'Editar Material' : 'Novo Material'}</h2>
+            <form onSubmit={editMaterialData ? handleEditMaterial : handleAddMaterial} className="space-y-4">
+              <div>
+                <label htmlFor="materialName" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Nome do Material</label>
+                <input id="materialName" type="text" value={editMaterialData ? editMaterialData.name : newMaterialName} onChange={(e) => editMaterialData ? setEditMaterialData({ ...editMaterialData, name: e.target.value }) : setNewMaterialName(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" required aria-label="Nome do Material" />
+              </div>
+              <div>
+                <label htmlFor="materialPlannedQty" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Quantidade Sugerida</label>
+                <input id="materialPlannedQty" type="number" value={editMaterialData ? editMaterialData.plannedQty.toString() : newMaterialPlannedQty} onChange={(e) => editMaterialData ? setEditMaterialData({ ...editMaterialData, plannedQty: Number(e.target.value) }) : setNewMaterialPlannedQty(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" required aria-label="Quantidade Sugerida" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="materialUnit" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Unidade</label>
+                  <input id="materialUnit" type="text" value={editMaterialData ? editMaterialData.unit : newMaterialUnit} onChange={(e) => editMaterialData ? setEditMaterialData({ ...editMaterialData, unit: e.target.value }) : setNewMaterialUnit(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" required aria-label="Unidade do Material" />
+                </div>
+                <div>
+                  <label htmlFor="materialCategory" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Categoria</label>
+                  <input id="materialCategory" type="text" value={editMaterialData ? editMaterialData.category || '' : newMaterialCategory} onChange={(e) => editMaterialData ? setEditMaterialData({ ...editMaterialData, category: e.target.value }) : setNewMaterialCategory(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" aria-label="Categoria do Material" />
+                </div>
+              </div>
+              <div>
+                <label htmlFor="materialStepId" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Vincular à Etapa</label>
+                <select id="materialStepId" value={editMaterialData ? editMaterialData.stepId || '' : newMaterialStepId} onChange={(e) => editMaterialData ? setEditMaterialData({ ...editMaterialData, stepId: e.target.value }) : setNewMaterialStepId(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" required aria-label="Vincular material à etapa">
+                  <option value="">Selecione uma etapa</option>
+                  {steps.map(step => (
+                    <option key={step.id} value={step.id}>{step.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* NEW: Purchase section for existing materials */}
+              {editMaterialData && (
+                <div className="pt-4 border-t border-slate-100 dark:border-slate-800 mt-6">
+                  <h3 className="text-lg font-black text-primary dark:text-white mb-4">Registrar Compra</h3>
+                  <div className="flex justify-between items-center text-sm font-bold text-slate-700 dark:text-slate-300 mb-2">
+                    <span>Já Comprado:</span>
+                    <span className="text-green-600 dark:text-green-400">{editMaterialData.purchasedQty} {editMaterialData.unit}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm font-bold text-slate-700 dark:text-slate-300 mb-4">
+                    <span>Custo Total:</span>
+                    <span className="text-green-600 dark:text-green-400">{formatCurrency(editMaterialData.totalCost)}</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                      <label htmlFor="currentPurchaseQty" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Quantidade a Comprar</label>
+                      <input id="currentPurchaseQty" type="number" value={currentPurchaseQty} onChange={(e) => setCurrentPurchaseQty(e.target.value)}
+                        className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" placeholder="0" aria-label="Quantidade de material a comprar" />
+                    </div>
+                    <div>
+                      <label htmlFor="currentPurchaseCost" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Custo da Compra (R$)</label>
+                      <input id="currentPurchaseCost" type="number" value={currentPurchaseCost} onChange={(e) => setCurrentPurchaseCost(e.target.value)}
+                        className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" placeholder="0,00" aria-label="Custo total da compra" />
+                    </div>
+                  </div>
+                  <button type="button" onClick={handleInternalRegisterPurchase} disabled={!currentPurchaseQty || !currentPurchaseCost} className="w-full py-4 bg-secondary hover:bg-secondary-dark text-white font-bold rounded-xl shadow-lg shadow-secondary/20 transition-all flex items-center justify-center gap-2">
+                    <i className="fa-solid fa-cart-shopping"></i> Registrar Compra
+                  </button>
+                </div>
+              )}
+
+              <button type="submit" className="w-full py-4 bg-primary hover:bg-primary-dark text-white font-bold rounded-xl shadow-lg shadow-primary/20 transition-all flex items-center justify-center gap-2">
+                <i className="fa-solid fa-save"></i> {editMaterialData ? 'Salvar Alterações' : 'Adicionar Material'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Add/Edit Expense Modal */}
+      {showAddExpenseModal && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-primary/80 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-md p-6 shadow-2xl border border-white/20 relative">
+            <button onClick={clearExpenseFormAndCloseModal} className="absolute top-4 right-4 text-slate-400 hover:text-primary dark:hover:text-white" aria-label="Fechar modal"><i className="fa-solid fa-xmark text-xl"></i></button>
+            <h2 className="text-xl font-black text-primary dark:text-white mb-6">{editExpenseData ? 'Editar Despesa' : 'Nova Despesa'}</h2>
+            <form onSubmit={editExpenseData ? handleEditExpense : handleAddExpense} className="space-y-4">
+              <div>
+                <label htmlFor="expenseDescription" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Descrição</label>
+                <input id="expenseDescription" type="text" value={editExpenseData ? editExpenseData.description : newExpenseDescription} onChange={(e) => editExpenseData ? setEditExpenseData({ ...editExpenseData, description: e.target.value }) : setNewExpenseDescription(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" required aria-label="Descrição da Despesa" />
+              </div>
+              <div>
+                <label htmlFor="expenseAmount" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Valor Total (R$)</label>
+                <input id="expenseAmount" type="number" value={editExpenseData ? editExpenseData.amount.toString() : newExpenseAmount} onChange={(e) => editExpenseData ? setEditExpenseData({ ...editExpenseData, amount: Number(e.target.value) }) : setNewExpenseAmount(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" required aria-label="Valor total da despesa" />
+              </div>
+              <div>
+                <label htmlFor="expenseCategory" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Categoria</label>
+                <select id="expenseCategory" value={editExpenseData ? editExpenseData.category : newExpenseCategory} onChange={(e) => editExpenseData ? setEditExpenseData({ ...editExpenseData, category: e.target.value }) : setNewExpenseCategory(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" required aria-label="Categoria da Despesa">
+                  {Object.values(ExpenseCategory).map(cat => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                  {/* Option for custom category if needed */}
+                  <option value="Outros">Outros</option>
+                </select>
+              </div>
+              {(editExpenseData?.category === ExpenseCategory.MATERIAL || newExpenseCategory === ExpenseCategory.MATERIAL) && (
+                <div>
+                  <label htmlFor="expenseStepId" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Vincular à Etapa</label>
+                  <select id="expenseStepId" value={editExpenseData ? editExpenseData.stepId || '' : newExpenseStepId} onChange={(e) => editExpenseData ? setEditExpenseData({ ...editExpenseData, stepId: e.target.value }) : setNewExpenseStepId(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" aria-label="Vincular despesa à etapa">
+                    <option value="">Selecione uma etapa (Opcional)</option>
+                    {steps.map(step => (
+                      <option key={step.id} value={step.id}>{step.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              <div>
+                <label htmlFor="expenseDate" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Data</label>
+                <input id="expenseDate" type="date" value={editExpenseData ? editExpenseData.date : newExpenseDate} onChange={(e) => editExpenseData ? setEditExpenseData({ ...editExpenseData, date: e.target.value }) : setNewExpenseDate(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" required aria-label="Data da Despesa" />
+              </div>
+              <button type="submit" className="w-full py-4 bg-primary hover:bg-primary-dark text-white font-bold rounded-xl shadow-lg shadow-primary/20 transition-all flex items-center justify-center gap-2">
+                <i className="fa-solid fa-save"></i> {editExpenseData ? 'Salvar Alterações' : 'Adicionar Despesa'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Add Payment Modal */}
+      {showAddPaymentModal && paymentExpenseData && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-primary/80 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-md p-6 shadow-2xl border border-white/20 relative">
+            <button onClick={() => setShowAddPaymentModal(false)} className="absolute top-4 right-4 text-slate-400 hover:text-primary dark:hover:text-white" aria-label="Fechar modal"><i className="fa-solid fa-xmark text-xl"></i></button>
+            <h2 className="text-xl font-black text-primary dark:text-white mb-4">Registrar Pagamento</h2>
+            <p className="text-slate-500 dark:text-slate-400 mb-4">Despesa: <span className="font-bold">{paymentExpenseData.description}</span></p>
+            <p className="text-slate-500 dark:text-slate-400 mb-6">Saldo a pagar: <span className="font-bold text-secondary">{formatCurrency((paymentExpenseData.totalAgreed || paymentExpenseData.amount) - (paymentExpenseData.paidAmount || 0))}</span></p>
+            <form onSubmit={handleAddPayment} className="space-y-4">
+              <div>
+                <label htmlFor="paymentAmount" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Valor do Pagamento (R$)</label>
+                <input id="paymentAmount" type="number" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" required aria-label="Valor do pagamento" />
+              </div>
+              <div>
+                <label htmlFor="paymentDate" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Data do Pagamento</label>
+                <input id="paymentDate" type="date" value={paymentDate} onChange={(e) => setNewPaymentDate(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" required aria-label="Data do Pagamento" />
+              </div>
+              <button type="submit" className="w-full py-4 bg-primary hover:bg-primary-dark text-white font-bold rounded-xl shadow-lg shadow-primary/20 transition-all flex items-center justify-center gap-2">
+                <i className="fa-solid fa-money-bill-wave"></i> Registrar Pagamento
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Add/Edit Worker Modal */}
+      {showAddWorkerModal && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-primary/80 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-md p-6 shadow-2xl border border-white/20 relative">
+            <button onClick={clearWorkerFormAndCloseModal} className="absolute top-4 right-4 text-slate-400 hover:text-primary dark:hover:text-white" aria-label="Fechar modal"><i className="fa-solid fa-xmark text-xl"></i></button>
+            <h2 className="text-xl font-black text-primary dark:text-white mb-6">{editWorkerData ? 'Editar Profissional' : 'Novo Profissional'}</h2>
+            <form onSubmit={editWorkerData ? handleEditWorker : handleAddWorker} className="space-y-4">
+              <div>
+                <label htmlFor="workerName" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Nome</label>
+                <input id="workerName" type="text" value={editWorkerData ? editWorkerData.name : newWorkerName} onChange={(e) => editWorkerData ? setEditWorkerData({ ...editWorkerData, name: e.target.value }) : setNewWorkerName(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" required aria-label="Nome do Profissional" />
+              </div>
+              <div>
+                <label htmlFor="workerRole" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Função</label>
+                <select id="workerRole" value={editWorkerData ? editWorkerData.role : newWorkerRole} onChange={(e) => editWorkerData ? setEditWorkerData({ ...editWorkerData, role: e.target.value }) : setNewWorkerRole(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" required aria-label="Função do Profissional">
+                  <option value="">Selecione a Função</option>
+                  {STANDARD_JOB_ROLES.map(role => (
+                    <option key={role} value={role}>{role}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label htmlFor="workerPhone" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Telefone</label>
+                <input id="workerPhone" type="text" value={editWorkerData ? editWorkerData.phone : newWorkerPhone} onChange={(e) => editWorkerData ? setEditWorkerData({ ...editWorkerData, phone: e.target.value }) : setNewWorkerPhone(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" aria-label="Telefone do Profissional" />
+              </div>
+              <div>
+                <label htmlFor="workerDailyRate" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Diária (R$)</label>
+                <input id="workerDailyRate" type="number" value={editWorkerData ? editWorkerData.dailyRate?.toString() || '' : newWorkerDailyRate} onChange={(e) => editWorkerData ? setEditWorkerData({ ...editWorkerData, dailyRate: Number(e.target.value) }) : setNewWorkerDailyRate(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" placeholder="0,00" aria-label="Valor da Diária" />
+              </div>
+              <div>
+                <label htmlFor="workerNotes" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Anotações</label>
+                <textarea id="workerNotes" value={editWorkerData ? editWorkerData.notes || '' : newWorkerNotes} onChange={(e) => editWorkerData ? setEditWorkerData({ ...editWorkerData, notes: e.target.value }) : setNewWorkerNotes(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all h-24 resize-none" aria-label="Anotações sobre o Profissional"></textarea>
+              </div>
+              <button type="submit" className="w-full py-4 bg-primary hover:bg-primary-dark text-white font-bold rounded-xl shadow-lg shadow-primary/20 transition-all flex items-center justify-center gap-2">
+                <i className="fa-solid fa-save"></i> {editWorkerData ? 'Salvar Alterações' : 'Adicionar Profissional'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Add/Edit Supplier Modal */}
+      {showAddSupplierModal && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-primary/80 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-md p-6 shadow-2xl border border-white/20 relative">
+            <button onClick={clearSupplierFormAndCloseModal} className="absolute top-4 right-4 text-slate-400 hover:text-primary dark:hover:text-white" aria-label="Fechar modal"><i className="fa-solid fa-xmark text-xl"></i></button>
+            <h2 className="text-xl font-black text-primary dark:text-white mb-6">{editSupplierData ? 'Editar Fornecedor' : 'Novo Fornecedor'}</h2>
+            <form onSubmit={editSupplierData ? handleEditSupplier : handleAddSupplier} className="space-y-4">
+              <div>
+                <label htmlFor="supplierName" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Nome</label>
+                <input id="supplierName" type="text" value={editSupplierData ? editSupplierData.name : newSupplierName} onChange={(e) => editSupplierData ? setEditSupplierData({ ...editSupplierData, name: e.target.value }) : setNewSupplierName(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" required aria-label="Nome do Fornecedor" />
+              </div>
+              <div>
+                <label htmlFor="supplierCategory" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Categoria</label>
+                <select id="supplierCategory" value={editSupplierData ? editSupplierData.category : newSupplierCategory} onChange={(e) => editSupplierData ? setEditSupplierData({ ...editSupplierData, category: e.target.value }) : setNewSupplierCategory(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" required aria-label="Categoria do Fornecedor">
+                  <option value="">Selecione a Categoria</option>
+                  {STANDARD_SUPPLIER_CATEGORIES.map(category => (
+                    <option key={category} value={category}>{category}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label htmlFor="supplierPhone" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Telefone</label>
+                <input id="supplierPhone" type="text" value={editSupplierData ? editSupplierData.phone : newSupplierPhone} onChange={(e) => editSupplierData ? setEditSupplierData({ ...editSupplierData, phone: e.target.value }) : setNewSupplierPhone(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" aria-label="Telefone do Fornecedor" />
+              </div>
+              <div>
+                <label htmlFor="supplierEmail" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">E-mail</label>
+                <input id="supplierEmail" type="email" value={editSupplierData ? editSupplierData.email || '' : newSupplierEmail} onChange={(e) => editSupplierData ? setEditSupplierData({ ...editSupplierData, email: e.target.value }) : setNewSupplierEmail(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" aria-label="E-mail do Fornecedor" />
+              </div>
+              <div>
+                <label htmlFor="supplierAddress" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Endereço</label>
+                <input id="supplierAddress" type="text" value={editSupplierData ? editSupplierData.address || '' : newSupplierAddress} onChange={(e) => editSupplierData ? setEditSupplierData({ ...editSupplierData, address: e.target.value }) : setNewSupplierAddress(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" aria-label="Endereço do Fornecedor" />
+              </div>
+              <div>
+                <label htmlFor="supplierNotes" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Anotações</label>
+                <textarea id="supplierNotes" value={editSupplierData ? editSupplierData.notes || '' : newSupplierNotes} onChange={(e) => editSupplierData ? setEditSupplierData({ ...editSupplierData, notes: e.target.value }) : setNewSupplierNotes(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all h-24 resize-none" aria-label="Anotações sobre o Fornecedor"></textarea>
+              </div>
+              <button type="submit" className="w-full py-4 bg-primary hover:bg-primary-dark text-white font-bold rounded-xl shadow-lg shadow-primary/20 transition-all flex items-center justify-center gap-2">
+                <i className="fa-solid fa-save"></i> {editSupplierData ? 'Salvar Alterações' : 'Adicionar Fornecedor'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Add Photo Modal */}
+      {showAddPhotoModal && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-primary/80 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-md p-6 shadow-2xl border border-white/20 relative">
+            <button onClick={() => setShowAddPhotoModal(false)} className="absolute top-4 right-4 text-slate-400 hover:text-primary dark:hover:text-white" aria-label="Fechar modal"><i className="fa-solid fa-xmark text-xl"></i></button>
+            <h2 className="text-xl font-black text-primary dark:text-white mb-6">Nova Foto</h2>
+            <form onSubmit={handleAddPhoto} className="space-y-4">
+              <div>
+                <label htmlFor="photoDescription" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Descrição</label>
+                <input id="photoDescription" type="text" value={newPhotoDescription} onChange={(e) => setNewPhotoDescription(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" required aria-label="Descrição da Foto" />
+              </div>
+              <div>
+                <label htmlFor="photoType" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Tipo</label>
+                <select id="photoType" value={newPhotoType} onChange={(e) => setNewPhotoType(e.target.value as 'BEFORE' | 'AFTER' | 'PROGRESS')}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" required aria-label="Tipo de Foto">
+                  <option value="PROGRESS">Progresso</option>
+                  <option value="BEFORE">Antes</option>
+                  <option value="AFTER">Depois</option>
+                </select>
+              </div>
+              <div>
+                <label htmlFor="photoFile" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Arquivo da Foto</label>
+                <input id="photoFile" type="file" accept="image/*" onChange={(e) => setNewPhotoFile(e.target.files ? e.target.files[0] : null)}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" required aria-label="Arquivo da Foto" />
+              </div>
+              <button type="submit" disabled={uploadingPhoto} className="w-full py-4 bg-primary hover:bg-primary-dark text-white font-bold rounded-xl shadow-lg shadow-primary/20 transition-all flex items-center justify-center gap-2">
+                {uploadingPhoto ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-upload"></i>} {uploadingPhoto ? 'Enviando...' : 'Adicionar Foto'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Add File Modal */}
+      {showAddFileModal && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-primary/80 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-md p-6 shadow-2xl border border-white/20 relative">
+            <button onClick={() => setShowAddFileModal(false)} className="absolute top-4 right-4 text-slate-400 hover:text-primary dark:hover:text-white" aria-label="Fechar modal"><i className="fa-solid fa-xmark text-xl"></i></button>
+            <h2 className="text-xl font-black text-primary dark:text-white mb-6">Novo Arquivo</h2>
+            <form onSubmit={handleAddFile} className="space-y-4">
+              <div>
+                <label htmlFor="fileName" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Nome do Arquivo</label>
+                <input id="fileName" type="text" value={newFileName} onChange={(e) => setNewFileName(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" required aria-label="Nome do Arquivo" />
+              </div>
+              <div>
+                <label htmlFor="fileCategory" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Categoria</label>
+                <select id="fileCategory" value={newFileCategory} onChange={(e) => setNewFileCategory(e.target.value as FileCategory)}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" required aria-label="Categoria do Arquivo">
+                  {Object.values(FileCategory).map(cat => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label htmlFor="uploadFile" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Selecionar Arquivo</label>
+                <input id="uploadFile" type="file" onChange={(e) => setNewUploadFile(e.target.files ? e.target.files[0] : null)}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" required aria-label="Selecionar Arquivo para Upload" />
+              </div>
+              <button type="submit" disabled={uploadingFile} className="w-full py-4 bg-primary hover:bg-primary-dark text-white font-bold rounded-xl shadow-lg shadow-primary/20 transition-all flex items-center justify-center gap-2">
+                {uploadingFile ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-upload"></i>} {uploadingFile ? 'Enviando...' : 'Adicionar Arquivo'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Add/Edit Checklist Modal */}
+      {showAddChecklistModal && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-primary/80 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-md p-6 shadow-2xl border border-white/20 relative">
+            <button onClick={clearChecklistFormAndCloseModal} className="absolute top-4 right-4 text-slate-400 hover:text-primary dark:hover:text-white" aria-label="Fechar modal"><i className="fa-solid fa-xmark text-xl"></i></button>
+            <h2 className="text-xl font-black text-primary dark:text-white mb-6">{editChecklistData ? 'Editar Checklist' : 'Nova Checklist'}</h2>
+            <form onSubmit={editChecklistData ? handleEditChecklist : handleAddChecklist} className="space-y-4">
+              <div>
+                <label htmlFor="checklistName" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Nome da Checklist</label>
+                <input id="checklistName" type="text" value={editChecklistData ? editChecklistData.name : newChecklistName} onChange={(e) => editChecklistData ? setEditChecklistData({ ...editChecklistData, name: e.target.value }) : setNewChecklistName(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" required aria-label="Nome da Checklist" />
+              </div>
+              <div>
+                <label htmlFor="checklistCategory" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Categoria (Etapa da Obra)</label>
+                <select id="checklistCategory" value={editChecklistData ? editChecklistData.category : newChecklistCategory} onChange={(e) => editChecklistData ? setEditChecklistData({ ...editChecklistData, category: e.target.value }) : setNewChecklistCategory(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" required aria-label="Categoria da Checklist (Etapa da Obra)">
+                  <option value="">Selecione uma categoria</option>
+                  {steps.map(step => (
+                    <option key={step.id} value={step.name}>{step.name}</option>
+                  ))}
+                  {/* Option for general checklists not tied to a specific step */}
+                  <option value="Geral">Geral</option>
+                  <option value="Segurança">Segurança</option>
+                  <option value="Entrega">Entrega</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Itens da Checklist</label>
+                {editChecklistData?.items.map((item, idx) => (
+                  <div key={item.id} className="flex items-center gap-2 mb-2">
+                    <input type="checkbox" checked={item.checked} onChange={(e) => {
+                      if (editChecklistData) {
+                        const updatedItems = [...editChecklistData.items];
+                        updatedItems[idx] = { ...updatedItems[idx], checked: e.target.checked };
+                        setEditChecklistData({ ...editChecklistData, items: updatedItems });
+                      }
+                    }} className="form-checkbox h-5 w-5 text-secondary rounded border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-slate-700" aria-label={`Marcar item ${item.text}`} />
+                    <input type="text" value={item.text} onChange={(e) => {
+                      if (editChecklistData) {
+                        const updatedItems = [...editChecklistData.items];
+                        updatedItems[idx] = { ...updatedItems[idx], text: e.target.value };
+                        setEditChecklistData({ ...editChecklistData, items: updatedItems });
+                      }
+                    }}
+                      className="flex-1 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" placeholder="Novo item" aria-label="Descrição do item da checklist" />
+                    <button type="button" onClick={() => {
+                      if (editChecklistData) {
+                        const updatedItems = editChecklistData.items.filter((_, i) => i !== idx);
+                        setEditChecklistData({ ...editChecklistData, items: updatedItems });
+                      }
+                    }} className="text-red-500 hover:text-red-700" aria-label="Remover item"><i className="fa-solid fa-trash-alt"></i></button>
+                  </div>
+                ))}
+                {!editChecklistData && newChecklistItems.map((item, idx) => (
+                  <div key={idx} className="flex items-center gap-2 mb-2">
+                    <input type="text" value={item} onChange={(e) => {
+                      const updatedItems = [...newChecklistItems];
+                      updatedItems[idx] = e.target.value;
+                      setNewChecklistItems(updatedItems);
+                    }}
+                      className="flex-1 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" placeholder="Novo item" aria-label="Descrição do item da checklist" />
+                    <button type="button" onClick={() => {
+                      const updatedItems = newChecklistItems.filter((_, i) => i !== idx);
+                      setNewChecklistItems(updatedItems);
+                    }} className="text-red-500 hover:text-red-700" aria-label="Remover item"><i className="fa-solid fa-trash-alt"></i></button>
+                  </div>
+                ))}
+                <button type="button" onClick={() => {
+                  if (editChecklistData) {
+                    setEditChecklistData({ ...editChecklistData, items: [...editChecklistData.items, { id: crypto.randomUUID(), text: '', checked: false }] });
+                  } else {
+                    setNewChecklistItems([...newChecklistItems, '']);
+                  }
+                }} className="mt-2 px-4 py-2 bg-slate-100 dark:bg-slate-800 text-primary dark:text-white text-sm font-bold rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors flex items-center justify-center gap-2" aria-label="Adicionar outro item">
+                  <i className="fa-solid fa-plus-circle"></i> Adicionar Item
+                </button>
+              </div>
+              <button type="submit" className="w-full py-4 bg-primary hover:bg-primary-dark text-white font-bold rounded-xl shadow-lg shadow-primary/20 transition-all flex items-center justify-center gap-2">
+                <i className="fa-solid fa-save"></i> {editChecklistData ? 'Salvar Alterações' : 'Adicionar Checklist'}
+              </button>
+            </form>
           </div>
         </div>
       )}
