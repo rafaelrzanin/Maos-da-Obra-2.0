@@ -1600,80 +1600,86 @@ const WorkDetail = () => {
               <ToolCard icon="fa-images" title="Fotos da Obra" description="Documente o progresso com fotos e vídeos." onClick={() => goToSubView('PHOTOS')} />
               <ToolCard icon="fa-file-lines" title="Projetos e Docs" description="Guarde plantas, licenças e outros documentos." onClick={() => goToSubView('PROJECTS')} />
               
+              {/* Vitalício Bonus Tools */}
               <ToolCard
                 icon="fa-robot"
                 title="Planejamento Inteligente AI"
                 description="Deixe a IA planejar e analisar riscos da sua obra."
-                onClick={() => hasAiAccess ? navigate(`/work/${workId}/ai-planner`) : setZeModal({
+                onClick={() => isVitalicio ? navigate(`/work/${workId}/ai-planner`) : setZeModal({ // Check only for Vitalicio
                   isOpen: true,
                   title: "Acesso Vitalício Necessário",
-                  message: "Para usar o Planejamento Inteligente AI, você precisa ter o plano Vitalício ou estar em período de teste. Desbloqueie essa ferramenta para otimizar sua obra!",
+                  message: "Para usar o Planejamento Inteligente AI, você precisa ter o plano Vitalício. Desbloqueie essa ferramenta para otimizar sua obra!",
                   confirmText: "Ver Planos",
                   onConfirm: async () => navigate('/settings'),
                   onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
                   type: "WARNING"
                 })}
-                isLocked={!hasAiAccess}
+                isLocked={!isVitalicio} // Only Vitalicio has access
+                requiresVitalicio={true} // Mark as requiring Vitalicio
               />
               <ToolCard
                 icon="fa-file-contract"
                 title="Gerador de Contratos"
                 description="Crie contratos profissionais de mão de obra e serviços em segundos."
-                onClick={() => hasAiAccess ? goToSubView('CONTRACTS') : setZeModal({
+                onClick={() => isVitalicio ? goToSubView('CONTRACTS') : setZeModal({ // Check only for Vitalicio
                   isOpen: true,
                   title: "Acesso Vitalício Necessário",
-                  message: "Esta ferramenta é exclusiva para assinantes Vitalícios ou durante o período de teste da IA. Adquira já seu acesso para ter contratos prontos e personalizados!",
+                  message: "Esta ferramenta é exclusiva para assinantes Vitalícios. Adquira já seu acesso para ter contratos prontos e personalizados!",
                   confirmText: "Ver Planos",
                   onConfirm: async () => navigate('/settings'),
                   onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
                   type: "WARNING"
                 })}
-                isLocked={!hasAiAccess}
+                isLocked={!isVitalicio} // Only Vitalicio has access
+                requiresVitalicio={true} // Mark as requiring Vitalicio
               />
               <ToolCard
                 icon="fa-list-check"
                 title="Checklists Inteligentes"
                 description="Listas de verificação para cada etapa, garantindo que nada seja esquecido."
-                onClick={() => hasAiAccess ? goToSubView('CHECKLIST') : setZeModal({
+                onClick={() => isVitalicio ? goToSubView('CHECKLIST') : setZeModal({ // Check only for Vitalicio
                   isOpen: true,
                   title: "Acesso Vitalício Necessário",
-                  message: "Para acessar os Checklists Inteligentes, você precisa ter o plano Vitalício ou estar em período de teste da IA. Não perca nenhum detalhe na sua obra!",
+                  message: "Para acessar os Checklists Inteligentes, você precisa ter o plano Vitalício. Não perca nenhum detalhe na sua obra!",
                   confirmText: "Ver Planos",
                   onConfirm: async () => navigate('/settings'),
                   onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
                   type: "WARNING"
                 })}
-                isLocked={!hasAiAccess}
+                isLocked={!isVitalicio} // Only Vitalicio has access
+                requiresVitalicio={true} // Mark as requiring Vitalicio
               />
               <ToolCard
                 icon="fa-calculator"
                 title="Calculadoras de Materiais"
                 description="Calcule quantidades de pisos, tintas, blocos, etc."
-                onClick={() => hasAiAccess ? goToSubView('CALCULATORS') : setZeModal({
+                onClick={() => isVitalicio ? goToSubView('CALCULATORS') : setZeModal({ // Check only for Vitalicio
                   isOpen: true,
                   title: "Acesso Vitalício Necessário",
-                  message: "As Calculadoras Avançadas são exclusivas para assinantes Vitalícios ou durante o período de teste da IA. Evite o desperdício de material!",
+                  message: "As Calculadoras Avançadas são exclusivas para assinantes Vitalícios. Evite o desperdício de material!",
                   confirmText: "Ver Planos",
                   onConfirm: async () => navigate('/settings'),
                   onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
                   type: "WARNING"
                 })}
-                isLocked={!hasAiAccess}
+                isLocked={!isVitalicio} // Only Vitalicio has access
+                requiresVitalicio={true} // Mark as requiring Vitalicio
               />
               <ToolCard
                 icon="fa-chart-line"
                 title="Relatórios Completos"
                 description="Análise detalhada de cronograma, materiais e finanças (PDF/Excel)."
-                onClick={() => hasAiAccess ? navigate(`/work/${workId}/reports`) : setZeModal({ // Direct navigation
+                onClick={() => isVitalicio ? navigate(`/work/${workId}/reports`) : setZeModal({ // Direct navigation - check only for Vitalicio
                   isOpen: true,
                   title: "Acesso Vitalício Necessário",
-                  message: "Os Relatórios Completos são exclusivos para assinantes Vitalícios ou durante o período de teste da IA. Tenha a visão total da sua obra!",
+                  message: "Os Relatórios Completos são exclusivos para assinantes Vitalícios. Tenha a visão total da sua obra!",
                   confirmText: "Ver Planos",
                   onConfirm: async () => navigate('/settings'),
                   onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
                   type: "WARNING"
                 })}
-                isLocked={!hasAiAccess}
+                isLocked={!isVitalicio} // Only Vitalicio has access
+                requiresVitalicio={true} // Mark as requiring Vitalicio
               />
             </div>
           </>
@@ -1691,29 +1697,30 @@ const WorkDetail = () => {
                     </button>
                 </div>
             ) : (
-                <div className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"> {/* Grid layout for workers */}
                     {workers.map(worker => (
-                        <div key={worker.id} onClick={() => { setEditWorkerData(worker); setShowAddWorkerModal(true); }} className={cx(surface, "p-4 rounded-2xl flex items-center justify-between gap-4 cursor-pointer hover:scale-[1.005] transition-transform")}>
-                            <div>
-                                <h3 className="font-bold text-primary dark:text-white text-lg">{worker.name}</h3>
-                                <p className="text-sm text-slate-500 dark:text-slate-400">{worker.role} - {worker.phone}</p>
-                                {worker.dailyRate && <p className="text-xs text-slate-500 dark:text-slate-400">Diária: {formatCurrency(worker.dailyRate)}</p>}
+                        <div key={worker.id} onClick={() => { setEditWorkerData(worker); setShowAddWorkerModal(true); }} className={cx(surface, "p-4 rounded-2xl flex flex-col gap-2 cursor-pointer hover:scale-[1.005] transition-transform")}>
+                            <div className="flex items-center justify-between w-full">
+                                <h3 className="font-bold text-primary dark:text-white text-lg leading-tight">{worker.name}</h3>
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); setZeModal({
+                                        isOpen: true,
+                                        title: "Excluir Profissional",
+                                        message: `Tem certeza que deseja excluir o profissional ${worker.name}?`,
+                                        confirmText: "Excluir",
+                                        onConfirm: async () => handleDeleteWorker(worker.id),
+                                        onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
+                                        type: "DANGER"
+                                    }); }}
+                                    className="text-slate-400 hover:text-red-500 transition-colors p-2 -mr-2"
+                                    aria-label={`Excluir profissional ${worker.name}`}
+                                >
+                                    <i className="fa-solid fa-trash-alt text-lg"></i>
+                                </button>
                             </div>
-                            <button
-                                onClick={(e) => { e.stopPropagation(); setZeModal({
-                                    isOpen: true,
-                                    title: "Excluir Profissional",
-                                    message: `Tem certeza que deseja excluir o profissional ${worker.name}?`,
-                                    confirmText: "Excluir",
-                                    onConfirm: async () => handleDeleteWorker(worker.id),
-                                    onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
-                                    type: "DANGER"
-                                }); }}
-                                className="text-slate-400 hover:text-red-500 transition-colors p-2"
-                                aria-label={`Excluir profissional ${worker.name}`}
-                            >
-                                <i className="fa-solid fa-trash-alt text-lg"></i>
-                            </button>
+                            <p className="text-sm text-slate-500 dark:text-slate-400">{worker.role}</p>
+                            <p className="text-sm text-slate-500 dark:text-slate-400">{worker.phone}</p>
+                            {worker.dailyRate && <p className="text-xs text-slate-500 dark:text-slate-400">Diária: {formatCurrency(worker.dailyRate)}</p>}
                         </div>
                     ))}
                 </div>
@@ -1733,29 +1740,30 @@ const WorkDetail = () => {
                     </button>
                 </div>
             ) : (
-                <div className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"> {/* Grid layout for suppliers */}
                     {suppliers.map(supplier => (
-                        <div key={supplier.id} onClick={() => { setEditSupplierData(supplier); setShowAddSupplierModal(true); }} className={cx(surface, "p-4 rounded-2xl flex items-center justify-between gap-4 cursor-pointer hover:scale-[1.005] transition-transform")}>
-                            <div>
-                                <h3 className="font-bold text-primary dark:text-white text-lg">{supplier.name}</h3>
-                                <p className="text-sm text-slate-500 dark:text-slate-400">{supplier.category} - {supplier.phone}</p>
-                                {supplier.email && <p className="text-xs text-slate-500 dark:text-slate-400">{supplier.email}</p>}
+                        <div key={supplier.id} onClick={() => { setEditSupplierData(supplier); setShowAddSupplierModal(true); }} className={cx(surface, "p-4 rounded-2xl flex flex-col gap-2 cursor-pointer hover:scale-[1.005] transition-transform")}>
+                            <div className="flex items-center justify-between w-full">
+                                <h3 className="font-bold text-primary dark:text-white text-lg leading-tight">{supplier.name}</h3>
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); setZeModal({
+                                        isOpen: true,
+                                        title: "Excluir Fornecedor",
+                                        message: `Tem certeza que deseja excluir o fornecedor ${supplier.name}?`,
+                                        confirmText: "Excluir",
+                                        onConfirm: async () => handleDeleteSupplier(supplier.id),
+                                        onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
+                                        type: "DANGER"
+                                    }); }}
+                                    className="text-slate-400 hover:text-red-500 transition-colors p-2 -mr-2"
+                                    aria-label={`Excluir fornecedor ${supplier.name}`}
+                                >
+                                    <i className="fa-solid fa-trash-alt text-lg"></i>
+                                </button>
                             </div>
-                            <button
-                                onClick={(e) => { e.stopPropagation(); setZeModal({
-                                    isOpen: true,
-                                    title: "Excluir Fornecedor",
-                                    message: `Tem certeza que deseja excluir o fornecedor ${supplier.name}?`,
-                                    confirmText: "Excluir",
-                                    onConfirm: async () => handleDeleteSupplier(supplier.id),
-                                    onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
-                                    type: "DANGER"
-                                }); }}
-                                className="text-slate-400 hover:text-red-500 transition-colors p-2"
-                                aria-label={`Excluir fornecedor ${supplier.name}`}
-                            >
-                                <i className="fa-solid fa-trash-alt text-lg"></i>
-                            </button>
+                            <p className="text-sm text-slate-500 dark:text-slate-400">{supplier.category}</p>
+                            <p className="text-sm text-slate-500 dark:text-slate-400">{supplier.phone}</p>
+                            {supplier.email && <p className="text-xs text-slate-500 dark:text-slate-400">{supplier.email}</p>}
                         </div>
                     ))}
                 </div>
@@ -2924,17 +2932,18 @@ interface ToolCardProps {
   description: string;
   onClick: () => void;
   isLocked?: boolean;
+  requiresVitalicio?: boolean; // NEW: Prop to indicate if tool requires Vitalício plan
 }
 
-const ToolCard: React.FC<ToolCardProps> = ({ icon, title, description, onClick, isLocked }) => (
+const ToolCard: React.FC<ToolCardProps> = ({ icon, title, description, onClick, isLocked, requiresVitalicio }) => (
   <button
     onClick={onClick}
     disabled={isLocked}
     className={cx(
       "relative flex flex-col items-center text-center p-6 rounded-2xl border-2 transition-all group",
-      "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800",
-      "shadow-sm dark:shadow-card-dark-subtle",
-      isLocked ? "opacity-50 cursor-not-allowed" : "hover:border-secondary/50 hover:shadow-lg hover:scale-[1.01] active:scale-[0.98]"
+      isLocked 
+        ? "opacity-50 cursor-not-allowed" 
+        : (requiresVitalicio ? "bg-gradient-vitalicio-bonus border-secondary/50 shadow-lg shadow-blue-500/10 hover:brightness-110 active:scale-98" : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 shadow-sm dark:shadow-card-dark-subtle hover:border-secondary/50 hover:shadow-lg hover:scale-[1.01] active:scale-[0.98]")
     )}
     aria-label={`Abrir ferramenta ${title}`}
     aria-disabled={isLocked}
@@ -2946,12 +2955,14 @@ const ToolCard: React.FC<ToolCardProps> = ({ icon, title, description, onClick, 
     )}
     <div className={cx(
       "w-16 h-16 rounded-full flex items-center justify-center text-3xl mb-4 transition-all",
-      isLocked ? "bg-slate-200 dark:bg-slate-700 text-slate-400 dark:text-slate-500" : "bg-primary text-white group-hover:bg-secondary"
+      isLocked 
+        ? "bg-slate-200 dark:bg-slate-700 text-slate-400 dark:text-slate-500" 
+        : (requiresVitalicio ? "bg-secondary text-white" : "bg-primary text-white group-hover:bg-secondary")
     )}>
       <i className={`fa-solid ${icon}`}></i>
     </div>
-    <h3 className="text-xl font-bold text-primary dark:text-white mb-2">{title}</h3>
-    <p className="text-sm text-slate-500 dark:text-slate-400">{description}</p>
+    <h3 className={cx("text-xl font-bold mb-2", requiresVitalicio && !isLocked ? "text-amber-300" : "text-primary dark:text-white")}>{title}</h3>
+    <p className={cx("text-sm", requiresVitalicio && !isLocked ? "text-slate-300" : "text-slate-500 dark:text-slate-400")}>{description}</p>
   </button>
 );
 
@@ -2986,3 +2997,4 @@ const ToolSubViewHeader: React.FC<ToolSubViewHeaderProps> = ({ title, onBack, on
 );
 
 export default WorkDetail;
+    

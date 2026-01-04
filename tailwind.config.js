@@ -59,6 +59,7 @@ export default {
         'gradient-premium': 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)',
         'gradient-gold': 'linear-gradient(135deg, #F59E0B 0%, #B45309 100%)',
         'gradient-dark-gold': 'linear-gradient(135deg, #451a03 0%, #78350f 100%)',
+        'gradient-vitalicio-bonus': 'linear-gradient(135deg, #0F172A 0%, #173250 100%)', // New gradient for vitalicio bonus tools
         // REMOVIDO: 'gradient-vitalicio-blue'
       },
       boxShadow: {
@@ -72,3 +73,4 @@ export default {
   },
   plugins: [],
 }
+    

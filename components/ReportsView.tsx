@@ -43,6 +43,8 @@ const formatCurrency = (value: number | string | undefined): string => {
   });
 };
 
+type ReportTab = 'CRONOGRAMA' | 'MATERIAIS' | 'FINANCEIRO';
+
 const ReportsView = () => {
   const { id: workId } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -55,10 +57,20 @@ const ReportsView = () => {
   const [loadingReports, setLoadingReports] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
   const [showAccessModal, setShowAccessModal] = useState(false);
+  const [activeReportTab, setActiveReportTab] = useState<ReportTab>('CRONOGRAMA'); // NEW: State for report tabs
+
+  // States for Collapsible Sections
+  const [isStepsDetailsExpanded, setIsStepsDetailsExpanded] = useState(false);
+  const [isMaterialsDetailsExpanded, setIsMaterialsDetailsExpanded] = useState(false);
+  const [isExpensesDetailsExpanded, setIsExpensesDetailsExpanded] = useState(false);
+
+  // States for Material Filter (same as WorkDetail)
+  const [materialFilterStepId, setMaterialFilterStepId] = useState('all');
+
 
   const isVitalicio = user?.plan === PlanType.VITALICIO;
   const isAiTrialActive = user?.isTrial && trialDaysRemaining !== null && trialDaysRemaining > 0;
-  const hasAccess = isVitalicio || isAiTrialActive;
+  const hasAccess = isVitalicio || isAiTrialActive; // Still using this for overall tool access
 
   // Memoized calculations for reports
   const totalExpenses = useMemo(() => expenses.reduce((sum, exp) => sum + exp.amount, 0), [expenses]);
@@ -66,6 +78,7 @@ const ReportsView = () => {
   const totalOutstandingExpenses = useMemo(() => totalExpenses - totalPaidExpenses, [totalExpenses, totalPaidExpenses]);
   const budgetBalance = useMemo(() => work ? work.budgetPlanned - totalExpenses : 0, [work, totalExpenses]);
 
+  // Materials Overview (calculated on all materials, regardless of filter for the summary)
   const materialsOverview = useMemo(() => {
     const planned = materials.reduce((sum, m) => sum + m.plannedQty, 0);
     const purchased = materials.reduce((sum, m) => sum + m.purchasedQty, 0);
@@ -73,6 +86,13 @@ const ReportsView = () => {
     const pending = materials.filter(m => m.purchasedQty < m.plannedQty).length;
     return { planned, purchased, cost, pending };
   }, [materials]);
+
+  // Filtered materials for display in the "Materiais" tab's detail section
+  const filteredMaterialsForDisplay = useMemo(() => {
+    return materialFilterStepId === 'all'
+      ? materials
+      : materials.filter(m => m.stepId === materialFilterStepId);
+  }, [materials, materialFilterStepId]);
 
   const stepsOverview = useMemo(() => {
     const completed = steps.filter(s => s.status === StepStatus.COMPLETED).length;
@@ -150,6 +170,201 @@ const ReportsView = () => {
   if (!user) {
     return null; // Should be handled by Layout redirect
   }
+
+  const renderReportContent = (tab: ReportTab) => {
+    if (!work) return null; // Should not happen if data is loaded
+
+    switch (tab) {
+      case 'CRONOGRAMA':
+        return (
+          <>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              <div className="bg-slate-50 dark:bg-slate-800 rounded-2xl p-3 flex flex-col items-start border border-slate-100 dark:border-slate-700 shadow-inner">
+                <i className="fa-solid fa-layer-group text-xl text-primary mb-1"></i>
+                <p className="text-lg font-black text-primary leading-none">{stepsOverview.total}</p>
+                <p className="text-[9px] font-extrabold tracking-widest uppercase text-slate-500">Total de Etapas</p>
+              </div>
+              <div className="bg-slate-50 dark:bg-slate-800 rounded-2xl p-3 flex flex-col items-start border border-slate-100 dark:border-slate-700 shadow-inner">
+                <i className="fa-solid fa-list-check text-xl text-green-500 mb-1"></i>
+                <p className="text-lg font-black text-green-600 leading-none">{stepsOverview.completed}</p>
+                <p className="text-[9px] font-extrabold tracking-widest uppercase text-slate-500">Concluídas</p>
+              </div>
+              <div className="bg-slate-50 dark:bg-slate-800 rounded-2xl p-3 flex flex-col items-start border border-slate-100 dark:border-slate-700 shadow-inner">
+                <i className="fa-solid fa-hourglass-half text-xl text-amber-500 mb-1"></i>
+                <p className="text-lg font-black text-amber-600 leading-none">{stepsOverview.inProgress}</p>
+                <p className="text-[9px] font-extrabold tracking-widest uppercase text-slate-500">Em Andamento</p>
+              </div>
+              <div className="bg-slate-50 dark:bg-slate-800 rounded-2xl p-3 flex flex-col items-start border border-slate-100 dark:border-slate-700 shadow-inner">
+                <i className="fa-solid fa-triangle-exclamation text-xl text-red-500 mb-1"></i>
+                <p className="text-lg font-black text-red-600 leading-none">{stepsOverview.delayed}</p>
+                <p className="text-[9px] font-extrabold tracking-widest uppercase text-slate-500">Atrasadas</p>
+              </div>
+            </div>
+
+            <div className="mt-8">
+              <div className="flex items-center justify-between mb-3 cursor-pointer" onClick={() => setIsStepsDetailsExpanded(!isStepsDetailsExpanded)} aria-expanded={isStepsDetailsExpanded}>
+                <h3 className="text-lg font-bold text-primary dark:text-white">Detalhes das Etapas</h3>
+                <i className={`fa-solid ${isStepsDetailsExpanded ? 'fa-chevron-up' : 'fa-chevron-down'} text-slate-500`}></i>
+              </div>
+              {isStepsDetailsExpanded && (
+                <div className="space-y-3 animate-in fade-in duration-300">
+                  {steps.length === 0 ? (
+                    <p className={mutedText}>Nenhuma etapa cadastrada.</p>
+                  ) : (
+                    steps.map(step => (
+                      <div key={step.id} className="bg-slate-50 dark:bg-slate-800 p-3 rounded-lg border border-slate-100 dark:border-slate-700 flex justify-between items-center">
+                        <div>
+                          <p className="font-bold text-primary dark:text-white">{step.name}</p>
+                          <p className="text-xs text-slate-500 dark:text-slate-400">
+                            {formatDateDisplay(step.startDate)} - {formatDateDisplay(step.endDate)}
+                            {step.realDate && <span className="ml-2 text-green-600 dark:text-green-400">(Concluído em: {formatDateDisplay(step.realDate)})</span>}
+                          </p>
+                        </div>
+                        <span className={`text-xs font-bold px-2 py-1 rounded-full ${
+                          step.status === StepStatus.COMPLETED ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' :
+                          step.status === StepStatus.IN_PROGRESS ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' :
+                          'bg-slate-100 text-slate-700 dark:bg-slate-700/30 dark:text-slate-400'
+                        }`}>
+                          {step.isDelayed ? 'ATRASADA' : step.status === StepStatus.COMPLETED ? 'CONCLUÍDA' : step.status === StepStatus.IN_PROGRESS ? 'EM ANDAMENTO' : 'NÃO INICIADA'}
+                        </span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+          </>
+        );
+
+      case 'MATERIAIS':
+        return (
+          <>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+              <div className="bg-slate-50 dark:bg-slate-800 rounded-2xl p-3 flex flex-col items-start border border-slate-100 dark:border-slate-700 shadow-inner">
+                <i className="fa-solid fa-boxes-stacked text-xl text-primary mb-1"></i>
+                <p className="text-lg font-black text-primary leading-none">{materials.length}</p>
+                <p className="text-[9px] font-extrabold tracking-widest uppercase text-slate-500">Total de Materiais</p>
+              </div>
+              <div className="bg-slate-50 dark:bg-slate-800 rounded-2xl p-3 flex flex-col items-start border border-slate-100 dark:border-slate-700 shadow-inner">
+                <i className="fa-solid fa-cart-flatbed text-xl text-green-500 mb-1"></i>
+                <p className="text-lg font-black text-green-600 leading-none">{materialsOverview.purchased}</p>
+                <p className="text-[9px] font-extrabold tracking-widest uppercase text-slate-500">Qtd. Comprada</p>
+              </div>
+              <div className="bg-slate-50 dark:bg-slate-800 rounded-2xl p-3 flex flex-col items-start border border-slate-100 dark:border-slate-700 shadow-inner">
+                <i className="fa-solid fa-hourglass-empty text-xl text-amber-500 mb-1"></i>
+                <p className="text-lg font-black text-amber-600 leading-none">{materialsOverview.pending}</p>
+                <p className="text-[9px] font-extrabold tracking-widest uppercase text-slate-500">Itens Pendentes</p>
+              </div>
+              <div className="bg-slate-50 dark:bg-slate-800 rounded-2xl p-3 flex flex-col items-start border border-slate-100 dark:border-slate-700 shadow-inner">
+                <i className="fa-solid fa-money-bill-wave text-xl text-primary mb-1"></i>
+                <p className="text-lg font-black text-primary leading-none">{formatCurrency(materialsOverview.cost)}</p>
+                <p className="text-[9px] font-extrabold tracking-widest uppercase text-slate-500">Custo Total</p>
+              </div>
+            </div>
+
+            <div className="mt-8">
+              <div className="flex items-center justify-between mb-3 cursor-pointer" onClick={() => setIsMaterialsDetailsExpanded(!isMaterialsDetailsExpanded)} aria-expanded={isMaterialsDetailsExpanded}>
+                <h3 className="text-lg font-bold text-primary dark:text-white">Detalhes dos Materiais</h3>
+                <i className={`fa-solid ${isMaterialsDetailsExpanded ? 'fa-chevron-up' : 'fa-chevron-down'} text-slate-500`}></i>
+              </div>
+              {isMaterialsDetailsExpanded && (
+                <div className="animate-in fade-in duration-300">
+                  <div className="mb-4">
+                    <label htmlFor="material-step-filter" className="sr-only">Filtrar por etapa</label>
+                    <select
+                      id="material-step-filter"
+                      value={materialFilterStepId}
+                      onChange={(e) => setMaterialFilterStepId(e.target.value)}
+                      className="w-full md:w-auto px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-primary dark:text-white focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
+                      aria-label="Filtrar materiais por etapa"
+                    >
+                      <option value="all">Todas as Etapas</option>
+                      {steps.map(step => (
+                        <option key={step.id} value={step.id}>{step.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-3">
+                    {filteredMaterialsForDisplay.length === 0 ? (
+                      <p className={mutedText}>Nenhum material cadastrado para esta etapa.</p>
+                    ) : (
+                      filteredMaterialsForDisplay.map(material => (
+                        <div key={material.id} className="bg-slate-50 dark:bg-slate-800 p-3 rounded-lg border border-slate-100 dark:border-slate-700 flex justify-between items-center">
+                          <div>
+                            <p className="font-bold text-primary dark:text-white">{material.name}</p>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">
+                              {material.brand && `${material.brand} - `}
+                              Planejado: {material.plannedQty} {material.unit} / Comprado: {material.purchasedQty} {material.unit}
+                            </p>
+                          </div>
+                          <span className="text-sm font-bold text-primary dark:text-white">{formatCurrency(material.totalCost || 0)}</span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </>
+        );
+
+      case 'FINANCEIRO':
+        return (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+              <div className={cx(surface, "p-5 rounded-2xl flex flex-col items-start")}>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">Orçamento Planejado</p>
+                <h3 className="text-xl font-bold text-primary dark:text-white">{formatCurrency(work.budgetPlanned)}</h3>
+              </div>
+              <div className={cx(surface, "p-5 rounded-2xl flex flex-col items-start")}>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">Gasto Total</p>
+                <h3 className={`text-xl font-bold ${totalExpenses > work.budgetPlanned ? 'text-red-500' : 'text-green-600 dark:text-green-400'}`}>{formatCurrency(totalExpenses)}</h3>
+              </div>
+              <div className={cx(surface, "p-5 rounded-2xl flex flex-col items-start")}>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">Balanço</p>
+                <h3 className={`text-xl font-bold ${budgetBalance < 0 ? 'text-red-500' : 'text-green-600 dark:text-green-400'}`}>{formatCurrency(budgetBalance)}</h3>
+              </div>
+            </div>
+
+            <div className="mt-8">
+              <div className="flex items-center justify-between mb-3 cursor-pointer" onClick={() => setIsExpensesDetailsExpanded(!isExpensesDetailsExpanded)} aria-expanded={isExpensesDetailsExpanded}>
+                <h3 className="text-lg font-bold text-primary dark:text-white">Detalhes das Despesas</h3>
+                <i className={`fa-solid ${isExpensesDetailsExpanded ? 'fa-chevron-up' : 'fa-chevron-down'} text-slate-500`}></i>
+              </div>
+              {isExpensesDetailsExpanded && (
+                <div className="space-y-3 animate-in fade-in duration-300">
+                  {expenses.length === 0 ? (
+                    <p className={mutedText}>Nenhuma despesa cadastrada.</p>
+                  ) : (
+                    expenses.map(expense => (
+                      <div key={expense.id} className="bg-slate-50 dark:bg-slate-800 p-3 rounded-lg border border-slate-100 dark:border-slate-700 flex justify-between items-center">
+                        <div>
+                          <p className="font-bold text-primary dark:text-white">{expense.description}</p>
+                          <p className="text-xs text-slate-500 dark:text-slate-400">
+                            {formatDateDisplay(expense.date)} - {expense.category}
+                            {expense.stepId && ` (Etapa: ${steps.find(s => s.id === expense.stepId)?.name || 'N/A'})`}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-bold text-primary dark:text-white">{formatCurrency(expense.amount)}</p>
+                          <p className={`text-xs ${ (expense.paidAmount || 0) >= expense.amount ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-400'}`}>
+                            Pago: {formatCurrency(expense.paidAmount || 0)}
+                          </p>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+          </>
+        );
+
+      default:
+        return null;
+    }
+  }
+
 
   return (
     <div className="max-w-4xl mx-auto pb-12 pt-4 px-2 sm:px-4 md:px-0 font-sans print:p-0 print:m-0 print:max-w-full">
@@ -233,148 +448,32 @@ const ReportsView = () => {
             </button>
           </div>
 
-          {/* Report: Cronograma */}
-          <div className={cx(surface, card)}>
-            <h2 className="text-xl font-black text-primary dark:text-white mb-4">Relatório de Cronograma</h2>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-              <div className="bg-slate-50 dark:bg-slate-800 rounded-2xl p-3 flex flex-col items-start border border-slate-100 dark:border-slate-700 shadow-inner">
-                <i className="fa-solid fa-layer-group text-xl text-primary mb-1"></i>
-                <p className="text-lg font-black text-primary leading-none">{stepsOverview.total}</p>
-                <p className="text-[9px] font-extrabold tracking-widest uppercase text-slate-500">Total de Etapas</p>
-              </div>
-              <div className="bg-slate-50 dark:bg-slate-800 rounded-2xl p-3 flex flex-col items-start border border-slate-100 dark:border-slate-700 shadow-inner">
-                <i className="fa-solid fa-list-check text-xl text-green-500 mb-1"></i>
-                <p className="text-lg font-black text-green-600 leading-none">{stepsOverview.completed}</p>
-                <p className="text-[9px] font-extrabold tracking-widest uppercase text-slate-500">Concluídas</p>
-              </div>
-              <div className="bg-slate-50 dark:bg-slate-800 rounded-2xl p-3 flex flex-col items-start border border-slate-100 dark:border-slate-700 shadow-inner">
-                <i className="fa-solid fa-hourglass-half text-xl text-amber-500 mb-1"></i>
-                <p className="text-lg font-black text-amber-600 leading-none">{stepsOverview.inProgress}</p>
-                <p className="text-[9px] font-extrabold tracking-widest uppercase text-slate-500">Em Andamento</p>
-              </div>
-              <div className="bg-slate-50 dark:bg-slate-800 rounded-2xl p-3 flex flex-col items-start border border-slate-100 dark:border-slate-700 shadow-inner">
-                <i className="fa-solid fa-triangle-exclamation text-xl text-red-500 mb-1"></i>
-                <p className="text-lg font-black text-red-600 leading-none">{stepsOverview.delayed}</p>
-                <p className="text-[9px] font-extrabold tracking-widest uppercase text-slate-500">Atrasadas</p>
-              </div>
-            </div>
-
-            <h3 className="text-lg font-bold text-primary dark:text-white mt-8 mb-3">Detalhes das Etapas</h3>
-            <div className="space-y-3">
-              {steps.length === 0 ? (
-                <p className={mutedText}>Nenhuma etapa cadastrada.</p>
-              ) : (
-                steps.map(step => (
-                  <div key={step.id} className="bg-slate-50 dark:bg-slate-800 p-3 rounded-lg border border-slate-100 dark:border-slate-700 flex justify-between items-center">
-                    <div>
-                      <p className="font-bold text-primary dark:text-white">{step.name}</p>
-                      <p className="text-xs text-slate-500 dark:text-slate-400">
-                        {formatDateDisplay(step.startDate)} - {formatDateDisplay(step.endDate)}
-                        {step.realDate && <span className="ml-2 text-green-600">(Concluído em: {formatDateDisplay(step.realDate)})</span>}
-                      </p>
-                    </div>
-                    <span className={`text-xs font-bold px-2 py-1 rounded-full ${
-                      step.status === StepStatus.COMPLETED ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' :
-                      step.status === StepStatus.IN_PROGRESS ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' :
-                      'bg-slate-100 text-slate-700 dark:bg-slate-700/30 dark:text-slate-400'
-                    }`}>
-                      {step.isDelayed ? 'ATRASADA' : step.status === StepStatus.COMPLETED ? 'CONCLUÍDA' : step.status === StepStatus.IN_PROGRESS ? 'EM ANDAMENTO' : 'NÃO INICIADA'}
-                    </span>
-                  </div>
-                ))
-              )}
-            </div>
+          {/* Report Tabs */}
+          <div className="flex justify-around bg-white dark:bg-slate-900 rounded-2xl p-2 shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800 mb-6 print:hidden">
+            <button
+              onClick={() => setActiveReportTab('CRONOGRAMA')}
+              className={`flex-1 py-2 rounded-xl text-sm font-bold transition-colors ${activeReportTab === 'CRONOGRAMA' ? 'bg-secondary text-white shadow-md' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+            >
+              Cronograma
+            </button>
+            <button
+              onClick={() => setActiveReportTab('MATERIAIS')}
+              className={`flex-1 py-2 rounded-xl text-sm font-bold transition-colors ${activeReportTab === 'MATERIAIS' ? 'bg-secondary text-white shadow-md' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+            >
+              Materiais
+            </button>
+            <button
+              onClick={() => setActiveReportTab('FINANCEIRO')}
+              className={`flex-1 py-2 rounded-xl text-sm font-bold transition-colors ${activeReportTab === 'FINANCEIRO' ? 'bg-secondary text-white shadow-md' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+            >
+              Financeiro
+            </button>
           </div>
 
-          {/* Report: Materiais */}
+          {/* Report Content */}
           <div className={cx(surface, card)}>
-            <h2 className="text-xl font-black text-primary dark:text-white mb-4">Relatório de Materiais</h2>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-              <div className="bg-slate-50 dark:bg-slate-800 rounded-2xl p-3 flex flex-col items-start border border-slate-100 dark:border-slate-700 shadow-inner">
-                <i className="fa-solid fa-boxes-stacked text-xl text-primary mb-1"></i>
-                <p className="text-lg font-black text-primary leading-none">{materials.length}</p>
-                <p className="text-[9px] font-extrabold tracking-widest uppercase text-slate-500">Total de Materiais</p>
-              </div>
-              <div className="bg-slate-50 dark:bg-slate-800 rounded-2xl p-3 flex flex-col items-start border border-slate-100 dark:border-slate-700 shadow-inner">
-                <i className="fa-solid fa-cart-flatbed text-xl text-green-500 mb-1"></i>
-                <p className="text-lg font-black text-green-600 leading-none">{materialsOverview.purchased}</p>
-                <p className="text-[9px] font-extrabold tracking-widest uppercase text-slate-500">Qtd. Comprada</p>
-              </div>
-              <div className="bg-slate-50 dark:bg-slate-800 rounded-2xl p-3 flex flex-col items-start border border-slate-100 dark:border-slate-700 shadow-inner">
-                <i className="fa-solid fa-hourglass-empty text-xl text-amber-500 mb-1"></i>
-                <p className="text-lg font-black text-amber-600 leading-none">{materialsOverview.pending}</p>
-                <p className="text-[9px] font-extrabold tracking-widest uppercase text-slate-500">Itens Pendentes</p>
-              </div>
-              <div className="bg-slate-50 dark:bg-slate-800 rounded-2xl p-3 flex flex-col items-start border border-slate-100 dark:border-slate-700 shadow-inner">
-                <i className="fa-solid fa-money-bill-wave text-xl text-primary mb-1"></i>
-                <p className="text-lg font-black text-primary leading-none">{formatCurrency(materialsOverview.cost)}</p>
-                <p className="text-[9px] font-extrabold tracking-widest uppercase text-slate-500">Custo Total</p>
-              </div>
-            </div>
-
-            <h3 className="text-lg font-bold text-primary dark:text-white mt-8 mb-3">Detalhes dos Materiais</h3>
-            <div className="space-y-3">
-              {materials.length === 0 ? (
-                <p className={mutedText}>Nenhum material cadastrado.</p>
-              ) : (
-                materials.map(material => (
-                  <div key={material.id} className="bg-slate-50 dark:bg-slate-800 p-3 rounded-lg border border-slate-100 dark:border-slate-700 flex justify-between items-center">
-                    <div>
-                      <p className="font-bold text-primary dark:text-white">{material.name}</p>
-                      <p className="text-xs text-slate-500 dark:text-slate-400">
-                        {material.brand && `${material.brand} - `}
-                        Planejado: {material.plannedQty} {material.unit} / Comprado: {material.purchasedQty} {material.unit}
-                      </p>
-                    </div>
-                    <span className="text-sm font-bold text-primary dark:text-white">{formatCurrency(material.totalCost || 0)}</span>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-
-          {/* Report: Financeiro */}
-          <div className={cx(surface, card)}>
-            <h2 className="text-xl font-black text-primary dark:text-white mb-4">Relatório Financeiro</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-              <div className={cx(surface, "p-5 rounded-2xl flex flex-col items-start")}>
-                <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">Orçamento Planejado</p>
-                <h3 className="text-xl font-bold text-primary dark:text-white">{formatCurrency(work.budgetPlanned)}</h3>
-              </div>
-              <div className={cx(surface, "p-5 rounded-2xl flex flex-col items-start")}>
-                <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">Gasto Total</p>
-                <h3 className={`text-xl font-bold ${totalExpenses > work.budgetPlanned ? 'text-red-500' : 'text-green-600 dark:text-green-400'}`}>{formatCurrency(totalExpenses)}</h3>
-              </div>
-              <div className={cx(surface, "p-5 rounded-2xl flex flex-col items-start")}>
-                <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">Balanço</p>
-                <h3 className={`text-xl font-bold ${budgetBalance < 0 ? 'text-red-500' : 'text-green-600 dark:text-green-400'}`}>{formatCurrency(budgetBalance)}</h3>
-              </div>
-            </div>
-
-            <h3 className="text-lg font-bold text-primary dark:text-white mt-8 mb-3">Detalhes das Despesas</h3>
-            <div className="space-y-3">
-              {expenses.length === 0 ? (
-                <p className={mutedText}>Nenhuma despesa cadastrada.</p>
-              ) : (
-                expenses.map(expense => (
-                  <div key={expense.id} className="bg-slate-50 dark:bg-slate-800 p-3 rounded-lg border border-slate-100 dark:border-slate-700 flex justify-between items-center">
-                    <div>
-                      <p className="font-bold text-primary dark:text-white">{expense.description}</p>
-                      <p className="text-xs text-slate-500 dark:text-slate-400">
-                        {formatDateDisplay(expense.date)} - {expense.category}
-                        {expense.stepId && ` (Etapa: ${steps.find(s => s.id === expense.stepId)?.name || 'N/A'})`}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm font-bold text-primary dark:text-white">{formatCurrency(expense.amount)}</p>
-                      <p className={`text-xs ${ (expense.paidAmount || 0) >= expense.amount ? 'text-green-600' : 'text-amber-600'}`}>
-                        Pago: {formatCurrency(expense.paidAmount || 0)}
-                      </p>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
+            <h2 className="sr-only">{activeReportTab} Report Overview</h2> {/* Accessible title */}
+            {renderReportContent(activeReportTab)}
           </div>
         </div>
       )}
