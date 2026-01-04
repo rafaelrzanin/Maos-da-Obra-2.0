@@ -1,15 +1,11 @@
 
-
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import * as ReactRouter from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.tsx';
 import { dbService } from '../services/db.ts';
 import { StepStatus, PlanType, WorkStatus, type Work, type DBNotification, type Step, type Material } from '../types.ts';
-import { ZE_AVATAR, ZE_AVATAR_FALLBACK } from '../services/standards.ts'; // REMOVED: ZeTip, getRandomZeTip
-import { ZeModal, ZeModalProps } from '../components/ZeModal.tsx'; 
-// REMOVIDO: import { Recharts } from '../components/RechartsWrapper.tsx';
-
-// REMOVIDO: const { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } = Recharts;
+import { ZE_AVATAR, ZE_AVATAR_FALLBACK } from '../services/standards.ts';
+import { ZeModal } from '../components/ZeModal.tsx'; 
 
 /** =========================
  * UI helpers
@@ -55,6 +51,7 @@ const formatCurrency = (value: number | string | undefined): string => {
  *========================= */
 const DashboardSkeleton = () => (
   <div className="max-w-4xl mx-auto pb-28 pt-6 px-4 md:px-0 animate-pulse">
+    {/* Header */}
     <div className="flex justify-between items-end mb-8">
       <div className="space-y-2">
         <div className="h-3 w-32 bg-slate-200 dark:bg-slate-800 rounded-full"></div>
@@ -62,21 +59,55 @@ const DashboardSkeleton = () => (
       </div>
       <div className="h-10 w-40 bg-slate-200 dark:bg-slate-800 rounded-xl"></div>
     </div>
-    <div className="h-24 w-full bg-slate-200 dark:bg-slate-800 rounded-2xl mb-8"></div>
-    <div className="mb-8 h-64 w-full rounded-[1.6rem] bg-slate-100 dark:bg-slate-900"></div>
-    {/* List Skeleton */}
-    <div className="space-y-4">
-      <div className="h-4 w-32 rounded-full bg-slate-200 dark:bg-slate-800 mb-2"></div>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        {[1, 2, 3].map((i) => (
-          <div
-            key={i}
-            className="h-20 rounded-2xl border border-slate-200 bg-white shadow-[0_12px_30px_-24px_rgba(15,23,42,0.40)] ring-1 ring-black/5 dark:border-slate-800 dark:bg-slate-900 dark:shadow-none dark:ring-0"
-          >
-            <div className="h-full w-full rounded-2xl bg-gradient-to-b from-slate-100 to-slate-200 dark:from-slate-800 to-slate-900"></div>
+    
+    {/* Ze Tip Skeleton */}
+    <div className={cx(surface, "rounded-3xl p-4 md:p-5 flex items-start gap-4 mb-6")}>
+      <div className="w-12 h-12 rounded-full bg-slate-200 dark:bg-slate-700 shrink-0"></div>
+      <div className="flex-1 space-y-2">
+        <div className="h-4 w-3/4 bg-slate-200 dark:bg-slate-700 rounded-full"></div>
+        <div className="h-4 w-1/2 bg-slate-200 dark:bg-slate-700 rounded-full"></div>
+      </div>
+    </div>
+
+    {/* Work Selector & Actions */}
+    <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-8">
+      <div className="h-12 w-full md:w-1/2 bg-slate-200 dark:bg-slate-800 rounded-xl"></div>
+      <div className="flex gap-4 w-full md:w-auto">
+        <div className="h-12 w-1/2 md:w-32 bg-slate-200 dark:bg-slate-800 rounded-xl"></div>
+        <div className="h-12 w-1/2 md:w-12 bg-slate-200 dark:bg-slate-800 rounded-xl"></div>
+      </div>
+    </div>
+
+    {/* Daily Summary Skeleton */}
+    <div className={cx(surface, "rounded-3xl p-6 mb-8")}>
+      <div className="h-6 w-1/3 bg-slate-200 dark:bg-slate-800 rounded-lg mb-4"></div>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {[1, 2, 3, 4].map((i) => (
+          <div key={i} className="h-20 bg-slate-100 dark:bg-slate-800 rounded-2xl p-3">
+            <div className="h-4 w-8 bg-slate-200 dark:bg-slate-700 rounded-full mb-2"></div>
+            <div className="h-3 w-16 bg-slate-200 dark:bg-slate-700 rounded-full"></div>
           </div>
         ))}
       </div>
+    </div>
+    
+    {/* Progress Bar Skeleton */}
+    <div className={cx(surface, "rounded-3xl p-6 mb-8")}>
+      <div className="h-6 w-1/4 bg-slate-200 dark:bg-slate-800 rounded-lg mb-4"></div>
+      <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-3 mb-2"></div>
+      <div className="flex justify-between text-xs text-slate-400">
+        <div className="h-3 w-1/5 bg-slate-200 dark:bg-slate-700 rounded-full"></div>
+        <div className="h-3 w-1/5 bg-slate-200 dark:bg-slate-700 rounded-full"></div>
+        <div className="h-3 w-1/5 bg-slate-200 dark:bg-slate-700 rounded-full"></div>
+        <div className="h-3 w-1/5 bg-slate-200 dark:bg-slate-700 rounded-full"></div>
+      </div>
+    </div>
+
+    {/* Budget Overview Skeleton */}
+    <div className={cx(surface, "rounded-3xl p-6")}>
+      <div className="h-6 w-1/4 bg-slate-200 dark:bg-slate-800 rounded-lg mb-4"></div>
+      <div className="h-4 w-full bg-slate-200 dark:bg-slate-700 rounded-full mb-2"></div>
+      <div className="h-4 w-2/3 bg-slate-200 dark:bg-slate-700 rounded-full"></div>
     </div>
   </div>
 );
@@ -85,7 +116,7 @@ const DashboardSkeleton = () => (
  * Sub-Componentes
  * ========================= */
 
-// NEW: Segmented Progress Bar Component
+// NEW: Segmented Progress Bar Component (used for Work Detail)
 const SegmentedProgressBar = ({ steps }: { steps: Step[] }) => {
   if (!steps || steps.length === 0) {
     return (
@@ -100,19 +131,15 @@ const SegmentedProgressBar = ({ steps }: { steps: Step[] }) => {
 
   const completed = steps.filter(s => s.status === StepStatus.COMPLETED);
   const inProgress = steps.filter(s => s.status === StepStatus.IN_PROGRESS);
-  // Fix: Renamed 'notStarted' to 'initialNotStartedSteps' to avoid redeclaration issues.
-  const initialNotStartedSteps = steps.filter(s => s.status === StepStatus.NOT_STARTED); 
-  const delayed = steps.filter(s => s.status !== StepStatus.COMPLETED && new Date(s.endDate).getTime() < new Date(today).getTime()); // Ensure proper date comparison
+  const notStarted = steps.filter(s => s.status === StepStatus.NOT_STARTED); 
+  const delayed = steps.filter(s => s.status !== StepStatus.COMPLETED && new Date(s.endDate).getTime() < new Date(today).getTime());
 
-  // Remove delayed steps from inProgress and initialNotStartedSteps to avoid double counting for accurate segment widths
-  const actualInProgress = inProgress.filter(s => !delayed.some(d => d.id === s.id));
-  // Fix: Updated usage of the renamed variable 'initialNotStartedSteps'.
-  const actualNotStarted = initialNotStartedSteps.filter(s => !delayed.some(d => d.id === s.id));
-
+  // Calculate percentages, ensuring no negative or over 100%
   const completedPct = (completed.length / totalSteps) * 100;
-  const inProgressPct = (actualInProgress.length / totalSteps) * 100;
   const delayedPct = (delayed.length / totalSteps) * 100;
-  const notStartedPct = (actualNotStarted.length / totalSteps) * 100; // Initialize notStartedPct
+  const inProgressPct = (inProgress.length / totalSteps) * 100;
+  const notStartedPct = (notStarted.length / totalSteps) * 100;
+
 
   return (
     <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-3 mb-2 flex overflow-hidden">
@@ -128,10 +155,10 @@ const SegmentedProgressBar = ({ steps }: { steps: Step[] }) => {
       {/* In Progress segment */}
       {inProgressPct > 0 && (
         <div 
-          className="h-full bg-amber-500" // Cor Laranja para Parcial/Em Andamento
+          className="h-full bg-amber-500"
           style={{ width: `${inProgressPct}%` }} 
-          title={`${actualInProgress.length} Em Andamento`}
-          aria-label={`${actualInProgress.length} etapas em andamento`}
+          title={`${inProgress.length} Em Andamento`}
+          aria-label={`${inProgress.length} etapas em andamento`}
         ></div>
       )}
       {/* Delayed segment */}
@@ -146,229 +173,204 @@ const SegmentedProgressBar = ({ steps }: { steps: Step[] }) => {
       {/* Not Started segment */}
       {notStartedPct > 0 && (
         <div 
-          className="h-full bg-slate-400 dark:bg-slate-600" // Cor Cinza para Pendente
+          className="h-full bg-slate-400 dark:bg-slate-600"
           style={{ width: `${notStartedPct}%` }} 
-          title={`${actualNotStarted.length} Pendente(s)`}
-          aria-label={`${actualNotStarted.length} etapas pendentes`}
+          title={`${notStarted.length} Pendente(s)`}
+          aria-label={`${notStarted.length} etapas pendentes`}
         ></div>
-      )}
-    </div>
-  );
-}; // End of SegmentedProgressBar
-
-
-const WorkCard = ({ work, userId, onDeleteSuccess }: { work: Work; userId: string; onDeleteSuccess: () => void }) => {
-  const navigate = ReactRouter.useNavigate();
-  const [stats, setStats] = useState({ totalSpent: 0, progress: 0, delayedSteps: 0 });
-  const [steps, setSteps] = useState<Step[]>([]); // State for steps specific to this work
-  const [loadingStats, setLoadingStats] = useState(true);
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [deleteError, setDeleteError] = useState('');
-
-  useEffect(() => {
-    let isMounted = true;
-    const fetchWorkData = async () => {
-      setLoadingStats(true);
-      try {
-        const [fetchedStats, fetchedSteps] = await Promise.all([
-          dbService.calculateWorkStats(work.id),
-          dbService.getSteps(work.id), // Fetch steps for the progress bar
-        ]);
-        if (isMounted) {
-          setStats(fetchedStats);
-          setSteps(fetchedSteps);
-        }
-      } catch (error) {
-        console.error(`Erro ao buscar estatísticas ou etapas para a obra ${work.name}:`, error);
-      } finally {
-        if (isMounted) {
-          setLoadingStats(false);
-        }
-      }
-    };
-    fetchWorkData();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [work.id, work.name]);
-
-
-  const handleDeleteWork = async () => {
-    setIsDeleting(true);
-    setDeleteError('');
-    try {
-      await dbService.deleteWork(work.id);
-      onDeleteSuccess(); // Notify parent to refresh list
-      setShowDeleteModal(false);
-    } catch (error: any) {
-      console.error("Erro ao excluir obra:", error);
-      setDeleteError(error.message);
-    } finally {
-      setIsDeleting(false);
-    }
-  };
-
-  return (
-    <div
-      onClick={() => navigate(`/work/${work.id}`)}
-      className={cx(surface, card, "flex flex-col cursor-pointer transition-all hover:scale-[1.01] hover:border-secondary/50")}
-      aria-label={`Ver detalhes da obra ${work.name}`}
-    >
-      <div className="flex items-start justify-between mb-3">
-        <h3 className="text-xl font-black text-primary dark:text-white leading-tight">{work.name}</h3>
-        <button
-          onClick={(e) => {
-            e.stopPropagation(); // Prevent card click from navigating
-            setShowDeleteModal(true);
-          }}
-          className="text-slate-400 hover:text-red-500 transition-colors p-2 -mr-2"
-          aria-label={`Excluir obra ${work.name}`}
-        >
-          <i className="fa-solid fa-trash-alt text-lg"></i>
-        </button>
-      </div>
-      <p className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-2">{work.address}</p>
-
-      {loadingStats ? (
-        <div className="h-3 w-full bg-slate-200 dark:bg-slate-700 rounded-full my-1 animate-pulse"></div>
-      ) : (
-        <SegmentedProgressBar steps={steps} />
-      )}
-
-      <div className="flex items-center justify-between text-sm mt-3">
-        {loadingStats ? (
-          <div className="h-4 w-24 bg-slate-200 dark:bg-slate-700 rounded-full"></div>
-        ) : (
-          <span className="font-bold text-primary dark:text-white">{stats.progress.toFixed(0)}% Concluído</span>
-        )}
-        {loadingStats ? (
-          <div className="h-4 w-24 bg-slate-200 dark:bg-slate-700 rounded-full"></div>
-        ) : (
-          <span className={cx("font-medium", stats.totalSpent > (work.budgetPlanned || 0) ? "text-red-500" : "text-green-600 dark:text-green-400")}>
-            {formatCurrency(stats.totalSpent)}
-          </span>
-        )}
-      </div>
-
-      {showDeleteModal && (
-        <ZeModal
-          isOpen={showDeleteModal}
-          title="Confirmar Exclusão"
-          message={`Tem certeza que deseja excluir a obra "${work.name}"? Esta ação é irreversível e removerá todos os dados associados.`}
-          confirmText="Sim, Excluir Obra"
-          onConfirm={handleDeleteWork}
-          onCancel={() => setShowDeleteModal(false)}
-          type="DANGER"
-          isConfirming={isDeleting}
-        >
-          {deleteError && (
-            <div className="mt-4 p-3 bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-700 text-red-700 dark:text-red-300 rounded-xl text-sm">
-              <i className="fa-solid fa-triangle-exclamation mr-2"></i> {deleteError}
-            </div>
-          )}
-        </ZeModal>
       )}
     </div>
   );
 };
 
-
 const Dashboard = () => {
-  const { user, authLoading, isUserAuthFinished, refreshUser, isSubscriptionValid, trialDaysRemaining, unreadNotificationsCount, refreshNotifications, requestPushNotificationPermission, pushSubscriptionStatus } = useAuth(); // NEW: pushSubscriptionStatus
+  const { user, authLoading, isUserAuthFinished, isSubscriptionValid, unreadNotificationsCount, requestPushNotificationPermission, pushSubscriptionStatus } = useAuth();
   const navigate = ReactRouter.useNavigate();
-  const [works, setWorks] = useState<Work[]>([]);
-  const [loadingWorks, setLoadingWorks] = useState(true);
-  const [dailySummary, setDailySummary] = useState<{ completedSteps: number; delayedSteps: number; pendingMaterials: number; totalSteps: number } | null>(null);
-  const [loadingSummary, setLoadingSummary] = useState(true);
-  // REMOVED: zeTip state as the card is removed.
+  
+  // All works available to the user
+  const [allWorks, setAllWorks] = useState<Work[]>([]);
+  // The currently selected work for display
+  const [selectedWork, setSelectedWork] = useState<Work | null>(null);
+  // Data for the selected work's dashboard summary
+  const [workSummary, setWorkSummary] = useState<{
+    totalSteps: number;
+    completedSteps: number;
+    inProgressSteps: number;
+    delayedSteps: number;
+    pendingMaterials: number;
+    totalSpent: number;
+    budgetPlanned: number;
+  } | null>(null);
+  const [selectedWorkSteps, setSelectedWorkSteps] = useState<Step[]>([]); // For progress bar
+  
+  const [loadingDashboard, setLoadingDashboard] = useState(true);
+  const [isDeletingWork, setIsDeletingWork] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
-  // Debugging user and auth status
-  useEffect(() => {
-    console.log("[Dashboard] Rendered. User:", user?.email, "AuthLoading:", authLoading, "isUserAuthFinished:", isUserAuthFinished);
-  }, [user, authLoading, isUserAuthFinished]);
+  // Ref to track notification count changes for data refresh
+  const notificationCountRef = useRef(unreadNotificationsCount);
 
+  // =======================================================================
+  // DATA LOADING
+  // =======================================================================
 
-  const loadWorksData = useCallback(async () => {
+  const loadAllWorks = useCallback(async () => {
     if (!user?.id || !isUserAuthFinished || authLoading) {
-      setLoadingWorks(false);
-      setLoadingSummary(false);
+      setLoadingDashboard(false);
       return;
     }
 
-    setLoadingWorks(true);
-    setLoadingSummary(true);
+    setLoadingDashboard(true);
     try {
       const fetchedWorks = await dbService.getWorks(user.id);
-      setWorks(fetchedWorks);
+      setAllWorks(fetchedWorks);
 
-      const summaries = await Promise.all(
-        fetchedWorks.map(async work => { // Made inner map async
-          const steps = await dbService.getSteps(work.id);
-          const materials = await dbService.getMaterials(work.id);
-          const today = new Date().toISOString().split('T')[0];
-
-          const totalSteps = steps.length;
-          const completedSteps = steps.filter(s => s.status === StepStatus.COMPLETED).length;
-          const delayedSteps = steps.filter(s => (s.status === StepStatus.NOT_STARTED || s.status === StepStatus.IN_PROGRESS) && new Date(s.endDate).getTime() < new Date(today).getTime()).length;
-          const pendingMaterials = materials.filter(m => m.purchasedQty < m.plannedQty).length;
-
-          return {
-            totalSteps,
-            completedSteps,
-            delayedSteps,
-            pendingMaterials,
-          };
-        })
-      );
-
-      const combinedSummary = summaries.reduce(
-        (acc, curr) => ({
-          completedSteps: acc.completedSteps + curr.completedSteps,
-          delayedSteps: acc.delayedSteps + curr.delayedSteps,
-          pendingMaterials: acc.pendingMaterials + curr.pendingMaterials,
-          totalSteps: acc.totalSteps + curr.totalSteps,
-        }),
-        { completedSteps: 0, delayedSteps: 0, pendingMaterials: 0, totalSteps: 0 }
-      );
-      setDailySummary(combinedSummary);
-      setLoadingSummary(false);
-      setLoadingWorks(false);
+      if (fetchedWorks.length > 0) {
+        // If a work was previously selected (e.g., from local storage or URL), try to maintain it
+        const lastSelectedWorkId = localStorage.getItem('lastSelectedWorkId');
+        const defaultWork = fetchedWorks.find(w => w.id === lastSelectedWorkId) || fetchedWorks[0];
+        
+        setSelectedWork(defaultWork);
+        await loadSelectedWorkData(defaultWork.id);
+      } else {
+        setSelectedWork(null);
+        setWorkSummary(null);
+        setSelectedWorkSteps([]);
+      }
       
       // Request push notification permission after data loads
-      if (pushSubscriptionStatus === 'idle' && isSubscriptionValid) { // Only prompt if subscription is valid
+      if (pushSubscriptionStatus === 'idle' && isSubscriptionValid) {
         requestPushNotificationPermission();
       }
+
     } catch (error) {
-      console.error("Erro ao carregar dados do dashboard:", error);
-      setWorks([]);
-      setDailySummary({ completedSteps: 0, delayedSteps: 0, pendingMaterials: 0, totalSteps: 0 });
-      setLoadingWorks(false);
-      setLoadingSummary(false);
+      console.error("Erro ao carregar todas as obras:", error);
+      setAllWorks([]);
+      setSelectedWork(null);
+      setWorkSummary(null);
+      setSelectedWorkSteps([]);
+    } finally {
+      setLoadingDashboard(false);
     }
   }, [user, isUserAuthFinished, authLoading, isSubscriptionValid, pushSubscriptionStatus, requestPushNotificationPermission]);
 
+  const loadSelectedWorkData = useCallback(async (workId: string) => {
+    setLoadingDashboard(true);
+    try {
+      const [fetchedSteps, fetchedMaterials, fetchedExpenses, fetchedWork] = await Promise.all([
+        dbService.getSteps(workId),
+        dbService.getMaterials(workId),
+        dbService.getExpenses(workId),
+        dbService.getWorkById(workId) // Fetch full work details
+      ]);
+
+      if (fetchedWork) {
+          setSelectedWork(fetchedWork);
+          localStorage.setItem('lastSelectedWorkId', fetchedWork.id); // Save last selected work
+      } else {
+          // Should not happen if workId came from loadAllWorks, but for safety
+          return;
+      }
+
+      const today = new Date().toISOString().split('T')[0];
+
+      const totalSteps = fetchedSteps.length;
+      const completedSteps = fetchedSteps.filter(s => s.status === StepStatus.COMPLETED).length;
+      // Define `delayedStepsArray` before using it in `inProgressSteps` filter
+      const delayedStepsArray = fetchedSteps.filter(s => (s.status === StepStatus.NOT_STARTED || s.status === StepStatus.IN_PROGRESS) && new Date(s.endDate).getTime() < new Date(today).getTime());
+      const delayedStepsCount = delayedStepsArray.length;
+      
+      // Calculate in progress steps by subtracting completed and delayed from total.
+      // This assumes a step is either not started, in progress, completed, or delayed.
+      const inProgressSteps = fetchedSteps.filter(s => 
+        s.status === StepStatus.IN_PROGRESS && !delayedStepsArray.some(d => d.id === s.id) // Use delayedStepsArray
+      ).length;
+
+      const pendingMaterials = fetchedMaterials.filter(m => m.purchasedQty < m.plannedQty).length;
+      const totalSpent = fetchedExpenses.reduce((sum, expense) => sum + expense.amount, 0);
+
+      setWorkSummary({
+        totalSteps,
+        completedSteps,
+        inProgressSteps,
+        delayedSteps: delayedStepsCount, // Use the count here
+        pendingMaterials,
+        totalSpent,
+        budgetPlanned: fetchedWork.budgetPlanned
+      });
+      setSelectedWorkSteps(fetchedSteps);
+
+    } catch (error) {
+      console.error(`Erro ao carregar dados da obra ${workId}:`, error);
+      setWorkSummary(null);
+      setSelectedWorkSteps([]);
+    } finally {
+      setLoadingDashboard(false);
+    }
+  }, []); // No dependencies for memoization, as workId is passed as argument
 
   useEffect(() => {
-    loadWorksData();
-  }, [loadWorksData]); // Recarrega dados ao mudar user ou após finalização de auth
-
-  // REMOVED: Zé da Obra Tip useEffect as the card is removed.
+    loadAllWorks();
+  }, [loadAllWorks]);
 
   // Refresh data when notifications are dismissed (as notification status can affect dashboard metrics)
-  const notificationCountRef = useRef(unreadNotificationsCount);
   useEffect(() => {
       if (unreadNotificationsCount !== notificationCountRef.current) {
           notificationCountRef.current = unreadNotificationsCount;
-          loadWorksData();
+          if (selectedWork) {
+            loadSelectedWorkData(selectedWork.id);
+          } else {
+            loadAllWorks(); // If no work selected, refresh overall work list
+          }
       }
-  }, [unreadNotificationsCount, loadWorksData]);
+  }, [unreadNotificationsCount, selectedWork, loadSelectedWorkData, loadAllWorks]);
 
+  // =======================================================================
+  // HANDLERS
+  // =======================================================================
+
+  const handleWorkSelectChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const workId = e.target.value;
+    const work = allWorks.find(w => w.id === workId);
+    if (work) {
+      setSelectedWork(work);
+      await loadSelectedWorkData(work.id);
+    }
+  };
+
+  const handleDeleteSelectedWork = async () => {
+    if (!selectedWork) return;
+
+    setIsDeletingWork(true);
+    setDeleteError('');
+    try {
+      await dbService.deleteWork(selectedWork.id);
+      setShowDeleteModal(false);
+      
+      // After deletion, reload all works to update the list and re-select if possible
+      await loadAllWorks(); 
+
+      // If no works remain, clear selected work; otherwise, the new loadAllWorks will set default
+      if (allWorks.length === 0) {
+        setSelectedWork(null);
+        setWorkSummary(null);
+        localStorage.removeItem('lastSelectedWorkId');
+      }
+    } catch (error: any) {
+      console.error("Erro ao excluir obra:", error);
+      setDeleteError(error.message);
+    } finally {
+      setIsDeletingWork(false);
+    }
+  };
+
+  // =======================================================================
+  // RENDERING
+  // =======================================================================
 
   // Show skeleton while initial authentication or data fetching is in progress.
-  // CRITICAL FIX: Ensure `isUserAuthFinished` is true before proceeding past initial loading.
-  if (!isUserAuthFinished || authLoading || loadingWorks || loadingSummary) {
+  if (!isUserAuthFinished || authLoading || loadingDashboard) {
     return <DashboardSkeleton />;
   }
 
@@ -378,7 +380,56 @@ const Dashboard = () => {
     return <ReactRouter.Navigate to="/login" replace />;
   }
 
-  // --- COMPONENT RENDERING ---
+  // No Works State
+  if (allWorks.length === 0) {
+    return (
+      <div className="max-w-4xl mx-auto pb-28 pt-6 px-4 md:px-0 font-sans">
+        {/* Header */}
+        <div className="flex justify-between items-end mb-8">
+          <div>
+            <p className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Bem-vindo(a) de volta</p>
+            <h1 className="text-3xl font-black text-primary dark:text-white">{user.name.split(' ')[0]}!</h1>
+          </div>
+          <button onClick={() => navigate('/create')} className="px-4 py-2 bg-secondary text-white text-sm font-bold rounded-xl hover:bg-secondary-dark transition-colors flex items-center gap-2" aria-label="Criar nova obra">
+            <i className="fa-solid fa-plus-circle"></i> Nova Obra
+          </button>
+        </div>
+
+        {/* Static Ze Tip */}
+        <div className={cx(surface, "rounded-3xl p-4 md:p-5 flex items-start gap-4 mb-6 transition-all duration-300 transform animate-in fade-in slide-in-from-top-4")} role="status">
+            <div className="w-12 h-12 rounded-full p-1 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-800 shadow-lg shrink-0">
+                <img 
+                src={ZE_AVATAR} 
+                alt="Zé da Obra" 
+                className="w-full h-full object-cover rounded-full border-2 border-white dark:border-slate-800"
+                onError={(e) => { 
+                    const target = e.currentTarget;
+                    if (target.src !== ZE_AVATAR_FALLBACK) {
+                        target.src = ZE_AVATAR_FALLBACK;
+                    }
+                }}
+                />
+            </div>
+            <div className="flex-1">
+                <p className="text-sm font-black uppercase tracking-widest mb-1 text-secondary">Dica do Zé!</p>
+                <p className="text-primary dark:text-white font-bold text-base leading-tight">
+                  Sua obra começa aqui! Clique em "Nova Obra" para começar a planejar seu projeto e ter tudo na palma da sua mão.
+                </p>
+            </div>
+        </div>
+
+        {/* No works card */}
+        <div className="bg-white dark:bg-slate-900 rounded-3xl p-8 text-center shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800">
+          <p className="text-slate-500 dark:text-slate-400 text-lg mb-4">Nenhuma obra cadastrada ainda.</p>
+          <button onClick={() => navigate('/create')} className="px-6 py-3 bg-secondary text-white font-bold rounded-xl hover:bg-secondary-dark transition-colors" aria-label="Criar sua primeira obra">
+            Criar sua primeira obra
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Main Dashboard Content
   return (
     <div className="max-w-4xl mx-auto pb-28 pt-6 px-4 md:px-0 font-sans">
       {/* Header */}
@@ -392,52 +443,146 @@ const Dashboard = () => {
         </button>
       </div>
 
-      {/* REMOVED: Zé da Obra Tip Card */}
-
-      {/* Daily Summary Card */}
-      {dailySummary && (
-        <div className={cx(surface, "rounded-3xl p-6 mb-8")} aria-labelledby="summary-title">
-          <h2 id="summary-title" className="text-xl font-black text-primary dark:text-white mb-4">Resumo Diário</h2>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            <div className="bg-slate-50 dark:bg-slate-800 rounded-2xl p-3 flex flex-col items-start border border-slate-100 dark:border-slate-700 shadow-inner">
-              <i className="fa-solid fa-list-check text-xl text-green-500 mb-1"></i>
-              <p className="text-lg font-black text-green-600 leading-none">{dailySummary.completedSteps}</p>
-              <p className="text-[9px] font-extrabold tracking-widest uppercase text-slate-500">Concluídas</p>
+      {/* Static Ze Tip */}
+      <div className={cx(surface, "rounded-3xl p-4 md:p-5 flex items-start gap-4 mb-6 transition-all duration-300 transform animate-in fade-in slide-in-from-top-4")} role="status">
+            <div className="w-12 h-12 rounded-full p-1 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-800 shadow-lg shrink-0">
+                <img 
+                src={ZE_AVATAR} 
+                alt="Zé da Obra" 
+                className="w-full h-full object-cover rounded-full border-2 border-white dark:border-slate-800"
+                onError={(e) => { 
+                    const target = e.currentTarget;
+                    if (target.src !== ZE_AVATAR_FALLBACK) {
+                        target.src = ZE_AVATAR_FALLBACK;
+                    }
+                }}
+                />
             </div>
-            <div className="bg-slate-50 dark:bg-slate-800 rounded-2xl p-3 flex flex-col items-start border border-slate-100 dark:border-slate-700 shadow-inner">
-              <i className="fa-solid fa-hourglass-half text-xl text-amber-500 mb-1"></i>
-              <p className="text-lg font-black text-amber-600 leading-none">{dailySummary.totalSteps - dailySummary.completedSteps - dailySummary.delayedSteps}</p> {/* NEW: calculate in-progress better for dashboard summary */}
-              <p className="text-[9px] font-extrabold tracking-widest uppercase text-slate-500">Em Andamento</p>
+            <div className="flex-1">
+                <p className="text-sm font-black uppercase tracking-widest mb-1 text-secondary">Dica do Zé!</p>
+                <p className="text-primary dark:text-white font-bold text-base leading-tight">
+                  Mantenha sempre o olho no cronograma e no orçamento! Uma boa gestão evita surpresas e prejuízos na obra.
+                </p>
             </div>
-            <div className="bg-slate-50 dark:bg-slate-800 rounded-2xl p-3 flex flex-col items-start border border-slate-100 dark:border-slate-700 shadow-inner">
-              <i className="fa-solid fa-triangle-exclamation text-xl text-red-500 mb-1"></i>
-              <p className="text-lg font-black text-red-600 leading-none">{dailySummary.delayedSteps}</p>
-              <p className="text-[9px] font-extrabold tracking-widest uppercase text-slate-500">Atrasadas</p>
-            </div>
-            <div className="bg-slate-50 dark:bg-slate-800 rounded-2xl p-3 flex flex-col items-start border border-slate-100 dark:border-slate-700 shadow-inner">
-              <i className="fa-solid fa-boxes-stacked text-xl text-secondary mb-1"></i>
-              <p className="text-lg font-black text-secondary leading-none">{dailySummary.pendingMaterials}</p>
-              <p className="text-[9px] font-extrabold tracking-widest uppercase text-slate-500">Material Pendente</p>
-            </div>
-          </div>
         </div>
-      )}
 
-      {/* Your Works List */}
-      <h2 className="text-xl font-black text-primary dark:text-white mb-4">Suas Obras</h2>
-      {works.length === 0 ? (
-        <div className="bg-white dark:bg-slate-900 rounded-3xl p-8 text-center shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800">
-          <p className="text-slate-500 dark:text-slate-400 text-lg mb-4">Nenhuma obra cadastrada ainda.</p>
-          <button onClick={() => navigate('/create')} className="px-6 py-3 bg-secondary text-white font-bold rounded-xl hover:bg-secondary-dark transition-colors" aria-label="Criar sua primeira obra">
-            Criar sua primeira obra
+      {/* Work Selector & Actions */}
+      <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-8">
+        {allWorks.length > 1 && (
+          <label htmlFor="work-select" className="sr-only">Selecionar Obra</label>
+        )}
+        <select
+          id="work-select"
+          value={selectedWork?.id || ''}
+          onChange={handleWorkSelectChange}
+          className="w-full md:w-auto flex-1 px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-primary dark:text-white focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
+          aria-label="Selecionar obra para visualizar dashboard"
+        >
+          {allWorks.map((workOption) => (
+            <option key={workOption.id} value={workOption.id}>{workOption.name}</option>
+          ))}
+        </select>
+        <div className="flex gap-3 w-full md:w-auto">
+          <button 
+            onClick={() => selectedWork && navigate(`/work/${selectedWork.id}`)} 
+            disabled={!selectedWork}
+            className="flex-1 md:flex-none px-6 py-3 bg-primary text-white font-bold rounded-xl hover:bg-primary-light transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+            aria-label={`Acessar obra ${selectedWork?.name || ''}`}
+          >
+            <i className="fa-solid fa-arrow-right"></i> Acessar Obra
+          </button>
+          <button
+            onClick={() => setShowDeleteModal(true)}
+            disabled={!selectedWork}
+            className="flex-none w-12 h-12 bg-red-500 text-white rounded-xl flex items-center justify-center hover:bg-red-600 transition-colors disabled:opacity-50"
+            aria-label={`Excluir obra ${selectedWork?.name || ''}`}
+          >
+            <i className="fa-solid fa-trash-alt text-lg"></i>
           </button>
         </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {works.map((work) => (
-            <WorkCard key={work.id} work={work} userId={user.id} onDeleteSuccess={loadWorksData} />
-          ))}
-        </div>
+      </div>
+
+      {selectedWork && workSummary && (
+        <>
+          {/* Daily Summary Card */}
+          <div className={cx(surface, "rounded-3xl p-6 mb-8")} aria-labelledby="summary-title">
+            <h2 id="summary-title" className="text-xl font-black text-primary dark:text-white mb-4">Resumo da Obra</h2>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+              <div className="bg-slate-50 dark:bg-slate-800 rounded-2xl p-3 flex flex-col items-start border border-slate-100 dark:border-slate-700 shadow-inner">
+                <i className="fa-solid fa-list-check text-xl text-green-500 mb-1"></i>
+                <p className="text-lg font-black text-green-600 leading-none">{workSummary.completedSteps}</p>
+                <p className="text-[9px] font-extrabold tracking-widest uppercase text-slate-500">Etapas Concluídas</p>
+              </div>
+              <div className="bg-slate-50 dark:bg-slate-800 rounded-2xl p-3 flex flex-col items-start border border-slate-100 dark:border-slate-700 shadow-inner">
+                <i className="fa-solid fa-hourglass-half text-xl text-amber-500 mb-1"></i>
+                <p className="text-lg font-black text-amber-600 leading-none">{workSummary.inProgressSteps}</p>
+                <p className="text-[9px] font-extrabold tracking-widest uppercase text-slate-500">Etapas Em Andamento</p>
+              </div>
+              <div className="bg-slate-50 dark:bg-slate-800 rounded-2xl p-3 flex flex-col items-start border border-slate-100 dark:border-slate-700 shadow-inner">
+                <i className="fa-solid fa-triangle-exclamation text-xl text-red-500 mb-1"></i>
+                <p className="text-lg font-black text-red-600 leading-none">{workSummary.delayedSteps}</p>
+                <p className="text-[9px] font-extrabold tracking-widest uppercase text-slate-500">Etapas Atrasadas</p>
+              </div>
+              <div className="bg-slate-50 dark:bg-slate-800 rounded-2xl p-3 flex flex-col items-start border border-slate-100 dark:border-slate-700 shadow-inner">
+                <i className="fa-solid fa-boxes-stacked text-xl text-secondary mb-1"></i>
+                <p className="text-lg font-black text-secondary leading-none">{workSummary.pendingMaterials}</p>
+                <p className="text-[9px] font-extrabold tracking-widest uppercase text-slate-500">Materiais Pendentes</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Cronograma Overview */}
+          <div className={cx(surface, "rounded-3xl p-6 mb-8")}>
+            <h2 className="text-xl font-black text-primary dark:text-white mb-4">Progresso do Cronograma</h2>
+            <SegmentedProgressBar steps={selectedWorkSteps} />
+            <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400 font-medium">
+              <span>Pendente</span>
+              <span>Em Andamento</span>
+              <span>Atrasada</span>
+              <span>Concluída</span>
+            </div>
+          </div>
+
+          {/* Financeiro Overview */}
+          <div className={cx(surface, "rounded-3xl p-6")}>
+            <h2 className="text-xl font-black text-primary dark:text-white mb-4">Orçamento</h2>
+            <div className="flex items-center justify-between text-lg font-bold mb-2">
+              <span className="text-slate-700 dark:text-slate-300">Planejado:</span>
+              <span className="text-primary dark:text-white">{formatCurrency(workSummary.budgetPlanned)}</span>
+            </div>
+            <div className="flex items-center justify-between text-lg font-bold">
+              <span className="text-slate-700 dark:text-slate-300">Gasto Total:</span>
+              <span className={workSummary.totalSpent > workSummary.budgetPlanned ? 'text-red-500' : 'text-green-600 dark:text-green-400'}>
+                {formatCurrency(workSummary.totalSpent)}
+              </span>
+            </div>
+            <div className="flex items-center justify-between text-xl font-black pt-4 border-t border-slate-200 dark:border-slate-800 mt-4">
+              <span className="text-primary dark:text-white">Balanço:</span>
+              <span className={workSummary.totalSpent > workSummary.budgetPlanned ? 'text-red-500' : 'text-green-600 dark:text-green-400'}>
+                {formatCurrency(workSummary.budgetPlanned - workSummary.totalSpent)}
+              </span>
+            </div>
+          </div>
+        </>
+      )}
+
+      {showDeleteModal && selectedWork && (
+        <ZeModal
+          isOpen={showDeleteModal}
+          title="Confirmar Exclusão"
+          message={`Tem certeza que deseja excluir a obra "${selectedWork.name}"? Esta ação é irreversível e removerá todos os dados associados.`}
+          confirmText="Sim, Excluir Obra"
+          onConfirm={handleDeleteSelectedWork}
+          onCancel={() => setShowDeleteModal(false)}
+          type="DANGER"
+          isConfirming={isDeletingWork}
+        >
+          {deleteError && (
+            <div className="mt-4 p-3 bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-700 text-red-700 dark:text-red-300 rounded-xl text-sm">
+              <i className="fa-solid fa-triangle-exclamation mr-2"></i> {deleteError}
+            </div>
+          )}
+        </ZeModal>
       )}
     </div>
   );
