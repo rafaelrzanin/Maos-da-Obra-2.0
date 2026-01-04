@@ -732,7 +732,6 @@ const WorkDetail = () => {
     }
 
     try {
-      // Fix: Removed 'isDelayed: false' as it's handled by dbService.addStep internally.
       const newStep = await dbService.addStep({
         workId, name: newStepName, startDate: newStepStartDate, endDate: newStepEndDate, status: StepStatus.NOT_STARTED
       });
@@ -846,9 +845,8 @@ const WorkDetail = () => {
     today.setHours(0,0,0,0);
     const isDelayed = (step.status === StepStatus.NOT_STARTED || step.status === StepStatus.IN_PROGRESS) && new Date(step.endDate) < today;
 
+    // Se atrasada ou já concluída, o botão é inativo.
     if (isDelayed || step.status === StepStatus.COMPLETED) {
-        // If delayed or already completed, the button is not clickable (disabled).
-        // This ensures the "Pendente -> Parcial -> Concluído" cycle is respected and not reverted.
         return; 
     }
 
@@ -857,7 +855,7 @@ const WorkDetail = () => {
         nextStatus = StepStatus.IN_PROGRESS;
     } else if (step.status === StepStatus.IN_PROGRESS) {
         nextStatus = StepStatus.COMPLETED;
-    } else { // Should not happen for a clickable button due to checks above
+    } else { 
         console.warn(`Attempted to toggle status for step ${step.name} with unsupported status: ${step.status}`);
         return;
     }
@@ -1844,57 +1842,55 @@ const WorkDetail = () => {
                     const today = new Date();
                     today.setHours(0,0,0,0); // Normalize to local midnight
                     const isDelayed = (step.status === StepStatus.NOT_STARTED || step.status === StepStatus.IN_PROGRESS) && new Date(step.endDate) < today;
-                    let stepStatusClass = '';
-                    let stepStatusBgClass = '';
-                    let statusText = '';
+                    
+                    let buttonBgClass = '';
+                    let buttonIconClass = '';
+                    let buttonTitle = '';
                     let borderClass = 'border-slate-200 dark:border-slate-800';
                     let shadowClass = 'shadow-card-default';
 
-                    // NEW: Combined status logic
+                    // Determine classes based on status and delay
                     const isCompleted = step.status === StepStatus.COMPLETED;
                     const isInProgress = step.status === StepStatus.IN_PROGRESS;
                     const isNotStarted = step.status === StepStatus.NOT_STARTED;
 
                     if (isDelayed) {
-                      stepStatusClass = 'text-red-600 dark:text-red-400';
-                      stepStatusBgClass = 'bg-red-500/10';
-                      statusText = 'Atrasada';
-                      borderClass = 'border-red-500/50 dark:border-red-700/50';
-                      shadowClass = 'shadow-lg shadow-red-500/20';
+                        buttonBgClass = 'bg-red-500';
+                        buttonIconClass = 'fa-exclamation-triangle';
+                        buttonTitle = 'Etapa Atrasada';
+                        borderClass = 'border-red-500/50 dark:border-red-700/50';
+                        shadowClass = 'shadow-lg shadow-red-500/20';
                     } else if (isCompleted) {
-                      stepStatusClass = 'text-green-600 dark:text-green-400';
-                      stepStatusBgClass = 'bg-green-500/10';
-                      statusText = 'Concluída';
-                      borderClass = 'border-green-500/50 dark:border-green-700/50';
-                      shadowClass = 'shadow-lg shadow-green-500/20';
+                        buttonBgClass = 'bg-green-500';
+                        buttonIconClass = 'fa-check';
+                        buttonTitle = 'Etapa Concluída';
+                        borderClass = 'border-green-500/50 dark:border-green-700/50';
+                        shadowClass = 'shadow-lg shadow-green-500/20';
                     } else if (isInProgress) {
-                      stepStatusClass = 'text-amber-600 dark:text-amber-400';
-                      stepStatusBgClass = 'bg-amber-500/10';
-                      statusText = 'Parcial';
-                      borderClass = 'border-amber-500/50 dark:border-amber-700/50';
-                      shadowClass = 'shadow-lg shadow-amber-500/20';
+                        buttonBgClass = 'bg-amber-500';
+                        buttonIconClass = 'fa-hourglass-half';
+                        buttonTitle = 'Etapa Em Andamento';
+                        borderClass = 'border-amber-500/50 dark:border-amber-700/50';
+                        shadowClass = 'shadow-lg shadow-amber-500/20';
                     } else if (isNotStarted) { // NOT_STARTED (Pendente)
-                      stepStatusClass = 'text-slate-500 dark:text-slate-400';
-                      stepStatusBgClass = 'bg-slate-200 dark:bg-slate-700/50';
-                      statusText = 'Pendente';
-                      // No specific shadow for Pendente, uses default card-default
+                        buttonBgClass = 'bg-slate-400';
+                        buttonIconClass = 'fa-hourglass-start';
+                        buttonTitle = 'Etapa Pendente';
                     } else { // Fallback for any other unexpected status
-                        stepStatusClass = 'text-slate-500 dark:text-slate-400';
-                        stepStatusBgClass = 'bg-slate-200 dark:bg-slate-700/50';
-                        statusText = 'Desconhecido';
+                        buttonBgClass = 'bg-slate-500';
+                        buttonIconClass = 'fa-question';
+                        buttonTitle = 'Status Desconhecido';
                     }
-
-                    // Determine if the current step is being dragged over
-                    const isDragOver = dragOverStepId === step.id && draggedStepId !== step.id;
-                    const dragOverClass = isDragOver ? 'border-dashed border-secondary-darker transform scale-[1.02] bg-slate-50 dark:bg-slate-800' : '';
 
                     // Disable button if delayed OR completed, as per cycle rule
                     const isStatusButtonDisabled = isDelayed || isCompleted;
+                    
+                    const isDragOver = dragOverStepId === step.id && draggedStepId !== step.id;
+                    const dragOverClass = isDragOver ? 'border-dashed border-secondary-darker transform scale-[1.02] bg-slate-50 dark:bg-slate-800' : '';
 
                     return (
                       <div 
                         key={step.id} 
-                        // Drag and Drop attributes
                         draggable
                         onDragStart={(e) => handleDragStart(e, step.id)}
                         onDragOver={(e) => handleDragOver(e, step.id)}
@@ -1908,16 +1904,17 @@ const WorkDetail = () => {
                         aria-label={`Editar etapa ${step.name}`}
                         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') openEditStepModal(step); }}
                       >
-                        <div className="flex items-center justify-between mb-3">
-                            <span className="text-sm font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">Etapa {step.orderIndex}</span> {/* Display orderIndex */}
+                        <div className="flex items-center gap-3 mb-3"> {/* Wrapper for button and status text */}
                             <button 
                                 onClick={(e) => { e.stopPropagation(); handleToggleStepStatus(step); }}
-                                className={cx("text-xs font-bold px-3 py-1 rounded-full transition-all", stepStatusClass, stepStatusBgClass, isStatusButtonDisabled ? 'cursor-not-allowed opacity-70' : 'hover:brightness-90 active:scale-95')}
-                                aria-label={`Alterar status da etapa ${step.name}. Status atual: ${statusText}`}
+                                className={cx("w-8 h-8 rounded-full flex items-center justify-center text-white text-base transition-all", buttonBgClass, isStatusButtonDisabled ? 'cursor-not-allowed opacity-70' : 'hover:brightness-90 active:scale-95')}
+                                aria-label={buttonTitle}
+                                title={buttonTitle}
                                 disabled={isStatusButtonDisabled}
                             >
-                                {statusText}
+                                <i className={`fa-solid ${buttonIconClass}`}></i>
                             </button>
+                            <span className="text-sm font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">Etapa {step.orderIndex}</span>
                         </div>
                         <h3 className="text-xl font-black text-primary dark:text-white leading-tight mb-2">{step.name}</h3>
                         <div className="flex items-center gap-3 text-sm text-slate-600 dark:text-slate-300">
@@ -2571,7 +2568,7 @@ const WorkDetail = () => {
       {/* Add/Edit Material Modal (now also handles purchase) */}
       {showAddMaterialModal && (
         <div className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-primary/80 backdrop-blur-sm animate-in fade-in duration-300">
-          <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-md p-6 shadow-2xl border border-white/20 relative">
+          <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-md p-6 shadow-2xl border border-white/20 relative max-h-[90vh] overflow-y-auto"> {/* ADDED max-h-[90vh] overflow-y-auto */}
             <button onClick={clearMaterialFormAndCloseModal} className="absolute top-4 right-4 text-slate-400 hover:text-primary dark:hover:text-white" aria-label="Fechar modal"><i className="fa-solid fa-xmark text-xl"></i></button>
             <h2 className="text-xl font-black text-primary dark:text-white mb-6">{editMaterialData ? 'Editar Material' : 'Novo Material'}</h2>
             <form onSubmit={editMaterialData ? handleEditMaterial : handleAddMaterial} className="space-y-4">
@@ -2767,7 +2764,6 @@ const WorkDetail = () => {
               </div>
               <div>
                 <label htmlFor="workerNotes" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Anotações</label>
-                {/* Corrected typo: editExpertData -> editWorkerData */}
                 <textarea id="workerNotes" value={editWorkerData ? editWorkerData.notes || '' : newWorkerNotes} onChange={(e) => editWorkerData ? setEditWorkerData({ ...editWorkerData, notes: e.target.value }) : setNewWorkerNotes(e.target.value)}
                   className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all" rows={3} aria-label="Anotações sobre o profissional"></textarea>
               </div>
