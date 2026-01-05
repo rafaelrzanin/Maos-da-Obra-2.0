@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import * as ReactRouter from 'react-router-dom';
 import * as XLSX from 'xlsx';
@@ -801,11 +802,12 @@ const WorkDetail = () => {
 
   const handleAddMaterial = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!workId || !newMaterialName || !newMaterialPlannedQty || !newMaterialUnit) return;
+    if (!workId || !user?.id || !newMaterialName || !newMaterialPlannedQty || !newMaterialUnit) return;
 
     setZeModal(prev => ({ ...prev, isConfirming: true }));
     try {
-      await dbService.addMaterial({
+      // FIX: Pass user.id as the first argument
+      await dbService.addMaterial(user.id, {
         workId,
         name: newMaterialName,
         brand: newMaterialBrand, // NEW: Pass brand
@@ -3051,109 +3053,4 @@ const WorkDetail = () => {
                 id="checklistCategory"
                 type="text"
                 value={isEditing ? editChecklistData.category : newChecklistCategory}
-                onChange={(e) => isEditing ? setEditChecklistData(prev => prev ? { ...prev, category: e.target.value } : null) : setNewChecklistCategory(e.target.value)}
-                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Itens do Checklist</label>
-              {newChecklistItems.map((item, index) => (
-                <div key={index} className="flex items-center gap-2 mb-2">
-                  <input
-                    type="text"
-                    value={item}
-                    onChange={(e) => {
-                      const updatedItems = [...newChecklistItems];
-                      updatedItems[index] = e.target.value;
-                      setNewChecklistItems(updatedItems);
-                    }}
-                    placeholder={`Item ${index + 1}`}
-                    className="flex-1 p-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white text-sm"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const updatedItems = newChecklistItems.filter((_, i) => i !== index);
-                      setNewChecklistItems(updatedItems);
-                    }}
-                    className="text-red-500 hover:text-red-700"
-                    aria-label="Remover item"
-                  >
-                    <i className="fa-solid fa-xmark"></i>
-                  </button>
-                </div>
-              ))}
-              <button
-                type="button"
-                onClick={() => setNewChecklistItems([...newChecklistItems, ''])}
-                className="mt-2 px-3 py-1 bg-primary/10 text-primary dark:text-white text-sm font-bold rounded-xl hover:bg-primary/20 transition-colors"
-              >
-                + Adicionar Item
-              </button>
-            </div>
-          </form>
-        </ZeModal>
-      );
-    }
-    // Generic ZeModal for confirmations/errors
-    if (zeModal.isOpen && zeModal.message) {
-      return <ZeModal {...zeModal} onConfirm={zeModal.onConfirm} />;
-    }
-    return null;
-  };
-
-  return (
-    <div className="max-w-4xl mx-auto pb-28 pt-4 px-4 font-sans">
-      <div className="flex items-center gap-4 mb-6 px-2 sm:px-0">
-        <button
-          onClick={() => navigate('/')}
-          className="text-slate-400 hover:text-primary dark:hover:text-white transition-colors p-2 -ml-2"
-          aria-label="Voltar para o Dashboard"
-        >
-          <i className="fa-solid fa-arrow-left text-xl"></i>
-        </button>
-        <div>
-          <h1 className="text-3xl font-black text-primary dark:text-white mb-1 tracking-tight">Obra: {work.name}</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">{work.address}</p>
-        </div>
-      </div>
-
-      <div className="flex justify-around bg-white dark:bg-slate-900 rounded-2xl p-2 shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800 mb-6">
-        <button
-          onClick={() => goToTab('ETAPAS')}
-          className={`flex-1 py-2 rounded-xl text-sm font-bold transition-colors ${activeTab === 'ETAPAS' ? 'bg-secondary text-white shadow-md' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
-          aria-label="Ver etapas da obra"
-        >
-          Cronograma
-        </button>
-        <button
-          onClick={() => goToTab('MATERIAIS')}
-          className={`flex-1 py-2 rounded-xl text-sm font-bold transition-colors ${activeTab === 'MATERIAIS' ? 'bg-secondary text-white shadow-md' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
-          aria-label="Ver materiais da obra"
-        >
-          Materiais
-        </button>
-        <button
-          onClick={() => goToTab('FINANCEIRO')}
-          className={`flex-1 py-2 rounded-xl text-sm font-bold transition-colors ${activeTab === 'FINANCEIRO' ? 'bg-secondary text-white shadow-md' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
-          aria-label="Ver financeiro da obra"
-        >
-          Financeiro
-        </button>
-        <button
-          onClick={() => goToTab('FERRAMENTAS')}
-          className={`flex-1 py-2 rounded-xl text-sm font-bold transition-colors ${activeTab === 'FERRAMENTAS' ? 'bg-secondary text-white shadow-md' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
-          aria-label="Ver ferramentas de gestão da obra"
-        >
-          Ferramentas
-        </button>
-      </div>
-
-      {renderMainContent()}
-      {renderModal()} {/* Render the modal conditionally */}
-    </div>
-  );
-};
-
-export default WorkDetail;
+                onChange={(e) => isEditing ? setEditChecklistData(prev => prev ? { ...prev

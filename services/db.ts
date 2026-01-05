@@ -85,6 +85,7 @@ const parseStepFromDB = (data: any): Step => ({
 const parseMaterialFromDB = (data: any): Material => ({
     id: data.id,
     workId: data.work_id,
+    userId: data.user_id, // NEW: Parse userId from DB
     name: data.name,
     brand: data.brand,
     plannedQty: Number(data.planned_qty || 0),
@@ -592,7 +593,6 @@ export const dbService = {
     sessionCache = null;
     _dashboardCache.notifications = null; // Plan updates might affect notification logic.
   },
-
   async resetPassword(email: string) {
       // Supabase is guaranteed to be initialized now
       const { error: resetPassError } = await supabase.auth.resetPasswordForEmail(email, { // Renamed error
@@ -699,7 +699,7 @@ export const dbService = {
             console.log(`[ensureMaterialsForWork] No steps to generate materials for work ${work.id}. Skipping generation.`);
         }
     } catch (error: any) {
-        console.error(`[ensureMaterialsForWork ERROR] Failed to ensure materials for work ${work.id}:`, error);
+        console.error(`[ensureMaterialsForWork ERROR] Failed to ensure materials for work ${work.id}:`, error?.message || error);
         throw error;
     }
 },
@@ -790,7 +790,7 @@ export const dbService = {
         if (materialsToInsert.length > 0) {
             const { error: insertMaterialsError } = await supabase.from('materials').insert(materialsToInsert);
             if (insertMaterialsError) {
-                console.error("Erro ao inserir materiais gerados:", insertMaterialsError);
+                console.error("Erro ao inserir materiais gerados:", insertMaterialsError?.message || insertMaterialsError);
                 throw insertMaterialsError;
             }
         }
@@ -801,7 +801,7 @@ export const dbService = {
         console.log(`[REGEN MATERIAL] Materiais para obra ${work.id} regenerados com sucesso.`);
 
     } catch (error: any) {
-        console.error(`[REGEN MATERIAL ERROR] Erro ao regenerar materiais para work ${work.id}:`, error);
+        console.error(`[REGEN MATERIAL ERROR] Erro ao regenerar materiais para work ${work.id}:`, error?.message || error);
         throw error;
     }
   },
@@ -1132,9 +1132,10 @@ export const dbService = {
     return parsed;
   },
 
-  async addMaterial(material: Omit<Material, 'id' | 'totalCost'>): Promise<Material> { // totalCost is initialized by DB, not passed
+  async addMaterial(userId: string, material: Omit<Material, 'id' | 'userId' | 'totalCost'>): Promise<Material> { // totalCost is initialized by DB, not passed
     const dbMaterial = {
       work_id: material.workId,
+      user_id: userId, // 🔥 FIX: Adicionado user_id aqui
       name: material.name,
       brand: material.brand || '', // FIX: Send empty string if undefined for TEXT NOT NULL.
       planned_qty: Math.max(1, material.plannedQty), // CRITICAL FIX: Ensure planned_qty is at least 1
@@ -1231,8 +1232,7 @@ export const dbService = {
 
   // --- EXPENSES (FINANCEIRO) ---
   async getExpenses(workId: string): Promise<Expense[]> {
-    // Corrected `Date.Now()` to `Date.now()`
-    const now = Date.now();
+    const now = Date.now(); // Corrected Date.Now() to Date.now()
     if (_dashboardCache.expenses[workId] && (now - _dashboardCache.expenses[workId].timestamp < CACHE_TTL)) {
       return _dashboardCache.expenses[workId].data;
     }
@@ -1597,8 +1597,7 @@ export const dbService = {
 
   // --- NOTIFICATIONS ---
   async getNotifications(userId: string): Promise<DBNotification[]> {
-    // Corrected `Date.Now()` to `Date.now()`
-    const now = Date.now();
+    const now = Date.now(); // Corrected Date.Now() to Date.now()
     if (_dashboardCache.notifications && (now - _dashboardCache.notifications.timestamp < CACHE_TTL)) {
         return _dashboardCache.notifications.data.filter(n => !n.read); // Only return unread for the count
     }

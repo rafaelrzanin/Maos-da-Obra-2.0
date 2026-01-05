@@ -106,6 +106,7 @@ export enum MaterialStatus {
 export interface Material {
   id: string;
   workId: string;
+  userId: string; // NEW: Adicionado para refletir a coluna `user_id` na tabela `materials`
   name: string;
   brand?: string; // NEW: Added brand for materials
   plannedQty: number;
