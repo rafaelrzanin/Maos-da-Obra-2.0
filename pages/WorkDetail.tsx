@@ -545,9 +545,8 @@ const WorkDetail = () => {
       }
       setWork(fetchedWork);
 
-      const [fetchedSteps, fetchedMaterials, fetchedExpenses, fetchedWorkers, fetchedSuppliers, fetchedPhotos, fetchedFiles, fetchedContracts, fetchedChecklists] = await Promise.all([
+      const [fetchedSteps, fetchedExpenses, fetchedWorkers, fetchedSuppliers, fetchedPhotos, fetchedFiles, fetchedContracts, fetchedChecklists] = await Promise.all([
         dbService.getSteps(workId),
-        dbService.getMaterials(workId),
         dbService.getExpenses(workId),
         dbService.getWorkers(workId),
         dbService.getSuppliers(workId),
@@ -557,8 +556,15 @@ const WorkDetail = () => {
         dbService.getChecklists(workId),
       ]);
 
+      // NEW CRITICAL STEP: Ensure materials are generated if none exist after fetching work and steps
+      await dbService.ensureMaterialsForWork(fetchedWork, fetchedSteps);
+      
+      // After ensuring materials (and potentially generating them),
+      // we need to re-fetch the materials to ensure the state is up-to-date.
+      const currentMaterials = await dbService.getMaterials(workId);
+      setMaterials(currentMaterials);
+
       setSteps(fetchedSteps);
-      setMaterials(fetchedMaterials);
       setExpenses(fetchedExpenses);
       setWorkers(fetchedWorkers);
       setSuppliers(fetchedSuppliers);

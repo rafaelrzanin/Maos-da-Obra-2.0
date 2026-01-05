@@ -674,6 +674,36 @@ export const dbService = {
     return data ? parseWorkFromDB(data) : null;
   },
 
+  // NEW: Function to ensure materials exist for a work, generating them if not present.
+  async ensureMaterialsForWork(work: Work, steps: Step[]): Promise<void> {
+    try {
+        const { data: existingMaterials, error: fetchMaterialsError } = await supabase
+            .from('materials')
+            .select('id')
+            .eq('work_id', work.id)
+            .limit(1); // Only need to know if *any* exist
+
+        if (fetchMaterialsError) {
+            console.error(`[ensureMaterialsForWork] Error checking existing materials for work ${work.id}:`, fetchMaterialsError);
+            throw fetchMaterialsError;
+        }
+
+        if ((!existingMaterials || existingMaterials.length === 0) && steps.length > 0) {
+            console.log(`[ensureMaterialsForWork] No materials found for work ${work.id} but steps exist. Initiating generation.`);
+            // Call the existing regenerateMaterials, which deletes all then inserts all.
+            // This is safe here because we just confirmed no materials exist.
+            await dbService.regenerateMaterials(work, steps);
+        } else if (existingMaterials && existingMaterials.length > 0) {
+            console.log(`[ensureMaterialsForWork] Materials already exist for work ${work.id}. Skipping generation.`);
+        } else {
+            console.log(`[ensureMaterialsForWork] No steps to generate materials for work ${work.id}. Skipping generation.`);
+        }
+    } catch (error: any) {
+        console.error(`[ensureMaterialsForWork ERROR] Failed to ensure materials for work ${work.id}:`, error);
+        throw error;
+    }
+},
+
   // NEW: Method to regenerate materials based on work attributes and steps
   async regenerateMaterials(work: Work, createdSteps: Step[]): Promise<void> {
     // Supabase is guaranteed to be initialized now
