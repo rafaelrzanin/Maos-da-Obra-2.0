@@ -1110,7 +1110,13 @@ export const dbService = {
       is_delayed: newIsDelayed, // Use the recalculated value
       order_index: step.orderIndex
     };
+
+    console.log(`[dbService.updateStep] Sending update to Supabase for step ${step.id}. Payload:`, dbStep);
+
     const { data, error } = await supabase.from('steps').update(dbStep).eq('id', step.id).select().single();
+    
+    console.log(`[dbService.updateStep] Supabase response for step ${step.id}: Data:`, data, "Error:", error);
+
     if (error) throw error;
     _dashboardCache.steps[step.workId] = null; // Invalidate cache
     _dashboardCache.summary[step.workId] = null; // Summary might change

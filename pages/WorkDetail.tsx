@@ -96,8 +96,6 @@ const getEntityStatusDetails = (
     const step = entity as Step;
     const isActuallyDelayed = step.isDelayed; 
 
-    // console.log(`[getEntityStatusDetails] Processing step ${step.name} (ID: ${step.id}). Status: ${step.status}, isDelayed: ${step.isDelayed}`);
-
     if (step.status === StepStatus.COMPLETED) {
       statusText = 'Concluído';
       bgColor = 'bg-green-500';
@@ -607,7 +605,7 @@ const WorkDetail = () => {
         return; // Prevent multiple clicks
     }
 
-    console.log(`[handleStepStatusChange] Processing step ID: ${step.id}. Current Status: ${step.status}.`);
+    console.log(`[handleStepStatusChange] Processing step ID: ${step.id}. Current Step Object:`, { ...step });
     setIsUpdatingStepStatus(true);
 
     let newStatus: StepStatus;
@@ -635,10 +633,10 @@ const WorkDetail = () => {
     
     try {
       // isDelayed is calculated in dbService.updateStep based on the new status and dates
-      await dbService.updateStep({ ...step, status: newStatus, realDate: newRealDate });
-      console.log(`[handleStepStatusChange] dbService.updateStep successful for step ${step.id}. Reloading data...`);
-      await loadWorkData();
+      const updatedStep = await dbService.updateStep({ ...step, status: newStatus, realDate: newRealDate });
+      console.log(`[handleStepStatusChange] dbService.updateStep successful for step ${step.id}. Updated Step Data:`, updatedStep);
       console.log(`[handleStepStatusChange] Data reloaded after status update for step ${step.id}.`);
+      await loadWorkData();
     } catch (error) {
       console.error(`[handleStepStatusChange] Erro ao alterar status da etapa ${step.id}:`, error);
       setZeModal({
@@ -2286,7 +2284,7 @@ const WorkDetail = () => {
                     </div>
                 ) : (
                     <div className="space-y-4">
-                        {contracts.map(contract => (
+                        {CONTRACT_TEMPLATES.map(contract => (
                             <div key={contract.id} className={cx(surface, "p-4 rounded-2xl flex items-start gap-4")}>
                                 <div className="w-10 h-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center text-lg shrink-0">
                                     <i className="fa-solid fa-file-contract"></i>
