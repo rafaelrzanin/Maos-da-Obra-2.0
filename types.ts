@@ -1,4 +1,3 @@
-
 export enum PlanType {
   MENSAL = 'MENSAL',
   SEMESTRAL = 'SEMESTRAL',
@@ -108,7 +107,7 @@ export interface Material {
   id: string;
   workId: string;
   name: string;
-  brand?: string; 
+  brand?: string; // NEW: Added brand for materials
   plannedQty: number;
   purchasedQty: number;
   unit: string;
@@ -270,4 +269,3 @@ declare global {
     }
   }
 }
-    

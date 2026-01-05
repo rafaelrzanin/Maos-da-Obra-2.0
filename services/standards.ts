@@ -122,8 +122,9 @@ export const WORK_TEMPLATES: WorkTemplate[] = [
 export interface MaterialItem {
   name: string;
   unit: string;
-  multiplier: number; // Será interpretado por db.ts como por m² ou por cômodo, dependendo da categoria
+  multiplier?: number; // Será interpretado por db.ts como por m² ou por cômodo, dependendo da categoria
   flat_qty?: number; // Quantidade fixa, não dependente de área ou cômodos (ex: caixa d'água)
+  brand?: string; // NEW: Adicionado para o campo brand
 }
 
 export interface MaterialCatalog {
@@ -201,8 +202,7 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
       { name: 'Tubos PVC 100mm (Esgoto Principal)', unit: 'barras', multiplier: 0.05 }, // por m²
       { name: 'Tubos PVC 75mm (Esgoto Secundário)', unit: 'barras', multiplier: 0.03 }, // por m²
       { name: 'Tubos PVC 50mm (Água Pluvial)', unit: 'barras', multiplier: 0.04 }, // por m²
-      // FIX: Add multiplier for items that only had flat_qty
-      { name: 'Caixa D\'água 1000L', unit: 'un', multiplier: 0, flat_qty: 1 }, // Flat 1 unidade
+      { name: 'Caixa D\'água 1000L', unit: 'un', flat_qty: 1 }, // Flat 1 unidade
       { name: 'Registros de Esfera (Geral)', unit: 'un', multiplier: 0.02 }, // por m²
       { name: 'Conexões PVC (Principais - Diversas)', unit: 'un', multiplier: 0.1 }, // por m²
       { name: 'Cola PVC Grande e Lixa', unit: 'kit', multiplier: 0.01 } // por m²
@@ -285,10 +285,9 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
   {
     category: 'Louças e Metais Finais', // Corresponde à etapa CONSTRUCAO e REFORMA_APTO (Itens para áreas de serviço, tanque)
     items: [
-      // FIX: Add multiplier for items that only had flat_qty
-      { name: 'Tanque de Lavar Roupa (Louça/Plástico)', unit: 'un', multiplier: 0, flat_qty: 1 }, 
-      { name: 'Torneira de Tanque', unit: 'un', multiplier: 0, flat_qty: 1 }, 
-      { name: 'Sifões e Engates Flexíveis (Serviço)', unit: 'un', multiplier: 0, flat_qty: 1 }
+      { name: 'Tanque de Lavar Roupa (Louça/Plástico)', unit: 'un', flat_qty: 1 }, 
+      { name: 'Torneira de Tanque', unit: 'un', flat_qty: 1 }, 
+      { name: 'Sifões e Engates Flexíveis (Serviço)', unit: 'un', flat_qty: 1 }
     ]
   },
   {
@@ -311,153 +310,138 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
   {
     category: 'Demolição e Retirada de Entulho (Banheiro)',
     items: [
-      // FIX: Add multiplier for items that only had flat_qty
-      { name: 'Sacos de Ráfia (Entulho)', unit: 'un', multiplier: 0, flat_qty: 5 }, // 5 por banheiro
-      { name: 'Marreta/Talhadeira', unit: 'un', multiplier: 0, flat_qty: 0.01 },
-      { name: 'Caçamba Estacionária Pequena (Compartilhada)', unit: 'un', multiplier: 0, flat_qty: 0.005 } // Pequena fração, é compartilhada
+      { name: 'Sacos de Ráfia (Entulho)', unit: 'un', flat_qty: 5 }, // 5 por banheiro
+      { name: 'Marreta/Talhadeira', unit: 'un', multiplier: 0.01 },
+      { name: 'Caçamba Estacionária Pequena (Compartilhada)', unit: 'un', multiplier: 0.005, flat_qty: 0.005 } // Pequena fração, é compartilhada
     ]
   },
   {
     category: 'Hidráulica de Banheiro',
     items: [
-      // FIX: Add multiplier for items that only had flat_qty
-      { name: 'Tubos PVC 50mm (Esgoto Banheiro)', unit: 'barra', multiplier: 0, flat_qty: 0.5 },
-      { name: 'Tubos PPR/CPVC 25mm (Água Banheiro)', unit: 'barra', multiplier: 0, flat_qty: 0.5 },
-      { name: 'Registros (Pressão/Gaveta)', unit: 'un', multiplier: 0, flat_qty: 3 },
-      { name: 'Joelhos/Conexões (Diversas Banheiro)', unit: 'un', multiplier: 0, flat_qty: 8 },
-      { name: 'Sifões Cromados', unit: 'un', multiplier: 0, flat_qty: 2 }, // Pia e Ducha Higiênica
-      { name: 'Engates Flexíveis', unit: 'un', multiplier: 0, flat_qty: 4 }, // Pia, Vaso, Ducha, Chuveiro
-      { name: 'Cola PVC e Veda Rosca', unit: 'kit', multiplier: 0, flat_qty: 0.05 }
+      { name: 'Tubos PVC 50mm (Esgoto Banheiro)', unit: 'barra', flat_qty: 0.5 },
+      { name: 'Tubos PPR/CPVC 25mm (Água Banheiro)', unit: 'barra', flat_qty: 0.5 },
+      { name: 'Registros (Pressão/Gaveta)', unit: 'un', flat_qty: 3 },
+      { name: 'Joelhos/Conexões (Diversas Banheiro)', unit: 'un', flat_qty: 8 },
+      { name: 'Sifões Cromados', unit: 'un', flat_qty: 2 }, // Pia e Ducha Higiênica
+      { name: 'Engates Flexíveis', unit: 'un', flat_qty: 4 }, // Pia, Vaso, Ducha, Chuveiro
+      { name: 'Cola PVC e Veda Rosca', unit: 'kit', flat_qty: 0.05 }
     ]
   },
   {
     category: 'Elétrica de Banheiro',
     items: [
-      // FIX: Add multiplier for items that only had flat_qty
-      { name: 'Fio Flexível 2.5mm (Banheiro)', unit: 'm', multiplier: 0, flat_qty: 10 },
-      { name: 'Fio Flexível 1.5mm (Banheiro)', unit: 'm', multiplier: 0, flat_qty: 5 },
-      { name: 'Disjuntor DR (Segurança)', unit: 'un', multiplier: 0, flat_qty: 1 },
-      { name: 'Caixa de Tomada 4x2', unit: 'un', multiplier: 0, flat_qty: 3 },
-      { name: 'Tomada com Proteção', unit: 'un', multiplier: 0, flat_qty: 2 },
-      { name: 'Interruptor Simples', unit: 'un', multiplier: 0, flat_qty: 1 }
+      { name: 'Fio Flexível 2.5mm (Banheiro)', unit: 'm', flat_qty: 10 },
+      { name: 'Fio Flexível 1.5mm (Banheiro)', unit: 'm', flat_qty: 5 },
+      { name: 'Disjuntor DR (Segurança)', unit: 'un', flat_qty: 1 },
+      { name: 'Caixa de Tomada 4x2', unit: 'un', flat_qty: 3 },
+      { name: 'Tomada com Proteção', unit: 'un', flat_qty: 2 },
+      { name: 'Interruptor Simples', unit: 'un', flat_qty: 1 }
     ]
   },
   {
     category: 'Impermeabilização de Banheiro',
     items: [
-      // FIX: Add multiplier for items that only had flat_qty
-      { name: 'Manta Líquida Acrílica (Banheiro)', unit: 'litro', multiplier: 0, flat_qty: 2 },
-      { name: 'Cimento Elástico (Argamassa Polimérica Banheiro)', unit: 'kg', multiplier: 0, flat_qty: 5 },
-      { name: 'Tela de Poliéster (Reforço Banheiro)', unit: 'm²', multiplier: 0, flat_qty: 2 }
+      { name: 'Manta Líquida Acrílica (Banheiro)', unit: 'litro', flat_qty: 2 },
+      { name: 'Cimento Elástico (Argamassa Polimérica Banheiro)', unit: 'kg', flat_qty: 5 },
+      { name: 'Tela de Poliéster (Reforço Banheiro)', unit: 'm²', flat_qty: 2 }
     ]
   },
   {
     category: 'Contrapiso de Banheiro',
     items: [
-      // FIX: Add multiplier for items that only had flat_qty
-      { name: 'Cimento CP-II (Contrapiso Banheiro)', unit: 'saco', multiplier: 0, flat_qty: 0.5 },
-      { name: 'Areia Média (Contrapiso Banheiro)', unit: 'm³', multiplier: 0, flat_qty: 0.03 }
+      { name: 'Cimento CP-II (Contrapiso Banheiro)', unit: 'saco', flat_qty: 0.5 },
+      { name: 'Areia Média (Contrapiso Banheiro)', unit: 'm³', flat_qty: 0.03 }
     ]
   },
   {
     category: 'Pisos e Revestimentos de Banheiro',
     items: [
-      // FIX: Add multiplier for items that only had flat_qty
-      { name: 'Piso Retificado (60x60cm Banheiro)', unit: 'm²', multiplier: 0, flat_qty: 1.15 * 5 }, // Assumindo ~5m² por banheiro
-      { name: 'Revestimento de Parede (30x60cm Banheiro)', unit: 'm²', multiplier: 0, flat_qty: 1.15 * 15 }, // Assumindo ~15m² por banheiro
-      { name: 'Argamassa AC-II / AC-III (Banheiro)', unit: 'saco', multiplier: 0, flat_qty: 1 },
-      { name: 'Rejunte Epóxi (Anti-mofo Banheiro)', unit: 'kg', multiplier: 0, flat_qty: 1 }
+      { name: 'Piso Retificado (60x60cm Banheiro)', unit: 'm²', flat_qty: 1.15 * 5 }, // Assumindo ~5m² por banheiro
+      { name: 'Revestimento de Parede (30x60cm Banheiro)', unit: 'm²', flat_qty: 1.15 * 15 }, // Assumindo ~15m² por banheiro
+      { name: 'Argamassa AC-II / AC-III (Banheiro)', unit: 'saco', flat_qty: 1 },
+      { name: 'Rejunte Epóxi (Anti-mofo Banheiro)', unit: 'kg', flat_qty: 1 }
     ]
   },
   {
     category: 'Gesso e Forro de Banheiro', 
     items: [
-      // FIX: Add multiplier for items that only had flat_qty
-      { name: 'Placa de Gesso Hidrofugado (Banheiro)', unit: 'chapa', multiplier: 0, flat_qty: 0.5 },
-      { name: 'Massa de Gesso (Banheiro)', unit: 'kg', multiplier: 0, flat_qty: 1 }
+      { name: 'Placa de Gesso Hidrofugado (Banheiro)', unit: 'chapa', flat_qty: 0.5 },
+      { name: 'Massa de Gesso (Banheiro)', unit: 'kg', flat_qty: 1 }
     ]
   },
   {
     category: 'Bancada de Banheiro',
     items: [
-      // FIX: Add multiplier for items that only had flat_qty
-      { name: 'Mármore/Granito (Bancada Banheiro)', unit: 'm', multiplier: 0, flat_qty: 1.2 },
-      { name: 'Cuba de Sobrepor/Encaixe (Banheiro)', unit: 'un', multiplier: 0, flat_qty: 1 },
-      { name: 'Válvula de Escoamento (Banheiro)', unit: 'un', multiplier: 0, flat_qty: 1 }
+      { name: 'Mármore/Granito (Bancada Banheiro)', unit: 'm', flat_qty: 1.2 },
+      { name: 'Cuba de Sobrepor/Encaixe (Banheiro)', unit: 'un', flat_qty: 1 },
+      { name: 'Válvula de Escoamento (Banheiro)', unit: 'un', flat_qty: 1 }
     ]
   },
   {
     category: 'Louças e Metais de Banheiro',
     items: [
-      // FIX: Add multiplier for items that only had flat_qty
-      { name: 'Vaso Sanitário com Caixa Acoplada', unit: 'un', multiplier: 0, flat_qty: 1 },
-      { name: 'Torneira (Bancada/Parede Banheiro)', unit: 'un', multiplier: 0, flat_qty: 1 },
-      { name: 'Chuveiro (com ou sem misturador)', unit: 'un', multiplier: 0, flat_qty: 1 },
-      { name: 'Ducha Higiênica', unit: 'un', multiplier: 0, flat_qty: 1 },
-      { name: 'Espelho com Armário (Banheiro)', unit: 'un', multiplier: 0, flat_qty: 1 }
+      { name: 'Vaso Sanitário com Caixa Acoplada', unit: 'un', flat_qty: 1 },
+      { name: 'Torneira (Bancada/Parede Banheiro)', unit: 'un', flat_qty: 1 },
+      { name: 'Chuveiro (com ou sem misturador)', unit: 'un', flat_qty: 1 },
+      { name: 'Ducha Higiênica', unit: 'un', flat_qty: 1 },
+      { name: 'Espelho com Armário (Banheiro)', unit: 'un', flat_qty: 1 }
     ]
   },
   // --- ITENS ESPECÍFICOS PARA REFORMA DE COZINHA (CATEGORIA ESPECÍFICA) ---
   {
     category: 'Demolição e Retirada de Entulho (Cozinha)',
     items: [
-      // FIX: Add multiplier for items that only had flat_qty
-      { name: 'Sacos de Ráfia (Entulho Cozinha)', unit: 'un', multiplier: 0, flat_qty: 8 },
-      { name: 'Marreta/Talhadeira', unit: 'un', multiplier: 0, flat_qty: 0.01 },
-      { name: 'Caçamba Estacionária Pequena (Compartilhada)', unit: 'un', multiplier: 0, flat_qty: 0.005 }
+      { name: 'Sacos de Ráfia (Entulho Cozinha)', unit: 'un', flat_qty: 8 },
+      { name: 'Marreta/Talhadeira', unit: 'un', multiplier: 0.01 },
+      { name: 'Caçamba Estacionária Pequena (Compartilhada)', unit: 'un', multiplier: 0.005, flat_qty: 0.005 }
     ]
   },
   {
     category: 'Hidráulica de Cozinha',
     items: [
-      // FIX: Add multiplier for items that only had flat_qty
-      { name: 'Tubos PVC 50mm (Esgoto Cozinha)', unit: 'barra', multiplier: 0, flat_qty: 0.8 },
-      { name: 'Tubos PPR/CPVC 25mm (Água Cozinha)', unit: 'barra', multiplier: 0, flat_qty: 0.8 },
-      { name: 'Registros Cozinha', unit: 'un', multiplier: 0, flat_qty: 2 },
-      { name: 'Joelhos/Conexões (Diversas Cozinha)', unit: 'un', multiplier: 0, flat_qty: 10 },
-      { name: 'Sifão para Pia de Cozinha', unit: 'un', multiplier: 0, flat_qty: 1 },
-      { name: 'Engates Flexíveis Cozinha', unit: 'un', multiplier: 0, flat_qty: 2 },
-      { name: 'Cola PVC/Termofusão', unit: 'frasco', multiplier: 0, flat_qty: 0.05 }
+      { name: 'Tubos PVC 50mm (Esgoto Cozinha)', unit: 'barra', flat_qty: 0.8 },
+      { name: 'Tubos PPR/CPVC 25mm (Água Cozinha)', unit: 'barra', flat_qty: 0.8 },
+      { name: 'Registros Cozinha', unit: 'un', flat_qty: 2 },
+      { name: 'Joelhos/Conexões (Diversas Cozinha)', unit: 'un', flat_qty: 10 },
+      { name: 'Sifão para Pia de Cozinha', unit: 'un', flat_qty: 1 },
+      { name: 'Engates Flexíveis Cozinha', unit: 'un', flat_qty: 2 },
+      { name: 'Cola PVC/Termofusão', unit: 'frasco', flat_qty: 0.05 }
     ]
   },
   {
     category: 'Elétrica de Cozinha',
     items: [
-      // FIX: Add multiplier for items that only had flat_qty
-      { name: 'Fio Flexível 4.0mm (Eletrodomésticos Cozinha)', unit: 'm', multiplier: 0, flat_qty: 15 },
-      { name: 'Fio Flexível 2.5mm (Tomadas Cozinha)', unit: 'm', multiplier: 0, flat_qty: 10 },
-      { name: 'Disjuntores (Cozinha)', unit: 'un', multiplier: 0, flat_qty: 3 },
-      { name: 'Caixa de Tomada 4x2', unit: 'un', multiplier: 0, flat_qty: 6 },
-      { name: 'Tomada 20A', unit: 'un', multiplier: 0, flat_qty: 3 },
-      { name: 'Tomada 10A', unit: 'un', multiplier: 0, flat_qty: 3 }
+      { name: 'Fio Flexível 4.0mm (Eletrodomésticos Cozinha)', unit: 'm', flat_qty: 15 },
+      { name: 'Fio Flexível 2.5mm (Tomadas Cozinha)', unit: 'm', flat_qty: 10 },
+      { name: 'Disjuntores (Cozinha)', unit: 'un', flat_qty: 3 },
+      { name: 'Caixa de Tomada 4x2', unit: 'un', flat_qty: 6 },
+      { name: 'Tomada 20A', unit: 'un', flat_qty: 3 },
+      { name: 'Tomada 10A', unit: 'un', flat_qty: 3 }
     ]
   },
   {
     category: 'Pisos e Revestimentos de Cozinha',
     items: [
-      // FIX: Add multiplier for items that only had flat_qty
-      { name: 'Piso Porcelanato (60x60cm Cozinha)', unit: 'm²', multiplier: 0, flat_qty: 1.15 * 10 }, // Assumindo ~10m² por cozinha
-      { name: 'Revestimento de Parede (30x60cm Cozinha)', unit: 'm²', multiplier: 0, flat_qty: 1.15 * 20 }, // Assumindo ~20m² por cozinha
-      { name: 'Argamassa AC-III (Cozinha)', unit: 'saco', multiplier: 0, flat_qty: 1.2 },
-      { name: 'Rejunte Flexível (Cozinha)', unit: 'kg', multiplier: 0, flat_qty: 1 }
+      { name: 'Piso Porcelanato (60x60cm Cozinha)', unit: 'm²', flat_qty: 1.15 * 10 }, // Assumindo ~10m² por cozinha
+      { name: 'Revestimento de Parede (30x60cm Cozinha)', unit: 'm²', flat_qty: 1.15 * 20 }, // Assumindo ~20m² por cozinha
+      { name: 'Argamassa AC-III (Cozinha)', unit: 'saco', flat_qty: 1.2 },
+      { name: 'Rejunte Flexível (Cozinha)', unit: 'kg', flat_qty: 1 }
     ]
   },
   {
     category: 'Bancada de Cozinha',
     items: [
-      // FIX: Add multiplier for items that only had flat_qty
-      { name: 'Granito/Quartzo (Bancada Cozinha)', unit: 'm', multiplier: 0, flat_qty: 3 },
-      { name: 'Cuba de Inox Simples/Dupla', unit: 'un', multiplier: 0, flat_qty: 1 },
-      { name: 'Válvula de Escoamento Cozinha', unit: 'un', multiplier: 0, flat_qty: 1 }
+      { name: 'Granito/Quartzo (Bancada Cozinha)', unit: 'm', flat_qty: 3 },
+      { name: 'Cuba de Inox Simples/Dupla', unit: 'un', flat_qty: 1 },
+      { name: 'Válvula de Escoamento Cozinha', unit: 'un', flat_qty: 1 }
     ]
   },
   {
     category: 'Louças e Metais de Cozinha',
     items: [
-      // FIX: Add multiplier for items that only had flat_qty
-      { name: 'Torneira Gourmet/Misturador Cozinha', unit: 'un', multiplier: 0, flat_qty: 1 },
-      { name: 'Filtro de Água', unit: 'un', multiplier: 0, flat_qty: 1 },
-      { name: 'Sifões e Engates Flexíveis (Cozinha)', unit: 'un', multiplier: 0, flat_qty: 1 }
+      { name: 'Torneira Gourmet/Misturador Cozinha', unit: 'un', flat_qty: 1 },
+      { name: 'Filtro de Água', unit: 'un', flat_qty: 1 },
+      { name: 'Sifões e Engates Flexíveis (Cozinha)', unit: 'un', flat_qty: 1 }
     ]
   },
   // --- ITENS ESPECÍFICOS PARA PINTURA (CATEGORIA ESPECÍFICA) ---
@@ -490,10 +474,9 @@ export const FULL_MATERIAL_PACKAGES: MaterialCatalog[] = [
   {
     category: 'Demolição e Retirada de Entulho', // Para obra de reforma geral
     items: [
-        // FIX: Add multiplier for items that only had flat_qty
-        { name: 'Sacos de Ráfia (Entulho Geral)', unit: 'un', multiplier: 0, flat_qty: 20 }, // Baseado em 20 sacos para uma reforma média
-        { name: 'Caçamba Estacionária Grande', unit: 'un', multiplier: 0, flat_qty: 1 },
-        { name: 'Marreta/Talhadeira', unit: 'un', multiplier: 0, flat_qty: 0.01 }
+        { name: 'Sacos de Ráfia (Entulho Geral)', unit: 'un', flat_qty: 20 }, // Baseado em 20 sacos para uma reforma média
+        { name: 'Caçamba Estacionária Grande', unit: 'un', flat_qty: 1 },
+        { name: 'Marreta/Talhadeira', unit: 'un', multiplier: 0.01 }
     ]
   },
   {

@@ -1,4 +1,3 @@
-
 import { PlanType, ExpenseCategory, StepStatus, FileCategory, type User, type Work, type Step, type Material, type Expense, type Worker, type Supplier, type WorkPhoto, type WorkFile, type DBNotification, type PushSubscriptionInfo, type Contract, type Checklist, type ChecklistItem } from '../types.ts';
 import { WORK_TEMPLATES, FULL_MATERIAL_PACKAGES, CONTRACT_TEMPLATES, CHECKLIST_TEMPLATES } from './standards.ts';
 import { supabase } from './supabase.ts';
@@ -696,7 +695,7 @@ export const dbService = {
                     for (const item of materialCatalog.items) {
                         let calculatedQty = 0;
 
-                        if (item.flat_qty !== undefined) { // Check for explicit flat_qty
+                        if (item.flat_qty !== undefined) { // NEW: Prioritize flat_qty if available
                             calculatedQty = item.flat_qty;
                         } else if (item.multiplier !== undefined) {
                             // Base calculation (e.g., per m² of area)
@@ -705,9 +704,9 @@ export const dbService = {
                             // Adjust based on room counts IF applicable (for specific room material categories)
                             // This ensures correct scaling for room-specific items
                             if (materialCategoryName.includes('Banheiro') && work.bathrooms && work.bathrooms > 0) {
-                                calculatedQty = item.flat_qty !== undefined ? item.flat_qty * work.bathrooms : item.multiplier * work.area * work.bathrooms;
+                                calculatedQty = (item.multiplier || 0) * work.area * work.bathrooms; // Use multiplier for rooms
                             } else if (materialCategoryName.includes('Cozinha') && work.kitchens && work.kitchens > 0) {
-                                calculatedQty = item.flat_qty !== undefined ? item.flat_qty * work.kitchens : item.multiplier * work.area * work.kitchens;
+                                calculatedQty = (item.multiplier || 0) * work.area * work.kitchens; // Use multiplier for rooms
                             } else if (materialCategoryName.includes('Quarto') && work.bedrooms && work.bedrooms > 0) {
                                 calculatedQty *= work.bedrooms;
                             } else if (materialCategoryName.includes('Sala') && work.livingRooms && work.livingRooms > 0) {
@@ -731,13 +730,13 @@ export const dbService = {
                         
                         // Ensure min 1 if calculated > 0, and round up
                         calculatedQty = Math.ceil(Math.max(0, calculatedQty));
-                        if (calculatedQty === 0 && item.multiplier > 0) calculatedQty = 1; // Ensure at least 1 unit if material has a multiplier but calculated to 0
+                        if (calculatedQty === 0 && (item.multiplier || 0) > 0) calculatedQty = 1; // Ensure at least 1 unit if material has a multiplier but calculated to 0
 
                         if (calculatedQty > 0) { // Only insert if quantity is positive
                           materialsToInsert.push({
                               work_id: work.id, 
                               name: item.name,
-                              brand: undefined, 
+                              brand: item.brand || undefined, // NEW: Pass brand if available
                               planned_qty: calculatedQty, 
                               purchased_qty: 0, 
                               unit: item.unit,
@@ -940,7 +939,8 @@ export const dbService = {
       return _dashboardCache.summary[workId].data;
     }
 
-    const today = new Date().toISOString().split('T')[0];
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Normalize to start of day
     
     const [steps, materials] = await Promise.all([
       dbService.getSteps(workId),
@@ -949,7 +949,8 @@ export const dbService = {
 
     const totalSteps = steps.length;
     const completedSteps = steps.filter(s => s.status === StepStatus.COMPLETED).length;
-    const delayedSteps = steps.filter(s => (s.status === StepStatus.NOT_STARTED || s.status === StepStatus.IN_PROGRESS) && new Date(s.endDate).getTime() < new Date(today).getTime()).length; // Ensure proper date comparison
+    // Recalculate delayed status based on actual current date
+    const delayedSteps = steps.filter(s => (s.status !== StepStatus.COMPLETED && new Date(s.endDate).setHours(0,0,0,0) < today.getTime())).length;
     const pendingMaterials = materials.filter(m => m.purchasedQty < m.plannedQty).length;
 
     const summary = {
@@ -1021,7 +1022,7 @@ export const dbService = {
       start_date: step.startDate,
       end_date: step.endDate,
       status: StepStatus.NOT_STARTED,
-      is_delayed: false,
+      is_delayed: false, // New steps are not delayed by default
       order_index: newOrderIndex
     };
     const { data, error } = await supabase.from('steps').insert(dbStep).select().single();
@@ -1032,13 +1033,21 @@ export const dbService = {
   },
 
   async updateStep(step: Step): Promise<Step> {
+    const stepEndDate = new Date(step.endDate);
+    const today = new Date();
+    today.setHours(0,0,0,0); // Normalize today's date to midnight
+    stepEndDate.setHours(0,0,0,0); // Normalize step end date to midnight
+
+    // NEW: Recalculate is_delayed based on new data before saving
+    const newIsDelayed = (step.status !== StepStatus.COMPLETED && stepEndDate < today);
+
     const dbStep = {
       name: step.name,
       start_date: step.startDate,
       end_date: step.endDate,
       real_date: step.realDate,
       status: step.status,
-      is_delayed: step.isDelayed,
+      is_delayed: newIsDelayed, // Use the recalculated value
       order_index: step.orderIndex
     };
     const { data, error } = await supabase.from('steps').update(dbStep).eq('id', step.id).select().single();
@@ -1050,7 +1059,8 @@ export const dbService = {
 
   async deleteStep(stepId: string, workId: string): Promise<void> {
     // Before deleting step, handle related materials and expenses
-    // Cascade delete on the DB should handle most, but invalidate related caches.
+    // Cascade delete is configured in Supabase, so deleting the work
+    // should automatically delete related steps, materials, expenses, etc.
     const { error: deleteStepError } = await supabase.from('steps').delete().eq('id', stepId);
     if (deleteStepError) throw deleteStepError;
 
@@ -1081,7 +1091,7 @@ export const dbService = {
     const dbMaterial = {
       work_id: material.workId,
       name: material.name,
-      brand: material.brand,
+      brand: material.brand || undefined, // NEW: Include brand
       planned_qty: material.plannedQty,
       purchased_qty: material.purchasedQty,
       unit: material.unit,
@@ -1099,7 +1109,7 @@ export const dbService = {
   async updateMaterial(material: Material): Promise<Material> {
     const dbMaterial = {
       name: material.name,
-      brand: material.brand,
+      brand: material.brand || undefined, // NEW: Include brand
       planned_qty: material.plannedQty,
       purchased_qty: material.purchasedQty,
       unit: material.unit,
