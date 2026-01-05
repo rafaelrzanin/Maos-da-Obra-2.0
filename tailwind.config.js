@@ -1,4 +1,3 @@
-
 /** @type {import('tailwindcss').Config} */
 export default {
   darkMode: 'class', // NEW: Configure dark mode to 'class'
@@ -68,9 +67,13 @@ export default {
         // NEW: Custom shadows for cards
         'card-default': '0 18px 45px -30px rgba(15,23,42,0.45)', // Existing light mode shadow
         'card-dark-subtle': '0 4px 15px rgba(255, 255, 255, 0.08), 0 0 5px rgba(255, 255, 255, 0.05)', // Subtle light shadow for dark mode
+        // NEW: Generic shadows for status colors (use with opacity utilities like shadow-red-500/20)
+        'red-500/20': '0 4px 6px -1px rgba(239, 68, 68, 0.1), 0 2px 4px -2px rgba(239, 68, 68, 0.1)',
+        'green-500/20': '0 4px 6px -1px rgba(34, 197, 94, 0.1), 0 2px 4px -2px rgba(34, 197, 94, 0.1)',
+        'amber-500/20': '0 4px 6px -1px rgba(245, 158, 11, 0.1), 0 2px 4px -2px rgba(245, 158, 11, 0.1)',
+        'slate-400/20': '0 4px 6px -1px rgba(148, 163, 184, 0.1), 0 2px 4px -2px rgba(148, 163, 184, 0.1)',
       }
     },
   },
   plugins: [],
 }
-    

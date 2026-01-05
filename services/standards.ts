@@ -1,4 +1,3 @@
-
 // Standard Libraries for Construction Management
 
 // --- AVATAR CONFIG ---
@@ -1000,16 +999,15 @@ export const CHECKLIST_TEMPLATES: Checklist[] = [
     name: 'Demolição e Retirada de Entulho Geral', // Modificado
     category: 'Demolição e Retirada de Entulho', // Updated category for general renovation
     items: [
-        // FIX: Add multiplier for items that only had flat_qty
-        { id: 'item1', text: 'Planejar sequência de demolição (evitar desabamentos)', checked: false, multiplier: 0 },
-        { id: 'item2', text: 'Desligar e isolar instalações elétricas e hidráulicas', checked: false, multiplier: 0 },
-        { id: 'item3', text: 'Proteção de áreas e elementos a serem preservados', checked: false, multiplier: 0 },
-        { id: 'item4', text: 'Uso obrigatório de EPIs (capacete, óculos, luvas, máscara, botas)', checked: false, multiplier: 0 },
-        { id: 'item5', text: 'Isolamento e sinalização da área de trabalho', checked: false, multiplier: 0 },
-        { id: 'item6', text: 'Alugar caçamba estacionária com antecedência', checked: false, multiplier: 0 },
-        { id: 'item7', text: 'Remoção constante do entulho para evitar acúmulo e acidentes', checked: false, multiplier: 0 },
-        { id: 'item8', text: 'Separar materiais recicláveis (madeira, metal) para descarte adequado', checked: false, multiplier: 0 },
-        { id: 'item9', text: 'Verificar estruturas vizinhas após demolição', checked: false, multiplier: 0 },
+        { id: 'item1', text: 'Planejar sequência de demolição (evitar desabamentos)', checked: false },
+        { id: 'item2', text: 'Desligar e isolar instalações elétricas e hidráulicas', checked: false },
+        { id: 'item3', text: 'Proteção de áreas e elementos a serem preservados', checked: false },
+        { id: 'item4', text: 'Uso obrigatório de EPIs (capacete, óculos, luvas, máscara, botas)', checked: false },
+        { id: 'item5', text: 'Isolamento e sinalização da área de trabalho', checked: false },
+        { id: 'item6', text: 'Alugar caçamba estacionária com antecedência', checked: false },
+        { id: 'item7', text: 'Remoção constante do entulho para evitar acúmulo e acidentes', checked: false },
+        { id: 'item8', text: 'Separar materiais recicláveis (madeira, metal) para descarte adequado', checked: false },
+        { id: 'item9', text: 'Verificar estruturas vizinhas após demolição', checked: false },
     ],
   },
 ];

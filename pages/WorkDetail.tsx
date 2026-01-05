@@ -67,6 +67,243 @@ const formatCurrency = (value: number | string | undefined): string => {
   });
 };
 
+// NEW: Type for status details
+interface StatusDetails {
+  statusText: string;
+  bgColor: string; // For status button/badge background
+  textColor: string; // For status text
+  borderColor: string; // For card border
+  shadowClass: string; // For card shadow
+  icon: string; // For status button/badge icon
+}
+
+// NEW: Helper function to get status details for Steps, Materials, and Expenses
+const getEntityStatusDetails = (
+  entityType: 'step' | 'material' | 'expense',
+  entity: Step | Material | Expense,
+  allSteps: Step[] // Needed for material delay calculation
+): StatusDetails => {
+  let statusText = '';
+  let bgColor = 'bg-slate-400'; // Default gray for pending/not started
+  let textColor = 'text-slate-700 dark:text-slate-300';
+  let borderColor = 'border-slate-200 dark:border-slate-700';
+  let shadowClass = 'shadow-slate-400/20'; // Custom shadow for status (using /20 opacity suffix)
+  let icon = 'fa-hourglass-start';
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0); // Normalize to start of day
+
+  // Common delay check for steps and materials
+  let isDelayed = false;
+
+  if (entityType === 'step') {
+    const step = entity as Step;
+    const stepEndDate = new Date(step.endDate);
+    stepEndDate.setHours(0, 0, 0, 0);
+    isDelayed = (step.status !== StepStatus.COMPLETED && stepEndDate < today);
+
+    if (isDelayed) {
+      statusText = 'Atrasado';
+      bgColor = 'bg-red-500';
+      textColor = 'text-red-600 dark:text-red-400';
+      borderColor = 'border-red-400 dark:border-red-700';
+      shadowClass = 'shadow-red-500/20';
+      icon = 'fa-exclamation-triangle';
+    } else if (step.status === StepStatus.COMPLETED) {
+      statusText = 'Concluído';
+      bgColor = 'bg-green-500';
+      textColor = 'text-green-600 dark:text-green-400';
+      borderColor = 'border-green-400 dark:border-green-700';
+      shadowClass = 'shadow-green-500/20';
+      icon = 'fa-check';
+    } else if (step.status === StepStatus.IN_PROGRESS) {
+      statusText = 'Em Andamento';
+      bgColor = 'bg-amber-500';
+      textColor = 'text-amber-600 dark:text-amber-400';
+      borderColor = 'border-amber-400 dark:border-amber-700';
+      shadowClass = 'shadow-amber-500/20';
+      icon = 'fa-hourglass-half';
+    } else { // NOT_STARTED
+      statusText = 'Não Iniciada';
+      bgColor = 'bg-slate-400';
+      textColor = 'text-slate-700 dark:text-slate-300';
+      borderColor = 'border-slate-200 dark:border-slate-700';
+      shadowClass = 'shadow-slate-400/20';
+      icon = 'fa-hourglass-start';
+    }
+  } else if (entityType === 'material') {
+    const material = entity as Material;
+    const associatedStep = allSteps.find(s => s.id === material.stepId);
+    
+    // Material Delay Logic: "Quando faltar 3 dias para a etapa iniciar e material não estiver concluído"
+    if (associatedStep) {
+      const stepStartDate = new Date(associatedStep.startDate);
+      stepStartDate.setHours(0, 0, 0, 0); // Normalize to start of day
+      const threeDaysFromNow = new Date();
+      threeDaysFromNow.setDate(today.getDate() + 3); // Current date + 3 days (inclusive)
+      threeDaysFromNow.setHours(0, 0, 0, 0);
+
+      isDelayed = (stepStartDate <= threeDaysFromNow && material.purchasedQty < material.plannedQty);
+    }
+    
+    const isMaterialComplete = (material.purchasedQty >= material.plannedQty && material.plannedQty > 0);
+    const isMaterialPartial = (material.purchasedQty > 0 && material.purchasedQty < material.plannedQty);
+    const isMaterialPending = (material.purchasedQty === 0 || material.plannedQty === 0);
+
+    if (isDelayed) {
+      statusText = 'Atrasado';
+      bgColor = 'bg-red-500';
+      textColor = 'text-red-600 dark:text-red-400';
+      borderColor = 'border-red-400 dark:border-red-700';
+      shadowClass = 'shadow-red-500/20';
+      icon = 'fa-exclamation-triangle';
+    } else if (isMaterialComplete) {
+      statusText = 'Concluído';
+      bgColor = 'bg-green-500';
+      textColor = 'text-green-600 dark:text-green-400';
+      borderColor = 'border-green-400 dark:border-green-700';
+      shadowClass = 'shadow-green-500/20';
+      icon = 'fa-check';
+    } else if (isMaterialPartial) {
+      statusText = 'Parcial';
+      bgColor = 'bg-amber-500';
+      textColor = 'text-amber-600 dark:text-amber-400';
+      borderColor = 'border-amber-400 dark:border-amber-700';
+      shadowClass = 'shadow-amber-500/20';
+      icon = 'fa-hourglass-half';
+    } else if (isMaterialPending) { // Includes plannedQty === 0, which means nothing to buy
+      statusText = 'Pendente';
+      bgColor = 'bg-slate-400';
+      textColor = 'text-slate-700 dark:text-slate-300';
+      borderColor = 'border-slate-200 dark:border-slate-700';
+      shadowClass = 'shadow-slate-400/20';
+      icon = 'fa-hourglass-start';
+    }
+  } else if (entityType === 'expense') {
+    const expense = entity as Expense;
+    const paidAmount = expense.paidAmount || 0;
+    const totalAgreed = expense.totalAgreed !== undefined ? expense.totalAgreed : expense.amount; // Use totalAgreed or fallback to amount
+
+    const isExpenseComplete = paidAmount >= totalAgreed && totalAgreed > 0;
+    const isExpensePartial = paidAmount > 0 && paidAmount < totalAgreed;
+    const isExpensePending = paidAmount === 0;
+    const isExpenseOverpaid = paidAmount > totalAgreed && totalAgreed > 0; // Prejuízo: total pago > combinado (and combinado > 0)
+    
+    // If totalAgreed is 0 (or not set), it means it's a "free" or non-monetary expense from the start, consider complete if paid 0
+    if (totalAgreed === 0 && paidAmount === 0) {
+        statusText = 'Concluído'; // Treat as completed if 0 agreed and 0 paid
+        bgColor = 'bg-green-500';
+        textColor = 'text-green-600 dark:text-green-400';
+        borderColor = 'border-green-400 dark:border-green-700';
+        shadowClass = 'shadow-green-500/20';
+        icon = 'fa-check';
+    } else if (isExpenseOverpaid) {
+      statusText = 'Prejuízo';
+      bgColor = 'bg-red-500';
+      textColor = 'text-red-600 dark:text-red-400';
+      borderColor = 'border-red-400 dark:border-red-700';
+      shadowClass = 'shadow-red-500/20';
+      icon = 'fa-sack-xmark'; // Icon for overpayment/loss
+    } else if (isExpenseComplete) {
+      statusText = 'Concluído';
+      bgColor = 'bg-green-500';
+      textColor = 'text-green-600 dark:text-green-400';
+      borderColor = 'border-green-400 dark:border-green-700';
+      shadowClass = 'shadow-green-500/20';
+      icon = 'fa-check';
+    } else if (isExpensePartial) {
+      statusText = 'Parcial';
+      bgColor = 'bg-amber-500';
+      textColor = 'text-amber-600 dark:text-amber-400';
+      borderColor = 'border-amber-400 dark:border-amber-700';
+      shadowClass = 'shadow-amber-500/20';
+      icon = 'fa-hand-holding-dollar'; // Icon for partial payment
+    } else if (isExpensePending) {
+      statusText = 'Pendente';
+      bgColor = 'bg-slate-400';
+      textColor = 'text-slate-700 dark:text-slate-300';
+      borderColor = 'border-slate-200 dark:border-slate-700';
+      shadowClass = 'shadow-slate-400/20';
+      icon = 'fa-hourglass-start';
+    }
+  }
+
+  return { statusText, bgColor, textColor, borderColor, shadowClass, icon };
+};
+
+// NEW: ToolCard Component
+interface ToolCardProps {
+  icon: string;
+  title: string;
+  description: string;
+  onClick: () => void;
+  isLocked?: boolean;
+  requiresVitalicio?: boolean;
+}
+
+const ToolCard: React.FC<ToolCardProps> = ({ icon, title, description, onClick, isLocked, requiresVitalicio }) => {
+  return (
+    <button
+      onClick={onClick}
+      disabled={isLocked}
+      className={cx(
+        surface,
+        "p-5 rounded-2xl flex flex-col items-center text-center gap-3 cursor-pointer hover:scale-[1.005] transition-transform relative group",
+        isLocked ? "opacity-60 cursor-not-allowed" : ""
+      )}
+      aria-label={title}
+    >
+      {isLocked && (
+        <div className="absolute inset-0 bg-black/50 rounded-2xl flex items-center justify-center z-10">
+          <i className="fa-solid fa-lock text-white text-3xl opacity-80"></i>
+        </div>
+      )}
+      <div className="w-12 h-12 rounded-full bg-secondary/10 text-secondary flex items-center justify-center text-xl shrink-0 group-hover:bg-secondary/20 transition-colors">
+        <i className={`fa-solid ${icon}`}></i>
+      </div>
+      <h3 className="font-bold text-primary dark:text-white text-lg leading-tight">{title}</h3>
+      <p className="text-sm text-slate-500 dark:text-slate-400">{description}</p>
+      {requiresVitalicio && (
+        <span className="text-xs font-bold text-amber-600 dark:text-amber-400 mt-1 uppercase tracking-wider">
+          <i className="fa-solid fa-crown mr-1"></i> Acesso Vitalício
+        </span>
+      )}
+    </button>
+  );
+};
+
+// NEW: ToolSubViewHeader Component
+interface ToolSubViewHeaderProps {
+  title: string;
+  onBack: () => void;
+  onAdd?: () => void; // Optional add button
+}
+
+const ToolSubViewHeader: React.FC<ToolSubViewHeaderProps> = ({ title, onBack, onAdd }) => {
+  return (
+    <div className="flex items-center justify-between mb-6 px-2 sm:px-0">
+      <div className="flex items-center gap-3">
+        <button
+          onClick={onBack}
+          className="text-slate-400 hover:text-primary dark:hover:text-white transition-colors p-2 -ml-2"
+          aria-label={`Voltar para ${title}`}
+        >
+          <i className="fa-solid fa-arrow-left text-xl"></i>
+        </button>
+        <h2 className="text-2xl font-black text-primary dark:text-white">{title}</h2>
+      </div>
+      {onAdd && (
+        <button
+          onClick={onAdd}
+          className="px-4 py-2 bg-secondary text-white text-sm font-bold rounded-xl hover:bg-secondary-dark transition-colors flex items-center gap-2"
+          aria-label={`Adicionar novo item em ${title}`}
+        >
+          <i className="fa-solid fa-plus"></i> Novo
+        </button>
+      )}
+    </div>
+  );
+};
 
 /** =========================
  * WorkDetail
@@ -138,6 +375,8 @@ const WorkDetail = () => {
   const [paymentExpenseData, setPaymentExpenseData] = useState<Expense | null>(null); 
   const [paymentAmount, setPaymentAmount] = useState(''); 
   const [paymentDate, setNewPaymentDate] = useState(new Date().toISOString().split('T')[0]); 
+  const [newExpenseTotalAgreed, setNewExpenseTotalAgreed] = useState<string>(''); // NEW: For totalAgreed in expense modal
+
 
   const [showAddWorkerModal, setShowAddWorkerModal] = useState(false);
   const [newWorkerName, setNewWorkerName] = useState('');
@@ -238,7 +477,7 @@ const WorkDetail = () => {
     });
 
     return stepOrder.map(stepId => ({
-      stepName: steps.find(s => s.id === stepId)?.name || 'Sem Etapa',
+      stepName: `${steps.find(s => s.id === stepId)?.orderIndex}. ${steps.find(s => s.id === stepId)?.name || 'Sem Etapa'}`,
       stepId: stepId,
       materials: groups[stepId] || [],
     }));
@@ -261,7 +500,7 @@ const WorkDetail = () => {
     steps.forEach(step => {
       if (groups[step.id]) {
         expenseGroups.push({
-          stepName: step.name,
+          stepName: `${step.orderIndex}. ${step.name}`,
           expenses: groups[step.id].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
           totalStepAmount: groups[step.id].reduce((sum, exp) => sum + exp.amount, 0),
         });
@@ -355,7 +594,14 @@ const WorkDetail = () => {
 
   // NEW: Handle Step Status Change (Pendente -> Parcial -> Concluída -> Pendente)
   const handleStepStatusChange = useCallback(async (step: Step) => {
-    if (step.isDelayed) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const stepEndDate = new Date(step.endDate);
+    stepEndDate.setHours(0, 0, 0, 0);
+
+    const isDelayed = (step.status !== StepStatus.COMPLETED && stepEndDate < today);
+
+    if (isDelayed) {
         setZeModal({
             isOpen: true,
             title: "Etapa Atrasada",
@@ -442,10 +688,11 @@ const WorkDetail = () => {
 
     setZeModal(prev => ({ ...prev, isConfirming: true }));
     try {
+      // isDelayed will be re-calculated in dbService.updateStep, not manually passed here
       await dbService.updateStep({
         ...editStepData,
         workId,
-        isDelayed: new Date(editStepData.endDate) < new Date() && editStepData.status !== StepStatus.COMPLETED
+        // isDelayed: new Date(editStepData.endDate) < new Date() && editStepData.status !== StepStatus.COMPLETED // This is calculated in DB service
       });
       setEditStepData(null);
       await loadWorkData();
@@ -708,7 +955,7 @@ const WorkDetail = () => {
         stepId: newExpenseStepId === 'none' ? undefined : newExpenseStepId,
         workerId: newExpenseWorkerId === 'none' ? undefined : newExpenseWorkerId,
         supplierId: newExpenseSupplierId === 'none' ? undefined : newExpenseSupplierId,
-        totalAgreed: Number(newExpenseAmount),
+        totalAgreed: Number(newExpenseTotalAgreed) || Number(newExpenseAmount), // Use totalAgreed or fallback to amount
       });
       setShowAddExpenseModal(false);
       setNewExpenseDescription('');
@@ -718,6 +965,7 @@ const WorkDetail = () => {
       setNewExpenseStepId('');
       setNewExpenseWorkerId('');
       setNewExpenseSupplierId('');
+      setNewExpenseTotalAgreed(''); // Clear new expense total agreed
       await loadWorkData();
     } catch (error) {
       console.error("Erro ao adicionar despesa:", error);
@@ -751,7 +999,7 @@ const WorkDetail = () => {
         stepId: newExpenseStepId === 'none' ? undefined : newExpenseStepId,
         workerId: newExpenseWorkerId === 'none' ? undefined : newExpenseWorkerId,
         supplierId: newExpenseSupplierId === 'none' ? undefined : newExpenseSupplierId,
-        totalAgreed: Number(newExpenseAmount),
+        totalAgreed: Number(newExpenseTotalAgreed) || Number(newExpenseAmount), // Use totalAgreed or fallback to amount
       });
       setEditExpenseData(null);
       setShowAddExpenseModal(false); // Close the modal
@@ -1365,27 +1613,16 @@ const WorkDetail = () => {
             ) : (
                 <div className="space-y-4">
                     {steps.map((step) => {
-                        const isDelayed = new Date(step.endDate) < new Date() && step.status !== StepStatus.COMPLETED;
-                        let statusColorClass = '';
-                        let statusIcon = '';
-                        switch (step.status) {
-                            case StepStatus.NOT_STARTED: statusColorClass = 'bg-slate-400'; statusIcon = 'fa-hourglass-start'; break;
-                            case StepStatus.IN_PROGRESS: statusColorClass = 'bg-amber-500'; statusIcon = 'fa-hourglass-half'; break;
-                            case StepStatus.COMPLETED: statusColorClass = 'bg-green-500'; statusIcon = 'fa-check'; break;
-                        }
-                        if (isDelayed) {
-                          statusColorClass = 'bg-red-500'; statusIcon = 'fa-exclamation-triangle';
-                        }
+                        const statusDetails = getEntityStatusDetails('step', step, steps);
                         
                         return (
                             <div
                                 key={step.id}
                                 className={cx(
                                     surface,
-                                    "p-4 rounded-2xl flex items-center gap-4 transition-all hover:scale-[1.005]",
+                                    `p-4 rounded-2xl flex items-center gap-4 transition-all hover:scale-[1.005] border-2 ${statusDetails.borderColor} shadow-lg ${statusDetails.shadowClass}`, // Apply dynamic border and shadow
                                     draggedStepId === step.id && "opacity-50",
-                                    dragOverStepId === step.id && "border-2 border-secondary", // Highlight drag target
-                                    isDelayed && "border-red-400 dark:border-red-700 bg-red-50 dark:bg-red-900/10" // Highlight delayed steps
+                                    dragOverStepId === step.id && "ring-2 ring-secondary/50", // Highlight drag target with a ring
                                 )}
                                 draggable
                                 onDragStart={(e) => handleDragStart(e, step.id)}
@@ -1394,36 +1631,48 @@ const WorkDetail = () => {
                                 onDrop={(e) => handleDrop(e, step.id)}
                                 onClick={() => { setEditStepData(step); setShowAddStepModal(true); }} // Open edit modal on card click
                                 role="listitem"
-                                aria-label={`Etapa ${step.name}, status: ${step.status}`}
+                                aria-label={`Etapa ${step.name}, status: ${statusDetails.statusText}`}
                             >
                                 <button
                                     onClick={(e) => { e.stopPropagation(); handleStepStatusChange(step); }} // Prevent card click
                                     className={cx(
-                                        "w-8 h-8 rounded-full text-white flex items-center justify-center text-sm font-bold transition-colors shrink-0",
-                                        statusColorClass,
-                                        isDelayed && "opacity-50 cursor-not-allowed" // Disable button if delayed
+                                        "w-10 h-10 rounded-full text-white flex items-center justify-center text-lg font-bold transition-colors shrink-0",
+                                        statusDetails.bgColor,
+                                        statusDetails.statusText === 'Atrasado' && "opacity-50 cursor-not-allowed" // Disable button if delayed
                                     )}
-                                    disabled={isDelayed}
+                                    disabled={statusDetails.statusText === 'Atrasado'}
                                     aria-label={`Mudar status da etapa ${step.name}`}
                                 >
-                                    <i className={`fa-solid ${statusIcon}`}></i>
+                                    <i className={`fa-solid ${statusDetails.icon}`}></i>
                                 </button>
                                 <div className="flex-1">
-                                    <p className="text-xs font-bold uppercase text-slate-400 dark:text-slate-500 mb-0.5">Etapa {step.orderIndex}</p>
+                                    <p className="text-xs font-bold uppercase text-slate-400 dark:text-slate-500 mb-0.5">Etapa {step.orderIndex} <span className={statusDetails.textColor}>({statusDetails.statusText})</span></p>
                                     <h3 className="text-lg font-bold text-primary dark:text-white leading-tight">{step.name}</h3>
                                     <p className="text-xs text-slate-500 dark:text-slate-400">
                                         {formatDateDisplay(step.startDate)} - {formatDateDisplay(step.endDate)}
                                         {step.realDate && <span className="ml-2 text-green-600 dark:text-green-400">(Concluído em: {formatDateDisplay(step.realDate)})</span>}
                                     </p>
-                                    {isDelayed && (
-                                        <p className="text-xs font-bold text-red-600 dark:text-red-400 mt-1 flex items-center gap-1">
-                                            <i className="fa-solid fa-clock"></i> ATRASADA!
-                                        </p>
-                                    )}
                                 </div>
-                                <div className="text-right text-sm">
+                                <div className="text-right text-sm flex flex-col items-center gap-2">
                                     <p className="font-bold text-primary dark:text-white">{calculateStepProgress(step.id).toFixed(0)}%</p>
                                     <p className="text-xs text-slate-500 dark:text-slate-400">Progresso Materiais</p>
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); 
+                                            setZeModal({
+                                                isOpen: true,
+                                                title: "Excluir Etapa",
+                                                message: `Tem certeza que deseja excluir a etapa ${step.name}?`,
+                                                confirmText: "Excluir",
+                                                onConfirm: async () => handleDeleteStep(step.id),
+                                                onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
+                                                type: "DANGER"
+                                            });
+                                        }}
+                                        className="text-slate-400 hover:text-red-500 transition-colors p-1"
+                                        aria-label={`Excluir etapa ${step.name}`}
+                                    >
+                                        <i className="fa-solid fa-trash-alt text-lg"></i>
+                                    </button>
                                 </div>
                             </div>
                         );
@@ -1466,7 +1715,7 @@ const WorkDetail = () => {
                   >
                     <option value="all">Todas as Etapas</option>
                     {steps.map(step => (
-                      <option key={step.id} value={step.id}>{step.name}</option>
+                      <option key={step.id} value={step.id}>{step.orderIndex}. {step.name}</option>
                     ))}
                   </select>
                 </div>
@@ -1476,19 +1725,64 @@ const WorkDetail = () => {
                     <div key={group.stepId}>
                       <h3 className="text-lg font-bold text-slate-500 dark:text-slate-400 mb-3 px-2 sm:px-0">{group.stepName}</h3>
                       <div className="space-y-4">
-                        {group.materials.map(material => (
-                          <div key={material.id} onClick={() => { setEditMaterialData(material); setShowAddMaterialModal(true); }} className={cx(surface, "p-4 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 cursor-pointer hover:scale-[1.005] transition-transform")} aria-label={`Material ${material.name}`}>
-                            <div className="flex-1 text-left w-full sm:w-auto">
-                              <h4 className="font-bold text-primary dark:text-white text-lg">{material.name}</h4>
-                              <p className="text-xs text-slate-500 dark:text-slate-400">{material.brand || 'Marca não informada'}</p>
+                        {group.materials.map(material => {
+                           const statusDetails = getEntityStatusDetails('material', material, steps);
+                           const progress = material.plannedQty > 0 ? (material.purchasedQty / material.plannedQty) * 100 : 0;
+
+                           return (
+                            <div 
+                              key={material.id} 
+                              onClick={() => { 
+                                setNewMaterialName(material.name);
+                                setNewMaterialPlannedQty(String(material.plannedQty));
+                                setNewMaterialUnit(material.unit);
+                                setNewMaterialCategory(material.category || '');
+                                setNewMaterialStepId(material.stepId || 'none');
+                                setEditMaterialData(material); 
+                                setShowAddMaterialModal(true); 
+                              }} 
+                              className={cx(
+                                surface, 
+                                `p-4 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 cursor-pointer hover:scale-[1.005] transition-transform border-2 ${statusDetails.borderColor} shadow-lg ${statusDetails.shadowClass}`
+                              )} 
+                              aria-label={`Material ${material.name}`}
+                            >
+                                <div className="flex-1 text-left w-full sm:w-auto">
+                                    <p className="text-xs font-bold uppercase text-slate-400 dark:text-slate-500 mb-0.5">Material <span className={statusDetails.textColor}>({statusDetails.statusText})</span></p>
+                                    <h4 className="font-bold text-primary dark:text-white text-lg">{material.name}</h4>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400">{material.brand || 'Marca não informada'}</p>
+                                    <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2 mt-2">
+                                        <div className="h-full bg-secondary rounded-full" style={{ width: `${progress}%` }}></div>
+                                    </div>
+                                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                                        {progress.toFixed(0)}% Comprado
+                                    </p>
+                                </div>
+                                <div className="text-center sm:text-right w-full sm:w-auto flex flex-col items-end gap-1">
+                                    <p className="text-sm text-slate-700 dark:text-slate-300">Sugerido: <span className="font-bold">{material.plannedQty} {material.unit}</span></p>
+                                    <p className="text-sm text-green-600 dark:text-green-400 font-bold">Comprado: {material.purchasedQty} {material.unit}</p>
+                                    {material.totalCost !== undefined && <p className="text-xs text-slate-500 dark:text-slate-400">Custo Total: {formatCurrency(material.totalCost)}</p>}
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); 
+                                            setZeModal({
+                                                isOpen: true,
+                                                title: "Excluir Material",
+                                                message: `Tem certeza que deseja excluir o material ${material.name}? Isso também excluirá despesas relacionadas.`,
+                                                confirmText: "Excluir",
+                                                onConfirm: async () => handleDeleteMaterial(material.id),
+                                                onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
+                                                type: "DANGER"
+                                            });
+                                        }}
+                                        className="text-slate-400 hover:text-red-500 transition-colors p-1"
+                                        aria-label={`Excluir material ${material.name}`}
+                                    >
+                                        <i className="fa-solid fa-trash-alt text-lg"></i>
+                                    </button>
+                                </div>
                             </div>
-                            <div className="text-center sm:text-right w-full sm:w-auto">
-                              <p className="text-sm text-slate-700 dark:text-slate-300">Planejado: <span className="font-bold">{material.plannedQty} {material.unit}</span></p>
-                              <p className="text-sm text-slate-700 dark:text-slate-300">Comprado: <span className="font-bold text-green-600">{material.purchasedQty} {material.unit}</span></p>
-                              {material.totalCost !== undefined && <p className="text-xs text-slate-500 dark:text-slate-400">Custo Total: {formatCurrency(material.totalCost)}</p>}
-                            </div>
-                          </div>
-                        ))}
+                           );
+                        })}
                       </div>
                     </div>
                   ))}
@@ -1546,28 +1840,61 @@ const WorkDetail = () => {
                             </h3>
                             <div className="space-y-4">
                                 {group.expenses.map(expense => {
-                                    const isPaid = (expense.paidAmount || 0) >= expense.amount;
-                                    const isPartial = (expense.paidAmount || 0) > 0 && !isPaid;
-                                    const remainingToPay = expense.amount - (expense.paidAmount || 0);
+                                    const statusDetails = getEntityStatusDetails('expense', expense, steps); // steps not directly used here, but for consistency
 
                                     return (
-                                        <div key={expense.id} onClick={() => { setEditExpenseData(expense); setShowAddExpenseModal(true); }} className={cx(surface, "p-4 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 cursor-pointer hover:scale-[1.005] transition-transform")} aria-label={`Despesa ${expense.description}`}>
+                                        <div 
+                                          key={expense.id} 
+                                          onClick={() => { 
+                                            setNewExpenseDescription(expense.description);
+                                            setNewExpenseAmount(String(expense.amount));
+                                            setNewExpenseCategory(expense.category);
+                                            setNewExpenseDate(expense.date);
+                                            setNewExpenseStepId(expense.stepId || 'none');
+                                            setNewExpenseWorkerId(expense.workerId || 'none');
+                                            setNewExpenseSupplierId(expense.supplierId || 'none');
+                                            setNewExpenseTotalAgreed(String(expense.totalAgreed !== undefined ? expense.totalAgreed : expense.amount)); // Set editable totalAgreed
+                                            setEditExpenseData(expense); 
+                                            setShowAddExpenseModal(true); 
+                                          }} 
+                                          className={cx(
+                                            surface, 
+                                            `p-4 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 cursor-pointer hover:scale-[1.005] transition-transform border-2 ${statusDetails.borderColor} shadow-lg ${statusDetails.shadowClass}`
+                                          )} 
+                                          aria-label={`Despesa ${expense.description}`}
+                                        >
                                             <div className="flex-1 text-left w-full sm:w-auto">
+                                                <p className="text-xs font-bold uppercase text-slate-400 dark:text-slate-500 mb-0.5">Despesa <span className={statusDetails.textColor}>({statusDetails.statusText})</span></p>
                                                 <h4 className="font-bold text-primary dark:text-white text-lg">{expense.description}</h4>
                                                 <p className="text-xs text-slate-500 dark:text-slate-400">{formatDateDisplay(expense.date)} - {expense.category}</p>
                                                 {expense.workerId && <p className="text-xs text-slate-500 dark:text-slate-400">Profissional: {workers.find(w => w.id === expense.workerId)?.name}</p>}
                                                 {expense.supplierId && <p className="text-xs text-slate-500 dark:text-slate-400">Fornecedor: {suppliers.find(s => s.id === expense.supplierId)?.name}</p>}
                                             </div>
                                             <div className="text-center sm:text-right w-full sm:w-auto flex flex-col items-end gap-1">
-                                                <p className="text-sm text-slate-700 dark:text-slate-300">Valor: <span className="font-bold">{formatCurrency(expense.amount)}</span></p>
-                                                <p className={cx("text-sm", isPaid ? "text-green-600 dark:text-green-400" : isPartial ? "text-amber-600 dark:text-amber-400" : "text-red-600 dark:text-red-400")}>
-                                                    Pago: <span className="font-bold">{formatCurrency(expense.paidAmount || 0)}</span>
-                                                </p>
-                                                {!isPaid && (
+                                                <p className="text-sm text-slate-700 dark:text-slate-300">Combinado: <span className="font-bold">{formatCurrency(expense.totalAgreed !== undefined ? expense.totalAgreed : expense.amount)}</span></p>
+                                                <p className={cx("text-sm font-bold", statusDetails.textColor)}>Pago: {formatCurrency(expense.paidAmount || 0)}</p>
+                                                {statusDetails.statusText !== 'Concluído' && statusDetails.statusText !== 'Prejuízo' && (
                                                     <button onClick={(e) => { e.stopPropagation(); setPaymentExpenseData(expense); setShowAddPaymentModal(true); }} className="text-xs text-secondary hover:underline" aria-label={`Adicionar pagamento para despesa ${expense.description}`}>
-                                                        Pagar {formatCurrency(remainingToPay)}
+                                                        Pagar {formatCurrency((expense.totalAgreed !== undefined ? expense.totalAgreed : expense.amount) - (expense.paidAmount || 0))}
                                                     </button>
                                                 )}
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); 
+                                                        setZeModal({
+                                                            isOpen: true,
+                                                            title: "Excluir Despesa",
+                                                            message: `Tem certeza que deseja excluir a despesa ${expense.description}?`,
+                                                            confirmText: "Excluir",
+                                                            onConfirm: async () => handleDeleteExpense(expense.id),
+                                                            onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
+                                                            type: "DANGER"
+                                                        });
+                                                    }}
+                                                    className="text-slate-400 hover:text-red-500 transition-colors p-1"
+                                                    aria-label={`Excluir despesa ${expense.description}`}
+                                                >
+                                                    <i className="fa-solid fa-trash-alt text-lg"></i>
+                                                </button>
                                             </div>
                                         </div>
                                     );
@@ -1727,7 +2054,7 @@ const WorkDetail = () => {
             )}
           </>
         );
-      
+
       case 'SUPPLIERS':
         return (
           <>
@@ -2096,24 +2423,6 @@ const WorkDetail = () => {
               </div>
             )}
           <div className="flex justify-between gap-3 mt-6">
-            {editStepData && (
-                <button
-                    type="button"
-                    onClick={() => setZeModal({
-                        isOpen: true,
-                        title: "Excluir Etapa",
-                        message: `Tem certeza que deseja excluir a etapa ${editStepData.name}?`,
-                        confirmText: "Excluir",
-                        onConfirm: async () => handleDeleteStep(editStepData.id),
-                        onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
-                        type: "DANGER"
-                    })}
-                    className="flex-1 py-3 px-4 bg-red-500 text-white font-bold rounded-xl hover:bg-red-600 transition-colors flex items-center justify-center gap-2"
-                    aria-label={`Excluir etapa ${editStepData.name}`}
-                >
-                    <i className="fa-solid fa-trash-alt"></i> Excluir
-                </button>
-            )}
             <button
               type="submit"
               disabled={zeModal.isConfirming}
@@ -2140,20 +2449,20 @@ const WorkDetail = () => {
             <input
               type="text"
               id="materialName"
-              value={editMaterialData ? editMaterialData.name : newMaterialName}
-              onChange={(e) => editMaterialData ? setEditMaterialData({ ...editMaterialData, name: e.target.value }) : setNewMaterialName(e.target.value)}
+              value={newMaterialName} // Use newMaterialName for consistency, update on change
+              onChange={(e) => setNewMaterialName(e.target.value)}
               className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
               required
               aria-label="Nome do material"
             />
           </div>
           <div>
-            <label htmlFor="materialPlannedQty" className="block text-sm font-bold text-slate-500 uppercase mb-2">Quantidade Planejada</label>
+            <label htmlFor="materialPlannedQty" className="block text-sm font-bold text-slate-500 uppercase mb-2">Quantidade Sugerida</label>
             <input
               type="number"
               id="materialPlannedQty"
-              value={editMaterialData ? editMaterialData.plannedQty : newMaterialPlannedQty}
-              onChange={(e) => editMaterialData ? setEditMaterialData({ ...editMaterialData, plannedQty: Number(e.target.value) }) : setNewMaterialPlannedQty(e.target.value)}
+              value={newMaterialPlannedQty} // Use newMaterialPlannedQty
+              onChange={(e) => setNewMaterialPlannedQty(e.target.value)}
               className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
               required
               min="0"
@@ -2165,8 +2474,8 @@ const WorkDetail = () => {
             <input
               type="text"
               id="materialUnit"
-              value={editMaterialData ? editMaterialData.unit : newMaterialUnit}
-              onChange={(e) => editMaterialData ? setEditMaterialData({ ...editMaterialData, unit: e.target.value }) : setNewMaterialUnit(e.target.value)}
+              value={newMaterialUnit} // Use newMaterialUnit
+              onChange={(e) => setNewMaterialUnit(e.target.value)}
               className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
               required
               aria-label="Unidade de medida"
@@ -2177,8 +2486,8 @@ const WorkDetail = () => {
             <input
               type="text"
               id="materialCategory"
-              value={editMaterialData ? editMaterialData.category : newMaterialCategory}
-              onChange={(e) => editMaterialData ? setEditMaterialData({ ...editMaterialData, category: e.target.value }) : setNewMaterialCategory(e.target.value)}
+              value={newMaterialCategory} // Use newMaterialCategory
+              onChange={(e) => setNewMaterialCategory(e.target.value)}
               className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
               aria-label="Categoria do material"
             />
@@ -2187,37 +2496,19 @@ const WorkDetail = () => {
             <label htmlFor="materialStep" className="block text-sm font-bold text-slate-500 uppercase mb-2">Etapa Relacionada</label>
             <select
               id="materialStep"
-              value={editMaterialData ? (editMaterialData.stepId || 'none') : (newMaterialStepId || 'none')}
-              onChange={(e) => editMaterialData ? setEditMaterialData({ ...editMaterialData, stepId: e.target.value === 'none' ? undefined : e.target.value }) : setNewMaterialStepId(e.target.value)}
+              value={newMaterialStepId} // Use newMaterialStepId
+              onChange={(e) => setNewMaterialStepId(e.target.value)}
               className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
               aria-label="Etapa relacionada ao material"
             >
               <option value="none">Nenhuma</option>
               {steps.map(step => (
-                <option key={step.id} value={step.id}>{step.name}</option>
+                <option key={step.id} value={step.id}>{step.orderIndex}. {step.name}</option>
               ))}
             </select>
           </div>
           
           <div className="flex justify-between gap-3 mt-6">
-            {editMaterialData && (
-                <button
-                    type="button"
-                    onClick={() => setZeModal({
-                        isOpen: true,
-                        title: "Excluir Material",
-                        message: `Tem certeza que deseja excluir o material ${editMaterialData.name}? Isso também excluirá despesas relacionadas.`,
-                        confirmText: "Excluir",
-                        onConfirm: async () => handleDeleteMaterial(editMaterialData.id),
-                        onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
-                        type: "DANGER"
-                    })}
-                    className="flex-1 py-3 px-4 bg-red-500 text-white font-bold rounded-xl hover:bg-red-600 transition-colors flex items-center justify-center gap-2"
-                    aria-label={`Excluir material ${editMaterialData.name}`}
-                >
-                    <i className="fa-solid fa-trash-alt"></i> Excluir
-                </button>
-            )}
             <button
               type="submit"
               disabled={zeModal.isConfirming}
@@ -2231,7 +2522,9 @@ const WorkDetail = () => {
 
           {editMaterialData && (
             <div className="mt-8 pt-6 border-t border-slate-200 dark:border-slate-700">
-                <h4 className="text-lg font-bold text-primary dark:text-white mb-4">Registrar Compra</h4>
+                <h4 className="text-lg font-bold text-primary dark:text-white mb-4">Quantidade Comprada <span className="text-green-600 dark:text-green-400">({editMaterialData.purchasedQty} {editMaterialData.unit})</span></h4>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">Esta quantidade não pode ser editada diretamente, apenas adicionando novas compras.</p>
+                <h4 className="text-lg font-bold text-primary dark:text-white mb-4 mt-6">Registrar Nova Compra</h4>
                 <div className="flex flex-col md:flex-row gap-4">
                     <div className="flex-1">
                         <label htmlFor="purchaseQty" className="block text-sm font-bold text-slate-500 uppercase mb-2">Quantidade Comprada</label>
@@ -2279,7 +2572,7 @@ const WorkDetail = () => {
   const AddEditExpenseModal = () => (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
       <div className={cx(surface, "rounded-3xl p-6 w-full max-w-lg relative max-h-[90vh] overflow-y-auto")}>
-        <button onClick={() => { setShowAddExpenseModal(false); setEditExpenseData(null); }} className="absolute top-4 right-4 text-slate-400 hover:text-primary dark:hover:text-white" aria-label="Fechar modal"><i className="fa-solid fa-xmark text-xl"></i></button>
+        <button onClick={() => { setShowAddExpenseModal(false); setEditExpenseData(null); setNewExpenseTotalAgreed(''); }} className="absolute top-4 right-4 text-slate-400 hover:text-primary dark:hover:text-white" aria-label="Fechar modal"><i className="fa-solid fa-xmark text-xl"></i></button>
         <h3 className="text-xl font-bold text-primary dark:text-white mb-6">{editExpenseData ? `Editar Despesa: ${editExpenseData.description}` : 'Adicionar Nova Despesa'}</h3>
         <form onSubmit={editExpenseData ? handleEditExpense : handleAddExpense} className="space-y-4">
           <div>
@@ -2287,8 +2580,8 @@ const WorkDetail = () => {
             <input
               type="text"
               id="expenseDescription"
-              value={editExpenseData ? editExpenseData.description : newExpenseDescription}
-              onChange={(e) => editExpenseData ? setEditExpenseData({ ...editExpenseData, description: e.target.value }) : setNewExpenseDescription(e.target.value)}
+              value={newExpenseDescription}
+              onChange={(e) => setNewExpenseDescription(e.target.value)}
               className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
               required
               aria-label="Descrição da despesa"
@@ -2299,8 +2592,14 @@ const WorkDetail = () => {
             <input
               type="number"
               id="expenseAmount"
-              value={editExpenseData ? editExpenseData.amount : newExpenseAmount}
-              onChange={(e) => editExpenseData ? setEditExpenseData({ ...editExpenseData, amount: Number(e.target.value) }) : setNewExpenseAmount(e.target.value)}
+              value={newExpenseAmount}
+              onChange={(e) => {
+                setNewExpenseAmount(e.target.value);
+                // If totalAgreed is not explicitly set or is 0, auto-fill it with amount
+                if (newExpenseTotalAgreed === '' || Number(newExpenseTotalAgreed) === 0) {
+                    setNewExpenseTotalAgreed(e.target.value);
+                }
+              }}
               className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
               required
               min="0"
@@ -2309,11 +2608,31 @@ const WorkDetail = () => {
             />
           </div>
           <div>
+            <label htmlFor="expenseTotalAgreed" className="block text-sm font-bold text-slate-500 uppercase mb-2">Valor Combinado (R$)</label>
+            <input
+              type="number"
+              id="expenseTotalAgreed"
+              value={newExpenseTotalAgreed}
+              onChange={(e) => setNewExpenseTotalAgreed(e.target.value)}
+              className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
+              required
+              min="0"
+              step="0.01"
+              aria-label="Valor total combinado para a despesa"
+            />
+          </div>
+          {editExpenseData && (
+            <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-700 text-sm flex justify-between">
+                <span className="text-slate-500 dark:text-slate-400">Total Pago:</span>
+                <span className="font-bold text-green-600 dark:text-green-400">{formatCurrency(editExpenseData.paidAmount || 0)}</span>
+            </div>
+          )}
+          <div>
             <label htmlFor="expenseCategory" className="block text-sm font-bold text-slate-500 uppercase mb-2">Categoria</label>
             <select
               id="expenseCategory"
-              value={editExpenseData ? editExpenseData.category : newExpenseCategory}
-              onChange={(e) => editExpenseData ? setEditExpenseData({ ...editExpenseData, category: e.target.value }) : setNewExpenseCategory(e.target.value)}
+              value={newExpenseCategory}
+              onChange={(e) => setNewExpenseCategory(e.target.value)}
               className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
               aria-label="Categoria da despesa"
             >
@@ -2328,8 +2647,8 @@ const WorkDetail = () => {
             <input
               type="date"
               id="expenseDate"
-              value={editExpenseData ? editExpenseData.date : newExpenseDate}
-              onChange={(e) => editExpenseData ? setEditExpenseData({ ...editExpenseData, date: e.target.value }) : setNewExpenseDate(e.target.value)}
+              value={newExpenseDate}
+              onChange={(e) => setNewExpenseDate(e.target.value)}
               className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
               required
               aria-label="Data da despesa"
@@ -2339,14 +2658,14 @@ const WorkDetail = () => {
             <label htmlFor="expenseStep" className="block text-sm font-bold text-slate-500 uppercase mb-2">Etapa Relacionada</label>
             <select
               id="expenseStep"
-              value={editExpenseData ? (editExpenseData.stepId || 'none') : (newExpenseStepId || 'none')}
-              onChange={(e) => editExpenseData ? setEditExpenseData({ ...editExpenseData, stepId: e.target.value === 'none' ? undefined : e.target.value }) : setNewExpenseStepId(e.target.value)}
+              value={newExpenseStepId}
+              onChange={(e) => setNewExpenseStepId(e.target.value)}
               className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
               aria-label="Etapa relacionada à despesa"
             >
               <option value="none">Nenhuma</option>
               {steps.map(step => (
-                <option key={step.id} value={step.id}>{step.name}</option>
+                <option key={step.id} value={step.id}>{step.orderIndex}. {step.name}</option>
               ))}
             </select>
           </div>
@@ -2354,8 +2673,8 @@ const WorkDetail = () => {
             <label htmlFor="expenseWorker" className="block text-sm font-bold text-slate-500 uppercase mb-2">Profissional</label>
             <select
               id="expenseWorker"
-              value={editExpenseData ? (editExpenseData.workerId || 'none') : (newExpenseWorkerId || 'none')}
-              onChange={(e) => editExpenseData ? setEditExpenseData({ ...editExpenseData, workerId: e.target.value === 'none' ? undefined : e.target.value }) : setNewExpenseWorkerId(e.target.value)}
+              value={newExpenseWorkerId}
+              onChange={(e) => setNewExpenseWorkerId(e.target.value)}
               className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
               aria-label="Profissional relacionado à despesa"
             >
@@ -2369,8 +2688,8 @@ const WorkDetail = () => {
             <label htmlFor="expenseSupplier" className="block text-sm font-bold text-slate-500 uppercase mb-2">Fornecedor</label>
             <select
               id="expenseSupplier"
-              value={editExpenseData ? (editExpenseData.supplierId || 'none') : (newExpenseSupplierId || 'none')}
-              onChange={(e) => editExpenseData ? setEditExpenseData({ ...editExpenseData, supplierId: e.target.value === 'none' ? undefined : e.target.value }) : setNewExpenseSupplierId(e.target.value)}
+              value={newExpenseSupplierId}
+              onChange={(e) => setNewExpenseSupplierId(e.target.value)}
               className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
               aria-label="Fornecedor relacionado à despesa"
             >
@@ -2382,24 +2701,6 @@ const WorkDetail = () => {
           </div>
 
           <div className="flex justify-between gap-3 mt-6">
-            {editExpenseData && (
-                <button
-                    type="button"
-                    onClick={() => setZeModal({
-                        isOpen: true,
-                        title: "Excluir Despesa",
-                        message: `Tem certeza que deseja excluir a despesa ${editExpenseData.description}?`,
-                        confirmText: "Excluir",
-                        onConfirm: async () => handleDeleteExpense(editExpenseData.id),
-                        onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
-                        type: "DANGER"
-                    })}
-                    className="flex-1 py-3 px-4 bg-red-500 text-white font-bold rounded-xl hover:bg-red-600 transition-colors flex items-center justify-center gap-2"
-                    aria-label={`Excluir despesa ${editExpenseData.description}`}
-                >
-                    <i className="fa-solid fa-trash-alt"></i> Excluir
-                </button>
-            )}
             <button
               type="submit"
               disabled={zeModal.isConfirming}
@@ -2421,7 +2722,7 @@ const WorkDetail = () => {
         <button onClick={() => { setShowAddPaymentModal(false); setPaymentExpenseData(null); setPaymentAmount(''); }} className="absolute top-4 right-4 text-slate-400 hover:text-primary dark:hover:text-white" aria-label="Fechar modal"><i className="fa-solid fa-xmark text-xl"></i></button>
         <h3 className="text-xl font-bold text-primary dark:text-white mb-6">Adicionar Pagamento</h3>
         <p className="text-slate-700 dark:text-slate-300 mb-4">Despesa: <span className="font-bold">{paymentExpenseData?.description}</span></p>
-        <p className="text-slate-700 dark:text-slate-300 mb-4">Valor Total: <span className="font-bold">{formatCurrency(paymentExpenseData?.amount)}</span></p>
+        <p className="text-slate-700 dark:text-slate-300 mb-4">Valor Combinado: <span className="font-bold">{formatCurrency(paymentExpenseData?.totalAgreed !== undefined ? paymentExpenseData.totalAgreed : paymentExpenseData?.amount)}</span></p>
         <p className="text-slate-700 dark:text-slate-300 mb-6">Já Pago: <span className="font-bold text-green-600">{formatCurrency(paymentExpenseData?.paidAmount || 0)}</span></p>
         <form onSubmit={handleAddPayment} className="space-y-4">
           <div>
@@ -2435,7 +2736,7 @@ const WorkDetail = () => {
               required
               min="0"
               step="0.01"
-              max={paymentExpenseData ? paymentExpenseData.amount - (paymentExpenseData.paidAmount || 0) : undefined}
+              max={paymentExpenseData ? ((paymentExpenseData.totalAgreed !== undefined ? paymentExpenseData.totalAgreed : paymentExpenseData.amount) - (paymentExpenseData.paidAmount || 0)) : undefined}
               aria-label="Valor do pagamento"
             />
           </div>
@@ -2824,7 +3125,7 @@ const WorkDetail = () => {
             >
               <option value="">Selecione uma etapa</option>
               {steps.map(step => (
-                <option key={step.id} value={step.name}>{step.name}</option> // Use step name as category
+                <option key={step.id} value={step.name}>{step.orderIndex}. {step.name}</option> // Use step name as category
               ))}
               <option value="Geral">Geral</option>
               <option value="Segurança">Segurança</option>
@@ -2917,84 +3218,8 @@ const WorkDetail = () => {
       {showAddPhotoModal && <AddPhotoModal />}
       {showAddFileModal && <AddFileModal />}
       {showAddChecklistModal && <AddEditChecklistModal />}
-      {zeModal.isOpen && <ZeModal {...zeModal} />}
     </div>
   );
 };
 
-// =======================================================================
-// SHARED COMPONENTS
-// =======================================================================
-
-interface ToolCardProps {
-  icon: string;
-  title: string;
-  description: string;
-  onClick: () => void;
-  isLocked?: boolean;
-  requiresVitalicio?: boolean; // NEW: Prop to indicate if tool requires Vitalício plan
-}
-
-const ToolCard: React.FC<ToolCardProps> = ({ icon, title, description, onClick, isLocked, requiresVitalicio }) => (
-  <button
-    onClick={onClick}
-    disabled={isLocked}
-    className={cx(
-      "relative flex flex-col items-center text-center p-6 rounded-2xl border-2 transition-all group",
-      isLocked 
-        ? "opacity-50 cursor-not-allowed" 
-        : (requiresVitalicio ? "bg-gradient-vitalicio-bonus border-secondary/50 shadow-lg shadow-blue-500/10 hover:brightness-110 active:scale-98" : "bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 shadow-sm dark:shadow-card-dark-subtle hover:border-secondary/50 hover:shadow-lg hover:scale-[1.01] active:scale-[0.98]")
-    )}
-    aria-label={`Abrir ferramenta ${title}`}
-    aria-disabled={isLocked}
-  >
-    {isLocked && (
-      <div className="absolute inset-0 flex items-center justify-center bg-black/20 rounded-2xl z-10">
-        <i className="fa-solid fa-lock text-white text-4xl"></i>
-      </div>
-    )}
-    <div className={cx(
-      "w-16 h-16 rounded-full flex items-center justify-center text-3xl mb-4 transition-all",
-      isLocked 
-        ? "bg-slate-200 dark:bg-slate-700 text-slate-400 dark:text-slate-500" 
-        : (requiresVitalicio ? "bg-secondary text-white" : "bg-primary text-white group-hover:bg-secondary")
-    )}>
-      <i className={`fa-solid ${icon}`}></i>
-    </div>
-    <h3 className={cx("text-xl font-bold mb-2", requiresVitalicio && !isLocked ? "text-amber-300" : "text-primary dark:text-white")}>{title}</h3>
-    <p className={cx("text-sm", requiresVitalicio && !isLocked ? "text-slate-300" : "text-slate-500 dark:text-slate-400")}>{description}</p>
-  </button>
-);
-
-interface ToolSubViewHeaderProps {
-  title: string;
-  onBack: () => void;
-  onAdd?: () => void;
-}
-
-const ToolSubViewHeader: React.FC<ToolSubViewHeaderProps> = ({ title, onBack, onAdd }) => (
-  <div className="flex items-center justify-between mb-6 px-2 sm:px-0">
-    <div className="flex items-center gap-4">
-      <button
-        onClick={onBack}
-        className="text-slate-400 hover:text-primary dark:hover:text-white transition-colors p-2 -ml-2"
-        aria-label="Voltar"
-      >
-        <i className="fa-solid fa-arrow-left text-xl"></i>
-      </button>
-      <h2 className="text-2xl font-black text-primary dark:text-white">{title}</h2>
-    </div>
-    {onAdd && (
-      <button
-        onClick={onAdd}
-        className="px-4 py-2 bg-secondary text-white text-sm font-bold rounded-xl hover:bg-secondary-dark transition-colors flex items-center gap-2"
-        aria-label={`Adicionar novo ${title}`}
-      >
-        <i className="fa-solid fa-plus"></i> Novo
-      </button>
-    )}
-  </div>
-);
-
 export default WorkDetail;
-    

@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import * as ReactRouter from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.tsx';
@@ -127,17 +126,18 @@ const SegmentedProgressBar = ({ steps }: { steps: Step[] }) => {
   }
 
   const totalSteps = steps.length;
-  const today = new Date().toISOString().split('T')[0];
+  const today = new Date();
+  today.setHours(0, 0, 0, 0); // Normalize today's date to midnight
 
   const completed = steps.filter(s => s.status === StepStatus.COMPLETED);
-  const inProgress = steps.filter(s => s.status === StepStatus.IN_PROGRESS);
-  const notStarted = steps.filter(s => s.status === StepStatus.NOT_STARTED); 
-  const delayed = steps.filter(s => s.status !== StepStatus.COMPLETED && new Date(s.endDate).getTime() < new Date(today).getTime());
+  const inProgress = steps.filter(s => s.status === StepStatus.IN_PROGRESS && new Date(s.endDate).setHours(0,0,0,0) >= today.getTime());
+  const notStarted = steps.filter(s => s.status === StepStatus.NOT_STARTED && new Date(s.endDate).setHours(0,0,0,0) >= today.getTime()); 
+  const delayed = steps.filter(s => s.status !== StepStatus.COMPLETED && new Date(s.endDate).setHours(0,0,0,0) < today.getTime());
 
-  // Calculate percentages, ensuring no negative or over 100%
+  // Calculate percentages based on the new, mutually exclusive categories
   const completedPct = (completed.length / totalSteps) * 100;
-  const delayedPct = (delayed.length / totalSteps) * 100;
   const inProgressPct = (inProgress.length / totalSteps) * 100;
+  const delayedPct = (delayed.length / totalSteps) * 100;
   const notStartedPct = (notStarted.length / totalSteps) * 100;
 
 
@@ -273,18 +273,19 @@ const Dashboard = () => {
           return;
       }
 
-      const today = new Date().toISOString().split('T')[0];
+      const today = new Date();
+      today.setHours(0, 0, 0, 0); // Normalize today's date to midnight
 
       const totalSteps = fetchedSteps.length;
       const completedSteps = fetchedSteps.filter(s => s.status === StepStatus.COMPLETED).length;
-      // Define `delayedStepsArray` before using it in `inProgressSteps` filter
-      const delayedStepsArray = fetchedSteps.filter(s => (s.status === StepStatus.NOT_STARTED || s.status === StepStatus.IN_PROGRESS) && new Date(s.endDate).getTime() < new Date(today).getTime());
+      
+      // Delayed steps are those not completed and whose end date has passed
+      const delayedStepsArray = fetchedSteps.filter(s => s.status !== StepStatus.COMPLETED && new Date(s.endDate).setHours(0,0,0,0) < today.getTime());
       const delayedStepsCount = delayedStepsArray.length;
       
-      // Calculate in progress steps by subtracting completed and delayed from total.
-      // This assumes a step is either not started, in progress, completed, or delayed.
+      // In progress steps are those currently in progress and not delayed
       const inProgressSteps = fetchedSteps.filter(s => 
-        s.status === StepStatus.IN_PROGRESS && !delayedStepsArray.some(d => d.id === s.id) // Use delayedStepsArray
+        s.status === StepStatus.IN_PROGRESS && !delayedStepsArray.some(d => d.id === s.id)
       ).length;
 
       const pendingMaterials = fetchedMaterials.filter(m => m.purchasedQty < m.plannedQty).length;
@@ -294,7 +295,7 @@ const Dashboard = () => {
         totalSteps,
         completedSteps,
         inProgressSteps,
-        delayedSteps: delayedStepsCount, // Use the count here
+        delayedSteps: delayedStepsCount,
         pendingMaterials,
         totalSpent,
         budgetPlanned: fetchedWork.budgetPlanned
