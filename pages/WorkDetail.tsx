@@ -94,8 +94,9 @@ const getEntityStatusDetails = (
 
   if (entityType === 'step') {
     const step = entity as Step;
-    // CRITICAL: is_delayed for step is now derived from DB. So we use step.isDelayed directly
     const isActuallyDelayed = step.isDelayed; 
+
+    // console.log(`[getEntityStatusDetails] Processing step ${step.name} (ID: ${step.id}). Status: ${step.status}, isDelayed: ${step.isDelayed}`);
 
     if (step.status === StepStatus.COMPLETED) {
       statusText = 'Concluído';
@@ -106,14 +107,18 @@ const getEntityStatusDetails = (
       icon = 'fa-check';
     } else if (step.status === StepStatus.IN_PROGRESS) {
       statusText = isActuallyDelayed ? 'Em Andamento (Atrasado)' : 'Em Andamento';
-      bgColor = isActuallyDelayed ? 'bg-red-500' : 'bg-amber-500'; // Red if delayed, Amber if on track
+      // CRITICAL FIX: Button bgColor should always be amber for IN_PROGRESS,
+      // regardless of isActuallyDelayed. Delay is reflected in text and card style.
+      bgColor = 'bg-amber-500'; 
       textColor = isActuallyDelayed ? 'text-red-600 dark:text-red-400' : 'text-amber-600 dark:text-amber-400';
       borderColor = isActuallyDelayed ? 'border-red-400 dark:border-red-700' : 'border-amber-400 dark:border-amber-700';
       shadowClass = isActuallyDelayed ? 'shadow-red-500/20' : 'shadow-amber-500/20';
       icon = isActuallyDelayed ? 'fa-exclamation-triangle' : 'fa-hourglass-half';
     } else { // StepStatus.NOT_STARTED
       statusText = isActuallyDelayed ? 'Pendente (Atrasado)' : 'Pendente';
-      bgColor = isActuallyDelayed ? 'bg-red-500' : 'bg-slate-400'; // Red if delayed, Grey if on track
+      // CRITICAL FIX: Button bgColor should always be gray for NOT_STARTED,
+      // regardless of isActuallyDelayed. This makes 'Concluído' -> 'Pendente' go to gray.
+      bgColor = 'bg-slate-400'; 
       textColor = isActuallyDelayed ? 'text-red-600 dark:text-red-400' : 'text-slate-700 dark:text-slate-300';
       borderColor = isActuallyDelayed ? 'border-red-400 dark:border-red-700' : 'border-slate-200 dark:border-slate-700';
       shadowClass = isActuallyDelayed ? 'shadow-red-500/20' : 'shadow-slate-400/20';
@@ -597,9 +602,12 @@ const WorkDetail = () => {
 
   // NEW: Handle Step Status Change (Pendente -> Parcial -> Concluída -> Pendente)
   const handleStepStatusChange = useCallback(async (step: Step) => {
-    if (isUpdatingStepStatus) return; // Prevent multiple clicks
+    if (isUpdatingStepStatus) {
+        console.log(`[handleStepStatusChange] Button disabled, preventing multiple clicks for step ${step.id}.`);
+        return; // Prevent multiple clicks
+    }
 
-    console.log(`[handleStepStatusChange] Step ID: ${step.id}, Current Status: ${step.status}`);
+    console.log(`[handleStepStatusChange] Processing step ID: ${step.id}. Current Status: ${step.status}.`);
     setIsUpdatingStepStatus(true);
 
     let newStatus: StepStatus;
@@ -608,26 +616,31 @@ const WorkDetail = () => {
     switch (step.status) {
       case StepStatus.NOT_STARTED:
         newStatus = StepStatus.IN_PROGRESS;
+        console.log(`[handleStepStatusChange] Status transition: NOT_STARTED -> IN_PROGRESS for step ${step.id}.`);
         break;
       case StepStatus.IN_PROGRESS:
         newStatus = StepStatus.COMPLETED;
         newRealDate = new Date().toISOString().split('T')[0]; // Set real completion date
+        console.log(`[handleStepStatusChange] Status transition: IN_PROGRESS -> COMPLETED for step ${step.id}. RealDate: ${newRealDate}.`);
         break;
       case StepStatus.COMPLETED:
         newStatus = StepStatus.NOT_STARTED; // Cycle back to NOT_STARTED
         newRealDate = undefined; // Clear real completion date
+        console.log(`[handleStepStatusChange] Status transition: COMPLETED -> NOT_STARTED for step ${step.id}. Clearing RealDate.`);
         break;
       default:
         newStatus = StepStatus.NOT_STARTED; // Should not happen
+        console.warn(`[handleStepStatusChange] Unexpected status for step ${step.id}: ${step.status}. Defaulting to NOT_STARTED.`);
     }
-    console.log(`[handleStepStatusChange] New Status intended: ${newStatus}`);
-
+    
     try {
       // isDelayed is calculated in dbService.updateStep based on the new status and dates
       await dbService.updateStep({ ...step, status: newStatus, realDate: newRealDate });
+      console.log(`[handleStepStatusChange] dbService.updateStep successful for step ${step.id}. Reloading data...`);
       await loadWorkData();
+      console.log(`[handleStepStatusChange] Data reloaded after status update for step ${step.id}.`);
     } catch (error) {
-      console.error("Erro ao alterar status da etapa:", error);
+      console.error(`[handleStepStatusChange] Erro ao alterar status da etapa ${step.id}:`, error);
       setZeModal({
         isOpen: true,
         title: "Erro ao Atualizar Status",
@@ -638,6 +651,7 @@ const WorkDetail = () => {
       });
     } finally {
       setIsUpdatingStepStatus(false);
+      console.log(`[handleStepStatusChange] Finalized status update for step ${step.id}. isUpdatingStepStatus set to false.`);
     }
   }, [loadWorkData, isUpdatingStepStatus]);
 
@@ -1330,9 +1344,17 @@ const WorkDetail = () => {
     setZeModal(prev => ({ ...prev, isConfirming: true }));
     try {
       // 1. Delete from Supabase Storage
-      const filePath = photoUrl.split('work_media/')[1]; // Extract path from URL
+      // The URL looks like: https://[project_id].supabase.co/storage/v1/object/public/work_media/workId/timestamp.ext
+      const filePath = photoUrl.split('work_media/')[1]; // Extract path from URL: workId/timestamp.ext
       const { error: storageError } = await supabase.storage.from('work_media').remove([filePath]);
-      if (storageError) throw storageError;
+      if (storageError) {
+        // If the storage object is not found (already deleted, etc.), don't block DB deletion
+        if (storageError.statusCode === '404' || storageError.message.includes('not found')) {
+            console.warn(`Storage object for photo ID ${photoId} not found or already deleted. Proceeding with DB deletion.`);
+        } else {
+            throw storageError;
+        }
+      }
 
       // 2. Delete record from database
       await dbService.deletePhoto(photoId);
@@ -1422,7 +1444,14 @@ const WorkDetail = () => {
       // 1. Delete from Supabase Storage
       const filePath = fileUrl.split('work_files/')[1]; // Extract path from URL
       const { error: storageError } = await supabase.storage.from('work_files').remove([filePath]);
-      if (storageError) throw storageError;
+      if (storageError) {
+          // If the storage object is not found (already deleted, etc.), don't block DB deletion
+          if (storageError.statusCode === '404' || storageError.message.includes('not found')) {
+              console.warn(`Storage object for file ID ${fileId} not found or already deleted. Proceeding with DB deletion.`);
+          } else {
+              throw storageError;
+          }
+      }
 
       // 2. Delete record from database
       await dbService.deleteFile(fileId);
@@ -2257,7 +2286,7 @@ const WorkDetail = () => {
                     </div>
                 ) : (
                     <div className="space-y-4">
-                        {CONTRACT_TEMPLATES.map(contract => (
+                        {contracts.map(contract => (
                             <div key={contract.id} className={cx(surface, "p-4 rounded-2xl flex items-start gap-4")}>
                                 <div className="w-10 h-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center text-lg shrink-0">
                                     <i className="fa-solid fa-file-contract"></i>
@@ -2730,7 +2759,6 @@ const WorkDetail = () => {
                 value={paymentAmount}
                 onChange={(e) => setPaymentAmount(e.target.value)}
                 min="0"
-                step="0.01"
                 className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
                 required
               />

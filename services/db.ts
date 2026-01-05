@@ -21,6 +21,8 @@ const _dashboardCache: {
     files: Record<string, { data: WorkFile[], timestamp: number }>;
     contracts: { data: Contract[], timestamp: number } | null; // Contracts are global
     checklists: Record<string, { data: Checklist[], timestamp: number }>;
+    // NEW: Cache for push subscriptions
+    pushSubscriptions: Record<string, { data: PushSubscriptionInfo[], timestamp: number }>;
 } = {
     works: null,
     stats: {},
@@ -35,6 +37,7 @@ const _dashboardCache: {
     files: {}, // NEW
     contracts: null, // NEW
     checklists: {}, // NEW
+    pushSubscriptions: {}, // NEW
 };
 
 // --- HELPERS ---
@@ -112,6 +115,7 @@ const parseExpenseFromDB = (data: any): Expense => ({
     totalAgreed: data.total_agreed ? Number(data.total_agreed) : undefined 
 });
 
+// NEW: Parser for Worker
 const parseWorkerFromDB = (data: any): Worker => ({
     id: data.id,
     userId: data.user_id,
@@ -123,6 +127,7 @@ const parseWorkerFromDB = (data: any): Worker => ({
     notes: data.notes
 });
 
+// NEW: Parser for Supplier
 const parseSupplierFromDB = (data: any): Supplier => ({
     id: data.id,
     userId: data.user_id,
@@ -135,6 +140,7 @@ const parseSupplierFromDB = (data: any): Supplier => ({
     notes: data.notes
 });
 
+// NEW: Parser for WorkPhoto
 const parsePhotoFromDB = (data: any): WorkPhoto => ({
     id: data.id,
     workId: data.work_id,
@@ -144,6 +150,7 @@ const parsePhotoFromDB = (data: any): WorkPhoto => ({
     type: data.type
 });
 
+// NEW: Parser for WorkFile
 const parseFileFromDB = (data: any): WorkFile => ({
     id: data.id,
     workId: data.work_id,
@@ -430,6 +437,7 @@ export const dbService = {
         _dashboardCache.files = {}; // NEW
         _dashboardCache.contracts = null; // NEW
         _dashboardCache.checklists = {}; // NEW
+        _dashboardCache.pushSubscriptions = {}; // NEW: Clear push subscriptions cache on logout
         callback(null);
       }
     });
@@ -500,6 +508,7 @@ export const dbService = {
     _dashboardCache.files = {}; // NEW
     _dashboardCache.contracts = null; // NEW
     _dashboardCache.checklists = {}; // NEW
+    _dashboardCache.pushSubscriptions = {}; // NEW: Clear push subscriptions cache on logout
   },
 
   async getUserProfile(userId: string): Promise<User | null> {
@@ -1077,20 +1086,26 @@ export const dbService = {
 
     // NEW: Recalculate is_delayed based on new data before saving, adhering to the prompt's rules
     let newIsDelayed = false;
-    if (step.status !== StepStatus.COMPLETED) {
-        // "etapa pendente e data atual > start_date OU etapa parcial e data atual > end_date"
-        if (step.status === StepStatus.NOT_STARTED && today.getTime() > stepStartDate.getTime()) {
-            newIsDelayed = true;
-        } else if (step.status === StepStatus.IN_PROGRESS && today.getTime() > stepEndDate.getTime()) {
-            newIsDelayed = true;
-        }
+    if (step.status === StepStatus.COMPLETED) {
+        newIsDelayed = false; // A completed step is never delayed
+    } else if (step.status === StepStatus.NOT_STARTED) {
+        // A NOT_STARTED step is delayed if its start date is in the past
+        newIsDelayed = today.getTime() > stepStartDate.getTime();
+    } else if (step.status === StepStatus.IN_PROGRESS) {
+        // An IN_PROGRESS step is delayed if its end date is in the past
+        newIsDelayed = today.getTime() > stepEndDate.getTime();
+    }
+    
+    // Also, clear realDate if status is being set back to NOT_STARTED
+    if (step.status === StepStatus.NOT_STARTED) {
+        step.realDate = undefined;
     }
 
     const dbStep = {
       name: step.name,
       start_date: step.startDate,
       end_date: step.endDate,
-      real_date: step.realDate,
+      real_date: step.realDate, // Use potentially modified realDate
       status: step.status,
       is_delayed: newIsDelayed, // Use the recalculated value
       order_index: step.orderIndex
@@ -1316,34 +1331,43 @@ export const dbService = {
     if (deleteExpenseError) throw deleteExpenseError;
 
     _dashboardCache.expenses[workId] = null; // Invalidate expenses cache
-    _dashboardCache.materials[workId] = null; // Materials cache might need invalidation if related_material_id was affected
+    _dashboardCache.materials[workId] = null; // Invalidate materials cache (if related material was updated)
     _dashboardCache.summary[workId] = null; // Summary might change
   },
 
+  // NEW: Add payment to an existing expense (for partial payments)
   async addPaymentToExpense(expenseId: string, amount: number, date: string): Promise<Expense> {
-    const { data: currentExpense, error: fetchError } = await supabase.from('expenses').select('work_id, paid_amount').eq('id', expenseId).single();
+    // 1. Fetch current expense data
+    const { data: currentExpense, error: fetchError } = await supabase.from('expenses').select('*').eq('id', expenseId).single();
     if (fetchError || !currentExpense) throw new Error(`Expense with ID ${expenseId} not found.`);
 
-    const newPaidAmount = currentExpense.paid_amount + amount;
+    const newPaidAmount = (currentExpense.paid_amount || 0) + amount;
 
+    // 2. Update expense's paid_amount
     const { data: updatedExpenseData, error: updateError } = await supabase.from('expenses')
-      .update({ paid_amount: newPaidAmount })
+      .update({
+        paid_amount: newPaidAmount,
+        // Optionally add a separate table for payment history if needed,
+        // but for now, just update the paid_amount directly on the expense.
+      })
       .eq('id', expenseId)
       .select()
       .single();
 
     if (updateError) throw updateError;
-    _dashboardCache.expenses[currentExpense.work_id] = null; // Invalidate cache
+
+    _dashboardCache.expenses[currentExpense.work_id] = null; // Invalidate expenses cache
     _dashboardCache.summary[currentExpense.work_id] = null; // Summary might change
     return parseExpenseFromDB(updatedExpenseData);
   },
 
-  // --- WORKERS (PROFISSIONAIS) ---
+  // --- WORKERS ---
   async getWorkers(workId: string): Promise<Worker[]> {
     const now = Date.now();
     if (_dashboardCache.workers[workId] && (now - _dashboardCache.workers[workId].timestamp < CACHE_TTL)) {
       return _dashboardCache.workers[workId].data;
     }
+
     const { data, error } = await supabase.from('workers').select('*').eq('work_id', workId).order('name', { ascending: true });
     if (error) {
       console.error(`Error fetching workers for work ${workId}:`, error);
@@ -1356,17 +1380,17 @@ export const dbService = {
 
   async addWorker(worker: Omit<Worker, 'id'>): Promise<Worker> {
     const dbWorker = {
-      user_id: worker.userId,
       work_id: worker.workId,
+      user_id: worker.userId,
       name: worker.name,
       role: worker.role,
       phone: worker.phone,
-      daily_rate: worker.dailyRate,
-      notes: worker.notes,
+      daily_rate: worker.dailyRate || null,
+      notes: worker.notes || null,
     };
     const { data, error } = await supabase.from('workers').insert(dbWorker).select().single();
     if (error) throw error;
-    _dashboardCache.workers[worker.workId] = null; // Invalidate cache
+    _dashboardCache.workers[worker.workId] = null;
     return parseWorkerFromDB(data);
   },
 
@@ -1375,29 +1399,30 @@ export const dbService = {
       name: worker.name,
       role: worker.role,
       phone: worker.phone,
-      daily_rate: worker.dailyRate,
-      notes: worker.notes,
+      daily_rate: worker.dailyRate || null,
+      notes: worker.notes || null,
     };
     const { data, error } = await supabase.from('workers').update(dbWorker).eq('id', worker.id).select().single();
     if (error) throw error;
-    _dashboardCache.workers[worker.workId] = null; // Invalidate cache
-    _dashboardCache.expenses[worker.workId] = null; // Expenses might be linked to this worker
+    _dashboardCache.workers[worker.workId] = null;
+    _dashboardCache.expenses[worker.workId] = null; // Expenses might be related
     return parseWorkerFromDB(data);
   },
 
   async deleteWorker(workerId: string, workId: string): Promise<void> {
-    const { error: deleteWorkerError } = await supabase.from('workers').delete().eq('id', workerId);
-    if (deleteWorkerError) throw deleteWorkerError;
-    _dashboardCache.workers[workId] = null; // Invalidate cache
-    _dashboardCache.expenses[workId] = null; // Expenses might be linked to this worker
+    const { error } = await supabase.from('workers').delete().eq('id', workerId);
+    if (error) throw error;
+    _dashboardCache.workers[workId] = null;
+    _dashboardCache.expenses[workId] = null; // Invalidate expenses that might have referenced this worker
   },
 
-  // --- SUPPLIERS (FORNECEDORES) ---
+  // --- SUPPLIERS ---
   async getSuppliers(workId: string): Promise<Supplier[]> {
     const now = Date.now();
     if (_dashboardCache.suppliers[workId] && (now - _dashboardCache.suppliers[workId].timestamp < CACHE_TTL)) {
       return _dashboardCache.suppliers[workId].data;
     }
+
     const { data, error } = await supabase.from('suppliers').select('*').eq('work_id', workId).order('name', { ascending: true });
     if (error) {
       console.error(`Error fetching suppliers for work ${workId}:`, error);
@@ -1410,18 +1435,18 @@ export const dbService = {
 
   async addSupplier(supplier: Omit<Supplier, 'id'>): Promise<Supplier> {
     const dbSupplier = {
-      user_id: supplier.userId,
       work_id: supplier.workId,
+      user_id: supplier.userId,
       name: supplier.name,
       category: supplier.category,
       phone: supplier.phone,
-      email: supplier.email,
-      address: supplier.address,
-      notes: supplier.notes,
+      email: supplier.email || null,
+      address: supplier.address || null,
+      notes: supplier.notes || null,
     };
     const { data, error } = await supabase.from('suppliers').insert(dbSupplier).select().single();
     if (error) throw error;
-    _dashboardCache.suppliers[supplier.workId] = null; // Invalidate cache
+    _dashboardCache.suppliers[supplier.workId] = null;
     return parseSupplierFromDB(data);
   },
 
@@ -1430,30 +1455,31 @@ export const dbService = {
       name: supplier.name,
       category: supplier.category,
       phone: supplier.phone,
-      email: supplier.email,
-      address: supplier.address,
-      notes: supplier.notes,
+      email: supplier.email || null,
+      address: supplier.address || null,
+      notes: supplier.notes || null,
     };
     const { data, error } = await supabase.from('suppliers').update(dbSupplier).eq('id', supplier.id).select().single();
     if (error) throw error;
-    _dashboardCache.suppliers[supplier.workId] = null; // Invalidate cache
-    _dashboardCache.expenses[supplier.workId] = null; // Expenses might be linked to this supplier
+    _dashboardCache.suppliers[supplier.workId] = null;
+    _dashboardCache.expenses[supplier.workId] = null; // Expenses might be related
     return parseSupplierFromDB(data);
   },
 
   async deleteSupplier(supplierId: string, workId: string): Promise<void> {
-    const { error: deleteSupplierError } = await supabase.from('suppliers').delete().eq('id', supplierId);
-    if (deleteSupplierError) throw deleteSupplierError;
-    _dashboardCache.suppliers[workId] = null; // Invalidate cache
-    _dashboardCache.expenses[workId] = null; // Expenses might be linked to this supplier
+    const { error } = await supabase.from('suppliers').delete().eq('id', supplierId);
+    if (error) throw error;
+    _dashboardCache.suppliers[workId] = null;
+    _dashboardCache.expenses[workId] = null; // Invalidate expenses that might have referenced this supplier
   },
 
-  // --- PHOTOS (FOTOS) ---
+  // --- WORK PHOTOS ---
   async getPhotos(workId: string): Promise<WorkPhoto[]> {
     const now = Date.now();
     if (_dashboardCache.photos[workId] && (now - _dashboardCache.photos[workId].timestamp < CACHE_TTL)) {
       return _dashboardCache.photos[workId].data;
     }
+
     const { data, error } = await supabase.from('work_photos').select('*').eq('work_id', workId).order('date', { ascending: false });
     if (error) {
       console.error(`Error fetching photos for work ${workId}:`, error);
@@ -1474,27 +1500,28 @@ export const dbService = {
     };
     const { data, error } = await supabase.from('work_photos').insert(dbPhoto).select().single();
     if (error) throw error;
-    _dashboardCache.photos[photo.workId] = null; // Invalidate cache
+    _dashboardCache.photos[photo.workId] = null;
     return parsePhotoFromDB(data);
   },
 
   async deletePhoto(photoId: string): Promise<void> {
+    // Note: Deleting the actual file from storage is handled in the UI component
     const { data: photoToDelete, error: fetchError } = await supabase.from('work_photos').select('work_id').eq('id', photoId).single();
-    if (fetchError || !photoToDelete) throw new Error("Photo not found or error fetching workId.");
+    if (fetchError || !photoToDelete) throw new Error("Photo not found.");
     const workId = photoToDelete.work_id;
 
-    const { error: deletePhotoError } = await supabase.from('work_photos').delete().eq('id', photoId);
-    if (deletePhotoError) throw deletePhotoError;
-    _dashboardCache.photos[workId] = null; // Invalidate cache
+    const { error } = await supabase.from('work_photos').delete().eq('id', photoId);
+    if (error) throw error;
+    _dashboardCache.photos[workId] = null;
   },
 
-  // --- FILES (PROJETOS & DOCS) ---
+  // --- WORK FILES ---
   async getFiles(workId: string): Promise<WorkFile[]> {
-    // Fix: Changed Date.Now() to Date.now()
     const now = Date.now();
     if (_dashboardCache.files[workId] && (now - _dashboardCache.files[workId].timestamp < CACHE_TTL)) {
       return _dashboardCache.files[workId].data;
     }
+
     const { data, error } = await supabase.from('work_files').select('*').eq('work_id', workId).order('date', { ascending: false });
     if (error) {
       console.error(`Error fetching files for work ${workId}:`, error);
@@ -1516,30 +1543,32 @@ export const dbService = {
     };
     const { data, error } = await supabase.from('work_files').insert(dbFile).select().single();
     if (error) throw error;
-    _dashboardCache.files[file.workId] = null; // Invalidate cache
+    _dashboardCache.files[file.workId] = null;
     return parseFileFromDB(data);
   },
 
   async deleteFile(fileId: string): Promise<void> {
+    // Note: Deleting the actual file from storage is handled in the UI component
     const { data: fileToDelete, error: fetchError } = await supabase.from('work_files').select('work_id').eq('id', fileId).single();
-    if (fetchError || !fileToDelete) throw new Error("File not found or error fetching workId.");
+    if (fetchError || !fileToDelete) throw new Error("File not found.");
     const workId = fileToDelete.work_id;
 
-    const { error: deleteFileError } = await supabase.from('work_files').delete().eq('id', fileId);
-    if (deleteFileError) throw deleteFileError;
-    _dashboardCache.files[workId] = null; // Invalidate cache
+    const { error } = await supabase.from('work_files').delete().eq('id', fileId);
+    if (error) throw error;
+    _dashboardCache.files[workId] = null;
   },
 
-  // --- CONTRACTS (CONTRATOS) ---
+  // --- CONTRACT TEMPLATES ---
+  // Contracts are global and don't change often, so a simple hardcoded list from standards.ts
+  // or a single fetch with aggressive caching is appropriate.
   async getContractTemplates(): Promise<Contract[]> {
     const now = Date.now();
-    // Contracts are global, use a single cache entry for all
     if (_dashboardCache.contracts && (now - _dashboardCache.contracts.timestamp < CACHE_TTL)) {
       return _dashboardCache.contracts.data;
     }
-
-    // For now, load from static standards. In a real app, this might come from DB.
-    const fetchedContracts = CONTRACT_TEMPLATES.map(parseContractFromDB);
+    // For simplicity, using the hardcoded templates from standards.ts
+    // If contracts were stored in DB, this would be a fetch operation.
+    const fetchedContracts = CONTRACT_TEMPLATES; // Assuming CONTRACT_TEMPLATES is an array of Contract
     _dashboardCache.contracts = { data: fetchedContracts, timestamp: now };
     return fetchedContracts;
   },
@@ -1550,6 +1579,7 @@ export const dbService = {
     if (_dashboardCache.checklists[workId] && (now - _dashboardCache.checklists[workId].timestamp < CACHE_TTL)) {
       return _dashboardCache.checklists[workId].data;
     }
+
     const { data, error } = await supabase.from('checklists').select('*').eq('work_id', workId).order('name', { ascending: true });
     if (error) {
       console.error(`Error fetching checklists for work ${workId}:`, error);
@@ -1569,7 +1599,7 @@ export const dbService = {
     };
     const { data, error } = await supabase.from('checklists').insert(dbChecklist).select().single();
     if (error) throw error;
-    _dashboardCache.checklists[checklist.workId] = null; // Invalidate cache
+    _dashboardCache.checklists[checklist.workId] = null;
     return parseChecklistFromDB(data);
   },
 
@@ -1581,56 +1611,60 @@ export const dbService = {
     };
     const { data, error } = await supabase.from('checklists').update(dbChecklist).eq('id', checklist.id).select().single();
     if (error) throw error;
-    _dashboardCache.checklists[checklist.workId] = null; // Invalidate cache
+    _dashboardCache.checklists[checklist.workId] = null;
     return parseChecklistFromDB(data);
   },
 
   async deleteChecklist(checklistId: string): Promise<void> {
     const { data: checklistToDelete, error: fetchError } = await supabase.from('checklists').select('work_id').eq('id', checklistId).single();
-    if (fetchError || !checklistToDelete) throw new Error("Checklist not found or error fetching workId.");
+    if (fetchError || !checklistToDelete) throw new Error("Checklist not found.");
     const workId = checklistToDelete.work_id;
 
-    const { error: deleteChecklistError } = await supabase.from('checklists').delete().eq('id', checklistId);
-    if (deleteChecklistError) throw deleteChecklistError;
-    _dashboardCache.checklists[workId] = null; // Invalidate cache
+    const { error } = await supabase.from('checklists').delete().eq('id', checklistId);
+    if (error) throw error;
+    _dashboardCache.checklists[workId] = null;
   },
 
   // --- NOTIFICATIONS ---
   async getNotifications(userId: string): Promise<DBNotification[]> {
-    const now = Date.now(); // Corrected Date.Now() to Date.now()
+    const now = Date.now();
+    // Cache for notifications is global, not per workId
     if (_dashboardCache.notifications && (now - _dashboardCache.notifications.timestamp < CACHE_TTL)) {
-        return _dashboardCache.notifications.data.filter(n => !n.read); // Only return unread for the count
+      return _dashboardCache.notifications.data;
     }
+
     const { data, error } = await supabase
-        .from('notifications')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('read', false)
-        .order('date', { ascending: false });
+      .from('notifications')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('read', false) // Only fetch unread for the count
+      .order('date', { ascending: false });
+
     if (error) {
-        console.error(`Error fetching notifications for user ${userId}:`, error);
-        return [];
+      console.error(`Error fetching notifications for user ${userId}:`, error);
+      return [];
     }
     const parsed = (data || []).map(parseNotificationFromDB);
-    // Cache all notifications (read/unread) for the dashboard, then filter for unread count
-    _dashboardCache.notifications = { data: (await dbService.getAllNotifications(userId)), timestamp: now }; 
+    _dashboardCache.notifications = { data: parsed, timestamp: now };
     return parsed;
   },
 
-  async getAllNotifications(userId: string): Promise<DBNotification[]> {
-    // This function is for internal use to populate cache with all notifications
-    const { data, error } = await supabase
-        .from('notifications')
-        .select('*')
-        .eq('user_id', userId)
-        .order('date', { ascending: false });
-    if (error) {
-        console.error(`Error fetching all notifications for user ${userId}:`, error);
-        return [];
-    }
-    return (data || []).map(parseNotificationFromDB);
+  async addNotification(notification: Omit<DBNotification, 'id'>): Promise<DBNotification> {
+    const dbNotification = {
+      user_id: notification.userId,
+      work_id: notification.workId || null,
+      title: notification.title,
+      message: notification.message,
+      date: notification.date,
+      read: notification.read,
+      type: notification.type,
+      tag: notification.tag || null,
+    };
+    const { data, error } = await supabase.from('notifications').insert(dbNotification).select().single();
+    if (error) throw error;
+    _dashboardCache.notifications = null; // Invalidate global notification cache
+    return parseNotificationFromDB(data);
   },
-
 
   async dismissNotification(notificationId: string): Promise<void> {
     const { data: notificationToDismiss, error: fetchError } = await supabase.from('notifications').select('user_id').eq('id', notificationId).single();
@@ -1638,75 +1672,40 @@ export const dbService = {
 
     const { error } = await supabase.from('notifications').update({ read: true }).eq('id', notificationId);
     if (error) throw error;
-    _dashboardCache.notifications = null; // Invalidate cache to recount
+    _dashboardCache.notifications = null; // Invalidate cache to force reload count
   },
 
   async clearAllNotifications(userId: string): Promise<void> {
     const { error } = await supabase.from('notifications').update({ read: true }).eq('user_id', userId).eq('read', false);
     if (error) throw error;
-    _dashboardCache.notifications = null; // Invalidate cache to recount
-  },
-
-  // NEW: Method to add a notification
-  async addNotification(notification: Omit<DBNotification, 'id'>): Promise<DBNotification> {
-    const { data, error } = await supabase.from('notifications').insert(notification).select().single();
-    if (error) throw error;
     _dashboardCache.notifications = null; // Invalidate cache
-    return parseNotificationFromDB(data);
   },
 
-  // NEW: Method to check for existing unread notification by tag
-  async getExistingNotificationByTag(userId: string, workId: string | undefined, tag: string): Promise<DBNotification | null> {
-    let query = supabase
-      .from('notifications')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('tag', tag)
-      .eq('read', false); // Only consider unread notifications
+  // --- PUSH SUBSCRIPTIONS ---
+  async savePushSubscription(userId: string, subscription: PushSubscriptionJSON): Promise<void> {
+    const now = Date.now();
+    try {
+        const { data, error } = await supabase
+            .from('user_subscriptions')
+            .upsert(
+                { 
+                    user_id: userId, 
+                    subscription: subscription, 
+                    endpoint: subscription.endpoint, // Store endpoint for easier lookup
+                    created_at: new Date().toISOString(), // Ensure created_at is set for new records
+                },
+                { onConflict: 'endpoint' } // Update if endpoint already exists
+            )
+            .select();
 
-    if (workId) {
-      query = query.eq('work_id', workId);
-    }
-    
-    const { data, error } = await query.maybeSingle();
-
-    if (error) {
-        console.error(`Error checking existing notification for tag ${tag}:`, error);
-        return null;
-    }
-    return data ? parseNotificationFromDB(data) : null;
-  },
-
-  // --- PUSH NOTIFICATIONS ---
-  async savePushSubscription(userId: string, subscription: PushSubscriptionJSON): Promise<PushSubscriptionInfo> {
-    const dbSubscription = {
-      user_id: userId,
-      subscription: subscription,
-      endpoint: subscription.endpoint,
-    };
-
-    const { data, error } = await supabase
-      .from('user_subscriptions')
-      .upsert(dbSubscription, { onConflict: 'endpoint' }) // Update if endpoint already exists
-      .select();
-
-    if (error) {
-      console.error("Error saving push subscription:", error);
-      throw new Error(`Falha ao salvar a inscrição de push: ${error.message}`);
-    }
-    return mapPushSubscriptionFromDB(data);
-  },
-
-  async deletePushSubscription(userId: string, endpoint: string): Promise<void> {
-    const { error } = await supabase
-      .from('user_subscriptions')
-      .delete()
-      .eq('user_id', userId)
-      .eq('endpoint', endpoint);
-
-    if (error) {
-      console.error("Error deleting push subscription:", error);
-      throw new Error(`Falha ao excluir a inscrição de push: ${error.message}`);
+        if (error) {
+            console.error("Error saving push subscription:", error);
+            throw error;
+        }
+        _dashboardCache.pushSubscriptions[userId] = null; // Invalidate user's push subscriptions cache
+    } catch (error: any) {
+        console.error(`Error saving push subscription for user ${userId}:`, error?.message || error);
+        throw error;
     }
   },
 };

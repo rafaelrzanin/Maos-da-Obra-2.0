@@ -186,6 +186,7 @@ const CreateWork = () => {
             const aiPlanSummaryPrompt = `Gere um resumo da timeline e dos principais marcos para a obra "${newWork.name}", com ${newWork.area}m², ${newWork.floors} pavimentos, ${newWork.bathrooms} banheiros e ${newWork.kitchens} cozinhas, com início em ${newWork.startDate} e orçamento de R$ ${newWork.budgetPlanned}. Foque nos pontos mais importantes e na duração total estimada.`;
             const aiPlanSummary = await aiService.chat(aiPlanSummaryPrompt); // Using chat for a slightly longer summary
             
+            // Fix: Call dbService.addNotification with an object conforming to Omit<DBNotification, 'id'>
             await dbService.addNotification({
                 userId: user.id,
                 workId: newWork.id,
