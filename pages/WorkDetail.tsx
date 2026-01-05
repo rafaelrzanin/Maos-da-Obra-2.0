@@ -92,22 +92,12 @@ const getEntityStatusDetails = (
   const today = new Date();
   today.setHours(0, 0, 0, 0); // Normalize to start of day
 
-  // Common delay check for steps and materials
-  let isDelayed = false;
-
   if (entityType === 'step') {
     const step = entity as Step;
     // CRITICAL: is_delayed for step is now derived from DB. So we use step.isDelayed directly
-    isDelayed = step.isDelayed; 
+    const isActuallyDelayed = step.isDelayed; 
 
-    if (isDelayed) {
-      statusText = 'Atrasado';
-      bgColor = 'bg-red-500';
-      textColor = 'text-red-600 dark:text-red-400';
-      borderColor = 'border-red-400 dark:border-red-700';
-      shadowClass = 'shadow-red-500/20';
-      icon = 'fa-exclamation-triangle';
-    } else if (step.status === StepStatus.COMPLETED) {
+    if (step.status === StepStatus.COMPLETED) {
       statusText = 'Concluído';
       bgColor = 'bg-green-500';
       textColor = 'text-green-600 dark:text-green-400';
@@ -115,25 +105,26 @@ const getEntityStatusDetails = (
       shadowClass = 'shadow-green-500/20';
       icon = 'fa-check';
     } else if (step.status === StepStatus.IN_PROGRESS) {
-      statusText = 'Em Andamento';
-      bgColor = 'bg-amber-500';
-      textColor = 'text-amber-600 dark:text-amber-400';
-      borderColor = 'border-amber-400 dark:border-amber-700';
-      shadowClass = 'shadow-amber-500/20';
-      icon = 'fa-hourglass-half';
-    } else { // NOT_STARTED
-      statusText = 'Pendente'; // Changed to Pendente for consistency with prompt
-      bgColor = 'bg-slate-400';
-      textColor = 'text-slate-700 dark:text-slate-300';
-      borderColor = 'border-slate-200 dark:border-slate-700';
-      shadowClass = 'shadow-slate-400/20';
-      icon = 'fa-hourglass-start';
+      statusText = isActuallyDelayed ? 'Em Andamento (Atrasado)' : 'Em Andamento';
+      bgColor = isActuallyDelayed ? 'bg-red-500' : 'bg-amber-500'; // Red if delayed, Amber if on track
+      textColor = isActuallyDelayed ? 'text-red-600 dark:text-red-400' : 'text-amber-600 dark:text-amber-400';
+      borderColor = isActuallyDelayed ? 'border-red-400 dark:border-red-700' : 'border-amber-400 dark:border-amber-700';
+      shadowClass = isActuallyDelayed ? 'shadow-red-500/20' : 'shadow-amber-500/20';
+      icon = isActuallyDelayed ? 'fa-exclamation-triangle' : 'fa-hourglass-half';
+    } else { // StepStatus.NOT_STARTED
+      statusText = isActuallyDelayed ? 'Pendente (Atrasado)' : 'Pendente';
+      bgColor = isActuallyDelayed ? 'bg-red-500' : 'bg-slate-400'; // Red if delayed, Grey if on track
+      textColor = isActuallyDelayed ? 'text-red-600 dark:text-red-400' : 'text-slate-700 dark:text-slate-300';
+      borderColor = isActuallyDelayed ? 'border-red-400 dark:border-red-700' : 'border-slate-200 dark:border-slate-700';
+      shadowClass = isActuallyDelayed ? 'shadow-red-500/20' : 'shadow-slate-400/20';
+      icon = isActuallyDelayed ? 'fa-exclamation-triangle' : 'fa-hourglass-start';
     }
   } else if (entityType === 'material') {
     const material = entity as Material;
     const associatedStep = allSteps.find(s => s.id === material.stepId);
     
     // Material Delay Logic: "Quando faltar 3 dias para a etapa iniciar e material não estiver concluído"
+    let isDelayed = false; // Local variable for material
     if (associatedStep) {
       const stepStartDate = new Date(associatedStep.startDate);
       stepStartDate.setHours(0, 0, 0, 0); // Normalize to start of day
@@ -345,7 +336,7 @@ const WorkDetail = () => {
   // State for drag and drop
   const [draggedStepId, setDraggedStepId, ] = useState<string | null>(null);
   const [dragOverStepId, setDragOverStepId] = useState<string | null>(null);
-
+  const [isUpdatingStepStatus, setIsUpdatingStepStatus] = useState(false); // NEW: Step status loading
 
   const [showAddMaterialModal, setShowAddMaterialModal] = useState(false);
   const [newMaterialName, setNewMaterialName] = useState('');
@@ -606,6 +597,11 @@ const WorkDetail = () => {
 
   // NEW: Handle Step Status Change (Pendente -> Parcial -> Concluída -> Pendente)
   const handleStepStatusChange = useCallback(async (step: Step) => {
+    if (isUpdatingStepStatus) return; // Prevent multiple clicks
+
+    console.log(`[handleStepStatusChange] Step ID: ${step.id}, Current Status: ${step.status}`);
+    setIsUpdatingStepStatus(true);
+
     let newStatus: StepStatus;
     let newRealDate: string | undefined = undefined;
 
@@ -624,6 +620,7 @@ const WorkDetail = () => {
       default:
         newStatus = StepStatus.NOT_STARTED; // Should not happen
     }
+    console.log(`[handleStepStatusChange] New Status intended: ${newStatus}`);
 
     try {
       // isDelayed is calculated in dbService.updateStep based on the new status and dates
@@ -639,8 +636,10 @@ const WorkDetail = () => {
         confirmText: "Ok",
         onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false }))
       });
+    } finally {
+      setIsUpdatingStepStatus(false);
     }
-  }, [loadWorkData]);
+  }, [loadWorkData, isUpdatingStepStatus]);
 
   const handleAddStep = async (e: React.FormEvent) => {
     e.preventDefault(); // Prevent default form submission
@@ -1643,13 +1642,15 @@ const WorkDetail = () => {
                             >
                                 <button
                                     onClick={(e) => { e.stopPropagation(); handleStepStatusChange(step); }} // Prevent card click
+                                    disabled={isUpdatingStepStatus} // NEW: Disable button while updating
                                     className={cx(
                                         "w-10 h-10 rounded-full text-white flex items-center justify-center text-lg font-bold transition-colors shrink-0",
-                                        statusDetails.bgColor // This will be red if isDelayed is true
+                                        statusDetails.bgColor, // This will be red if isDelayed is true
+                                        isUpdatingStepStatus ? 'opacity-70 cursor-not-allowed' : ''
                                     )}
                                     aria-label={`Mudar status da etapa ${step.name}`}
                                 >
-                                    <i className={`fa-solid ${statusDetails.icon}`}></i>
+                                    {isUpdatingStepStatus ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className={`fa-solid ${statusDetails.icon}`}></i>}
                                 </button>
                                 <div className="flex-1">
                                     <p className="text-xs font-bold uppercase text-slate-400 dark:text-slate-500 mb-0.5">Etapa {step.orderIndex} <span className={statusDetails.textColor}>({statusDetails.statusText})</span></p>
