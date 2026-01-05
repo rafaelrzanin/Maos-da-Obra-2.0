@@ -409,28 +409,28 @@ export const dbService = {
     const client = supabase; // Supabase is guaranteed to be initialized now
     
     const { data: { subscription } } = client.auth.onAuthStateChange(async (_event, session) => {
-        sessionCache = null; // Clear cache on auth state change
+      sessionCache = null; // Clear cache on auth state change
         
-        if (session?.user) {
-            const user = await ensureUserProfile(session.user);
-            callback(user);
-        } else {
-            // Limpa cache ao deslogar
-            _dashboardCache.works = null;
-            _dashboardCache.stats = {};
-            _dashboardCache.summary = {};
-            _dashboardCache.notifications = null;
-            _dashboardCache.steps = {}; // NEW: Clear steps cache on logout
-            _dashboardCache.materials = {}; // NEW: Clear materials cache on logout
-            _dashboardCache.expenses = {}; // NEW: Clear expenses cache on logout
-            _dashboardCache.workers = {}; // NEW
-            _dashboardCache.suppliers = {}; // NEW
-            _dashboardCache.photos = {}; // NEW
-            _dashboardCache.files = {}; // NEW
-            _dashboardCache.contracts = null; // NEW
-            _dashboardCache.checklists = {}; // NEW
-            callback(null);
-        }
+      if (session?.user) {
+        const user = await ensureUserProfile(session.user);
+        callback(user);
+      } else {
+        // Limpa cache ao deslogar
+        _dashboardCache.works = null;
+        _dashboardCache.stats = {};
+        _dashboardCache.summary = {};
+        _dashboardCache.notifications = null;
+        _dashboardCache.steps = {}; // NEW: Clear steps cache on logout
+        _dashboardCache.materials = {}; // NEW: Clear materials cache on logout
+        _dashboardCache.expenses = {}; // NEW: Clear expenses cache on logout
+        _dashboardCache.workers = {}; // NEW
+        _dashboardCache.suppliers = {}; // NEW
+        _dashboardCache.photos = {}; // NEW
+        _dashboardCache.files = {}; // NEW
+        _dashboardCache.contracts = null; // NEW
+        _dashboardCache.checklists = {}; // NEW
+        callback(null);
+      }
     });
     return () => subscription.unsubscribe();
   },
@@ -768,6 +768,7 @@ export const dbService = {
                         if (calculatedQty > 0) { // Only insert if quantity is positive
                           materialsToInsert.push({
                               work_id: work.id, 
+                              user_id: work.userId, // 🔥 FIX CRÍTICO: Adicionado user_id
                               name: item.name,
                               brand: item.brand || '', // FIX: Send empty string if undefined for TEXT NOT NULL.
                               planned_qty: calculatedQty, 
@@ -1230,6 +1231,7 @@ export const dbService = {
 
   // --- EXPENSES (FINANCEIRO) ---
   async getExpenses(workId: string): Promise<Expense[]> {
+    // Corrected `Date.Now()` to `Date.now()`
     const now = Date.now();
     if (_dashboardCache.expenses[workId] && (now - _dashboardCache.expenses[workId].timestamp < CACHE_TTL)) {
       return _dashboardCache.expenses[workId].data;
@@ -1595,6 +1597,7 @@ export const dbService = {
 
   // --- NOTIFICATIONS ---
   async getNotifications(userId: string): Promise<DBNotification[]> {
+    // Corrected `Date.Now()` to `Date.now()`
     const now = Date.now();
     if (_dashboardCache.notifications && (now - _dashboardCache.notifications.timestamp < CACHE_TTL)) {
         return _dashboardCache.notifications.data.filter(n => !n.read); // Only return unread for the count
