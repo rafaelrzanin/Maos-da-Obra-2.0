@@ -758,10 +758,13 @@ export const dbService = {
                             }
                         }
                         
-                        // Ensure min 1 if calculated > 0, and round up
                         calculatedQty = Math.ceil(Math.max(0, calculatedQty));
-                        if (calculatedQty === 0 && (item.multiplier || 0) > 0) calculatedQty = 1; // Ensure at least 1 unit if material has a multiplier but calculated to 0
-
+                        // CRITICAL FIX: Ensure planned_qty is at least 1 if a quantity was expected
+                        // (i.e., if item had a multiplier or a flat_qty defined).
+                        if (calculatedQty === 0 && (item.multiplier !== undefined || item.flat_qty !== undefined)) {
+                            calculatedQty = 1; 
+                        }
+                        
                         if (calculatedQty > 0) { // Only insert if quantity is positive
                           materialsToInsert.push({
                               work_id: work.id, 
@@ -1133,7 +1136,7 @@ export const dbService = {
       work_id: material.workId,
       name: material.name,
       brand: material.brand || undefined, // NEW: Include brand
-      planned_qty: material.plannedQty,
+      planned_qty: Math.max(1, material.plannedQty), // CRITICAL FIX: Ensure planned_qty is at least 1
       purchased_qty: material.purchasedQty,
       unit: material.unit,
       step_id: material.stepId,

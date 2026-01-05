@@ -81,7 +81,7 @@ const CreateWork = () => {
         const newErrors = { ...prev };
         delete newErrors[field];
         return newErrors;
-    });
+      });
   };
 
   // Refatorado para validar passos específicos
