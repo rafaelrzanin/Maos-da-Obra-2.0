@@ -769,12 +769,12 @@ export const dbService = {
                           materialsToInsert.push({
                               work_id: work.id, 
                               name: item.name,
-                              brand: item.brand || undefined, // NEW: Pass brand if available
+                              brand: item.brand || '', // FIX: Send empty string if undefined for TEXT NOT NULL.
                               planned_qty: calculatedQty, 
                               purchased_qty: 0, 
                               unit: item.unit,
                               step_id: step.id, // Link material to the specific step
-                              category: materialCategoryName, // Use the inferred specific category
+                              category: materialCategoryName || '', // FIX: Send empty string if undefined for TEXT NOT NULL.
                               total_cost: 0 // Initialize total_cost
                           });
                         }
@@ -1135,13 +1135,13 @@ export const dbService = {
     const dbMaterial = {
       work_id: material.workId,
       name: material.name,
-      brand: material.brand || undefined, // NEW: Include brand
+      brand: material.brand || '', // FIX: Send empty string if undefined for TEXT NOT NULL.
       planned_qty: Math.max(1, material.plannedQty), // CRITICAL FIX: Ensure planned_qty is at least 1
-      purchased_qty: material.purchasedQty,
+      purchased_qty: material.purchasedQty, // This is passed from the front end, which could be 0.
       unit: material.unit,
-      step_id: material.stepId,
-      category: material.category,
-      total_cost: 0, // Initialize total_cost to 0 for new materials
+      step_id: material.stepId || null, // FIX: Send null if undefined, assuming step_id is nullable in DB.
+      category: material.category || '', // FIX: Send empty string if undefined for TEXT NOT NULL.
+      total_cost: 0, // Initialized to 0
     };
     const { data, error } = await supabase.from('materials').insert(dbMaterial).select().single();
     if (error) throw error;
@@ -1153,12 +1153,12 @@ export const dbService = {
   async updateMaterial(material: Material): Promise<Material> {
     const dbMaterial = {
       name: material.name,
-      brand: material.brand || undefined, // NEW: Include brand
+      brand: material.brand || '', // FIX: Send empty string if undefined for TEXT NOT NULL.
       planned_qty: material.plannedQty,
       purchased_qty: material.purchasedQty,
       unit: material.unit,
-      step_id: material.stepId,
-      category: material.category,
+      step_id: material.stepId || null, // FIX: Send null if undefined, assuming step_id is nullable in DB.
+      category: material.category || '', // FIX: Send empty string if undefined for TEXT NOT NULL.
       total_cost: material.totalCost,
     };
     const { data, error } = await supabase.from('materials').update(dbMaterial).eq('id', material.id).select().single();
