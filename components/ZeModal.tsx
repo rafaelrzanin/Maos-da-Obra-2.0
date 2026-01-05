@@ -1,5 +1,3 @@
-
-
 import React from 'react';
 import { ZE_AVATAR, ZE_AVATAR_FALLBACK } from '../services/standards.ts';
 
@@ -10,7 +8,8 @@ export interface ZeModalProps {
   confirmText?: string; // Made optional
   cancelText?: string; // Made optional
   type?: 'DANGER' | 'INFO' | 'SUCCESS' | 'WARNING' | 'ERROR';
-  onConfirm?: () => Promise<void>; // Changed to optional Promise<void>
+  // Fix: Allow onConfirm to accept an optional React.FormEvent
+  onConfirm?: (e?: React.FormEvent) => Promise<void>; 
   onCancel: () => void; // Still required as the primary way to close
   isConfirming?: boolean; // NEW: To disable confirm button during async ops
   // Add children prop explicitly
@@ -39,6 +38,7 @@ export const ZeModal: React.FC<ZeModalProps> = ({
 
   // O handler do botão principal será onConfirm se não for um alerta simples,
   // ou onCancel se for um alerta simples (para fechar o modal).
+  // Fix: Ensure primaryButtonHandler can accept event if onConfirm takes it
   const primaryButtonHandler = isSimpleAlert ? onCancel : onConfirm;
   const primaryButtonText = isSimpleAlert ? "Entendido" : confirmText;
 
@@ -99,7 +99,8 @@ export const ZeModal: React.FC<ZeModalProps> = ({
 
             <div className="flex flex-col gap-3">
                 <button 
-                    onClick={() => primaryButtonHandler()} 
+                    // Fix: Pass an optional event object to primaryButtonHandler
+                    onClick={(e) => primaryButtonHandler(e)} 
                     disabled={isConfirming} // NEW: Disable button while confirming
                     className={`w-full py-4 rounded-xl text-white font-bold transition-all shadow-lg active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2 ${isDangerOrWarning ? 'bg-danger hover:bg-red-700 shadow-red-500/20' : 'bg-primary hover:bg-slate-800 shadow-slate-500/20'}`}
                 >

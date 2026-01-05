@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import * as ReactRouter from 'react-router-dom';
 import * as XLSX from 'xlsx';
@@ -7,7 +6,7 @@ import { dbService } from '../services/db.ts';
 import { supabase } from '../services/supabase.ts';
 import { StepStatus, FileCategory, ExpenseCategory, type Work, type Worker, type Supplier, type Material, type Step, type Expense, type WorkPhoto, type WorkFile, type Contract, type Checklist, type ChecklistItem, PlanType } from '../types.ts';
 import { STANDARD_JOB_ROLES, STANDARD_SUPPLIER_CATEGORIES, ZE_AVATAR, ZE_AVATAR_FALLBACK, CONTRACT_TEMPLATES, CHECKLIST_TEMPLATES } from '../services/standards.ts';
-import { ZeModal, ZeModalProps } from '../components/ZeModal.tsx';
+import { ZeModal, type ZeModalProps } from '../components/ZeModal.tsx';
 // REMOVED: aiService import as Ze Assistant card is removed from here
 
 // --- TYPES FOR VIEW STATE ---
@@ -98,9 +97,8 @@ const getEntityStatusDetails = (
 
   if (entityType === 'step') {
     const step = entity as Step;
-    const stepEndDate = new Date(step.endDate);
-    stepEndDate.setHours(0, 0, 0, 0);
-    isDelayed = (step.status !== StepStatus.COMPLETED && stepEndDate < today);
+    // CRITICAL: is_delayed for step is now derived from DB. So we use step.isDelayed directly
+    isDelayed = step.isDelayed; 
 
     if (isDelayed) {
       statusText = 'Atrasado';
@@ -124,7 +122,7 @@ const getEntityStatusDetails = (
       shadowClass = 'shadow-amber-500/20';
       icon = 'fa-hourglass-half';
     } else { // NOT_STARTED
-      statusText = 'Não Iniciada';
+      statusText = 'Pendente'; // Changed to Pendente for consistency with prompt
       bgColor = 'bg-slate-400';
       textColor = 'text-slate-700 dark:text-slate-300';
       borderColor = 'border-slate-200 dark:border-slate-700';
@@ -602,27 +600,6 @@ const WorkDetail = () => {
 
   // NEW: Handle Step Status Change (Pendente -> Parcial -> Concluída -> Pendente)
   const handleStepStatusChange = useCallback(async (step: Step) => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const stepEndDate = new Date(step.endDate);
-    stepEndDate.setHours(0, 0, 0, 0);
-
-    // isDelayed check is now based on DB's calculated `isDelayed` for the step,
-    // which is updated by `dbService.updateStep`
-    const isDelayed = step.isDelayed; 
-
-    if (isDelayed) {
-        setZeModal({
-            isOpen: true,
-            title: "Etapa Atrasada",
-            message: "Esta etapa está atrasada e não pode ter seu status alterado manualmente. Ajuste as datas para remover o atraso.",
-            type: "WARNING",
-            confirmText: "Entendido",
-            onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false }))
-        });
-        return;
-    }
-
     let newStatus: StepStatus;
     let newRealDate: string | undefined = undefined;
 
@@ -639,10 +616,11 @@ const WorkDetail = () => {
         newRealDate = undefined; // Clear real completion date
         break;
       default:
-        newStatus = StepStatus.NOT_STARTED;
+        newStatus = StepStatus.NOT_STARTED; // Should not happen
     }
 
     try {
+      // isDelayed is calculated in dbService.updateStep based on the new status and dates
       await dbService.updateStep({ ...step, status: newStatus, realDate: newRealDate });
       await loadWorkData();
     } catch (error) {
@@ -659,11 +637,12 @@ const WorkDetail = () => {
   }, [loadWorkData]);
 
   const handleAddStep = async (e: React.FormEvent) => {
-    e.preventDefault();
+    e.preventDefault(); // Prevent default form submission
     if (!workId || !newStepName) return;
 
     setZeModal(prev => ({ ...prev, isConfirming: true }));
     try {
+      // Fix: orderIndex is omitted from the input type because it's calculated internally by dbService.addStep
       await dbService.addStep({
         workId,
         name: newStepName,
@@ -693,7 +672,7 @@ const WorkDetail = () => {
   };
 
   const handleEditStep = async (e: React.FormEvent) => {
-    e.preventDefault();
+    e.preventDefault(); // Prevent default form submission
     if (!editStepData || !workId) return;
 
     setZeModal(prev => ({ ...prev, isConfirming: true }));
@@ -832,7 +811,7 @@ const WorkDetail = () => {
       });
       setShowAddMaterialModal(false);
       setNewMaterialName('');
-      setNewMaterialBrand(''); // NEW: Clear brand
+      setNewMaterialBrand(''); // Clear brand for new material
       setNewMaterialPlannedQty('');
       setNewMaterialUnit('');
       setNewMaterialCategory('');
@@ -911,7 +890,8 @@ const WorkDetail = () => {
     }
   };
 
-  const handleRegisterMaterialPurchase = async () => {
+  const handleRegisterMaterialPurchase = async (e: React.FormEvent) => {
+    e.preventDefault(); // Prevent default form submission
     if (!editMaterialData || !workId || !currentPurchaseQty || !currentPurchaseCost) return;
 
     setZeModal(prev => ({ ...prev, isConfirming: true }));
@@ -961,14 +941,16 @@ const WorkDetail = () => {
         workId,
         description: newExpenseDescription,
         amount: Number(newExpenseAmount),
-        paidAmount: Number(newExpenseAmount), // Assume full payment on add
+        // When adding a new expense, paidAmount is 0 by default, unless explicitly set
+        paidAmount: 0, 
         quantity: 1, // Default to 1 for generic expenses
         date: newExpenseDate,
         category: newExpenseCategory,
         stepId: newExpenseStepId === 'none' ? undefined : newExpenseStepId,
         workerId: newExpenseWorkerId === 'none' ? undefined : newExpenseWorkerId,
         supplierId: newExpenseSupplierId === 'none' ? undefined : newExpenseSupplierId,
-        totalAgreed: Number(newExpenseTotalAgreed) || Number(newExpenseAmount), // Use totalAgreed or fallback to amount
+        // totalAgreed defaults to amount if not explicitly provided
+        totalAgreed: newExpenseTotalAgreed ? Number(newExpenseTotalAgreed) : Number(newExpenseAmount), 
       });
       setShowAddExpenseModal(false);
       setNewExpenseDescription('');
@@ -1012,7 +994,7 @@ const WorkDetail = () => {
         stepId: newExpenseStepId === 'none' ? undefined : newExpenseStepId,
         workerId: newExpenseWorkerId === 'none' ? undefined : newExpenseWorkerId,
         supplierId: newExpenseSupplierId === 'none' ? undefined : newExpenseSupplierId,
-        totalAgreed: Number(newExpenseTotalAgreed) || Number(newExpenseAmount), // Use totalAgreed or fallback to amount
+        totalAgreed: newExpenseTotalAgreed ? Number(newExpenseTotalAgreed) : Number(newExpenseAmount), // Use totalAgreed or fallback to amount
       });
       setEditExpenseData(null);
       setShowAddExpenseModal(false); // Close the modal
@@ -1650,16 +1632,14 @@ const WorkDetail = () => {
                                     setShowAddStepModal(true); 
                                 }} // Open edit modal on card click
                                 role="listitem"
-                                aria-label={`Etapa ${step.name}, status: ${statusDetails.statusText}`}
+                                aria-label={`Etapa ${step.orderIndex}. ${step.name}, status: ${statusDetails.statusText}`}
                             >
                                 <button
                                     onClick={(e) => { e.stopPropagation(); handleStepStatusChange(step); }} // Prevent card click
                                     className={cx(
                                         "w-10 h-10 rounded-full text-white flex items-center justify-center text-lg font-bold transition-colors shrink-0",
-                                        statusDetails.bgColor,
-                                        step.isDelayed && "opacity-50 cursor-not-allowed" // Disable button if delayed (using step.isDelayed from DB)
+                                        statusDetails.bgColor // This will be red if isDelayed is true
                                     )}
-                                    disabled={step.isDelayed} // Disable button if step is delayed
                                     aria-label={`Mudar status da etapa ${step.name}`}
                                 >
                                     <i className={`fa-solid ${statusDetails.icon}`}></i>
@@ -2138,7 +2118,7 @@ const WorkDetail = () => {
                                         title: "Excluir Fornecedor",
                                         message: `Tem certeza que deseja excluir o fornecedor ${supplier.name}?`,
                                         confirmText: "Excluir",
-                                        onConfirm: async () => handleDeleteSupplier(supplier.id, workId),
+                                        onConfirm: async () => handleDeleteSupplier(supplier.id),
                                         onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
                                         type: "DANGER"
                                     });

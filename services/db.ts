@@ -704,9 +704,9 @@ export const dbService = {
                             // Adjust based on room counts IF applicable (for specific room material categories)
                             // This ensures correct scaling for room-specific items
                             if (materialCategoryName.includes('Banheiro') && work.bathrooms && work.bathrooms > 0) {
-                                calculatedQty = (item.multiplier || 0) * work.area * work.bathrooms; // Use multiplier for rooms
+                                calculatedQty = (item.multiplier || 0) * work.bathrooms; // Use multiplier for rooms
                             } else if (materialCategoryName.includes('Cozinha') && work.kitchens && work.kitchens > 0) {
-                                calculatedQty = (item.multiplier || 0) * work.area * work.kitchens; // Use multiplier for rooms
+                                calculatedQty = (item.multiplier || 0) * work.kitchens; // Use multiplier for rooms
                             } else if (materialCategoryName.includes('Quarto') && work.bedrooms && work.bedrooms > 0) {
                                 calculatedQty *= work.bedrooms;
                             } else if (materialCategoryName.includes('Sala') && work.livingRooms && work.livingRooms > 0) {
@@ -1010,7 +1010,8 @@ export const dbService = {
     return parsed;
   },
 
-  async addStep(step: Omit<Step, 'id' | 'isDelayed' | 'orderIndex' | 'realDate'>): Promise<Step> {
+  // Fix: orderIndex is now omitted from the input parameter as it's calculated internally.
+  async addStep(step: Omit<Step, 'id' | 'isDelayed' | 'orderIndex'>): Promise<Step> { 
     const { data: currentSteps, error: fetchError } = await supabase.from('steps').select('order_index').eq('work_id', step.workId).order('order_index', { ascending: false }).limit(1);
     if (fetchError) console.error("Error fetching max order_index:", fetchError);
 
@@ -1037,9 +1038,19 @@ export const dbService = {
     const today = new Date();
     today.setHours(0,0,0,0); // Normalize today's date to midnight
     stepEndDate.setHours(0,0,0,0); // Normalize step end date to midnight
+    const stepStartDate = new Date(step.startDate);
+    stepStartDate.setHours(0,0,0,0); // Normalize step start date to midnight
 
-    // NEW: Recalculate is_delayed based on new data before saving
-    const newIsDelayed = (step.status !== StepStatus.COMPLETED && stepEndDate < today);
+    // NEW: Recalculate is_delayed based on new data before saving, adhering to the prompt's rules
+    let newIsDelayed = false;
+    if (step.status !== StepStatus.COMPLETED) {
+        // "etapa pendente e data atual > start_date OU etapa parcial e data atual > end_date"
+        if (step.status === StepStatus.NOT_STARTED && today.getTime() > stepStartDate.getTime()) {
+            newIsDelayed = true;
+        } else if (step.status === StepStatus.IN_PROGRESS && today.getTime() > stepEndDate.getTime()) {
+            newIsDelayed = true;
+        }
+    }
 
     const dbStep = {
       name: step.name,
@@ -1087,7 +1098,7 @@ export const dbService = {
     return parsed;
   },
 
-  async addMaterial(material: Omit<Material, 'id'>): Promise<Material> {
+  async addMaterial(material: Omit<Material, 'id' | 'totalCost'>): Promise<Material> { // totalCost is initialized by DB, not passed
     const dbMaterial = {
       work_id: material.workId,
       name: material.name,
@@ -1097,7 +1108,7 @@ export const dbService = {
       unit: material.unit,
       step_id: material.stepId,
       category: material.category,
-      total_cost: material.totalCost,
+      total_cost: 0, // Initialize total_cost to 0 for new materials
     };
     const { data, error } = await supabase.from('materials').insert(dbMaterial).select().single();
     if (error) throw error;
@@ -1206,7 +1217,8 @@ export const dbService = {
       work_id: expense.workId,
       description: expense.description,
       amount: expense.amount,
-      paid_amount: expense.paidAmount,
+      // Default paid_amount to 0 if not provided, allowing for incremental payments
+      paid_amount: expense.paidAmount !== undefined ? expense.paidAmount : 0, 
       quantity: expense.quantity,
       date: expense.date,
       category: expense.category,
@@ -1214,7 +1226,8 @@ export const dbService = {
       step_id: expense.stepId,
       worker_id: expense.workerId,
       supplier_id: expense.supplierId,
-      total_agreed: expense.totalAgreed,
+      // total_agreed defaults to amount if not provided
+      total_agreed: expense.totalAgreed !== undefined ? expense.totalAgreed : expense.amount, 
     };
     const { data, error } = await supabase.from('expenses').insert(dbExpense).select().single();
     if (error) throw error;
