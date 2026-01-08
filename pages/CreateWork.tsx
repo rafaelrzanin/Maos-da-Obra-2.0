@@ -1,5 +1,4 @@
 
-
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext.tsx'; // Use authLoading and isUserAuthFinished
 import * as ReactRouter from 'react-router-dom';
@@ -8,7 +7,7 @@ import { WorkStatus } from '../types.ts';
 import { WORK_TEMPLATES, ZE_AVATAR, ZE_AVATAR_FALLBACK } from '../services/standards.ts';
 import { aiService } from '../services/ai.ts'; // NEW: Import aiService
 
-// Helper para formatar valores monetários
+// Helper para formatar valores monetários (apenas para exibição estática)
 const formatCurrency = (value: number | string | undefined): string => {
   if (value === undefined || value === null || isNaN(Number(value))) {
     return '0,00'; // Retorna apenas o valor sem R$ para placeholder
@@ -17,6 +16,27 @@ const formatCurrency = (value: number | string | undefined): string => {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
+};
+
+// NEW: Helper para formatar um número para exibição em um input (e.g., "1.250.000,00")
+const formatInputReal = (value: number | string | undefined): string => {
+  if (value === undefined || value === null || value === '') return '';
+  // Se já é uma string formatada, tenta limpar e reformatar para consistência
+  const num = typeof value === 'string' ? parseFloat(value.replace(/\./g, '').replace(',', '.')) : value;
+  if (isNaN(num)) return '';
+  // Formata com ponto para milhares e vírgula para decimais
+  return num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
+
+// NEW: Helper para parsear uma string formatada (e.g., "1.250.000,00") para um número puro (e.g., 1250000.00)
+const parseInputReal = (value: string): string => {
+  if (!value) return '';
+  // Remove pontos de milhar e substitui vírgula decimal por ponto
+  const cleanValue = value.replace(/\./g, '').replace(',', '.');
+  const num = parseFloat(cleanValue);
+  if (isNaN(num)) return '';
+  // Retorna uma string com 2 casas decimais, para manter o formato de armazenamento consistente
+  return num.toFixed(2);
 };
 
 
@@ -35,8 +55,8 @@ const CreateWork = () => {
   const [formData, setFormData] = useState({
     name: '',
     address: '',
-    budgetPlanned: '',
-    area: '',
+    budgetPlanned: '', // Changed to string for easier formatting
+    area: '', // Still string, but not currency formatted
     floors: '1',
     startDate: new Date().toISOString().split('T')[0],
     bedrooms: '3',
@@ -58,10 +78,18 @@ const CreateWork = () => {
   // --- END NEW ---
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value, type, checked } = e.target;
+    let { name, value, type, checked } = e.target;
     // For number inputs, allow empty string but convert to number on blur or submission
     const processedValue = type === 'checkbox' ? checked : value;
-    setFormData({ ...formData, [name]: processedValue });
+
+    // NEW: Apply currency formatting/parsing for budgetPlanned
+    if (name === 'budgetPlanned') {
+        const parsedValue = parseInputReal(value);
+        setFormData({ ...formData, [name]: parsedValue });
+    } else {
+        setFormData({ ...formData, [name]: processedValue });
+    }
+    
     // Clear error for the field being edited
     setFormErrors(prev => {
         const newErrors = { ...prev };
@@ -162,7 +190,7 @@ const CreateWork = () => {
             userId: user.id,
             name: formData.name,
             address: formData.address || 'Endereço não informado',
-            budgetPlanned: Number(formData.budgetPlanned),
+            budgetPlanned: Number(formData.budgetPlanned), // Convert to number for DB
             startDate: formData.startDate,
             area: Number(formData.area) || 0,
             floors: Number(formData.floors) || 1,
@@ -272,25 +300,26 @@ const CreateWork = () => {
               <div>
                 <label htmlFor="budgetPlanned" className="block text-sm font-bold text-slate-500 uppercase mb-2">Orçamento Previsto (R$) <span className="text-red-500">*</span></label>
                 <input
-                  type="number" // Changed to number input for easier handling
+                  type="text" // NEW: Changed to text for custom formatting
                   id="budgetPlanned"
                   name="budgetPlanned"
-                  value={formData.budgetPlanned}
+                  value={formatInputReal(formData.budgetPlanned)} // NEW: Formatted for display
                   onChange={handleChange}
                   placeholder="50.000,00"
-                  min="0"
-                  step="0.01"
+                  // min="0" // min and step are for type="number", remove them for type="text"
+                  // step="0.01" // min and step are for type="number", remove them for type="text"
                   className={`w-full px-4 py-3 rounded-xl border-2 ${formErrors.budgetPlanned ? 'border-red-500' : 'border-slate-200 dark:border-slate-700'} bg-white dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all`}
                   required
                   aria-invalid={!!formErrors.budgetPlanned}
                   aria-describedby={formErrors.budgetPlanned ? "budgetPlanned-error" : undefined}
+                  inputMode="decimal" // Suggest numeric keyboard with decimal support
                 />
                 {formErrors.budgetPlanned && <p id="budgetPlanned-error" className="text-red-500 text-xs mt-1">{formErrors.budgetPlanned}</p>}
               </div>
               <div>
                 <label htmlFor="area" className="block text-sm font-bold text-slate-500 uppercase mb-2">Área (m²) (Opcional)</label>
                 <input
-                  type="number"
+                  type="number" // Keep as number, as it's not currency
                   id="area"
                   name="area"
                   value={formData.area}

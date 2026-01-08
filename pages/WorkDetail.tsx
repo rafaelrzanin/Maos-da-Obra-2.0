@@ -54,7 +54,7 @@ const formatDateDisplay = (dateStr: string) => {
   }
 };
 
-// Helper para formatar valores monetários
+// Helper para formatar valores monetários (apenas para exibição estática)
 const formatCurrency = (value: number | string | undefined): string => {
   if (value === undefined || value === null || isNaN(Number(value))) {
     return 'R$ 0,00';
@@ -65,6 +65,27 @@ const formatCurrency = (value: number | string | undefined): string => {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
+};
+
+// NEW: Helper para formatar um número para exibição em um input (e.g., "1.250.000,00")
+const formatInputReal = (value: number | string | undefined): string => {
+  if (value === undefined || value === null || value === '') return '';
+  // Se já é uma string formatada, tenta limpar e reformatar para consistência
+  const num = typeof value === 'string' ? parseFloat(value.replace(/\./g, '').replace(',', '.')) : value;
+  if (isNaN(num)) return '';
+  // Formata com ponto para milhares e vírgula para decimais
+  return num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
+
+// NEW: Helper para parsear uma string formatada (e.g., "1.250.000,00") para um número puro em string (e.g., "1250000.00")
+const parseInputReal = (value: string): string => {
+  if (!value) return '';
+  // Remove pontos de milhar e substitui vírgula decimal por ponto
+  const cleanValue = value.replace(/\./g, '').replace(',', '.');
+  const num = parseFloat(cleanValue);
+  if (isNaN(num)) return '';
+  // Retorna uma string com 2 casas decimais, para manter o formato de armazenamento consistente
+  return num.toFixed(2);
 };
 
 // NEW: Type for status details
@@ -2643,12 +2664,13 @@ const WorkDetail = () => {
                     <label htmlFor="purchaseCost" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Custo da Compra (R$)</label>
                     <input
                       id="purchaseCost"
-                      type="number"
-                      value={currentPurchaseCost}
-                      onChange={(e) => setCurrentPurchaseCost(e.target.value)}
-                      min="0"
-                      step="0.01"
+                      type="text" // NEW: Changed to text for custom formatting
+                      value={formatInputReal(currentPurchaseCost)} // NEW: Formatted for display
+                      onChange={(e) => setCurrentPurchaseCost(parseInputReal(e.target.value))} // NEW: Parsed for state
+                      // min="0" // min and step are for type="number", remove them for type="text"
+                      // step="0.01" // min and step are for type="number", remove them for type="text"
                       className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
+                      inputMode="decimal" // Suggest numeric keyboard with decimal support
                     />
                   </div>
                 </div>
@@ -2697,26 +2719,28 @@ const WorkDetail = () => {
               <label htmlFor="expenseAmount" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Valor Total (R$)</label>
               <input
                 id="expenseAmount"
-                type="number"
-                value={isEditing ? String(editExpenseData.amount) : newExpenseAmount}
-                onChange={(e) => isEditing ? setEditExpenseData(prev => prev ? { ...prev, amount: Number(e.target.value) } : null) : setNewExpenseAmount(e.target.value)}
-                min="0"
-                step="0.01"
+                type="text" // NEW: Changed to text for custom formatting
+                value={formatInputReal(isEditing ? String(editExpenseData.amount) : newExpenseAmount)} // NEW: Formatted for display
+                onChange={(e) => isEditing ? setEditExpenseData(prev => prev ? { ...prev, amount: Number(parseInputReal(e.target.value)) } : null) : setNewExpenseAmount(parseInputReal(e.target.value))} // NEW: Parsed for state
+                // min="0" // min and step are for type="number", remove them for type="text"
+                // step="0.01" // min and step are for type="number", remove them for type="text"
                 className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
                 required
+                inputMode="decimal" // Suggest numeric keyboard with decimal support
               />
             </div>
             <div>
               <label htmlFor="expenseTotalAgreed" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Valor Combinado (R$) <span className="text-xs text-slate-400">(Se diferente do valor total)</span></label>
               <input
                 id="expenseTotalAgreed"
-                type="number"
-                value={isEditing ? (editExpenseData.totalAgreed !== undefined ? String(editExpenseData.totalAgreed) : String(editExpenseData.amount)) : newExpenseTotalAgreed}
-                onChange={(e) => isEditing ? setEditExpenseData(prev => prev ? { ...prev, totalAgreed: Number(e.target.value) } : null) : setNewExpenseTotalAgreed(e.target.value)}
-                min="0"
-                step="0.01"
+                type="text" // NEW: Changed to text for custom formatting
+                value={formatInputReal(isEditing ? (editExpenseData.totalAgreed !== undefined ? String(editExpenseData.totalAgreed) : String(editExpenseData.amount)) : newExpenseTotalAgreed)} // NEW: Formatted for display
+                onChange={(e) => isEditing ? setEditExpenseData(prev => prev ? { ...prev, totalAgreed: Number(parseInputReal(e.target.value)) } : null) : setNewExpenseTotalAgreed(parseInputReal(e.target.value))} // NEW: Parsed for state
+                // min="0" // min and step are for type="number", remove them for type="text"
+                // step="0.01" // min and step are for type="number", remove them for type="text"
                 placeholder="Igual ao valor total, se não preenchido"
                 className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
+                inputMode="decimal" // Suggest numeric keyboard with decimal support
               />
             </div>
             <div>
@@ -2813,12 +2837,13 @@ const WorkDetail = () => {
               <label htmlFor="paymentAmount" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Valor do Pagamento (R$)</label>
               <input
                 id="paymentAmount"
-                type="number"
-                value={paymentAmount}
-                onChange={(e) => setPaymentAmount(e.target.value)}
-                min="0"
+                type="text" // NEW: Changed to text for custom formatting
+                value={formatInputReal(paymentAmount)} // NEW: Formatted for display
+                onChange={(e) => setPaymentAmount(parseInputReal(e.target.value))} // NEW: Parsed for state
+                // min="0" // min and step are for type="number", remove them for type="text"
                 className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
                 required
+                inputMode="decimal" // Suggest numeric keyboard with decimal support
               />
             </div>
             <div>
@@ -2892,12 +2917,13 @@ const WorkDetail = () => {
               <label htmlFor="workerDailyRate" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Diária (R$) (Opcional)</label>
               <input
                 id="workerDailyRate"
-                type="number"
-                value={isEditing ? String(editWorkerData.dailyRate || '') : newWorkerDailyRate}
-                onChange={(e) => isEditing ? setEditWorkerData(prev => prev ? { ...prev, dailyRate: Number(e.target.value) } : null) : setNewWorkerDailyRate(e.target.value)}
-                min="0"
-                step="0.01"
+                type="text" // NEW: Changed to text for custom formatting
+                value={formatInputReal(isEditing ? String(editWorkerData.dailyRate || '') : newWorkerDailyRate)} // NEW: Formatted for display
+                onChange={(e) => isEditing ? setEditWorkerData(prev => prev ? { ...prev, dailyRate: Number(parseInputReal(e.target.value)) } : null) : setNewWorkerDailyRate(parseInputReal(e.target.value))} // NEW: Parsed for state
+                // min="0" // min and step are for type="number", remove them for type="text"
+                // step="0.01" // min and step are for type="number", remove them for type="text"
                 className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
+                inputMode="decimal" // Suggest numeric keyboard with decimal support
               />
             </div>
             <div>

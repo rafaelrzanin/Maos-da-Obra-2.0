@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext.tsx';
 import { dbService } from '../services/db.ts';
 
-// Helper para formatar valores monetários
+// Helper para formatar valores monetários (apenas para exibição estática)
 const formatCurrency = (value: number | string | undefined): string => {
   if (value === undefined || value === null || isNaN(Number(value))) {
     return 'R$ 0,00';
@@ -15,6 +15,28 @@ const formatCurrency = (value: number | string | undefined): string => {
     maximumFractionDigits: 2,
   });
 };
+
+// NEW: Helper para formatar um número para exibição em um input (e.g., "1.250.000,00")
+const formatInputReal = (value: number | string | undefined): string => {
+  if (value === undefined || value === null || value === '') return '';
+  // Se já é uma string formatada, tenta limpar e reformatar para consistência
+  const num = typeof value === 'string' ? parseFloat(value.replace(/\./g, '').replace(',', '.')) : value;
+  if (isNaN(num)) return '';
+  // Formata com ponto para milhares e vírgula para decimais
+  return num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
+
+// NEW: Helper para parsear uma string formatada (e.g., "1.250.000,00") para um número puro em string (e.g., "1250000.00")
+const parseInputReal = (value: string): string => {
+  if (!value) return '';
+  // Remove pontos de milhar e substitui vírgula decimal por ponto
+  const cleanValue = value.replace(/\./g, '').replace(',', '.');
+  const num = parseFloat(cleanValue);
+  if (isNaN(num)) return '';
+  // Retorna uma string com 2 casas decimais, para manter o formato de armazenamento consistente
+  return num.toFixed(2);
+};
+
 
 const Profile = () => {
   const { user, refreshUser, authLoading } = useAuth();
@@ -198,4 +220,3 @@ const Profile = () => {
 };
 
 export default Profile;
-    
