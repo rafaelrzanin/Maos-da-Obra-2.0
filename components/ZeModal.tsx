@@ -1,5 +1,4 @@
 
-
 import React from 'react';
 import { ZE_AVATAR, ZE_AVATAR_FALLBACK } from '../services/standards.ts';
 
@@ -61,12 +60,12 @@ export const ZeModal: React.FC<ZeModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-primary/80 backdrop-blur-sm animate-in fade-in duration-300">
-      <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-6 shadow-2xl border border-white/20 transform scale-100 transition-all relative overflow-hidden">
+      <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-6 shadow-2xl border border-white/20 transform scale-100 transition-all relative overflow-hidden flex flex-col max-h-[90vh]">
         {/* Glow Effect */}
         <div className="absolute top-0 right-0 w-32 h-32 bg-secondary/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
         
-        <div className="relative z-10">
-            <div className="flex gap-5 mb-6">
+        <div className="relative z-10 flex flex-col flex-1">
+            <div className="flex gap-5 mb-6 shrink-0">
                 <div className="w-16 h-16 rounded-full p-1 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-800 shadow-lg shrink-0">
                     <img 
                     src={ZE_AVATAR} 
@@ -91,16 +90,16 @@ export const ZeModal: React.FC<ZeModalProps> = ({
             
             {/* Render children if provided, otherwise render the message */}
             {children ? (
-                <div className="mb-8">
+                <div className="flex-1 overflow-y-auto -mr-2 pr-2">
                     {children}
                 </div>
             ) : (
-                <div className={`mb-8 p-4 rounded-2xl text-sm leading-relaxed border ${messageBoxBgClass}`}>
+                <div className={`flex-1 overflow-y-auto -mr-2 pr-2 p-4 rounded-2xl text-sm leading-relaxed border ${messageBoxBgClass}`}>
                     <p>{message}</p>
                 </div>
             )}
 
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-3 mt-6 shrink-0">
                 <button 
                     // Fix: Pass an optional event object to primaryButtonHandler
                     onClick={(e) => primaryButtonHandler(e)} 
@@ -124,3 +123,4 @@ export const ZeModal: React.FC<ZeModalProps> = ({
     </div>
   );
 };
+    
