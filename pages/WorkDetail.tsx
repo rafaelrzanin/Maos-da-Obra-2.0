@@ -104,13 +104,6 @@ const getEntityStatusDetails = (
       borderColor = 'border-green-400 dark:border-green-700';
       shadowClass = 'shadow-green-500/20';
       icon = 'fa-check';
-    } else if (isActuallyDelayed) { // Prioritize delayed status for styling, including the button's background
-      statusText = `${step.status === StepStatus.IN_PROGRESS ? 'Em Andamento' : 'Pendente'} (Atrasado)`;
-      bgColor = 'bg-red-500'; // Make button red if delayed
-      textColor = 'text-red-600 dark:text-red-400';
-      borderColor = 'border-red-400 dark:border-red-700';
-      shadowClass = 'shadow-red-500/20';
-      icon = 'fa-exclamation-triangle';
     } else if (step.status === StepStatus.IN_PROGRESS) {
       statusText = 'Em Andamento';
       bgColor = 'bg-amber-500';
@@ -118,7 +111,7 @@ const getEntityStatusDetails = (
       borderColor = 'border-amber-400 dark:border-amber-700';
       shadowClass = 'shadow-amber-500/20';
       icon = 'fa-hourglass-half';
-    } else { // StepStatus.NOT_STARTED (and not delayed)
+    } else { // StepStatus.NOT_STARTED
       statusText = 'Pendente';
       bgColor = 'bg-slate-400';
       textColor = 'text-slate-700 dark:text-slate-300';
@@ -126,6 +119,16 @@ const getEntityStatusDetails = (
       shadowClass = 'shadow-slate-400/20';
       icon = 'fa-hourglass-start';
     }
+
+    // Override colors/shadows if actually delayed, but keep statusText pure
+    if (isActuallyDelayed) {
+      bgColor = 'bg-red-500';
+      textColor = 'text-red-600 dark:text-red-400';
+      borderColor = 'border-red-400 dark:border-red-700';
+      shadowClass = 'shadow-red-500/20';
+      icon = 'fa-exclamation-triangle'; // Delayed icon
+    }
+
   } else if (entityType === 'material') {
     const material = entity as Material;
     const associatedStep = allSteps.find(s => s.id === material.stepId);
@@ -1711,11 +1714,19 @@ const WorkDetail = () => {
                                     {isUpdatingStepStatus ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className={`fa-solid ${statusDetails.icon}`}></i>}
                                 </button>
                                 <div className="flex-1">
-                                    <p className="text-xs font-bold uppercase text-slate-400 dark:text-slate-500 mb-0.5">Etapa {step.orderIndex} <span className={statusDetails.textColor}>({statusDetails.statusText})</span></p>
+                                    <p className="text-xs font-bold uppercase text-slate-400 dark:text-slate-500 mb-0.5">
+                                        Etapa {step.orderIndex} 
+                                        {step.isDelayed && (
+                                            <span className="ml-2 px-2 py-0.5 rounded-full bg-red-500 text-white text-[10px] font-black uppercase tracking-wider">
+                                                Atrasada <i className="fa-solid fa-exclamation-triangle ml-1"></i>
+                                            </span>
+                                        )}
+                                        <span className={statusDetails.textColor}> ({statusDetails.statusText})</span>
+                                    </p>
                                     <h3 className="text-lg font-bold text-primary dark:text-white leading-tight">{step.name}</h3>
                                     <p className="text-xs text-slate-500 dark:text-slate-400">
                                         {formatDateDisplay(step.startDate)} - {formatDateDisplay(step.endDate)}
-                                        {step.realDate && <span className="ml-2 text-green-600 dark:text-green-400">(Concluído em: {formatDateDisplay(step.realDate)})</span>}
+                                        {/* REMOVED: {step.realDate && <span className="ml-2 text-green-600 dark:text-green-400">(Concluído em: {formatDateDisplay(step.realDate)})</span>} */}
                                     </p>
                                 </div>
                                 <div className="text-right text-sm flex flex-col items-center gap-2">

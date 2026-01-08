@@ -382,11 +382,11 @@ const Dashboard = () => {
     return <ReactRouter.Navigate to="/login" replace />;
   }
 
-  // No Works State
+  // No Works State - Redesigned
   if (allWorks.length === 0) {
     return (
       <div className="max-w-4xl mx-auto pb-28 pt-6 px-4 md:px-0 font-sans">
-        {/* Header */}
+        {/* Header - Welcome back [user's first name] */}
         <div className="flex justify-between items-end mb-8">
           <div>
             <p className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Bem-vindo(a) de volta</p>
@@ -397,34 +397,17 @@ const Dashboard = () => {
           </button>
         </div>
 
-        {/* Static Ze Tip */}
-        <div className={cx(surface, "rounded-3xl p-4 md:p-5 flex items-start gap-4 mb-6 transition-all duration-300 transform animate-in fade-in slide-in-from-top-4")} role="status">
-            <div className="w-12 h-12 rounded-full p-1 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-800 shadow-lg shrink-0">
-                <img 
-                src={ZE_AVATAR} 
-                alt="Zé da Obra" 
-                className="w-full h-full object-cover rounded-full border-2 border-white dark:border-slate-800"
-                onError={(e) => { 
-                    const target = e.currentTarget;
-                    if (target.src !== ZE_AVATAR_FALLBACK) {
-                        target.src = ZE_AVATAR_FALLBACK;
-                    }
-                }}
-                />
-            </div>
-            <div className="flex-1">
-                <p className="text-sm font-black uppercase tracking-widest mb-1 text-secondary">Dica do Zé!</p>
-                <p className="text-primary dark:text-white font-bold text-base leading-tight">
-                  Sua obra começa aqui! Clique em "Nova Obra" para começar a planejar seu projeto e ter tudo na palma da sua mão.
-                </p>
-            </div>
-        </div>
-
-        {/* No works card */}
-        <div className="bg-white dark:bg-slate-900 rounded-3xl p-8 text-center shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800">
-          <p className="text-slate-500 dark:text-slate-400 text-lg mb-4">Nenhuma obra cadastrada ainda.</p>
-          <button onClick={() => navigate('/create')} className="px-6 py-3 bg-secondary text-white font-bold rounded-xl hover:bg-secondary-dark transition-colors" aria-label="Criar sua primeira obra">
-            Criar sua primeira obra
+        {/* "Create your first work" eye-catching section */}
+        <div className="flex flex-col items-center justify-center min-h-[40vh] bg-gradient-gold rounded-3xl p-8 text-white text-center shadow-lg shadow-amber-500/30 animate-in fade-in zoom-in-95 duration-500">
+          <i className="fa-solid fa-hammer text-6xl mb-4 text-white/90"></i>
+          <h2 className="text-3xl md:text-4xl font-black mb-4">Crie sua primeira obra!</h2>
+          <p className="text-lg mb-8 text-white/80">Transforme suas ideias em realidade com a gestão perfeita.</p>
+          <button 
+            onClick={() => navigate('/create')} 
+            className="px-8 py-4 bg-primary text-white font-black rounded-2xl shadow-xl shadow-primary/30 hover:shadow-primary/50 hover:scale-105 transition-all flex items-center justify-center gap-3"
+            aria-label="Começar a criar sua primeira obra"
+          >
+            <i className="fa-solid fa-plus-circle"></i> Começar Nova Obra
           </button>
         </div>
       </div>
