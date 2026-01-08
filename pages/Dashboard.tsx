@@ -428,7 +428,7 @@ const Dashboard = () => {
         </button>
       </div>
 
-      {/* Static Ze Tip */}
+      {/* Static Ze Tip (Only shown if works exist) */}
       <div className={cx(surface, "rounded-3xl p-4 md:p-5 flex items-start gap-4 mb-6 transition-all duration-300 transform animate-in fade-in slide-in-from-top-4")} role="status">
             <div className="w-12 h-12 rounded-full p-1 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-800 shadow-lg shrink-0">
                 <img 

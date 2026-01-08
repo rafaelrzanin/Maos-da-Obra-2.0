@@ -122,6 +122,7 @@ const getEntityStatusDetails = (
 
     // Override colors/shadows if actually delayed, but keep statusText pure
     if (isActuallyDelayed) {
+      // The button/card visuals should still turn red for delayed items
       bgColor = 'bg-red-500';
       textColor = 'text-red-600 dark:text-red-400';
       borderColor = 'border-red-400 dark:border-red-700';
@@ -397,7 +398,7 @@ const WorkDetail = () => {
 
   const [showAddPhotoModal, setShowAddPhotoModal] = useState(false);
   const [newPhotoDescription, setNewPhotoDescription] = useState('');
-  const [newPhotoFile, setNewPhotoFile] = useState<File | null>(null);
+  const [newPhotoFile, setNewPhotoFile] = useState<File | null>(() => null); // Corrected useState syntax
   const [newPhotoType, setNewPhotoType] = useState<'BEFORE' | 'AFTER' | 'PROGRESS'>('PROGRESS');
   const [uploadingPhoto, setLoadingPhoto] = useState(false);
 
@@ -565,7 +566,25 @@ const WorkDetail = () => {
       const currentMaterials = await dbService.getMaterials(workId);
       setMaterials(currentMaterials);
 
-      setSteps(fetchedSteps);
+      // Recalculate isDelayed for fetched steps
+      const today = new Date();
+      today.setHours(0, 0, 0, 0); // Normalize today's date to midnight
+
+      const stepsWithCorrectedDelay = fetchedSteps.map(step => {
+        let currentIsDelayed = false;
+        const stepStartDate = new Date(step.startDate);
+        stepStartDate.setHours(0, 0, 0, 0);
+        const stepEndDate = new Date(step.endDate);
+        stepEndDate.setHours(0, 0, 0, 0);
+
+        if (step.status !== StepStatus.COMPLETED) {
+            currentIsDelayed = today.getTime() > stepEndDate.getTime(); // Delayed if end date is past
+        }
+        return { ...step, isDelayed: currentIsDelayed };
+      }).sort((a, b) => a.orderIndex - b.orderIndex); // Ensure sorted by orderIndex
+
+      setSteps(stepsWithCorrectedDelay); // Use corrected steps
+
       setExpenses(fetchedExpenses);
       setWorkers(fetchedWorkers);
       setSuppliers(fetchedSuppliers);
@@ -662,7 +681,6 @@ const WorkDetail = () => {
         isDelayed: newIsDelayed // Explicitly set the new isDelayed state
       };
 
-      // isDelayed is calculated in dbService.updateStep based on the new status and dates
       const updatedStep = await dbService.updateStep(updatedStepData); // Pass the fully formed object
       console.log(`[handleStepStatusChange] dbService.updateStep successful for step ${step.id}. Updated Step Data:`, updatedStep);
       console.log(`[handleStepStatusChange] Data reloaded after status update for step ${step.id}.`);
