@@ -20,60 +20,8 @@ const formatCurrency = (value: number | string | undefined): string => {
   });
 };
 
-// **NEW:** Helper para limpar string do input e prepará-la para o estado (remove tudo exceto dígitos e um único ponto/vírgula decimal)
-const cleanMonetaryInput = (inputString: string | undefined): string => {
-  if (inputString === undefined || inputString === null) return '';
-  let cleaned = String(inputString).replace(/[^\d,.]/g, ''); // Remove tudo exceto dígitos, vírgula e ponto
-
-  // Garante apenas um separador decimal e o padroniza para ponto no estado
-  const parts = cleaned.split(/[,.]/);
-  if (parts.length > 2) {
-    // Múltiplos separadores, mantém apenas o último como decimal
-    cleaned = parts.slice(0, -1).join('') + '.' + parts[parts.length - 1];
-  } else if (parts.length === 2) {
-    // Um separador, padroniza para ponto
-    cleaned = parts[0] + '.' + parts[1];
-  } else if (parts.length === 1) {
-    // Nenhum separador, ou apenas um ponto/vírgula inicial
-    cleaned = parts[0];
-  }
-
-  // Permite '0.' ou '.' para iniciar a digitação de decimais
-  if (cleaned === '.' || cleaned === ',') return '0.';
-
-  return cleaned;
-};
-
-// **NEW:** Helper para formatar string numérica (no estado, ex: "1234.56") para exibição no input (ex: "1.234,56")
-const formatMonetaryDisplay = (numericString: string | undefined): string => {
-  if (numericString === undefined || numericString === null || numericString.trim() === '') {
-    return '';
-  }
-
-  // Se o usuário está digitando um decimal (ex: "123." ou "123,")
-  if (numericString.endsWith('.') && !isNaN(parseFloat(numericString))) {
-      return parseFloat(numericString).toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + ',';
-  }
-
-  const num = parseFloat(numericString);
-  if (isNaN(num)) {
-    return '';
-  }
-
-  return num.toLocaleString('pt-BR', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-};
-
-// **NEW:** Helper para parsear a string numérica do estado (ex: "1234.56") para o formato DB ("1234.56") com 2 casas decimais
-const formatMonetaryValueForDB = (numericString: string | undefined): string => {
-  if (numericString === undefined || numericString === null || numericString.trim() === '') {
-    return '0.00';
-  }
-  const num = parseFloat(numericString);
-  return isNaN(num) ? '0.00' : num.toFixed(2);
-};
+// REMOVED: cleanMonetaryInput, formatMonetaryDisplay, formatMonetaryValueForDB
+// Removed as per user request to simplify monetary input.
 
 
 const CreateWork = () => {
@@ -91,7 +39,7 @@ const CreateWork = () => {
   const [formData, setFormData] = useState({
     name: '',
     address: '',
-    budgetPlanned: '', // Changed to string for easier formatting
+    budgetPlanned: '', // Kept as string for direct input, converted to Number on submit
     area: '', // Still string, but not currency formatted
     floors: '1',
     startDate: new Date().toISOString().split('T')[0],
@@ -119,12 +67,8 @@ const CreateWork = () => {
     // For number inputs, allow empty string but convert to number on blur or submission
     const processedValue = type === 'checkbox' ? checked : value;
 
-    // NEW: Apply currency formatting/parsing for budgetPlanned
-    if (name === 'budgetPlanned') {
-        setFormData({ ...formData, [name]: cleanMonetaryInput(value) });
-    } else {
-        setFormData({ ...formData, [name]: processedValue });
-    }
+    // Direct update without custom monetary formatting logic
+    setFormData({ ...formData, [name]: processedValue });
     
     // Clear error for the field being edited
     setFormErrors(prev => {
@@ -134,12 +78,7 @@ const CreateWork = () => {
     });
   };
 
-  const handleMonetaryBlur = (fieldName: keyof typeof formData) => {
-    setFormData(prev => ({
-        ...prev,
-        [fieldName]: formatMonetaryValueForDB(prev[fieldName] as string) // Ensure 2 decimals on blur
-    }));
-  };
+  // REMOVED: handleMonetaryBlur
 
   const handleCounter = (field: keyof typeof formData, increment: boolean) => {
       setFormData(prev => {
@@ -165,9 +104,8 @@ const CreateWork = () => {
       if (!formData.area || Number(formData.area) <= 0) { // AREA IS NOW MANDATORY
           newErrors.area = "A área em m² é obrigatória e deve ser maior que zero.";
       }
-      if (!formData.budgetPlanned) {
-          newErrors.budgetPlanned = "Quanto você pretende gastar (mesmo que seja um chute)?"; 
-      } else if (Number(formData.budgetPlanned) <= 0) {
+      // Validation for budgetPlanned directly on Number conversion
+      if (!formData.budgetPlanned || Number(formData.budgetPlanned) <= 0) {
           newErrors.budgetPlanned = "O orçamento deve ser maior que zero.";
       }
     } 
@@ -231,7 +169,7 @@ const CreateWork = () => {
             userId: user.id,
             name: formData.name,
             address: formData.address || 'Endereço não informado',
-            budgetPlanned: Number(formatMonetaryValueForDB(formData.budgetPlanned)), // Convert to number for DB
+            budgetPlanned: Number(formData.budgetPlanned), // Direct conversion from string to number
             startDate: formData.startDate,
             area: Number(formData.area) || 0,
             floors: Number(formData.floors) || 1,
@@ -367,18 +305,18 @@ const CreateWork = () => {
                 <div className="flex-1">
                     <label htmlFor="budgetPlanned" className="block text-xs font-bold text-slate-500 uppercase mb-1">Orçamento Previsto (R$) <span className="text-red-500">*</span></label>
                     <input
-                        type="text" 
+                        type="number" // Reverted to number
                         id="budgetPlanned"
                         name="budgetPlanned"
-                        value={formatMonetaryDisplay(formData.budgetPlanned)} 
+                        value={formData.budgetPlanned} 
                         onChange={handleChange}
-                        onBlur={() => handleMonetaryBlur('budgetPlanned')} // Ensure 2 decimals on blur
-                        placeholder="50.000,00"
+                        placeholder="50000.00"
                         className={`w-full bg-transparent text-primary dark:text-white outline-none text-base ${formErrors.budgetPlanned ? 'border-red-500' : ''}`}
                         required
                         aria-invalid={!!formErrors.budgetPlanned}
                         aria-describedby={formErrors.budgetPlanned ? "budgetPlanned-error" : undefined}
-                        inputMode="decimal" 
+                        min="0"
+                        step="0.01"
                     />
                     {formErrors.budgetPlanned && <p id="budgetPlanned-error" className="text-red-500 text-xs mt-1">{formErrors.budgetPlanned}</p>}
                 </div>
