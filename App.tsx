@@ -46,6 +46,11 @@ interface ErrorBoundaryState {
 }
 
 class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  // FIX: Explicitly declare state and props to satisfy a potentially confused TypeScript linter.
+  // This is usually NOT required as they are inherited from React.Component.
+  public state: ErrorBoundaryState;
+  public props: ErrorBoundaryProps;
+
   constructor(props: ErrorBoundaryProps) {
     super(props);
     this.state = { hasError: false, error: null, errorInfo: null };
@@ -56,14 +61,16 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
     return { hasError: true, error, errorInfo: null };
   }
 
-  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+  // FIX: Explicitly set return type for componentDidCatch
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo): void {
     // You can also log the error to an error reporting service
     console.error("[ErrorBoundary] Uncaught error:", error, errorInfo);
     // FIX: Use this.setState to update component state
     this.setState({ errorInfo });
   }
 
-  render() {
+  // FIX: Explicitly set return type for render
+  render(): React.ReactNode {
     // FIX: Use this.state to access component state
     if (this.state.hasError) {
       // You can render any custom fallback UI

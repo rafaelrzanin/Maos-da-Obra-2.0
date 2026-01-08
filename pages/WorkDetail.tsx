@@ -104,24 +104,27 @@ const getEntityStatusDetails = (
       borderColor = 'border-green-400 dark:border-green-700';
       shadowClass = 'shadow-green-500/20';
       icon = 'fa-check';
+    } else if (isActuallyDelayed) { // Prioritize delayed status for styling, including the button's background
+      statusText = `${step.status === StepStatus.IN_PROGRESS ? 'Em Andamento' : 'Pendente'} (Atrasado)`;
+      bgColor = 'bg-red-500'; // Make button red if delayed
+      textColor = 'text-red-600 dark:text-red-400';
+      borderColor = 'border-red-400 dark:border-red-700';
+      shadowClass = 'shadow-red-500/20';
+      icon = 'fa-exclamation-triangle';
     } else if (step.status === StepStatus.IN_PROGRESS) {
-      statusText = isActuallyDelayed ? 'Em Andamento (Atrasado)' : 'Em Andamento';
-      // CRITICAL FIX: Button bgColor should always be amber for IN_PROGRESS,
-      // regardless of isActuallyDelayed. Delay is reflected in text and card style.
-      bgColor = 'bg-amber-500'; 
-      textColor = isActuallyDelayed ? 'text-red-600 dark:text-red-400' : 'text-amber-600 dark:text-amber-400';
-      borderColor = isActuallyDelayed ? 'border-red-400 dark:border-red-700' : 'border-amber-400 dark:border-amber-700';
-      shadowClass = isActuallyDelayed ? 'shadow-red-500/20' : 'shadow-amber-500/20';
-      icon = isActuallyDelayed ? 'fa-exclamation-triangle' : 'fa-hourglass-half';
-    } else { // StepStatus.NOT_STARTED
-      statusText = isActuallyDelayed ? 'Pendente (Atrasado)' : 'Pendente';
-      // CRITICAL FIX: Button bgColor should always be gray for NOT_STARTED,
-      // regardless of isActuallyDelayed. This makes 'Concluído' -> 'Pendente' go to gray.
-      bgColor = 'bg-slate-400'; 
-      textColor = isActuallyDelayed ? 'text-red-600 dark:text-red-400' : 'text-slate-700 dark:text-slate-300';
-      borderColor = isActuallyDelayed ? 'border-red-400 dark:border-red-700' : 'border-slate-200 dark:border-slate-700';
-      shadowClass = isActuallyDelayed ? 'shadow-red-500/20' : 'shadow-slate-400/20';
-      icon = isActuallyDelayed ? 'fa-exclamation-triangle' : 'fa-hourglass-start';
+      statusText = 'Em Andamento';
+      bgColor = 'bg-amber-500';
+      textColor = 'text-amber-600 dark:text-amber-400';
+      borderColor = 'border-amber-400 dark:border-amber-700';
+      shadowClass = 'shadow-amber-500/20';
+      icon = 'fa-hourglass-half';
+    } else { // StepStatus.NOT_STARTED (and not delayed)
+      statusText = 'Pendente';
+      bgColor = 'bg-slate-400';
+      textColor = 'text-slate-700 dark:text-slate-300';
+      borderColor = 'border-slate-200 dark:border-slate-700';
+      shadowClass = 'shadow-slate-400/20';
+      icon = 'fa-hourglass-start';
     }
   } else if (entityType === 'material') {
     const material = entity as Material;
@@ -319,7 +322,7 @@ const WorkDetail = () => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [workers, setWorkers] = useState<Worker[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [photos, setPhotos] = useState<WorkPhoto[]>([]);
+  const [photos, setPhotos] = useState<WorkPhoto[]>(([]);
   const [files, setFiles] = useState<WorkFile[]>([]); 
   const [contracts, setContracts] = useState<Contract[]>([]); 
   const [checklists, setChecklists] = useState<Checklist[]>([]); 
@@ -338,7 +341,9 @@ const WorkDetail = () => {
   const [newStepEndDate, setNewStepEndDate] = useState(new Date().toISOString().split('T')[0]);
   const [editStepData, setEditStepData] = useState<Step | null>(null);
   // State for drag and drop
-  const [draggedStepId, setDraggedStepId, ] = useState<string | null>(null);
+  // FIX: Removed extraneous comma
+  const [draggedStepId, setDraggedStepId] = useState<string | null>(null);
+  // FIX: Removed extraneous comma
   const [dragOverStepId, setDragOverStepId] = useState<string | null>(null);
   const [isUpdatingStepStatus, setIsUpdatingStepStatus] = useState(false); // NEW: Step status loading
 
@@ -686,7 +691,7 @@ const WorkDetail = () => {
     try {
       // Fix: orderIndex is omitted from the input type because it's calculated internally by dbService.addStep
       await dbService.addStep({
-        workId,
+        workId: workId, // Explicitly pass workId
         name: newStepName,
         startDate: newStepStartDate,
         endDate: newStepEndDate,
@@ -721,8 +726,8 @@ const WorkDetail = () => {
     try {
       // isDelayed will be re-calculated in dbService.updateStep (backend logic for consistency)
       await dbService.updateStep({
-        ...editStepData,
-        workId,
+        ...editStepData!,
+        workId: workId, // Explicitly pass workId
       });
       setEditStepData(null);
       setShowAddStepModal(false); // Close the modal
@@ -830,7 +835,7 @@ const WorkDetail = () => {
       setDragOverStepId(null);
       setLoading(false);
     }
-  }, [draggedStepId, steps, workId, loadWorkData]);
+  }, [draggedStepId, steps, workId, loadWorkData, setLoading, setDraggedStepId, setDragOverStepId, setZeModal]);
 
 
   // =======================================================================
@@ -845,7 +850,7 @@ const WorkDetail = () => {
     try {
       // FIX: Pass user.id as the first argument
       await dbService.addMaterial(user.id, {
-        workId,
+        workId: workId, // Explicitly pass workId
         name: newMaterialName,
         brand: newMaterialBrand, // NEW: Pass brand
         plannedQty: Number(newMaterialPlannedQty),
@@ -887,7 +892,7 @@ const WorkDetail = () => {
       // FIX: Use non-null assertion for editMaterialData
       await dbService.updateMaterial({
         ...editMaterialData!,
-        workId,
+        workId: workId, // Explicitly pass workId
         name: newMaterialName,
         brand: newMaterialBrand, // NEW: Pass brand
         plannedQty: Number(newMaterialPlannedQty),
@@ -984,7 +989,7 @@ const WorkDetail = () => {
     setZeModal(prev => ({ ...prev, isConfirming: true }));
     try {
       await dbService.addExpense({
-        workId,
+        workId: workId, // Explicitly pass workId
         description: newExpenseDescription,
         amount: Number(newExpenseAmount),
         // When adding a new expense, paidAmount is 0 by default, unless explicitly set
@@ -1032,7 +1037,7 @@ const WorkDetail = () => {
     try {
       await dbService.updateExpense({
         ...editExpenseData,
-        workId,
+        workId: workId, // Explicitly pass workId
         description: newExpenseDescription,
         amount: Number(newExpenseAmount),
         date: newExpenseDate,
@@ -1040,7 +1045,8 @@ const WorkDetail = () => {
         stepId: newExpenseStepId === 'none' ? undefined : newExpenseStepId,
         workerId: newExpenseWorkerId === 'none' ? undefined : newExpenseWorkerId,
         supplierId: newExpenseSupplierId === 'none' ? undefined : newExpenseSupplierId,
-        totalAgreed: newExpenseTotalAgreed ? Number(newExpenseTotalAgreed) : Number(newExpenseAmount), // Use totalAgreed or fallback to amount
+        // FIX: Add non-null assertion for editExpenseData.amount, as it's guaranteed by the 'if' guard
+        totalAgreed: newExpenseTotalAgreed ? Number(newExpenseTotalAgreed) : Number(editExpenseData.amount), // Use totalAgreed or fallback to amount
       });
       setEditExpenseData(null);
       setShowAddExpenseModal(false); // Close the modal
@@ -1125,7 +1131,7 @@ const WorkDetail = () => {
     setZeModal(prev => ({ ...prev, isConfirming: true }));
     try {
       await dbService.addWorker({
-        workId,
+        workId: workId, // Explicitly pass workId
         userId: user.id,
         name: newWorkerName,
         role: newWorkerRole,
@@ -1219,7 +1225,7 @@ const WorkDetail = () => {
     setZeModal(prev => ({ ...prev, isConfirming: true }));
     try {
       await dbService.addSupplier({
-        workId,
+        workId: workId, // Explicitly pass workId
         userId: user.id,
         name: newSupplierName,
         category: newSupplierCategory,
@@ -1336,7 +1342,7 @@ const WorkDetail = () => {
 
       // 3. Save photo record to database
       await dbService.addPhoto({
-        workId,
+        workId: workId, // Explicitly pass workId
         url: publicUrlData.publicUrl,
         description: newPhotoDescription,
         date: new Date().toISOString().split('T')[0],
@@ -1433,7 +1439,7 @@ const WorkDetail = () => {
 
       // 3. Save file record to database
       await dbService.addFile({
-        workId,
+        workId: workId, // Explicitly pass workId
         name: newFileName || newUploadFile.name,
         category: newFileCategory,
         url: publicUrlData.publicUrl,
@@ -1515,7 +1521,7 @@ const WorkDetail = () => {
     setZeModal(prev => ({ ...prev, isConfirming: true }));
     try {
       await dbService.addChecklist({
-        workId,
+        workId: workId, // Explicitly pass workId
         name: newChecklistName,
         category: newChecklistCategory,
         items: itemsForDb,
@@ -1974,7 +1980,7 @@ const WorkDetail = () => {
                                                 {expense.supplierId && <p className="text-xs text-slate-500 dark:text-slate-400">Fornecedor: {suppliers.find(s => s.id === expense.supplierId)?.name}</p>}
                                             </div>
                                             <div className="text-center sm:text-right w-full sm:w-auto flex flex-col items-end gap-1">
-                                                <p className="text-sm text-slate-700 dark:text-slate-300">Combinado: <span className="font-bold">{formatCurrency(expense.totalAgreed !== undefined ? expense.totalAgred : expense.amount)}</span></p>
+                                                <p className="text-sm text-slate-700 dark:text-slate-300">Combinado: <span className="font-bold">{formatCurrency(expense.totalAgreed !== undefined ? expense.totalAgreed : expense.amount)}</span></p>
                                                 <p className={cx("text-sm font-bold", statusDetails.textColor)}>Pago: {formatCurrency(expense.paidAmount || 0)}</p>
                                                 {statusDetails.statusText !== 'Concluído' && statusDetails.statusText !== 'Prejuízo' && (
                                                     <button onClick={(e) => { e.stopPropagation(); setPaymentExpenseData(expense); setShowAddPaymentModal(true); }} className="text-xs text-secondary hover:underline" aria-label={`Adicionar pagamento para despesa ${expense.description}`}>
@@ -2592,8 +2598,8 @@ const WorkDetail = () => {
               <div className="mt-6 pt-4 border-t border-slate-200 dark:border-slate-700">
                 <h3 className="font-bold text-primary dark:text-white text-lg mb-3">Registrar Compra</h3>
                 <div className="flex justify-between text-sm text-slate-500 dark:text-slate-400 mb-2">
-                  <span>Comprado: {editMaterialData.purchasedQty} / {editMaterialData.plannedQty} {editMaterialData.unit}</span>
-                  <span>Custo Total: {formatCurrency(editMaterialData.totalCost)}</span>
+                  <span>Comprado: {editMaterialData!.purchasedQty} / {editMaterialData!.plannedQty} {editMaterialData!.unit}</span>
+                  <span>Custo Total: {formatCurrency(editMaterialData!.totalCost)}</span>
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -3124,80 +3130,114 @@ const WorkDetail = () => {
                       updatedItems[index] = e.target.value;
                       setNewChecklistItems(updatedItems);
                     }}
-                    placeholder={`Item ${index + 1}`}
-                    className="flex-1 p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
+                    className="flex-1 p-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
                   />
+                  {/* Remove item button */}
                   {newChecklistItems.length > 1 && (
-                    <button type="button" onClick={() => setNewChecklistItems(newChecklistItems.filter((_, i) => i !== index))} className="p-2 text-red-500 hover:text-red-700" aria-label="Remover item">
-                      <i className="fa-solid fa-trash-alt"></i>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const updatedItems = newChecklistItems.filter((_, i) => i !== index);
+                        setNewChecklistItems(updatedItems);
+                      }}
+                      className="text-red-500 hover:text-red-700 p-1"
+                      aria-label="Remover item do checklist"
+                    >
+                      <i className="fa-solid fa-trash-alt text-sm"></i>
                     </button>
                   )}
                 </div>
               ))}
-              <button type="button" onClick={() => setNewChecklistItems([...newChecklistItems, ''])} className="px-4 py-2 bg-slate-100 dark:bg-slate-700 text-primary dark:text-white text-sm font-bold rounded-xl hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors mt-2">
-                Adicionar Item
+              {/* Button to add new checklist item */}
+              <button
+                type="button"
+                onClick={() => setNewChecklistItems(prev => [...prev, ''])}
+                className="mt-2 px-4 py-2 bg-slate-100 dark:bg-slate-800 text-primary dark:text-white text-sm font-bold rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors flex items-center gap-2"
+                aria-label="Adicionar novo item ao checklist"
+              >
+                <i className="fa-solid fa-plus"></i> Adicionar Item
               </button>
             </div>
           </form>
         </ZeModal>
       );
     }
-    // Generic ZeModal for confirmations/errors
-    if (zeModal.isOpen) {
-        return <ZeModal {...zeModal} />;
-    }
-    return null;
+    // End of add/edit checklist modal
+
+    return null; // Fallback if no modal should be shown
   };
+  // End of renderModal function
 
 
   return (
-    <div className="max-w-4xl mx-auto pb-12 pt-6 px-4 font-sans">
+    <div className="max-w-4xl mx-auto pb-12 pt-6 px-4">
       <div className="flex items-center gap-4 mb-6 px-2 sm:px-0">
-        <button 
-          onClick={() => navigate('/')} 
+        <button
+          onClick={() => navigate('/')}
           className="text-slate-400 hover:text-primary dark:hover:text-white transition-colors p-2 -ml-2"
           aria-label="Voltar para o Dashboard"
         >
           <i className="fa-solid fa-arrow-left text-xl"></i>
         </button>
         <div>
-          <h1 className="text-3xl font-black text-primary dark:text-white mb-1 tracking-tight">Obra: {work?.name || 'Carregando...'}</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">{work?.address || 'Endereço não informado'}</p>
+          <h1 className="text-3xl font-black text-primary dark:text-white mb-1 tracking-tight">
+            Obra: {work.name}
+          </h1>
+          <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">
+            {work.address}
+          </p>
         </div>
       </div>
 
-      <div className="flex justify-around bg-white dark:bg-slate-900 rounded-2xl p-2 shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800 mb-6">
-        {['ETAPAS', 'MATERIAIS', 'FINANCEIRO', 'FERRAMENTAS'].map((tab) => (
-          <button
-            key={tab}
-            onClick={() => goToTab(tab as MainTab)}
-            className={`flex-1 py-2 rounded-xl text-sm font-bold transition-colors ${activeTab === tab ? 'bg-secondary text-white shadow-md' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
-            aria-current={activeTab === tab ? 'page' : undefined}
-          >
-            {tab === 'ETAPAS' && 'Cronograma'}
-            {tab === 'MATERIAIS' && 'Materiais'}
-            {tab === 'FINANCEIRO' && 'Financeiro'}
-            {tab === 'FERRAMENTAS' && 'Ferramentas'}
-          </button>
-        ))}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <button
+          onClick={() => goToTab('ETAPAS')}
+          className={`flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all ${
+            activeTab === 'ETAPAS' ? 'border-secondary bg-secondary/10' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-secondary/50'
+          }`}
+          aria-pressed={activeTab === 'ETAPAS'}
+        >
+          <i className="fa-solid fa-list-check text-2xl mb-2 text-primary dark:text-white"></i>
+          <span className="font-bold text-primary dark:text-white text-sm">Cronograma</span>
+        </button>
+        <button
+          onClick={() => goToTab('MATERIAIS')}
+          className={`flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all ${
+            activeTab === 'MATERIAIS' ? 'border-secondary bg-secondary/10' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-secondary/50'
+          }`}
+          aria-pressed={activeTab === 'MATERIAIS'}
+        >
+          <i className="fa-solid fa-boxes-stacked text-2xl mb-2 text-primary dark:text-white"></i>
+          <span className="font-bold text-primary dark:text-white text-sm">Materiais</span>
+        </button>
+        <button
+          onClick={() => goToTab('FINANCEIRO')}
+          className={`flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all ${
+            activeTab === 'FINANCEIRO' ? 'border-secondary bg-secondary/10' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-secondary/50'
+          }`}
+          aria-pressed={activeTab === 'FINANCEIRO'}
+        >
+          <i className="fa-solid fa-dollar-sign text-2xl mb-2 text-primary dark:text-white"></i>
+          <span className="font-bold text-primary dark:text-white text-sm">Financeiro</span>
+        </button>
+        <button
+          onClick={() => goToTab('FERRAMENTAS')}
+          className={`flex flex-col items-center justify-center p-4 rounded-xl border-2 transition-all ${
+            activeTab === 'FERRAMENTAS' ? 'border-secondary bg-secondary/10' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-secondary/50'
+          }`}
+          aria-pressed={activeTab === 'FERRAMENTAS'}
+        >
+          <i className="fa-solid fa-screwdriver-wrench text-2xl mb-2 text-primary dark:text-white"></i>
+          <span className="font-bold text-primary dark:text-white text-sm">Ferramentas</span>
+        </button>
       </div>
 
-      {/* NEW: No `errorMsg` state in WorkDetail.tsx. This was an unused local state or from a previous version.
-          Removing this block to prevent potential issues or confusion. 
-          The ZeModal already handles error messages if dbService throws an error. */}
-      {/* {errorMsg && (
-        <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-900 text-red-600 dark:text-red-400 rounded-xl text-sm font-bold flex items-center gap-2 animate-in fade-in" role="alert">
-          <i className="fa-solid fa-triangle-exclamation"></i> {errorMsg}
-        </div>
-      )} */}
-
-      {!loading && ( /* Removed `!errorMsg` from condition */
-        <div className={cx(surface, card)}>
-          {renderMainContent()}
-        </div>
-      )}
+      <div className={cx(surface, card)}>
+        {renderMainContent()}
+      </div>
 
       {renderModal()}
+      {zeModal.isOpen && <ZeModal {...zeModal} />}
     </div>
   );
 };

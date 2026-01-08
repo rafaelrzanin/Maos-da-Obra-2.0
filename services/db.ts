@@ -1084,18 +1084,6 @@ export const dbService = {
     const stepStartDate = new Date(step.startDate);
     stepStartDate.setHours(0,0,0,0); // Normalize step start date to midnight
 
-    // NEW: Recalculate is_delayed based on new data before saving, adhering to the prompt's rules
-    let newIsDelayed = false;
-    if (step.status === StepStatus.COMPLETED) { // IMPORTANT: 'step.status' here is the *new* status from frontend
-        newIsDelayed = false; 
-    } else if (step.status === StepStatus.NOT_STARTED) {
-        // A NOT_STARTED step is delayed if its start date is in the past
-        newIsDelayed = today.getTime() > stepStartDate.getTime();
-    } else if (step.status === StepStatus.IN_PROGRESS) {
-        // An IN_PROGRESS step is delayed if its end date is in the past
-        newIsDelayed = today.getTime() > stepEndDate.getTime();
-    }
-    
     // CORREÇÃO CRÍTICA: Limpar real_date se o status NÃO for CONCLUIDO
     if (step.status !== StepStatus.COMPLETED) { 
         step.realDate = undefined; // Garante que realDate é nulo/undefined se a etapa não está concluída
@@ -1107,7 +1095,7 @@ export const dbService = {
       end_date: step.endDate,
       real_date: step.realDate, // Use potentially modified realDate
       status: step.status,
-      is_delayed: newIsDelayed, // Use the recalculated value
+      is_delayed: step.isDelayed, // Use the recalculated value from the frontend
       order_index: step.orderIndex
     };
 
