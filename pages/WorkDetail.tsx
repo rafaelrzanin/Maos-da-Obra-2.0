@@ -614,39 +614,38 @@ const WorkDetail = () => {
 
     let newStatus: StepStatus;
     let newRealDate: string | undefined = undefined;
-    let newIsDelayed: boolean = false; // Initialize newIsDelayed
+    let newIsDelayed: boolean = false; 
 
     const today = new Date();
-    today.setHours(0, 0, 0, 0); // Normalize today's date to midnight
+    today.setHours(0, 0, 0, 0); 
     const stepStartDate = new Date(step.startDate);
-    stepStartDate.setHours(0, 0, 0, 0); // Normalize step start date to midnight
+    stepStartDate.setHours(0, 0, 0, 0);
     const stepEndDate = new Date(step.endDate);
-    stepEndDate.setHours(0, 0, 0, 0); // Normalize step end date to midnight
+    stepEndDate.setHours(0, 0, 0, 0);
 
     switch (step.status) {
       case StepStatus.NOT_STARTED:
         newStatus = StepStatus.IN_PROGRESS;
-        // A step in progress is delayed if its end date is in the past
+        // A step going into IN_PROGRESS is delayed if its END date has already passed.
         newIsDelayed = today.getTime() > stepEndDate.getTime();
         console.log(`[handleStepStatusChange] Status transition: NOT_STARTED -> IN_PROGRESS for step ${step.id}. Recalculated newIsDelayed: ${newIsDelayed}.`);
         break;
       case StepStatus.IN_PROGRESS:
         newStatus = StepStatus.COMPLETED;
         newRealDate = new Date().toISOString().split('T')[0]; // Set real completion date
-        newIsDelayed = false; // A completed step is never delayed
+        newIsDelayed = false; // Completed steps are never delayed.
         console.log(`[handleStepStatusChange] Status transition: IN_PROGRESS -> COMPLETED for step ${step.id}. RealDate: ${newRealDate}. newIsDelayed: ${newIsDelayed}.`);
         break;
       case StepStatus.COMPLETED:
-        newStatus = StepStatus.NOT_STARTED; // Cycle back to NOT_STARTED
-        newRealDate = undefined; // Clear real completion date
-        // A NOT_STARTED step is delayed if its start date is in the past
+        newStatus = StepStatus.NOT_STARTED; // Reverts to NOT_STARTED
+        newRealDate = undefined; // Clear realDate
+        // A step reverting to NOT_STARTED is delayed if its START date has already passed.
         newIsDelayed = today.getTime() > stepStartDate.getTime();
         console.log(`[handleStepStatusChange] Status transition: COMPLETED -> NOT_STARTED for step ${step.id}. Clearing RealDate. Recalculated newIsDelayed: ${newIsDelayed}.`);
         break;
       default:
-        newStatus = StepStatus.NOT_STARTED; // Should not happen
-        // Default delay calculation for safety
-        newIsDelayed = today.getTime() > stepStartDate.getTime();
+        newStatus = StepStatus.NOT_STARTED;
+        newIsDelayed = today.getTime() > stepStartDate.getTime(); // Default to delayed if start date is past.
         console.warn(`[handleStepStatusChange] Unexpected status for step ${step.id}: ${step.status}. Defaulting to NOT_STARTED. Recalculated newIsDelayed: ${newIsDelayed}.`);
     }
     
@@ -3187,6 +3186,8 @@ const WorkDetail = () => {
         </div>
       </div>
 
+      {/* REMOVED: Duplicated top navigation tabs */}
+      {/*
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         <button
           onClick={() => goToTab('ETAPAS')}
@@ -3229,6 +3230,7 @@ const WorkDetail = () => {
           <span className="font-bold text-primary dark:text-white text-sm">Ferramentas</span>
         </button>
       </div>
+      */}
 
       <div className={cx(surface, card)}>
         {renderMainContent()}
