@@ -10,33 +10,48 @@ import { aiService } from '../services/ai.ts'; // NEW: Import aiService
 // Helper para formatar valores monetários (apenas para exibição estática)
 const formatCurrency = (value: number | string | undefined): string => {
   if (value === undefined || value === null || isNaN(Number(value))) {
-    return '0,00'; // Retorna apenas o valor sem R$ para placeholder
+    return 'R$ 0,00'; // Retorna apenas o valor sem R$ para placeholder
   }
   return Number(value).toLocaleString('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
 };
 
 // NEW: Helper para formatar um número para exibição em um input (e.g., "1.250.000,00")
-const formatInputReal = (value: number | string | undefined): string => {
-  if (value === undefined || value === null || value === '') return '';
-  // Se já é uma string formatada, tenta limpar e reformatar para consistência
-  const num = typeof value === 'string' ? parseFloat(value.replace(/\./g, '').replace(',', '.')) : value;
+const formatInputReal = (rawNumericString: string): string => {
+  if (!rawNumericString) return '';
+  const num = parseFloat(rawNumericString);
   if (isNaN(num)) return '';
-  // Formata com ponto para milhares e vírgula para decimais
+  // Use toLocaleString for proper formatting. Force 2 decimal places for consistency.
   return num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 };
 
-// NEW: Helper para parsear uma string formatada (e.g., "1.250.000,00") para um número puro (e.g., 1250000.00)
-const parseInputReal = (value: string): string => {
-  if (!value) return '';
-  // Remove pontos de milhar e substitui vírgula decimal por ponto
-  const cleanValue = value.replace(/\./g, '').replace(',', '.');
-  const num = parseFloat(cleanValue);
+// NEW: Helper para parsear uma string formatada (e.g., "1.250.000,00") para um número puro em string (e.g., "1250000.00")
+const parseInputReal = (displayString: string): string => {
+  if (!displayString) return '';
+
+  // Remove tudo que não é dígito ou vírgula. Pontos são considerados separadores de milhar (e removidos).
+  let cleaned = displayString.replace(/[^0-9,]/g, '');
+
+  // Se houver mais de uma vírgula, assume que todas (exceto a última, se houver) são separadores de milhar e remove.
+  // Depois, a última vírgula (se houver) é o separador decimal.
+  const parts = cleaned.split(',');
+  if (parts.length > 2) { // Ex: "1,000,000,00"
+    cleaned = parts.slice(0, -1).join('') + ',' + parts[parts.length - 1]; // Mantém apenas a última vírgula
+  }
+  
+  // Substitui a vírgula por ponto para parseFloat, se ela for o separador decimal.
+  cleaned = cleaned.replace(',', '.');
+  
+  const num = parseFloat(cleaned);
   if (isNaN(num)) return '';
-  // Retorna uma string com 2 casas decimais, para manter o formato de armazenamento consistente
-  return num.toFixed(2);
+
+  // Retorna a string numérica para que o input possa manipular os decimais enquanto o usuário digita
+  // Não fixa o toFixed(2) aqui para permitir que o usuário digite "123.4"
+  return cleaned.toString();
 };
 
 
@@ -119,13 +134,13 @@ const CreateWork = () => {
       if (!formData.name.trim()) {
           newErrors.name = "Por favor, dê um apelido para sua obra."; 
       }
+      if (!formData.area || Number(formData.area) <= 0) { // AREA IS NOW MANDATORY
+          newErrors.area = "A área em m² é obrigatória e deve ser maior que zero.";
+      }
       if (!formData.budgetPlanned) {
           newErrors.budgetPlanned = "Quanto você pretende gastar (mesmo que seja um chute)?"; 
       } else if (Number(formData.budgetPlanned) <= 0) {
           newErrors.budgetPlanned = "O orçamento deve ser maior que zero.";
-      }
-      if (formData.area && Number(formData.area) <= 0) {
-        newErrors.area = "A área deve ser maior que zero.";
       }
     } 
     else if (step === 2) {
@@ -267,71 +282,97 @@ const CreateWork = () => {
       case 1:
         return (
           <>
-            <h2 className="text-2xl font-black text-primary dark:text-white mb-6">Informações Básicas</h2>
+            <h2 className="text-3xl font-black text-primary dark:text-white mb-2 tracking-tight text-center">Crie sua Obra!</h2>
+            <p className="text-slate-500 dark:text-slate-400 max-w-sm mx-auto text-center mb-8">
+              Primeiros passos para o seu projeto de sucesso.
+            </p>
+
             <div className="space-y-5">
-              <div>
-                <label htmlFor="name" className="block text-sm font-bold text-slate-500 uppercase mb-2">Apelido da Obra <span className="text-red-500">*</span></label>
-                <input
-                  type="text"
-                  id="name"
-                  name="name"
-                  value={formData.name}
-                  onChange={handleChange}
-                  placeholder="Ex: Reforma da Cozinha, Casa da Praia"
-                  className={`w-full px-4 py-3 rounded-xl border-2 ${formErrors.name ? 'border-red-500' : 'border-slate-200 dark:border-slate-700'} bg-white dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all`}
-                  required
-                  aria-invalid={!!formErrors.name}
-                  aria-describedby={formErrors.name ? "name-error" : undefined}
-                />
-                {formErrors.name && <p id="name-error" className="text-red-500 text-xs mt-1">{formErrors.name}</p>}
+              <div className="bg-white dark:bg-slate-800 rounded-2xl border-2 border-slate-200 dark:border-slate-700 p-4 flex items-center gap-4 shadow-sm group hover:border-secondary/50 dark:hover:border-secondary/50 transition-colors">
+                <div className="w-10 h-10 flex items-center justify-center text-secondary text-2xl">
+                    <i className="fa-solid fa-signature"></i>
+                </div>
+                <div className="flex-1">
+                    <label htmlFor="name" className="block text-xs font-bold text-slate-500 uppercase mb-1">Apelido da Obra <span className="text-red-500">*</span></label>
+                    <input
+                        type="text"
+                        id="name"
+                        name="name"
+                        value={formData.name}
+                        onChange={handleChange}
+                        placeholder="Ex: Reforma da Cozinha, Casa da Praia"
+                        className={`w-full bg-transparent text-primary dark:text-white outline-none text-base ${formErrors.name ? 'border-red-500' : ''}`}
+                        required
+                        aria-invalid={!!formErrors.name}
+                        aria-describedby={formErrors.name ? "name-error" : undefined}
+                    />
+                    {formErrors.name && <p id="name-error" className="text-red-500 text-xs mt-1">{formErrors.name}</p>}
+                </div>
               </div>
-              <div>
-                <label htmlFor="address" className="block text-sm font-bold text-slate-500 uppercase mb-2">Endereço (Opcional)</label>
-                <input
-                  type="text"
-                  id="address"
-                  name="address"
-                  value={formData.address}
-                  onChange={handleChange}
-                  placeholder="Ex: Rua das Flores, 123"
-                  className="w-full px-4 py-3 rounded-xl border-2 border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
-                />
+
+              <div className="bg-white dark:bg-slate-800 rounded-2xl border-2 border-slate-200 dark:border-slate-700 p-4 flex items-center gap-4 shadow-sm group hover:border-secondary/50 dark:hover:border-secondary/50 transition-colors">
+                <div className="w-10 h-10 flex items-center justify-center text-secondary text-2xl">
+                    <i className="fa-solid fa-ruler-combined"></i>
+                </div>
+                <div className="flex-1">
+                    <label htmlFor="area" className="block text-xs font-bold text-slate-500 uppercase mb-1">Área (m²) <span className="text-red-500">*</span></label>
+                    <input
+                        type="number" 
+                        id="area"
+                        name="area"
+                        value={formData.area}
+                        onChange={handleChange}
+                        placeholder="100"
+                        min="0"
+                        step="0.01"
+                        className={`w-full bg-transparent text-primary dark:text-white outline-none text-base ${formErrors.area ? 'border-red-500' : ''}`}
+                        required
+                        aria-invalid={!!formErrors.area}
+                        aria-describedby={formErrors.area ? "area-error" : undefined}
+                    />
+                    {formErrors.area && <p id="area-error" className="text-red-500 text-xs mt-1">{formErrors.area}</p>}
+                </div>
               </div>
-              <div>
-                <label htmlFor="budgetPlanned" className="block text-sm font-bold text-slate-500 uppercase mb-2">Orçamento Previsto (R$) <span className="text-red-500">*</span></label>
-                <input
-                  type="text" // NEW: Changed to text for custom formatting
-                  id="budgetPlanned"
-                  name="budgetPlanned"
-                  value={formatInputReal(formData.budgetPlanned)} // NEW: Formatted for display
-                  onChange={handleChange}
-                  placeholder="50.000,00"
-                  // min="0" // min and step are for type="number", remove them for type="text"
-                  // step="0.01" // min and step are for type="number", remove them for type="text"
-                  className={`w-full px-4 py-3 rounded-xl border-2 ${formErrors.budgetPlanned ? 'border-red-500' : 'border-slate-200 dark:border-slate-700'} bg-white dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all`}
-                  required
-                  aria-invalid={!!formErrors.budgetPlanned}
-                  aria-describedby={formErrors.budgetPlanned ? "budgetPlanned-error" : undefined}
-                  inputMode="decimal" // Suggest numeric keyboard with decimal support
-                />
-                {formErrors.budgetPlanned && <p id="budgetPlanned-error" className="text-red-500 text-xs mt-1">{formErrors.budgetPlanned}</p>}
+
+              <div className="bg-white dark:bg-slate-800 rounded-2xl border-2 border-slate-200 dark:border-slate-700 p-4 flex items-center gap-4 shadow-sm group hover:border-secondary/50 dark:hover:border-secondary/50 transition-colors">
+                <div className="w-10 h-10 flex items-center justify-center text-secondary text-2xl">
+                    <i className="fa-solid fa-dollar-sign"></i>
+                </div>
+                <div className="flex-1">
+                    <label htmlFor="budgetPlanned" className="block text-xs font-bold text-slate-500 uppercase mb-1">Orçamento Previsto (R$) <span className="text-red-500">*</span></label>
+                    <input
+                        type="text" 
+                        id="budgetPlanned"
+                        name="budgetPlanned"
+                        value={formatInputReal(formData.budgetPlanned)} 
+                        onChange={handleChange}
+                        placeholder="50.000,00"
+                        className={`w-full bg-transparent text-primary dark:text-white outline-none text-base ${formErrors.budgetPlanned ? 'border-red-500' : ''}`}
+                        required
+                        aria-invalid={!!formErrors.budgetPlanned}
+                        aria-describedby={formErrors.budgetPlanned ? "budgetPlanned-error" : undefined}
+                        inputMode="decimal" 
+                    />
+                    {formErrors.budgetPlanned && <p id="budgetPlanned-error" className="text-red-500 text-xs mt-1">{formErrors.budgetPlanned}</p>}
+                </div>
               </div>
-              <div>
-                <label htmlFor="area" className="block text-sm font-bold text-slate-500 uppercase mb-2">Área (m²) (Opcional)</label>
-                <input
-                  type="number" // Keep as number, as it's not currency
-                  id="area"
-                  name="area"
-                  value={formData.area}
-                  onChange={handleChange}
-                  placeholder="100"
-                  min="0"
-                  step="0.01"
-                  className={`w-full px-4 py-3 rounded-xl border-2 ${formErrors.area ? 'border-red-500' : 'border-slate-200 dark:border-slate-700'} bg-white dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all`}
-                  aria-invalid={!!formErrors.area}
-                  aria-describedby={formErrors.area ? "area-error" : undefined}
-                />
-                {formErrors.area && <p id="area-error" className="text-red-500 text-xs mt-1">{formErrors.area}</p>}
+
+              <div className="bg-white dark:bg-slate-800 rounded-2xl border-2 border-slate-200 dark:border-slate-700 p-4 flex items-center gap-4 shadow-sm group hover:border-secondary/50 dark:hover:border-secondary/50 transition-colors">
+                <div className="w-10 h-10 flex items-center justify-center text-secondary text-2xl">
+                    <i className="fa-solid fa-location-dot"></i>
+                </div>
+                <div className="flex-1">
+                    <label htmlFor="address" className="block text-xs font-bold text-slate-500 uppercase mb-1">Endereço (Opcional)</label>
+                    <input
+                        type="text"
+                        id="address"
+                        name="address"
+                        value={formData.address}
+                        onChange={handleChange}
+                        placeholder="Ex: Rua das Flores, 123"
+                        className="w-full bg-transparent text-primary dark:text-white outline-none text-base"
+                    />
+                </div>
               </div>
             </div>
           </>
@@ -339,28 +380,32 @@ const CreateWork = () => {
       case 2:
         return (
           <>
-            <h2 className="text-2xl font-black text-primary dark:text-white mb-6">Detalhes da Obra</h2>
-            <div className="space-y-5">
+            <h2 className="text-3xl font-black text-primary dark:text-white mb-2 tracking-tight text-center">Detalhes Essenciais</h2>
+            <p className="text-slate-500 dark:text-slate-400 max-w-sm mx-auto text-center mb-8">
+              Selecione o tipo e a data de início da sua obra.
+            </p>
+
+            <div className="space-y-6">
               <div>
-                <label className="block text-sm font-bold text-slate-500 uppercase mb-2">Tipo de Obra <span className="text-red-500">*</span></label>
+                <label className="block text-sm font-bold text-slate-500 uppercase mb-3">Tipo de Obra <span className="text-red-500">*</span></label>
                 <div className="grid grid-cols-2 gap-4">
                   <button
                     type="button"
                     onClick={() => handleCategorySelect('CONSTRUCTION')}
-                    className={`flex flex-col items-center justify-center p-4 rounded-2xl border-2 transition-all ${workCategory === 'CONSTRUCTION' ? 'border-secondary bg-secondary/10' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-secondary/50'}`}
+                    className={`flex flex-col items-center justify-center p-5 rounded-2xl border-2 transition-all shadow-md ${workCategory === 'CONSTRUCTION' ? 'border-secondary bg-secondary/10' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-secondary/50'}`}
                     aria-pressed={workCategory === 'CONSTRUCTION'}
                   >
-                    <i className="fa-solid fa-house-chimney text-3xl mb-2 text-primary dark:text-white"></i>
-                    <span className="font-bold text-primary dark:text-white text-sm">Construção</span>
+                    <i className="fa-solid fa-house-chimney text-4xl mb-3 text-primary dark:text-white"></i>
+                    <span className="font-black text-primary dark:text-white text-base">Construção</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => handleCategorySelect('RENOVATION')}
-                    className={`flex flex-col items-center justify-center p-4 rounded-2xl border-2 transition-all ${workCategory === 'RENOVATION' ? 'border-secondary bg-secondary/10' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-secondary/50'}`}
+                    className={`flex flex-col items-center justify-center p-5 rounded-2xl border-2 transition-all shadow-md ${workCategory === 'RENOVATION' ? 'border-secondary bg-secondary/10' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-secondary/50'}`}
                     aria-pressed={workCategory === 'RENOVATION'}
                   >
-                    <i className="fa-solid fa-screwdriver-wrench text-3xl mb-2 text-primary dark:text-white"></i>
-                    <span className="font-bold text-primary dark:text-white text-sm">Reforma</span>
+                    <i className="fa-solid fa-screwdriver-wrench text-4xl mb-3 text-primary dark:text-white"></i>
+                    <span className="font-black text-primary dark:text-white text-base">Reforma</span>
                   </button>
                 </div>
                 {formErrors.workCategory && <p className="text-red-500 text-xs mt-1">{formErrors.workCategory}</p>}
@@ -368,8 +413,8 @@ const CreateWork = () => {
 
               {workCategory && (
                 <div>
-                  <label htmlFor="selectedTemplateId" className="block text-sm font-bold text-slate-500 uppercase mb-2">Tipo Específico <span className="text-red-500">*</span></label>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <label htmlFor="selectedTemplateId" className="block text-sm font-bold text-slate-500 uppercase mb-3">Tipo Específico <span className="text-red-500">*</span></label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {WORK_TEMPLATES.filter(t => 
                       workCategory === 'CONSTRUCTION' ? t.id === 'CONSTRUCAO' : t.id !== 'CONSTRUCAO'
                     ).map(template => (
@@ -377,7 +422,7 @@ const CreateWork = () => {
                         type="button"
                         key={template.id}
                         onClick={() => { setSelectedTemplateId(template.id); setFormErrors(prev => { const newErrors = { ...prev }; delete newErrors.selectedTemplate; return newErrors; }); }}
-                        className={`flex items-center p-4 rounded-2xl border-2 transition-all text-left ${selectedTemplateId === template.id ? 'border-secondary bg-secondary/10' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-secondary/50'}`}
+                        className={`flex items-center p-4 rounded-2xl border-2 transition-all text-left shadow-sm ${selectedTemplateId === template.id ? 'border-secondary bg-secondary/10' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-secondary/50'}`}
                         aria-pressed={selectedTemplateId === template.id}
                       >
                         <i className={`fa-solid ${template.icon} text-2xl mr-3 text-primary dark:text-white`}></i>
@@ -392,43 +437,52 @@ const CreateWork = () => {
                 </div>
               )}
 
-              <div>
-                <label htmlFor="startDate" className="block text-sm font-bold text-slate-500 uppercase mb-2">Data de Início <span className="text-red-500">*</span></label>
-                <input
-                  type="date"
-                  id="startDate"
-                  name="startDate"
-                  value={formData.startDate}
-                  onChange={handleChange}
-                  className={`w-full px-4 py-3 rounded-xl border-2 ${formErrors.startDate ? 'border-red-500' : 'border-slate-200 dark:border-slate-700'} bg-white dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all`}
-                  required
-                  aria-invalid={!!formErrors.startDate}
-                  aria-describedby={formErrors.startDate ? "startDate-error" : undefined}
-                />
-                {formErrors.startDate && <p id="startDate-error" className="text-red-500 text-xs mt-1">{formErrors.startDate}</p>}
+              <div className="bg-white dark:bg-slate-800 rounded-2xl border-2 border-slate-200 dark:border-slate-700 p-4 flex items-center gap-4 shadow-sm group hover:border-secondary/50 dark:hover:border-secondary/50 transition-colors">
+                <div className="w-10 h-10 flex items-center justify-center text-secondary text-2xl">
+                    <i className="fa-solid fa-calendar-alt"></i>
+                </div>
+                <div className="flex-1">
+                    <label htmlFor="startDate" className="block text-xs font-bold text-slate-500 uppercase mb-1">Data de Início <span className="text-red-500">*</span></label>
+                    <input
+                        type="date"
+                        id="startDate"
+                        name="startDate"
+                        value={formData.startDate}
+                        onChange={handleChange}
+                        className={`w-full bg-transparent text-primary dark:text-white outline-none text-base ${formErrors.startDate ? 'border-red-500' : ''}`}
+                        required
+                        aria-invalid={!!formErrors.startDate}
+                        aria-describedby={formErrors.startDate ? "startDate-error" : undefined}
+                    />
+                    {formErrors.startDate && <p id="startDate-error" className="text-red-500 text-xs mt-1">{formErrors.startDate}</p>}
+                </div>
               </div>
 
+
               {needsDetailedInputs && (
-                <>
-                  <div className="grid grid-cols-2 gap-4 mt-6">
-                    <CounterInput label="Nº de Pavimentos" field="floors" icon="fa-layer-group" />
-                    <CounterInput label="Nº de Banheiros" field="bathrooms" icon="fa-toilet" />
-                    <CounterInput label="Nº de Cozinhas" field="kitchens" icon="fa-kitchen-set" />
-                    <CounterInput label="Nº de Quartos" field="bedrooms" icon="fa-bed" />
-                    <CounterInput label="Nº de Salas" field="livingRooms" icon="fa-couch" />
-                  </div>
-                  <div className="flex items-center mt-5">
-                    <input
-                      type="checkbox"
-                      id="hasLeisureArea"
-                      name="hasLeisureArea"
-                      checked={formData.hasLeisureArea}
-                      onChange={handleChange}
-                      className="h-5 w-5 rounded border-slate-300 dark:border-slate-600 text-secondary focus:ring-secondary/50"
-                    />
-                    <label htmlFor="hasLeisureArea" className="ml-3 text-sm font-bold text-slate-700 dark:text-slate-300">Possui área de lazer?</label>
-                  </div>
-                </>
+                <div className="mt-6 pt-4 border-t border-slate-200 dark:border-slate-700">
+                    <h3 className="text-lg font-bold text-primary dark:text-white mb-4">Detalhes Adicionais</h3>
+                    <div className="grid grid-cols-2 gap-4">
+                        <CounterInput label="Nº de Pavimentos" field="floors" icon="fa-layer-group" />
+                        <CounterInput label="Nº de Banheiros" field="bathrooms" icon="fa-toilet" />
+                        <CounterInput label="Nº de Cozinhas" field="kitchens" icon="fa-kitchen-set" />
+                        <CounterInput label="Nº de Quartos" field="bedrooms" icon="fa-bed" />
+                        <CounterInput label="Nº de Salas" field="livingRooms" icon="fa-couch" />
+                        {/* Leisure area is a checkbox, not a counter */}
+                        <div className="bg-white dark:bg-slate-800 rounded-2xl border-2 border-slate-200 dark:border-slate-700 p-3 flex flex-col items-center justify-center shadow-sm hover:border-secondary/50 dark:hover:border-secondary/50 transition-colors group">
+                            <div className="text-slate-400 mb-1 group-hover:text-secondary transition-colors text-lg"><i className="fa-solid fa-swimming-pool"></i></div>
+                            <label htmlFor="hasLeisureArea" className="text-[10px] font-black text-slate-700 dark:text-slate-300 uppercase mb-2 text-center tracking-wider cursor-pointer">Área de Lazer</label>
+                            <input
+                                type="checkbox"
+                                id="hasLeisureArea"
+                                name="hasLeisureArea"
+                                checked={formData.hasLeisureArea}
+                                onChange={handleChange}
+                                className="h-6 w-6 rounded border-slate-300 dark:border-slate-600 text-secondary focus:ring-secondary/50"
+                            />
+                        </div>
+                    </div>
+                </div>
               )}
             </div>
           </>
@@ -477,12 +531,12 @@ const CreateWork = () => {
           )}
           {renderStepContent()}
           
-          <div className="mt-8 flex justify-end">
+          <div className="mt-8 flex justify-center"> {/* Centralize the button */}
               {currentStep < totalSteps ? (
                   <button 
                     type="button" 
                     onClick={() => { if(validateStep(currentStep)) setCurrentStep(prev => prev + 1); setGeneralError(''); }} 
-                    className="px-8 py-4 bg-primary text-white font-bold rounded-2xl shadow-lg hover:bg-primary-light transition-all flex items-center gap-3"
+                    className="px-8 py-4 bg-secondary text-white font-bold rounded-2xl shadow-lg hover:bg-orange-600 transition-all flex items-center gap-3"
                     aria-label="Próxima etapa do formulário"
                   >
                       Próximo <i className="fa-solid fa-arrow-right"></i>
@@ -491,7 +545,7 @@ const CreateWork = () => {
                   <button 
                     type="submit" 
                     disabled={loading} 
-                    className="px-8 py-4 bg-gradient-gold text-white font-bold rounded-2xl shadow-lg hover:shadow-orange-500/30 hover:scale-105 transition-all flex items-center justify-center gap-3 disabled:opacity-70 disabled:scale-100"
+                    className="px-8 py-4 bg-gradient-gold text-white font-black rounded-2xl shadow-lg hover:shadow-amber-500/30 hover:scale-105 transition-all flex items-center justify-center gap-3 disabled:opacity-70 disabled:scale-100"
                     aria-label={loading ? 'Gerando obra' : 'Criar obra'}
                   >
                       {loading ? 'Gerando...' : 'Criar Obra'} {loading ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-check"></i>}

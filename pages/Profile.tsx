@@ -17,24 +17,30 @@ const formatCurrency = (value: number | string | undefined): string => {
 };
 
 // NEW: Helper para formatar um número para exibição em um input (e.g., "1.250.000,00")
-const formatInputReal = (value: number | string | undefined): string => {
-  if (value === undefined || value === null || value === '') return '';
-  // Se já é uma string formatada, tenta limpar e reformatar para consistência
-  const num = typeof value === 'string' ? parseFloat(value.replace(/\./g, '').replace(',', '.')) : value;
+const formatInputReal = (rawNumericString: string): string => {
+  if (!rawNumericString) return '';
+  const num = parseFloat(rawNumericString);
   if (isNaN(num)) return '';
-  // Formata com ponto para milhares e vírgula para decimais
   return num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 };
 
 // NEW: Helper para parsear uma string formatada (e.g., "1.250.000,00") para um número puro em string (e.g., "1250000.00")
-const parseInputReal = (value: string): string => {
-  if (!value) return '';
-  // Remove pontos de milhar e substitui vírgula decimal por ponto
-  const cleanValue = value.replace(/\./g, '').replace(',', '.');
-  const num = parseFloat(cleanValue);
+const parseInputReal = (displayString: string): string => {
+  if (!displayString) return '';
+
+  let cleaned = displayString.replace(/[^0-9,]/g, '');
+
+  const parts = cleaned.split(',');
+  if (parts.length > 2) {
+    cleaned = parts.slice(0, -1).join('') + ',' + parts[parts.length - 1];
+  }
+  
+  cleaned = cleaned.replace(',', '.');
+  
+  const num = parseFloat(cleaned);
   if (isNaN(num)) return '';
-  // Retorna uma string com 2 casas decimais, para manter o formato de armazenamento consistente
-  return num.toFixed(2);
+
+  return cleaned.toString();
 };
 
 
