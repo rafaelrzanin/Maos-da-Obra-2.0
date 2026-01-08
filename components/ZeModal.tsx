@@ -60,14 +60,14 @@ export const ZeModal: React.FC<ZeModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-primary/80 backdrop-blur-sm animate-in fade-in duration-300">
-      {/* Removed p-6 from here */}
       <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm shadow-2xl border border-white/20 transform scale-100 transition-all relative overflow-hidden flex flex-col max-h-[90vh]">
         {/* Glow Effect */}
         <div className="absolute top-0 right-0 w-32 h-32 bg-secondary/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
         
-        {/* Added p-6 here */}
-        <div className="relative z-10 flex flex-col flex-1 p-6"> 
-            <div className="flex gap-5 mb-6 shrink-0">
+        {/* Content wrapper without padding, now just acting as a flex container for header, body, footer */}
+        <div className="relative z-10 flex flex-col flex-1"> 
+            {/* Header with its own padding and bottom border */}
+            <div className="flex gap-5 py-6 px-6 shrink-0 border-b border-slate-100 dark:border-slate-800">
                 <div className="w-16 h-16 rounded-full p-1 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-800 shadow-lg shrink-0">
                     <img 
                     src={ZE_AVATAR} 
@@ -82,26 +82,24 @@ export const ZeModal: React.FC<ZeModalProps> = ({
                     />
                 </div>
                 <div className="flex-1">
-                    {/* The original structure had h3 "Atenção" and p "{title}". 
-                        To keep consistency and address the user's request for no layout changes,
-                        we'll maintain this structure, using `title` as the subtitle. */}
                     <h3 className="text-xl font-bold text-primary dark:text-white leading-tight mb-1">Atenção</h3>
                     <p className="text-sm font-medium text-slate-500 dark:text-slate-400">{title}</p>
                 </div>
             </div>
             
-            {/* Render children if provided, otherwise render the message */}
+            {/* Scrollable content area with its own padding */}
             {children ? (
-                <div className="flex-1 overflow-y-auto -mr-2 pr-2">
+                <div className="flex-1 overflow-y-auto py-4 px-6">
                     {children}
                 </div>
             ) : (
-                <div className={`flex-1 overflow-y-auto -mr-2 pr-2 p-4 rounded-2xl text-sm leading-relaxed border ${messageBoxBgClass}`}>
+                <div className={`flex-1 overflow-y-auto py-4 px-6 p-4 rounded-2xl text-sm leading-relaxed border ${messageBoxBgClass}`}>
                     <p>{message}</p>
                 </div>
             )}
 
-            <div className="flex flex-col gap-3 mt-6 shrink-0">
+            {/* Footer with its own padding and top border */}
+            <div className="flex flex-col gap-3 pt-6 px-6 shrink-0 border-t border-slate-100 dark:border-slate-800">
                 <button 
                     // Fix: Pass an optional event object to primaryButtonHandler
                     onClick={(e) => primaryButtonHandler(e)} 
