@@ -60,11 +60,13 @@ export const ZeModal: React.FC<ZeModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-primary/80 backdrop-blur-sm animate-in fade-in duration-300">
-      <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm p-6 shadow-2xl border border-white/20 transform scale-100 transition-all relative overflow-hidden flex flex-col max-h-[90vh]">
+      {/* Removed p-6 from here */}
+      <div className="bg-white dark:bg-slate-900 rounded-3xl w-full max-w-sm shadow-2xl border border-white/20 transform scale-100 transition-all relative overflow-hidden flex flex-col max-h-[90vh]">
         {/* Glow Effect */}
         <div className="absolute top-0 right-0 w-32 h-32 bg-secondary/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
         
-        <div className="relative z-10 flex flex-col flex-1">
+        {/* Added p-6 here */}
+        <div className="relative z-10 flex flex-col flex-1 p-6"> 
             <div className="flex gap-5 mb-6 shrink-0">
                 <div className="w-16 h-16 rounded-full p-1 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-800 shadow-lg shrink-0">
                     <img 
