@@ -322,7 +322,7 @@ const WorkDetail = () => {
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [workers, setWorkers] = useState<Worker[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [photos, setPhotos] = useState<WorkPhoto[]>(([]);
+  const [photos, setPhotos] = useState<WorkPhoto[]>([]);
   const [files, setFiles] = useState<WorkFile[]>([]); 
   const [contracts, setContracts] = useState<Contract[]>([]); 
   const [checklists, setChecklists] = useState<Checklist[]>([]); 
@@ -341,9 +341,7 @@ const WorkDetail = () => {
   const [newStepEndDate, setNewStepEndDate] = useState(new Date().toISOString().split('T')[0]);
   const [editStepData, setEditStepData] = useState<Step | null>(null);
   // State for drag and drop
-  // FIX: Removed extraneous comma
   const [draggedStepId, setDraggedStepId] = useState<string | null>(null);
-  // FIX: Removed extraneous comma
   const [dragOverStepId, setDragOverStepId] = useState<string | null>(null);
   const [isUpdatingStepStatus, setIsUpdatingStepStatus] = useState(false); // NEW: Step status loading
 
@@ -691,7 +689,7 @@ const WorkDetail = () => {
     try {
       // Fix: orderIndex is omitted from the input type because it's calculated internally by dbService.addStep
       await dbService.addStep({
-        workId: workId, // Explicitly pass workId
+        workId: workId,
         name: newStepName,
         startDate: newStepStartDate,
         endDate: newStepEndDate,
@@ -727,7 +725,7 @@ const WorkDetail = () => {
       // isDelayed will be re-calculated in dbService.updateStep (backend logic for consistency)
       await dbService.updateStep({
         ...editStepData!,
-        workId: workId, // Explicitly pass workId
+        workId: workId,
       });
       setEditStepData(null);
       setShowAddStepModal(false); // Close the modal
@@ -850,7 +848,7 @@ const WorkDetail = () => {
     try {
       // FIX: Pass user.id as the first argument
       await dbService.addMaterial(user.id, {
-        workId: workId, // Explicitly pass workId
+        workId: workId,
         name: newMaterialName,
         brand: newMaterialBrand, // NEW: Pass brand
         plannedQty: Number(newMaterialPlannedQty),
@@ -892,7 +890,7 @@ const WorkDetail = () => {
       // FIX: Use non-null assertion for editMaterialData
       await dbService.updateMaterial({
         ...editMaterialData!,
-        workId: workId, // Explicitly pass workId
+        workId: workId,
         name: newMaterialName,
         brand: newMaterialBrand, // NEW: Pass brand
         plannedQty: Number(newMaterialPlannedQty),
@@ -989,7 +987,7 @@ const WorkDetail = () => {
     setZeModal(prev => ({ ...prev, isConfirming: true }));
     try {
       await dbService.addExpense({
-        workId: workId, // Explicitly pass workId
+        workId: workId,
         description: newExpenseDescription,
         amount: Number(newExpenseAmount),
         // When adding a new expense, paidAmount is 0 by default, unless explicitly set
@@ -1037,7 +1035,7 @@ const WorkDetail = () => {
     try {
       await dbService.updateExpense({
         ...editExpenseData,
-        workId: workId, // Explicitly pass workId
+        workId: workId,
         description: newExpenseDescription,
         amount: Number(newExpenseAmount),
         date: newExpenseDate,
@@ -1131,7 +1129,7 @@ const WorkDetail = () => {
     setZeModal(prev => ({ ...prev, isConfirming: true }));
     try {
       await dbService.addWorker({
-        workId: workId, // Explicitly pass workId
+        workId: workId,
         userId: user.id,
         name: newWorkerName,
         role: newWorkerRole,
@@ -1225,7 +1223,7 @@ const WorkDetail = () => {
     setZeModal(prev => ({ ...prev, isConfirming: true }));
     try {
       await dbService.addSupplier({
-        workId: workId, // Explicitly pass workId
+        workId: workId,
         userId: user.id,
         name: newSupplierName,
         category: newSupplierCategory,
@@ -1342,7 +1340,7 @@ const WorkDetail = () => {
 
       // 3. Save photo record to database
       await dbService.addPhoto({
-        workId: workId, // Explicitly pass workId
+        workId: workId,
         url: publicUrlData.publicUrl,
         description: newPhotoDescription,
         date: new Date().toISOString().split('T')[0],
@@ -1439,7 +1437,7 @@ const WorkDetail = () => {
 
       // 3. Save file record to database
       await dbService.addFile({
-        workId: workId, // Explicitly pass workId
+        workId: workId,
         name: newFileName || newUploadFile.name,
         category: newFileCategory,
         url: publicUrlData.publicUrl,
@@ -1521,7 +1519,7 @@ const WorkDetail = () => {
     setZeModal(prev => ({ ...prev, isConfirming: true }));
     try {
       await dbService.addChecklist({
-        workId: workId, // Explicitly pass workId
+        workId: workId,
         name: newChecklistName,
         category: newChecklistCategory,
         items: itemsForDb,
