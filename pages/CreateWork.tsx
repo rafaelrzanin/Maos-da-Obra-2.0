@@ -23,35 +23,50 @@ const formatCurrency = (value: number | string | undefined): string => {
 // NEW: Helper para formatar um número para exibição em um input (e.g., "1.250.000,00")
 const formatInputReal = (rawNumericString: string): string => {
   if (!rawNumericString) return '';
-  const num = parseFloat(rawNumericString);
-  if (isNaN(num)) return '';
-  // Use toLocaleString for proper formatting. Force 2 decimal places for consistency.
-  return num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  
+  // Clean potential non-numeric input from partial typing (e.g., just a comma)
+  const cleanedInput = rawNumericString.replace(/[^0-9.]/g, '');
+  const num = parseFloat(cleanedInput);
+  
+  if (isNaN(num)) {
+      // If after cleaning, it's not a number (e.g., "", "."), return original raw string
+      return rawNumericString;
+  }
+  
+  // Format with toLocaleString
+  const formatted = num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+  // Handle cases where user is typing decimals
+  // If the raw input explicitly has a dot/comma at the end and is an integer in state, preserve the decimal typing.
+  if (rawNumericString.includes(',') && !rawNumericString.split(',')[1]) {
+    return formatted.replace(',00', ',');
+  }
+  if (rawNumericString.endsWith(',') && formatted.endsWith(',00')) {
+    return formatted.slice(0, -2); // Remove '00' if user is actively typing a comma
+  }
+  if (rawNumericString.endsWith(',0')) {
+      return formatted.slice(0, -1);
+  }
+
+  return formatted;
 };
 
 // NEW: Helper para parsear uma string formatada (e.g., "1.250.000,00") para um número puro em string (e.g., "1250000.00")
 const parseInputReal = (displayString: string): string => {
   if (!displayString) return '';
 
-  // Remove tudo que não é dígito ou vírgula. Pontos são considerados separadores de milhar (e removidos).
-  let cleaned = displayString.replace(/[^0-9,]/g, '');
+  // Remove pontos de milhar e substitui vírgula decimal por ponto
+  // Permite que o usuário digite a vírgula antes de digitar os centavos
+  let cleaned = displayString.replace(/\./g, ''); // Remove pontos de milhar
+  cleaned = cleaned.replace(',', '.'); // Substitui vírgula por ponto para decimais
 
-  // Se houver mais de uma vírgula, assume que todas (exceto a última, se houver) são separadores de milhar e remove.
-  // Depois, a última vírgula (se houver) é o separador decimal.
-  const parts = cleaned.split(',');
-  if (parts.length > 2) { // Ex: "1,000,000,00"
-    cleaned = parts.slice(0, -1).join('') + ',' + parts[parts.length - 1]; // Mantém apenas a última vírgula
-  }
-  
-  // Substitui a vírgula por ponto para parseFloat, se ela for o separador decimal.
-  cleaned = cleaned.replace(',', '.');
-  
+  // Garante que o valor é um número válido ou uma string vazia se não for
   const num = parseFloat(cleaned);
   if (isNaN(num)) return '';
 
-  // Retorna a string numérica para que o input possa manipular os decimais enquanto o usuário digita
-  // Não fixa o toFixed(2) aqui para permitir que o usuário digite "123.4"
-  return cleaned.toString();
+  // Retorna o valor numérico como uma string com 2 casas decimais fixas.
+  // Isso é o que será armazenado no estado e enviado para o DB.
+  return num.toFixed(2);
 };
 
 
@@ -61,7 +76,7 @@ const CreateWork = () => {
   
   // Wizard State
   const [currentStep, setCurrentStep] = useState(1);
-  const totalSteps = 2; // Simplified to 2 steps for better UX
+  const totalSteps = 3; // UPDATED to 3 steps
   const [loading, setLoading] = useState(false); // Local loading for form submission, not global auth loading
   
   // REMOVED: Generation Animation State (generationMode, genStep)
@@ -84,6 +99,7 @@ const CreateWork = () => {
   const [workCategory, setWorkCategory] = useState<'CONSTRUCTION' | 'RENOVATION' | null>(null);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
   
+  // CRITICAL: Ensure conditional logic uses current `selectedTemplateId`
   const selectedTemplate = WORK_TEMPLATES.find(t => t.id === selectedTemplateId);
   const needsDetailedInputs = workCategory === 'CONSTRUCTION' || selectedTemplateId === 'REFORMA_APTO';
 
@@ -130,7 +146,7 @@ const CreateWork = () => {
   // Refatorado para validar passos específicos
   const validateStep = (step: number) => {
     const newErrors: Record<string, string> = {};
-    if (step === 1) {
+    if (step === 1) { // Step 1: Basic Info
       if (!formData.name.trim()) {
           newErrors.name = "Por favor, dê um apelido para sua obra."; 
       }
@@ -143,30 +159,29 @@ const CreateWork = () => {
           newErrors.budgetPlanned = "O orçamento deve ser maior que zero.";
       }
     } 
-    else if (step === 2) {
+    else if (step === 2) { // Step 2: Work Type and Start Date
       if (!workCategory) {
           newErrors.workCategory = "Escolha entre Construção ou Reforma."; 
       }
-      if (!selectedTemplateId) {
-          newErrors.selectedTemplate = "Selecione o tipo específico da obra."; 
-      }
       if (!formData.startDate) {
           newErrors.startDate = "Qual a data de início?"; 
-      // Fix: Compare Date objects' time values (milliseconds since epoch) for accurate date comparison.
       } else {
-          // --- INÍCIO DA CORREÇÃO DA VALIDAÇÃO DE DATA ---
-          // Garante que ambas as datas são comparadas como "início do dia" na hora LOCAL.
           const [year, month, day] = formData.startDate.split('-').map(Number);
-          const selectedDateAtLocalMidnight = new Date(year, month - 1, day, 0, 0, 0, 0).getTime(); // Set to midnight local time
+          const selectedDateAtLocalMidnight = new Date(year, month - 1, day, 0, 0, 0, 0).getTime();
 
           const today = new Date();
-          const todayAtLocalMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0, 0).getTime(); // Set to midnight local time
+          const todayAtLocalMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0, 0).getTime();
 
           if (selectedDateAtLocalMidnight < todayAtLocalMidnight) {
               newErrors.startDate = "A data de início não pode ser no passado.";
           }
-          // --- FIM DA CORREÇÃO DA VALIDAÇÃO DE DATA ---
       }
+    }
+    else if (step === 3) { // Step 3: Specific Type and Additional Details
+        if (!selectedTemplateId) {
+            newErrors.selectedTemplate = "Selecione o tipo específico da obra.";
+        }
+        // No specific validation needed for counters here, as they have default values (1) or are optional (leisure area)
     }
     setFormErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -174,12 +189,11 @@ const CreateWork = () => {
 
   const handleCategorySelect = (category: 'CONSTRUCTION' | 'RENOVATION') => {
       setWorkCategory(category);
-      if (category === 'CONSTRUCTION') setSelectedTemplateId('CONSTRUCAO');
-      else setSelectedTemplateId('');
+      setSelectedTemplateId(''); // Clear specific template on category change
       setFormErrors(prev => { // Clear category specific errors on selection
         const newErrors = { ...prev };
         delete newErrors.workCategory;
-        delete newErrors.selectedTemplate;
+        delete newErrors.selectedTemplate; // Clear template error too
         return newErrors;
       });
   };
@@ -380,9 +394,9 @@ const CreateWork = () => {
       case 2:
         return (
           <>
-            <h2 className="text-3xl font-black text-primary dark:text-white mb-2 tracking-tight text-center">Detalhes Essenciais</h2>
+            <h2 className="text-3xl font-black text-primary dark:text-white mb-2 tracking-tight text-center">Tipo de Obra e Início</h2>
             <p className="text-slate-500 dark:text-slate-400 max-w-sm mx-auto text-center mb-8">
-              Selecione o tipo e a data de início da sua obra.
+              Selecione o tipo de projeto e a data de início.
             </p>
 
             <div className="space-y-6">
@@ -411,6 +425,38 @@ const CreateWork = () => {
                 {formErrors.workCategory && <p className="text-red-500 text-xs mt-1">{formErrors.workCategory}</p>}
               </div>
 
+              <div className="bg-white dark:bg-slate-800 rounded-2xl border-2 border-slate-200 dark:border-slate-700 p-4 flex items-center gap-4 shadow-sm group hover:border-secondary/50 dark:hover:border-secondary/50 transition-colors">
+                <div className="w-10 h-10 flex items-center justify-center text-secondary text-2xl">
+                    <i className="fa-solid fa-calendar-alt"></i>
+                </div>
+                <div className="flex-1">
+                    <label htmlFor="startDate" className="block text-xs font-bold text-slate-500 uppercase mb-1">Data de Início <span className="text-red-500">*</span></label>
+                    <input
+                        type="date"
+                        id="startDate"
+                        name="startDate"
+                        value={formData.startDate}
+                        onChange={handleChange}
+                        className={`w-full bg-transparent text-primary dark:text-white outline-none text-base ${formErrors.startDate ? 'border-red-500' : ''}`}
+                        required
+                        aria-invalid={!!formErrors.startDate}
+                        aria-describedby={formErrors.startDate ? "startDate-error" : undefined}
+                    />
+                    {formErrors.startDate && <p id="startDate-error" className="text-red-500 text-xs mt-1">{formErrors.startDate}</p>}
+                </div>
+              </div>
+            </div>
+          </>
+        );
+      case 3: // NEW Step 3
+        return (
+          <>
+            <h2 className="text-3xl font-black text-primary dark:text-white mb-2 tracking-tight text-center">Detalhes do Projeto</h2>
+            <p className="text-slate-500 dark:text-slate-400 max-w-sm mx-auto text-center mb-8">
+              Selecione o tipo específico e adicione detalhes para o Zé da Obra planejar tudo.
+            </p>
+
+            <div className="space-y-6">
               {workCategory && (
                 <div>
                   <label htmlFor="selectedTemplateId" className="block text-sm font-bold text-slate-500 uppercase mb-3">Tipo Específico <span className="text-red-500">*</span></label>
@@ -436,28 +482,6 @@ const CreateWork = () => {
                   {formErrors.selectedTemplate && <p className="text-red-500 text-xs mt-1">{formErrors.selectedTemplate}</p>}
                 </div>
               )}
-
-              <div className="bg-white dark:bg-slate-800 rounded-2xl border-2 border-slate-200 dark:border-slate-700 p-4 flex items-center gap-4 shadow-sm group hover:border-secondary/50 dark:hover:border-secondary/50 transition-colors">
-                <div className="w-10 h-10 flex items-center justify-center text-secondary text-2xl">
-                    <i className="fa-solid fa-calendar-alt"></i>
-                </div>
-                <div className="flex-1">
-                    <label htmlFor="startDate" className="block text-xs font-bold text-slate-500 uppercase mb-1">Data de Início <span className="text-red-500">*</span></label>
-                    <input
-                        type="date"
-                        id="startDate"
-                        name="startDate"
-                        value={formData.startDate}
-                        onChange={handleChange}
-                        className={`w-full bg-transparent text-primary dark:text-white outline-none text-base ${formErrors.startDate ? 'border-red-500' : ''}`}
-                        required
-                        aria-invalid={!!formErrors.startDate}
-                        aria-describedby={formErrors.startDate ? "startDate-error" : undefined}
-                    />
-                    {formErrors.startDate && <p id="startDate-error" className="text-red-500 text-xs mt-1">{formErrors.startDate}</p>}
-                </div>
-              </div>
-
 
               {needsDetailedInputs && (
                 <div className="mt-6 pt-4 border-t border-slate-200 dark:border-slate-700">
@@ -509,14 +533,19 @@ const CreateWork = () => {
     <div className="max-w-2xl mx-auto pb-12 pt-6 px-4">
       <div className="flex items-center justify-between mb-8">
           <button 
-            onClick={() => { if(currentStep === 1) navigate('/'); else setCurrentStep(prev => prev - 1); setFormErrors({}); setGeneralError(''); }} 
+            onClick={() => { 
+                if(currentStep === 1) navigate('/'); 
+                else setCurrentStep(prev => prev - 1); 
+                setFormErrors({}); 
+                setGeneralError(''); 
+            }} 
             className="text-slate-400 hover:text-primary dark:hover:text-white transition-colors p-2 -ml-2"
             aria-label={currentStep === 1 ? "Voltar ao Dashboard" : "Voltar à etapa anterior"}
           >
             <i className="fa-solid fa-arrow-left text-xl"></i>
           </button>
           <div className="flex gap-2" role="progressbar" aria-valuenow={currentStep} aria-valuemin={1} aria-valuemax={totalSteps}>
-              {[1, 2].map(s => (
+              {[1, 2, 3].map(s => ( // UPDATED progress bar for 3 steps
                   <div key={s} className={`h-2 rounded-full transition-all duration-500 ${s <= currentStep ? 'w-8 bg-secondary' : 'w-2 bg-slate-200 dark:bg-slate-700'}`}></div>
               ))}
           </div>
