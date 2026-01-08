@@ -1086,8 +1086,8 @@ export const dbService = {
 
     // NEW: Recalculate is_delayed based on new data before saving, adhering to the prompt's rules
     let newIsDelayed = false;
-    if (step.status === StepStatus.COMPLETED) {
-        newIsDelayed = false; // A completed step is never delayed
+    if (step.status === StepStatus.COMPLETED) { // IMPORTANT: 'step.status' here is the *new* status from frontend
+        newIsDelayed = false; 
     } else if (step.status === StepStatus.NOT_STARTED) {
         // A NOT_STARTED step is delayed if its start date is in the past
         newIsDelayed = today.getTime() > stepStartDate.getTime();
@@ -1096,9 +1096,9 @@ export const dbService = {
         newIsDelayed = today.getTime() > stepEndDate.getTime();
     }
     
-    // Also, clear realDate if status is being set back to NOT_STARTED
-    if (step.status === StepStatus.NOT_STARTED) {
-        step.realDate = undefined;
+    // CORREÇÃO CRÍTICA: Limpar real_date se o status NÃO for CONCLUIDO
+    if (step.status !== StepStatus.COMPLETED) { 
+        step.realDate = undefined; // Garante que realDate é nulo/undefined se a etapa não está concluída
     }
 
     const dbStep = {
@@ -1568,6 +1568,7 @@ export const dbService = {
   // Contracts are global and don't change often, so a simple hardcoded list from standards.ts
   // or a single fetch with aggressive caching is appropriate.
   async getContractTemplates(): Promise<Contract[]> {
+    // Fix: Changed Date.Now() to Date.now()
     const now = Date.now();
     if (_dashboardCache.contracts && (now - _dashboardCache.contracts.timestamp < CACHE_TTL)) {
       return _dashboardCache.contracts.data;
