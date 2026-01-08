@@ -1,3 +1,5 @@
+
+
 import React from 'react';
 import { ZE_AVATAR, ZE_AVATAR_FALLBACK } from '../services/standards.ts';
 
@@ -23,7 +25,8 @@ export const ZeModal: React.FC<ZeModalProps> = ({
   confirmText = "Confirmar", // Default to "Confirmar" for actions
   cancelText = "Cancelar", 
   type = 'INFO', // Default to INFO
-  onConfirm = async () => {}, // Changed to a no-op async function default
+  // Fix: Changed default onConfirm to accept an optional event argument
+  onConfirm = async (_e?: React.FormEvent) => {}, 
   onCancel,
   isConfirming = false, // NEW: Default to false
   children // Destructure children

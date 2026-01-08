@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect, Suspense, lazy, Fragment } from 'react';
 import * as ReactRouter from 'react-router-dom';
 import { PlanType } from './types.ts';
@@ -60,10 +59,12 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     // You can also log the error to an error reporting service
     console.error("[ErrorBoundary] Uncaught error:", error, errorInfo);
+    // FIX: Use this.setState to update component state
     this.setState({ errorInfo });
   }
 
   render() {
+    // FIX: Use this.state to access component state
     if (this.state.hasError) {
       // You can render any custom fallback UI
       return (
@@ -82,7 +83,9 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
           {this.state.error && (
             <details className="mt-6 p-4 bg-danger-light/50 border border-danger rounded-lg max-w-lg overflow-auto text-xs text-left">
               <summary className="font-bold cursor-pointer">Detalhes do Erro</summary>
+              {/* FIX: Use this.state.error to access error object */}
               <pre className="whitespace-pre-wrap mt-2 break-words">{this.state.error.toString()}</pre>
+              {/* FIX: Use this.state.errorInfo to access errorInfo object */}
               {this.state.errorInfo?.componentStack && (
                 <div className="mt-2">
                   <h4 className="font-bold">Component Stack:</h4>
@@ -95,6 +98,7 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
       );
     }
 
+    // FIX: Use this.props.children to access children prop
     return this.props.children;
   }
 }
@@ -347,6 +351,7 @@ const App = () => {
                 {/* <ReactRouter.Route path="/register" element={<Register />} /> REMOVED: Register absorbed into Login */}
                 
                 {/* Protected Routes - Wrapped by Layout */}
+                {/* FIX: Pass components as children to Layout, not as an element prop's value */}
                 <ReactRouter.Route path="/" element={<Layout><Dashboard /></Layout>} />
                 <ReactRouter.Route path="/create" element={<Layout><CreateWork /></Layout>} />
                 {/* Modified WorkDetail route to include optional 'tab' parameter */}
