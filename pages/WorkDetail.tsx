@@ -67,64 +67,59 @@ const formatCurrency = (value: number | string | undefined): string => {
   });
 };
 
-// NEW: Helper para formatar um número para exibição em um input (e.g., "1.250.000,00")
-const formatInputReal = (rawNumericString: string): string => {
-  if (!rawNumericString) return '';
-  
-  // Remove tudo que não for dígito ou ponto/vírgula.
-  // Permite que o usuário digite a vírgula antes de digitar os centavos.
-  let cleaned = rawNumericString.replace(/[^0-9,.]/g, ''); 
+// **NEW:** Helper para limpar string do input e prepará-la para o estado (remove tudo exceto dígitos e um único ponto/vírgula decimal)
+const cleanMonetaryInput = (inputString: string | undefined): string => {
+  if (inputString === undefined || inputString === null) return '';
+  let cleaned = String(inputString).replace(/[^\d,.]/g, ''); // Remove tudo exceto dígitos, vírgula e ponto
 
-  // Trata múltiplas vírgulas/pontos e normaliza para um ponto decimal
+  // Garante apenas um separador decimal e o padroniza para ponto no estado
   const parts = cleaned.split(/[,.]/);
-  if (parts.length > 1) {
-      cleaned = parts.slice(0, -1).join('') + '.' + parts[parts.length - 1];
-  } else {
-      cleaned = parts[0];
+  if (parts.length > 2) {
+    // Múltiplos separadores, mantém apenas o último como decimal
+    cleaned = parts.slice(0, -1).join('') + '.' + parts[parts.length - 1];
+  } else if (parts.length === 2) {
+    // Um separador, padroniza para ponto
+    cleaned = parts[0] + '.' + parts[1];
+  } else if (parts.length === 1) {
+    // Nenhum separador, ou apenas um ponto/vírgula inicial
+    cleaned = parts[0];
   }
 
-  const num = parseFloat(cleaned);
-  
-  if (isNaN(num)) {
-      // Se não for um número válido após a limpeza (ex: "."), retorna string vazia
-      // Exceto se o usuário estiver digitando a vírgula/ponto como primeiro caractere
-      if (rawNumericString === ',' || rawNumericString === '.') return rawNumericString;
-      return '';
-  }
-  
-  // Formata com toLocaleString
-  const formatted = num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  // Permite '0.' ou '.' para iniciar a digitação de decimais
+  if (cleaned === '.' || cleaned === ',') return '0.';
 
-  // Lógica para preservar a digitação de decimais (ex: "123," ou "123,0")
-  if (rawNumericString.endsWith(',') && formatted.endsWith(',00')) {
-      return formatted.slice(0, -2); // Remove '00' se o usuário está digitando uma vírgula
-  }
-  if (rawNumericString.endsWith(',0') && formatted.endsWith(',00')) {
-      return formatted.slice(0, -1); // Remove '0' se o usuário está digitando ',0'
-  }
-  if (rawNumericString.endsWith('.') && formatted.endsWith('.00')) { // Para inputs que usam . para decimal
-    return formatted.replace(',00', '.');
-  }
-
-
-  return formatted;
+  return cleaned;
 };
 
-// NEW: Helper para parsear uma string formatada (e.g., "1.250.000,00") para um número puro em string (e.g., "1250000.00")
-const parseInputReal = (displayString: string): string => {
-  if (!displayString) return '';
+// **NEW:** Helper para formatar string numérica (no estado, ex: "1234.56") para exibição no input (ex: "1.234,56")
+const formatMonetaryDisplay = (numericString: string | undefined): string => {
+  if (numericString === undefined || numericString === null || numericString.trim() === '') {
+    return '';
+  }
 
-  // Remove pontos de milhar e substitui vírgula decimal por ponto
-  let cleaned = displayString.replace(/\./g, ''); // Remove pontos de milhar
-  cleaned = cleaned.replace(',', '.'); // Substitui vírgula por ponto para decimais
+  // Se o usuário está digitando um decimal (ex: "123." ou "123,")
+  if (numericString.endsWith('.') && !isNaN(parseFloat(numericString))) {
+      return parseFloat(numericString).toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + ',';
+  }
 
-  // Garante que o valor é um número válido ou uma string vazia se não for
-  const num = parseFloat(cleaned);
-  if (isNaN(num)) return '';
+  const num = parseFloat(numericString);
+  if (isNaN(num)) {
+    return '';
+  }
 
-  // Retorna o valor numérico como uma string com 2 casas decimais fixas.
-  // Isso é o que será armazenado no estado e enviado para o DB.
-  return num.toFixed(2);
+  return num.toLocaleString('pt-BR', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+};
+
+// **NEW:** Helper para parsear a string numérica do estado (ex: "1234.56") para o formato DB ("1234.56") com 2 casas decimais
+const formatMonetaryValueForDB = (numericString: string | undefined): string => {
+  if (numericString === undefined || numericString === null || numericString.trim() === '') {
+    return '0.00';
+  }
+  const num = parseFloat(numericString);
+  return isNaN(num) ? '0.00' : num.toFixed(2);
 };
 
 // NEW: Type for status details
@@ -277,7 +272,7 @@ const getEntityStatusDetails = (
       textColor = 'text-amber-600 dark:text-amber-400';
       borderColor = 'border-amber-400 dark:border-amber-700';
       shadowClass = 'shadow-amber-500/20';
-      icon = 'fa-hand-holding-dollar'; // Icon for partial payment
+      icon = 'fa-hourglass-half';
     } else if (isExpensePending) {
       statusText = 'Pendente';
       bgColor = 'bg-slate-400';
@@ -412,19 +407,19 @@ const WorkDetail = () => {
   const [showAddMaterialModal, setShowAddMaterialModal] = useState(false);
   const [newMaterialName, setNewMaterialName] = useState('');
   const [newMaterialBrand, setNewMaterialBrand] = useState(''); // NEW: State for material brand
-  const [newMaterialPlannedQty, setNewMaterialPlannedQty] = useState('');
+  const [newMaterialPlannedQty, setNewMaterialPlannedQty] = useState(''); // Raw string for quantity input
   const [newMaterialUnit, setNewMaterialUnit] = useState('');
   const [newMaterialCategory, setNewMaterialCategory] = useState('');
   const [newMaterialStepId, setNewMaterialStepId] = useState('');
   const [editMaterialData, setEditMaterialData] = useState<Material | null>(null);
   // NEW: States for material purchase within the edit modal
-  const [currentPurchaseQty, setCurrentPurchaseQty] = useState('');
-  const [currentPurchaseCost, setCurrentPurchaseCost] = useState('');
+  const [currentPurchaseQty, setCurrentPurchaseQty] = useState(''); // Raw string for quantity input
+  const [currentPurchaseCost, setCurrentPurchaseCost] = useState(''); // Raw string for monetary input
 
 
   const [showAddExpenseModal, setShowAddExpenseModal] = useState(false);
   const [newExpenseDescription, setNewExpenseDescription] = useState('');
-  const [newExpenseAmount, setNewExpenseAmount] = useState('');
+  const [newExpenseAmount, setNewExpenseAmount] = useState(''); // Raw string for monetary input
   const [newExpenseCategory, setNewExpenseCategory] = useState<ExpenseCategory | string>(ExpenseCategory.OTHER);
   const [newExpenseDate, setNewExpenseDate] = useState(new Date().toISOString().split('T')[0]);
   const [newExpenseStepId, setNewExpenseStepId] = useState(''); 
@@ -434,16 +429,16 @@ const WorkDetail = () => {
   const [editExpenseData, setEditExpenseData] = useState<Expense | null>(null);
   const [showAddPaymentModal, setShowAddPaymentModal] = useState(false); 
   const [paymentExpenseData, setPaymentExpenseData] = useState<Expense | null>(null); 
-  const [paymentAmount, setPaymentAmount] = useState(''); 
+  const [paymentAmount, setPaymentAmount] = useState(''); // Raw string for monetary input
   const [paymentDate, setNewPaymentDate] = useState(new Date().toISOString().split('T')[0]); 
-  const [newExpenseTotalAgreed, setNewExpenseTotalAgreed] = useState<string>(''); // NEW: For totalAgreed in expense modal
+  const [newExpenseTotalAgreed, setNewExpenseTotalAgreed] = useState<string>(''); // Raw string for monetary input
 
 
   const [showAddWorkerModal, setShowAddWorkerModal] = useState(false);
   const [newWorkerName, setNewWorkerName] = useState('');
   const [newWorkerRole, setNewWorkerRole] = useState('');
   const [newWorkerPhone, setNewWorkerPhone] = useState('');
-  const [newWorkerDailyRate, setNewWorkerDailyRate] = useState('');
+  const [newWorkerDailyRate, setNewWorkerDailyRate] = useState(''); // Raw string for monetary input
   const [newWorkerNotes, setNewWorkerNotes] = useState('');
   const [editWorkerData, setEditWorkerData] = useState<Worker | null>(null);
 
@@ -938,7 +933,7 @@ const WorkDetail = () => {
         workId: workId,
         name: newMaterialName,
         brand: newMaterialBrand, // NEW: Pass brand
-        plannedQty: Number(newMaterialPlannedQty),
+        plannedQty: Number(newMaterialPlannedQty), // Quantity is not monetary
         purchasedQty: 0,
         unit: newMaterialUnit,
         category: newMaterialCategory,
@@ -980,7 +975,7 @@ const WorkDetail = () => {
         workId: workId,
         name: newMaterialName,
         brand: newMaterialBrand, // NEW: Pass brand
-        plannedQty: Number(newMaterialPlannedQty),
+        plannedQty: Number(newMaterialPlannedQty), // Quantity is not monetary
         unit: newMaterialUnit,
         category: newMaterialCategory,
         stepId: newMaterialStepId === 'none' ? undefined : newMaterialStepId,
@@ -1039,7 +1034,7 @@ const WorkDetail = () => {
         editMaterialData.plannedQty,
         editMaterialData.unit,
         Number(currentPurchaseQty),
-        Number(parseInputReal(currentPurchaseCost)) // Use parseInputReal for monetary value
+        Number(formatMonetaryValueForDB(currentPurchaseCost)) // Use formatMonetaryValueForDB for monetary value
       );
       setCurrentPurchaseQty('');
       setCurrentPurchaseCost('');
@@ -1076,7 +1071,7 @@ const WorkDetail = () => {
       await dbService.addExpense({
         workId: workId,
         description: newExpenseDescription,
-        amount: Number(parseInputReal(newExpenseAmount)), // Use parseInputReal for monetary value
+        amount: Number(formatMonetaryValueForDB(newExpenseAmount)), // Use formatMonetaryValueForDB for monetary value
         // When adding a new expense, paidAmount is 0 by default, unless explicitly set
         paidAmount: 0, 
         quantity: 1, // Default to 1 for generic expenses
@@ -1086,7 +1081,7 @@ const WorkDetail = () => {
         workerId: newExpenseWorkerId === 'none' ? undefined : newExpenseWorkerId,
         supplierId: newExpenseSupplierId === 'none' ? undefined : newExpenseSupplierId,
         // totalAgreed defaults to amount if not explicitly provided
-        totalAgreed: newExpenseTotalAgreed ? Number(parseInputReal(newExpenseTotalAgreed)) : Number(parseInputReal(newExpenseAmount)), 
+        totalAgreed: newExpenseTotalAgreed ? Number(formatMonetaryValueForDB(newExpenseTotalAgreed)) : Number(formatMonetaryValueForDB(newExpenseAmount)), 
       });
       setShowAddExpenseModal(false);
       setNewExpenseDescription('');
@@ -1124,14 +1119,14 @@ const WorkDetail = () => {
         ...editExpenseData,
         workId: workId,
         description: newExpenseDescription,
-        amount: Number(parseInputReal(newExpenseAmount)), // Use parseInputReal for monetary value
+        amount: Number(formatMonetaryValueForDB(newExpenseAmount)), // Use formatMonetaryValueForDB for monetary value
         date: newExpenseDate,
         category: newExpenseCategory,
         stepId: newExpenseStepId === 'none' ? undefined : newExpenseStepId,
         workerId: newExpenseWorkerId === 'none' ? undefined : newExpenseWorkerId,
         supplierId: newExpenseSupplierId === 'none' ? undefined : newExpenseSupplierId,
         // FIX: Add non-null assertion for editExpenseData.amount, as it's guaranteed by the 'if' guard
-        totalAgreed: newExpenseTotalAgreed ? Number(parseInputReal(newExpenseTotalAgreed)) : Number(editExpenseData.amount), // Use totalAgreed or fallback to amount
+        totalAgreed: newExpenseTotalAgreed ? Number(formatMonetaryValueForDB(newExpenseTotalAgreed)) : Number(editExpenseData.amount), // Use totalAgreed or fallback to amount
       });
       setEditExpenseData(null);
       setShowAddExpenseModal(false); // Close the modal
@@ -1182,7 +1177,7 @@ const WorkDetail = () => {
     try {
       await dbService.addPaymentToExpense(
         paymentExpenseData.id,
-        Number(parseInputReal(paymentAmount)), // Use parseInputReal for monetary value
+        Number(formatMonetaryValueForDB(paymentAmount)), // Use formatMonetaryValueForDB for monetary value
         paymentDate
       );
       setPaymentAmount('');
@@ -1221,7 +1216,7 @@ const WorkDetail = () => {
         name: newWorkerName,
         role: newWorkerRole,
         phone: newWorkerPhone,
-        dailyRate: newWorkerDailyRate ? Number(parseInputReal(newWorkerDailyRate)) : undefined, // Use parseInputReal
+        dailyRate: newWorkerDailyRate ? Number(formatMonetaryValueForDB(newWorkerDailyRate)) : undefined, // Use formatMonetaryValueForDB
         notes: newWorkerNotes,
       });
       setShowAddWorkerModal(false);
@@ -1254,7 +1249,7 @@ const WorkDetail = () => {
         name: newWorkerName,
         role: newWorkerRole,
         phone: newWorkerPhone,
-        dailyRate: newWorkerDailyRate ? Number(parseInputReal(newWorkerDailyRate)) : undefined, // Use parseInputReal
+        dailyRate: newWorkerDailyRate ? Number(formatMonetaryValueForDB(newWorkerDailyRate)) : undefined, // Use formatMonetaryValueForDB
         notes: newWorkerNotes,
       });
       setEditWorkerData(null);
@@ -1926,7 +1921,7 @@ const WorkDetail = () => {
                               onClick={() => { 
                                 setNewMaterialName(material.name);
                                 setNewMaterialBrand(material.brand || ''); // NEW: Pre-populate brand
-                                setNewMaterialPlannedQty(String(material.plannedQty));
+                                setNewMaterialPlannedQty(String(material.plannedQty)); // Convert to string for input
                                 setNewMaterialUnit(material.unit);
                                 setNewMaterialCategory(material.category || '');
                                 setNewMaterialStepId(material.stepId || 'none');
@@ -2061,7 +2056,7 @@ const WorkDetail = () => {
                                           key={expense.id} 
                                           onClick={() => { 
                                             setNewExpenseDescription(expense.description);
-                                            setNewExpenseAmount(String(expense.amount));
+                                            setNewExpenseAmount(String(expense.amount)); // Convert to string for input
                                             setNewExpenseCategory(expense.category);
                                             setNewExpenseDate(expense.date);
                                             setNewExpenseStepId(expense.stepId || 'none');
@@ -2207,7 +2202,7 @@ const WorkDetail = () => {
                                 setNewWorkerName(worker.name);
                                 setNewWorkerRole(worker.role);
                                 setNewWorkerPhone(worker.phone);
-                                setNewWorkerDailyRate(String(worker.dailyRate || ''));
+                                setNewWorkerDailyRate(String(worker.dailyRate || '')); // Convert to string for input
                                 setNewWorkerNotes(worker.notes || '');
                                 setEditWorkerData(worker); 
                                 setShowAddWorkerModal(true);
@@ -2784,8 +2779,9 @@ const WorkDetail = () => {
                     <input
                       id="purchaseCost"
                       type="text"
-                      value={formatInputReal(currentPurchaseCost)} // Use formatInputReal
-                      onChange={(e) => setCurrentPurchaseCost(parseInputReal(e.target.value))} // Use parseInputReal for state
+                      value={formatMonetaryDisplay(currentPurchaseCost)}
+                      onChange={(e) => setCurrentPurchaseCost(cleanMonetaryInput(e.target.value))}
+                      onBlur={(e) => setCurrentPurchaseCost(formatMonetaryValueForDB(currentPurchaseCost))} // Ensure 2 decimals on blur
                       className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
                       required
                       inputMode="decimal"
@@ -2831,8 +2827,9 @@ const WorkDetail = () => {
                     <input
                       id="expenseAmount"
                       type="text"
-                      value={formatInputReal(newExpenseAmount)} // Use formatInputReal
-                      onChange={(e) => setNewExpenseAmount(parseInputReal(e.target.value))} // Use parseInputReal
+                      value={formatMonetaryDisplay(newExpenseAmount)}
+                      onChange={(e) => setNewExpenseAmount(cleanMonetaryInput(e.target.value))}
+                      onBlur={(e) => setNewExpenseAmount(formatMonetaryValueForDB(newExpenseAmount))} // Ensure 2 decimals on blur
                       className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
                       required
                       inputMode="decimal"
@@ -2843,8 +2840,9 @@ const WorkDetail = () => {
                     <input
                       id="expenseTotalAgreed"
                       type="text"
-                      value={formatInputReal(newExpenseTotalAgreed)} // Use formatInputReal
-                      onChange={(e) => setNewExpenseTotalAgreed(parseInputReal(e.target.value))} // Use parseInputReal
+                      value={formatMonetaryDisplay(newExpenseTotalAgreed)}
+                      onChange={(e) => setNewExpenseTotalAgreed(cleanMonetaryInput(e.target.value))}
+                      onBlur={(e) => setNewExpenseTotalAgreed(formatMonetaryValueForDB(newExpenseTotalAgreed))} // Ensure 2 decimals on blur
                       placeholder="Igual ao Valor Total se vazio"
                       className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
                       inputMode="decimal"
@@ -2948,13 +2946,12 @@ const WorkDetail = () => {
               <input
                 id="paymentAmount"
                 type="text"
-                value={formatInputReal(paymentAmount)} // Use formatInputReal
-                onChange={(e) => setPaymentAmount(parseInputReal(e.target.value))} // Use parseInputReal
+                value={formatMonetaryDisplay(paymentAmount)}
+                onChange={(e) => setPaymentAmount(cleanMonetaryInput(e.target.value))}
+                onBlur={(e) => setPaymentAmount(formatMonetaryValueForDB(paymentAmount))} // Ensure 2 decimals on blur
                 className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
                 required
                 inputMode="decimal"
-                min="0"
-                max={String((paymentExpenseData.totalAgreed !== undefined ? paymentExpenseData.totalAgreed : paymentExpenseData.amount) - (paymentExpenseData.paidAmount || 0))} // Max limit to remaining
               />
             </div>
             <div>
@@ -3026,8 +3023,9 @@ const WorkDetail = () => {
               <input
                 id="workerDailyRate"
                 type="text"
-                value={formatInputReal(newWorkerDailyRate)} // Use formatInputReal
-                onChange={(e) => setNewWorkerDailyRate(parseInputReal(e.target.value))} // Use parseInputReal
+                value={formatMonetaryDisplay(newWorkerDailyRate)}
+                onChange={(e) => setNewWorkerDailyRate(cleanMonetaryInput(e.target.value))}
+                onBlur={(e) => setNewWorkerDailyRate(formatMonetaryValueForDB(newWorkerDailyRate))} // Ensure 2 decimals on blur
                 className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
                 inputMode="decimal"
               />
