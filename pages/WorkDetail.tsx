@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import * as ReactRouter from 'react-router-dom';
 import * as XLSX from 'xlsx';
@@ -544,7 +545,7 @@ const WorkDetail = () => {
   const loadWorkData = useCallback(async () => {
     if (!workId || !user?.id) {
       setLoading(false);
-      navigate('/'); // Redirect if no workId or user
+      navigate('/', { replace: true }); // Use replace: true for redirects
       return;
     }
 
@@ -552,7 +553,7 @@ const WorkDetail = () => {
     try {
       const fetchedWork = await dbService.getWorkById(workId);
       if (!fetchedWork || fetchedWork.userId !== user.id) {
-        navigate('/'); // Redirect if work not found or not owned by user
+        navigate('/', { replace: true }); // Use replace: true for redirects
         return;
       }
       setWork(fetchedWork);
@@ -894,6 +895,8 @@ const WorkDetail = () => {
       setNewMaterialUnit('');
       setNewMaterialCategory('');
       setNewMaterialStepId('');
+      setPurchaseQtyInput(''); // Clear temporary purchase inputs
+      setPurchaseCostInput(''); // Clear temporary purchase inputs
       await loadWorkData();
     } catch (error) {
       console.error("Erro ao adicionar material:", error);
@@ -1990,6 +1993,10 @@ const WorkDetail = () => {
                             <div className="space-y-4">
                                 {group.expenses.map(expense => {
                                     const statusDetails = getEntityStatusDetails('expense', expense, steps); // steps not directly used here, but for consistency
+                                    const valorCombinado = expense.totalAgreed !== undefined ? expense.totalAgreed : expense.amount;
+                                    const valorPago = expense.paidAmount || 0;
+                                    const valorRestante = valorCombinado - valorPago;
+                                    const progressPercent = valorCombinado > 0 ? (valorPago / valorCombinado) * 100 : 0;
 
                                     return (
                                         <div 
@@ -2020,11 +2027,20 @@ const WorkDetail = () => {
                                                 {expense.supplierId && <p className="text-xs text-slate-500 dark:text-slate-400">Fornecedor: {suppliers.find(s => s.id === expense.supplierId)?.name}</p>}
                                             </div>
                                             <div className="text-center sm:text-right w-full sm:w-auto flex flex-col items-end gap-1">
-                                                <p className="text-sm text-slate-700 dark:text-slate-300">Combinado: <span className="font-bold">{formatCurrency(expense.totalAgreed !== undefined ? expense.totalAgreed : expense.amount)}</span></p>
-                                                <p className={cx("text-sm font-bold", statusDetails.textColor)}>Pago: {formatCurrency(expense.paidAmount || 0)}</p>
+                                                <p className="text-sm text-slate-700 dark:text-slate-300">Combinado: <span className="font-bold">{formatCurrency(valorCombinado)}</span></p>
+                                                <p className={cx("text-sm font-bold", statusDetails.textColor)}>Pago: {formatCurrency(valorPago)}</p>
+                                                {valorRestante > 0 && <p className="text-xs text-slate-500 dark:text-slate-400">Restante: {formatCurrency(valorRestante)}</p>}
+                                                
+                                                <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2 mt-2">
+                                                    <div className="h-full bg-secondary rounded-full" style={{ width: `${progressPercent}%` }}></div>
+                                                </div>
+                                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                                                    {progressPercent.toFixed(0)}% Pago
+                                                </p>
+
                                                 {statusDetails.statusText !== 'Concluído' && statusDetails.statusText !== 'Prejuízo' && (
                                                     <button onClick={(e) => { e.stopPropagation(); setPaymentExpenseData(expense); setShowAddPaymentModal(true); }} className="text-xs text-secondary hover:underline" aria-label={`Adicionar pagamento para despesa ${expense.description}`}>
-                                                        Pagar {formatCurrency((expense.totalAgreed !== undefined ? expense.totalAgreed : expense.amount) - (expense.paidAmount || 0))}
+                                                        Pagar {formatCurrency(valorRestante)}
                                                     </button>
                                                 )}
                                                 <button
@@ -2077,7 +2093,20 @@ const WorkDetail = () => {
               <ToolCard icon="fa-file-lines" title="Projetos e Docs" description="Guarde plantas, licenças e outros documentos." onClick={() => goToSubView('PROJECTS')} />
               
               {/* Vitalício Bonus Tools */}
-              <ToolCard icon="fa-calculator" title="Calculadoras" description="Ferramentas para cálculo de materiais, mão de obra, etc." onClick={() => goToSubView('CALCULATORS')} />
+              <ToolCard icon="fa-calculator" title="Calculadoras" description="Ferramentas para cálculo de materiais, mão de obra, etc." 
+                onClick={() => setZeModal({
+                    isOpen: true,
+                    title: "Calculadoras em Desenvolvimento",
+                    message: "As calculadoras estão sendo desenvolvidas. Fique ligado!",
+                    confirmText: "Entendido",
+                    onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
+                    // Removed onConfirm: showAccessModal as it was a boolean assignment error.
+                    // The ZeModal component's internal logic handles "Entendido" as closing the modal
+                    // if onConfirm is the default no-op function or explicitly onCancel.
+                })} 
+                isLocked={!isVitalicio} // Only Vitalicio users can access
+                requiresVitalicio={true}
+              />
               <ToolCard
                 icon="fa-file-contract"
                 title="Gerador de Contratos"
@@ -2482,28 +2511,12 @@ const WorkDetail = () => {
             <>
                 <ToolSubViewHeader title="Zé da Obra AI" onBack={() => goToSubView('NONE')} />
                 <div className={cx(surface, "rounded-3xl p-8 text-center", mutedText)}>
-                    <p className="text-lg mb-4">Converse com seu engenheiro virtual para tirar dúvidas e obter dicas rápidas.</p>
+                    <p className="text-lg mb-4">Acessar o Zé da Obra AI para conversar!</p>
                     <button 
-                        onClick={() => navigate('/ai-chat')}
-                        className="px-6 py-3 bg-secondary text-white font-bold rounded-xl hover:bg-secondary-dark transition-colors flex items-center justify-center gap-2 mx-auto"
+                        onClick={() => navigate('/ai-chat')} 
+                        className="px-6 py-3 bg-secondary text-white font-bold rounded-xl hover:bg-secondary-dark transition-colors"
                     >
-                        <i className="fa-solid fa-robot"></i> Abrir Chat AI
-                    </button>
-                </div>
-            </>
-        );
-
-      case 'AIPLANNER':
-        return (
-            <>
-                <ToolSubViewHeader title="Planejamento Inteligente AI" onBack={() => goToSubView('NONE')} />
-                <div className={cx(surface, "rounded-3xl p-8 text-center", mutedText)}>
-                    <p className="text-lg mb-4">Gere planos, riscos e sugestões de materiais com a inteligência artificial do Zé da Obra.</p>
-                    <button 
-                        onClick={() => navigate(`/work/${workId}/ai-planner`)}
-                        className="px-6 py-3 bg-secondary text-white font-bold rounded-xl hover:bg-secondary-dark transition-colors flex items-center justify-center gap-2 mx-auto"
-                    >
-                        <i className="fa-solid fa-microchip"></i> Gerar Plano AI
+                        Abrir Chat AI
                     </button>
                 </div>
             </>
@@ -2511,98 +2524,104 @@ const WorkDetail = () => {
       case 'REPORTS':
         return (
           <>
-            <ToolSubViewHeader title="Relatórios Completos" onBack={() => goToSubView('NONE')} />
+            <ToolSubViewHeader title="Relatórios" onBack={() => goToSubView('NONE')} />
             <div className={cx(surface, "rounded-3xl p-8 text-center", mutedText)}>
-              <p className="text-lg mb-4">Analise o desempenho financeiro e de cronograma com relatórios detalhados.</p>
-              <button
-                onClick={() => navigate(`/work/${workId}/reports`)}
-                className="px-6 py-3 bg-secondary text-white font-bold rounded-xl hover:bg-secondary-dark transition-colors flex items-center justify-center gap-2 mx-auto"
+              <p className="text-lg mb-4">Acessar a visualização de Relatórios!</p>
+              <button 
+                  onClick={() => navigate(`/work/${workId}/reports`)} 
+                  className="px-6 py-3 bg-secondary text-white font-bold rounded-xl hover:bg-secondary-dark transition-colors"
               >
-                <i className="fa-solid fa-chart-line"></i> Ver Relatórios
+                  Ver Relatórios
               </button>
             </div>
           </>
         );
-
+      case 'AIPLANNER':
+        return (
+          <>
+            <ToolSubViewHeader title="Planejamento Inteligente AI" onBack={() => goToSubView('NONE')} />
+            <div className={cx(surface, "rounded-3xl p-8 text-center", mutedText)}>
+              <p className="text-lg mb-4">Acessar o Planejamento Inteligente AI!</p>
+              <button 
+                  onClick={() => navigate(`/work/${workId}/ai-planner`)} 
+                  className="px-6 py-3 bg-secondary text-white font-bold rounded-xl hover:bg-secondary-dark transition-colors"
+              >
+                  Ver Plano AI
+              </button>
+            </div>
+          </>
+        );
       default:
         return null;
     }
   };
 
-
   return (
-    <div className="max-w-4xl mx-auto pb-12 pt-4 px-4 font-sans">
-      <div className="flex items-center gap-4 mb-6">
+    <div className="max-w-4xl mx-auto pb-12 pt-4 px-2 sm:px-4 md:px-0 font-sans">
+      <div className="flex items-center gap-4 mb-6 px-2 sm:px-0 print:hidden">
         <button
-          onClick={() => {
-            if (activeSubView !== 'NONE') {
-              goToSubView('NONE');
-            } else {
-              navigate('/');
-            }
-          }}
+          onClick={() => navigate('/')}
           className="text-slate-400 hover:text-primary dark:hover:text-white transition-colors p-2 -ml-2"
-          aria-label={activeSubView !== 'NONE' ? "Voltar para Ferramentas" : "Voltar para Dashboard"}
+          aria-label="Voltar para dashboard"
         >
           <i className="fa-solid fa-arrow-left text-xl"></i>
         </button>
         <div>
-          <h1 className="text-3xl font-black text-primary dark:text-white mb-1 tracking-tight">Obra: {work.name}</h1>
+          <h1 className="text-3xl font-black text-primary dark:text-white mb-1 tracking-tight">{work.name}</h1>
           <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">{work.address}</p>
         </div>
       </div>
-      
+
       {/* Main Content Area */}
       {renderMainContent()}
 
-      {/* MODALS */}
-
+      {/* Modals for CRUD operations */}
       {/* Add/Edit Step Modal */}
       {showAddStepModal && (
         <ZeModal
           isOpen={showAddStepModal}
           title={editStepData ? "Editar Etapa" : "Adicionar Nova Etapa"}
-          message=""
+          message="" // Content will be in children
           confirmText={editStepData ? "Salvar Alterações" : "Adicionar Etapa"}
           onConfirm={editStepData ? handleEditStep : handleAddStep}
           onCancel={() => { setShowAddStepModal(false); setEditStepData(null); }}
+          type="INFO"
           isConfirming={zeModal.isConfirming}
         >
           <form onSubmit={editStepData ? handleEditStep : handleAddStep} className="space-y-4">
             <div>
-              <label htmlFor="stepName" className="block text-xs font-bold text-slate-500 uppercase mb-1">Nome da Etapa</label>
+              <label htmlFor="stepName" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Nome da Etapa</label>
               <input
-                id="stepName"
                 type="text"
+                id="stepName"
                 value={newStepName}
                 onChange={(e) => setNewStepName(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
+                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
                 required
               />
             </div>
             <div>
-              <label htmlFor="stepStartDate" className="block text-xs font-bold text-slate-500 uppercase mb-1">Data de Início</label>
+              <label htmlFor="stepStartDate" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Data de Início</label>
               <input
-                id="stepStartDate"
                 type="date"
+                id="stepStartDate"
                 value={newStepStartDate}
                 onChange={(e) => setNewStepStartDate(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
+                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
                 required
               />
             </div>
             <div>
-              <label htmlFor="stepEndDate" className="block text-xs font-bold text-slate-500 uppercase mb-1">Data de Término</label>
+              <label htmlFor="stepEndDate" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Data de Término</label>
               <input
-                id="stepEndDate"
                 type="date"
+                id="stepEndDate"
                 value={newStepEndDate}
                 onChange={(e) => setNewStepEndDate(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
+                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
                 required
               />
             </div>
-            {/* Submit button is handled by ZeModal's own confirm button */}
           </form>
         </ZeModal>
       )}
@@ -2612,268 +2631,234 @@ const WorkDetail = () => {
         <ZeModal
           isOpen={showAddMaterialModal}
           title={editMaterialData ? "Editar Material" : "Adicionar Novo Material"}
-          message=""
+          message="" // Content in children
           confirmText={editMaterialData ? "Salvar Alterações" : "Adicionar Material"}
-          onConfirm={handleEditMaterial} // This now also handles purchase registration
+          onConfirm={editMaterialData ? handleEditMaterial : handleAddMaterial}
           onCancel={() => { setShowAddMaterialModal(false); setEditMaterialData(null); setPurchaseQtyInput(''); setPurchaseCostInput(''); }}
+          type="INFO"
           isConfirming={zeModal.isConfirming}
         >
-          <form onSubmit={handleEditMaterial} className="space-y-4">
+          <form onSubmit={editMaterialData ? handleEditMaterial : handleAddMaterial} className="space-y-4">
             <div>
-              <label htmlFor="materialName" className="block text-xs font-bold text-slate-500 uppercase mb-1">Nome do Material</label>
+              <label htmlFor="materialName" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Nome do Material</label>
               <input
-                id="materialName"
                 type="text"
+                id="materialName"
                 value={newMaterialName}
                 onChange={(e) => setNewMaterialName(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
+                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
                 required
               />
             </div>
             <div>
-              <label htmlFor="materialBrand" className="block text-xs font-bold text-slate-500 uppercase mb-1">Marca (Opcional)</label>
+              <label htmlFor="materialBrand" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Marca (Opcional)</label>
               <input
-                id="materialBrand"
                 type="text"
+                id="materialBrand"
                 value={newMaterialBrand}
                 onChange={(e) => setNewMaterialBrand(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
+                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="plannedQty" className="block text-xs font-bold text-slate-500 uppercase mb-1">Qtd. Planejada</label>
-                <input
-                  id="plannedQty"
-                  type="number"
-                  value={newMaterialPlannedQty}
-                  onChange={(e) => setNewMaterialPlannedQty(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
-                  required
-                  min="0"
-                  step="0.01"
-                />
-              </div>
-              <div>
-                <label htmlFor="materialUnit" className="block text-xs font-bold text-slate-500 uppercase mb-1">Unidade</label>
-                <input
-                  id="materialUnit"
-                  type="text"
-                  value={newMaterialUnit}
-                  onChange={(e) => setNewMaterialUnit(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
-                  required
-                />
-              </div>
+            <div>
+              <label htmlFor="materialPlannedQty" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Quantidade Planejada</label>
+              <input
+                type="number"
+                id="materialPlannedQty"
+                value={newMaterialPlannedQty}
+                onChange={(e) => setNewMaterialPlannedQty(e.target.value)}
+                min="0"
+                step="any"
+                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
+                required
+              />
             </div>
             <div>
-              <label htmlFor="materialCategory" className="block text-xs font-bold text-slate-500 uppercase mb-1">Categoria</label>
+              <label htmlFor="materialUnit" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Unidade</label>
               <input
-                id="materialCategory"
                 type="text"
+                id="materialUnit"
+                value={newMaterialUnit}
+                onChange={(e) => setNewMaterialUnit(e.target.value)}
+                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
+                required
+              />
+            </div>
+            <div>
+              <label htmlFor="materialCategory" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Categoria (Opcional)</label>
+              <input
+                type="text"
+                id="materialCategory"
                 value={newMaterialCategory}
                 onChange={(e) => setNewMaterialCategory(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
-                list="material-categories" // Use datalist for suggestions
+                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
               />
-              <datalist id="material-categories">
-                {Array.from(new Set(materials.map(m => m.category))).filter(Boolean).map(cat => (
-                  <option key={cat} value={cat} />
-                ))}
-              </datalist>
             </div>
             <div>
-              <label htmlFor="materialStep" className="block text-xs font-bold text-slate-500 uppercase mb-1">Etapa Relacionada (Opcional)</label>
+              <label htmlFor="materialStep" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Etapa Relacionada (Opcional)</label>
               <select
                 id="materialStep"
                 value={newMaterialStepId}
                 onChange={(e) => setNewMaterialStepId(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
+                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
               >
                 <option value="none">Nenhuma</option>
                 {steps.map(step => (
-                  <option key={step.id} value={step.id}>{step.orderIndex}. {step.name}</option>
+                  <option key={step.id} value={step.id}>{step.name}</option>
                 ))}
               </select>
             </div>
-
             {editMaterialData && (
-              <>
-                <div className="grid grid-cols-2 gap-4 pt-4 mt-4 border-t border-slate-100 dark:border-slate-700">
-                  <div>
-                    <label htmlFor="currentPurchasedQty" className="block text-xs font-bold text-slate-500 uppercase mb-1">Qtd. Comprada (Total)</label>
-                    <input
-                      id="currentPurchasedQty"
-                      type="number"
-                      value={editMaterialData.purchasedQty}
-                      className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none"
-                      readOnly // Make this field read-only
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="currentTotalCost" className="block text-xs font-bold text-slate-500 uppercase mb-1">Custo Total (R$)</label>
-                    <input
-                      id="currentTotalCost"
-                      type="number"
-                      value={editMaterialData.totalCost}
-                      className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none"
-                      readOnly // Make this field read-only
-                    />
-                  </div>
-                </div>
-
+              <div className="pt-4 border-t border-slate-200 dark:border-slate-700 mt-4">
+                <h3 className="text-lg font-bold text-primary dark:text-white mb-3">Registrar Compra</h3>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label htmlFor="purchaseQtyInput" className="block text-xs font-bold text-slate-500 uppercase mb-1">Qtd. Adicional Comprada</label>
+                    <label htmlFor="purchaseQtyInput" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Quantidade Comprada</label>
                     <input
-                      id="purchaseQtyInput"
                       type="number"
+                      id="purchaseQtyInput"
                       value={purchaseQtyInput}
                       onChange={(e) => setPurchaseQtyInput(e.target.value)}
-                      className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
                       min="0"
-                      step="0.01"
-                      placeholder="0 para não registrar"
+                      step="any"
+                      placeholder={`Ex: ${editMaterialData.plannedQty - editMaterialData.purchasedQty}`}
+                      className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
                     />
                   </div>
                   <div>
-                    <label htmlFor="purchaseCostInput" className="block text-xs font-bold text-slate-500 uppercase mb-1">Custo Desta Compra (R$)</label>
+                    <label htmlFor="purchaseCostInput" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Custo Total (R$)</label>
                     <input
-                      id="purchaseCostInput"
                       type="number"
+                      id="purchaseCostInput"
                       value={purchaseCostInput}
                       onChange={(e) => setPurchaseCostInput(e.target.value)}
-                      className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
                       min="0"
                       step="0.01"
-                      placeholder="0.00 para não registrar"
+                      placeholder="Ex: 150.75"
+                      className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
                     />
                   </div>
                 </div>
-              </>
+              </div>
             )}
           </form>
         </ZeModal>
       )}
-
+      
       {/* Add/Edit Expense Modal */}
       {showAddExpenseModal && (
         <ZeModal
           isOpen={showAddExpenseModal}
           title={editExpenseData ? "Editar Despesa" : "Adicionar Nova Despesa"}
-          message=""
+          message="" // Content in children
           confirmText={editExpenseData ? "Salvar Alterações" : "Adicionar Despesa"}
           onConfirm={editExpenseData ? handleEditExpense : handleAddExpense}
           onCancel={() => { setShowAddExpenseModal(false); setEditExpenseData(null); }}
+          type="INFO"
           isConfirming={zeModal.isConfirming}
         >
           <form onSubmit={editExpenseData ? handleEditExpense : handleAddExpense} className="space-y-4">
             <div>
-              <label htmlFor="expenseDescription" className="block text-xs font-bold text-slate-500 uppercase mb-1">Descrição</label>
+              <label htmlFor="expenseDescription" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Descrição</label>
               <input
-                id="expenseDescription"
                 type="text"
+                id="expenseDescription"
                 value={newExpenseDescription}
                 onChange={(e) => setNewExpenseDescription(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
+                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
                 required
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-                <div>
-                    <label htmlFor="expenseAmount" className="block text-xs font-bold text-slate-500 uppercase mb-1">Valor Total (R$)</label>
-                    <input
-                      id="expenseAmount"
-                      type="number" // Reverted to number
-                      value={newExpenseAmount}
-                      onChange={(e) => setNewExpenseAmount(e.target.value)}
-                      className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
-                      required
-                      min="0"
-                      step="0.01"
-                    />
-                </div>
-                <div>
-                    <label htmlFor="expenseTotalAgreed" className="block text-xs font-bold text-slate-500 uppercase mb-1">Valor Combinado (R$) <span className="text-slate-400">(Opcional)</span></label>
-                    <input
-                      id="expenseTotalAgreed"
-                      type="number" // Reverted to number
-                      value={newExpenseTotalAgreed}
-                      onChange={(e) => setNewExpenseTotalAgreed(e.target.value)}
-                      placeholder="Igual ao Valor Total se vazio"
-                      className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
-                      min="0"
-                      step="0.01"
-                    />
-                </div>
-            </div>
-            
             <div>
-              <label htmlFor="expenseCategory" className="block text-xs font-bold text-slate-500 uppercase mb-1">Categoria</label>
+              <label htmlFor="expenseAmount" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Valor (R$)</label>
+              <input
+                type="number"
+                id="expenseAmount"
+                value={newExpenseAmount}
+                onChange={(e) => setNewExpenseAmount(e.target.value)}
+                min="0"
+                step="0.01"
+                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
+                required
+              />
+            </div>
+            <div>
+              <label htmlFor="expenseTotalAgreed" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Valor Combinado (Opcional, default é o valor da despesa)</label>
+              <input
+                type="number"
+                id="expenseTotalAgreed"
+                value={newExpenseTotalAgreed}
+                onChange={(e) => setNewExpenseTotalAgreed(e.target.value)}
+                min="0"
+                step="0.01"
+                placeholder="Ex: 500.00"
+                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
+              />
+            </div>
+            <div>
+              <label htmlFor="expenseCategory" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Categoria</label>
               <select
                 id="expenseCategory"
                 value={newExpenseCategory}
-                onChange={(e) => setNewExpenseCategory(e.target.value as ExpenseCategory | string)}
-                className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
+                onChange={(e) => setNewExpenseCategory(e.target.value)}
+                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
                 required
               >
                 {Object.values(ExpenseCategory).map(cat => (
                   <option key={cat} value={cat}>{cat}</option>
                 ))}
-                {/* Allow custom categories */}
-                <option value="Outros">Outros</option>
               </select>
             </div>
             <div>
-              <label htmlFor="expenseDate" className="block text-xs font-bold text-slate-500 uppercase mb-1">Data</label>
+              <label htmlFor="expenseDate" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Data</label>
               <input
-                id="expenseDate"
                 type="date"
+                id="expenseDate"
                 value={newExpenseDate}
                 onChange={(e) => setNewExpenseDate(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
+                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
                 required
               />
             </div>
             <div>
-              <label htmlFor="expenseStep" className="block text-xs font-bold text-slate-500 uppercase mb-1">Etapa Relacionada (Opcional)</label>
+              <label htmlFor="expenseStep" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Etapa Relacionada (Opcional)</label>
               <select
                 id="expenseStep"
                 value={newExpenseStepId}
                 onChange={(e) => setNewExpenseStepId(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
+                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
               >
                 <option value="none">Nenhuma</option>
                 {steps.map(step => (
-                  <option key={step.id} value={step.id}>{step.orderIndex}. {step.name}</option>
+                  <option key={step.id} value={step.id}>{step.name}</option>
                 ))}
               </select>
             </div>
             <div>
-              <label htmlFor="expenseWorker" className="block text-xs font-bold text-slate-500 uppercase mb-1">Profissional Relacionado (Opcional)</label>
+              <label htmlFor="expenseWorker" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Profissional Relacionado (Opcional)</label>
               <select
                 id="expenseWorker"
                 value={newExpenseWorkerId}
                 onChange={(e) => setNewExpenseWorkerId(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
+                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
               >
                 <option value="none">Nenhum</option>
                 {workers.map(worker => (
-                  <option key={worker.id} value={worker.id}>{worker.name} ({worker.role})</option>
+                  <option key={worker.id} value={worker.id}>{worker.name}</option>
                 ))}
               </select>
             </div>
             <div>
-              <label htmlFor="expenseSupplier" className="block text-xs font-bold text-slate-500 uppercase mb-1">Fornecedor Relacionado (Opcional)</label>
+              <label htmlFor="expenseSupplier" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Fornecedor Relacionado (Opcional)</label>
               <select
                 id="expenseSupplier"
                 value={newExpenseSupplierId}
                 onChange={(e) => setNewExpenseSupplierId(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
+                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
               >
                 <option value="none">Nenhum</option>
                 {suppliers.map(supplier => (
-                  <option key={supplier.id} value={supplier.id}>{supplier.name} ({supplier.category})</option>
+                  <option key={supplier.id} value={supplier.id}>{supplier.name}</option>
                 ))}
               </select>
             </div>
@@ -2881,45 +2866,49 @@ const WorkDetail = () => {
         </ZeModal>
       )}
 
-      {/* Add Payment Modal */}
+      {/* Add Payment to Expense Modal */}
       {showAddPaymentModal && paymentExpenseData && (
         <ZeModal
           isOpen={showAddPaymentModal}
-          title={`Adicionar Pagamento para "${paymentExpenseData.description}"`}
-          message=""
+          title={`Adicionar Pagamento para ${paymentExpenseData.description}`}
+          message="" // Content in children
           confirmText="Adicionar Pagamento"
           onConfirm={handleAddPayment}
           onCancel={() => { setShowAddPaymentModal(false); setPaymentExpenseData(null); setPaymentAmount(''); setNewPaymentDate(new Date().toISOString().split('T')[0]); }}
+          type="INFO"
           isConfirming={zeModal.isConfirming}
         >
           <form onSubmit={handleAddPayment} className="space-y-4">
             <p className="text-sm text-slate-700 dark:text-slate-300">
-                Valor Combinado: <span className="font-bold">{formatCurrency(paymentExpenseData.totalAgreed !== undefined ? paymentExpenseData.totalAgreed : paymentExpenseData.amount)}</span>
+              Valor Combinado: <span className="font-bold">{formatCurrency(paymentExpenseData.totalAgreed !== undefined ? paymentExpenseData.totalAgreed : paymentExpenseData.amount)}</span>
+            </p>
+            <p className="text-sm text-slate-700 dark:text-slate-300">
+              Valor Já Pago: <span className="font-bold">{formatCurrency(paymentExpenseData.paidAmount || 0)}</span>
             </p>
             <p className="text-sm text-slate-700 dark:text-slate-300 mb-4">
-                Já Pago: <span className="font-bold">{formatCurrency(paymentExpenseData.paidAmount || 0)}</span>
+              Valor Restante: <span className="font-bold">{formatCurrency((paymentExpenseData.totalAgreed !== undefined ? paymentExpenseData.totalAgreed : paymentExpenseData.amount) - (paymentExpenseData.paidAmount || 0))}</span>
             </p>
             <div>
-              <label htmlFor="paymentAmount" className="block text-xs font-bold text-slate-500 uppercase mb-1">Valor do Pagamento (R$)</label>
+              <label htmlFor="paymentAmount" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Valor do Pagamento (R$)</label>
               <input
+                type="number"
                 id="paymentAmount"
-                type="number" // Reverted to number
                 value={paymentAmount}
                 onChange={(e) => setPaymentAmount(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
-                required
-                min="0"
+                min="0.01"
                 step="0.01"
+                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
+                required
               />
             </div>
             <div>
-              <label htmlFor="paymentDate" className="block text-xs font-bold text-slate-500 uppercase mb-1">Data do Pagamento</label>
+              <label htmlFor="paymentDate" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Data do Pagamento</label>
               <input
-                id="paymentDate"
                 type="date"
+                id="paymentDate"
                 value={paymentDate}
                 onChange={(e) => setNewPaymentDate(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
+                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
                 required
               />
             </div>
@@ -2932,70 +2921,71 @@ const WorkDetail = () => {
         <ZeModal
           isOpen={showAddWorkerModal}
           title={editWorkerData ? "Editar Profissional" : "Adicionar Novo Profissional"}
-          message=""
+          message="" // Content in children
           confirmText={editWorkerData ? "Salvar Alterações" : "Adicionar Profissional"}
           onConfirm={editWorkerData ? handleEditWorker : handleAddWorker}
           onCancel={() => { setShowAddWorkerModal(false); setEditWorkerData(null); }}
+          type="INFO"
           isConfirming={zeModal.isConfirming}
         >
           <form onSubmit={editWorkerData ? handleEditWorker : handleAddWorker} className="space-y-4">
             <div>
-              <label htmlFor="workerName" className="block text-xs font-bold text-slate-500 uppercase mb-1">Nome</label>
+              <label htmlFor="workerName" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Nome</label>
               <input
-                id="workerName"
                 type="text"
+                id="workerName"
                 value={newWorkerName}
                 onChange={(e) => setNewWorkerName(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
+                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
                 required
               />
             </div>
             <div>
-              <label htmlFor="workerRole" className="block text-xs font-bold text-slate-500 uppercase mb-1">Função</label>
+              <label htmlFor="workerRole" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Função</label>
               <select
                 id="workerRole"
                 value={newWorkerRole}
                 onChange={(e) => setNewWorkerRole(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
+                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
                 required
               >
-                <option value="">Selecione uma função</option>
+                <option value="">Selecione</option>
                 {STANDARD_JOB_ROLES.map(role => (
                   <option key={role} value={role}>{role}</option>
                 ))}
               </select>
             </div>
             <div>
-              <label htmlFor="workerPhone" className="block text-xs font-bold text-slate-500 uppercase mb-1">Telefone</label>
+              <label htmlFor="workerPhone" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Telefone</label>
               <input
-                id="workerPhone"
                 type="tel"
+                id="workerPhone"
                 value={newWorkerPhone}
                 onChange={(e) => setNewWorkerPhone(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
+                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
                 required
               />
             </div>
             <div>
-              <label htmlFor="workerDailyRate" className="block text-xs font-bold text-slate-500 uppercase mb-1">Valor da Diária (R$) (Opcional)</label>
+              <label htmlFor="workerDailyRate" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Diária (R$)</label>
               <input
+                type="number"
                 id="workerDailyRate"
-                type="number" // Reverted to number
                 value={newWorkerDailyRate}
                 onChange={(e) => setNewWorkerDailyRate(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
                 min="0"
                 step="0.01"
+                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
               />
             </div>
             <div>
-              <label htmlFor="workerNotes" className="block text-xs font-bold text-slate-500 uppercase mb-1">Observações (Opcional)</label>
+              <label htmlFor="workerNotes" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Observações (Opcional)</label>
               <textarea
                 id="workerNotes"
                 value={newWorkerNotes}
                 onChange={(e) => setNewWorkerNotes(e.target.value)}
                 rows={3}
-                className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
+                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
               ></textarea>
             </div>
           </form>
@@ -3007,78 +2997,79 @@ const WorkDetail = () => {
         <ZeModal
           isOpen={showAddSupplierModal}
           title={editSupplierData ? "Editar Fornecedor" : "Adicionar Novo Fornecedor"}
-          message=""
+          message="" // Content in children
           confirmText={editSupplierData ? "Salvar Alterações" : "Adicionar Fornecedor"}
           onConfirm={editSupplierData ? handleEditSupplier : handleAddSupplier}
           onCancel={() => { setShowAddSupplierModal(false); setEditSupplierData(null); }}
+          type="INFO"
           isConfirming={zeModal.isConfirming}
         >
           <form onSubmit={editSupplierData ? handleEditSupplier : handleAddSupplier} className="space-y-4">
             <div>
-              <label htmlFor="supplierName" className="block text-xs font-bold text-slate-500 uppercase mb-1">Nome do Fornecedor</label>
+              <label htmlFor="supplierName" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Nome do Fornecedor</label>
               <input
-                id="supplierName"
                 type="text"
+                id="supplierName"
                 value={newSupplierName}
                 onChange={(e) => setNewSupplierName(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
+                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
                 required
               />
             </div>
             <div>
-              <label htmlFor="supplierCategory" className="block text-xs font-bold text-slate-500 uppercase mb-1">Categoria</label>
+              <label htmlFor="supplierCategory" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Categoria</label>
               <select
                 id="supplierCategory"
                 value={newSupplierCategory}
                 onChange={(e) => setNewSupplierCategory(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
+                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
                 required
               >
-                <option value="">Selecione uma categoria</option>
+                <option value="">Selecione</option>
                 {STANDARD_SUPPLIER_CATEGORIES.map(category => (
                   <option key={category} value={category}>{category}</option>
                 ))}
               </select>
             </div>
             <div>
-              <label htmlFor="supplierPhone" className="block text-xs font-bold text-slate-500 uppercase mb-1">Telefone</label>
+              <label htmlFor="supplierPhone" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Telefone</label>
               <input
-                id="supplierPhone"
                 type="tel"
+                id="supplierPhone"
                 value={newSupplierPhone}
                 onChange={(e) => setNewSupplierPhone(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
+                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
                 required
               />
             </div>
             <div>
-              <label htmlFor="supplierEmail" className="block text-xs font-bold text-slate-500 uppercase mb-1">E-mail (Opcional)</label>
+              <label htmlFor="supplierEmail" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Email (Opcional)</label>
               <input
-                id="supplierEmail"
                 type="email"
+                id="supplierEmail"
                 value={newSupplierEmail}
                 onChange={(e) => setNewSupplierEmail(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
+                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
               />
             </div>
             <div>
-              <label htmlFor="supplierAddress" className="block text-xs font-bold text-slate-500 uppercase mb-1">Endereço (Opcional)</label>
+              <label htmlFor="supplierAddress" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Endereço (Opcional)</label>
               <input
-                id="supplierAddress"
                 type="text"
+                id="supplierAddress"
                 value={newSupplierAddress}
                 onChange={(e) => setNewSupplierAddress(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
+                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
               />
             </div>
             <div>
-              <label htmlFor="supplierNotes" className="block text-xs font-bold text-slate-500 uppercase mb-1">Observações (Opcional)</label>
+              <label htmlFor="supplierNotes" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Observações (Opcional)</label>
               <textarea
                 id="supplierNotes"
                 value={newSupplierNotes}
                 onChange={(e) => setNewSupplierNotes(e.target.value)}
                 rows={3}
-                className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
+                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
               ></textarea>
             </div>
           </form>
@@ -3091,41 +3082,41 @@ const WorkDetail = () => {
           isOpen={showAddPhotoModal}
           title="Adicionar Nova Foto"
           message=""
-          confirmText="Adicionar Foto"
+          confirmText="Upload da Foto"
           onConfirm={handleAddPhoto}
           onCancel={() => { setShowAddPhotoModal(false); setNewPhotoFile(null); setNewPhotoDescription(''); setNewPhotoType('PROGRESS'); }}
+          type="INFO"
           isConfirming={uploadingPhoto}
         >
           <form onSubmit={handleAddPhoto} className="space-y-4">
             <div>
-              <label htmlFor="photoFile" className="block text-xs font-bold text-slate-500 uppercase mb-1">Arquivo da Foto</label>
+              <label htmlFor="photoFile" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Arquivo de Imagem</label>
               <input
-                id="photoFile"
                 type="file"
+                id="photoFile"
                 accept="image/*"
                 onChange={(e) => setNewPhotoFile(e.target.files ? e.target.files[0] : null)}
-                className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-bold file:bg-secondary file:text-white hover:file:bg-secondary-dark"
+                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
                 required
               />
             </div>
             <div>
-              <label htmlFor="photoDescription" className="block text-xs font-bold text-slate-500 uppercase mb-1">Descrição</label>
+              <label htmlFor="photoDescription" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Descrição (Opcional)</label>
               <input
-                id="photoDescription"
                 type="text"
+                id="photoDescription"
                 value={newPhotoDescription}
                 onChange={(e) => setNewPhotoDescription(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
-                required
+                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
               />
             </div>
             <div>
-              <label htmlFor="photoType" className="block text-xs font-bold text-slate-500 uppercase mb-1">Tipo de Foto</label>
+              <label htmlFor="photoType" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Tipo da Foto</label>
               <select
                 id="photoType"
                 value={newPhotoType}
                 onChange={(e) => setNewPhotoType(e.target.value as 'BEFORE' | 'AFTER' | 'PROGRESS')}
-                className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
+                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
                 required
               >
                 <option value="PROGRESS">Progresso</option>
@@ -3143,40 +3134,40 @@ const WorkDetail = () => {
           isOpen={showAddFileModal}
           title="Adicionar Novo Documento"
           message=""
-          confirmText="Adicionar Documento"
+          confirmText="Upload do Documento"
           onConfirm={handleAddFile}
           onCancel={() => { setShowAddFileModal(false); setNewUploadFile(null); setNewFileName(''); setNewFileCategory(FileCategory.GENERAL); }}
+          type="INFO"
           isConfirming={uploadingFile}
         >
           <form onSubmit={handleAddFile} className="space-y-4">
             <div>
-              <label htmlFor="uploadFile" className="block text-xs font-bold text-slate-500 uppercase mb-1">Arquivo</label>
+              <label htmlFor="uploadFile" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Arquivo</label>
               <input
-                id="uploadFile"
                 type="file"
+                id="uploadFile"
                 onChange={(e) => setNewUploadFile(e.target.files ? e.target.files[0] : null)}
-                className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-bold file:bg-secondary file:text-white hover:file:bg-secondary-dark"
+                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
                 required
               />
             </div>
             <div>
-              <label htmlFor="fileName" className="block text-xs font-bold text-slate-500 uppercase mb-1">Nome do Documento (Opcional)</label>
+              <label htmlFor="fileName" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Nome do Documento (Opcional, default é o nome do arquivo)</label>
               <input
-                id="fileName"
                 type="text"
+                id="fileName"
                 value={newFileName}
                 onChange={(e) => setNewFileName(e.target.value)}
-                placeholder="Ex: Planta Estrutural v1"
-                className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
+                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
               />
             </div>
             <div>
-              <label htmlFor="fileCategory" className="block text-xs font-bold text-slate-500 uppercase mb-1">Categoria</label>
+              <label htmlFor="fileCategory" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Categoria</label>
               <select
                 id="fileCategory"
                 value={newFileCategory}
                 onChange={(e) => setNewFileCategory(e.target.value as FileCategory)}
-                className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
+                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
                 required
               >
                 {Object.values(FileCategory).map(cat => (
@@ -3188,63 +3179,89 @@ const WorkDetail = () => {
         </ZeModal>
       )}
 
+      {/* Contract Content Viewer Modal */}
+      {showContractContentModal && (
+        <ZeModal
+          isOpen={showContractContentModal}
+          title={selectedContractTitle}
+          message="" // Content in children
+          confirmText={copyContractSuccess ? "Copiado!" : "Copiar Texto"}
+          onConfirm={async () => {
+              await navigator.clipboard.writeText(selectedContractContent);
+              setCopyContractSuccess(true);
+              setTimeout(() => setCopyContractSuccess(false), 2000); // Reset after 2 seconds
+          }}
+          onCancel={() => { setShowContractContentModal(false); setCopyContractSuccess(false); }}
+          type="INFO"
+        >
+          <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-lg border border-slate-100 dark:border-slate-700 text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap max-h-96 overflow-auto">
+            {selectedContractContent}
+          </div>
+          {copyContractSuccess && (
+            <p className="text-center text-green-500 text-sm mt-3 animate-in fade-in">
+              <i className="fa-solid fa-check-circle mr-1"></i> Texto copiado para a área de transferência!
+            </p>
+          )}
+        </ZeModal>
+      )}
+
       {/* Add/Edit Checklist Modal */}
       {showAddChecklistModal && (
         <ZeModal
           isOpen={showAddChecklistModal}
           title={editChecklistData ? "Editar Checklist" : "Adicionar Novo Checklist"}
-          message=""
-          confirmText={editChecklistData ? "Salvar Alterações" : "Adicionar Checklist"}
+          message="" // Content in children
+          confirmText={editChecklistData ? "Salvar Checklist" : "Adicionar Checklist"}
           onConfirm={editChecklistData ? handleEditChecklist : handleAddChecklist}
-          onCancel={() => { setShowAddChecklistModal(false); setEditChecklistData(null); setNewChecklistName(''); setNewChecklistCategory(''); setNewChecklistItems(['']); }}
+          onCancel={() => { 
+            setShowAddChecklistModal(false); 
+            setEditChecklistData(null); 
+            setNewChecklistName(''); 
+            setNewChecklistCategory(''); 
+            setNewChecklistItems(['']); 
+          }}
+          type="INFO"
           isConfirming={zeModal.isConfirming}
         >
           <form onSubmit={editChecklistData ? handleEditChecklist : handleAddChecklist} className="space-y-4">
             <div>
-              <label htmlFor="checklistName" className="block text-xs font-bold text-slate-500 uppercase mb-1">Nome do Checklist</label>
+              <label htmlFor="checklistName" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Nome do Checklist</label>
               <input
-                id="checklistName"
                 type="text"
+                id="checklistName"
                 value={newChecklistName}
                 onChange={(e) => setNewChecklistName(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
+                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
                 required
               />
             </div>
             <div>
-              <label htmlFor="checklistCategory" className="block text-xs font-bold text-slate-500 uppercase mb-1">Categoria</label>
+              <label htmlFor="checklistCategory" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Categoria (Ex: Fundações, Elétrica)</label>
               <input
-                id="checklistCategory"
                 type="text"
+                id="checklistCategory"
                 value={newChecklistCategory}
                 onChange={(e) => setNewChecklistCategory(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
+                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
                 required
-                list="checklist-categories"
               />
-              <datalist id="checklist-categories">
-                {Array.from(new Set(CHECKLIST_TEMPLATES.map(cl => cl.category))).filter(Boolean).map(cat => (
-                  <option key={cat} value={cat} />
-                ))}
-              </datalist>
             </div>
-            <div className="pt-4 border-t border-slate-100 dark:border-slate-700">
-              <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">Itens do Checklist</h3>
-              <div className="space-y-3">
-                {newChecklistItems.map((item, index) => (
-                  <div key={index} className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      value={item}
-                      onChange={(e) => {
-                        const updatedItems = [...newChecklistItems];
-                        updatedItems[index] = e.target.value;
-                        setNewChecklistItems(updatedItems);
-                      }}
-                      placeholder={`Item ${index + 1}`}
-                      className="flex-1 px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
-                      required
-                    />
+            <div>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Itens do Checklist</label>
+              {newChecklistItems.map((item, index) => (
+                <div key={index} className="flex items-center gap-2 mb-2">
+                  <input
+                    type="text"
+                    value={item}
+                    onChange={(e) => {
+                      const updatedItems = [...newChecklistItems];
+                      updatedItems[index] = e.target.value;
+                      setNewChecklistItems(updatedItems);
+                    }}
+                    placeholder={`Item ${index + 1}`}
+                    className="flex-1 p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
+                  />
+                  {newChecklistItems.length > 1 && (
                     <button
                       type="button"
                       onClick={() => {
@@ -3252,44 +3269,21 @@ const WorkDetail = () => {
                         setNewChecklistItems(updatedItems);
                       }}
                       className="p-2 text-red-500 hover:bg-red-500/10 rounded-full"
-                      aria-label="Remover item do checklist"
                     >
                       <i className="fa-solid fa-times"></i>
                     </button>
-                  </div>
-                ))}
-                <button
-                  type="button"
-                  onClick={() => setNewChecklistItems([...newChecklistItems, ''])}
-                  className="w-full py-2 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors flex items-center justify-center gap-2"
-                  aria-label="Adicionar novo item"
-                >
-                  <i className="fa-solid fa-plus"></i> Adicionar Item
-                </button>
-              </div>
+                  )}
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={() => setNewChecklistItems([...newChecklistItems, ''])}
+                className="w-full py-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-sm font-bold rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors mt-2"
+              >
+                <i className="fa-solid fa-plus mr-2"></i> Adicionar Item
+              </button>
             </div>
           </form>
-        </ZeModal>
-      )}
-
-      {/* Contract Content Viewer Modal */}
-      {showContractContentModal && (
-        <ZeModal
-          isOpen={showContractContentModal}
-          title={selectedContractTitle}
-          message="" // Content is rendered via children
-          confirmText={copyContractSuccess ? "Copiado!" : "Copiar Texto"}
-          onConfirm={async () => {
-            await navigator.clipboard.writeText(selectedContractContent);
-            setCopyContractSuccess(true);
-            setTimeout(() => setCopyContractSuccess(false), 2000);
-          }}
-          onCancel={() => { setShowContractContentModal(false); setSelectedContractContent(''); setSelectedContractTitle(''); setCopyContractSuccess(false); }}
-          isConfirming={copyContractSuccess} // Use isConfirming for copy status
-        >
-          <div className="mb-4 p-4 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 overflow-y-auto max-h-80 whitespace-pre-wrap text-sm text-primary dark:text-white">
-            {selectedContractContent}
-          </div>
         </ZeModal>
       )}
 
@@ -3300,10 +3294,9 @@ const WorkDetail = () => {
           title={zeModal.title}
           message={zeModal.message}
           confirmText={zeModal.confirmText}
-          cancelText={zeModal.cancelText}
-          type={zeModal.type}
           onConfirm={zeModal.onConfirm}
           onCancel={zeModal.onCancel}
+          type={zeModal.type}
           isConfirming={zeModal.isConfirming}
         >
           {zeModal.children}

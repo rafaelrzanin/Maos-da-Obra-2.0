@@ -1,4 +1,5 @@
 
+
 import { PlanType, ExpenseCategory, StepStatus, FileCategory, type User, type Work, type Step, type Material, type Expense, type Worker, type Supplier, type WorkPhoto, type WorkFile, type DBNotification, type PushSubscriptionInfo, type Contract, type Checklist, type ChecklistItem } from '../types.ts';
 import { WORK_TEMPLATES, FULL_MATERIAL_PACKAGES, CONTRACT_TEMPLATES, CHECKLIST_TEMPLATES } from './standards.ts';
 import { supabase } from './supabase.ts';
@@ -704,7 +705,7 @@ export const dbService = {
             // This is safe here because we just confirmed no materials exist.
             await dbService.regenerateMaterials(work, steps);
         } else if (existingMaterials && existingMaterials.length > 0) {
-            console.log(`[ensureMaterialsForWork] Materials already exist for work ${work.id}. Skipping generation.`);
+            console.log(`[ensureMaterialsForWork] Materiais already exist for work ${work.id}. Skipping generation.`);
         } else {
             console.log(`[ensureMaterialsForWork] No steps to generate materials for work ${work.id}. Skipping generation.`);
         }
@@ -1336,7 +1337,7 @@ export const dbService = {
     const { data: currentExpense, error: fetchError } = await supabase.from('expenses').select('*').eq('id', expenseId).single();
     if (fetchError || !currentExpense) throw new Error(`Expense with ID ${expenseId} not found.`);
 
-    const newPaidAmount = (currentExpense.paid_amount || 0) + amount;
+    const newPaidAmount = (currentExpense.paidAmount || 0) + amount;
 
     // 2. Update expense's paid_amount
     const { data: updatedExpenseData, error: updateError } = await supabase.from('expenses')
