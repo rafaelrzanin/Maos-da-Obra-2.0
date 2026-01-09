@@ -1417,7 +1417,7 @@ const WorkDetail = () => {
         type: "ERROR",
         confirmText: "Ok",
         onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
-      });
+      }));
     } finally {
       setLoadingPhoto(false);
     }
