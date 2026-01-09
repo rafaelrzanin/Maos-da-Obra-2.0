@@ -534,7 +534,7 @@ export const dbService = {
         options: {
             data: { name }
         }
-    );
+    });
 
     if (authError) throw authError;
     // If user already exists and signed in, just ensure profile and return
