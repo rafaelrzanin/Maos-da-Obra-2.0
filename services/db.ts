@@ -1,6 +1,6 @@
 
 
-import { PlanType, ExpenseCategory, StepStatus, FileCategory, type User, type Work, type Step, type Material, type Expense, type Worker, type Supplier, type WorkPhoto, type WorkFile, type DBNotification, type PushSubscriptionInfo, type Contract, type Checklist, type ChecklistItem, type FinancialHistoryEntry } from '../types.ts';
+import { PlanType, ExpenseCategory, StepStatus, FileCategory, type User, type Work, type Step, type Material, type Expense, type Worker, type Supplier, type WorkPhoto, type WorkFile, type DBNotification, type PushSubscriptionInfo, type Contract, type Checklist, type ChecklistItem, type FinancialHistoryEntry, InstallmentStatus, ExpenseStatus } from '../types.ts';
 import { WORK_TEMPLATES, FULL_MATERIAL_PACKAGES, CONTRACT_TEMPLATES, CHECKLIST_TEMPLATES } from './standards.ts';
 import { supabase } from './supabase.ts';
 
@@ -104,21 +104,40 @@ const parseMaterialFromDB = (data: any): Material => ({
     totalCost: Number(data.total_cost || 0) // NEW: Parse total_cost
 });
 
-const parseExpenseFromDB = (data: any): Expense => ({
-    id: data.id,
-    workId: data.work_id,
-    description: data.description,
-    amount: Number(data.amount || 0),
-    paidAmount: Number(data.paid_amount || 0), // Added paidAmount parsing
-    quantity: Number(data.quantity || 0), // Added quantity parsing
-    date: data.date,
-    category: data.category,
-    stepId: data.step_id,
-    relatedMaterialId: data.related_material_id,
-    workerId: data.worker_id, // Added workerId parsing
-    supplierId: data.supplier_id, // NEW: Added supplierId for financial reports
-    totalAgreed: data.total_agreed ? Number(data.total_agreed) : undefined 
-});
+// MODIFICADO: parseExpenseFromDB agora calcula paidAmount e status dinamicamente
+const parseExpenseFromDB = (data: any): Expense => {
+    // data pode incluir `paid_amount_sum` e `installment_count` do JOIN SQL
+    const paidAmount = Number(data.paid_amount_sum || 0);
+    const totalAgreed = data.total_agreed ? Number(data.total_agreed) : Number(data.amount || 0);
+
+    let status: ExpenseStatus;
+    if (paidAmount === 0) {
+        status = ExpenseStatus.PENDING;
+    } else if (paidAmount < totalAgreed) {
+        status = ExpenseStatus.PARTIAL;
+    } else if (paidAmount === totalAgreed) {
+        status = ExpenseStatus.COMPLETED;
+    } else { // paidAmount > totalAgreed
+        status = ExpenseStatus.OVERPAID;
+    }
+
+    return {
+        id: data.id,
+        workId: data.work_id,
+        description: data.description,
+        amount: Number(data.amount || 0),
+        paidAmount: paidAmount, // Derivado
+        quantity: Number(data.quantity || 0),
+        date: data.date,
+        category: data.category,
+        stepId: data.step_id,
+        relatedMaterialId: data.related_material_id,
+        workerId: data.worker_id,
+        supplierId: data.supplier_id,
+        totalAgreed: data.total_agreed ? Number(data.total_agreed) : undefined,
+        status: status, // Derivado
+    };
+};
 
 // NEW: Parser for Worker
 const parseWorkerFromDB = (data: any): Worker => ({
@@ -996,7 +1015,7 @@ export const dbService = {
     const [steps, materials, expenses] = await Promise.all([
       dbService.getSteps(workId),
       dbService.getMaterials(workId),
-      dbService.getExpenses(workId),
+      dbService.getExpenses(workId), // getExpenses já retorna `paidAmount` calculado
     ]);
 
     const totalSteps = steps.length;
@@ -1005,10 +1024,10 @@ export const dbService = {
     
     const progress = totalSteps > 0 ? (completedSteps / totalSteps) * 100 : 0;
     
-    // 🔥 FIX CRÍTICO: Excluir despesas de material do total gasto para o cálculo de progresso financeiro principal
+    // 🔥 MODIFICADO: totalSpent agora soma paidAmount das despesas (não material)
     const totalSpent = expenses
       .filter(expense => expense.category !== ExpenseCategory.MATERIAL)
-      .reduce((sum, expense) => sum + expense.amount, 0);
+      .reduce((sum, expense) => sum + (expense.paidAmount || 0), 0); // Soma o paidAmount derivado
 
     const stats = {
       totalSpent,
@@ -1233,7 +1252,8 @@ export const dbService = {
     const workId = materialToDelete.work_id;
 
     // Delete any associated expenses
-    const { data: deletedExpenses, error: deleteExpensesError } = await supabase.from('expenses').delete().eq('related_material_id', materialId).select('id');
+    // MODIFICADO: A exclusão de expenses agora tem cascata para installments e excess
+    const { data: deletedExpenses, error: deleteExpensesError } = await supabase.from('expenses').delete().eq('related_material_id', materialId).select('id, amount, quantity, description');
     if (deleteExpensesError) console.error("Error deleting related expenses:", deleteExpensesError);
     else if (deletedExpenses) {
         for (const expense of deletedExpenses) {
@@ -1242,7 +1262,9 @@ export const dbService = {
                 userId: (await dbService.getCurrentUser())?.id || 'unknown', // Attempt to get current user ID
                 expenseId: expense.id,
                 action: 'delete',
-                description: `Despesa de material ${expense.id} excluída junto com o material.`
+                description: `Despesa de material "${expense.description}" (R$${expense.amount}) excluída junto com o material.`,
+                oldValue: expense.amount,
+                newValue: null
             });
         }
     }
@@ -1276,11 +1298,10 @@ export const dbService = {
     if (updateError) throw updateError;
 
     // 3. Add a new expense record for this purchase
-    const expense: Omit<Expense, 'id'> = {
+    const expenseData: Omit<Expense, 'id' | 'paidAmount' | 'status'> = { // REMOVIDO paidAmount e status
       workId: currentMaterial.work_id,
       description: `Compra de ${purchasedQtyDelta} ${unit} de ${materialName} (${materialBrand || 's/marca'})`,
-      amount: cost,
-      paidAmount: cost, // Assume full payment for a material purchase
+      amount: cost, // O `amount` da despesa será o custo total da compra
       quantity: purchasedQtyDelta,
       date: new Date().toISOString().split('T')[0],
       category: ExpenseCategory.MATERIAL,
@@ -1289,15 +1310,16 @@ export const dbService = {
       // 🔥 FIX CRÍTICO: Para materiais, o valor combinado é SEMPRE nulo/indefinido.
       totalAgreed: undefined, 
     };
-    const addedExpense = await dbService.addExpense(expense); // Use dbService.addExpense to leverage its logic
+    // MODIFICADO: addExpense agora gerencia a criação da primeira parcela
+    const addedExpense = await dbService.addExpense(expenseData); 
 
     // Log the material purchase and associated expense creation
     await _addFinancialHistoryEntry({
         workId: currentMaterial.work_id,
         userId: (await dbService.getCurrentUser())?.id || 'unknown',
         expenseId: addedExpense.id,
-        action: 'payment',
-        description: `Compra de material "${materialName}" registrada: ${purchasedQtyDelta} ${unit} por ${cost}. Despesa #${addedExpense.id} criada.`,
+        action: 'payment', // Tipo de ação é 'payment' porque registra uma compra.
+        description: `Compra de material "${materialName}" registrada: ${purchasedQtyDelta} ${unit} por ${cost}. Despesa #${addedExpense.id} criada e paga.`,
         field: 'purchased_qty',
         oldValue: currentMaterial.purchased_qty,
         newValue: newPurchasedQty
@@ -1322,22 +1344,68 @@ export const dbService = {
 
   // --- EXPENSES (FINANCEIRO) ---
   async getExpenses(workId: string): Promise<Expense[]> {
-    const now = Date.now(); // Corrected Date.Now() to Date.now()
+    const now = Date.now();
     if (_dashboardCache.expenses[workId] && (now - _dashboardCache.expenses[workId].timestamp < CACHE_TTL)) {
       return _dashboardCache.expenses[workId].data;
     }
 
-    const { data, error } = await supabase.from('expenses').select('*').eq('work_id', workId).order('date', { ascending: false });
+    // MODIFICADO: Consulta para unir expenses com financial_installments para calcular paidAmount e status
+    const { data, error } = await supabase
+        .from('expenses')
+        .select(`
+            *,
+            financial_installments(amount, status)
+        `)
+        .eq('work_id', workId)
+        .order('date', { ascending: false });
+
     if (error) {
-      console.error(`Error fetching expenses for work ${workId}:`, error);
-      return [];
+        console.error(`Error fetching expenses for work ${workId}:`, error);
+        return [];
     }
-    const parsed = (data || []).map(parseExpenseFromDB);
-    _dashboardCache.expenses[workId] = { data: parsed, timestamp: now };
-    return parsed;
+    
+    // Processar os dados para incluir paidAmount e status
+    const parsedExpenses: Expense[] = (data || []).map((dbExpense: any) => {
+        const installments = dbExpense.financial_installments || [];
+        const paidAmount = installments.filter((inst: any) => inst.status === InstallmentStatus.PAID).reduce((sum: number, inst: any) => sum + Number(inst.amount), 0);
+        const totalAgreed = dbExpense.total_agreed ? Number(dbExpense.total_agreed) : Number(dbExpense.amount || 0);
+
+        let status: ExpenseStatus;
+        if (paidAmount === 0) {
+            status = ExpenseStatus.PENDING;
+        } else if (paidAmount < totalAgreed) {
+            status = ExpenseStatus.PARTIAL;
+        } else if (paidAmount === totalAgreed) {
+            status = ExpenseStatus.COMPLETED;
+        } else { // paidAmount > totalAgreed
+            status = ExpenseStatus.OVERPAID;
+        }
+
+        return {
+            id: dbExpense.id,
+            workId: dbExpense.work_id,
+            description: dbExpense.description,
+            amount: Number(dbExpense.amount || 0),
+            paidAmount: paidAmount, // Propriedade DERIVADA
+            quantity: Number(dbExpense.quantity || 0),
+            date: dbExpense.date,
+            category: dbExpense.category,
+            relatedMaterialId: dbExpense.related_material_id,
+            stepId: dbExpense.step_id,
+            workerId: dbExpense.worker_id,
+            supplierId: dbExpense.supplier_id,
+            totalAgreed: dbExpense.total_agreed ? Number(dbExpense.total_agreed) : undefined,
+            status: status, // Propriedade DERIVADA
+        };
+    });
+
+    _dashboardCache.expenses[workId] = { data: parsedExpenses, timestamp: now };
+    return parsedExpenses;
   },
 
-  async addExpense(expense: Omit<Expense, 'id'>): Promise<Expense> {
+  async addExpense(expense: Omit<Expense, 'id' | 'paidAmount' | 'status'>): Promise<Expense> { // MODIFICADO: Remove paidAmount e status do input
+    const userId = (await dbService.getCurrentUser())?.id || 'unknown';
+
     // 🔥 FIX CRÍTICO: Valor combinado NÃO existe em Materiais (Validação Backend)
     let totalAgreedValue = expense.totalAgreed !== undefined ? expense.totalAgreed : expense.amount;
     if (expense.category === ExpenseCategory.MATERIAL) {
@@ -1348,7 +1416,6 @@ export const dbService = {
       work_id: expense.workId,
       description: expense.description,
       amount: expense.amount,
-      paid_amount: expense.paidAmount !== undefined ? expense.paidAmount : 0, 
       quantity: expense.quantity,
       date: expense.date,
       category: expense.category,
@@ -1358,42 +1425,79 @@ export const dbService = {
       supplier_id: expense.supplierId,
       total_agreed: totalAgreedValue, 
     };
-    const { data, error } = await supabase.from('expenses').insert(dbExpense).select().single();
-    if (error) throw error;
+    const { data: newExpense, error: addExpenseError } = await supabase.from('expenses').insert(dbExpense).select().single();
+    if (addExpenseError) throw addExpenseError;
+
+    // Criar uma parcela inicial para a despesa
+    const installmentAmount = totalAgreedValue !== undefined ? totalAgreedValue : expense.amount;
+    const initialInstallmentStatus = (expense.category === ExpenseCategory.MATERIAL) ? InstallmentStatus.PAID : InstallmentStatus.PENDING; // Material expenses are usually 'paid in full' at creation
+    const initialInstallmentPaidAt = (expense.category === ExpenseCategory.MATERIAL) ? new Date().toISOString() : undefined;
+
+    const { data: newInstallment, error: addInstallmentError } = await supabase.from('financial_installments').insert({
+        expense_id: newExpense.id,
+        amount: installmentAmount,
+        paid_at: initialInstallmentPaidAt,
+        status: initialInstallmentStatus,
+    }).select().single();
+    if (addInstallmentError) {
+        // Se a parcela não puder ser criada, a despesa ainda existe, mas o fluxo financeiro está comprometido.
+        console.error("Erro ao criar parcela inicial para despesa:", addInstallmentError);
+        // Opcional: deletar a despesa recém-criada para manter a consistência, ou deixar para ser corrigido manualmente.
+        // await supabase.from('expenses').delete().eq('id', newExpense.id);
+        throw new Error("Despesa criada, mas falha ao criar parcela inicial. Verifique o financeiro.");
+    }
 
     await _addFinancialHistoryEntry({
         workId: expense.workId,
-        userId: (await dbService.getCurrentUser())?.id || 'unknown',
-        expenseId: data.id,
+        userId,
+        expenseId: newExpense.id,
         action: 'create',
         description: `Despesa "${expense.description}" (R$${expense.amount}) criada.`,
         newValue: expense.amount
+    });
+    await _addFinancialHistoryEntry({
+        workId: expense.workId,
+        userId,
+        expenseId: newExpense.id,
+        action: 'installment_create',
+        description: `Parcela inicial (R$${installmentAmount}, status: ${initialInstallmentStatus}) criada para a despesa "${expense.description}".`
     });
 
     _dashboardCache.expenses[expense.workId] = null; // Invalidate cache
     _dashboardCache.summary[expense.workId] = null; // Summary might change
     _dashboardCache.stats[expense.workId] = null; // Stats might change due to new expense
-    return parseExpenseFromDB(data);
+    return parseExpenseFromDB(newExpense); // Retorna a despesa com os campos derivados
   },
 
-  async updateExpense(expense: Expense): Promise<Expense> {
+  async updateExpense(expense: Expense): Promise<Expense> { // MODIFICADO: Aceita Expense com paidAmount/status derivado
     // 1. Fetch current expense data for comparison and validation
-    const { data: currentExpense, error: fetchError } = await supabase.from('expenses').select('*').eq('id', expense.id).single();
-    if (fetchError || !currentExpense) throw new Error(`Expense with ID ${expense.id} not found.`);
+    const { data: currentDbExpense, error: fetchError } = await supabase.from('expenses').select('*').eq('id', expense.id).single();
+    if (fetchError || !currentDbExpense) throw new Error(`Expense with ID ${expense.id} not found.`);
     
     const userId = (await dbService.getCurrentUser())?.id || 'unknown';
 
+    // Buscar as parcelas para determinar o status real e paidAmount
+    const { data: currentInstallments, error: fetchInstallmentsError } = await supabase
+        .from('financial_installments')
+        .select('amount, status')
+        .eq('expense_id', expense.id);
+    if (fetchInstallmentsError) throw fetchInstallmentsError;
+    const currentPaidAmount = (currentInstallments || []).filter(inst => inst.status === InstallmentStatus.PAID).reduce((sum, inst) => sum + Number(inst.amount), 0);
+    
     // 🔥 FIX CRÍTICO: Bloqueio de edição para campos pagos (Validação Backend)
-    // Se a despesa já tem algum valor pago, 'amount', 'total_agreed' e 'date' não podem ser alterados.
-    if ((currentExpense.paid_amount || 0) > 0) {
-        if (expense.amount !== currentExpense.amount) {
+    // Se a despesa já tem algum valor pago, 'amount', 'total_agreed', 'date' e 'category' não podem ser alterados.
+    if (currentPaidAmount > 0) {
+        if (expense.amount !== currentDbExpense.amount) {
             throw new Error("Não é possível alterar o 'Valor' de uma despesa que já possui pagamentos.");
         }
-        if (expense.totalAgreed !== undefined && expense.totalAgreed !== currentExpense.total_agreed) {
+        if (expense.totalAgreed !== undefined && expense.totalAgreed !== currentDbExpense.total_agreed) {
             throw new Error("Não é possível alterar o 'Valor Combinado' de uma despesa que já possui pagamentos.");
         }
-        if (expense.date !== currentExpense.date) {
+        if (expense.date !== currentDbExpense.date) {
             throw new Error("Não é possível alterar a 'Data' de uma despesa que já possui pagamentos.");
+        }
+        if (expense.category !== currentDbExpense.category) {
+            throw new Error("Não é possível alterar a 'Categoria' de uma despesa que já possui pagamentos.");
         }
     }
 
@@ -1406,10 +1510,10 @@ export const dbService = {
         }
     }
 
-    const dbExpense = {
+    const dbExpenseUpdates = {
       description: expense.description,
       amount: expense.amount,
-      paid_amount: expense.paidAmount, // This field is usually updated via addPaymentToExpense or automatically
+      // paid_amount foi removido
       quantity: expense.quantity,
       date: expense.date,
       category: expense.category,
@@ -1419,25 +1523,25 @@ export const dbService = {
       supplier_id: expense.supplierId,
       total_agreed: totalAgreedValue,
     };
-    const { data, error } = await supabase.from('expenses').update(dbExpense).eq('id', expense.id).select().single();
-    if (error) throw error;
+    const { data: updatedDbExpense, error: updateError } = await supabase.from('expenses').update(dbExpenseUpdates).eq('id', expense.id).select().single();
+    if (updateError) throw updateError;
 
     // Log changes to financial history
     const changes: Array<{ field: string; oldValue: any; newValue: any; description: string }> = [];
-    if (expense.description !== currentExpense.description) {
-        changes.push({ field: 'description', oldValue: currentExpense.description, newValue: expense.description, description: `Descrição alterada de "${currentExpense.description}" para "${expense.description}".` });
+    if (expense.description !== currentDbExpense.description) {
+        changes.push({ field: 'description', oldValue: currentDbExpense.description, newValue: expense.description, description: `Descrição alterada de "${currentDbExpense.description}" para "${expense.description}".` });
     }
-    if (expense.amount !== currentExpense.amount) {
-        changes.push({ field: 'amount', oldValue: currentExpense.amount, newValue: expense.amount, description: `Valor alterado de R$${currentExpense.amount} para R$${expense.amount}.` });
+    if (expense.amount !== currentDbExpense.amount) {
+        changes.push({ field: 'amount', oldValue: currentDbExpense.amount, newValue: expense.amount, description: `Valor alterado de R$${currentDbExpense.amount} para R$${expense.amount}.` });
     }
-    if (expense.date !== currentExpense.date) {
-        changes.push({ field: 'date', oldValue: currentExpense.date, newValue: expense.date, description: `Data alterada de ${currentExpense.date} para ${expense.date}.` });
+    if (expense.date !== currentDbExpense.date) {
+        changes.push({ field: 'date', oldValue: currentDbExpense.date, newValue: expense.date, description: `Data alterada de ${currentDbExpense.date} para ${expense.date}.` });
     }
-    if (expense.category !== currentExpense.category) {
-        changes.push({ field: 'category', oldValue: currentExpense.category, newValue: expense.category, description: `Categoria alterada de "${currentExpense.category}" para "${expense.category}".` });
+    if (expense.category !== currentDbExpense.category) {
+        changes.push({ field: 'category', oldValue: currentDbExpense.category, newValue: expense.category, description: `Categoria alterada de "${currentDbExpense.category}" para "${expense.category}".` });
     }
-    if (expense.totalAgreed !== undefined && expense.totalAgreed !== currentExpense.total_agreed) {
-        changes.push({ field: 'totalAgreed', oldValue: currentExpense.total_agreed, newValue: expense.totalAgreed, description: `Valor combinado alterado de R$${currentExpense.total_agreed} para R$${expense.totalAgreed}.` });
+    if (expense.totalAgreed !== undefined && expense.totalAgreed !== currentDbExpense.total_agreed) {
+        changes.push({ field: 'totalAgreed', oldValue: currentDbExpense.total_agreed, newValue: expense.totalAgreed, description: `Valor combinado alterado de R$${currentDbExpense.total_agreed} para R$${expense.totalAgreed}.` });
     }
     // Add similar checks for other fields if desired
 
@@ -1457,7 +1561,8 @@ export const dbService = {
     _dashboardCache.expenses[expense.workId] = null; // Invalidate cache
     _dashboardCache.summary[expense.workId] = null; // Summary might change
     _dashboardCache.stats[expense.workId] = null; // Stats might change due to expense update
-    return parseExpenseFromDB(data);
+    // Retornar a despesa com paidAmount e status calculados
+    return parseExpenseFromDB(updatedDbExpense); 
   },
 
   async deleteExpense(expenseId: string): Promise<void> {
@@ -1492,6 +1597,7 @@ export const dbService = {
       }
     }
 
+    // A exclusão da despesa em `expenses` agora vai em cascata para `financial_installments` e `financial_excess`
     const { error: deleteExpenseError } = await supabase.from('expenses').delete().eq('id', expenseId);
     if (deleteExpenseError) throw deleteExpenseError;
 
@@ -1515,41 +1621,88 @@ export const dbService = {
   // NEW: Add payment to an existing expense (for partial payments)
   async addPaymentToExpense(expenseId: string, amount: number, date: string): Promise<Expense> {
     // 1. Fetch current expense data
-    const { data: currentExpense, error: fetchError } = await supabase.from('expenses').select('*').eq('id', expenseId).single();
-    if (fetchError || !currentExpense) throw new Error(`Expense with ID ${expenseId} not found.`);
+    const { data: currentExpenseData, error: fetchError } = await supabase.from('expenses').select('*').eq('id', expenseId).single();
+    if (fetchError || !currentExpenseData) throw new Error(`Expense with ID ${expenseId} not found.`);
     
     const userId = (await dbService.getCurrentUser())?.id || 'unknown';
-
-    const oldPaidAmount = currentExpense.paidAmount || 0;
-    const newPaidAmount = oldPaidAmount + amount;
-
-    // 2. Update expense's paid_amount
-    const { data: updatedExpenseData, error: updateError } = await supabase.from('expenses')
-      .update({
-        paid_amount: newPaidAmount,
-        // For now, no separate payment date field in the expense itself, history will track.
-      })
-      .eq('id', expenseId)
-      .select()
-      .single();
-
-    if (updateError) throw updateError;
+    const currentExpense = parseExpenseFromDB(currentExpenseData); // Convert to Expense to get derived properties
+    
+    // 2. Criar nova parcela
+    const { data: newInstallment, error: addInstallmentError } = await supabase.from('financial_installments').insert({
+        expense_id: expenseId,
+        amount: amount,
+        paid_at: date,
+        status: InstallmentStatus.PAID,
+    }).select().single();
+    if (addInstallmentError) throw addInstallmentError;
 
     await _addFinancialHistoryEntry({
-        workId: currentExpense.work_id,
+        workId: currentExpense.workId,
         userId,
         expenseId: currentExpense.id,
         action: 'payment',
-        field: 'paidAmount',
-        oldValue: oldPaidAmount,
-        newValue: newPaidAmount,
-        description: `Pagamento de R$${amount} adicionado para despesa "${currentExpense.description}". Total pago agora: R$${newPaidAmount}. Data do pagamento: ${date}.`
+        field: 'new_installment',
+        newValue: amount,
+        description: `Pagamento de R$${amount} registrado para a despesa "${currentExpense.description}". Parcela #${newInstallment.id} criada.`
     });
 
-    _dashboardCache.expenses[currentExpense.work_id] = null; // Invalidate expenses cache
-    _dashboardCache.summary[currentExpense.work_id] = null; // Summary might change
-    _dashboardCache.stats[currentExpense.work_id] = null; // Stats might change due to new payment
-    return parseExpenseFromDB(updatedExpenseData);
+    // Recalcular paidAmount e status APÓS adicionar a parcela
+    _dashboardCache.expenses[currentExpense.workId] = null; // Invalidate cache para forçar recálculo
+    _dashboardCache.summary[currentExpense.workId] = null; // Summary might change
+    _dashboardCache.stats[currentExpense.workId] = null; // Stats might change due to new payment
+
+    const updatedExpense = await dbService.getExpenses(currentExpense.workId);
+    const latestExpense = updatedExpense.find(exp => exp.id === expenseId);
+
+    if (latestExpense && latestExpense.status === ExpenseStatus.OVERPAID) {
+        // 🔥 FIX CRÍTICO: Registrar excedente separadamente
+        const excessAmount = (latestExpense.paidAmount || 0) - (latestExpense.totalAgreed !== undefined ? latestExpense.totalAgreed : latestExpense.amount);
+        
+        const { data: existingExcess, error: fetchExcessError } = await supabase
+            .from('financial_excess')
+            .select('id')
+            .eq('expense_id', expenseId)
+            .maybeSingle();
+
+        if (fetchExcessError) console.error("Error fetching existing excess:", fetchExcessError);
+
+        if (existingExcess) {
+            // Atualizar excedente existente
+            await supabase.from('financial_excess').update({
+                amount: excessAmount,
+                description: `Excedente atualizado para R$${excessAmount}.`,
+                recorded_at: new Date().toISOString(),
+            }).eq('expense_id', expenseId);
+            await _addFinancialHistoryEntry({
+                workId: currentExpense.workId,
+                userId,
+                expenseId: currentExpense.id,
+                action: 'excess_create', // Pode ser 'excess_update' se houver um tipo
+                field: 'excess_amount',
+                newValue: excessAmount,
+                description: `Excedente financeiro atualizado para R$${excessAmount} na despesa "${currentExpense.description}".`
+            });
+        } else {
+            // Criar novo registro de excedente
+            await supabase.from('financial_excess').insert({
+                expense_id: expenseId,
+                amount: excessAmount,
+                description: `Excedente financeiro registrado: R$${excessAmount}.`,
+                recorded_at: new Date().toISOString(),
+            });
+            await _addFinancialHistoryEntry({
+                workId: currentExpense.workId,
+                userId,
+                expenseId: currentExpense.id,
+                action: 'excess_create',
+                field: 'excess_amount',
+                newValue: excessAmount,
+                description: `Excedente financeiro de R$${excessAmount} registrado na despesa "${currentExpense.description}".`
+            });
+        }
+    }
+
+    return latestExpense || currentExpense; // Return the latest data or fallback
   },
 
   // --- WORKERS ---

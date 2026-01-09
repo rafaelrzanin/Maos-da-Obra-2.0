@@ -1,10 +1,11 @@
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import * as ReactRouter from 'react-router-dom';
 import * as XLSX from 'xlsx'; // Keep XLSX import, as reports might use it
 import { useAuth } from '../contexts/AuthContext.tsx';
 import { dbService } from '../services/db.ts';
 import { supabase } from '../services/supabase.ts';
-import { StepStatus, FileCategory, ExpenseCategory, type Work, type Worker, type Supplier, type Material, type Step, type Expense, type WorkPhoto, type WorkFile, type Contract, type Checklist, type ChecklistItem, PlanType } from '../types.ts';
+import { StepStatus, FileCategory, ExpenseCategory, ExpenseStatus, type Work, type Worker, type Supplier, type Material, type Step, type Expense, type WorkPhoto, type WorkFile, type Contract, type Checklist, type ChecklistItem, PlanType } from '../types.ts';
 import { STANDARD_JOB_ROLES, STANDARD_SUPPLIER_CATEGORIES, ZE_AVATAR, ZE_AVATAR_FALLBACK, CONTRACT_TEMPLATES, CHECKLIST_TEMPLATES } from '../services/standards.ts';
 import { ZeModal, type ZeModalProps } from '../components/ZeModal.tsx';
 
@@ -178,51 +179,50 @@ const getEntityStatusDetails = (
       icon = 'fa-hourglass-start';
     }
   } else if (entityType === 'expense') {
+    // MODIFICADO: Usa o novo ExpenseStatus derivado
     const expense = entity as Expense;
-    const paidAmount = expense.paidAmount || 0;
-    const totalAgreed = expense.totalAgreed !== undefined ? expense.totalAgreed : expense.amount; // Use totalAgreed or fallback to amount
-
-    const isExpenseComplete = paidAmount >= totalAgreed && totalAgreed > 0;
-    const isExpensePartial = paidAmount > 0 && paidAmount < totalAgreed;
-    const isExpensePending = paidAmount === 0;
-    const isExpenseOverpaid = paidAmount > totalAgreed && totalAgreed > 0; // Prejuízo: total pago > combinado (and combinado > 0)
     
-    // If totalAgreed is 0 (or not set), it means it's a "free" or non-monetary expense from the start, consider complete if paid 0
-    if (totalAgreed === 0 && paidAmount === 0) {
-        statusText = 'Concluído'; // Treat as completed if 0 agreed and 0 paid
+    switch (expense.status) {
+      case ExpenseStatus.COMPLETED:
+        statusText = 'Concluído';
         bgColor = 'bg-green-500';
         textColor = 'text-green-600 dark:text-green-400';
         borderColor = 'border-green-400 dark:border-green-700';
         shadowClass = 'shadow-green-500/20';
         icon = 'fa-check';
-    } else if (isExpenseOverpaid) {
-      statusText = 'Prejuízo';
-      bgColor = 'bg-red-500';
-      textColor = 'text-red-600 dark:text-red-400';
-      borderColor = 'border-red-400 dark:border-red-700';
-      shadowClass = 'shadow-red-500/20';
-      icon = 'fa-sack-xmark'; // Icon for overpayment/loss
-    } else if (isExpenseComplete) {
-      statusText = 'Concluído';
-      bgColor = 'bg-green-500';
-      textColor = 'text-green-600 dark:text-green-400';
-      borderColor = 'border-green-400 dark:border-green-700';
-      shadowClass = 'shadow-green-500/20';
-      icon = 'fa-check';
-    } else if (isExpensePartial) {
-      statusText = 'Parcial';
-      bgColor = 'bg-amber-500';
-      textColor = 'text-amber-600 dark:text-amber-400';
-      borderColor = 'border-amber-400 dark:border-amber-700';
-      shadowClass = 'shadow-amber-500/20';
-      icon = 'fa-hourglass-half';
-    } else if (isExpensePending) {
-      statusText = 'Pendente';
-      bgColor = 'bg-slate-400';
-      textColor = 'text-slate-700 dark:text-slate-300';
-      borderColor = 'border-slate-200 dark:border-slate-700';
-      shadowClass = 'shadow-slate-400/20';
-      icon = 'fa-hourglass-start';
+        break;
+      case ExpenseStatus.PARTIAL:
+        statusText = 'Parcial';
+        bgColor = 'bg-amber-500';
+        textColor = 'text-amber-600 dark:text-amber-400';
+        borderColor = 'border-amber-400 dark:border-amber-700';
+        shadowClass = 'shadow-amber-500/20';
+        icon = 'fa-hourglass-half';
+        break;
+      case ExpenseStatus.PENDING:
+        statusText = 'Pendente';
+        bgColor = 'bg-slate-400';
+        textColor = 'text-slate-700 dark:text-slate-300';
+        borderColor = 'border-slate-200 dark:border-slate-700';
+        shadowClass = 'shadow-slate-400/20';
+        icon = 'fa-hourglass-start';
+        break;
+      case ExpenseStatus.OVERPAID:
+        statusText = 'Prejuízo'; // NOVO STATUS
+        bgColor = 'bg-red-500';
+        textColor = 'text-red-600 dark:text-red-400';
+        borderColor = 'border-red-400 dark:border-red-700';
+        shadowClass = 'shadow-red-500/20';
+        icon = 'fa-sack-xmark'; // Ícone para prejuízo
+        break;
+      default:
+        statusText = 'Desconhecido';
+        bgColor = 'bg-slate-400';
+        textColor = 'text-slate-700 dark:text-slate-300';
+        borderColor = 'border-slate-200 dark:border-slate-700';
+        shadowClass = 'shadow-slate-400/20';
+        icon = 'fa-question';
+        break;
     }
   }
 
@@ -459,7 +459,8 @@ const WorkDetail = () => {
 
   const calculateTotalExpenses = useMemo(() => {
     // 🔥 FIX CRÍTICO: Excluir despesas de material do total gasto para o cálculo de progresso financeiro principal
-    return expenses.filter(expense => expense.category !== ExpenseCategory.MATERIAL).reduce((sum, expense) => sum + expense.amount, 0);
+    // Agora o expense.paidAmount é derivado, o que o torna a soma das parcelas pagas.
+    return expenses.filter(expense => expense.category !== ExpenseCategory.MATERIAL).reduce((sum, expense) => sum + (expense.paidAmount || 0), 0);
   }, [expenses]);
 
   const budgetUsage = useMemo(() =>
@@ -609,7 +610,6 @@ const WorkDetail = () => {
         message: "Não foi possível carregar os dados da obra. Verifique sua conexão ou tente novamente.",
         type: "ERROR",
         confirmText: "Ok",
-        // Fixing error: `isOpen = false` should be `isOpen: false`
         onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false }))
       });
     } finally {
@@ -1006,8 +1006,7 @@ const WorkDetail = () => {
         workId: workId,
         description: newExpenseDescription,
         amount: Number(newExpenseAmount), // Direct conversion
-        // When adding a new expense, paidAmount is 0 by default, unless explicitly set
-        paidAmount: 0, 
+        // paidAmount e status são DERIVADOS, não passados na criação
         quantity: 1, // Default to 1 for generic expenses
         date: newExpenseDate,
         category: newExpenseCategory,
@@ -1050,7 +1049,7 @@ const WorkDetail = () => {
     setZeModal(prev => ({ ...prev, isConfirming: true }));
     try {
       await dbService.updateExpense({
-        ...editExpenseData,
+        ...editExpenseData, // Contém paidAmount e status derivados
         workId: workId,
         description: newExpenseDescription,
         amount: Number(newExpenseAmount), // Direct conversion
@@ -1059,7 +1058,6 @@ const WorkDetail = () => {
         stepId: newExpenseStepId === 'none' ? undefined : newExpenseStepId,
         workerId: newExpenseWorkerId === 'none' ? undefined : newExpenseWorkerId,
         supplierId: newExpenseSupplierId === 'none' ? undefined : newExpenseSupplierId,
-        // FIX: Add non-null assertion for editExpenseData.amount, as it's guaranteed by the 'if' guard
         totalAgreed: newExpenseTotalAgreed ? Number(newExpenseTotalAgreed) : Number(editExpenseData.amount), // Direct conversion
       });
       setEditExpenseData(null);
@@ -1663,6 +1661,13 @@ const WorkDetail = () => {
     );
   }
 
+  // Define se a despesa está "paga" ou tem pagamentos, para desabilitar edição de campos chave
+  // MODIFICADO: Usa o novo status derivado
+  const isEditingExpenseWithPayments = editExpenseData && editExpenseData.status !== ExpenseStatus.PENDING;
+  
+  // Determine if the currently selected category is 'Material'
+  const isMaterialCategorySelected = newExpenseCategory === ExpenseCategory.MATERIAL;
+
   const renderMainContent = () => {
     switch (activeTab) {
       case 'ETAPAS':
@@ -1928,9 +1933,9 @@ const WorkDetail = () => {
       case 'FINANCEIRO':
         const totalPaid = expenses.reduce((sum, exp) => sum + (exp.paidAmount || 0), 0);
         // Calculate outstanding relative to non-material budget
-        const totalNonMaterialExpenses = expenses.filter(e => e.category !== ExpenseCategory.MATERIAL).reduce((sum, exp) => sum + exp.amount, 0);
-        const totalNonMaterialPaid = expenses.filter(e => e.category !== ExpenseCategory.MATERIAL).reduce((sum, exp) => sum + (exp.paidAmount || 0), 0);
-        const budgetBalance = work.budgetPlanned - totalNonMaterialExpenses;
+        const totalNonMaterialExpenses = expenses.filter(e => e.category !== ExpenseCategory.MATERIAL).reduce((sum, exp) => sum + exp.amount, 0); // O amount é o planejado original
+        const totalNonMaterialPaid = expenses.filter(e => e.category !== ExpenseCategory.MATERIAL).reduce((sum, exp) => sum + (exp.paidAmount || 0), 0); // paidAmount é derivado da soma das parcelas
+        const budgetBalance = work.budgetPlanned - totalNonMaterialExpenses; // Balanço contra o planejado
 
         return (
           <>
@@ -1962,11 +1967,11 @@ const WorkDetail = () => {
               </div>
               <div className={cx(surface, "p-5 rounded-2xl flex flex-col items-start")}>
                 <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">Gasto Total (s/ materiais)</p>
-                <h3 className={`text-xl font-bold ${totalNonMaterialExpenses > work.budgetPlanned ? 'text-red-500' : 'text-green-600 dark:text-green-400'}`}>{formatCurrency(totalNonMaterialExpenses)}</h3>
+                <h3 className={`text-xl font-bold ${totalNonMaterialPaid > work.budgetPlanned ? 'text-red-500' : 'text-green-600 dark:text-green-400'}`}>{formatCurrency(totalNonMaterialPaid)}</h3>
               </div>
               <div className={cx(surface, "p-5 rounded-2xl flex flex-col items-start")}>
                 <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">Balanço (s/ materiais)</p>
-                <h3 className={`text-xl font-bold ${budgetBalance < 0 ? 'text-red-500' : 'text-green-600 dark:text-green-400'}`}>{formatCurrency(budgetBalance)}</h3>
+                <h3 className={`text-xl font-bold ${budgetBalance < 0 ? 'text-red-500' : 'text-green-600 dark:text-green-400'}`}>{formatCurrency(work.budgetPlanned - totalNonMaterialPaid)}</h3>
               </div>
             </div>
 
@@ -2000,18 +2005,20 @@ const WorkDetail = () => {
                                 {group.expenses.map(expense => {
                                     const statusDetails = getEntityStatusDetails('expense', expense, steps); // steps not directly used here, but for consistency
                                     const valorCombinado = expense.totalAgreed !== undefined ? expense.totalAgreed : expense.amount;
-                                    const valorPago = expense.paidAmount || 0;
+                                    const valorPago = expense.paidAmount || 0; // paidAmount é DERIVADO
                                     const valorRestante = valorCombinado - valorPago;
                                     const progressPercent = valorCombinado > 0 ? (valorPago / valorCombinado) * 100 : 0;
+                                    
                                     // 🔥 FIX CRÍTICO: Bloqueio de edição para despesa paga
-                                    const isExpensePaid = (expense.paidAmount || 0) > 0;
+                                    // isEditingExpenseWithPayments agora usa o status derivado, mais preciso.
+                                    const isExpenseUneditable = expense.status !== ExpenseStatus.PENDING; 
 
                                     return (
                                         <div 
                                           key={expense.id} 
                                           onClick={() => { 
-                                            // Only allow opening edit modal if not paid
-                                            if (!isExpensePaid) {
+                                            // Only allow opening edit modal if status is PENDING
+                                            if (!isExpenseUneditable) {
                                                 setNewExpenseDescription(expense.description);
                                                 setNewExpenseAmount(String(expense.amount)); // Convert to string for input
                                                 setNewExpenseCategory(expense.category);
@@ -2026,8 +2033,8 @@ const WorkDetail = () => {
                                           }} 
                                           className={cx(
                                             surface, 
-                                            `p-4 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 ${isExpensePaid ? 'cursor-default' : 'cursor-pointer hover:scale-[1.005]'} transition-transform border-2 ${statusDetails.borderColor} shadow-lg ${statusDetails.shadowClass}`,
-                                            isExpensePaid ? 'opacity-70' : '' // Dim if paid
+                                            `p-4 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 ${isExpenseUneditable ? 'cursor-default' : 'cursor-pointer hover:scale-[1.005]'} transition-transform border-2 ${statusDetails.borderColor} shadow-lg ${statusDetails.shadowClass}`,
+                                            isExpenseUneditable ? 'opacity-70' : '' // Dim if paid
                                           )} 
                                           aria-label={`Despesa ${expense.description}`}
                                         >
@@ -2050,7 +2057,8 @@ const WorkDetail = () => {
                                                     {progressPercent.toFixed(0)}% Pago
                                                 </p>
 
-                                                {statusDetails.statusText !== 'Concluído' && statusDetails.statusText !== 'Prejuízo' && (
+                                                {/* Botão de pagar aparece se não estiver 'Concluído' ou 'Prejuízo' */}
+                                                {expense.status !== ExpenseStatus.COMPLETED && expense.status !== ExpenseStatus.OVERPAID && (
                                                     <button onClick={(e) => { e.stopPropagation(); setPaymentExpenseData(expense); setShowAddPaymentModal(true); }} className="text-xs text-secondary hover:underline" aria-label={`Adicionar pagamento para despesa ${expense.description}`}>
                                                         Pagar {formatCurrency(valorRestante)}
                                                     </button>
@@ -2565,11 +2573,6 @@ const WorkDetail = () => {
     }
   };
 
-  // Determine if the expense being edited has any payment recorded
-  const isEditingPaidExpense = editExpenseData && (editExpenseData.paidAmount || 0) > 0;
-  // Determine if the currently selected category is 'Material'
-  const isMaterialCategorySelected = newExpenseCategory === ExpenseCategory.MATERIAL;
-
   return (
     <div className="max-w-4xl mx-auto pb-12 pt-4 px-2 sm:px-4 md:px-0 font-sans">
       <div className="flex items-center gap-4 mb-6 px-2 sm:px-0 print:hidden">
@@ -2662,7 +2665,7 @@ const WorkDetail = () => {
                 onChange={(e) => setNewMaterialName(e.target.value)}
                 className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
                 required
-                disabled={isEditingPaidExpense} // Disable if material is paid
+                disabled={isEditingExpenseWithPayments} // Disable if material is paid
               />
             </div>
             <div>
@@ -2673,7 +2676,7 @@ const WorkDetail = () => {
                 value={newMaterialBrand}
                 onChange={(e) => setNewMaterialBrand(e.target.value)}
                 className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
-                disabled={isEditingPaidExpense} // Disable if material is paid
+                disabled={isEditingExpenseWithPayments} // Disable if material is paid
               />
             </div>
             <div>
@@ -2687,7 +2690,7 @@ const WorkDetail = () => {
                 step="any"
                 className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
                 required
-                disabled={isEditingPaidExpense} // Disable if material is paid
+                disabled={isEditingExpenseWithPayments} // Disable if material is paid
               />
             </div>
             <div>
@@ -2699,7 +2702,7 @@ const WorkDetail = () => {
                 onChange={(e) => setNewMaterialUnit(e.target.value)}
                 className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
                 required
-                disabled={isEditingPaidExpense} // Disable if material is paid
+                disabled={isEditingExpenseWithPayments} // Disable if material is paid
               />
             </div>
             <div>
@@ -2710,7 +2713,7 @@ const WorkDetail = () => {
                 value={newMaterialCategory}
                 onChange={(e) => setNewMaterialCategory(e.target.value)}
                 className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
-                disabled={isEditingPaidExpense} // Disable if material is paid
+                disabled={isEditingExpenseWithPayments} // Disable if material is paid
               />
             </div>
             <div>
@@ -2720,7 +2723,7 @@ const WorkDetail = () => {
                 value={newMaterialStepId}
                 onChange={(e) => setNewMaterialStepId(e.target.value)}
                 className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
-                disabled={isEditingPaidExpense} // Disable if material is paid
+                disabled={isEditingExpenseWithPayments} // Disable if material is paid
               >
                 <option value="none">Nenhuma</option>
                 {steps.map(step => (
@@ -2743,7 +2746,7 @@ const WorkDetail = () => {
                       step="any"
                       placeholder={`Ex: ${editMaterialData.plannedQty - editMaterialData.purchasedQty}`}
                       className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
-                      disabled={isEditingPaidExpense} // Disable if material is paid
+                      disabled={isEditingExpenseWithPayments} // Disable if material is paid
                     />
                   </div>
                   <div>
@@ -2752,13 +2755,12 @@ const WorkDetail = () => {
                       type="number"
                       id="purchaseCostInput"
                       value={purchaseCostInput}
-                      // Fixing error: `setNewMaterialCost` is not defined. It should be `setPurchaseCostInput`.
-                      onChange={(e) => setPurchaseCostInput(e.target.value)}
+                      onChange={(e) => setPurchaseCostInput(e.target.value)} // Fixed to handle setNewMaterialCost
                       min="0"
                       step="0.01"
                       placeholder="Ex: 150.75"
                       className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
-                      disabled={isEditingPaidExpense} // Disable if material is paid
+                      disabled={isEditingExpenseWithPayments} // Disable if material is paid
                     />
                   </div>
                 </div>
@@ -2803,7 +2805,7 @@ const WorkDetail = () => {
                 step="0.01"
                 className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
                 required
-                disabled={isEditingPaidExpense} // 🔥 FIX CRÍTICO: Bloqueia edição se já foi pago
+                disabled={isEditingExpenseWithPayments} // 🔥 FIX CRÍTICO: Bloqueia edição se já foi pago
               />
             </div>
             {/* 🔥 FIX CRÍTICO: Esconde o Valor Combinado para materiais */}
@@ -2819,7 +2821,7 @@ const WorkDetail = () => {
                     step="0.01"
                     placeholder="Ex: 500.00"
                     className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
-                    disabled={isEditingPaidExpense} // 🔥 FIX CRÍTICO: Bloqueia edição se já foi pago
+                    disabled={isEditingExpenseWithPayments} // 🔥 FIX CRÍTICO: Bloqueia edição se já foi pago
                 />
                 </div>
             )}
@@ -2831,7 +2833,7 @@ const WorkDetail = () => {
                 onChange={(e) => setNewExpenseCategory(e.target.value as ExpenseCategory)}
                 className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
                 required
-                disabled={isEditingPaidExpense} // 🔥 FIX CRÍTICO: Bloqueia edição se já foi pago
+                disabled={isEditingExpenseWithPayments} // 🔥 FIX CRÍTICO: Bloqueia edição se já foi pago
               >
                 {Object.values(ExpenseCategory).map(cat => (
                   <option key={cat} value={cat}>{cat}</option>
@@ -2847,7 +2849,7 @@ const WorkDetail = () => {
                 onChange={(e) => setNewExpenseDate(e.target.value)}
                 className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
                 required
-                disabled={isEditingPaidExpense} // 🔥 FIX CRÍTICO: Bloqueia edição se já foi pago
+                disabled={isEditingExpenseWithPayments} // 🔥 FIX CRÍTICO: Bloqueia edição se já foi pago
               />
             </div>
             <div>

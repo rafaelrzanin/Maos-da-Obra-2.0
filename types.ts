@@ -82,12 +82,20 @@ export enum ExpenseCategory {
   OTHER = 'Outros',
 }
 
+// NEW: Enum para o status geral da despesa (derivado)
+export enum ExpenseStatus { 
+  PENDING = 'pending',
+  PARTIAL = 'partial',
+  COMPLETED = 'completed',
+  OVERPAID = 'overpaid', // Quando paidAmount > totalAgreed
+}
+
 export interface Expense {
   id: string;
   workId: string;
   description: string;
   amount: number; 
-  paidAmount?: number; 
+  paidAmount?: number; // DERIVADO: Soma dos amounts das parcelas pagas
   quantity?: number; 
   date: string;
   category: ExpenseCategory | string;
@@ -96,6 +104,32 @@ export interface Expense {
   workerId?: string;
   supplierId?: string; // NEW: Added supplierId for financial reports
   totalAgreed?: number; 
+  status?: ExpenseStatus; // NEW: DERIVADO: Status geral da despesa
+}
+
+// NEW: Enum para o status de uma parcela individual
+export enum InstallmentStatus {
+  PENDING = 'pending',
+  PAID = 'paid',
+}
+
+// NEW: Interface para uma parcela/pagamento individual
+export interface FinancialInstallment {
+  id: string;
+  expenseId: string; // FK para Expense
+  amount: number; // Valor desta parcela/pagamento específico
+  paidAt?: string; // Data em que esta parcela foi paga (pode ser nulo se 'pending')
+  status: InstallmentStatus;
+  createdAt: string;
+}
+
+// NEW: Interface para registrar valores excedentes
+export interface FinancialExcess {
+  id: string;
+  expenseId: string; // FK para Expense (UNIQUE)
+  amount: number; // O valor excedente
+  recordedAt: string;
+  description: string; // Ex: "Excedente registrado sobre o valor combinado"
 }
 
 export enum MaterialStatus {
@@ -239,7 +273,7 @@ export interface FinancialHistoryEntry {
   workId: string;
   userId: string;
   timestamp: string;
-  action: 'create' | 'update' | 'delete' | 'payment'; // Tipo de alteração
+  action: 'create' | 'update' | 'delete' | 'payment' | 'installment_create' | 'excess_create'; // Tipo de alteração
   field?: string; // Campo alterado (ex: 'amount', 'description', 'paidAmount')
   oldValue?: string | number | null; // Valor antes da alteração
   newValue?: string | number | null; // Novo valor
