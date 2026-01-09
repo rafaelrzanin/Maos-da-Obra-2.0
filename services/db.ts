@@ -1,6 +1,6 @@
 
 
-import { PlanType, ExpenseCategory, StepStatus, FileCategory, type User, type Work, type Step, type Material, type Expense, type Worker, type Supplier, type WorkPhoto, type WorkFile, type DBNotification, type PushSubscriptionInfo, type Contract, type Checklist, type ChecklistItem } from '../types.ts';
+import { PlanType, ExpenseCategory, StepStatus, FileCategory, type User, type Work, type Step, type Material, type Expense, type Worker, type Supplier, type WorkPhoto, type WorkFile, type DBNotification, type PushSubscriptionInfo, type Contract, type Checklist, type ChecklistItem, type FinancialHistoryEntry } from '../types.ts';
 import { WORK_TEMPLATES, FULL_MATERIAL_PACKAGES, CONTRACT_TEMPLATES, CHECKLIST_TEMPLATES } from './standards.ts';
 import { supabase } from './supabase.ts';
 
@@ -25,6 +25,8 @@ const _dashboardCache: {
     checklists: Record<string, { data: Checklist[], timestamp: number }>;
     // NEW: Cache for push subscriptions
     pushSubscriptions: Record<string, { data: PushSubscriptionInfo[], timestamp: number }>;
+    // NEW: Cache for financial history (not exposed in UI, but good for internal consistency)
+    financialHistory: Record<string, { data: FinancialHistoryEntry[], timestamp: number }>;
 } = {
     works: null,
     stats: {},
@@ -40,6 +42,7 @@ const _dashboardCache: {
     contracts: null, // NEW
     checklists: {}, // NEW
     pushSubscriptions: {}, // NEW
+    financialHistory: {}, // NEW
 };
 
 // --- HELPERS ---
@@ -205,6 +208,21 @@ const parseChecklistFromDB = (data: any): Checklist => ({
     items: data.items ? data.items.map(parseChecklistItemFromDB) : [], // items is a JSONB column
 });
 
+// NEW: Parser for FinancialHistoryEntry
+const parseFinancialHistoryFromDB = (data: any): FinancialHistoryEntry => ({
+  id: data.id,
+  expenseId: data.expense_id || undefined,
+  workId: data.work_id,
+  userId: data.user_id,
+  timestamp: data.timestamp,
+  action: data.action,
+  field: data.field || undefined,
+  oldValue: data.old_value,
+  newValue: data.new_value,
+  description: data.description,
+});
+
+
 // NEW: Helper para mapear nomes de etapas generalizadas para categorias de materiais específicas
 // Esta função agora retorna um ARRAY de categorias de materiais relevantes
 const getMaterialCategoriesFromStepName = (stepName: string, work: Work): string[] => {
@@ -335,7 +353,7 @@ const ensureUserProfile = async (authUser: any): Promise<User | null> => {
                 console.log(`[ensureUserProfile] Nenhum perfil existente encontrado para ${authUser.id}. Criando um novo...`);
             }
 
-            // CRITICAL FIX: NEW PROFILE CREATION MUST BE PLAN-AGNOSTIC
+            // CRITICAL: NEW PROFILE CREATION MUST BE PLAN-AGNOSTIC
             const newProfileData = {
                 id: authUser.id,
                 name: authUser.user_metadata?.name || authUser.email?.split('@')[0] || 'Novo Usuário',
@@ -378,6 +396,26 @@ const ensureUserProfile = async (authUser: any): Promise<User | null> => {
 
     return promise;
 };
+
+// NEW: Helper function for adding financial history entries
+const _addFinancialHistoryEntry = async (entry: Omit<FinancialHistoryEntry, 'id' | 'timestamp'>) => {
+  try {
+    const { error } = await supabase.from('financial_history').insert({
+      ...entry,
+      timestamp: new Date().toISOString(), // Automatically set timestamp
+    });
+    if (error) {
+      console.error("Erro ao registrar histórico financeiro:", error);
+      // It's critical to log this, but not necessarily throw an error that blocks the main operation.
+    } else {
+      // Invalidate specific cache for financial history if needed, but not exposed in UI.
+      // delete _dashboardCache.financialHistory[entry.workId]; 
+    }
+  } catch (e) {
+    console.error("Exceção ao tentar registrar histórico financeiro:", e);
+  }
+};
+
 
 export const dbService = {
   // --- AUTH ---
@@ -440,6 +478,7 @@ export const dbService = {
         _dashboardCache.contracts = null; // NEW
         _dashboardCache.checklists = {}; // NEW
         _dashboardCache.pushSubscriptions = {}; // NEW: Clear push subscriptions cache on logout
+        _dashboardCache.financialHistory = {}; // NEW: Clear financial history cache
         callback(null);
       }
     });
@@ -476,7 +515,7 @@ export const dbService = {
         options: {
             data: { name }
         }
-    });
+    );
 
     if (authError) throw authError;
     // If user already exists and signed in, just ensure profile and return
@@ -511,6 +550,7 @@ export const dbService = {
     _dashboardCache.contracts = null; // NEW
     _dashboardCache.checklists = {}; // NEW
     _dashboardCache.pushSubscriptions = {}; // NEW: Clear push subscriptions cache on logout
+    _dashboardCache.financialHistory = {}; // NEW: Clear financial history cache
   },
 
   async getUserProfile(userId: string): Promise<User | null> {
@@ -965,7 +1005,10 @@ export const dbService = {
     
     const progress = totalSteps > 0 ? (completedSteps / totalSteps) * 100 : 0;
     
-    const totalSpent = expenses.reduce((sum, expense) => sum + expense.amount, 0);
+    // 🔥 FIX CRÍTICO: Excluir despesas de material do total gasto para o cálculo de progresso financeiro principal
+    const totalSpent = expenses
+      .filter(expense => expense.category !== ExpenseCategory.MATERIAL)
+      .reduce((sum, expense) => sum + expense.amount, 0);
 
     const stats = {
       totalSpent,
@@ -1031,6 +1074,7 @@ export const dbService = {
       // Checklists are also linked
       delete _dashboardCache.checklists[workId];
       _dashboardCache.notifications = null; // Notifications might be linked to workId
+      delete _dashboardCache.financialHistory[workId]; // NEW: Invalidate financial history cache
       
     } catch (error: any) {
       console.error(`Error deleting work ${workId}:`, error);
@@ -1189,8 +1233,19 @@ export const dbService = {
     const workId = materialToDelete.work_id;
 
     // Delete any associated expenses
-    const { error: deleteExpensesError } = await supabase.from('expenses').delete().eq('related_material_id', materialId);
+    const { data: deletedExpenses, error: deleteExpensesError } = await supabase.from('expenses').delete().eq('related_material_id', materialId).select('id');
     if (deleteExpensesError) console.error("Error deleting related expenses:", deleteExpensesError);
+    else if (deletedExpenses) {
+        for (const expense of deletedExpenses) {
+            await _addFinancialHistoryEntry({
+                workId,
+                userId: (await dbService.getCurrentUser())?.id || 'unknown', // Attempt to get current user ID
+                expenseId: expense.id,
+                action: 'delete',
+                description: `Despesa de material ${expense.id} excluída junto com o material.`
+            });
+        }
+    }
 
     const { error: deleteMaterialError } = await supabase.from('materials').delete().eq('id', materialId);
     if (deleteMaterialError) throw deleteMaterialError;
@@ -1231,9 +1286,33 @@ export const dbService = {
       category: ExpenseCategory.MATERIAL,
       relatedMaterialId: materialId,
       stepId: currentMaterial.step_id,
-      totalAgreed: cost, // For material purchase, agreed is usually the paid amount
+      // 🔥 FIX CRÍTICO: Para materiais, o valor combinado é SEMPRE nulo/indefinido.
+      totalAgreed: undefined, 
     };
-    await dbService.addExpense(expense); // Use dbService.addExpense to leverage its logic
+    const addedExpense = await dbService.addExpense(expense); // Use dbService.addExpense to leverage its logic
+
+    // Log the material purchase and associated expense creation
+    await _addFinancialHistoryEntry({
+        workId: currentMaterial.work_id,
+        userId: (await dbService.getCurrentUser())?.id || 'unknown',
+        expenseId: addedExpense.id,
+        action: 'payment',
+        description: `Compra de material "${materialName}" registrada: ${purchasedQtyDelta} ${unit} por ${cost}. Despesa #${addedExpense.id} criada.`,
+        field: 'purchased_qty',
+        oldValue: currentMaterial.purchased_qty,
+        newValue: newPurchasedQty
+    });
+    await _addFinancialHistoryEntry({
+        workId: currentMaterial.work_id,
+        userId: (await dbService.getCurrentUser())?.id || 'unknown',
+        expenseId: addedExpense.id,
+        action: 'payment',
+        description: `Custo total do material "${materialName}" atualizado.`,
+        field: 'total_cost',
+        oldValue: currentMaterial.total_cost,
+        newValue: newTotalCost
+    });
+
 
     _dashboardCache.materials[currentMaterial.work_id] = null; // Invalidate materials cache
     _dashboardCache.expenses[currentMaterial.work_id] = null; // Invalidate expenses cache
@@ -1259,11 +1338,16 @@ export const dbService = {
   },
 
   async addExpense(expense: Omit<Expense, 'id'>): Promise<Expense> {
+    // 🔥 FIX CRÍTICO: Valor combinado NÃO existe em Materiais (Validação Backend)
+    let totalAgreedValue = expense.totalAgreed !== undefined ? expense.totalAgreed : expense.amount;
+    if (expense.category === ExpenseCategory.MATERIAL) {
+        totalAgreedValue = undefined; // Garante que seja nulo no DB
+    }
+
     const dbExpense = {
       work_id: expense.workId,
       description: expense.description,
       amount: expense.amount,
-      // Default paid_amount to 0 if not provided, allowing for incremental payments
       paid_amount: expense.paidAmount !== undefined ? expense.paidAmount : 0, 
       quantity: expense.quantity,
       date: expense.date,
@@ -1272,21 +1356,60 @@ export const dbService = {
       step_id: expense.stepId,
       worker_id: expense.workerId,
       supplier_id: expense.supplierId,
-      // total_agreed defaults to amount if not provided
-      total_agreed: expense.totalAgreed !== undefined ? expense.totalAgreed : expense.amount, 
+      total_agreed: totalAgreedValue, 
     };
     const { data, error } = await supabase.from('expenses').insert(dbExpense).select().single();
     if (error) throw error;
+
+    await _addFinancialHistoryEntry({
+        workId: expense.workId,
+        userId: (await dbService.getCurrentUser())?.id || 'unknown',
+        expenseId: data.id,
+        action: 'create',
+        description: `Despesa "${expense.description}" (R$${expense.amount}) criada.`,
+        newValue: expense.amount
+    });
+
     _dashboardCache.expenses[expense.workId] = null; // Invalidate cache
     _dashboardCache.summary[expense.workId] = null; // Summary might change
+    _dashboardCache.stats[expense.workId] = null; // Stats might change due to new expense
     return parseExpenseFromDB(data);
   },
 
   async updateExpense(expense: Expense): Promise<Expense> {
+    // 1. Fetch current expense data for comparison and validation
+    const { data: currentExpense, error: fetchError } = await supabase.from('expenses').select('*').eq('id', expense.id).single();
+    if (fetchError || !currentExpense) throw new Error(`Expense with ID ${expense.id} not found.`);
+    
+    const userId = (await dbService.getCurrentUser())?.id || 'unknown';
+
+    // 🔥 FIX CRÍTICO: Bloqueio de edição para campos pagos (Validação Backend)
+    // Se a despesa já tem algum valor pago, 'amount', 'total_agreed' e 'date' não podem ser alterados.
+    if ((currentExpense.paid_amount || 0) > 0) {
+        if (expense.amount !== currentExpense.amount) {
+            throw new Error("Não é possível alterar o 'Valor' de uma despesa que já possui pagamentos.");
+        }
+        if (expense.totalAgreed !== undefined && expense.totalAgreed !== currentExpense.total_agreed) {
+            throw new Error("Não é possível alterar o 'Valor Combinado' de uma despesa que já possui pagamentos.");
+        }
+        if (expense.date !== currentExpense.date) {
+            throw new Error("Não é possível alterar a 'Data' de uma despesa que já possui pagamentos.");
+        }
+    }
+
+    // 🔥 FIX CRÍTICO: Valor combinado NÃO existe em Materiais (Validação Backend)
+    let totalAgreedValue = expense.totalAgreed;
+    if (expense.category === ExpenseCategory.MATERIAL) {
+        totalAgreedValue = undefined; // Garante que seja nulo no DB
+        if (expense.totalAgreed !== undefined && expense.totalAgreed !== null) {
+            console.warn(`Tentativa de definir 'totalAgreed' para despesa de material ${expense.id}. Valor será ignorado.`);
+        }
+    }
+
     const dbExpense = {
       description: expense.description,
       amount: expense.amount,
-      paid_amount: expense.paidAmount,
+      paid_amount: expense.paidAmount, // This field is usually updated via addPaymentToExpense or automatically
       quantity: expense.quantity,
       date: expense.date,
       category: expense.category,
@@ -1294,24 +1417,59 @@ export const dbService = {
       step_id: expense.stepId,
       worker_id: expense.workerId,
       supplier_id: expense.supplierId,
-      total_agreed: expense.totalAgreed,
+      total_agreed: totalAgreedValue,
     };
     const { data, error } = await supabase.from('expenses').update(dbExpense).eq('id', expense.id).select().single();
     if (error) throw error;
+
+    // Log changes to financial history
+    const changes: Array<{ field: string; oldValue: any; newValue: any; description: string }> = [];
+    if (expense.description !== currentExpense.description) {
+        changes.push({ field: 'description', oldValue: currentExpense.description, newValue: expense.description, description: `Descrição alterada de "${currentExpense.description}" para "${expense.description}".` });
+    }
+    if (expense.amount !== currentExpense.amount) {
+        changes.push({ field: 'amount', oldValue: currentExpense.amount, newValue: expense.amount, description: `Valor alterado de R$${currentExpense.amount} para R$${expense.amount}.` });
+    }
+    if (expense.date !== currentExpense.date) {
+        changes.push({ field: 'date', oldValue: currentExpense.date, newValue: expense.date, description: `Data alterada de ${currentExpense.date} para ${expense.date}.` });
+    }
+    if (expense.category !== currentExpense.category) {
+        changes.push({ field: 'category', oldValue: currentExpense.category, newValue: expense.category, description: `Categoria alterada de "${currentExpense.category}" para "${expense.category}".` });
+    }
+    if (expense.totalAgreed !== undefined && expense.totalAgreed !== currentExpense.total_agreed) {
+        changes.push({ field: 'totalAgreed', oldValue: currentExpense.total_agreed, newValue: expense.totalAgreed, description: `Valor combinado alterado de R$${currentExpense.total_agreed} para R$${expense.totalAgreed}.` });
+    }
+    // Add similar checks for other fields if desired
+
+    if (changes.length > 0) {
+        for (const change of changes) {
+            await _addFinancialHistoryEntry({
+                workId: expense.workId,
+                userId,
+                expenseId: expense.id,
+                action: 'update',
+                ...change
+            });
+        }
+    }
+
+
     _dashboardCache.expenses[expense.workId] = null; // Invalidate cache
     _dashboardCache.summary[expense.workId] = null; // Summary might change
+    _dashboardCache.stats[expense.workId] = null; // Stats might change due to expense update
     return parseExpenseFromDB(data);
   },
 
   async deleteExpense(expenseId: string): Promise<void> {
     // Before deleting expense, get its workId and if it was related to a material
-    const { data: expenseToDelete, error: fetchError } = await supabase.from('expenses').select('work_id, related_material_id, amount, quantity').eq('id', expenseId).single();
+    const { data: expenseToDelete, error: fetchError } = await supabase.from('expenses').select('work_id, related_material_id, amount, quantity, description').eq('id', expenseId).single();
     if (fetchError || !expenseToDelete) throw new Error("Expense not found or error fetching workId.");
     const workId = expenseToDelete.work_id;
+    const userId = (await dbService.getCurrentUser())?.id || 'unknown';
 
     // If it was a material-related expense, decrement the purchased_qty and total_cost of the material
     if (expenseToDelete.related_material_id) {
-      const { data: material, error: materialFetchError } = await supabase.from('materials').select('purchased_qty, total_cost').eq('id', expenseToDelete.related_material_id).single();
+      const { data: material, error: materialFetchError } = await supabase.from('materials').select('purchased_qty, total_cost, name').eq('id', expenseToDelete.related_material_id).single();
       if (materialFetchError) console.error("Error fetching related material for expense deletion:", materialFetchError);
       if (material) {
         const newPurchasedQty = material.purchased_qty - (expenseToDelete.quantity || 0);
@@ -1320,15 +1478,38 @@ export const dbService = {
           purchased_qty: Math.max(0, newPurchasedQty),
           total_cost: Math.max(0, newTotalCost)
         }).eq('id', expenseToDelete.related_material_id);
+
+        await _addFinancialHistoryEntry({
+            workId,
+            userId,
+            expenseId: expenseId,
+            action: 'update',
+            field: 'material_purchased_qty_deducted',
+            description: `Dedução de material "${material.name}" devido à exclusão da despesa "${expenseToDelete.description}".`,
+            oldValue: material.purchased_qty,
+            newValue: newPurchasedQty
+        });
       }
     }
 
     const { error: deleteExpenseError } = await supabase.from('expenses').delete().eq('id', expenseId);
     if (deleteExpenseError) throw deleteExpenseError;
 
+    await _addFinancialHistoryEntry({
+        workId,
+        userId,
+        expenseId: expenseId,
+        action: 'delete',
+        description: `Despesa "${expenseToDelete.description}" (R$${expenseToDelete.amount}) excluída.`,
+        oldValue: expenseToDelete.amount,
+        newValue: null
+    });
+
+
     _dashboardCache.expenses[workId] = null; // Invalidate expenses cache
     _dashboardCache.materials[workId] = null; // Invalidate materials cache (if related material was updated)
     _dashboardCache.summary[workId] = null; // Summary might change
+    _dashboardCache.stats[workId] = null; // Stats might change due to expense deletion
   },
 
   // NEW: Add payment to an existing expense (for partial payments)
@@ -1336,15 +1517,17 @@ export const dbService = {
     // 1. Fetch current expense data
     const { data: currentExpense, error: fetchError } = await supabase.from('expenses').select('*').eq('id', expenseId).single();
     if (fetchError || !currentExpense) throw new Error(`Expense with ID ${expenseId} not found.`);
+    
+    const userId = (await dbService.getCurrentUser())?.id || 'unknown';
 
-    const newPaidAmount = (currentExpense.paidAmount || 0) + amount;
+    const oldPaidAmount = currentExpense.paidAmount || 0;
+    const newPaidAmount = oldPaidAmount + amount;
 
     // 2. Update expense's paid_amount
     const { data: updatedExpenseData, error: updateError } = await supabase.from('expenses')
       .update({
         paid_amount: newPaidAmount,
-        // Optionally add a separate table for payment history if needed,
-        // but for now, just update the paid_amount directly on the expense.
+        // For now, no separate payment date field in the expense itself, history will track.
       })
       .eq('id', expenseId)
       .select()
@@ -1352,8 +1535,20 @@ export const dbService = {
 
     if (updateError) throw updateError;
 
+    await _addFinancialHistoryEntry({
+        workId: currentExpense.work_id,
+        userId,
+        expenseId: currentExpense.id,
+        action: 'payment',
+        field: 'paidAmount',
+        oldValue: oldPaidAmount,
+        newValue: newPaidAmount,
+        description: `Pagamento de R$${amount} adicionado para despesa "${currentExpense.description}". Total pago agora: R$${newPaidAmount}. Data do pagamento: ${date}.`
+    });
+
     _dashboardCache.expenses[currentExpense.work_id] = null; // Invalidate expenses cache
     _dashboardCache.summary[currentExpense.work_id] = null; // Summary might change
+    _dashboardCache.stats[currentExpense.work_id] = null; // Stats might change due to new payment
     return parseExpenseFromDB(updatedExpenseData);
   },
 

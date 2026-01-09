@@ -232,6 +232,20 @@ export interface AIWorkPlan {
   }[];
 }
 
+// NEW: Interface para histórico financeiro
+export interface FinancialHistoryEntry {
+  id: string;
+  expenseId?: string; // The expense that was altered (optional, for non-expense related history if needed)
+  workId: string;
+  userId: string;
+  timestamp: string;
+  action: 'create' | 'update' | 'delete' | 'payment'; // Tipo de alteração
+  field?: string; // Campo alterado (ex: 'amount', 'description', 'paidAmount')
+  oldValue?: string | number | null; // Valor antes da alteração
+  newValue?: string | number | null; // Novo valor
+  description: string; // Descrição legível da alteração (ex: "Pagamento de R$100 adicionado para despesa X")
+}
+
 // Removed ZeSuggestion as the card UI is removed.
 // Removed AI-related interfaces as AI Planner will handle structured responses differently.
 

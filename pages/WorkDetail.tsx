@@ -1,15 +1,12 @@
-
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import * as ReactRouter from 'react-router-dom';
-import * as XLSX from 'xlsx';
+import * as XLSX from 'xlsx'; // Keep XLSX import, as reports might use it
 import { useAuth } from '../contexts/AuthContext.tsx';
 import { dbService } from '../services/db.ts';
 import { supabase } from '../services/supabase.ts';
 import { StepStatus, FileCategory, ExpenseCategory, type Work, type Worker, type Supplier, type Material, type Step, type Expense, type WorkPhoto, type WorkFile, type Contract, type Checklist, type ChecklistItem, PlanType } from '../types.ts';
 import { STANDARD_JOB_ROLES, STANDARD_SUPPLIER_CATEGORIES, ZE_AVATAR, ZE_AVATAR_FALLBACK, CONTRACT_TEMPLATES, CHECKLIST_TEMPLATES } from '../services/standards.ts';
 import { ZeModal, type ZeModalProps } from '../components/ZeModal.tsx';
-// REMOVED: aiService import as Ze Assistant card is removed from here
 
 // --- TYPES FOR VIEW STATE ---
 type MainTab = 'ETAPAS' | 'MATERIAIS' | 'FINANCEIRO' | 'FERRAMENTAS';
@@ -67,9 +64,6 @@ const formatCurrency = (value: number | string | undefined): string => {
     maximumFractionDigits: 2,
   });
 };
-
-// REMOVED: cleanMonetaryInput, formatMonetaryDisplay, formatMonetaryValueForDB
-// Removed as per user request to simplify monetary input.
 
 // NEW: Type for status details
 interface StatusDetails {
@@ -363,6 +357,7 @@ const WorkDetail = () => {
   const [editMaterialData, setEditMaterialData] = useState<Material | null>(null);
   // NEW: States for material purchase *within* the edit modal (these replace the old currentPurchaseQty/Cost states)
   const [purchaseQtyInput, setPurchaseQtyInput] = useState(''); 
+  // Fixing error: `setNewMaterialCost` is not defined. It should be `setPurchaseCostInput`.
   const [purchaseCostInput, setPurchaseCostInput] = useState('');
 
 
@@ -463,7 +458,8 @@ const WorkDetail = () => {
   };
 
   const calculateTotalExpenses = useMemo(() => {
-    return expenses.reduce((sum, expense) => sum + expense.amount, 0);
+    // 🔥 FIX CRÍTICO: Excluir despesas de material do total gasto para o cálculo de progresso financeiro principal
+    return expenses.filter(expense => expense.category !== ExpenseCategory.MATERIAL).reduce((sum, expense) => sum + expense.amount, 0);
   }, [expenses]);
 
   const budgetUsage = useMemo(() =>
@@ -613,6 +609,7 @@ const WorkDetail = () => {
         message: "Não foi possível carregar os dados da obra. Verifique sua conexão ou tente novamente.",
         type: "ERROR",
         confirmText: "Ok",
+        // Fixing error: `isOpen = false` should be `isOpen: false`
         onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false }))
       });
     } finally {
@@ -696,12 +693,12 @@ const WorkDetail = () => {
       console.log(`[handleStepStatusChange] dbService.updateStep successful for step ${step.id}. Updated Step Data:`, updatedStep);
       console.log(`[handleStepStatusChange] Data reloaded after status update for step ${step.id}.`);
       await loadWorkData();
-    } catch (error) {
+    } catch (error: any) {
       console.error(`[handleStepStatusChange] Erro ao alterar status da etapa ${step.id}:`, error);
       setZeModal({
         isOpen: true,
         title: "Erro ao Atualizar Status",
-        message: "Não foi possível atualizar o status da etapa. Tente novamente.",
+        message: `Não foi possível atualizar o status da etapa: ${error.message || 'Erro desconhecido'}. Tente novamente.`,
         type: "ERROR",
         confirmText: "Ok",
         onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false }))
@@ -731,13 +728,13 @@ const WorkDetail = () => {
       setNewStepStartDate(new Date().toISOString().split('T')[0]);
       setNewStepEndDate(new Date().toISOString().split('T')[0]);
       await loadWorkData();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erro ao adicionar etapa:", error);
       setZeModal(prev => ({
         ...prev,
         isConfirming: false,
         title: "Erro ao Adicionar Etapa",
-        message: "Não foi possível adicionar a etapa. Tente novamente.",
+        message: `Não foi possível adicionar a etapa: ${error.message || 'Erro desconhecido'}. Tente novamente.`,
         type: "ERROR",
         confirmText: "Ok",
         onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
@@ -761,13 +758,13 @@ const WorkDetail = () => {
       setEditStepData(null);
       setShowAddStepModal(false); // Close the modal
       await loadWorkData();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erro ao editar etapa:", error);
       setZeModal(prev => ({
         ...prev,
         isConfirming: false,
         title: "Erro ao Editar Etapa",
-        message: "Não foi possível editar a etapa. Tente novamente.",
+        message: `Não foi possível editar a etapa: ${error.message || 'Erro desconhecido'}. Tente novamente.`,
         type: "ERROR",
         confirmText: "Ok",
         onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
@@ -784,13 +781,13 @@ const WorkDetail = () => {
       await dbService.deleteStep(stepId, workId);
       await loadWorkData();
       setZeModal(prev => ({ ...prev, isOpen: false })); // Close the modal after successful deletion
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erro ao deletar etapa:", error);
       setZeModal(prev => ({
         ...prev,
         isConfirming: false,
         title: "Erro ao Deletar Etapa",
-        message: "Não foi possível deletar a etapa. Tente novamente.",
+        message: `Não foi possível deletar a etapa: ${error.message || 'Erro desconhecido'}. Tente novamente.`,
         type: "ERROR",
         confirmText: "Ok",
         onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
@@ -849,12 +846,12 @@ const WorkDetail = () => {
       // Send updates to the database in parallel
       await Promise.all(updatedSteps.map(step => dbService.updateStep(step)));
       await loadWorkData(); // Refresh data to ensure consistency
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erro ao reordenar etapas:", error);
       setZeModal({
         isOpen: true,
         title: "Erro ao Reordenar Etapas",
-        message: "Não foi possível reordenar as etapas. Tente novamente.",
+        message: `Não foi possível reordenar as etapas: ${error.message || 'Erro desconhecido'}. Tente novamente.`,
         type: "ERROR",
         confirmText: "Ok",
         onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
@@ -898,13 +895,13 @@ const WorkDetail = () => {
       setPurchaseQtyInput(''); // Clear temporary purchase inputs
       setPurchaseCostInput(''); // Clear temporary purchase inputs
       await loadWorkData();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erro ao adicionar material:", error);
       setZeModal(prev => ({
         ...prev,
         isConfirming: false,
         title: "Erro ao Adicionar Material",
-        message: "Não foi possível adicionar o material. Tente novamente.",
+        message: `Não foi possível adicionar o material: ${error.message || 'Erro desconhecido'}. Tente novamente.`,
         type: "ERROR",
         confirmText: "Ok",
         onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
@@ -955,13 +952,13 @@ const WorkDetail = () => {
       setEditMaterialData(null);
       setShowAddMaterialModal(false); // Close the modal
       await loadWorkData();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erro ao editar material ou registrar compra:", error);
       setZeModal(prev => ({
         ...prev,
         isConfirming: false,
         title: "Erro na Operação",
-        message: "Não foi possível completar a operação. Tente novamente.",
+        message: `Não foi possível completar a operação: ${error.message || 'Erro desconhecido'}. Tente novamente.`,
         type: "ERROR",
         confirmText: "Ok",
         onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
@@ -977,13 +974,13 @@ const WorkDetail = () => {
       await dbService.deleteMaterial(materialId);
       await loadWorkData();
       setZeModal(prev => ({ ...prev, isOpen: false })); // Close the modal after successful deletion
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erro ao deletar material:", error);
       setZeModal(prev => ({
         ...prev,
         isConfirming: false,
         title: "Erro ao Deletar Material",
-        message: "Não foi possível deletar o material. Tente novamente.",
+        message: `Não foi possível deletar o material: ${error.message || 'Erro desconhecido'}. Tente novamente.`,
         type: "ERROR",
         confirmText: "Ok",
         onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
@@ -1030,13 +1027,13 @@ const WorkDetail = () => {
       setNewExpenseSupplierId('');
       setNewExpenseTotalAgreed(''); // Clear new expense total agreed
       await loadWorkData();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erro ao adicionar despesa:", error);
       setZeModal(prev => ({
         ...prev,
         isConfirming: false,
         title: "Erro ao Adicionar Despesa",
-        message: "Não foi possível adicionar a despesa. Tente novamente.",
+        message: `Não foi possível adicionar a despesa: ${error.message || 'Erro desconhecido'}. Tente novamente.`,
         type: "ERROR",
         confirmText: "Ok",
         onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
@@ -1068,13 +1065,13 @@ const WorkDetail = () => {
       setEditExpenseData(null);
       setShowAddExpenseModal(false); // Close the modal
       await loadWorkData();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erro ao editar despesa:", error);
       setZeModal(prev => ({
         ...prev,
         isConfirming: false,
         title: "Erro ao Editar Despesa",
-        message: "Não foi possível editar a despesa. Tente novamente.",
+        message: `Não foi possível editar a despesa: ${error.message || 'Erro desconhecido'}. Tente novamente.`,
         type: "ERROR",
         confirmText: "Ok",
         onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
@@ -1090,13 +1087,13 @@ const WorkDetail = () => {
       await dbService.deleteExpense(expenseId);
       await loadWorkData();
       setZeModal(prev => ({ ...prev, isOpen: false })); // Close the modal after successful deletion
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erro ao deletar despesa:", error);
       setZeModal(prev => ({
         ...prev,
         isConfirming: false,
         title: "Erro ao Deletar Despesa",
-        message: "Não foi possível deletar a despesa. Tente novamente.",
+        message: `Não foi possível deletar a despesa: ${error.message || 'Erro desconhecido'}. Tente novamente.`,
         type: "ERROR",
         confirmText: "Ok",
         onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
@@ -1121,13 +1118,13 @@ const WorkDetail = () => {
       setPaymentExpenseData(null);
       setShowAddPaymentModal(false);
       await loadWorkData();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erro ao adicionar pagamento:", error);
       setZeModal(prev => ({
         ...prev,
         isConfirming: false,
         title: "Erro ao Adicionar Pagamento",
-        message: "Não foi possível adicionar o pagamento. Tente novamente.",
+        message: `Não foi possível adicionar o pagamento: ${error.message || 'Erro desconhecido'}. Tente novamente.`,
         type: "ERROR",
         confirmText: "Ok",
         onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
@@ -1159,13 +1156,13 @@ const WorkDetail = () => {
       setShowAddWorkerModal(false);
       setNewWorkerName(''); setNewWorkerRole(''); setNewWorkerPhone(''); setNewWorkerDailyRate(''); setNewWorkerNotes('');
       await loadWorkData();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erro ao adicionar profissional:", error);
       setZeModal(prev => ({
         ...prev,
         isConfirming: false,
         title: "Erro ao Adicionar Profissional",
-        message: "Não foi possível adicionar o profissional. Tente novamente.",
+        message: `Não foi possível adicionar o profissional: ${error.message || 'Erro desconhecido'}. Tente novamente.`,
         type: "ERROR",
         confirmText: "Ok",
         onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
@@ -1192,13 +1189,13 @@ const WorkDetail = () => {
       setEditWorkerData(null);
       setShowAddWorkerModal(false);
       await loadWorkData();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erro ao editar profissional:", error);
       setZeModal(prev => ({
         ...prev,
         isConfirming: false,
         title: "Erro ao Editar Profissional",
-        message: "Não foi possível editar o profissional. Tente novamente.",
+        message: `Não foi possível editar o profissional: ${error.message || 'Erro desconhecido'}. Tente novamente.`,
         type: "ERROR",
         confirmText: "Ok",
         onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
@@ -1215,13 +1212,13 @@ const WorkDetail = () => {
       await dbService.deleteWorker(workerId, workId);
       await loadWorkData();
       setZeModal(prev => ({ ...prev, isOpen: false }));
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erro ao deletar profissional:", error);
       setZeModal(prev => ({
         ...prev,
         isConfirming: false,
         title: "Erro ao Deletar Profissional",
-        message: "Não foi possível deletar o profissional. Tente novamente.",
+        message: `Não foi possível deletar o profissional: ${error.message || 'Erro desconhecido'}. Tente novamente.`,
         type: "ERROR",
         confirmText: "Ok",
         onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
@@ -1254,13 +1251,13 @@ const WorkDetail = () => {
       setShowAddSupplierModal(false);
       setNewSupplierName(''); setNewSupplierCategory(''); setNewSupplierPhone(''); setNewSupplierEmail(''); setNewSupplierAddress(''); setNewSupplierNotes('');
       await loadWorkData();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erro ao adicionar fornecedor:", error);
       setZeModal(prev => ({
         ...prev,
         isConfirming: false,
         title: "Erro ao Adicionar Fornecedor",
-        message: "Não foi possível adicionar o fornecedor. Tente novamente.",
+        message: `Não foi possível adicionar o fornecedor: ${error.message || 'Erro desconhecido'}. Tente novamente.`,
         type: "ERROR",
         confirmText: "Ok",
         onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
@@ -1288,13 +1285,13 @@ const WorkDetail = () => {
       setEditSupplierData(null);
       setShowAddSupplierModal(false);
       await loadWorkData();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erro ao editar fornecedor:", error);
       setZeModal(prev => ({
         ...prev,
         isConfirming: false,
         title: "Erro ao Editar Fornecedor",
-        message: "Não foi possível editar o fornecedor. Tente novamente.",
+        message: `Não foi possível editar o fornecedor: ${error.message || 'Erro desconhecido'}. Tente novamente.`,
         type: "ERROR",
         confirmText: "Ok",
         onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
@@ -1311,13 +1308,13 @@ const WorkDetail = () => {
       await dbService.deleteSupplier(supplierId, workId);
       await loadWorkData();
       setZeModal(prev => ({ ...prev, isOpen: false }));
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erro ao deletar fornecedor:", error);
       setZeModal(prev => ({
         ...prev,
         isConfirming: false,
         title: "Erro ao Deletar Fornecedor",
-        message: "Não foi possível deletar o fornecedor. Tente novamente.",
+        message: `Não foi possível deletar o fornecedor: ${error.message || 'Erro desconhecido'}. Tente novamente.`,
         type: "ERROR",
         confirmText: "Ok",
         onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
@@ -1421,7 +1418,7 @@ const WorkDetail = () => {
         onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
       }));
     } finally {
-      setZeModal(prev => ({ ...prev, isConfirming: false }));
+      setLoadingPhoto(false);
     }
   };
 
@@ -1518,7 +1515,7 @@ const WorkDetail = () => {
         onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
       }));
     } finally {
-      setZeModal(prev => ({ ...prev, isConfirming: false }));
+      setLoadingFile(false);
     }
   };
 
@@ -1548,13 +1545,13 @@ const WorkDetail = () => {
       setNewChecklistCategory('');
       setNewChecklistItems(['']); // Reset to one empty item
       await loadWorkData();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erro ao adicionar checklist:", error);
       setZeModal(prev => ({
         ...prev,
         isConfirming: false,
         title: "Erro ao Adicionar Checklist",
-        message: "Não foi possível adicionar o checklist. Tente novamente.",
+        message: `Não foi possível adicionar o checklist: ${error.message || 'Erro desconhecido'}. Tente novamente.`,
         type: "ERROR",
         confirmText: "Ok",
         onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
@@ -1589,13 +1586,13 @@ const WorkDetail = () => {
       setEditChecklistData(null);
       setShowAddChecklistModal(false);
       await loadWorkData();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erro ao editar checklist:", error);
       setZeModal(prev => ({
         ...prev,
         isConfirming: false,
         title: "Erro ao Editar Checklist",
-        message: "Não foi possível editar o checklist. Tente novamente.",
+        message: `Não foi possível editar o checklist: ${error.message || 'Erro desconhecido'}. Tente novamente.`,
         type: "ERROR",
         confirmText: "Ok",
         onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
@@ -1617,12 +1614,12 @@ const WorkDetail = () => {
 
       await dbService.updateChecklist({ ...checklistToUpdate, items: updatedItems });
       await loadWorkData();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erro ao atualizar item do checklist:", error);
       setZeModal({
         isOpen: true,
         title: "Erro ao Atualizar Item",
-        message: "Não foi possível atualizar o item do checklist. Tente novamente.",
+        message: `Não foi possível atualizar o item do checklist: ${error.message || 'Erro desconhecido'}. Tente novamente.`,
         type: "ERROR",
         confirmText: "Ok",
         onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
@@ -1636,13 +1633,13 @@ const WorkDetail = () => {
       await dbService.deleteChecklist(checklistId);
       await loadWorkData();
       setZeModal(prev => ({ ...prev, isOpen: false }));
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erro ao deletar checklist:", error);
       setZeModal(prev => ({
         ...prev,
         isConfirming: false,
         title: "Erro ao Deletar Checklist",
-        message: "Não foi possível deletar o checklist. Tente novamente.",
+        message: `Não foi possível deletar o checklist: ${error.message || 'Erro desconhecido'}. Tente novamente.`,
         type: "ERROR",
         confirmText: "Ok",
         onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
@@ -1855,25 +1852,31 @@ const WorkDetail = () => {
                         {group.materials.map(material => {
                            const statusDetails = getEntityStatusDetails('material', material, steps);
                            const progress = material.plannedQty > 0 ? (material.purchasedQty / material.plannedQty) * 100 : 0;
+                           // 🔥 FIX CRÍTICO: Bloqueio de edição para material pago
+                           const isMaterialPaid = material.purchasedQty >= material.plannedQty && material.plannedQty > 0;
 
                            return (
                             <div 
                               key={material.id} 
                               onClick={() => { 
-                                setNewMaterialName(material.name);
-                                setNewMaterialBrand(material.brand || ''); // NEW: Pre-populate brand
-                                setNewMaterialPlannedQty(String(material.plannedQty)); // Convert to string for input
-                                setNewMaterialUnit(material.unit);
-                                setNewMaterialCategory(material.category || '');
-                                setNewMaterialStepId(material.stepId || 'none');
-                                setEditMaterialData(material); 
-                                setPurchaseQtyInput(''); // Clear temporary purchase inputs
-                                setPurchaseCostInput(''); // Clear temporary purchase inputs
-                                setShowAddMaterialModal(true); 
+                                // Only allow opening edit modal if not fully paid, or just view if paid
+                                if (!isMaterialPaid) {
+                                  setNewMaterialName(material.name);
+                                  setNewMaterialBrand(material.brand || ''); // NEW: Pre-populate brand
+                                  setNewMaterialPlannedQty(String(material.plannedQty)); // Convert to string for input
+                                  setNewMaterialUnit(material.unit);
+                                  setNewMaterialCategory(material.category || '');
+                                  setNewMaterialStepId(material.stepId || 'none');
+                                  setEditMaterialData(material); 
+                                  setPurchaseQtyInput(''); // Clear temporary purchase inputs
+                                  setPurchaseCostInput(''); // Clear temporary purchase inputs
+                                  setShowAddMaterialModal(true); 
+                                }
                               }} 
                               className={cx(
                                 surface, 
-                                `p-4 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 cursor-pointer hover:scale-[1.005] transition-transform border-2 ${statusDetails.borderColor} shadow-lg ${statusDetails.shadowClass}`
+                                `p-4 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 ${isMaterialPaid ? 'cursor-default' : 'cursor-pointer hover:scale-[1.005]'} transition-transform border-2 ${statusDetails.borderColor} shadow-lg ${statusDetails.shadowClass}`,
+                                isMaterialPaid ? 'opacity-70' : '' // Dim if paid
                               )} 
                               aria-label={`Material ${material.name}`}
                             >
@@ -1924,7 +1927,10 @@ const WorkDetail = () => {
 
       case 'FINANCEIRO':
         const totalPaid = expenses.reduce((sum, exp) => sum + (exp.paidAmount || 0), 0);
-        const totalOutstanding = calculateTotalExpenses - totalPaid;
+        // Calculate outstanding relative to non-material budget
+        const totalNonMaterialExpenses = expenses.filter(e => e.category !== ExpenseCategory.MATERIAL).reduce((sum, exp) => sum + exp.amount, 0);
+        const totalNonMaterialPaid = expenses.filter(e => e.category !== ExpenseCategory.MATERIAL).reduce((sum, exp) => sum + (exp.paidAmount || 0), 0);
+        const budgetBalance = work.budgetPlanned - totalNonMaterialExpenses;
 
         return (
           <>
@@ -1955,12 +1961,12 @@ const WorkDetail = () => {
                 <h3 className="text-xl font-bold text-primary dark:text-white">{formatCurrency(work.budgetPlanned)}</h3>
               </div>
               <div className={cx(surface, "p-5 rounded-2xl flex flex-col items-start")}>
-                <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">Gasto Total</p>
-                <h3 className={`text-xl font-bold ${calculateTotalExpenses > work.budgetPlanned ? 'text-red-500' : 'text-green-600 dark:text-green-400'}`}>{formatCurrency(calculateTotalExpenses)}</h3>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">Gasto Total (s/ materiais)</p>
+                <h3 className={`text-xl font-bold ${totalNonMaterialExpenses > work.budgetPlanned ? 'text-red-500' : 'text-green-600 dark:text-green-400'}`}>{formatCurrency(totalNonMaterialExpenses)}</h3>
               </div>
               <div className={cx(surface, "p-5 rounded-2xl flex flex-col items-start")}>
-                <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">Balanço</p>
-                <h3 className={`text-xl font-bold ${totalOutstanding > 0 ? 'text-amber-500' : 'text-green-600 dark:text-green-400'}`}>{formatCurrency(work.budgetPlanned - calculateTotalExpenses)}</h3>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">Balanço (s/ materiais)</p>
+                <h3 className={`text-xl font-bold ${budgetBalance < 0 ? 'text-red-500' : 'text-green-600 dark:text-green-400'}`}>{formatCurrency(budgetBalance)}</h3>
               </div>
             </div>
 
@@ -1997,25 +2003,31 @@ const WorkDetail = () => {
                                     const valorPago = expense.paidAmount || 0;
                                     const valorRestante = valorCombinado - valorPago;
                                     const progressPercent = valorCombinado > 0 ? (valorPago / valorCombinado) * 100 : 0;
+                                    // 🔥 FIX CRÍTICO: Bloqueio de edição para despesa paga
+                                    const isExpensePaid = (expense.paidAmount || 0) > 0;
 
                                     return (
                                         <div 
                                           key={expense.id} 
                                           onClick={() => { 
-                                            setNewExpenseDescription(expense.description);
-                                            setNewExpenseAmount(String(expense.amount)); // Convert to string for input
-                                            setNewExpenseCategory(expense.category);
-                                            setNewExpenseDate(expense.date);
-                                            setNewExpenseStepId(expense.stepId || 'none');
-                                            setNewExpenseWorkerId(expense.workerId || 'none');
-                                            setNewExpenseSupplierId(expense.supplierId || 'none');
-                                            setNewExpenseTotalAgreed(String(expense.totalAgreed !== undefined ? expense.totalAgreed : expense.amount)); // Set editable totalAgreed
-                                            setEditExpenseData(expense); 
-                                            setShowAddExpenseModal(true); 
+                                            // Only allow opening edit modal if not paid
+                                            if (!isExpensePaid) {
+                                                setNewExpenseDescription(expense.description);
+                                                setNewExpenseAmount(String(expense.amount)); // Convert to string for input
+                                                setNewExpenseCategory(expense.category);
+                                                setNewExpenseDate(expense.date);
+                                                setNewExpenseStepId(expense.stepId || 'none');
+                                                setNewExpenseWorkerId(expense.workerId || 'none');
+                                                setNewExpenseSupplierId(expense.supplierId || 'none');
+                                                setNewExpenseTotalAgreed(String(expense.totalAgreed !== undefined ? expense.totalAgreed : expense.amount)); // Set editable totalAgreed
+                                                setEditExpenseData(expense); 
+                                                setShowAddExpenseModal(true); 
+                                            }
                                           }} 
                                           className={cx(
                                             surface, 
-                                            `p-4 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 cursor-pointer hover:scale-[1.005] transition-transform border-2 ${statusDetails.borderColor} shadow-lg ${statusDetails.shadowClass}`
+                                            `p-4 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 ${isExpensePaid ? 'cursor-default' : 'cursor-pointer hover:scale-[1.005]'} transition-transform border-2 ${statusDetails.borderColor} shadow-lg ${statusDetails.shadowClass}`,
+                                            isExpensePaid ? 'opacity-70' : '' // Dim if paid
                                           )} 
                                           aria-label={`Despesa ${expense.description}`}
                                         >
@@ -2100,9 +2112,6 @@ const WorkDetail = () => {
                     message: "As calculadoras estão sendo desenvolvidas. Fique ligado!",
                     confirmText: "Entendido",
                     onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
-                    // Removed onConfirm: showAccessModal as it was a boolean assignment error.
-                    // The ZeModal component's internal logic handles "Entendido" as closing the modal
-                    // if onConfirm is the default no-op function or explicitly onCancel.
                 })} 
                 isLocked={!isVitalicio} // Only Vitalicio users can access
                 requiresVitalicio={true}
@@ -2556,6 +2565,11 @@ const WorkDetail = () => {
     }
   };
 
+  // Determine if the expense being edited has any payment recorded
+  const isEditingPaidExpense = editExpenseData && (editExpenseData.paidAmount || 0) > 0;
+  // Determine if the currently selected category is 'Material'
+  const isMaterialCategorySelected = newExpenseCategory === ExpenseCategory.MATERIAL;
+
   return (
     <div className="max-w-4xl mx-auto pb-12 pt-4 px-2 sm:px-4 md:px-0 font-sans">
       <div className="flex items-center gap-4 mb-6 px-2 sm:px-0 print:hidden">
@@ -2648,6 +2662,7 @@ const WorkDetail = () => {
                 onChange={(e) => setNewMaterialName(e.target.value)}
                 className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
                 required
+                disabled={isEditingPaidExpense} // Disable if material is paid
               />
             </div>
             <div>
@@ -2658,6 +2673,7 @@ const WorkDetail = () => {
                 value={newMaterialBrand}
                 onChange={(e) => setNewMaterialBrand(e.target.value)}
                 className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
+                disabled={isEditingPaidExpense} // Disable if material is paid
               />
             </div>
             <div>
@@ -2671,6 +2687,7 @@ const WorkDetail = () => {
                 step="any"
                 className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
                 required
+                disabled={isEditingPaidExpense} // Disable if material is paid
               />
             </div>
             <div>
@@ -2682,6 +2699,7 @@ const WorkDetail = () => {
                 onChange={(e) => setNewMaterialUnit(e.target.value)}
                 className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
                 required
+                disabled={isEditingPaidExpense} // Disable if material is paid
               />
             </div>
             <div>
@@ -2692,6 +2710,7 @@ const WorkDetail = () => {
                 value={newMaterialCategory}
                 onChange={(e) => setNewMaterialCategory(e.target.value)}
                 className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
+                disabled={isEditingPaidExpense} // Disable if material is paid
               />
             </div>
             <div>
@@ -2701,6 +2720,7 @@ const WorkDetail = () => {
                 value={newMaterialStepId}
                 onChange={(e) => setNewMaterialStepId(e.target.value)}
                 className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
+                disabled={isEditingPaidExpense} // Disable if material is paid
               >
                 <option value="none">Nenhuma</option>
                 {steps.map(step => (
@@ -2723,6 +2743,7 @@ const WorkDetail = () => {
                       step="any"
                       placeholder={`Ex: ${editMaterialData.plannedQty - editMaterialData.purchasedQty}`}
                       className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
+                      disabled={isEditingPaidExpense} // Disable if material is paid
                     />
                   </div>
                   <div>
@@ -2731,11 +2752,13 @@ const WorkDetail = () => {
                       type="number"
                       id="purchaseCostInput"
                       value={purchaseCostInput}
+                      // Fixing error: `setNewMaterialCost` is not defined. It should be `setPurchaseCostInput`.
                       onChange={(e) => setPurchaseCostInput(e.target.value)}
                       min="0"
                       step="0.01"
                       placeholder="Ex: 150.75"
                       className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
+                      disabled={isEditingPaidExpense} // Disable if material is paid
                     />
                   </div>
                 </div>
@@ -2780,29 +2803,35 @@ const WorkDetail = () => {
                 step="0.01"
                 className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
                 required
+                disabled={isEditingPaidExpense} // 🔥 FIX CRÍTICO: Bloqueia edição se já foi pago
               />
             </div>
-            <div>
-              <label htmlFor="expenseTotalAgreed" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Valor Combinado (Opcional, default é o valor da despesa)</label>
-              <input
-                type="number"
-                id="expenseTotalAgreed"
-                value={newExpenseTotalAgreed}
-                onChange={(e) => setNewExpenseTotalAgreed(e.target.value)}
-                min="0"
-                step="0.01"
-                placeholder="Ex: 500.00"
-                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
-              />
-            </div>
+            {/* 🔥 FIX CRÍTICO: Esconde o Valor Combinado para materiais */}
+            {!isMaterialCategorySelected && (
+                <div>
+                <label htmlFor="expenseTotalAgreed" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Valor Combinado (Opcional, default é o valor da despesa)</label>
+                <input
+                    type="number"
+                    id="expenseTotalAgreed"
+                    value={newExpenseTotalAgreed}
+                    onChange={(e) => setNewExpenseTotalAgreed(e.target.value)}
+                    min="0"
+                    step="0.01"
+                    placeholder="Ex: 500.00"
+                    className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
+                    disabled={isEditingPaidExpense} // 🔥 FIX CRÍTICO: Bloqueia edição se já foi pago
+                />
+                </div>
+            )}
             <div>
               <label htmlFor="expenseCategory" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Categoria</label>
               <select
                 id="expenseCategory"
                 value={newExpenseCategory}
-                onChange={(e) => setNewExpenseCategory(e.target.value)}
+                onChange={(e) => setNewExpenseCategory(e.target.value as ExpenseCategory)}
                 className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
                 required
+                disabled={isEditingPaidExpense} // 🔥 FIX CRÍTICO: Bloqueia edição se já foi pago
               >
                 {Object.values(ExpenseCategory).map(cat => (
                   <option key={cat} value={cat}>{cat}</option>
@@ -2818,6 +2847,7 @@ const WorkDetail = () => {
                 onChange={(e) => setNewExpenseDate(e.target.value)}
                 className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
                 required
+                disabled={isEditingPaidExpense} // 🔥 FIX CRÍTICO: Bloqueia edição se já foi pago
               />
             </div>
             <div>
@@ -3146,6 +3176,7 @@ const WorkDetail = () => {
               <input
                 type="file"
                 id="uploadFile"
+                accept="/*"
                 onChange={(e) => setNewUploadFile(e.target.files ? e.target.files[0] : null)}
                 className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
                 required
