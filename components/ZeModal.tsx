@@ -87,14 +87,20 @@ export const ZeModal: React.FC<ZeModalProps> = ({
                 </div>
             </div>
             
-            {/* Scrollable content area with its own padding */}
+            {/* Scrollable content area (no direct padding here) */}
             {children ? (
-                <div className="flex-1 overflow-y-auto py-4 px-6">
-                    {children}
+                <div className="flex-1 overflow-y-auto">
+                    {/* Inner div for padding */}
+                    <div className="py-4 px-6">
+                        {children}
+                    </div>
                 </div>
             ) : (
-                <div className={`flex-1 overflow-y-auto py-4 px-6 p-4 rounded-2xl text-sm leading-relaxed border ${messageBoxBgClass}`}>
-                    <p>{message}</p>
+                <div className={`flex-1 overflow-y-auto`}>
+                    {/* Inner div for padding and message box styles */}
+                    <div className={`py-4 px-6 p-4 rounded-2xl text-sm leading-relaxed border ${messageBoxBgClass}`}>
+                        <p>{message}</p>
+                    </div>
                 </div>
             )}
 
