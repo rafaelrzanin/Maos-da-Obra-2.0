@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import * as ReactRouter from 'react-router-dom';
 import * as XLSX from 'xlsx'; // Keep XLSX import, as reports might use it
@@ -316,8 +314,7 @@ export interface WorkDetailProps {
 const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
   const { id: workId } = ReactRouter.useParams<{ id: string }>();
   const navigate = ReactRouter.useNavigate();
-  const location = ReactRouter.useLocation();
-  const { user, isSubscriptionValid, authLoading, isUserAuthFinished, refreshUser, trialDaysRemaining } = useAuth();
+  const { user, authLoading, isUserAuthFinished, trialDaysRemaining } = useAuth();
   const [searchParams] = ReactRouter.useSearchParams();
 
   // NEW: Calculate AI access for tool access
@@ -337,7 +334,6 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
   const [checklists, setChecklists] = useState<Checklist[]>([]); 
 
   const [loading, setLoading] = useState(true);
-  // REMOVED: `activeTab` from useState, it's now a prop
   const [activeSubView, setActiveSubView] = useState<SubView>('NONE'); 
   
   // States for Material Filter
@@ -362,9 +358,8 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
   const [newMaterialCategory, setNewMaterialCategory] = useState('');
   const [newMaterialStepId, setNewMaterialStepId] = useState('');
   const [editMaterialData, setEditMaterialData] = useState<Material | null>(null);
-  // NEW: States for material purchase *within* the edit modal (these replace the old currentPurchaseQty/Cost states)
+  // NEW: States for material purchase within the edit modal
   const [purchaseQtyInput, setPurchaseQtyInput] = useState(''); 
-  // Fixing error: `setNewMaterialCost` is not defined. It should be `setPurchaseCostInput`.
   const [purchaseCostInput, setPurchaseCostInput] = useState('');
 
 
@@ -404,7 +399,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
 
   const [showAddPhotoModal, setShowAddPhotoModal] = useState(false);
   const [newPhotoDescription, setNewPhotoDescription] = useState('');
-  const [newPhotoFile, setNewPhotoFile] = useState<File | null>(null); // Corrected useState syntax
+  const [newPhotoFile, setNewPhotoFile] = useState<File | null>(null); 
   const [newPhotoType, setNewPhotoType] = useState<'BEFORE' | 'AFTER' | 'PROGRESS'>('PROGRESS');
   const [uploadingPhoto, setLoadingPhoto] = useState(false);
 
@@ -439,19 +434,12 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
     onTabChange(tab); // Use the prop to update activeTab in App.tsx
     setActiveSubView('NONE'); 
     setMaterialFilterStepId('all'); 
-    navigate(`/work/${workId}?tab=${tab}`, { replace: true }); // Update URL for consistent navigation
+    navigate(`/work/${workId}?tab=${tab}`, { replace: true }); 
   }, [workId, navigate, onTabChange]);
 
   const goToSubView = useCallback((subView: SubView) => {
     setActiveSubView(subView);
   }, []);
-
-  const getDayDifference = (date1: string, date2: string): number => {
-    const d1 = new Date(date1);
-    const d2 = new Date(date2);
-    const diffTime = Math.abs(d2.getTime() - d1.getTime());
-    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  };
 
   const calculateStepProgress = (stepId: string): number => {
     const totalMaterialsForStep = materials.filter(m => m.stepId === stepId);
@@ -460,34 +448,23 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
     const totalPlannedQty = totalMaterialsForStep.reduce((sum, m) => sum + m.plannedQty, 0);
     const totalPurchasedQty = totalMaterialsForStep.reduce((sum, m) => sum + m.purchasedQty, 0);
 
-    // Fix: Use totalPurchasedQty instead of undefined purchasedQty
     return totalPlannedQty > 0 ? (totalPurchasedQty / totalPlannedQty) * 100 : 0;
   };
 
   const calculateTotalExpenses = useMemo(() => {
-    // 🔥 MODIFICADO: Excluir despesas de material do total gasto para o cálculo de progresso financeiro principal
-    // Agora o expense.paidAmount é derivado, o que o torna a soma das parcelas pagas.
     return expenses.filter(expense => expense.category !== ExpenseCategory.MATERIAL).reduce((sum, expense) => sum + (expense.paidAmount || 0), 0);
   }, [expenses]);
 
-  const budgetUsage = useMemo(() =>
-    work && work.budgetPlanned > 0 ? (calculateTotalExpenses / work.budgetPlanned) * 100 : 0
-  , [work, calculateTotalExpenses]);
-
   // NEW: Grouped and filtered materials for UI
   const groupedMaterials = useMemo<MaterialStepGroup[]>(() => {
-    // Filter materials by selected step if not 'all'
     const filteredMaterials = materialFilterStepId === 'all'
       ? materials
       : materials.filter(m => m.stepId === materialFilterStepId);
 
     const groups: { [key: string]: Material[] } = {};
     const stepOrder: string[] = [];
-
-    // Ensure steps are sorted by orderIndex
     const sortedSteps = [...steps].sort((a, b) => a.orderIndex - b.orderIndex);
 
-    // Group materials by step, preserving step order
     sortedSteps.forEach(step => {
       const materialsForStep = filteredMaterials.filter(m => m.stepId === step.id);
       if (materialsForStep.length > 0) {
@@ -507,7 +484,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
   const groupedExpensesByStep = useMemo<ExpenseStepGroup[]>(() => {
     const groups: { [key: string]: Expense[] } = {};
     expenses.forEach(expense => {
-      const stepKey = expense.stepId || 'no_step'; // Group by stepId or 'no_step'
+      const stepKey = expense.stepId || 'no_step'; 
       if (!groups[stepKey]) {
         groups[stepKey] = [];
       }
@@ -515,25 +492,21 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
     });
 
     const expenseGroups: ExpenseStepGroup[] = [];
-    
-    // Ensure steps are sorted by orderIndex
     const sortedSteps = [...steps].sort((a, b) => a.orderIndex - b.orderIndex);
 
-    // Add expenses linked to steps, in step order
     sortedSteps.forEach(step => {
       if (groups[step.id]) {
         expenseGroups.push({
           stepName: `${step.orderIndex}. ${step.name}`,
           expenses: groups[step.id].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
-          totalStepAmount: groups[step.id].reduce((sum, exp) => sum + (exp.amount || 0), 0), // Use amount here for planned
+          totalStepAmount: groups[step.id].reduce((sum, exp) => sum + (exp.amount || 0), 0), 
         });
       }
     });
 
-    // Add expenses not linked to any specific step (e.g., 'no_step')
     if (groups['no_step']) {
       expenseGroups.push({
-        stepName: 'Sem Etapa Definida', // Label for expenses not linked to any step
+        stepName: 'Sem Etapa Definida', 
         expenses: groups['no_step'].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
         totalStepAmount: groups['no_step'].reduce((sum, exp) => sum + (exp.amount || 0), 0),
       });
@@ -549,7 +522,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
   const loadWorkData = useCallback(async () => {
     if (!workId || !user?.id) {
       setLoading(false);
-      navigate('/', { replace: true }); // Use replace: true for redirects
+      navigate('/', { replace: true });
       return;
     }
 
@@ -557,7 +530,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
     try {
       const fetchedWork = await dbService.getWorkById(workId);
       if (!fetchedWork || fetchedWork.userId !== user.id) {
-        navigate('/', { replace: true }); // Use replace: true for redirects
+        navigate('/', { replace: true });
         return;
       }
       setWork(fetchedWork);
@@ -569,37 +542,29 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         dbService.getSuppliers(workId),
         dbService.getPhotos(workId),
         dbService.getFiles(workId),
-        dbService.getContractTemplates(), // Contracts are global
+        dbService.getContractTemplates(), 
         dbService.getChecklists(workId),
       ]);
 
-      // NEW CRITICAL STEP: Ensure materials are generated if none exist after fetching work and steps
       await dbService.ensureMaterialsForWork(fetchedWork, fetchedSteps);
-      
-      // After ensuring materials (and potentially generating them),
-      // we need to re-fetch the materials to ensure the state is up-to-date.
       const currentMaterials = await dbService.getMaterials(workId);
       setMaterials(currentMaterials);
 
-      // Recalculate isDelayed for fetched steps
       const today = new Date();
-      today.setHours(0, 0, 0, 0); // Normalize today's date to midnight
+      today.setHours(0, 0, 0, 0);
 
       const stepsWithCorrectedDelay = fetchedSteps.map(step => {
         let currentIsDelayed = false;
-        // const stepStartDate = new Date(step.startDate); // Not used directly for delay logic
-        // stepStartDate.setHours(0, 0, 0, 0);
         const stepEndDate = new Date(step.endDate);
         stepEndDate.setHours(0, 0, 0, 0);
 
         if (step.status !== StepStatus.COMPLETED) {
-            currentIsDelayed = today.getTime() > stepEndDate.getTime(); // Delayed if end date is past
+            currentIsDelayed = today.getTime() > stepEndDate.getTime();
         }
         return { ...step, isDelayed: currentIsDelayed };
-      }).sort((a, b) => a.orderIndex - b.orderIndex); // Ensure sorted by orderIndex
+      }).sort((a, b) => a.orderIndex - b.orderIndex);
 
-      setSteps(stepsWithCorrectedDelay); // Use corrected steps
-
+      setSteps(stepsWithCorrectedDelay); 
       setExpenses(fetchedExpenses);
       setWorkers(fetchedWorkers);
       setSuppliers(fetchedSuppliers);
@@ -610,11 +575,10 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
 
     } catch (error) {
       console.error("Erro ao carregar dados da obra:", error);
-      // Optionally show a user-friendly error message
       setZeModal({
         isOpen: true,
         title: "Erro de Carregamento",
-        message: "Não foi possível carregar os dados da obra. Verifique sua conexão ou tente novamente.",
+        message: "Não foi possível carregar os dados da obra.",
         type: "ERROR",
         confirmText: "Ok",
         onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false }))
@@ -627,10 +591,9 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
   useEffect(() => {
     if (!authLoading && isUserAuthFinished) {
       loadWorkData();
-      // Read initial tab from URL on first load
       const tabFromUrl = searchParams.get('tab') as MainTab;
       if (tabFromUrl && ['ETAPAS', 'MATERIAIS', 'FINANCEIRO', 'FERRAMENTAS'].includes(tabFromUrl)) {
-        onTabChange(tabFromUrl); // Update parent state from URL
+        onTabChange(tabFromUrl);
       }
     }
   }, [authLoading, isUserAuthFinished, loadWorkData, searchParams, onTabChange]);
@@ -639,14 +602,8 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
   // CRUD HANDLERS: STEPS
   // =======================================================================
 
-  // NEW: Handle Step Status Change (Pendente -> Parcial -> Concluída -> Pendente)
   const handleStepStatusChange = useCallback(async (step: Step) => {
-    if (isUpdatingStepStatus) {
-        console.log(`[handleStepStatusChange] Button disabled, preventing multiple clicks for step ${step.id}.`);
-        return; // Prevent multiple clicks
-    }
-
-    console.log(`[handleStepStatusChange] Processing step ID: ${step.id}. Current Step Object:`, { ...step });
+    if (isUpdatingStepStatus) return;
     setIsUpdatingStepStatus(true);
 
     let newStatus: StepStatus;
@@ -663,66 +620,52 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
     switch (step.status) {
       case StepStatus.NOT_STARTED:
         newStatus = StepStatus.IN_PROGRESS;
-        // A step going into IN_PROGRESS is delayed if its END date has already passed.
         newIsDelayed = today.getTime() > stepEndDate.getTime();
-        console.log(`[handleStepStatusChange] Status transition: NOT_STARTED -> IN_PROGRESS for step ${step.id}. Recalculated newIsDelayed: ${newIsDelayed}.`);
         break;
       case StepStatus.IN_PROGRESS:
         newStatus = StepStatus.COMPLETED;
-        newRealDate = new Date().toISOString().split('T')[0]; // Set real completion date
-        newIsDelayed = false; // Completed steps are never delayed.
-        console.log(`[handleStepStatusChange] Status transition: IN_PROGRESS -> COMPLETED for step ${step.id}. RealDate: ${newRealDate}. newIsDelayed: ${newIsDelayed}.`);
+        newRealDate = new Date().toISOString().split('T')[0];
+        newIsDelayed = false;
         break;
       case StepStatus.COMPLETED:
-        newStatus = StepStatus.NOT_STARTED; // Reverts to NOT_STARTED
-        newRealDate = undefined; // Clear realDate
-        // A step reverting to NOT_STARTED is delayed if its START date has already passed.
+        newStatus = StepStatus.NOT_STARTED;
+        newRealDate = undefined;
         newIsDelayed = today.getTime() > stepStartDate.getTime();
-        console.log(`[handleStepStatusChange] Status transition: COMPLETED -> NOT_STARTED for step ${step.id}. Clearing RealDate. Recalculated newIsDelayed: ${newIsDelayed}.`);
         break;
       default:
         newStatus = StepStatus.NOT_STARTED;
-        newIsDelayed = today.getTime() > stepStartDate.getTime(); // Default to delayed if start date is past.
-        console.warn(`[handleStepStatusChange] Unexpected status for step ${step.id}: ${step.status}. Defaulting to NOT_STARTED. Recalculated newIsDelayed: ${newIsDelayed}.`);
     }
     
     try {
-      // Create a new Step object ensuring all properties are present and
-      // status/realDate/isDelayed are explicitly updated.
       const updatedStepData: Step = {
-        ...step, // Spread all existing properties
-        status: newStatus, // Explicitly set the new status
-        realDate: newRealDate, // Explicitly set the new realDate (or undefined to be converted to null in dbService)
-        isDelayed: newIsDelayed // Explicitly set the new isDelayed state
+        ...step,
+        status: newStatus,
+        realDate: newRealDate,
+        isDelayed: newIsDelayed
       };
 
-      const updatedStep = await dbService.updateStep(updatedStepData); // Pass the fully formed object
-      console.log(`[handleStepStatusChange] dbService.updateStep successful for step ${step.id}. Updated Step Data:`, updatedStep);
-      console.log(`[handleStepStatusChange] Data reloaded after status update for step ${step.id}.`);
+      await dbService.updateStep(updatedStepData);
       await loadWorkData();
     } catch (error: any) {
-      console.error(`[handleStepStatusChange] Erro ao alterar status da etapa ${step.id}:`, error);
       setZeModal({
         isOpen: true,
         title: "Erro ao Atualizar Status",
-        message: `Não foi possível atualizar o status da etapa: ${error.message || 'Erro desconhecido'}. Tente novamente.`,
+        message: "Não foi possível atualizar o status da etapa.",
         type: "ERROR",
         confirmText: "Ok",
         onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
       });
     } finally {
       setIsUpdatingStepStatus(false);
-      console.log(`[handleStepStatusChange] Finalized status update for step ${step.id}. isUpdatingStepStatus set to false.`);
     }
   }, [loadWorkData, isUpdatingStepStatus]);
 
   const handleAddStep = async (e: React.FormEvent) => {
-    e.preventDefault(); // Prevent default form submission
+    e.preventDefault();
     if (!workId || !newStepName) return;
 
     setZeModal(prev => ({ ...prev, isConfirming: true }));
     try {
-      // Fix: orderIndex is omitted from the input type because it's calculated internally by dbService.addStep
       await dbService.addStep({
         workId: workId,
         name: newStepName,
@@ -732,16 +675,13 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
       });
       setShowAddStepModal(false);
       setNewStepName('');
-      setNewStepStartDate(new Date().toISOString().split('T')[0]);
-      setNewStepEndDate(new Date().toISOString().split('T')[0]);
       await loadWorkData();
     } catch (error: any) {
-      console.error("Erro ao adicionar etapa:", error);
       setZeModal(prev => ({
         ...prev,
         isConfirming: false,
         title: "Erro ao Adicionar Etapa",
-        message: `Não foi possível adicionar a etapa: ${error.message || 'Erro desconhecido'}. Tente novamente.`,
+        message: "Não foi possível adicionar a etapa.",
         type: "ERROR",
         confirmText: "Ok",
         onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
@@ -752,29 +692,27 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
   };
 
   const handleEditStep = async (e: React.FormEvent) => {
-    e.preventDefault(); // Prevent default form submission
+    e.preventDefault();
     if (!editStepData || !workId) return;
 
     setZeModal(prev => ({ ...prev, isConfirming: true }));
     try {
-      // isDelayed will be re-calculated in dbService.updateStep (backend logic for consistency)
       await dbService.updateStep({
-        ...editStepData!,
+        ...editStepData,
         name: newStepName,
         startDate: newStepStartDate,
         endDate: newStepEndDate,
         workId: workId,
       });
       setEditStepData(null);
-      setShowAddStepModal(false); // Close the modal
+      setShowAddStepModal(false);
       await loadWorkData();
     } catch (error: any) {
-      console.error("Erro ao editar etapa:", error);
       setZeModal(prev => ({
         ...prev,
         isConfirming: false,
         title: "Erro ao Editar Etapa",
-        message: `Não foi possível editar a etapa: ${error.message || 'Erro desconhecido'}. Tente novamente.`,
+        message: "Não foi possível editar a etapa.",
         type: "ERROR",
         confirmText: "Ok",
         onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
@@ -790,14 +728,13 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
     try {
       await dbService.deleteStep(stepId, workId);
       await loadWorkData();
-      setZeModal(prev => ({ ...prev, isOpen: false })); // Close the modal after successful deletion
+      setZeModal(prev => ({ ...prev, isOpen: false }));
     } catch (error: any) {
-      console.error("Erro ao deletar etapa:", error);
       setZeModal(prev => ({
         ...prev,
         isConfirming: false,
         title: "Erro ao Deletar Etapa",
-        message: `Não foi possível deletar a etapa: ${error.message || 'Erro desconhecido'}. Tente novamente.`,
+        message: "Não foi possível deletar a etapa.",
         type: "ERROR",
         confirmText: "Ok",
         onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
@@ -807,20 +744,14 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
     }
   };
 
-  // Drag and drop handlers for steps
   const handleDragStart = (e: React.DragEvent, stepId: string) => {
     setDraggedStepId(stepId);
     e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', stepId); // Required for Firefox
   };
 
   const handleDragOver = (e: React.DragEvent, stepId: string) => {
-    e.preventDefault(); // Allow drop
+    e.preventDefault();
     setDragOverStepId(stepId);
-  };
-
-  const handleDragLeave = () => {
-    setDragOverStepId(null);
   };
 
   const handleDrop = useCallback(async (e: React.DragEvent, targetStepId: string) => {
@@ -831,9 +762,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
     }
 
     const newStepsOrder = Array.from(steps);
-    // Fix: Explicitly type 's' in the findIndex callback to resolve 'Property 'id' does not exist on type 'unknown'.'
     const draggedIndex = newStepsOrder.findIndex((s: Step) => s.id === draggedStepId);
-    // Fix: Explicitly type 's' in the findIndex callback to resolve 'Property 'id' does not exist on type 'unknown'.'
     const targetIndex = newStepsOrder.findIndex((s: Step) => s.id === targetStepId);
 
     if (draggedIndex === -1 || targetIndex === -1) {
@@ -841,11 +770,9 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
       return;
     }
 
-    // Move the dragged item
     const [reorderedItem] = newStepsOrder.splice(draggedIndex, 1);
     newStepsOrder.splice(targetIndex, 0, reorderedItem);
 
-    // Update orderIndex for all steps
     const updatedSteps = newStepsOrder.map((step, index) => ({
       ...step,
       orderIndex: index + 1,
@@ -853,15 +780,13 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
 
     setLoading(true);
     try {
-      // Send updates to the database in parallel
       await Promise.all(updatedSteps.map(step => dbService.updateStep(step)));
-      await loadWorkData(); // Refresh data to ensure consistency
+      await loadWorkData();
     } catch (error: any) {
-      console.error("Erro ao reordenar etapas:", error);
       setZeModal({
         isOpen: true,
-        title: "Erro ao Reordenar Etapas",
-        message: `Não foi possível reordenar as etapas: ${error.message || 'Erro desconhecido'}. Tente novamente.`,
+        title: "Erro ao Reordenar",
+        message: "Não foi possível reordenar as etapas.",
         type: "ERROR",
         confirmText: "Ok",
         onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
@@ -871,8 +796,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
       setDragOverStepId(null);
       setLoading(false);
     }
-  }, [draggedStepId, steps, workId, loadWorkData, setLoading, setDraggedStepId, setDragOverStepId, setZeModal]);
-
+  }, [draggedStepId, steps, workId, loadWorkData]);
 
   // =======================================================================
   // CRUD HANDLERS: MATERIALS
@@ -884,12 +808,11 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
 
     setZeModal(prev => ({ ...prev, isConfirming: true }));
     try {
-      // FIX: Pass user.id as the first argument
       await dbService.addMaterial(user.id, {
         workId: workId,
         name: newMaterialName,
-        brand: newMaterialBrand, // NEW: Pass brand
-        plannedQty: Number(newMaterialPlannedQty), // Quantity is not monetary
+        brand: newMaterialBrand,
+        plannedQty: Number(newMaterialPlannedQty),
         purchasedQty: 0,
         unit: newMaterialUnit,
         category: newMaterialCategory,
@@ -897,21 +820,13 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
       });
       setShowAddMaterialModal(false);
       setNewMaterialName('');
-      setNewMaterialBrand(''); // Clear brand for new material
-      setNewMaterialPlannedQty('');
-      setNewMaterialUnit('');
-      setNewMaterialCategory('');
-      setNewMaterialStepId('');
-      setPurchaseQtyInput(''); // Clear temporary purchase inputs
-      setPurchaseCostInput(''); // Clear temporary purchase inputs
       await loadWorkData();
     } catch (error: any) {
-      console.error("Erro ao adicionar material:", error);
       setZeModal(prev => ({
         ...prev,
         isConfirming: false,
-        title: "Erro ao Adicionar Material",
-        message: `Não foi possível adicionar o material: ${error.message || 'Erro desconhecido'}. Tente novamente.`,
+        title: "Erro ao Adicionar",
+        message: "Não foi possível adicionar o material.",
         type: "ERROR",
         confirmText: "Ok",
         onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
@@ -930,48 +845,37 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
       const qtyToRegister = Number(purchaseQtyInput);
       const costToRegister = Number(purchaseCostInput);
 
-      // 1. Update the material's descriptive properties
-      // dbService.updateMaterial will validate and prevent changes to key fields if already purchased
       await dbService.updateMaterial({
-        ...editMaterialData, // All original data
+        ...editMaterialData,
         name: newMaterialName,
         brand: newMaterialBrand,
         plannedQty: Number(newMaterialPlannedQty),
         unit: newMaterialUnit,
         category: newMaterialCategory,
         stepId: newMaterialStepId === 'none' ? undefined : newMaterialStepId,
-        // purchasedQty and totalCost are derived and handled by registerMaterialPurchase,
-        // so we pass the original values here and update them only via purchase registration.
-        // dbService.updateMaterial will ignore them anyway for consistency if a purchase exists.
-        purchasedQty: editMaterialData.purchasedQty, 
-        totalCost: editMaterialData.totalCost,
       });
 
-      // 2. If new purchase quantities are provided, register the purchase
       if (qtyToRegister > 0 && costToRegister >= 0) {
         await dbService.registerMaterialPurchase(
           editMaterialData.id,
-          newMaterialName, // Use potentially updated name
-          newMaterialBrand, // Use potentially updated brand
-          Number(newMaterialPlannedQty), // Use potentially updated plannedQty
-          newMaterialUnit, // Use potentially updated unit
+          newMaterialName,
+          newMaterialBrand,
+          Number(newMaterialPlannedQty),
+          newMaterialUnit,
           qtyToRegister,
           costToRegister
         );
-        setPurchaseQtyInput(''); // Clear temporary purchase inputs
-        setPurchaseCostInput('');
       }
 
       setEditMaterialData(null);
-      setShowAddMaterialModal(false); // Close the modal
+      setShowAddMaterialModal(false);
       await loadWorkData();
     } catch (error: any) {
-      console.error("Erro ao editar material ou registrar compra:", error);
       setZeModal(prev => ({
         ...prev,
         isConfirming: false,
         title: "Erro na Operação",
-        message: `Não foi possível completar a operação: ${error.message || 'Erro desconhecido'}. Tente novamente.`,
+        message: "Não foi possível completar a operação.",
         type: "ERROR",
         confirmText: "Ok",
         onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
@@ -986,14 +890,13 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
     try {
       await dbService.deleteMaterial(materialId);
       await loadWorkData();
-      setZeModal(prev => ({ ...prev, isOpen: false })); // Close the modal after successful deletion
+      setZeModal(prev => ({ ...prev, isOpen: false }));
     } catch (error: any) {
-      console.error("Erro ao deletar material:", error);
       setZeModal(prev => ({
         ...prev,
         isConfirming: false,
-        title: "Erro ao Deletar Material",
-        message: `Não foi possível deletar o material: ${error.message || 'Erro desconhecido'}. Tente novamente.`,
+        title: "Erro ao Deletar",
+        message: "Não foi possível deletar o material.",
         type: "ERROR",
         confirmText: "Ok",
         onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
@@ -1002,8 +905,6 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
       setZeModal(prev => ({ ...prev, isConfirming: false }));
     }
   };
-
-  // REMOVED handleRegisterMaterialPurchase as it's now integrated
 
   // =======================================================================
   // CRUD HANDLERS: EXPENSES
@@ -1018,34 +919,23 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
       await dbService.addExpense({
         workId: workId,
         description: newExpenseDescription,
-        amount: Number(newExpenseAmount), // Direct conversion
-        // paidAmount e status são DERIVADOS, não passados na criação
-        quantity: 1, // Default to 1 for generic expenses
+        amount: Number(newExpenseAmount),
+        quantity: 1,
         date: newExpenseDate,
         category: newExpenseCategory,
         stepId: newExpenseStepId === 'none' ? undefined : newExpenseStepId,
         workerId: newExpenseWorkerId === 'none' ? undefined : newExpenseWorkerId,
         supplierId: newExpenseSupplierId === 'none' ? undefined : newExpenseSupplierId,
-        // totalAgreed defaults to amount if not explicitly provided
-        totalAgreed: newExpenseTotalAgreed ? Number(newExpenseTotalAgreed) : Number(newExpenseAmount), // Direct conversion
+        totalAgreed: newExpenseTotalAgreed ? Number(newExpenseTotalAgreed) : Number(newExpenseAmount),
       });
       setShowAddExpenseModal(false);
-      setNewExpenseDescription('');
-      setNewExpenseAmount('');
-      setNewExpenseCategory(ExpenseCategory.OTHER);
-      setNewExpenseDate(new Date().toISOString().split('T')[0]);
-      setNewExpenseStepId('');
-      setNewExpenseWorkerId('');
-      setNewExpenseSupplierId('');
-      setNewExpenseTotalAgreed(''); // Clear new expense total agreed
       await loadWorkData();
     } catch (error: any) {
-      console.error("Erro ao adicionar despesa:", error);
       setZeModal(prev => ({
         ...prev,
         isConfirming: false,
-        title: "Erro ao Adicionar Despesa",
-        message: `Não foi possível adicionar a despesa: ${error.message || 'Erro desconhecido'}. Tente novamente.`,
+        title: "Erro ao Adicionar",
+        message: "Não foi possível adicionar a despesa.",
         type: "ERROR",
         confirmText: "Ok",
         onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
@@ -1062,27 +952,26 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
     setZeModal(prev => ({ ...prev, isConfirming: true }));
     try {
       await dbService.updateExpense({
-        ...editExpenseData, // Contém paidAmount e status derivados
+        ...editExpenseData,
         workId: workId,
         description: newExpenseDescription,
-        amount: Number(newExpenseAmount), // Direct conversion
+        amount: Number(newExpenseAmount),
         date: newExpenseDate,
         category: newExpenseCategory,
         stepId: newExpenseStepId === 'none' ? undefined : newExpenseStepId,
         workerId: newExpenseWorkerId === 'none' ? undefined : newExpenseWorkerId,
         supplierId: newExpenseSupplierId === 'none' ? undefined : newExpenseSupplierId,
-        totalAgreed: newExpenseTotalAgreed ? Number(newExpenseTotalAgreed) : Number(editExpenseData.amount), // Direct conversion
+        totalAgreed: newExpenseTotalAgreed ? Number(newExpenseTotalAgreed) : Number(editExpenseData.amount),
       });
       setEditExpenseData(null);
-      setShowAddExpenseModal(false); // Close the modal
+      setShowAddExpenseModal(false);
       await loadWorkData();
     } catch (error: any) {
-      console.error("Erro ao editar despesa:", error);
       setZeModal(prev => ({
         ...prev,
         isConfirming: false,
-        title: "Erro ao Editar Despesa",
-        message: `Não foi possível editar a despesa: ${error.message || 'Erro desconhecido'}. Tente novamente.`,
+        title: "Erro ao Editar",
+        message: "Não foi possível editar a despesa.",
         type: "ERROR",
         confirmText: "Ok",
         onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
@@ -1097,14 +986,13 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
     try {
       await dbService.deleteExpense(expenseId);
       await loadWorkData();
-      setZeModal(prev => ({ ...prev, isOpen: false })); // Close the modal after successful deletion
+      setZeModal(prev => ({ ...prev, isOpen: false }));
     } catch (error: any) {
-      console.error("Erro ao deletar despesa:", error);
       setZeModal(prev => ({
         ...prev,
         isConfirming: false,
-        title: "Erro ao Deletar Despesa",
-        message: `Não foi possível deletar a despesa: ${error.message || 'Erro desconhecido'}. Tente novamente.`,
+        title: "Erro ao Deletar",
+        message: "Não foi possível deletar a despesa.",
         type: "ERROR",
         confirmText: "Ok",
         onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
@@ -1122,20 +1010,18 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
     try {
       await dbService.addPaymentToExpense(
         paymentExpenseData.id,
-        Number(paymentAmount), // Direct conversion
+        Number(paymentAmount),
         paymentDate
       );
       setPaymentAmount('');
-      setPaymentExpenseData(null);
       setShowAddPaymentModal(false);
       await loadWorkData();
     } catch (error: any) {
-      console.error("Erro ao adicionar pagamento:", error);
       setZeModal(prev => ({
         ...prev,
         isConfirming: false,
-        title: "Erro ao Adicionar Pagamento",
-        message: `Não foi possível adicionar o pagamento: ${error.message || 'Erro desconhecido'}. Tente novamente.`,
+        title: "Erro ao Pagar",
+        message: "Não foi possível adicionar o pagamento.",
         type: "ERROR",
         confirmText: "Ok",
         onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
@@ -1146,73 +1032,42 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
   };
 
   // =======================================================================
-  // CRUD HANDLERS: WORKERS
+  // CRUD HANDLERS: WORKERS / SUPPLIERS / PHOTOS / FILES / CHECKLISTS
   // =======================================================================
 
   const handleAddWorker = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!workId || !user?.id || !newWorkerName || !newWorkerRole || !newWorkerPhone) return;
-    
     setZeModal(prev => ({ ...prev, isConfirming: true }));
     try {
       await dbService.addWorker({
-        workId: workId,
-        userId: user.id,
-        name: newWorkerName,
-        role: newWorkerRole,
-        phone: newWorkerPhone,
-        dailyRate: newWorkerDailyRate ? Number(newWorkerDailyRate) : undefined, // Direct conversion
-        notes: newWorkerNotes,
+        workId, userId: user.id, name: newWorkerName, role: newWorkerRole, phone: newWorkerPhone,
+        dailyRate: newWorkerDailyRate ? Number(newWorkerDailyRate) : undefined, notes: newWorkerNotes,
       });
       setShowAddWorkerModal(false);
-      setNewWorkerName(''); setNewWorkerRole(''); setNewWorkerPhone(''); setNewWorkerDailyRate(''); setNewWorkerNotes('');
       await loadWorkData();
     } catch (error: any) {
-      console.error("Erro ao adicionar profissional:", error);
-      setZeModal(prev => ({
-        ...prev,
-        isConfirming: false,
-        title: "Erro ao Adicionar Profissional",
-        message: `Não foi possível adicionar o profissional: ${error.message || 'Erro desconhecido'}. Tente novamente.`,
-        type: "ERROR",
-        confirmText: "Ok",
-        onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
-      }));
+        console.error(error);
     } finally {
-      setZeModal(prev => ({ ...prev, isConfirming: false }));
+        setZeModal(prev => ({ ...prev, isConfirming: false }));
     }
   };
 
   const handleEditWorker = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editWorkerData || !workId) return;
-
+    if (!editWorkerData) return;
     setZeModal(prev => ({ ...prev, isConfirming: true }));
     try {
       await dbService.updateWorker({
-        ...editWorkerData,
-        name: newWorkerName,
-        role: newWorkerRole,
-        phone: newWorkerPhone,
-        dailyRate: newWorkerDailyRate ? Number(newWorkerDailyRate) : undefined, // Direct conversion
-        notes: newWorkerNotes,
+        ...editWorkerData, name: newWorkerName, role: newWorkerRole, phone: newWorkerPhone,
+        dailyRate: newWorkerDailyRate ? Number(newWorkerDailyRate) : undefined, notes: newWorkerNotes,
       });
       setEditWorkerData(null);
-      setShowAddWorkerModal(false);
       await loadWorkData();
     } catch (error: any) {
-      console.error("Erro ao editar profissional:", error);
-      setZeModal(prev => ({
-        ...prev,
-        isConfirming: false,
-        title: "Erro ao Editar Profissional",
-        message: `Não foi possível editar o profissional: ${error.message || 'Erro desconhecido'}. Tente novamente.`,
-        type: "ERROR",
-        confirmText: "Ok",
-        onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
-      }));
+        console.error(error);
     } finally {
-      setZeModal(prev => ({ ...prev, isConfirming: false }));
+        setZeModal(prev => ({ ...prev, isConfirming: false }));
     }
   };
 
@@ -1224,91 +1079,45 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
       await loadWorkData();
       setZeModal(prev => ({ ...prev, isOpen: false }));
     } catch (error: any) {
-      console.error("Erro ao deletar profissional:", error);
-      setZeModal(prev => ({
-        ...prev,
-        isConfirming: false,
-        title: "Erro ao Deletar Profissional",
-        message: `Não foi possível deletar o profissional: ${error.message || 'Erro desconhecido'}. Tente novamente.`,
-        type: "ERROR",
-        confirmText: "Ok",
-        onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
-      }));
+        console.error(error);
     } finally {
-      setZeModal(prev => ({ ...prev, isConfirming: false }));
+        setZeModal(prev => ({ ...prev, isConfirming: false }));
     }
   };
 
-  // =======================================================================
-  // CRUD HANDLERS: SUPPLIERS
-  // =======================================================================
-
   const handleAddSupplier = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!workId || !user?.id || !newSupplierName || !newSupplierCategory || !newSupplierPhone) return;
-
+    if (!workId || !user?.id || !newSupplierName) return;
     setZeModal(prev => ({ ...prev, isConfirming: true }));
     try {
       await dbService.addSupplier({
-        workId: workId,
-        userId: user.id,
-        name: newSupplierName,
-        category: newSupplierCategory,
-        phone: newSupplierPhone,
-        email: newSupplierEmail,
-        address: newSupplierAddress,
-        notes: newSupplierNotes,
+        workId, userId: user.id, name: newSupplierName, category: newSupplierCategory,
+        phone: newSupplierPhone, email: newSupplierEmail, address: newSupplierAddress, notes: newSupplierNotes,
       });
       setShowAddSupplierModal(false);
-      setNewSupplierName(''); setNewSupplierCategory(''); setNewSupplierPhone(''); setNewSupplierEmail(''); setNewSupplierAddress(''); setNewSupplierNotes('');
       await loadWorkData();
     } catch (error: any) {
-      console.error("Erro ao adicionar fornecedor:", error);
-      setZeModal(prev => ({
-        ...prev,
-        isConfirming: false,
-        title: "Erro ao Adicionar Fornecedor",
-        message: `Não foi possível adicionar o fornecedor: ${error.message || 'Erro desconhecido'}. Tente novamente.`,
-        type: "ERROR",
-        confirmText: "Ok",
-        onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
-      }));
+        console.error(error);
     } finally {
-      setZeModal(prev => ({ ...prev, isConfirming: false }));
+        setZeModal(prev => ({ ...prev, isConfirming: false }));
     }
   };
 
   const handleEditSupplier = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editSupplierData || !workId) return;
-
+    if (!editSupplierData) return;
     setZeModal(prev => ({ ...prev, isConfirming: true }));
     try {
       await dbService.updateSupplier({
-        ...editSupplierData,
-        name: newSupplierName,
-        category: newSupplierCategory,
-        phone: newSupplierPhone,
-        email: newSupplierEmail,
-        address: newSupplierAddress,
-        notes: newSupplierNotes,
+        ...editSupplierData, name: newSupplierName, category: newSupplierCategory,
+        phone: newSupplierPhone, email: newSupplierEmail, address: newSupplierAddress, notes: newSupplierNotes,
       });
       setEditSupplierData(null);
-      setShowAddSupplierModal(false);
       await loadWorkData();
     } catch (error: any) {
-      console.error("Erro ao editar fornecedor:", error);
-      setZeModal(prev => ({
-        ...prev,
-        isConfirming: false,
-        title: "Erro ao Editar Fornecedor",
-        message: `Não foi possível editar o fornecedor: ${error.message || 'Erro desconhecido'}. Tente novamente.`,
-        type: "ERROR",
-        confirmText: "Ok",
-        onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
-      }));
+        console.error(error);
     } finally {
-      setZeModal(prev => ({ ...prev, isConfirming: false }));
+        setZeModal(prev => ({ ...prev, isConfirming: false }));
     }
   };
 
@@ -1320,76 +1129,30 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
       await loadWorkData();
       setZeModal(prev => ({ ...prev, isOpen: false }));
     } catch (error: any) {
-      console.error("Erro ao deletar fornecedor:", error);
-      setZeModal(prev => ({
-        ...prev,
-        isConfirming: false,
-        title: "Erro ao Deletar Fornecedor",
-        message: `Não foi possível deletar o fornecedor: ${error.message || 'Erro desconhecido'}. Tente novamente.`,
-        type: "ERROR",
-        confirmText: "Ok",
-        onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
-      }));
+        console.error(error);
     } finally {
-      setZeModal(prev => ({ ...prev, isConfirming: false }));
+        setZeModal(prev => ({ ...prev, isConfirming: false }));
     }
   };
 
-
-  // =======================================================================
-  // CRUD HANDLERS: PHOTOS
-  // =======================================================================
   const handleAddPhoto = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!workId || !newPhotoFile) return;
-
     setLoadingPhoto(true);
     try {
-      // 1. Upload to Supabase Storage
       const fileExt = newPhotoFile.name.split('.').pop();
       const filePath = `${workId}/${Date.now()}.${fileExt}`;
-      
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('work_media')
-        .upload(filePath, newPhotoFile, {
-          cacheControl: '3600',
-          upsert: false,
-        });
-
+      const { error: uploadError } = await supabase.storage.from('work_media').upload(filePath, newPhotoFile);
       if (uploadError) throw uploadError;
-
-      // 2. Get public URL
-      const { data: publicUrlData } = supabase.storage
-        .from('work_media')
-        .getPublicUrl(filePath);
-      
-      if (!publicUrlData?.publicUrl) throw new Error("Could not get public URL for the image.");
-
-      // 3. Save photo record to database
+      const { data: publicUrlData } = supabase.storage.from('work_media').getPublicUrl(filePath);
       await dbService.addPhoto({
-        workId: workId,
-        url: publicUrlData.publicUrl,
-        description: newPhotoDescription,
-        date: new Date().toISOString().split('T')[0],
-        type: newPhotoType,
+        workId, url: publicUrlData.publicUrl, description: newPhotoDescription,
+        date: new Date().toISOString().split('T')[0], type: newPhotoType,
       });
-      
       setShowAddPhotoModal(false);
-      setNewPhotoDescription('');
-      setNewPhotoFile(null);
-      setNewPhotoType('PROGRESS');
       await loadWorkData();
-
     } catch (error: any) {
-      console.error("Erro ao adicionar foto:", error);
-      setZeModal({
-        isOpen: true,
-        title: "Erro ao Adicionar Foto",
-        message: `Não foi possível adicionar a foto: ${error.message}.`,
-        type: "ERROR",
-        confirmText: "Ok",
-        onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
-      });
+        console.error(error);
     } finally {
       setLoadingPhoto(false);
     }
@@ -1397,97 +1160,38 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
 
   const handleDeletePhoto = async (photoId: string, photoUrl: string) => {
     if (!workId) return;
-
     setZeModal(prev => ({ ...prev, isConfirming: true }));
     try {
-      // 1. Delete from Supabase Storage
-      // The URL looks like: https://[project_id].supabase.co/storage/v1/object/public/work_media/workId/timestamp.ext
-      const filePath = photoUrl.split('work_media/')[1]; // Extract path from URL: workId/timestamp.ext
-      const { error: storageError } = await supabase.storage.from('work_media').remove([filePath]);
-      if (storageError) {
-        // If the storage object is not found (already deleted, etc.), don't block DB deletion
-        if (storageError.statusCode === '404' || storageError.message.includes('not found')) {
-            console.warn(`Storage object for photo ID ${photoId} not found or already deleted. Proceeding with DB deletion.`);
-        } else {
-            throw storageError;
-        }
-      }
-
-      // 2. Delete record from database
+      const filePath = photoUrl.split('work_media/')[1];
+      await supabase.storage.from('work_media').remove([filePath]);
       await dbService.deletePhoto(photoId);
       await loadWorkData();
       setZeModal(prev => ({ ...prev, isOpen: false }));
     } catch (error: any) {
-      console.error("Erro ao deletar foto:", error);
-      setZeModal(prev => ({
-        ...prev,
-        isConfirming: false,
-        title: "Erro ao Deletar Foto",
-        message: `Não foi possível deletar a foto: ${error.message}.`,
-        type: "ERROR",
-        confirmText: "Ok",
-        onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
-      });
+        console.error(error);
     } finally {
-      setLoadingPhoto(false);
+        setZeModal(prev => ({ ...prev, isConfirming: false }));
     }
   };
 
-  // =======================================================================
-  // CRUD HANDLERS: FILES
-  // =======================================================================
   const handleAddFile = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!workId || !newUploadFile) return;
-
     setLoadingFile(true);
     try {
-      // 1. Upload to Supabase Storage
       const fileExt = newUploadFile.name.split('.').pop();
       const filePath = `${workId}/docs/${newFileName || newUploadFile.name}-${Date.now()}.${fileExt}`;
-      
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('work_files') // Assuming a separate bucket for files
-        .upload(filePath, newUploadFile, {
-          cacheControl: '3600',
-          upsert: false,
-        });
-
+      const { error: uploadError } = await supabase.storage.from('work_files').upload(filePath, newUploadFile);
       if (uploadError) throw uploadError;
-
-      // 2. Get public URL
-      const { data: publicUrlData } = supabase.storage
-        .from('work_files')
-        .getPublicUrl(filePath);
-      
-      if (!publicUrlData?.publicUrl) throw new Error("Could not get public URL for the file.");
-
-      // 3. Save file record to database
+      const { data: publicUrlData } = supabase.storage.from('work_files').getPublicUrl(filePath);
       await dbService.addFile({
-        workId: workId,
-        name: newFileName || newUploadFile.name,
-        category: newFileCategory,
-        url: publicUrlData.publicUrl,
-        type: newUploadFile.type,
-        date: new Date().toISOString().split('T')[0],
+        workId, name: newFileName || newUploadFile.name, category: newFileCategory,
+        url: publicUrlData.publicUrl, type: newUploadFile.type, date: new Date().toISOString().split('T')[0],
       });
-      
       setShowAddFileModal(false);
-      setNewFileName('');
-      setNewFileCategory(FileCategory.GENERAL);
-      setNewUploadFile(null);
       await loadWorkData();
-
     } catch (error: any) {
-      console.error("Erro ao adicionar arquivo:", error);
-      setZeModal({
-        isOpen: true,
-        title: "Erro ao Adicionar Arquivo",
-        message: `Não foi possível adicionar o arquivo: ${error.message}.`,
-        type: "ERROR",
-        confirmText: "Ok",
-        onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
-      });
+        console.error(error);
     } finally {
       setLoadingFile(false);
     }
@@ -1495,146 +1199,66 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
 
   const handleDeleteFile = async (fileId: string, fileUrl: string) => {
     if (!workId) return;
-
     setZeModal(prev => ({ ...prev, isConfirming: true }));
     try {
-      // 1. Delete from Supabase Storage
-      const filePath = fileUrl.split('work_files/')[1]; // Extract path from URL
-      const { error: storageError } = await supabase.storage.from('work_files').remove([filePath]);
-      if (storageError) {
-          // If the storage object is not found (already deleted, etc.), don't block DB deletion
-          if (storageError.statusCode === '404' || storageError.message.includes('not found')) {
-              console.warn(`Storage object for file ID ${fileId} not found or already deleted. Proceeding with DB deletion.`);
-          } else {
-              throw storageError;
-          }
-      }
-
-      // 2. Delete record from database
+      const filePath = fileUrl.split('work_files/')[1];
+      await supabase.storage.from('work_files').remove([filePath]);
       await dbService.deleteFile(fileId);
       await loadWorkData();
       setZeModal(prev => ({ ...prev, isOpen: false }));
     } catch (error: any) {
-      console.error("Erro ao deletar arquivo:", error);
-      setZeModal(prev => ({
-        ...prev,
-        isConfirming: false,
-        title: "Erro ao Deletar Arquivo",
-        message: `Não foi possível deletar o arquivo: ${error.message}.`,
-        type: "ERROR",
-        confirmText: "Ok",
-        onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
-      }));
+        console.error(error);
     } finally {
-      setLoadingFile(false);
+        setZeModal(prev => ({ ...prev, isConfirming: false }));
     }
   };
 
-  // =======================================================================
-  // CRUD HANDLERS: CHECKLISTS
-  // =======================================================================
   const handleAddChecklist = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!workId || !newChecklistName || !newChecklistCategory) return;
-
+    if (!workId || !newChecklistName) return;
     const itemsForDb = newChecklistItems.filter(item => item.trim() !== '').map((text, idx) => ({
-      id: `item-${Date.now()}-${idx}`,
-      text: text.trim(),
-      checked: false
+      id: `item-${Date.now()}-${idx}`, text: text.trim(), checked: false
     }));
-
     setZeModal(prev => ({ ...prev, isConfirming: true }));
     try {
-      await dbService.addChecklist({
-        workId: workId,
-        name: newChecklistName,
-        category: newChecklistCategory,
-        items: itemsForDb,
-      });
+      await dbService.addChecklist({ workId, name: newChecklistName, category: newChecklistCategory, items: itemsForDb });
       setShowAddChecklistModal(false);
-      setNewChecklistName('');
-      setNewChecklistCategory('');
-      setNewChecklistItems(['']); // Reset to one empty item
       await loadWorkData();
     } catch (error: any) {
-      console.error("Erro ao adicionar checklist:", error);
-      setZeModal(prev => ({
-        ...prev,
-        isConfirming: false,
-        title: "Erro ao Adicionar Checklist",
-        message: `Não foi possível adicionar o checklist: ${error.message || 'Erro desconhecido'}. Tente novamente.`,
-        type: "ERROR",
-        confirmText: "Ok",
-        onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
-      }));
+        console.error(error);
     } finally {
-      setZeModal(prev => ({ ...prev, isConfirming: false }));
+        setZeModal(prev => ({ ...prev, isConfirming: false }));
     }
   };
 
   const handleEditChecklist = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editChecklistData || !workId) return;
-
+    if (!editChecklistData) return;
     const itemsForDb = newChecklistItems.filter(item => item.trim() !== '').map((text, idx) => {
-      // Try to preserve existing item IDs if possible
       const existingItem = editChecklistData.items.find(item => item.text === text.trim());
-      return {
-        id: existingItem ? existingItem.id : `item-${Date.now()}-${idx}`,
-        text: text.trim(),
-        checked: existingItem ? existingItem.checked : false
-      };
+      return { id: existingItem ? existingItem.id : `item-${Date.now()}-${idx}`, text: text.trim(), checked: existingItem ? existingItem.checked : false };
     });
-
     setZeModal(prev => ({ ...prev, isConfirming: true }));
     try {
-      await dbService.updateChecklist({
-        ...editChecklistData,
-        name: newChecklistName,
-        category: newChecklistCategory,
-        items: itemsForDb,
-      });
+      await dbService.updateChecklist({ ...editChecklistData, name: newChecklistName, category: newChecklistCategory, items: itemsForDb });
       setEditChecklistData(null);
-      setShowAddChecklistModal(false);
       await loadWorkData();
     } catch (error: any) {
-      console.error("Erro ao editar checklist:", error);
-      setZeModal(prev => ({
-        ...prev,
-        isConfirming: false,
-        title: "Erro ao Editar Checklist",
-        message: `Não foi possível editar o checklist: ${error.message || 'Erro desconhecido'}. Tente novamente.`,
-        type: "ERROR",
-        confirmText: "Ok",
-        onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
-      }));
+        console.error(error);
     } finally {
-      setZeModal(prev => ({ ...prev, isConfirming: false }));
+        setZeModal(prev => ({ ...prev, isConfirming: false }));
     }
   };
 
   const handleChecklistItemToggle = async (checklistId: string, itemId: string, checked: boolean) => {
-    if (!workId) return;
     try {
       const checklistToUpdate = checklists.find(cl => cl.id === checklistId);
       if (!checklistToUpdate) return;
-
-      const updatedItems = checklistToUpdate.items.map(item =>
-        item.id === itemId ? { ...item, checked: checked } : item
-      );
-
+      const updatedItems = checklistToUpdate.items.map(item => item.id === itemId ? { ...item, checked } : item);
       await dbService.updateChecklist({ ...checklistToUpdate, items: updatedItems });
       await loadWorkData();
     } catch (error: any) {
-      console.error("Erro ao atualizar item do checklist:", error);
-      setZeModal({
-        isOpen: true,
-        title: "Erro ao Atualizar Item",
-        message: `Não foi possível atualizar o item do checklist: ${error.message || 'Erro desconhecido'}. Tente novamente.`,
-        type: "ERROR",
-        confirmText: "Ok",
-        onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
-      });
+        console.error(error);
     }
   };
 
@@ -1645,18 +1269,9 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
       await loadWorkData();
       setZeModal(prev => ({ ...prev, isOpen: false }));
     } catch (error: any) {
-      console.error("Erro ao deletar checklist:", error);
-      setZeModal(prev => ({
-        ...prev,
-        isConfirming: false,
-        title: "Erro ao Deletar Checklist",
-        message: `Não foi possível deletar o checklist: ${error.message || 'Erro desconhecido'}. Tente novamente.`,
-        type: "ERROR",
-        confirmText: "Ok",
-        onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
-      }));
+        console.error(error);
     } finally {
-      setZeModal(prev => ({ ...prev, isConfirming: false }));
+        setZeModal(prev => ({ ...prev, isConfirming: false }));
     }
   };
 
@@ -1674,11 +1289,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
     );
   }
 
-  // Define se a despesa está "paga" ou tem pagamentos, para desabilitar edição de campos chave
-  // MODIFICADO: Usa o novo ExpenseStatus derivado
   const isEditingExpenseWithPayments = editExpenseData && editExpenseData.status !== ExpenseStatus.PENDING;
-  
-  // Determine if the currently selected category is 'Material'
   const isMaterialCategorySelected = newExpenseCategory === ExpenseCategory.MATERIAL;
 
   const renderMainContent = () => {
@@ -1690,14 +1301,13 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
               <h2 className="text-2xl font-black text-primary dark:text-white">Cronograma</h2>
               <button
                 onClick={() => {
-                    setEditStepData(null); // Ensure add mode
+                    setEditStepData(null);
                     setNewStepName('');
                     setNewStepStartDate(new Date().toISOString().split('T')[0]);
                     setNewStepEndDate(new Date().toISOString().split('T')[0]);
                     setShowAddStepModal(true);
                 }}
                 className="px-4 py-2 bg-secondary text-white text-sm font-bold rounded-xl hover:bg-secondary-dark transition-colors flex items-center gap-2"
-                aria-label="Adicionar nova etapa"
               >
                 <i className="fa-solid fa-plus"></i> Nova Etapa
               </button>
@@ -1706,34 +1316,23 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
             {steps.length === 0 ? (
                 <div className={cx(surface, "rounded-3xl p-8 text-center", mutedText)}>
                     <p className="text-lg mb-4">Nenhuma etapa cadastrada ainda.</p>
-                    <button onClick={() => {
-                        setEditStepData(null); // Ensure add mode
-                        setNewStepName('');
-                        setNewStepStartDate(new Date().toISOString().split('T')[0]);
-                        setNewStepEndDate(new Date().toISOString().split('T')[0]);
-                        setShowAddStepModal(true);
-                    }} className="px-6 py-3 bg-secondary text-white font-bold rounded-xl hover:bg-secondary-dark transition-colors">
-                        Adicionar sua primeira etapa
-                    </button>
                 </div>
             ) : (
                 <div className="space-y-4">
                     {steps.map((step) => {
                         const statusDetails = getEntityStatusDetails('step', step, steps);
-                        
                         return (
                             <div
                                 key={step.id}
                                 className={cx(
                                     surface,
-                                    `p-4 rounded-2xl flex items-center gap-4 transition-all hover:scale-[1.005] border-2 ${statusDetails.borderColor} shadow-lg ${statusDetails.shadowClass}`, // Apply dynamic border and shadow
+                                    `p-4 rounded-2xl flex items-center gap-4 transition-all hover:scale-[1.005] border-2 ${statusDetails.borderColor} shadow-lg ${statusDetails.shadowClass}`,
                                     draggedStepId === step.id && "opacity-50",
-                                    dragOverStepId === step.id && "ring-2 ring-secondary/50", // Highlight drag target with a ring
+                                    dragOverStepId === step.id && "ring-2 ring-secondary/50",
                                 )}
                                 draggable
                                 onDragStart={(e) => handleDragStart(e, step.id)}
                                 onDragOver={(e) => handleDragOver(e, step.id)}
-                                onDragLeave={handleDragLeave}
                                 onDrop={(e) => handleDrop(e, step.id)}
                                 onClick={() => { 
                                     setNewStepName(step.name);
@@ -1741,57 +1340,42 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                                     setNewStepEndDate(step.endDate);
                                     setEditStepData(step); 
                                     setShowAddStepModal(true); 
-                                }} // Open edit modal on card click
-                                role="listitem"
-                                aria-label={`Etapa ${step.orderIndex}. ${step.name}, status: ${statusDetails.statusText}`}
+                                }}
                             >
                                 <button
-                                    onClick={(e) => { e.stopPropagation(); handleStepStatusChange(step); }} // Prevent card click
-                                    disabled={isUpdatingStepStatus} // NEW: Disable button while updating
+                                    onClick={(e) => { e.stopPropagation(); handleStepStatusChange(step); }}
+                                    disabled={isUpdatingStepStatus}
                                     className={cx(
                                         "w-10 h-10 rounded-full text-white flex items-center justify-center text-lg font-bold transition-colors shrink-0",
-                                        statusDetails.bgColor, // This will be red if isDelayed is true
-                                        isUpdatingStepStatus ? 'opacity-70 cursor-not-allowed' : ''
+                                        statusDetails.bgColor
                                     )}
-                                    aria-label={`Mudar status da etapa ${step.name}`}
                                 >
-                                    {isUpdatingStepStatus ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className={`fa-solid ${statusDetails.icon}`}></i>}
+                                    <i className={`fa-solid ${statusDetails.icon}`}></i>
                                 </button>
                                 <div className="flex-1">
                                     <p className="text-xs font-bold uppercase text-slate-400 dark:text-slate-500 mb-0.5">
                                         Etapa {step.orderIndex} 
-                                        {step.isDelayed && (
-                                            <span className="ml-2 px-2 py-0.5 rounded-full bg-red-500 text-white text-[10px] font-black uppercase tracking-wider">
-                                                Atrasada <i className="fa-solid fa-exclamation-triangle ml-1"></i>
-                                            </span>
-                                        )}
                                         <span className={statusDetails.textColor}> ({statusDetails.statusText})</span>
                                     </p>
                                     <h3 className="text-lg font-bold text-primary dark:text-white leading-tight">{step.name}</h3>
-                                    <p className="text-xs text-slate-500 dark:text-slate-400">
-                                        {formatDateDisplay(step.startDate)} - {formatDateDisplay(step.endDate)}
-                                        {/* REMOVED: {step.realDate && <span className="ml-2 text-green-600 dark:text-green-400">(Concluído em: {formatDateDisplay(step.realDate)})</span>} */}
-                                    </p>
                                 </div>
-                                <div className="text-right text-sm flex flex-col items-center gap-2">
+                                <div className="text-right text-sm">
                                     <p className="font-bold text-primary dark:text-white">{calculateStepProgress(step.id).toFixed(0)}%</p>
-                                    <p className="text-xs text-slate-500 dark:text-slate-400">Progresso Materiais</p>
                                     <button
                                         onClick={(e) => { e.stopPropagation(); 
                                             setZeModal({
                                                 isOpen: true,
                                                 title: "Excluir Etapa",
-                                                message: `Tem certeza que deseja excluir a etapa ${step.name}?`,
+                                                message: `Tem certeza?`,
                                                 confirmText: "Excluir",
-                                                onConfirm: async (ev) => { ev?.preventDefault(); handleDeleteStep(step.id); },
+                                                onConfirm: () => handleDeleteStep(step.id),
                                                 onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
                                                 type: "DANGER"
                                             });
                                         }}
                                         className="text-slate-400 hover:text-red-500 transition-colors p-1"
-                                        aria-label={`Excluir etapa ${step.name}`}
                                     >
-                                        <i className="fa-solid fa-trash-alt text-lg"></i>
+                                        <i className="fa-solid fa-trash-alt"></i>
                                     </button>
                                 </div>
                             </div>
@@ -1809,299 +1393,92 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
               <h2 className="text-2xl font-black text-primary dark:text-white">Materiais</h2>
               <button
                 onClick={() => {
-                  setEditMaterialData(null); // Ensure add mode
+                  setEditMaterialData(null);
                   setNewMaterialName('');
-                  setNewMaterialBrand(''); // Clear brand for new material
                   setNewMaterialPlannedQty('');
                   setNewMaterialUnit('');
-                  setNewMaterialCategory('');
-                  setNewMaterialStepId('');
-                  setPurchaseQtyInput(''); // Clear temporary purchase inputs
-                  setPurchaseCostInput(''); // Clear temporary purchase inputs
                   setShowAddMaterialModal(true);
                 }}
                 className="px-4 py-2 bg-secondary text-white text-sm font-bold rounded-xl hover:bg-secondary-dark transition-colors flex items-center gap-2"
-                aria-label="Adicionar novo material"
               >
                 <i className="fa-solid fa-plus"></i> Novo Material
               </button>
             </div>
-            {materials.length === 0 ? (
-                <div className={cx(surface, "rounded-3xl p-8 text-center", mutedText)}>
-                    <p className="text-lg mb-4">Nenhuma material cadastrado ainda.</p>
-                    <button onClick={() => {
-                      setEditMaterialData(null); 
-                      setNewMaterialName('');
-                      setNewMaterialBrand('');
-                      setNewMaterialPlannedQty('');
-                      setNewMaterialUnit('');
-                      setNewMaterialCategory('');
-                      setNewMaterialStepId('');
-                      setPurchaseQtyInput(''); // Clear temporary purchase inputs
-                      setPurchaseCostInput(''); // Clear temporary purchase inputs
-                      setShowAddMaterialModal(true);
-                    }} className="px-6 py-3 bg-secondary text-white font-bold rounded-xl hover:bg-secondary-dark transition-colors">
-                        Adicionar seu primeiro material
-                    </button>
-                </div>
-            ) : (
-              <>
-                <div className="mb-6 px-2 sm:px-0">
-                  <label htmlFor="material-step-filter" className="sr-only">Filtrar por etapa</label>
-                  <select
-                    id="material-step-filter"
-                    value={materialFilterStepId}
-                    onChange={(e) => setMaterialFilterStepId(e.target.value)}
-                    className="w-full md:w-auto px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-primary dark:text-white focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
-                    aria-label="Filtrar materiais por etapa"
-                  >
-                    <option value="all">Todas as Etapas</option>
-                    {steps.map(step => (
-                      <option key={step.id} value={step.id}>{step.orderIndex}. {step.name}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="space-y-6">
-                  {groupedMaterials.map(group => (
-                    <div key={group.stepId}>
-                      <h3 className="text-lg font-bold text-slate-500 dark:text-slate-400 mb-3 px-2 sm:px-0">{group.stepName}</h3>
-                      <div className="space-y-4">
-                        {group.materials.map(material => {
-                           const statusDetails = getEntityStatusDetails('material', material, steps);
-                           const progress = material.plannedQty > 0 ? (material.purchasedQty / material.plannedQty) * 100 : 0;
-                           // 🔥 FIX CRÍTICO: Bloqueio de edição para material pago (se purchasedQty > 0)
-                           const isMaterialPurchased = material.purchasedQty > 0;
-
-                           return (
+            {groupedMaterials.map(group => (
+                <div key={group.stepId} className="mb-6">
+                    <h3 className="text-lg font-bold text-slate-500 dark:text-slate-400 mb-3">{group.stepName}</h3>
+                    <div className="space-y-4">
+                    {group.materials.map(material => {
+                        const statusDetails = getEntityStatusDetails('material', material, steps);
+                        return (
                             <div 
-                              key={material.id} 
-                              onClick={() => { 
-                                // Only allow opening edit modal if not fully paid, or just view if paid
-                                // MODIFICADO: Abertura para edição é sempre permitida, mas campos são desabilitados
-                                  setNewMaterialName(material.name);
-                                  setNewMaterialBrand(material.brand || ''); // NEW: Pre-populate brand
-                                  setNewMaterialPlannedQty(String(material.plannedQty)); // Convert to string for input
-                                  setNewMaterialUnit(material.unit);
-                                  setNewMaterialCategory(material.category || '');
-                                  setNewMaterialStepId(material.stepId || 'none');
-                                  setEditMaterialData(material); 
-                                  setPurchaseQtyInput(''); // Clear temporary purchase inputs
-                                  setPurchaseCostInput(''); // Clear temporary purchase inputs
-                                  setShowAddMaterialModal(true); 
-                              }} 
-                              className={cx(
-                                surface, 
-                                `p-4 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 cursor-pointer hover:scale-[1.005] transition-transform border-2 ${statusDetails.borderColor} shadow-lg ${statusDetails.shadowClass}`,
-                                isMaterialPurchased ? 'opacity-70' : '' // Dim if any purchase has been made
-                              )} 
-                              aria-label={`Material ${material.name}`}
+                            key={material.id} 
+                            onClick={() => {
+                                setNewMaterialName(material.name);
+                                setNewMaterialBrand(material.brand || '');
+                                setNewMaterialPlannedQty(String(material.plannedQty));
+                                setNewMaterialUnit(material.unit);
+                                setEditMaterialData(material); 
+                                setShowAddMaterialModal(true); 
+                            }}
+                            className={cx(surface, `p-4 rounded-2xl flex items-center justify-between border-2 ${statusDetails.borderColor}`)}
                             >
-                                <div className="flex-1 text-left w-full sm:w-auto">
-                                    <p className="text-xs font-bold uppercase text-slate-400 dark:text-slate-500 mb-0.5">Material <span className={statusDetails.textColor}>({statusDetails.statusText})</span></p>
-                                    <h4 className="font-bold text-primary dark:text-white text-lg">{material.name}</h4>
-                                    <p className="text-xs text-slate-500 dark:text-slate-400">{material.brand || 'Marca não informada'}</p>
-                                    <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2 mt-2">
-                                        <div className="h-full bg-secondary rounded-full" style={{ width: `${progress}%` }}></div>
-                                    </div>
-                                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                                        {progress.toFixed(0)}% Comprado
-                                    </p>
+                                <div className="flex-1">
+                                    <h4 className="font-bold text-primary dark:text-white">{material.name}</h4>
+                                    <p className="text-xs text-slate-500">{material.brand}</p>
                                 </div>
-                                <div className="text-center sm:text-right w-full sm:w-auto flex flex-col items-end gap-1">
-                                    <p className="text-sm text-slate-700 dark:text-slate-300">Sugerido: <span className="font-bold">{material.plannedQty} {material.unit}</span></p>
-                                    <p className="text-sm text-green-600 dark:text-green-400 font-bold">Comprado: {material.purchasedQty} {material.unit}</p>
-                                    {material.totalCost !== undefined && <p className="text-xs text-slate-500 dark:text-slate-400">Custo Total: {formatCurrency(material.totalCost)}</p>}
-                                    <button
-                                        onClick={(e) => { e.stopPropagation(); 
-                                            setZeModal({
-                                                isOpen: true,
-                                                title: "Excluir Material",
-                                                message: `Tem certeza que deseja excluir o material ${material.name}? Isso também excluirá despesas relacionadas.`,
-                                                confirmText: "Excluir",
-                                                onConfirm: async (ev) => { ev?.preventDefault(); handleDeleteMaterial(material.id); },
-                                                onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
-                                                type: "DANGER"
-                                            });
-                                        }}
-                                        className="text-slate-400 hover:text-red-500 transition-colors p-1"
-                                        aria-label={`Excluir material ${material.name}`}
-                                    >
-                                        <i className="fa-solid fa-trash-alt text-lg"></i>
-                                    </button>
+                                <div className="text-right">
+                                    <p className="text-sm font-bold">{material.purchasedQty} / {material.plannedQty} {material.unit}</p>
+                                    <button onClick={(e) => { e.stopPropagation(); handleDeleteMaterial(material.id); }} className="text-slate-400 hover:text-red-500"><i className="fa-solid fa-trash"></i></button>
                                 </div>
                             </div>
-                           );
-                        })}
-                      </div>
+                        );
+                    })}
                     </div>
-                  ))}
                 </div>
-              </>
-            )}
+            ))}
           </>
         );
 
       case 'FINANCEIRO':
-        const totalPaid = expenses.reduce((sum, exp) => sum + (exp.paidAmount || 0), 0);
-        // Calculate outstanding relative to non-material budget
-        const totalNonMaterialExpensesPlanned = expenses.filter(e => e.category !== ExpenseCategory.MATERIAL).reduce((sum, exp) => sum + (exp.amount || 0), 0); // O amount é o planejado original
-        const totalNonMaterialPaid = expenses.filter(e => e.category !== ExpenseCategory.MATERIAL).reduce((sum, exp) => sum + (exp.paidAmount || 0), 0); // paidAmount é derivado da soma das parcelas
-        const budgetBalance = work.budgetPlanned - totalNonMaterialPaid; // Balanço contra o que foi pago
-
-
+        const totalNonMaterialPaid = expenses.filter(e => e.category !== ExpenseCategory.MATERIAL).reduce((sum, exp) => sum + (exp.paidAmount || 0), 0);
         return (
           <>
             <div className="flex items-center justify-between mb-6 px-2 sm:px-0">
               <h2 className="text-2xl font-black text-primary dark:text-white">Financeiro</h2>
-              <button
-                onClick={() => {
-                  setEditExpenseData(null); // Ensure add mode
-                  setNewExpenseDescription('');
-                  setNewExpenseAmount('');
-                  setNewExpenseCategory(ExpenseCategory.OTHER);
-                  setNewExpenseDate(new Date().toISOString().split('T')[0]);
-                  setNewExpenseStepId('');
-                  setNewExpenseWorkerId('');
-                  setNewExpenseSupplierId('');
-                  setNewExpenseTotalAgreed('');
-                  setShowAddExpenseModal(true);
-                }}
-                className="px-4 py-2 bg-secondary text-white text-sm font-bold rounded-xl hover:bg-secondary-dark transition-colors flex items-center gap-2"
-                aria-label="Adicionar nova despesa"
-              >
+              <button onClick={() => setShowAddExpenseModal(true)} className="px-4 py-2 bg-secondary text-white text-sm font-bold rounded-xl hover:bg-secondary-dark transition-colors flex items-center gap-2">
                 <i className="fa-solid fa-plus"></i> Nova Despesa
               </button>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-              <div className={cx(surface, "p-5 rounded-2xl flex flex-col items-start")}>
-                <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">Orçamento Planejado</p>
-                <h3 className="text-xl font-bold text-primary dark:text-white">{formatCurrency(work.budgetPlanned)}</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+              <div className={cx(surface, "p-5 rounded-2xl")}>
+                <p className="text-sm text-slate-500">Orçamento Planejado</p>
+                <h3 className="text-xl font-bold">{formatCurrency(work.budgetPlanned)}</h3>
               </div>
-              <div className={cx(surface, "p-5 rounded-2xl flex flex-col items-start")}>
-                <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">Gasto Total (s/ materiais)</p>
-                <h3 className={`text-xl font-bold ${totalNonMaterialPaid > work.budgetPlanned ? 'text-red-500' : 'text-green-600 dark:text-green-400'}`}>{formatCurrency(totalNonMaterialPaid)}</h3>
-              </div>
-              <div className={cx(surface, "p-5 rounded-2xl flex flex-col items-start")}>
-                <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">Balanço (s/ materiais)</p>
-                <h3 className={`text-xl font-bold ${budgetBalance < 0 ? 'text-red-500' : 'text-green-600 dark:text-green-400'}`}>{formatCurrency(work.budgetPlanned - totalNonMaterialPaid)}</h3>
+              <div className={cx(surface, "p-5 rounded-2xl")}>
+                <p className="text-sm text-slate-500">Gasto Total (Mão de Obra)</p>
+                <h3 className="text-xl font-bold">{formatCurrency(totalNonMaterialPaid)}</h3>
               </div>
             </div>
-
-            {expenses.length === 0 ? (
-                <div className={cx(surface, "rounded-3xl p-8 text-center", mutedText)}>
-                    <p className="text-lg mb-4">Nenhuma despesa cadastrada ainda.</p>
-                    <button onClick={() => {
-                      setEditExpenseData(null); // Ensure add mode
-                      setNewExpenseDescription('');
-                      setNewExpenseAmount('');
-                      setNewExpenseCategory(ExpenseCategory.OTHER);
-                      setNewExpenseDate(new Date().toISOString().split('T')[0]);
-                      setNewExpenseStepId('');
-                      setNewExpenseWorkerId('');
-                      setNewExpenseSupplierId('');
-                      setNewExpenseTotalAgreed('');
-                      setShowAddExpenseModal(true);
-                    }} className="px-6 py-3 bg-secondary text-white font-bold rounded-xl hover:bg-secondary-dark transition-colors">
-                        Adicionar sua primeira despesa
-                    </button>
-                </div>
-            ) : (
-                <div className="space-y-6">
-                    {groupedExpensesByStep.map((group, groupIndex) => (
-                        <div key={groupIndex}>
-                            <h3 className="text-lg font-bold text-slate-500 dark:text-slate-400 mb-3 px-2 sm:px-0 flex justify-between items-center">
-                                {group.stepName}
-                                <span className="text-base font-black text-primary dark:text-white">{formatCurrency(group.totalStepAmount)}</span>
-                            </h3>
-                            <div className="space-y-4">
-                                {group.expenses.map(expense => {
-                                    const statusDetails = getEntityStatusDetails('expense', expense, steps); // steps not directly used here, but for consistency
-                                    const valorCombinado = expense.totalAgreed !== undefined ? expense.totalAgreed : (expense.amount || 0);
-                                    const valorPago = expense.paidAmount || 0; // paidAmount é DERIVADO
-                                    const valorRestante = valorCombinado - valorPago;
-                                    const progressPercent = valorCombinado > 0 ? (valorPago / valorCombinado) * 100 : 0;
-                                    
-                                    // 🔥 FIX CRÍTICO: Bloqueio de edição para despesa paga
-                                    // isEditingExpenseWithPayments agora usa o status derivado, mais preciso.
-                                    const isExpenseUneditable = expense.status !== ExpenseStatus.PENDING; 
-
-                                    return (
-                                        <div 
-                                          key={expense.id} 
-                                          onClick={() => { 
-                                            // Only allow opening edit modal if status is PENDING
-                                            if (!isExpenseUneditable) {
-                                                setNewExpenseDescription(expense.description);
-                                                setNewExpenseAmount(String(expense.amount)); // Convert to string for input
-                                                setNewExpenseCategory(expense.category);
-                                                setNewExpenseDate(expense.date);
-                                                setNewExpenseStepId(expense.stepId || 'none');
-                                                setNewExpenseWorkerId(expense.workerId || 'none');
-                                                setNewExpenseSupplierId(expense.supplierId || 'none');
-                                                setNewExpenseTotalAgreed(String(expense.totalAgreed !== undefined ? expense.totalAgreed : (expense.amount || 0))); // Set editable totalAgreed
-                                                setEditExpenseData(expense); 
-                                                setShowAddExpenseModal(true); 
-                                            }
-                                          }} 
-                                          className={cx(
-                                            surface, 
-                                            `p-4 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 ${isExpenseUneditable ? 'cursor-default' : 'cursor-pointer hover:scale-[1.005]'} transition-transform border-2 ${statusDetails.borderColor} shadow-lg ${statusDetails.shadowClass}`,
-                                            isExpenseUneditable ? 'opacity-70' : '' // Dim if paid
-                                          )} 
-                                          aria-label={`Despesa ${expense.description}`}
-                                        >
-                                            <div className="flex-1 text-left w-full sm:w-auto">
-                                                <p className="text-xs font-bold uppercase text-slate-400 dark:text-slate-500 mb-0.5">Despesa <span className={statusDetails.textColor}>({statusDetails.statusText})</span></p>
-                                                <h4 className="font-bold text-primary dark:text-white text-lg">{expense.description}</h4>
-                                                <p className="text-xs text-slate-500 dark:text-slate-400">{formatDateDisplay(expense.date)} - {expense.category}</p>
-                                                {expense.workerId && <p className="text-xs text-slate-500 dark:text-slate-400">Profissional: {workers.find(w => w.id === expense.workerId)?.name}</p>}
-                                                {expense.supplierId && <p className="text-xs text-slate-500 dark:text-slate-400">Fornecedor: {suppliers.find(s => s.id === expense.supplierId)?.name}</p>}
-                                            </div>
-                                            <div className="text-center sm:text-right w-full sm:w-auto flex flex-col items-end gap-1">
-                                                <p className="text-sm text-slate-700 dark:text-slate-300">Combinado: <span className="font-bold">{formatCurrency(valorCombinado)}</span></p>
-                                                <p className={cx("text-sm font-bold", statusDetails.textColor)}>Pago: {formatCurrency(valorPago)}</p>
-                                                {valorRestante > 0 && <p className="text-xs text-slate-500 dark:text-slate-400">Restante: {formatCurrency(valorRestante)}</p>}
-                                                
-                                                <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2 mt-2">
-                                                    <div className="h-full bg-secondary rounded-full" style={{ width: `${progressPercent}%` }}></div>
-                                                </div>
-                                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                                                    {progressPercent.toFixed(0)}% Pago
-                                                </p>
-
-                                                {/* Botão de pagar aparece se não estiver 'Concluído' ou 'Prejuízo' */}
-                                                {expense.status !== ExpenseStatus.COMPLETED && expense.status !== ExpenseStatus.OVERPAID && (
-                                                    <button onClick={(e) => { e.stopPropagation(); setPaymentExpenseData(expense); setShowAddPaymentModal(true); }} className="text-xs text-secondary hover:underline" aria-label={`Adicionar pagamento para despesa ${expense.description}`}>
-                                                        Pagar {formatCurrency(valorRestante)}
-                                                    </button>
-                                                )}
-                                                <button
-                                                    onClick={(e) => { e.stopPropagation(); 
-                                                        setZeModal({
-                                                            isOpen: true,
-                                                            title: "Excluir Despesa",
-                                                            message: `Tem certeza que deseja excluir a despesa ${expense.description}?`,
-                                                            confirmText: "Excluir",
-                                                            onConfirm: async (ev) => { ev?.preventDefault(); handleDeleteExpense(expense.id); },
-                                                            onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
-                                                            type: "DANGER"
-                                                        });
-                                                    }}
-                                                    className="text-slate-400 hover:text-red-500 transition-colors p-1"
-                                                    aria-label={`Excluir despesa ${expense.description}`}
-                                                >
-                                                    <i className="fa-solid fa-trash-alt text-lg"></i>
-                                                </button>
-                                            </div>
-                                        </div>
-                                    );
-                                })}
+            <div className="space-y-6">
+                {groupedExpensesByStep.map((group, idx) => (
+                    <div key={idx}>
+                        <h3 className="font-bold text-slate-500 mb-3">{group.stepName}</h3>
+                        {group.expenses.map(expense => (
+                            <div key={expense.id} className={cx(surface, "p-4 rounded-2xl flex justify-between mb-2")}>
+                                <div>
+                                    <h4 className="font-bold">{expense.description}</h4>
+                                    <p className="text-xs">{formatDateDisplay(expense.date)}</p>
+                                </div>
+                                <div className="text-right">
+                                    <p className="font-bold">{formatCurrency(expense.paidAmount || 0)}</p>
+                                    <button onClick={() => { setPaymentExpenseData(expense); setShowAddPaymentModal(true); }} className="text-xs text-secondary underline">Pagar</button>
+                                </div>
                             </div>
-                        </div>
-                    ))}
-                </div>
-            )}
+                        ))}
+                    </div>
+                ))}
+            </div>
           </>
         );
 
@@ -2117,421 +1494,109 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
     switch (activeSubView) {
       case 'NONE':
         return (
-          <>
-            <h2 className="text-2xl font-black text-primary dark:text-white mb-6 px-2 sm:px-0">Ferramentas de Gestão</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              <ToolCard icon="fa-users-gear" title="Profissionais" description="Gerencie sua equipe e mão de obra." onClick={() => goToSubView('WORKERS')} />
-              <ToolCard icon="fa-truck-field" title="Fornecedores" description="Organize seus contatos e orçamentos de materiais." onClick={() => goToSubView('SUPPLIERS')} />
-              <ToolCard icon="fa-images" title="Fotos da Obra" description="Documente o progresso com fotos e vídeos." onClick={() => goToSubView('PHOTOS')} />
-              <ToolCard icon="fa-file-lines" title="Projetos e Docs" description="Guarde plantas, licenças e outros documentos." onClick={() => goToSubView('PROJECTS')} />
-              
-              {/* Vitalício Bonus Tools */}
-              <ToolCard icon="fa-calculator" title="Calculadoras" description="Ferramentas para cálculo de materiais, mão de obra, etc." 
-                onClick={() => setZeModal({
-                    isOpen: true,
-                    title: "Calculadoras em Desenvolvimento",
-                    message: "As calculadoras estão sendo desenvolvidas. Fique ligado!",
-                    confirmText: "Entendido",
-                    onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
-                })} 
-                isLocked={!isVitalicio} // Only Vitalicio users can access
-                requiresVitalicio={true}
-              />
-              <ToolCard
-                icon="fa-file-contract"
-                title="Gerador de Contratos"
-                description="Crie contratos de mão de obra e serviços em segundos, de forma profissional."
-                onClick={() => goToSubView('CONTRACTS')}
-                isLocked={!isVitalicio} // Only Vitalicio users can access
-                requiresVitalicio={true}
-              />
-              <ToolCard
-                icon="fa-list-check"
-                title="Checklists"
-                description="Listas de verificação para cada etapa da obra, garantindo que nada seja esquecido."
-                onClick={() => goToSubView('CHECKLIST')}
-                isLocked={!isVitalicio} // Only Vitalicio users can access
-                requiresVitalicio={true}
-              />
-              <ToolCard
-                icon="fa-robot"
-                title="Planejamento Inteligente AI"
-                description="Gere planos, riscos e sugestões de materiais com IA."
-                onClick={() => navigate(`/work/${workId}/ai-planner`)}
-                isLocked={!hasAiAccess} // AI access (Vitalicio or trial)
-                requiresVitalicio={true} // Marketing for Vitalicio
-              />
-              <ToolCard
-                icon="fa-chart-line"
-                title="Relatórios Completos"
-                description="Analise o desempenho financeiro e de cronograma com relatórios detalhados."
-                onClick={() => navigate(`/work/${workId}/reports`)}
-                isLocked={!isVitalicio} // Only Vitalicio users can access
-                requiresVitalicio={true}
-              />
-            </div>
-          </>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <ToolCard icon="fa-users-gear" title="Profissionais" description="Equipe e mão de obra." onClick={() => goToSubView('WORKERS')} />
+            <ToolCard icon="fa-truck-field" title="Fornecedores" description="Organize seus contatos." onClick={() => goToSubView('SUPPLIERS')} />
+            <ToolCard icon="fa-images" title="Fotos da Obra" description="Documente o progresso." onClick={() => goToSubView('PHOTOS')} />
+            <ToolCard icon="fa-file-lines" title="Projetos e Docs" description="Guarde suas plantas." onClick={() => goToSubView('PROJECTS')} />
+            <ToolCard icon="fa-file-contract" title="Gerador de Contratos" description="Crie contratos profissionais." onClick={() => goToSubView('CONTRACTS')} isLocked={!isVitalicio} requiresVitalicio />
+            <ToolCard icon="fa-list-check" title="Checklists" description="Listas de verificação." onClick={() => goToSubView('CHECKLIST')} isLocked={!isVitalicio} requiresVitalicio />
+          </div>
         );
-
       case 'WORKERS':
         return (
-          <>
-            <ToolSubViewHeader title="Profissionais" onBack={() => goToSubView('NONE')} onAdd={() => {
-              setEditWorkerData(null);
-              setNewWorkerName(''); setNewWorkerRole(''); setNewWorkerPhone(''); setNewWorkerDailyRate(''); setNewWorkerNotes('');
-              setShowAddWorkerModal(true);
-            }} />
-            {workers.length === 0 ? (
-                <div className={cx(surface, "rounded-3xl p-8 text-center", mutedText)}>
-                    <p className="text-lg mb-4">Nenhum profissional cadastrado ainda.</p>
-                    <button onClick={() => {
-                      setEditWorkerData(null); 
-                      setNewWorkerName(''); setNewWorkerRole(''); setNewWorkerPhone(''); setNewWorkerDailyRate(''); setNewWorkerNotes('');
-                      setShowAddWorkerModal(true);
-                    }} className="px-6 py-3 bg-secondary text-white font-bold rounded-xl hover:bg-secondary-dark transition-colors">
-                        Adicionar seu primeiro profissional
-                    </button>
-                </div>
-            ) : (
+            <>
+                <ToolSubViewHeader title="Profissionais" onBack={() => goToSubView('NONE')} onAdd={() => setShowAddWorkerModal(true)} />
                 <div className="space-y-4">
                     {workers.map(worker => (
-                        <div 
-                            key={worker.id} 
-                            onClick={() => {
-                                setNewWorkerName(worker.name);
-                                setNewWorkerRole(worker.role);
-                                setNewWorkerPhone(worker.phone);
-                                setNewWorkerDailyRate(String(worker.dailyRate || '')); // Convert to string for input
-                                setNewWorkerNotes(worker.notes || '');
-                                setEditWorkerData(worker); 
-                                setShowAddWorkerModal(true);
-                            }}
-                            className={cx(surface, "p-4 rounded-2xl flex items-center justify-between gap-4 cursor-pointer hover:scale-[1.005] transition-transform")}
-                            aria-label={`Profissional ${worker.name}, função: ${worker.role}`}
-                        >
-                            <div className="flex-1">
-                                <h3 className="font-bold text-primary dark:text-white text-lg">{worker.name}</h3>
-                                <p className="text-sm text-slate-500 dark:text-slate-400">{worker.role} - {worker.phone}</p>
-                                {worker.dailyRate !== undefined && worker.dailyRate > 0 && <p className="text-xs text-secondary">Diária: {formatCurrency(worker.dailyRate)}</p>}
-                            </div>
-                            <button
-                                onClick={(e) => { e.stopPropagation(); 
-                                    setZeModal({
-                                        isOpen: true,
-                                        title: "Excluir Profissional",
-                                        message: `Tem certeza que deseja excluir o profissional ${worker.name}?`,
-                                        confirmText: "Excluir",
-                                        onConfirm: async (ev) => { ev?.preventDefault(); handleDeleteWorker(worker.id); },
-                                        onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
-                                        type: "DANGER"
-                                    });
-                                }}
-                                className="text-slate-400 hover:text-red-500 transition-colors p-1 shrink-0"
-                                aria-label={`Excluir profissional ${worker.name}`}
-                            >
-                                <i className="fa-solid fa-trash-alt text-lg"></i>
-                            </button>
+                        <div key={worker.id} className={cx(surface, "p-4 rounded-2xl flex justify-between")}>
+                            <div><h3 className="font-bold">{worker.name}</h3><p className="text-sm">{worker.role}</p></div>
+                            <button onClick={() => handleDeleteWorker(worker.id)} className="text-red-500"><i className="fa-solid fa-trash"></i></button>
                         </div>
                     ))}
                 </div>
-            )}
-          </>
+            </>
         );
-
       case 'SUPPLIERS':
         return (
-          <>
-            <ToolSubViewHeader title="Fornecedores" onBack={() => goToSubView('NONE')} onAdd={() => {
-              setEditSupplierData(null);
-              setNewSupplierName(''); setNewSupplierCategory(''); setNewSupplierPhone(''); setNewSupplierEmail(''); setNewSupplierAddress(''); setNewSupplierNotes('');
-              setShowAddSupplierModal(true);
-            }} />
-            {suppliers.length === 0 ? (
-                <div className={cx(surface, "rounded-3xl p-8 text-center", mutedText)}>
-                    <p className="text-lg mb-4">Nenhum fornecedor cadastrado ainda.</p>
-                    <button onClick={() => {
-                      setEditSupplierData(null);
-                      setNewSupplierName(''); setNewSupplierCategory(''); setNewSupplierPhone(''); setNewSupplierEmail(''); setNewSupplierAddress(''); setNewSupplierNotes('');
-                      setShowAddSupplierModal(true);
-                    }} className="px-6 py-3 bg-secondary text-white font-bold rounded-xl hover:bg-secondary-dark transition-colors">
-                        Adicionar seu primeiro fornecedor
-                    </button>
-                </div>
-            ) : (
+            <>
+                <ToolSubViewHeader title="Fornecedores" onBack={() => goToSubView('NONE')} onAdd={() => setShowAddSupplierModal(true)} />
                 <div className="space-y-4">
                     {suppliers.map(supplier => (
-                        <div 
-                            key={supplier.id} 
-                            onClick={() => {
-                                setNewSupplierName(supplier.name);
-                                setNewSupplierCategory(supplier.category);
-                                setNewSupplierPhone(supplier.phone);
-                                setNewSupplierEmail(supplier.email || '');
-                                setNewSupplierAddress(supplier.address || '');
-                                setNewSupplierNotes(supplier.notes || '');
-                                setEditSupplierData(supplier); 
-                                setShowAddSupplierModal(true);
-                            }}
-                            className={cx(surface, "p-4 rounded-2xl flex items-center justify-between gap-4 cursor-pointer hover:scale-[1.005] transition-transform")}
-                            aria-label={`Fornecedor ${supplier.name}, categoria: ${supplier.category}`}
-                        >
-                            <div className="flex-1">
-                                <h3 className="font-bold text-primary dark:text-white text-lg">{supplier.name}</h3>
-                                <p className="text-sm text-slate-500 dark:text-slate-400">{supplier.category} - {supplier.phone}</p>
-                            </div>
-                            <button
-                                onClick={(e) => { e.stopPropagation(); 
-                                    setZeModal({
-                                        isOpen: true,
-                                        title: "Excluir Fornecedor",
-                                        message: `Tem certeza que deseja excluir o fornecedor ${supplier.name}?`,
-                                        confirmText: "Excluir",
-                                        onConfirm: async (ev) => { ev?.preventDefault(); handleDeleteSupplier(supplier.id); },
-                                        onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
-                                        type: "DANGER"
-                                    });
-                                }}
-                                className="text-slate-400 hover:text-red-500 transition-colors p-1 shrink-0"
-                                aria-label={`Excluir fornecedor ${supplier.name}`}
-                            >
-                                <i className="fa-solid fa-trash-alt text-lg"></i>
-                            </button>
+                        <div key={supplier.id} className={cx(surface, "p-4 rounded-2xl flex justify-between")}>
+                            <div><h3 className="font-bold">{supplier.name}</h3><p className="text-sm">{supplier.category}</p></div>
+                            <button onClick={() => handleDeleteSupplier(supplier.id)} className="text-red-500"><i className="fa-solid fa-trash"></i></button>
                         </div>
                     ))}
                 </div>
-            )}
-          </>
+            </>
         );
-
       case 'PHOTOS':
         return (
-          <>
-            <ToolSubViewHeader title="Fotos da Obra" onBack={() => goToSubView('NONE')} onAdd={() => setShowAddPhotoModal(true)} />
-            {photos.length === 0 ? (
-                <div className={cx(surface, "rounded-3xl p-8 text-center", mutedText)}>
-                    <p className="text-lg mb-4">Nenhuma foto cadastrada ainda.</p>
-                    <button onClick={() => setShowAddPhotoModal(true)} className="px-6 py-3 bg-secondary text-white font-bold rounded-xl hover:bg-secondary-dark transition-colors">
-                        Adicionar sua primeira foto
-                    </button>
-                </div>
-            ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+            <>
+                <ToolSubViewHeader title="Fotos" onBack={() => goToSubView('NONE')} onAdd={() => setShowAddPhotoModal(true)} />
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                     {photos.map(photo => (
-                        <div key={photo.id} className={cx(surface, "rounded-2xl overflow-hidden shadow-lg group relative")}>
-                            <img src={photo.url} alt={photo.description} className="w-full h-48 object-cover transition-transform group-hover:scale-105" />
-                            <div className="p-4">
-                                <p className="text-xs font-bold uppercase text-slate-400 dark:text-slate-500 mb-1">{photo.type}</p>
-                                <h3 className="font-bold text-primary dark:text-white text-lg leading-tight">{photo.description}</h3>
-                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{formatDateDisplay(photo.date)}</p>
-                            </div>
-                            <button
-                                onClick={(e) => { e.stopPropagation(); 
-                                    setZeModal({
-                                        isOpen: true,
-                                        title: "Excluir Foto",
-                                        message: `Tem certeza que deseja excluir esta foto?`,
-                                        confirmText: "Excluir",
-                                        onConfirm: async (ev) => { ev?.preventDefault(); handleDeletePhoto(photo.id, photo.url); },
-                                        onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
-                                        type: "DANGER"
-                                    });
-                                }}
-                                className="absolute top-3 right-3 p-2 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                                aria-label="Excluir foto"
-                            >
-                                <i className="fa-solid fa-trash-alt text-sm"></i>
-                            </button>
+                        <div key={photo.id} className="relative group">
+                            <img src={photo.url} alt="" className="rounded-xl h-40 w-full object-cover" />
+                            <button onClick={() => handleDeletePhoto(photo.id, photo.url)} className="absolute top-2 right-2 bg-red-500 text-white p-2 rounded-full opacity-0 group-hover:opacity-100"><i className="fa-solid fa-trash"></i></button>
                         </div>
                     ))}
                 </div>
-            )}
-          </>
+            </>
         );
-
       case 'PROJECTS':
         return (
-          <>
-            <ToolSubViewHeader title="Projetos e Documentos" onBack={() => goToSubView('NONE')} onAdd={() => setShowAddFileModal(true)} />
-            {files.length === 0 ? (
-                <div className={cx(surface, "rounded-3xl p-8 text-center", mutedText)}>
-                    <p className="text-lg mb-4">Nenhum documento cadastrado ainda.</p>
-                    <button onClick={() => setShowAddFileModal(true)} className="px-6 py-3 bg-secondary text-white font-bold rounded-xl hover:bg-secondary-dark transition-colors">Adicionar seu primeiro documento</button>
-                </div>
-            ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+            <>
+                <ToolSubViewHeader title="Documentos" onBack={() => goToSubView('NONE')} onAdd={() => setShowAddFileModal(true)} />
+                <div className="space-y-4">
                     {files.map(file => (
-                        <div key={file.id} className={cx(surface, "rounded-2xl p-4 flex flex-col justify-between gap-4 shadow-lg group relative")}>
-                            <div>
-                                <p className="text-xs font-bold uppercase text-slate-400 dark:text-slate-500 mb-1">{file.category}</p>
-                                <h3 className="font-bold text-primary dark:text-white text-lg leading-tight truncate">{file.name}</h3>
-                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{formatDateDisplay(file.date)}</p>
-                            </div>
-                            <div className="flex items-center justify-between mt-auto">
-                                <a 
-                                    href={file.url} 
-                                    target="_blank" 
-                                    rel="noopener noreferrer" 
-                                    className="px-3 py-1.5 bg-primary/10 text-primary dark:text-white text-xs font-bold rounded-lg hover:bg-primary/20 transition-colors flex items-center gap-2"
-                                    aria-label={`Visualizar documento ${file.name}`}
-                                >
-                                    <i className="fa-solid fa-eye"></i> Visualizar
-                                </a>
-                                <button
-                                    onClick={(e) => { e.stopPropagation(); 
-                                        setZeModal({
-                                            isOpen: true,
-                                            title: "Excluir Arquivo",
-                                            message: `Tem certeza que deseja excluir o arquivo "${file.name}"?`,
-                                            confirmText: "Excluir",
-                                            onConfirm: async (ev) => { ev?.preventDefault(); handleDeleteFile(file.id, file.url); },
-                                            onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
-                                            type: "DANGER"
-                                        });
-                                    }}
-                                    className="text-slate-400 hover:text-red-500 transition-colors p-1"
-                                    aria-label={`Excluir arquivo ${file.name}`}
-                                >
-                                    <i className="fa-solid fa-trash-alt text-lg"></i>
-                                </button>
+                        <div key={file.id} className={cx(surface, "p-4 rounded-2xl flex justify-between")}>
+                            <div><h3 className="font-bold">{file.name}</h3></div>
+                            <div className="flex gap-4">
+                                <a href={file.url} target="_blank" rel="noreferrer" className="text-secondary">Ver</a>
+                                <button onClick={() => handleDeleteFile(file.id, file.url)} className="text-red-500"><i className="fa-solid fa-trash"></i></button>
                             </div>
                         </div>
                     ))}
                 </div>
-            )}
-          </>
+            </>
         );
-      
       case 'CONTRACTS':
         return (
-          <>
-            <ToolSubViewHeader title="Gerador de Contratos" onBack={() => goToSubView('NONE')} />
-            <p className="text-slate-500 dark:text-slate-400 mb-6 px-2 sm:px-0">
-              Escolha um modelo de contrato para gerar e personalizar.
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {contracts.map(contract => (
-                <button
-                  key={contract.id}
-                  onClick={() => {
-                    setSelectedContractTitle(contract.title);
-                    setSelectedContractContent(contract.contentTemplate);
-                    setShowContractContentModal(true);
-                  }}
-                  className={cx(surface, "p-4 rounded-2xl flex items-start gap-4 text-left cursor-pointer hover:scale-[1.005] transition-transform")}
-                  aria-label={`Abrir modelo de contrato: ${contract.title}`}
-                >
-                  <i className="fa-solid fa-file-contract text-2xl text-secondary shrink-0 mt-1"></i>
-                  <div>
-                    <h3 className="font-bold text-primary dark:text-white text-lg">{contract.title}</h3>
-                    <p className="text-sm text-slate-500 dark:text-slate-400">{contract.category}</p>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </>
+            <>
+                <ToolSubViewHeader title="Contratos" onBack={() => goToSubView('NONE')} />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {contracts.map(contract => (
+                        <button key={contract.id} onClick={() => { setSelectedContractTitle(contract.title); setSelectedContractContent(contract.contentTemplate); setShowContractContentModal(true); }} className={cx(surface, "p-4 rounded-2xl text-left")}>
+                            <h3 className="font-bold">{contract.title}</h3>
+                        </button>
+                    ))}
+                </div>
+            </>
         );
-
       case 'CHECKLIST':
         return (
-          <>
-            <ToolSubViewHeader title="Checklists da Obra" onBack={() => goToSubView('NONE')} onAdd={() => {
-              setEditChecklistData(null);
-              setNewChecklistName('');
-              setNewChecklistCategory('');
-              setNewChecklistItems(['']);
-              setShowAddChecklistModal(true);
-            }} />
-            {checklists.length === 0 ? (
-                <div className={cx(surface, "rounded-3xl p-8 text-center", mutedText)}>
-                    <p className="text-lg mb-4">Nenhum checklist cadastrado ainda.</p>
-                    <button onClick={() => {
-                      setEditChecklistData(null);
-                      setNewChecklistName('');
-                      setNewChecklistCategory('');
-                      setNewChecklistItems(['']);
-                      setShowAddChecklistModal(true);
-                    }} className="px-6 py-3 bg-secondary text-white font-bold rounded-xl hover:bg-secondary-dark transition-colors">
-                        Adicionar seu primeiro checklist
-                    </button>
-                </div>
-            ) : (
+            <>
+                <ToolSubViewHeader title="Checklists" onBack={() => goToSubView('NONE')} onAdd={() => setShowAddChecklistModal(true)} />
                 <div className="space-y-6">
                     {checklists.map(checklist => (
-                        <div key={checklist.id} className={cx(surface, "p-5 rounded-2xl shadow-lg")}>
-                            <div className="flex items-center justify-between mb-4">
-                                <div>
-                                    <h3 className="font-bold text-primary dark:text-white text-xl">{checklist.name}</h3>
-                                    <p className="text-sm text-slate-500 dark:text-slate-400">{checklist.category}</p>
-                                </div>
-                                <div className="flex gap-2">
-                                    <button
-                                        onClick={() => {
-                                            setNewChecklistName(checklist.name);
-                                            setNewChecklistCategory(checklist.category);
-                                            setNewChecklistItems(checklist.items.map(item => item.text));
-                                            setEditChecklistData(checklist);
-                                            setShowAddChecklistModal(true);
-                                        }}
-                                        className="text-slate-400 hover:text-secondary transition-colors p-1"
-                                        aria-label={`Editar checklist ${checklist.name}`}
-                                    >
-                                        <i className="fa-solid fa-pencil text-lg"></i>
-                                    </button>
-                                    <button
-                                        onClick={() => {
-                                            setZeModal({
-                                                isOpen: true,
-                                                title: "Excluir Checklist",
-                                                message: `Tem certeza que deseja excluir o checklist ${checklist.name}?`,
-                                                confirmText: "Excluir",
-                                                onConfirm: async (ev) => { ev?.preventDefault(); handleDeleteChecklist(checklist.id); },
-                                                onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
-                                                type: "DANGER"
-                                            });
-                                        }}
-                                        className="text-slate-400 hover:text-red-500 transition-colors p-1"
-                                        aria-label={`Excluir checklist ${checklist.name}`}
-                                    >
-                                        <i className="fa-solid fa-trash-alt text-lg"></i>
-                                    </button>
-                                </div>
-                            </div>
-                            <div className="space-y-3">
+                        <div key={checklist.id} className={cx(surface, "p-5 rounded-2xl")}>
+                            <h3 className="font-bold text-xl mb-4">{checklist.name}</h3>
+                            <div className="space-y-2">
                                 {checklist.items.map(item => (
-                                    <label key={item.id} className="flex items-center gap-3 text-sm text-primary dark:text-white cursor-pointer">
-                                        <input
-                                            type="checkbox"
-                                            checked={item.checked}
-                                            onChange={(e) => handleChecklistItemToggle(checklist.id, item.id, e.target.checked)}
-                                            className="h-5 w-5 rounded border-slate-300 dark:border-slate-600 text-secondary focus:ring-secondary/50"
-                                            aria-label={item.text}
-                                        />
-                                        <span className={item.checked ? 'line-through text-slate-500 dark:text-slate-400' : ''}>{item.text}</span>
+                                    <label key={item.id} className="flex items-center gap-3">
+                                        <input type="checkbox" checked={item.checked} onChange={(e) => handleChecklistItemToggle(checklist.id, item.id, e.target.checked)} />
+                                        <span className={item.checked ? 'line-through' : ''}>{item.text}</span>
                                     </label>
                                 ))}
                             </div>
+                            <button onClick={() => handleDeleteChecklist(checklist.id)} className="mt-4 text-red-500 text-sm">Excluir Checklist</button>
                         </div>
                     ))}
                 </div>
-            )}
-          </>
+            </>
         );
-
-      case 'AICHAT':
-        // This tool is routed to a separate page, so just navigate there
-        navigate(`/ai-chat`);
-        return null;
-      
-      case 'AIPLANNER':
-        // This tool is routed to a separate page, so just navigate there
-        navigate(`/work/${workId}/ai-planner`);
-        return null;
-      
-      case 'REPORTS':
-        // This tool is routed to a separate page, so just navigate there
-        navigate(`/work/${workId}/reports`);
-        return null;
-
       default:
         return null;
     }
@@ -2540,805 +1605,58 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
   return (
     <div className="max-w-4xl mx-auto pb-12 pt-4 px-2 sm:px-4 md:px-0 font-sans">
       <div className="flex items-center gap-4 mb-6 px-2 sm:px-0">
-        <button
-          onClick={() => navigate('/')} // Back to Dashboard
-          className="text-slate-400 hover:text-primary dark:hover:text-white transition-colors p-2 -ml-2"
-          aria-label="Voltar para o Dashboard"
-        >
-          <i className="fa-solid fa-arrow-left text-xl"></i>
-        </button>
+        <button onClick={() => navigate('/')} className="text-slate-400 hover:text-primary p-2 -ml-2"><i className="fa-solid fa-arrow-left text-xl"></i></button>
         <div>
           <h1 className="text-3xl font-black text-primary dark:text-white mb-1 tracking-tight">{work.name}</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">Endereço: {work.address}</p>
+          <p className="text-sm text-slate-500 font-medium">Endereço: {work.address}</p>
         </div>
       </div>
       
-      {/* Tab Navigation */}
-      <div className="flex justify-around bg-white dark:bg-slate-900 rounded-2xl p-2 shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800 mb-6 print:hidden">
-        <button
-          onClick={() => goToTab('ETAPAS')}
-          className={`flex-1 py-2 rounded-xl text-sm font-bold transition-colors ${activeTab === 'ETAPAS' ? 'bg-secondary text-white shadow-md' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
-          aria-current={activeTab === 'ETAPAS' ? 'page' : undefined}
-        >
-          Cronograma
-        </button>
-        <button
-          onClick={() => goToTab('MATERIAIS')}
-          className={`flex-1 py-2 rounded-xl text-sm font-bold transition-colors ${activeTab === 'MATERIAIS' ? 'bg-secondary text-white shadow-md' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
-          aria-current={activeTab === 'MATERIAIS' ? 'page' : undefined}
-        >
-          Materiais
-        </button>
-        <button
-          onClick={() => goToTab('FINANCEIRO')}
-          className={`flex-1 py-2 rounded-xl text-sm font-bold transition-colors ${activeTab === 'FINANCEIRO' ? 'bg-secondary text-white shadow-md' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
-          aria-current={activeTab === 'FINANCEIRO' ? 'page' : undefined}
-        >
-          Financeiro
-        </button>
-        <button
-          onClick={() => goToTab('FERRAMENTAS')}
-          className={`flex-1 py-2 rounded-xl text-sm font-bold transition-colors ${activeTab === 'FERRAMENTAS' ? 'bg-secondary text-white shadow-md' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
-          aria-current={activeTab === 'FERRAMENTAS' ? 'page' : undefined}
-        >
-          Ferramentas
-        </button>
+      <div className="flex justify-around bg-white dark:bg-slate-900 rounded-2xl p-2 shadow-sm border border-slate-200 dark:border-slate-800 mb-6">
+        {(['ETAPAS', 'MATERIAIS', 'FINANCEIRO', 'FERRAMENTAS'] as MainTab[]).map(tab => (
+            <button key={tab} onClick={() => goToTab(tab)} className={`flex-1 py-2 rounded-xl text-sm font-bold transition-colors ${activeTab === tab ? 'bg-secondary text-white' : 'text-slate-600 dark:text-slate-300'}`}>
+                {tab === 'ETAPAS' ? 'Cronograma' : tab === 'MATERIAIS' ? 'Materiais' : tab === 'FINANCEIRO' ? 'Financeiro' : 'Ferramentas'}
+            </button>
+        ))}
       </div>
 
-      {/* Main Content Area */}
       <div className={cx(surface, card, "animate-in fade-in")}>
         {renderMainContent()}
       </div>
 
-      {/* --- MODALS --- */}
-
-      {/* Add/Edit Step Modal */}
+      {/* MODALS */}
       {(showAddStepModal || editStepData) && (
-        <ZeModal
-          isOpen={true}
-          title={editStepData ? "Editar Etapa" : "Adicionar Nova Etapa"}
-          message="" // Content passed as children
-          confirmText={editStepData ? "Salvar Alterações" : "Adicionar Etapa"}
-          onConfirm={editStepData ? handleEditStep : handleAddStep}
-          onCancel={() => { setShowAddStepModal(false); setEditStepData(null); }}
-          isConfirming={zeModal.isConfirming}
-        >
-          <form onSubmit={editStepData ? handleEditStep : handleAddStep} className="space-y-4">
-            <div>
-              <label htmlFor="stepName" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Nome da Etapa</label>
-              <input
-                id="stepName"
-                type="text"
-                value={newStepName}
-                onChange={(e) => setNewStepName(e.target.value)}
-                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
-                required
-                aria-label="Nome da Etapa"
-              />
+        <ZeModal isOpen title={editStepData ? "Editar Etapa" : "Nova Etapa"} confirmText="Salvar" onConfirm={editStepData ? handleEditStep : handleAddStep} onCancel={() => { setShowAddStepModal(false); setEditStepData(null); }} isConfirming={zeModal.isConfirming}>
+            <div className="space-y-4">
+                <input type="text" placeholder="Nome" value={newStepName} onChange={e => setNewStepName(e.target.value)} className="w-full p-3 rounded-xl border" />
+                <input type="date" value={newStepStartDate} onChange={e => setNewStepStartDate(e.target.value)} className="w-full p-3 rounded-xl border" />
+                <input type="date" value={newStepEndDate} onChange={e => setNewStepEndDate(e.target.value)} className="w-full p-3 rounded-xl border" />
             </div>
-            <div>
-              <label htmlFor="stepStartDate" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Data de Início</label>
-              <input
-                id="stepStartDate"
-                type="date"
-                value={newStepStartDate}
-                onChange={(e) => setNewStepStartDate(e.target.value)}
-                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
-                required
-                aria-label="Data de Início da Etapa"
-              />
-            </div>
-            <div>
-              <label htmlFor="stepEndDate" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Data de Término</label>
-              <input
-                id="stepEndDate"
-                type="date"
-                value={newStepEndDate}
-                onChange={(e) => setNewStepEndDate(e.target.value)}
-                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
-                required
-                aria-label="Data de Término da Etapa"
-              />
-            </div>
-            {/* The form submission is handled by the modal's onConfirm, but we keep the form for structure and accessibility */}
-            <button type="submit" hidden></button>
-          </form>
         </ZeModal>
       )}
 
-      {/* Add/Edit Material Modal */}
-      {(showAddMaterialModal || editMaterialData) && (
-        <ZeModal
-          isOpen={true}
-          title={editMaterialData ? "Editar Material" : "Adicionar Novo Material"}
-          message=""
-          confirmText={editMaterialData ? "Salvar/Registrar Compra" : "Adicionar Material"}
-          onConfirm={editMaterialData ? handleEditMaterial : handleAddMaterial}
-          onCancel={() => { setShowAddMaterialModal(false); setEditMaterialData(null); setPurchaseQtyInput(''); setPurchaseCostInput(''); }}
-          isConfirming={zeModal.isConfirming}
-        >
-          <form onSubmit={editMaterialData ? handleEditMaterial : handleAddMaterial} className="space-y-4">
-            <div>
-              <label htmlFor="materialName" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Nome do Material</label>
-              <input
-                id="materialName"
-                type="text"
-                value={newMaterialName}
-                onChange={(e) => setNewMaterialName(e.target.value)}
-                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
-                required
-                aria-label="Nome do Material"
-                disabled={editMaterialData && editMaterialData.purchasedQty > 0} // Disable if purchased
-              />
+      {showAddExpenseModal && (
+        <ZeModal isOpen title="Nova Despesa" confirmText="Adicionar" onConfirm={handleAddExpense} onCancel={() => setShowAddExpenseModal(false)} isConfirming={zeModal.isConfirming}>
+            <div className="space-y-4">
+                <input type="text" placeholder="Descrição" value={newExpenseDescription} onChange={e => setNewExpenseDescription(e.target.value)} className="w-full p-3 rounded-xl border" />
+                <input type="number" placeholder="Valor" value={newExpenseAmount} onChange={e => setNewExpenseAmount(e.target.value)} className="w-full p-3 rounded-xl border" />
+                <select value={newExpenseCategory} onChange={e => setNewExpenseCategory(e.target.value as ExpenseCategory)} className="w-full p-3 rounded-xl border">
+                    {Object.values(ExpenseCategory).map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+                <input type="date" value={newExpenseDate} onChange={e => setNewExpenseDate(e.target.value)} className="w-full p-3 rounded-xl border" />
             </div>
-            <div>
-              <label htmlFor="materialBrand" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Marca (Opcional)</label>
-              <input
-                id="materialBrand"
-                type="text"
-                value={newMaterialBrand}
-                onChange={(e) => setNewMaterialBrand(e.target.value)}
-                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
-                aria-label="Marca do Material"
-                disabled={editMaterialData && editMaterialData.purchasedQty > 0} // Disable if purchased
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label htmlFor="plannedQty" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Qtd. Planejada</label>
-                  <input
-                    id="plannedQty"
-                    type="number"
-                    value={newMaterialPlannedQty}
-                    onChange={(e) => setNewMaterialPlannedQty(e.target.value)}
-                    min="0"
-                    step="0.01"
-                    className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
-                    required
-                    aria-label="Quantidade Planejada"
-                    disabled={editMaterialData && editMaterialData.purchasedQty > 0} // Disable if purchased
-                  />
-                </div>
-                <div>
-                  <label htmlFor="materialUnit" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Unidade</label>
-                  <input
-                    id="materialUnit"
-                    type="text"
-                    value={newMaterialUnit}
-                    onChange={(e) => setNewMaterialUnit(e.target.value)}
-                    className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
-                    required
-                    aria-label="Unidade de Medida"
-                    disabled={editMaterialData && editMaterialData.purchasedQty > 0} // Disable if purchased
-                  />
-                </div>
-            </div>
-            <div>
-              <label htmlFor="materialCategory" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Categoria (Opcional)</label>
-              <input
-                id="materialCategory"
-                type="text"
-                value={newMaterialCategory}
-                onChange={(e) => setNewMaterialCategory(e.target.value)}
-                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
-                aria-label="Categoria do Material"
-                disabled={editMaterialData && editMaterialData.purchasedQty > 0} // Disable if purchased
-              />
-            </div>
-            <div>
-              <label htmlFor="materialStepId" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Associar à Etapa (Opcional)</label>
-              <select
-                id="materialStepId"
-                value={newMaterialStepId}
-                onChange={(e) => setNewMaterialStepId(e.target.value)}
-                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
-                aria-label="Associar material a uma etapa"
-                disabled={editMaterialData && editMaterialData.purchasedQty > 0} // Disable if purchased
-              >
-                <option value="none">Nenhuma</option>
-                {steps.map(step => (
-                  <option key={step.id} value={step.id}>{step.name}</option>
-                ))}
-              </select>
-            </div>
-
-            {editMaterialData && (
-                <div className="pt-4 mt-4 border-t border-slate-200 dark:border-slate-700">
-                    <h3 className="text-md font-bold text-primary dark:text-white mb-3">Registrar Nova Compra</h3>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label htmlFor="purchaseQty" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Qtd. da Compra</label>
-                            <input
-                                id="purchaseQty"
-                                type="number"
-                                value={purchaseQtyInput}
-                                onChange={(e) => setPurchaseQtyInput(e.target.value)}
-                                min="0"
-                                step="0.01"
-                                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
-                                aria-label="Quantidade da Compra"
-                            />
-                        </div>
-                        <div>
-                            <label htmlFor="purchaseCost" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Custo da Compra (R$)</label>
-                            <input
-                                id="purchaseCost"
-                                type="number"
-                                value={purchaseCostInput}
-                                onChange={(e) => setPurchaseCostInput(e.target.value)}
-                                min="0"
-                                step="0.01"
-                                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
-                                aria-label="Custo da Compra"
-                            />
-                        </div>
-                    </div>
-                </div>
-            )}
-            <button type="submit" hidden></button>
-          </form>
         </ZeModal>
       )}
 
-      {/* Add/Edit Expense Modal */}
-      {(showAddExpenseModal || editExpenseData) && (
-        <ZeModal
-          isOpen={true}
-          title={editExpenseData ? "Editar Despesa" : "Adicionar Nova Despesa"}
-          message=""
-          confirmText={editExpenseData ? "Salvar Alterações" : "Adicionar Despesa"}
-          onConfirm={editExpenseData ? handleEditExpense : handleAddExpense}
-          onCancel={() => { setShowAddExpenseModal(false); setEditExpenseData(null); }}
-          isConfirming={zeModal.isConfirming}
-        >
-          <form onSubmit={editExpenseData ? handleEditExpense : handleAddExpense} className="space-y-4">
-            <div>
-              <label htmlFor="expenseDescription" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Descrição</label>
-              <input
-                id="expenseDescription"
-                type="text"
-                value={newExpenseDescription}
-                onChange={(e) => setNewExpenseDescription(e.target.value)}
-                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
-                required
-                aria-label="Descrição da Despesa"
-              />
+      {showAddPaymentModal && (
+        <ZeModal isOpen title="Pagar" confirmText="Confirmar" onConfirm={handleAddPayment} onCancel={() => setShowAddPaymentModal(false)} isConfirming={zeModal.isConfirming}>
+            <div className="space-y-4">
+                <input type="number" placeholder="Valor do Pagamento" value={paymentAmount} onChange={e => setPaymentAmount(e.target.value)} className="w-full p-3 rounded-xl border" />
+                <input type="date" value={paymentDate} onChange={e => setNewPaymentDate(e.target.value)} className="w-full p-3 rounded-xl border" />
             </div>
-            <div>
-              <label htmlFor="expenseAmount" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Valor (R$)</label>
-              <input
-                id="expenseAmount"
-                type="number" // Reverted to number
-                value={newExpenseAmount}
-                onChange={(e) => setNewExpenseAmount(e.target.value)}
-                min="0"
-                step="0.01"
-                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
-                required
-                aria-label="Valor da Despesa"
-                // 🔥 FIX CRÍTICO: Não desabilitar se for material, apenas se tiver pagos e não for material.
-                disabled={isEditingExpenseWithPayments && !isMaterialCategorySelected}
-              />
-            </div>
-            {/* NEW: Field for totalAgreed, only shown if NOT a material category */}
-            {!isMaterialCategorySelected && (
-              <div>
-                <label htmlFor="expenseTotalAgreed" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Valor Combinado (R$)</label>
-                <input
-                  id="expenseTotalAgreed"
-                  type="number"
-                  value={newExpenseTotalAgreed}
-                  onChange={(e) => setNewExpenseTotalAgreed(e.target.value)}
-                  min="0"
-                  step="0.01"
-                  placeholder="Deixe em branco para usar o Valor da Despesa"
-                  className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
-                  aria-label="Valor combinado da despesa (para pagamentos parcelados)"
-                  disabled={isEditingExpenseWithPayments}
-                />
-              </div>
-            )}
-            <div>
-              <label htmlFor="expenseCategory" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Categoria</label>
-              <select
-                id="expenseCategory"
-                value={newExpenseCategory}
-                onChange={(e) => setNewExpenseCategory(e.target.value)}
-                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
-                required
-                aria-label="Categoria da Despesa"
-                disabled={isEditingExpenseWithPayments && !isMaterialCategorySelected}
-              >
-                {Object.values(ExpenseCategory).map(cat => (
-                  <option key={cat} value={cat}>{cat}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label htmlFor="expenseDate" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Data</label>
-              <input
-                id="expenseDate"
-                type="date"
-                value={newExpenseDate}
-                onChange={(e) => setNewExpenseDate(e.target.value)}
-                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
-                required
-                aria-label="Data da Despesa"
-                disabled={isEditingExpenseWithPayments && !isMaterialCategorySelected}
-              />
-            </div>
-            <div>
-              <label htmlFor="expenseStepId" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Associar à Etapa (Opcional)</label>
-              <select
-                id="expenseStepId"
-                value={newExpenseStepId}
-                onChange={(e) => setNewExpenseStepId(e.target.value)}
-                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
-                aria-label="Associar despesa a uma etapa"
-              >
-                <option value="none">Nenhuma</option>
-                {steps.map(step => (
-                  <option key={step.id} value={step.id}>{step.name}</option>
-                ))}
-              </select>
-            </div>
-            {/* NEW: Worker and Supplier association */}
-            <div>
-              <label htmlFor="expenseWorkerId" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Associar a Profissional (Opcional)</label>
-              <select
-                id="expenseWorkerId"
-                value={newExpenseWorkerId}
-                onChange={(e) => setNewExpenseWorkerId(e.target.value)}
-                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
-                aria-label="Associar despesa a um profissional"
-              >
-                <option value="none">Nenhum</option>
-                {workers.map(worker => (
-                  <option key={worker.id} value={worker.id}>{worker.name}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label htmlFor="expenseSupplierId" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Associar a Fornecedor (Opcional)</label>
-              <select
-                id="expenseSupplierId"
-                value={newExpenseSupplierId}
-                onChange={(e) => setNewExpenseSupplierId(e.target.value)}
-                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
-                aria-label="Associar despesa a um fornecedor"
-              >
-                <option value="none">Nenhum</option>
-                {suppliers.map(supplier => (
-                  <option key={supplier.id} value={supplier.id}>{supplier.name}</option>
-                ))}
-              </select>
-            </div>
-            <button type="submit" hidden></button>
-          </form>
         </ZeModal>
       )}
 
-      {/* Add Payment Modal */}
-      {showAddPaymentModal && paymentExpenseData && (
-        <ZeModal
-          isOpen={true}
-          title={`Adicionar Pagamento para ${paymentExpenseData.description}`}
-          message=""
-          confirmText="Adicionar Pagamento"
-          onConfirm={handleAddPayment}
-          onCancel={() => { setShowAddPaymentModal(false); setPaymentExpenseData(null); setPaymentAmount(''); setNewPaymentDate(new Date().toISOString().split('T')[0]); }}
-          isConfirming={zeModal.isConfirming}
-        >
-          <form onSubmit={handleAddPayment} className="space-y-4">
-            <div>
-              <label htmlFor="paymentAmount" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Valor do Pagamento (R$)</label>
-              <input
-                id="paymentAmount"
-                type="number" // Reverted to number
-                value={paymentAmount}
-                onChange={(e) => setPaymentAmount(e.target.value)}
-                min="0.01"
-                step="0.01"
-                max={Math.max(0.01, (paymentExpenseData.totalAgreed !== undefined ? paymentExpenseData.totalAgreed : paymentExpenseData.amount || 0) - (paymentExpenseData.paidAmount || 0))} // Max is remaining amount
-                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
-                required
-                aria-label="Valor do Pagamento"
-              />
-            </div>
-            <div>
-              <label htmlFor="paymentDate" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Data do Pagamento</label>
-              <input
-                id="paymentDate"
-                type="date"
-                value={paymentDate}
-                onChange={(e) => setNewPaymentDate(e.target.value)}
-                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
-                required
-                aria-label="Data do Pagamento"
-              />
-            </div>
-            <button type="submit" hidden></button>
-          </form>
-        </ZeModal>
-      )}
-
-      {/* Add/Edit Worker Modal */}
-      {(showAddWorkerModal || editWorkerData) && (
-        <ZeModal
-          isOpen={true}
-          title={editWorkerData ? "Editar Profissional" : "Adicionar Novo Profissional"}
-          message=""
-          confirmText={editWorkerData ? "Salvar Alterações" : "Adicionar Profissional"}
-          onConfirm={editWorkerData ? handleEditWorker : handleAddWorker}
-          onCancel={() => { setShowAddWorkerModal(false); setEditWorkerData(null); }}
-          isConfirming={zeModal.isConfirming}
-        >
-          <form onSubmit={editWorkerData ? handleEditWorker : handleAddWorker} className="space-y-4">
-            <div>
-              <label htmlFor="workerName" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Nome</label>
-              <input
-                id="workerName"
-                type="text"
-                value={newWorkerName}
-                onChange={(e) => setNewWorkerName(e.target.value)}
-                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
-                required
-                aria-label="Nome do Profissional"
-              />
-            </div>
-            <div>
-              <label htmlFor="workerRole" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Função</label>
-              <select
-                id="workerRole"
-                value={newWorkerRole}
-                onChange={(e) => setNewWorkerRole(e.target.value)}
-                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
-                required
-                aria-label="Função do Profissional"
-              >
-                <option value="">Selecione uma função</option>
-                {STANDARD_JOB_ROLES.map(role => <option key={role} value={role}>{role}</option>)}
-              </select>
-            </div>
-            <div>
-              <label htmlFor="workerPhone" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Telefone (WhatsApp)</label>
-              <input
-                id="workerPhone"
-                type="tel"
-                value={newWorkerPhone}
-                onChange={(e) => setNewWorkerPhone(e.target.value)}
-                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
-                required
-                aria-label="Telefone do Profissional"
-              />
-            </div>
-            <div>
-              <label htmlFor="workerDailyRate" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Diária (R$)</label>
-              <input
-                id="workerDailyRate"
-                type="number"
-                value={newWorkerDailyRate}
-                onChange={(e) => setNewWorkerDailyRate(e.target.value)}
-                min="0"
-                step="0.01"
-                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
-                aria-label="Diária do Profissional"
-              />
-            </div>
-            <div>
-              <label htmlFor="workerNotes" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Observações (Opcional)</label>
-              <textarea
-                id="workerNotes"
-                value={newWorkerNotes}
-                onChange={(e) => setNewWorkerNotes(e.target.value)}
-                rows={3}
-                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
-                aria-label="Observações do Profissional"
-              ></textarea>
-            </div>
-            <button type="submit" hidden></button>
-          </form>
-        </ZeModal>
-      )}
-
-      {/* Add/Edit Supplier Modal */}
-      {(showAddSupplierModal || editSupplierData) && (
-        <ZeModal
-          isOpen={true}
-          title={editSupplierData ? "Editar Fornecedor" : "Adicionar Novo Fornecedor"}
-          message=""
-          confirmText={editSupplierData ? "Salvar Alterações" : "Adicionar Fornecedor"}
-          onConfirm={editSupplierData ? handleEditSupplier : handleAddSupplier}
-          onCancel={() => { setShowAddSupplierModal(false); setEditSupplierData(null); }}
-          isConfirming={zeModal.isConfirming}
-        >
-          <form onSubmit={editSupplierData ? handleEditSupplier : handleAddSupplier} className="space-y-4">
-            <div>
-              <label htmlFor="supplierName" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Nome</label>
-              <input
-                id="supplierName"
-                type="text"
-                value={newSupplierName}
-                onChange={(e) => setNewSupplierName(e.target.value)}
-                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
-                required
-                aria-label="Nome do Fornecedor"
-              />
-            </div>
-            <div>
-              <label htmlFor="supplierCategory" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Categoria</label>
-              <select
-                id="supplierCategory"
-                value={newSupplierCategory}
-                onChange={(e) => setNewSupplierCategory(e.target.value)}
-                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
-                required
-                aria-label="Categoria do Fornecedor"
-              >
-                <option value="">Selecione uma categoria</option>
-                {STANDARD_SUPPLIER_CATEGORIES.map(category => <option key={category} value={category}>{category}</option>)}
-              </select>
-            </div>
-            <div>
-              <label htmlFor="supplierPhone" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Telefone</label>
-              <input
-                id="supplierPhone"
-                type="tel"
-                value={newSupplierPhone}
-                onChange={(e) => setNewSupplierPhone(e.target.value)}
-                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
-                required
-                aria-label="Telefone do Fornecedor"
-              />
-            </div>
-            <div>
-              <label htmlFor="supplierEmail" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Email (Opcional)</label>
-              <input
-                id="supplierEmail"
-                type="email"
-                value={newSupplierEmail}
-                onChange={(e) => setNewSupplierEmail(e.target.value)}
-                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
-                aria-label="Email do Fornecedor"
-              />
-            </div>
-            <div>
-              <label htmlFor="supplierAddress" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Endereço (Opcional)</label>
-              <input
-                id="supplierAddress"
-                type="text"
-                value={newSupplierAddress}
-                onChange={(e) => setNewSupplierAddress(e.target.value)}
-                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
-                aria-label="Endereço do Fornecedor"
-              />
-            </div>
-            <div>
-              <label htmlFor="supplierNotes" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Observações (Opcional)</label>
-              <textarea
-                id="supplierNotes"
-                value={newSupplierNotes}
-                onChange={(e) => setNewSupplierNotes(e.target.value)}
-                rows={3}
-                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
-                aria-label="Observações do Fornecedor"
-              ></textarea>
-            </div>
-            <button type="submit" hidden></button>
-          </form>
-        </ZeModal>
-      )}
-
-      {/* Add Photo Modal */}
-      {showAddPhotoModal && (
-        <ZeModal
-          isOpen={true}
-          title="Adicionar Nova Foto"
-          message=""
-          confirmText="Adicionar Foto"
-          onConfirm={handleAddPhoto}
-          onCancel={() => { setShowAddPhotoModal(false); setNewPhotoFile(null); setNewPhotoDescription(''); setNewPhotoType('PROGRESS'); }}
-          isConfirming={uploadingPhoto}
-        >
-          <form onSubmit={handleAddPhoto} className="space-y-4">
-            <div>
-              <label htmlFor="photoFile" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Arquivo da Foto</label>
-              <input
-                id="photoFile"
-                type="file"
-                accept="image/*"
-                onChange={(e) => setNewPhotoFile(e.target.files ? e.target.files[0] : null)}
-                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-bold file:bg-secondary file:text-white hover:file:bg-secondary-dark transition-colors"
-                required
-                aria-label="Arquivo da Foto"
-              />
-            </div>
-            <div>
-              <label htmlFor="photoDescription" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Descrição (Opcional)</label>
-              <input
-                id="photoDescription"
-                type="text"
-                value={newPhotoDescription}
-                onChange={(e) => setNewPhotoDescription(e.target.value)}
-                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
-                aria-label="Descrição da Foto"
-              />
-            </div>
-            <div>
-              <label htmlFor="photoType" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Tipo da Foto</label>
-              <select
-                id="photoType"
-                value={newPhotoType}
-                onChange={(e) => setNewPhotoType(e.target.value as 'BEFORE' | 'AFTER' | 'PROGRESS')}
-                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
-                required
-                aria-label="Tipo da Foto"
-              >
-                <option value="PROGRESS">Progresso</option>
-                <option value="BEFORE">Antes</option>
-                <option value="AFTER">Depois</option>
-              </select>
-            </div>
-            <button type="submit" hidden></button>
-          </form>
-        </ZeModal>
-      )}
-
-      {/* Add File Modal */}
-      {showAddFileModal && (
-        <ZeModal
-          isOpen={true}
-          title="Adicionar Novo Documento/Projeto"
-          message=""
-          confirmText="Adicionar Arquivo"
-          onConfirm={handleAddFile}
-          onCancel={() => { setShowAddFileModal(false); setNewUploadFile(null); setNewFileName(''); setNewFileCategory(FileCategory.GENERAL); }}
-          isConfirming={uploadingFile}
-        >
-          <form onSubmit={handleAddFile} className="space-y-4">
-            <div>
-              <label htmlFor="uploadFile" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Arquivo</label>
-              <input
-                id="uploadFile"
-                type="file"
-                onChange={(e) => setNewUploadFile(e.target.files ? e.target.files[0] : null)}
-                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-bold file:bg-secondary file:text-white hover:file:bg-secondary-dark transition-colors"
-                required
-                aria-label="Arquivo para Upload"
-              />
-            </div>
-            <div>
-              <label htmlFor="fileName" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Nome do Documento (Opcional)</label>
-              <input
-                id="fileName"
-                type="text"
-                value={newFileName}
-                onChange={(e) => setNewFileName(e.target.value)}
-                placeholder="Nome do arquivo ou projeto"
-                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
-                aria-label="Nome do Documento"
-              />
-            </div>
-            <div>
-              <label htmlFor="fileCategory" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Categoria</label>
-              <select
-                id="fileCategory"
-                value={newFileCategory}
-                onChange={(e) => setNewFileCategory(e.target.value as FileCategory)}
-                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
-                required
-                aria-label="Categoria do Documento"
-              >
-                {Object.values(FileCategory).map(category => (
-                  <option key={category} value={category}>{category}</option>
-                ))}
-              </select>
-            </div>
-            <button type="submit" hidden></button>
-          </form>
-        </ZeModal>
-      )}
-
-      {/* View Contract Content Modal */}
-      {showContractContentModal && (
-        <ZeModal
-          isOpen={true}
-          title={selectedContractTitle}
-          message="" // Content is in children
-          confirmText="Copiar Texto"
-          onConfirm={async (e) => {
-              e?.preventDefault(); // Prevent modal from closing immediately
-              await navigator.clipboard.writeText(selectedContractContent);
-              setCopyContractSuccess(true);
-              setTimeout(() => setCopyContractSuccess(false), 2000);
-          }}
-          onCancel={() => { setShowContractContentModal(false); setSelectedContractContent(''); setSelectedContractTitle(''); setCopyContractSuccess(false); }}
-          cancelText="Fechar"
-        >
-          <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-4 border border-slate-100 dark:border-slate-700 max-h-96 overflow-y-auto">
-            <pre className="whitespace-pre-wrap font-mono text-xs text-primary dark:text-white">{selectedContractContent}</pre>
-          </div>
-          {copyContractSuccess && <p className="mt-2 text-green-600 dark:text-green-400 text-sm text-center">Copiado para a área de transferência!</p>}
-        </ZeModal>
-      )}
-
-      {/* Add/Edit Checklist Modal */}
-      {(showAddChecklistModal || editChecklistData) && (
-        <ZeModal
-          isOpen={true}
-          title={editChecklistData ? "Editar Checklist" : "Adicionar Novo Checklist"}
-          message=""
-          confirmText={editChecklistData ? "Salvar Alterações" : "Adicionar Checklist"}
-          onConfirm={editChecklistData ? handleEditChecklist : handleAddChecklist}
-          onCancel={() => { setShowAddChecklistModal(false); setEditChecklistData(null); setNewChecklistItems(['']); }}
-          isConfirming={zeModal.isConfirming}
-        >
-          <form onSubmit={editChecklistData ? handleEditChecklist : handleAddChecklist} className="space-y-4">
-            <div>
-              <label htmlFor="checklistName" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Nome do Checklist</label>
-              <input
-                id="checklistName"
-                type="text"
-                value={newChecklistName}
-                onChange={(e) => setNewChecklistName(e.target.value)}
-                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
-                required
-                aria-label="Nome do Checklist"
-              />
-            </div>
-            <div>
-              <label htmlFor="checklistCategory" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Categoria</label>
-              <input
-                id="checklistCategory"
-                type="text"
-                value={newChecklistCategory}
-                onChange={(e) => setNewChecklistCategory(e.target.value)}
-                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
-                required
-                aria-label="Categoria do Checklist"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Itens do Checklist</label>
-              {newChecklistItems.map((item, index) => (
-                <div key={index} className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    value={item}
-                    onChange={(e) => {
-                      const updatedItems = [...newChecklistItems];
-                      updatedItems[index] = e.target.value;
-                      setNewChecklistItems(updatedItems);
-                    }}
-                    placeholder={`Item ${index + 1}`}
-                    className="flex-1 p-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white text-sm"
-                    aria-label={`Item ${index + 1} do checklist`}
-                  />
-                  {newChecklistItems.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => setNewChecklistItems(newChecklistItems.filter((_, i) => i !== index))}
-                      className="text-red-500 hover:text-red-700 p-1"
-                      aria-label="Remover item"
-                    >
-                      <i className="fa-solid fa-trash-alt text-base"></i>
-                    </button>
-                  )}
-                </div>
-              ))}
-              <button
-                type="button"
-                onClick={() => setNewChecklistItems([...newChecklistItems, ''])}
-                className="mt-2 px-3 py-1 bg-primary/10 text-primary dark:text-white text-xs font-bold rounded-lg hover:bg-primary/20 transition-colors"
-                aria-label="Adicionar novo item"
-              >
-                Adicionar Item
-              </button>
-            </div>
-            <button type="submit" hidden></button>
-          </form>
-        </ZeModal>
-      )}
       {zeModal.isOpen && <ZeModal {...zeModal} />}
     </div>
   );
