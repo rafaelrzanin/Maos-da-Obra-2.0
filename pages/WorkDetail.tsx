@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import * as ReactRouter from 'react-router-dom';
 import * as XLSX from 'xlsx'; // Keep XLSX import, as reports might use it
@@ -303,10 +304,16 @@ const ToolSubViewHeader: React.FC<ToolSubViewHeaderProps> = ({ title, onBack, on
   );
 };
 
+// EXPORT WorkDetailProps so it can be imported and used for type casting in App.tsx
+export interface WorkDetailProps {
+  activeTab: MainTab;
+  onTabChange: (tab: MainTab) => void;
+}
+
 /** =========================
  * WorkDetail
  * ========================= */
-const WorkDetail = () => {
+const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
   const { id: workId } = ReactRouter.useParams<{ id: string }>();
   const navigate = ReactRouter.useNavigate();
   const location = ReactRouter.useLocation();
@@ -330,7 +337,7 @@ const WorkDetail = () => {
   const [checklists, setChecklists] = useState<Checklist[]>([]); 
 
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<MainTab>('ETAPAS'); // Controlled by BottomNavBar or URL
+  // REMOVED: `activeTab` from useState, it's now a prop
   const [activeSubView, setActiveSubView] = useState<SubView>('NONE'); 
   
   // States for Material Filter
@@ -429,11 +436,11 @@ const WorkDetail = () => {
   // =======================================================================
 
   const goToTab = useCallback((tab: MainTab) => {
-    setActiveTab(tab);
+    onTabChange(tab); // Use the prop to update activeTab in App.tsx
     setActiveSubView('NONE'); 
     setMaterialFilterStepId('all'); 
     navigate(`/work/${workId}?tab=${tab}`, { replace: true }); // Update URL for consistent navigation
-  }, [workId, navigate]);
+  }, [workId, navigate, onTabChange]);
 
   const goToSubView = useCallback((subView: SubView) => {
     setActiveSubView(subView);
@@ -623,10 +630,10 @@ const WorkDetail = () => {
       // Read initial tab from URL on first load
       const tabFromUrl = searchParams.get('tab') as MainTab;
       if (tabFromUrl && ['ETAPAS', 'MATERIAIS', 'FINANCEIRO', 'FERRAMENTAS'].includes(tabFromUrl)) {
-        setActiveTab(tabFromUrl);
+        onTabChange(tabFromUrl); // Update parent state from URL
       }
     }
-  }, [authLoading, isUserAuthFinished, loadWorkData, searchParams]);
+  }, [authLoading, isUserAuthFinished, loadWorkData, searchParams, onTabChange]);
 
   // =======================================================================
   // CRUD HANDLERS: STEPS
@@ -924,6 +931,7 @@ const WorkDetail = () => {
       const costToRegister = Number(purchaseCostInput);
 
       // 1. Update the material's descriptive properties
+      // dbService.updateMaterial will validate and prevent changes to key fields if already purchased
       await dbService.updateMaterial({
         ...editMaterialData, // All original data
         name: newMaterialName,
@@ -932,8 +940,10 @@ const WorkDetail = () => {
         unit: newMaterialUnit,
         category: newMaterialCategory,
         stepId: newMaterialStepId === 'none' ? undefined : newMaterialStepId,
-        // Keep original purchasedQty and totalCost here, dbService.registerMaterialPurchase will update them
-        purchasedQty: editMaterialData.purchasedQty,
+        // purchasedQty and totalCost are derived and handled by registerMaterialPurchase,
+        // so we pass the original values here and update them only via purchase registration.
+        // dbService.updateMaterial will ignore them anyway for consistency if a purchase exists.
+        purchasedQty: editMaterialData.purchasedQty, 
         totalCost: editMaterialData.totalCost,
       });
 
@@ -1417,7 +1427,7 @@ const WorkDetail = () => {
         type: "ERROR",
         confirmText: "Ok",
         onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
-      }));
+      });
     } finally {
       setLoadingPhoto(false);
     }
@@ -1665,7 +1675,7 @@ const WorkDetail = () => {
   }
 
   // Define se a despesa está "paga" ou tem pagamentos, para desabilitar edição de campos chave
-  // MODIFICADO: Usa o novo status derivado
+  // MODIFICADO: Usa o novo ExpenseStatus derivado
   const isEditingExpenseWithPayments = editExpenseData && editExpenseData.status !== ExpenseStatus.PENDING;
   
   // Determine if the currently selected category is 'Material'
@@ -1861,7 +1871,7 @@ const WorkDetail = () => {
                            const statusDetails = getEntityStatusDetails('material', material, steps);
                            const progress = material.plannedQty > 0 ? (material.purchasedQty / material.plannedQty) * 100 : 0;
                            // 🔥 FIX CRÍTICO: Bloqueio de edição para material pago (se purchasedQty > 0)
-                           const isMaterialPaid = material.purchasedQty > 0;
+                           const isMaterialPurchased = material.purchasedQty > 0;
 
                            return (
                             <div 
@@ -1883,7 +1893,7 @@ const WorkDetail = () => {
                               className={cx(
                                 surface, 
                                 `p-4 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 cursor-pointer hover:scale-[1.005] transition-transform border-2 ${statusDetails.borderColor} shadow-lg ${statusDetails.shadowClass}`,
-                                isMaterialPaid ? 'opacity-70' : '' // Dim if any purchase has been made
+                                isMaterialPurchased ? 'opacity-70' : '' // Dim if any purchase has been made
                               )} 
                               aria-label={`Material ${material.name}`}
                             >
@@ -1935,7 +1945,7 @@ const WorkDetail = () => {
       case 'FINANCEIRO':
         const totalPaid = expenses.reduce((sum, exp) => sum + (exp.paidAmount || 0), 0);
         // Calculate outstanding relative to non-material budget
-        const totalNonMaterialExpenses = expenses.filter(e => e.category !== ExpenseCategory.MATERIAL).reduce((sum, exp) => sum + (exp.amount || 0), 0); // O amount é o planejado original
+        const totalNonMaterialExpensesPlanned = expenses.filter(e => e.category !== ExpenseCategory.MATERIAL).reduce((sum, exp) => sum + (exp.amount || 0), 0); // O amount é o planejado original
         const totalNonMaterialPaid = expenses.filter(e => e.category !== ExpenseCategory.MATERIAL).reduce((sum, exp) => sum + (exp.paidAmount || 0), 0); // paidAmount é derivado da soma das parcelas
         const budgetBalance = work.budgetPlanned - totalNonMaterialPaid; // Balanço contra o que foi pago
 
@@ -2345,40 +2355,45 @@ const WorkDetail = () => {
             {files.length === 0 ? (
                 <div className={cx(surface, "rounded-3xl p-8 text-center", mutedText)}>
                     <p className="text-lg mb-4">Nenhum documento cadastrado ainda.</p>
-                    <button onClick={() => setShowAddFileModal(true)} className="px-6 py-3 bg-secondary text-white font-bold rounded-xl hover:bg-secondary-dark transition-colors">
-                        Adicionar seu primeiro documento
-                    </button>
+                    <button onClick={() => setShowAddFileModal(true)} className="px-6 py-3 bg-secondary text-white font-bold rounded-xl hover:bg-secondary-dark transition-colors">Adicionar seu primeiro documento</button>
                 </div>
             ) : (
-                <div className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                     {files.map(file => (
-                        <div key={file.id} className={cx(surface, "p-4 rounded-2xl flex items-center justify-between gap-4")}>
-                            <a href={file.url} target="_blank" rel="noopener noreferrer" className="flex-1 flex items-center gap-4 group cursor-pointer" aria-label={`Abrir arquivo ${file.name}`}>
-                                <div className="w-10 h-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center text-lg shrink-0 group-hover:bg-primary/20 transition-colors">
-                                    <i className="fa-solid fa-file"></i>
-                                </div>
-                                <div>
-                                    <h3 className="font-bold text-primary dark:text-white text-lg leading-tight group-hover:text-secondary transition-colors">{file.name}</h3>
-                                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{file.category} - {formatDateDisplay(file.date)}</p>
-                                </div>
-                            </a>
-                            <button
-                                onClick={(e) => { e.stopPropagation(); 
-                                    setZeModal({
-                                        isOpen: true,
-                                        title: "Excluir Documento",
-                                        message: `Tem certeza que deseja excluir o documento "${file.name}"?`,
-                                        confirmText: "Excluir",
-                                        onConfirm: async (ev) => { ev?.preventDefault(); handleDeleteFile(file.id, file.url); },
-                                        onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
-                                        type: "DANGER"
-                                    });
-                                }}
-                                className="text-slate-400 hover:text-red-500 transition-colors p-1 shrink-0"
-                                aria-label={`Excluir documento ${file.name}`}
-                            >
-                                <i className="fa-solid fa-trash-alt text-lg"></i>
-                            </button>
+                        <div key={file.id} className={cx(surface, "rounded-2xl p-4 flex flex-col justify-between gap-4 shadow-lg group relative")}>
+                            <div>
+                                <p className="text-xs font-bold uppercase text-slate-400 dark:text-slate-500 mb-1">{file.category}</p>
+                                <h3 className="font-bold text-primary dark:text-white text-lg leading-tight truncate">{file.name}</h3>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{formatDateDisplay(file.date)}</p>
+                            </div>
+                            <div className="flex items-center justify-between mt-auto">
+                                <a 
+                                    href={file.url} 
+                                    target="_blank" 
+                                    rel="noopener noreferrer" 
+                                    className="px-3 py-1.5 bg-primary/10 text-primary dark:text-white text-xs font-bold rounded-lg hover:bg-primary/20 transition-colors flex items-center gap-2"
+                                    aria-label={`Visualizar documento ${file.name}`}
+                                >
+                                    <i className="fa-solid fa-eye"></i> Visualizar
+                                </a>
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); 
+                                        setZeModal({
+                                            isOpen: true,
+                                            title: "Excluir Arquivo",
+                                            message: `Tem certeza que deseja excluir o arquivo "${file.name}"?`,
+                                            confirmText: "Excluir",
+                                            onConfirm: async (ev) => { ev?.preventDefault(); handleDeleteFile(file.id, file.url); },
+                                            onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
+                                            type: "DANGER"
+                                        });
+                                    }}
+                                    className="text-slate-400 hover:text-red-500 transition-colors p-1"
+                                    aria-label={`Excluir arquivo ${file.name}`}
+                                >
+                                    <i className="fa-solid fa-trash-alt text-lg"></i>
+                                </button>
+                            </div>
                         </div>
                     ))}
                 </div>
@@ -2386,213 +2401,137 @@ const WorkDetail = () => {
           </>
         );
       
-      case 'CALCULATORS':
-        return (
-          <>
-            <ToolSubViewHeader title="Calculadoras" onBack={() => goToSubView('NONE')} />
-            <div className={cx(surface, "rounded-3xl p-8 text-center", mutedText)}>
-              <p className="text-lg mb-4">Calculadoras em desenvolvimento!</p>
-              <p className="text-sm">Em breve, ferramentas para te ajudar a calcular materiais e mão de obra.</p>
-              <div className="mt-6 text-slate-300 dark:text-slate-500">
-                <i className="fa-solid fa-calculator text-5xl opacity-40"></i>
-              </div>
-            </div>
-          </>
-        );
-
       case 'CONTRACTS':
         return (
-            <>
-                <ToolSubViewHeader title="Gerador de Contratos" onBack={() => goToSubView('NONE')} />
-                {contracts.length === 0 ? (
-                    <div className={cx(surface, "rounded-3xl p-8 text-center", mutedText)}>
-                        <p className="text-lg mb-4">Nenhum modelo de contrato disponível.</p>
-                        <p className="text-sm">Contratos padrões serão adicionados em breve.</p>
-                    </div>
-                ) : (
-                    <div className="space-y-4">
-                        {CONTRACT_TEMPLATES.map(contract => (
-                            <div key={contract.id} className={cx(surface, "p-4 rounded-2xl flex items-start gap-4")}>
-                                <div className="w-10 h-10 rounded-lg bg-primary/10 text-primary flex items-center justify-center text-lg shrink-0">
-                                    <i className="fa-solid fa-file-contract"></i>
-                                </div>
-                                <div className="flex-1">
-                                    <h3 className="font-bold text-primary dark:text-white text-lg leading-tight">{contract.title}</h3>
-                                    <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{contract.category}</p>
-                                </div>
-                                <button
-                                    onClick={() => {
-                                        setSelectedContractTitle(contract.title);
-                                        setSelectedContractContent(contract.contentTemplate);
-                                        setShowContractContentModal(true);
-                                    }}
-                                    className="px-4 py-2 bg-secondary text-white text-sm font-bold rounded-xl hover:bg-secondary-dark transition-colors shrink-0"
-                                    aria-label={`Visualizar contrato ${contract.title}`}
-                                >
-                                    Visualizar
-                                </button>
-                            </div>
-                        ))}
-                    </div>
-                )}
-                {showContractContentModal && (
-                    <ZeModal
-                        isOpen={showContractContentModal}
-                        title={selectedContractTitle}
-                        message=""
-                        confirmText={copyContractSuccess ? "Copiado!" : "Copiar Texto"}
-                        onConfirm={async (e) => { 
-                            e?.preventDefault();
-                            await navigator.clipboard.writeText(selectedContractContent);
-                            setCopyContractSuccess(true);
-                            setTimeout(() => setCopyContractSuccess(false), 2000);
-                        }}
-                        onCancel={() => setShowContractContentModal(false)}
-                        type="INFO"
-                    >
-                        <textarea 
-                            value={selectedContractContent} 
-                            readOnly 
-                            className="w-full h-80 p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white text-sm resize-none font-mono"
-                        ></textarea>
-                    </ZeModal>
-                )}
-            </>
+          <>
+            <ToolSubViewHeader title="Gerador de Contratos" onBack={() => goToSubView('NONE')} />
+            <p className="text-slate-500 dark:text-slate-400 mb-6 px-2 sm:px-0">
+              Escolha um modelo de contrato para gerar e personalizar.
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {contracts.map(contract => (
+                <button
+                  key={contract.id}
+                  onClick={() => {
+                    setSelectedContractTitle(contract.title);
+                    setSelectedContractContent(contract.contentTemplate);
+                    setShowContractContentModal(true);
+                  }}
+                  className={cx(surface, "p-4 rounded-2xl flex items-start gap-4 text-left cursor-pointer hover:scale-[1.005] transition-transform")}
+                  aria-label={`Abrir modelo de contrato: ${contract.title}`}
+                >
+                  <i className="fa-solid fa-file-contract text-2xl text-secondary shrink-0 mt-1"></i>
+                  <div>
+                    <h3 className="font-bold text-primary dark:text-white text-lg">{contract.title}</h3>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">{contract.category}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </>
         );
 
       case 'CHECKLIST':
         return (
-            <>
-                <ToolSubViewHeader title="Checklists" onBack={() => goToSubView('NONE')} onAdd={() => {
-                  setEditChecklistData(null); // Ensure add mode
-                  setNewChecklistName('');
-                  setNewChecklistCategory('');
-                  setNewChecklistItems(['']); // Reset to one empty item
-                  setShowAddChecklistModal(true);
-                }} />
-                {checklists.length === 0 ? (
-                    <div className={cx(surface, "rounded-3xl p-8 text-center", mutedText)}>
-                        <p className="text-lg mb-4">Nenhum checklist cadastrado ainda.</p>
-                        <button onClick={() => {
-                          setEditChecklistData(null); 
-                          setNewChecklistName('');
-                          setNewChecklistCategory('');
-                          setNewChecklistItems(['']);
-                          setShowAddChecklistModal(true);
-                        }} className="px-6 py-3 bg-secondary text-white font-bold rounded-xl hover:bg-secondary-dark transition-colors">
-                            Adicionar seu primeiro checklist
-                        </button>
-                    </div>
-                ) : (
-                    <div className="space-y-4">
-                        {checklists.map(checklist => (
-                            <div key={checklist.id} className={cx(surface, "p-4 rounded-2xl flex flex-col items-start gap-4")}>
-                                <div className="flex justify-between items-center w-full">
-                                    <div className="flex-1">
-                                        <h3 className="font-bold text-primary dark:text-white text-lg leading-tight">{checklist.name}</h3>
-                                        <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{checklist.category}</p>
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <button
-                                            onClick={() => {
-                                                setNewChecklistName(checklist.name);
-                                                setNewChecklistCategory(checklist.category);
-                                                setNewChecklistItems(checklist.items.map(item => item.text));
-                                                setEditChecklistData(checklist);
-                                                setShowAddChecklistModal(true);
-                                            }}
-                                            className="text-slate-400 hover:text-primary dark:hover:text-white transition-colors p-1"
-                                            aria-label={`Editar checklist ${checklist.name}`}
-                                        >
-                                            <i className="fa-solid fa-edit text-lg"></i>
-                                        </button>
-                                        <button
-                                            onClick={() => {
-                                                setZeModal({
-                                                    isOpen: true,
-                                                    title: "Excluir Checklist",
-                                                    message: `Tem certeza que deseja excluir o checklist "${checklist.name}"?`,
-                                                    confirmText: "Excluir",
-                                                    onConfirm: async (ev) => { ev?.preventDefault(); handleDeleteChecklist(checklist.id); },
-                                                    onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
-                                                    type: "DANGER"
-                                                });
-                                            }}
-                                            className="text-slate-400 hover:text-red-500 transition-colors p-1"
-                                            aria-label={`Excluir checklist ${checklist.name}`}
-                                        >
-                                            <i className="fa-solid fa-trash-alt text-lg"></i>
-                                        </button>
-                                    </div>
+          <>
+            <ToolSubViewHeader title="Checklists da Obra" onBack={() => goToSubView('NONE')} onAdd={() => {
+              setEditChecklistData(null);
+              setNewChecklistName('');
+              setNewChecklistCategory('');
+              setNewChecklistItems(['']);
+              setShowAddChecklistModal(true);
+            }} />
+            {checklists.length === 0 ? (
+                <div className={cx(surface, "rounded-3xl p-8 text-center", mutedText)}>
+                    <p className="text-lg mb-4">Nenhum checklist cadastrado ainda.</p>
+                    <button onClick={() => {
+                      setEditChecklistData(null);
+                      setNewChecklistName('');
+                      setNewChecklistCategory('');
+                      setNewChecklistItems(['']);
+                      setShowAddChecklistModal(true);
+                    }} className="px-6 py-3 bg-secondary text-white font-bold rounded-xl hover:bg-secondary-dark transition-colors">
+                        Adicionar seu primeiro checklist
+                    </button>
+                </div>
+            ) : (
+                <div className="space-y-6">
+                    {checklists.map(checklist => (
+                        <div key={checklist.id} className={cx(surface, "p-5 rounded-2xl shadow-lg")}>
+                            <div className="flex items-center justify-between mb-4">
+                                <div>
+                                    <h3 className="font-bold text-primary dark:text-white text-xl">{checklist.name}</h3>
+                                    <p className="text-sm text-slate-500 dark:text-slate-400">{checklist.category}</p>
                                 </div>
-                                <ul className="w-full mt-2 space-y-2">
-                                    {checklist.items.map(item => (
-                                        <li key={item.id} className="flex items-center">
-                                            <input
-                                                type="checkbox"
-                                                id={`checklist-item-${item.id}`}
-                                                checked={item.checked}
-                                                onChange={(e) => handleChecklistItemToggle(checklist.id, item.id, e.target.checked)}
-                                                className="h-5 w-5 rounded border-slate-300 dark:border-slate-600 text-secondary focus:ring-secondary/50"
-                                            />
-                                            <label htmlFor={`checklist-item-${item.id}`} className="ml-3 text-sm text-primary dark:text-white cursor-pointer">
-                                                {item.text}
-                                            </label>
-                                        </li>
-                                    ))}
-                                </ul>
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={() => {
+                                            setNewChecklistName(checklist.name);
+                                            setNewChecklistCategory(checklist.category);
+                                            setNewChecklistItems(checklist.items.map(item => item.text));
+                                            setEditChecklistData(checklist);
+                                            setShowAddChecklistModal(true);
+                                        }}
+                                        className="text-slate-400 hover:text-secondary transition-colors p-1"
+                                        aria-label={`Editar checklist ${checklist.name}`}
+                                    >
+                                        <i className="fa-solid fa-pencil text-lg"></i>
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            setZeModal({
+                                                isOpen: true,
+                                                title: "Excluir Checklist",
+                                                message: `Tem certeza que deseja excluir o checklist ${checklist.name}?`,
+                                                confirmText: "Excluir",
+                                                onConfirm: async (ev) => { ev?.preventDefault(); handleDeleteChecklist(checklist.id); },
+                                                onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
+                                                type: "DANGER"
+                                            });
+                                        }}
+                                        className="text-slate-400 hover:text-red-500 transition-colors p-1"
+                                        aria-label={`Excluir checklist ${checklist.name}`}
+                                    >
+                                        <i className="fa-solid fa-trash-alt text-lg"></i>
+                                    </button>
+                                </div>
                             </div>
-                        ))}
-                    </div>
-                )}
-            </>
+                            <div className="space-y-3">
+                                {checklist.items.map(item => (
+                                    <label key={item.id} className="flex items-center gap-3 text-sm text-primary dark:text-white cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked={item.checked}
+                                            onChange={(e) => handleChecklistItemToggle(checklist.id, item.id, e.target.checked)}
+                                            className="h-5 w-5 rounded border-slate-300 dark:border-slate-600 text-secondary focus:ring-secondary/50"
+                                            aria-label={item.text}
+                                        />
+                                        <span className={item.checked ? 'line-through text-slate-500 dark:text-slate-400' : ''}>{item.text}</span>
+                                    </label>
+                                ))}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
+          </>
         );
 
       case 'AICHAT':
-        return (
-            <>
-                <ToolSubViewHeader title="Zé da Obra AI" onBack={() => goToSubView('NONE')} />
-                <div className={cx(surface, "rounded-3xl p-8 text-center", mutedText)}>
-                    <p className="text-lg mb-4">Acessar o Zé da Obra AI para conversar!</p>
-                    <button 
-                        onClick={() => navigate('/ai-chat')} 
-                        className="px-6 py-3 bg-secondary text-white font-bold rounded-xl hover:bg-secondary-dark transition-colors"
-                    >
-                        Abrir Chat AI
-                    </button>
-                </div>
-            </>
-        );
-      case 'REPORTS':
-        return (
-          <>
-            <ToolSubViewHeader title="Relatórios" onBack={() => goToSubView('NONE')} />
-            <div className={cx(surface, "rounded-3xl p-8 text-center", mutedText)}>
-              <p className="text-lg mb-4">Acessar a visualização de Relatórios!</p>
-              <button 
-                  onClick={() => navigate(`/work/${workId}/reports`)} 
-                  className="px-6 py-3 bg-secondary text-white font-bold rounded-xl hover:bg-secondary-dark transition-colors"
-              >
-                  Ver Relatórios
-              </button>
-            </div>
-          </>
-        );
+        // This tool is routed to a separate page, so just navigate there
+        navigate(`/ai-chat`);
+        return null;
+      
       case 'AIPLANNER':
-        return (
-          <>
-            <ToolSubViewHeader title="Planejamento Inteligente AI" onBack={() => goToSubView('NONE')} />
-            <div className={cx(surface, "rounded-3xl p-8 text-center", mutedText)}>
-              <p className="text-lg mb-4">Acessar o Planejamento Inteligente AI!</p>
-              <button 
-                  onClick={() => navigate(`/work/${workId}/ai-planner`)} 
-                  className="px-6 py-3 bg-secondary text-white font-bold rounded-xl hover:bg-secondary-dark transition-colors"
-              >
-                  Ver Plano AI
-              </button>
-            </div>
-          </>
-        );
+        // This tool is routed to a separate page, so just navigate there
+        navigate(`/work/${workId}/ai-planner`);
+        return null;
+      
+      case 'REPORTS':
+        // This tool is routed to a separate page, so just navigate there
+        navigate(`/work/${workId}/reports`);
+        return null;
+
       default:
         return null;
     }
@@ -2600,155 +2539,201 @@ const WorkDetail = () => {
 
   return (
     <div className="max-w-4xl mx-auto pb-12 pt-4 px-2 sm:px-4 md:px-0 font-sans">
-      <div className="flex items-center gap-4 mb-6 px-2 sm:px-0 print:hidden">
+      <div className="flex items-center gap-4 mb-6 px-2 sm:px-0">
         <button
-          onClick={() => navigate('/')}
+          onClick={() => navigate('/')} // Back to Dashboard
           className="text-slate-400 hover:text-primary dark:hover:text-white transition-colors p-2 -ml-2"
-          aria-label="Voltar para dashboard"
+          aria-label="Voltar para o Dashboard"
         >
           <i className="fa-solid fa-arrow-left text-xl"></i>
         </button>
         <div>
           <h1 className="text-3xl font-black text-primary dark:text-white mb-1 tracking-tight">{work.name}</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">{work.address}</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">Endereço: {work.address}</p>
         </div>
+      </div>
+      
+      {/* Tab Navigation */}
+      <div className="flex justify-around bg-white dark:bg-slate-900 rounded-2xl p-2 shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800 mb-6 print:hidden">
+        <button
+          onClick={() => goToTab('ETAPAS')}
+          className={`flex-1 py-2 rounded-xl text-sm font-bold transition-colors ${activeTab === 'ETAPAS' ? 'bg-secondary text-white shadow-md' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+          aria-current={activeTab === 'ETAPAS' ? 'page' : undefined}
+        >
+          Cronograma
+        </button>
+        <button
+          onClick={() => goToTab('MATERIAIS')}
+          className={`flex-1 py-2 rounded-xl text-sm font-bold transition-colors ${activeTab === 'MATERIAIS' ? 'bg-secondary text-white shadow-md' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+          aria-current={activeTab === 'MATERIAIS' ? 'page' : undefined}
+        >
+          Materiais
+        </button>
+        <button
+          onClick={() => goToTab('FINANCEIRO')}
+          className={`flex-1 py-2 rounded-xl text-sm font-bold transition-colors ${activeTab === 'FINANCEIRO' ? 'bg-secondary text-white shadow-md' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+          aria-current={activeTab === 'FINANCEIRO' ? 'page' : undefined}
+        >
+          Financeiro
+        </button>
+        <button
+          onClick={() => goToTab('FERRAMENTAS')}
+          className={`flex-1 py-2 rounded-xl text-sm font-bold transition-colors ${activeTab === 'FERRAMENTAS' ? 'bg-secondary text-white shadow-md' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+          aria-current={activeTab === 'FERRAMENTAS' ? 'page' : undefined}
+        >
+          Ferramentas
+        </button>
       </div>
 
       {/* Main Content Area */}
-      {renderMainContent()}
+      <div className={cx(surface, card, "animate-in fade-in")}>
+        {renderMainContent()}
+      </div>
 
-      {/* Modals for CRUD operations */}
+      {/* --- MODALS --- */}
+
       {/* Add/Edit Step Modal */}
-      {showAddStepModal && (
+      {(showAddStepModal || editStepData) && (
         <ZeModal
-          isOpen={showAddStepModal}
+          isOpen={true}
           title={editStepData ? "Editar Etapa" : "Adicionar Nova Etapa"}
-          message="" // Content will be in children
+          message="" // Content passed as children
           confirmText={editStepData ? "Salvar Alterações" : "Adicionar Etapa"}
           onConfirm={editStepData ? handleEditStep : handleAddStep}
           onCancel={() => { setShowAddStepModal(false); setEditStepData(null); }}
-          type="INFO"
           isConfirming={zeModal.isConfirming}
         >
           <form onSubmit={editStepData ? handleEditStep : handleAddStep} className="space-y-4">
             <div>
               <label htmlFor="stepName" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Nome da Etapa</label>
               <input
-                type="text"
                 id="stepName"
+                type="text"
                 value={newStepName}
                 onChange={(e) => setNewStepName(e.target.value)}
                 className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
                 required
+                aria-label="Nome da Etapa"
               />
             </div>
             <div>
               <label htmlFor="stepStartDate" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Data de Início</label>
               <input
-                type="date"
                 id="stepStartDate"
+                type="date"
                 value={newStepStartDate}
                 onChange={(e) => setNewStepStartDate(e.target.value)}
                 className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
                 required
+                aria-label="Data de Início da Etapa"
               />
             </div>
             <div>
               <label htmlFor="stepEndDate" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Data de Término</label>
               <input
-                type="date"
                 id="stepEndDate"
+                type="date"
                 value={newStepEndDate}
                 onChange={(e) => setNewStepEndDate(e.target.value)}
                 className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
                 required
+                aria-label="Data de Término da Etapa"
               />
             </div>
+            {/* The form submission is handled by the modal's onConfirm, but we keep the form for structure and accessibility */}
+            <button type="submit" hidden></button>
           </form>
         </ZeModal>
       )}
 
       {/* Add/Edit Material Modal */}
-      {showAddMaterialModal && (
+      {(showAddMaterialModal || editMaterialData) && (
         <ZeModal
-          isOpen={showAddMaterialModal}
+          isOpen={true}
           title={editMaterialData ? "Editar Material" : "Adicionar Novo Material"}
-          message="" // Content in children
-          confirmText={editMaterialData ? "Salvar Alterações" : "Adicionar Material"}
+          message=""
+          confirmText={editMaterialData ? "Salvar/Registrar Compra" : "Adicionar Material"}
           onConfirm={editMaterialData ? handleEditMaterial : handleAddMaterial}
           onCancel={() => { setShowAddMaterialModal(false); setEditMaterialData(null); setPurchaseQtyInput(''); setPurchaseCostInput(''); }}
-          type="INFO"
           isConfirming={zeModal.isConfirming}
         >
           <form onSubmit={editMaterialData ? handleEditMaterial : handleAddMaterial} className="space-y-4">
             <div>
               <label htmlFor="materialName" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Nome do Material</label>
               <input
-                type="text"
                 id="materialName"
+                type="text"
                 value={newMaterialName}
                 onChange={(e) => setNewMaterialName(e.target.value)}
                 className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
                 required
-                disabled={editMaterialData?.purchasedQty > 0} // Disable if material has purchases
+                aria-label="Nome do Material"
+                disabled={editMaterialData && editMaterialData.purchasedQty > 0} // Disable if purchased
               />
             </div>
             <div>
               <label htmlFor="materialBrand" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Marca (Opcional)</label>
               <input
-                type="text"
                 id="materialBrand"
+                type="text"
                 value={newMaterialBrand}
                 onChange={(e) => setNewMaterialBrand(e.target.value)}
                 className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
-                disabled={editMaterialData?.purchasedQty > 0} // Disable if material has purchases
+                aria-label="Marca do Material"
+                disabled={editMaterialData && editMaterialData.purchasedQty > 0} // Disable if purchased
               />
             </div>
-            <div>
-              <label htmlFor="materialPlannedQty" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Quantidade Planejada</label>
-              <input
-                type="number"
-                id="materialPlannedQty"
-                value={newMaterialPlannedQty}
-                onChange={(e) => setNewMaterialPlannedQty(e.target.value)}
-                min="0"
-                step="any"
-                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
-                required
-                disabled={editMaterialData?.purchasedQty > 0} // Disable if material has purchases
-              />
-            </div>
-            <div>
-              <label htmlFor="materialUnit" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Unidade</label>
-              <input
-                type="text"
-                id="materialUnit"
-                value={newMaterialUnit}
-                onChange={(e) => setNewMaterialUnit(e.target.value)}
-                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
-                required
-                disabled={editMaterialData?.purchasedQty > 0} // Disable if material has purchases
-              />
+            <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="plannedQty" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Qtd. Planejada</label>
+                  <input
+                    id="plannedQty"
+                    type="number"
+                    value={newMaterialPlannedQty}
+                    onChange={(e) => setNewMaterialPlannedQty(e.target.value)}
+                    min="0"
+                    step="0.01"
+                    className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
+                    required
+                    aria-label="Quantidade Planejada"
+                    disabled={editMaterialData && editMaterialData.purchasedQty > 0} // Disable if purchased
+                  />
+                </div>
+                <div>
+                  <label htmlFor="materialUnit" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Unidade</label>
+                  <input
+                    id="materialUnit"
+                    type="text"
+                    value={newMaterialUnit}
+                    onChange={(e) => setNewMaterialUnit(e.target.value)}
+                    className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
+                    required
+                    aria-label="Unidade de Medida"
+                    disabled={editMaterialData && editMaterialData.purchasedQty > 0} // Disable if purchased
+                  />
+                </div>
             </div>
             <div>
               <label htmlFor="materialCategory" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Categoria (Opcional)</label>
               <input
-                type="text"
                 id="materialCategory"
+                type="text"
                 value={newMaterialCategory}
                 onChange={(e) => setNewMaterialCategory(e.target.value)}
                 className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
-                disabled={editMaterialData?.purchasedQty > 0} // Disable if material has purchases
+                aria-label="Categoria do Material"
+                disabled={editMaterialData && editMaterialData.purchasedQty > 0} // Disable if purchased
               />
             </div>
             <div>
-              <label htmlFor="materialStep" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Etapa Relacionada (Opcional)</label>
+              <label htmlFor="materialStepId" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Associar à Etapa (Opcional)</label>
               <select
-                id="materialStep"
+                id="materialStepId"
                 value={newMaterialStepId}
                 onChange={(e) => setNewMaterialStepId(e.target.value)}
                 className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
-                disabled={editMaterialData?.purchasedQty > 0} // Disable if material has purchases
+                aria-label="Associar material a uma etapa"
+                disabled={editMaterialData && editMaterialData.purchasedQty > 0} // Disable if purchased
               >
                 <option value="none">Nenhuma</option>
                 {steps.map(step => (
@@ -2756,107 +2741,113 @@ const WorkDetail = () => {
                 ))}
               </select>
             </div>
+
             {editMaterialData && (
-              <div className="pt-4 border-t border-slate-200 dark:border-slate-700 mt-4">
-                <h3 className="text-lg font-bold text-primary dark:text-white mb-3">Registrar Compra</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label htmlFor="purchaseQtyInput" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Quantidade Comprada</label>
-                    <input
-                      type="number"
-                      id="purchaseQtyInput"
-                      value={purchaseQtyInput}
-                      onChange={(e) => setPurchaseQtyInput(e.target.value)}
-                      min="0"
-                      step="any"
-                      placeholder={`Ex: ${editMaterialData.plannedQty - editMaterialData.purchasedQty}`}
-                      className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="purchaseCostInput" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Custo Total (R$)</label>
-                    <input
-                      type="number"
-                      id="purchaseCostInput"
-                      value={purchaseCostInput}
-                      onChange={(e) => setPurchaseCostInput(e.target.value)} // Fixed to handle setNewMaterialCost
-                      min="0"
-                      step="0.01"
-                      placeholder="Ex: 150.75"
-                      className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
-                    />
-                  </div>
+                <div className="pt-4 mt-4 border-t border-slate-200 dark:border-slate-700">
+                    <h3 className="text-md font-bold text-primary dark:text-white mb-3">Registrar Nova Compra</h3>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label htmlFor="purchaseQty" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Qtd. da Compra</label>
+                            <input
+                                id="purchaseQty"
+                                type="number"
+                                value={purchaseQtyInput}
+                                onChange={(e) => setPurchaseQtyInput(e.target.value)}
+                                min="0"
+                                step="0.01"
+                                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
+                                aria-label="Quantidade da Compra"
+                            />
+                        </div>
+                        <div>
+                            <label htmlFor="purchaseCost" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Custo da Compra (R$)</label>
+                            <input
+                                id="purchaseCost"
+                                type="number"
+                                value={purchaseCostInput}
+                                onChange={(e) => setPurchaseCostInput(e.target.value)}
+                                min="0"
+                                step="0.01"
+                                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
+                                aria-label="Custo da Compra"
+                            />
+                        </div>
+                    </div>
                 </div>
-              </div>
             )}
+            <button type="submit" hidden></button>
           </form>
         </ZeModal>
       )}
-      
+
       {/* Add/Edit Expense Modal */}
-      {showAddExpenseModal && (
+      {(showAddExpenseModal || editExpenseData) && (
         <ZeModal
-          isOpen={showAddExpenseModal}
+          isOpen={true}
           title={editExpenseData ? "Editar Despesa" : "Adicionar Nova Despesa"}
-          message="" // Content in children
+          message=""
           confirmText={editExpenseData ? "Salvar Alterações" : "Adicionar Despesa"}
           onConfirm={editExpenseData ? handleEditExpense : handleAddExpense}
           onCancel={() => { setShowAddExpenseModal(false); setEditExpenseData(null); }}
-          type="INFO"
           isConfirming={zeModal.isConfirming}
         >
           <form onSubmit={editExpenseData ? handleEditExpense : handleAddExpense} className="space-y-4">
             <div>
               <label htmlFor="expenseDescription" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Descrição</label>
               <input
-                type="text"
                 id="expenseDescription"
+                type="text"
                 value={newExpenseDescription}
                 onChange={(e) => setNewExpenseDescription(e.target.value)}
                 className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
                 required
+                aria-label="Descrição da Despesa"
               />
             </div>
             <div>
               <label htmlFor="expenseAmount" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Valor (R$)</label>
               <input
-                type="number"
                 id="expenseAmount"
+                type="number" // Reverted to number
                 value={newExpenseAmount}
                 onChange={(e) => setNewExpenseAmount(e.target.value)}
                 min="0"
                 step="0.01"
                 className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
                 required
-                disabled={isEditingExpenseWithPayments} // 🔥 FIX CRÍTICO: Bloqueia edição se já foi pago
+                aria-label="Valor da Despesa"
+                // 🔥 FIX CRÍTICO: Não desabilitar se for material, apenas se tiver pagos e não for material.
+                disabled={isEditingExpenseWithPayments && !isMaterialCategorySelected}
               />
             </div>
-            {/* 🔥 FIX CRÍTICO: Esconde o Valor Combinado para materiais */}
+            {/* NEW: Field for totalAgreed, only shown if NOT a material category */}
             {!isMaterialCategorySelected && (
-                <div>
-                <label htmlFor="expenseTotalAgreed" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Valor Combinado (Opcional, default é o valor da despesa)</label>
+              <div>
+                <label htmlFor="expenseTotalAgreed" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Valor Combinado (R$)</label>
                 <input
-                    type="number"
-                    id="expenseTotalAgreed"
-                    value={newExpenseTotalAgreed}
-                    onChange={(e) => setNewExpenseTotalAgreed(e.target.value)}
-                    min="0"
-                    step="0.01"
-                    placeholder="Ex: 500.00"
-                    className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
-                    disabled={isEditingExpenseWithPayments} // 🔥 FIX CRÍTICO: Bloqueia edição se já foi pago
+                  id="expenseTotalAgreed"
+                  type="number"
+                  value={newExpenseTotalAgreed}
+                  onChange={(e) => setNewExpenseTotalAgreed(e.target.value)}
+                  min="0"
+                  step="0.01"
+                  placeholder="Deixe em branco para usar o Valor da Despesa"
+                  className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
+                  aria-label="Valor combinado da despesa (para pagamentos parcelados)"
+                  disabled={isEditingExpenseWithPayments}
                 />
-                </div>
+              </div>
             )}
             <div>
               <label htmlFor="expenseCategory" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Categoria</label>
               <select
                 id="expenseCategory"
                 value={newExpenseCategory}
-                onChange={(e) => setNewExpenseCategory(e.target.value as ExpenseCategory)}
+                onChange={(e) => setNewExpenseCategory(e.target.value)}
                 className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
                 required
-                disabled={isEditingExpenseWithPayments} // 🔥 FIX CRÍTICO: Bloqueia edição se já foi pago
+                aria-label="Categoria da Despesa"
+                disabled={isEditingExpenseWithPayments && !isMaterialCategorySelected}
               >
                 {Object.values(ExpenseCategory).map(cat => (
                   <option key={cat} value={cat}>{cat}</option>
@@ -2866,22 +2857,24 @@ const WorkDetail = () => {
             <div>
               <label htmlFor="expenseDate" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Data</label>
               <input
-                type="date"
                 id="expenseDate"
+                type="date"
                 value={newExpenseDate}
                 onChange={(e) => setNewExpenseDate(e.target.value)}
                 className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
                 required
-                disabled={isEditingExpenseWithPayments} // 🔥 FIX CRÍTICO: Bloqueia edição se já foi pago
+                aria-label="Data da Despesa"
+                disabled={isEditingExpenseWithPayments && !isMaterialCategorySelected}
               />
             </div>
             <div>
-              <label htmlFor="expenseStep" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Etapa Relacionada (Opcional)</label>
+              <label htmlFor="expenseStepId" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Associar à Etapa (Opcional)</label>
               <select
-                id="expenseStep"
+                id="expenseStepId"
                 value={newExpenseStepId}
                 onChange={(e) => setNewExpenseStepId(e.target.value)}
                 className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
+                aria-label="Associar despesa a uma etapa"
               >
                 <option value="none">Nenhuma</option>
                 {steps.map(step => (
@@ -2889,13 +2882,15 @@ const WorkDetail = () => {
                 ))}
               </select>
             </div>
+            {/* NEW: Worker and Supplier association */}
             <div>
-              <label htmlFor="expenseWorker" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Profissional Relacionado (Opcional)</label>
+              <label htmlFor="expenseWorkerId" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Associar a Profissional (Opcional)</label>
               <select
-                id="expenseWorker"
+                id="expenseWorkerId"
                 value={newExpenseWorkerId}
                 onChange={(e) => setNewExpenseWorkerId(e.target.value)}
                 className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
+                aria-label="Associar despesa a um profissional"
               >
                 <option value="none">Nenhum</option>
                 {workers.map(worker => (
@@ -2904,12 +2899,13 @@ const WorkDetail = () => {
               </select>
             </div>
             <div>
-              <label htmlFor="expenseSupplier" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Fornecedor Relacionado (Opcional)</label>
+              <label htmlFor="expenseSupplierId" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Associar a Fornecedor (Opcional)</label>
               <select
-                id="expenseSupplier"
+                id="expenseSupplierId"
                 value={newExpenseSupplierId}
                 onChange={(e) => setNewExpenseSupplierId(e.target.value)}
                 className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
+                aria-label="Associar despesa a um fornecedor"
               >
                 <option value="none">Nenhum</option>
                 {suppliers.map(supplier => (
@@ -2917,82 +2913,77 @@ const WorkDetail = () => {
                 ))}
               </select>
             </div>
+            <button type="submit" hidden></button>
           </form>
         </ZeModal>
       )}
 
-      {/* Add Payment to Expense Modal */}
+      {/* Add Payment Modal */}
       {showAddPaymentModal && paymentExpenseData && (
         <ZeModal
-          isOpen={showAddPaymentModal}
+          isOpen={true}
           title={`Adicionar Pagamento para ${paymentExpenseData.description}`}
-          message="" // Content in children
+          message=""
           confirmText="Adicionar Pagamento"
           onConfirm={handleAddPayment}
           onCancel={() => { setShowAddPaymentModal(false); setPaymentExpenseData(null); setPaymentAmount(''); setNewPaymentDate(new Date().toISOString().split('T')[0]); }}
-          type="INFO"
           isConfirming={zeModal.isConfirming}
         >
           <form onSubmit={handleAddPayment} className="space-y-4">
-            <p className="text-sm text-slate-700 dark:text-slate-300">
-              Valor Combinado: <span className="font-bold">{formatCurrency(paymentExpenseData.totalAgreed !== undefined ? paymentExpenseData.totalAgreed : (paymentExpenseData.amount || 0))}</span>
-            </p>
-            <p className="text-sm text-slate-700 dark:text-slate-300">
-              Valor Já Pago: <span className="font-bold">{formatCurrency(paymentExpenseData.paidAmount || 0)}</span>
-            </p>
-            <p className="text-sm text-slate-700 dark:text-slate-300 mb-4">
-              Valor Restante: <span className="font-bold">{formatCurrency((paymentExpenseData.totalAgreed !== undefined ? paymentExpenseData.totalAgreed : (paymentExpenseData.amount || 0)) - (paymentExpenseData.paidAmount || 0))}</span>
-            </p>
             <div>
               <label htmlFor="paymentAmount" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Valor do Pagamento (R$)</label>
               <input
-                type="number"
                 id="paymentAmount"
+                type="number" // Reverted to number
                 value={paymentAmount}
                 onChange={(e) => setPaymentAmount(e.target.value)}
                 min="0.01"
                 step="0.01"
+                max={Math.max(0.01, (paymentExpenseData.totalAgreed !== undefined ? paymentExpenseData.totalAgreed : paymentExpenseData.amount || 0) - (paymentExpenseData.paidAmount || 0))} // Max is remaining amount
                 className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
                 required
+                aria-label="Valor do Pagamento"
               />
             </div>
             <div>
               <label htmlFor="paymentDate" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Data do Pagamento</label>
               <input
-                type="date"
                 id="paymentDate"
+                type="date"
                 value={paymentDate}
                 onChange={(e) => setNewPaymentDate(e.target.value)}
                 className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
                 required
+                aria-label="Data do Pagamento"
               />
             </div>
+            <button type="submit" hidden></button>
           </form>
         </ZeModal>
       )}
 
       {/* Add/Edit Worker Modal */}
-      {showAddWorkerModal && (
+      {(showAddWorkerModal || editWorkerData) && (
         <ZeModal
-          isOpen={showAddWorkerModal}
+          isOpen={true}
           title={editWorkerData ? "Editar Profissional" : "Adicionar Novo Profissional"}
-          message="" // Content in children
+          message=""
           confirmText={editWorkerData ? "Salvar Alterações" : "Adicionar Profissional"}
           onConfirm={editWorkerData ? handleEditWorker : handleAddWorker}
           onCancel={() => { setShowAddWorkerModal(false); setEditWorkerData(null); }}
-          type="INFO"
           isConfirming={zeModal.isConfirming}
         >
           <form onSubmit={editWorkerData ? handleEditWorker : handleAddWorker} className="space-y-4">
             <div>
               <label htmlFor="workerName" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Nome</label>
               <input
-                type="text"
                 id="workerName"
+                type="text"
                 value={newWorkerName}
                 onChange={(e) => setNewWorkerName(e.target.value)}
                 className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
                 required
+                aria-label="Nome do Profissional"
               />
             </div>
             <div>
@@ -3003,34 +2994,35 @@ const WorkDetail = () => {
                 onChange={(e) => setNewWorkerRole(e.target.value)}
                 className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
                 required
+                aria-label="Função do Profissional"
               >
-                <option value="">Selecione</option>
-                {STANDARD_JOB_ROLES.map(role => (
-                  <option key={role} value={role}>{role}</option>
-                ))}
+                <option value="">Selecione uma função</option>
+                {STANDARD_JOB_ROLES.map(role => <option key={role} value={role}>{role}</option>)}
               </select>
             </div>
             <div>
-              <label htmlFor="workerPhone" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Telefone</label>
+              <label htmlFor="workerPhone" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Telefone (WhatsApp)</label>
               <input
-                type="tel"
                 id="workerPhone"
+                type="tel"
                 value={newWorkerPhone}
                 onChange={(e) => setNewWorkerPhone(e.target.value)}
                 className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
                 required
+                aria-label="Telefone do Profissional"
               />
             </div>
             <div>
               <label htmlFor="workerDailyRate" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Diária (R$)</label>
               <input
-                type="number"
                 id="workerDailyRate"
+                type="number"
                 value={newWorkerDailyRate}
                 onChange={(e) => setNewWorkerDailyRate(e.target.value)}
                 min="0"
                 step="0.01"
                 className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
+                aria-label="Diária do Profissional"
               />
             </div>
             <div>
@@ -3041,34 +3033,36 @@ const WorkDetail = () => {
                 onChange={(e) => setNewWorkerNotes(e.target.value)}
                 rows={3}
                 className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
+                aria-label="Observações do Profissional"
               ></textarea>
             </div>
+            <button type="submit" hidden></button>
           </form>
         </ZeModal>
       )}
 
       {/* Add/Edit Supplier Modal */}
-      {showAddSupplierModal && (
+      {(showAddSupplierModal || editSupplierData) && (
         <ZeModal
-          isOpen={showAddSupplierModal}
+          isOpen={true}
           title={editSupplierData ? "Editar Fornecedor" : "Adicionar Novo Fornecedor"}
-          message="" // Content in children
+          message=""
           confirmText={editSupplierData ? "Salvar Alterações" : "Adicionar Fornecedor"}
           onConfirm={editSupplierData ? handleEditSupplier : handleAddSupplier}
           onCancel={() => { setShowAddSupplierModal(false); setEditSupplierData(null); }}
-          type="INFO"
           isConfirming={zeModal.isConfirming}
         >
           <form onSubmit={editSupplierData ? handleEditSupplier : handleAddSupplier} className="space-y-4">
             <div>
-              <label htmlFor="supplierName" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Nome do Fornecedor</label>
+              <label htmlFor="supplierName" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Nome</label>
               <input
-                type="text"
                 id="supplierName"
+                type="text"
                 value={newSupplierName}
                 onChange={(e) => setNewSupplierName(e.target.value)}
                 className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
                 required
+                aria-label="Nome do Fornecedor"
               />
             </div>
             <div>
@@ -3079,42 +3073,44 @@ const WorkDetail = () => {
                 onChange={(e) => setNewSupplierCategory(e.target.value)}
                 className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
                 required
+                aria-label="Categoria do Fornecedor"
               >
-                <option value="">Selecione</option>
-                {STANDARD_SUPPLIER_CATEGORIES.map(category => (
-                  <option key={category} value={category}>{category}</option>
-                ))}
+                <option value="">Selecione uma categoria</option>
+                {STANDARD_SUPPLIER_CATEGORIES.map(category => <option key={category} value={category}>{category}</option>)}
               </select>
             </div>
             <div>
               <label htmlFor="supplierPhone" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Telefone</label>
               <input
-                type="tel"
                 id="supplierPhone"
+                type="tel"
                 value={newSupplierPhone}
                 onChange={(e) => setNewSupplierPhone(e.target.value)}
                 className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
                 required
+                aria-label="Telefone do Fornecedor"
               />
             </div>
             <div>
               <label htmlFor="supplierEmail" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Email (Opcional)</label>
               <input
-                type="email"
                 id="supplierEmail"
+                type="email"
                 value={newSupplierEmail}
                 onChange={(e) => setNewSupplierEmail(e.target.value)}
                 className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
+                aria-label="Email do Fornecedor"
               />
             </div>
             <div>
               <label htmlFor="supplierAddress" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Endereço (Opcional)</label>
               <input
-                type="text"
                 id="supplierAddress"
+                type="text"
                 value={newSupplierAddress}
                 onChange={(e) => setNewSupplierAddress(e.target.value)}
                 className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
+                aria-label="Endereço do Fornecedor"
               />
             </div>
             <div>
@@ -3125,8 +3121,10 @@ const WorkDetail = () => {
                 onChange={(e) => setNewSupplierNotes(e.target.value)}
                 rows={3}
                 className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
+                aria-label="Observações do Fornecedor"
               ></textarea>
             </div>
+            <button type="submit" hidden></button>
           </form>
         </ZeModal>
       )}
@@ -3134,51 +3132,54 @@ const WorkDetail = () => {
       {/* Add Photo Modal */}
       {showAddPhotoModal && (
         <ZeModal
-          isOpen={showAddPhotoModal}
+          isOpen={true}
           title="Adicionar Nova Foto"
           message=""
           confirmText="Adicionar Foto"
           onConfirm={handleAddPhoto}
           onCancel={() => { setShowAddPhotoModal(false); setNewPhotoFile(null); setNewPhotoDescription(''); setNewPhotoType('PROGRESS'); }}
-          type="INFO"
           isConfirming={uploadingPhoto}
         >
           <form onSubmit={handleAddPhoto} className="space-y-4">
             <div>
-              <label htmlFor="photoFile" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Arquivo da Imagem</label>
+              <label htmlFor="photoFile" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Arquivo da Foto</label>
               <input
-                type="file"
                 id="photoFile"
+                type="file"
                 accept="image/*"
                 onChange={(e) => setNewPhotoFile(e.target.files ? e.target.files[0] : null)}
-                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-secondary file:text-white hover:file:bg-secondary-dark"
+                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-bold file:bg-secondary file:text-white hover:file:bg-secondary-dark transition-colors"
                 required
+                aria-label="Arquivo da Foto"
               />
             </div>
             <div>
               <label htmlFor="photoDescription" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Descrição (Opcional)</label>
               <input
-                type="text"
                 id="photoDescription"
+                type="text"
                 value={newPhotoDescription}
                 onChange={(e) => setNewPhotoDescription(e.target.value)}
                 className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
+                aria-label="Descrição da Foto"
               />
             </div>
             <div>
-              <label htmlFor="photoType" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Tipo</label>
+              <label htmlFor="photoType" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Tipo da Foto</label>
               <select
                 id="photoType"
                 value={newPhotoType}
                 onChange={(e) => setNewPhotoType(e.target.value as 'BEFORE' | 'AFTER' | 'PROGRESS')}
                 className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
                 required
+                aria-label="Tipo da Foto"
               >
                 <option value="PROGRESS">Progresso</option>
                 <option value="BEFORE">Antes</option>
                 <option value="AFTER">Depois</option>
               </select>
             </div>
+            <button type="submit" hidden></button>
           </form>
         </ZeModal>
       )}
@@ -3186,35 +3187,36 @@ const WorkDetail = () => {
       {/* Add File Modal */}
       {showAddFileModal && (
         <ZeModal
-          isOpen={showAddFileModal}
-          title="Adicionar Novo Documento"
+          isOpen={true}
+          title="Adicionar Novo Documento/Projeto"
           message=""
-          confirmText="Adicionar Documento"
+          confirmText="Adicionar Arquivo"
           onConfirm={handleAddFile}
           onCancel={() => { setShowAddFileModal(false); setNewUploadFile(null); setNewFileName(''); setNewFileCategory(FileCategory.GENERAL); }}
-          type="INFO"
           isConfirming={uploadingFile}
         >
           <form onSubmit={handleAddFile} className="space-y-4">
             <div>
               <label htmlFor="uploadFile" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Arquivo</label>
               <input
-                type="file"
                 id="uploadFile"
+                type="file"
                 onChange={(e) => setNewUploadFile(e.target.files ? e.target.files[0] : null)}
-                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-secondary file:text-white hover:file:bg-secondary-dark"
+                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-bold file:bg-secondary file:text-white hover:file:bg-secondary-dark transition-colors"
                 required
+                aria-label="Arquivo para Upload"
               />
             </div>
             <div>
               <label htmlFor="fileName" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Nome do Documento (Opcional)</label>
               <input
-                type="text"
                 id="fileName"
+                type="text"
                 value={newFileName}
                 onChange={(e) => setNewFileName(e.target.value)}
-                placeholder={newUploadFile?.name || "Nome do Documento"}
+                placeholder="Nome do arquivo ou projeto"
                 className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
+                aria-label="Nome do Documento"
               />
             </div>
             <div>
@@ -3225,62 +3227,81 @@ const WorkDetail = () => {
                 onChange={(e) => setNewFileCategory(e.target.value as FileCategory)}
                 className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
                 required
+                aria-label="Categoria do Documento"
               >
-                {Object.values(FileCategory).map(cat => (
-                  <option key={cat} value={cat}>{cat}</option>
+                {Object.values(FileCategory).map(category => (
+                  <option key={category} value={category}>{category}</option>
                 ))}
               </select>
             </div>
+            <button type="submit" hidden></button>
           </form>
         </ZeModal>
       )}
 
-      {/* Add/Edit Checklist Modal */}
-      {showAddChecklistModal && (
+      {/* View Contract Content Modal */}
+      {showContractContentModal && (
         <ZeModal
-          isOpen={showAddChecklistModal}
+          isOpen={true}
+          title={selectedContractTitle}
+          message="" // Content is in children
+          confirmText="Copiar Texto"
+          onConfirm={async (e) => {
+              e?.preventDefault(); // Prevent modal from closing immediately
+              await navigator.clipboard.writeText(selectedContractContent);
+              setCopyContractSuccess(true);
+              setTimeout(() => setCopyContractSuccess(false), 2000);
+          }}
+          onCancel={() => { setShowContractContentModal(false); setSelectedContractContent(''); setSelectedContractTitle(''); setCopyContractSuccess(false); }}
+          cancelText="Fechar"
+        >
+          <div className="bg-slate-50 dark:bg-slate-800 rounded-xl p-4 border border-slate-100 dark:border-slate-700 max-h-96 overflow-y-auto">
+            <pre className="whitespace-pre-wrap font-mono text-xs text-primary dark:text-white">{selectedContractContent}</pre>
+          </div>
+          {copyContractSuccess && <p className="mt-2 text-green-600 dark:text-green-400 text-sm text-center">Copiado para a área de transferência!</p>}
+        </ZeModal>
+      )}
+
+      {/* Add/Edit Checklist Modal */}
+      {(showAddChecklistModal || editChecklistData) && (
+        <ZeModal
+          isOpen={true}
           title={editChecklistData ? "Editar Checklist" : "Adicionar Novo Checklist"}
           message=""
-          confirmText={editChecklistData ? "Salvar Checklist" : "Adicionar Checklist"}
+          confirmText={editChecklistData ? "Salvar Alterações" : "Adicionar Checklist"}
           onConfirm={editChecklistData ? handleEditChecklist : handleAddChecklist}
-          onCancel={() => { setShowAddChecklistModal(false); setEditChecklistData(null); setNewChecklistItems(['']); setNewChecklistName(''); setNewChecklistCategory(''); }}
-          type="INFO"
+          onCancel={() => { setShowAddChecklistModal(false); setEditChecklistData(null); setNewChecklistItems(['']); }}
           isConfirming={zeModal.isConfirming}
         >
           <form onSubmit={editChecklistData ? handleEditChecklist : handleAddChecklist} className="space-y-4">
             <div>
               <label htmlFor="checklistName" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Nome do Checklist</label>
               <input
-                type="text"
                 id="checklistName"
+                type="text"
                 value={newChecklistName}
                 onChange={(e) => setNewChecklistName(e.target.value)}
                 className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
                 required
+                aria-label="Nome do Checklist"
               />
             </div>
             <div>
-              <label htmlFor="checklistCategory" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Categoria (Etapa)</label>
-              <select
+              <label htmlFor="checklistCategory" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Categoria</label>
+              <input
                 id="checklistCategory"
+                type="text"
                 value={newChecklistCategory}
                 onChange={(e) => setNewChecklistCategory(e.target.value)}
                 className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
                 required
-              >
-                <option value="">Selecione a Categoria</option>
-                {/* Dynamically populate categories based on existing steps, plus a general option */}
-                {steps.map(step => (
-                  <option key={step.id} value={step.name}>{step.name}</option>
-                ))}
-                <option value="Geral">Geral</option>
-                <option value="Segurança">Segurança</option>
-              </select>
+                aria-label="Categoria do Checklist"
+              />
             </div>
-            <div>
+            <div className="space-y-2">
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Itens do Checklist</label>
               {newChecklistItems.map((item, index) => (
-                <div key={index} className="flex items-center gap-2 mb-2">
+                <div key={index} className="flex items-center gap-2">
                   <input
                     type="text"
                     value={item}
@@ -3290,33 +3311,35 @@ const WorkDetail = () => {
                       setNewChecklistItems(updatedItems);
                     }}
                     placeholder={`Item ${index + 1}`}
-                    className="flex-1 p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
+                    className="flex-1 p-2 rounded-lg border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white text-sm"
+                    aria-label={`Item ${index + 1} do checklist`}
                   />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const updatedItems = newChecklistItems.filter((_, i) => i !== index);
-                      setNewChecklistItems(updatedItems);
-                    }}
-                    className="p-2 text-red-500 hover:bg-red-500/10 rounded-full"
-                    aria-label="Remover item"
-                  >
-                    <i className="fa-solid fa-xmark"></i>
-                  </button>
+                  {newChecklistItems.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => setNewChecklistItems(newChecklistItems.filter((_, i) => i !== index))}
+                      className="text-red-500 hover:text-red-700 p-1"
+                      aria-label="Remover item"
+                    >
+                      <i className="fa-solid fa-trash-alt text-base"></i>
+                    </button>
+                  )}
                 </div>
               ))}
               <button
                 type="button"
                 onClick={() => setNewChecklistItems([...newChecklistItems, ''])}
-                className="w-full py-2 bg-slate-100 dark:bg-slate-800 text-secondary font-bold rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors mt-2"
-                aria-label="Adicionar novo item ao checklist"
+                className="mt-2 px-3 py-1 bg-primary/10 text-primary dark:text-white text-xs font-bold rounded-lg hover:bg-primary/20 transition-colors"
+                aria-label="Adicionar novo item"
               >
-                <i className="fa-solid fa-plus mr-2"></i> Adicionar Item
+                Adicionar Item
               </button>
             </div>
+            <button type="submit" hidden></button>
           </form>
         </ZeModal>
       )}
+      {zeModal.isOpen && <ZeModal {...zeModal} />}
     </div>
   );
 };

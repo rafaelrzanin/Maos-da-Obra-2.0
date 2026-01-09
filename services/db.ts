@@ -130,8 +130,8 @@ const parseExpenseFromDB = (data: any): Expense => {
         quantity: Number(data.quantity || 0),
         date: data.date,
         category: data.category,
-        stepId: data.step_id,
         relatedMaterialId: data.related_material_id,
+        stepId: data.step_id,
         workerId: data.worker_id,
         supplierId: data.supplier_id,
         totalAgreed: data.total_agreed ? Number(data.total_agreed) : undefined,
@@ -1144,13 +1144,6 @@ export const dbService = {
   },
 
   async updateStep(step: Step): Promise<Step> {
-    const stepEndDate = new Date(step.endDate);
-    const today = new Date();
-    today.setHours(0,0,0,0); // Normalize today's date to midnight
-    stepEndDate.setHours(0,0,0,0); // Normalize step end date to midnight
-    const stepStartDate = new Date(step.startDate);
-    stepStartDate.setHours(0,0,0,0); // Normalize step start date to midnight
-
     // CORREÇÃO CRÍTICA: Limpar real_date se o status NÃO for CONCLUIDO
     if (step.status !== StepStatus.COMPLETED) { 
         step.realDate = undefined; // Garante que realDate é nulo/undefined se a etapa não está concluída
@@ -1235,12 +1228,21 @@ export const dbService = {
 
     if (currentMaterial.purchased_qty > 0) {
       // Campos que NÃO podem ser alterados se já houver compras registradas
-      const restrictedFields: (keyof Material)[] = ['name', 'brand', 'plannedQty', 'unit', 'category', 'stepId'];
+      const restrictedFields: (keyof Omit<Material, 'id' | 'workId' | 'userId' | 'purchasedQty' | 'totalCost' | 'stepId'>)[] = ['name', 'brand', 'plannedQty', 'unit', 'category'];
+      
       for (const field of restrictedFields) {
-        if (material[field] !== currentMaterial[field.replace(/([A-Z])/g, '_$1').toLowerCase()]) { // Convert camelCase to snake_case for DB field comparison
+        // Handle conversion from camelCase to snake_case for DB field names
+        const dbFieldName = field.replace(/([A-Z])/g, '_$1').toLowerCase();
+        if (material[field] !== (currentMaterial as any)[dbFieldName]) { 
           throw new Error(`Não é possível alterar o campo '${field}' de um material que já possui compras registradas.`);
         }
       }
+      // stepId can be updated even if there are purchases, as it only links to a different step
+      if (material.stepId !== currentMaterial.step_id) {
+          // Allow stepId change, but log a warning if needed
+          console.warn(`Material ${material.id} com compras registradas teve seu stepId alterado de ${currentMaterial.step_id} para ${material.stepId}.`);
+      }
+
       // purchasedQty e totalCost são derivados de compras, não editáveis diretamente via updateMaterial
       if (material.purchasedQty !== currentMaterial.purchased_qty || material.totalCost !== currentMaterial.total_cost) {
         throw new Error("Não é possível alterar 'Quantidade Comprada' ou 'Custo Total' diretamente. Use a função 'registerMaterialPurchase' para isso.");
@@ -1463,7 +1465,7 @@ export const dbService = {
     if (addExpenseError) throw addExpenseError;
 
     // Criar uma parcela inicial para a despesa
-    const installmentAmount = totalAgreedValue !== undefined ? totalAgreedValue : expense.amount;
+    const installmentAmount = totalAgreedValue !== undefined && totalAgreedValue !== null ? totalAgreedValue : expense.amount; // Use actual amount if totalAgreed is undefined/null
     const initialInstallmentStatus = (expense.category === ExpenseCategory.MATERIAL) ? InstallmentStatus.PAID : InstallmentStatus.PENDING; // Material expenses are usually 'paid in full' at creation
     const initialInstallmentPaidAt = (expense.category === ExpenseCategory.MATERIAL) ? new Date().toISOString() : undefined;
 
@@ -1574,7 +1576,8 @@ export const dbService = {
     if (expense.category !== currentDbExpense.category) {
         changes.push({ field: 'category', oldValue: currentDbExpense.category, newValue: expense.category, description: `Categoria alterada de "${currentDbExpense.category}" para "${expense.category}".` });
     }
-    if (expense.totalAgreed !== undefined && expense.totalAgreed !== currentDbExpense.total_agreed) {
+    // Only log if totalAgreed was actually changed and is not for a material expense
+    if (expense.category !== ExpenseCategory.MATERIAL && expense.totalAgreed !== undefined && expense.totalAgreed !== currentDbExpense.total_agreed) {
         changes.push({ field: 'totalAgreed', oldValue: currentDbExpense.total_agreed, newValue: expense.totalAgreed, description: `Valor combinado alterado de R$${currentDbExpense.total_agreed} para R$${expense.totalAgreed}.` });
     }
     // Add similar checks for other fields if desired
@@ -1601,13 +1604,13 @@ export const dbService = {
 
   async deleteExpense(expenseId: string): Promise<void> {
     // Before deleting expense, get its workId and if it was related to a material
-    const { data: expenseToDelete, error: fetchError } = await supabase.from('expenses').select('work_id, related_material_id, amount, quantity, description').eq('id', expenseId).single();
+    const { data: expenseToDelete, error: fetchError } = await supabase.from('expenses').select('work_id, related_material_id, amount, quantity, description, category').eq('id', expenseId).single();
     if (fetchError || !expenseToDelete) throw new Error("Expense not found or error fetching workId.");
     const workId = expenseToDelete.work_id;
     const userId = (await dbService.getCurrentUser())?.id || 'unknown';
 
     // If it was a material-related expense, decrement the purchased_qty and total_cost of the material
-    if (expenseToDelete.related_material_id) {
+    if (expenseToDelete.related_material_id && expenseToDelete.category === ExpenseCategory.MATERIAL) {
       const { data: material, error: materialFetchError } = await supabase.from('materials').select('purchased_qty, total_cost, name').eq('id', expenseToDelete.related_material_id).single();
       if (materialFetchError) console.error("Error fetching related material for expense deletion:", materialFetchError);
       if (material) {
@@ -1685,12 +1688,26 @@ export const dbService = {
     _dashboardCache.summary[currentExpense.workId] = null; // Summary might change
     _dashboardCache.stats[currentExpense.workId] = null; // Stats might change due to new payment
 
-    const updatedExpense = await dbService.getExpenses(currentExpense.workId);
-    const latestExpense = updatedExpense.find(exp => exp.id === expenseId);
+    // Refetch the updated expense to ensure latest derived status and paidAmount
+    const { data: latestExpenseRaw, error: refetchError } = await supabase
+        .from('expenses')
+        .select(`
+            *,
+            financial_installments(amount, status)
+        `)
+        .eq('id', expenseId)
+        .single();
+    
+    if (refetchError || !latestExpenseRaw) {
+        console.error("Erro ao refetchar despesa após adicionar pagamento:", refetchError);
+        throw new Error("Erro ao carregar status atualizado da despesa.");
+    }
+    const latestExpense = parseExpenseFromDB(latestExpenseRaw);
+
 
     if (latestExpense && latestExpense.status === ExpenseStatus.OVERPAID) {
         // 🔥 FIX CRÍTICO: Registrar excedente separadamente
-        const excessAmount = (latestExpense.paidAmount || 0) - (latestExpense.totalAgreed !== undefined ? latestExpense.totalAgreed : latestExpense.amount);
+        const excessAmount = (latestExpense.paidAmount || 0) - (latestExpense.totalAgreed !== undefined && latestExpense.totalAgreed !== null ? latestExpense.totalAgreed : latestExpense.amount);
         
         const { data: existingExcess, error: fetchExcessError } = await supabase
             .from('financial_excess')

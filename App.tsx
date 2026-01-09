@@ -1,9 +1,10 @@
 
-
 import React, { useState, useEffect, Suspense, lazy, Fragment } from 'react';
 import * as ReactRouter from 'react-router-dom';
 import { PlanType } from './types.ts';
 import { AuthProvider, ThemeProvider, useAuth, useTheme } from './contexts/AuthContext.tsx';
+// NEW: Import WorkDetailProps for type casting
+import { WorkDetailProps } from './pages/WorkDetail.tsx'; 
 
 // --- IMPORTAÇÕES ESTÁTICAS (Críticas para velocidade inicial) ---
 import Login from './pages/Login.tsx'; // Keep Login static as it's the entry point for unauthenticated users
@@ -11,7 +12,9 @@ import Login from './pages/Login.tsx'; // Keep Login static as it's the entry po
 // --- Lazy Loading ---
 const Dashboard = lazy(() => import('./pages/Dashboard.tsx').then(module => ({ default: (module as any).default })));
 const CreateWork = lazy(() => import('./pages/CreateWork.tsx').then(module => ({ default: (module as any).default })));
-const WorkDetail = lazy(() => import('./pages/WorkDetail.tsx').then(module => ({ default: (module as any).default })));
+// MODIFICADO: WorkDetail agora aceitará `activeTab` e `onTabChange` como props
+// FIX: Correctly type the lazy-loaded WorkDetail component
+const WorkDetail = lazy(() => import('./pages/WorkDetail.tsx').then(module => ({ default: module.default as React.ComponentType<WorkDetailProps> })));
 const Settings = lazy(() => import('./pages/Settings.tsx').then(module => ({ default: (module as any).default })));
 const Profile = lazy(() => import('./pages/Profile.tsx').then(module => ({ default: (module as any).default })));
 const VideoTutorials = lazy(() => import('./pages/VideoTutorials.tsx').then(module => ({ default: (module as any).default })));
@@ -347,6 +350,8 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
 };
 
 const App = () => {
+  const [activeWorkDetailTab, setActiveWorkDetailTab] = useState('ETAPAS'); // Centralized state for WorkDetail tab
+
   return (
     <ReactRouter.BrowserRouter>
       <ThemeProvider>
@@ -363,7 +368,10 @@ const App = () => {
                 <ReactRouter.Route path="/" element={<Layout><Dashboard /></Layout>} />
                 <ReactRouter.Route path="/create" element={<Layout><CreateWork /></Layout>} />
                 {/* Modified WorkDetail route to include optional 'tab' parameter */}
-                <ReactRouter.Route path="/work/:id" element={<Layout><WorkDetail /></Layout>} />
+                <ReactRouter.Route 
+                  path="/work/:id" 
+                  element={<Layout><WorkDetail activeTab={activeWorkDetailTab} onTabChange={setActiveWorkDetailTab} /></Layout>} 
+                />
                 <ReactRouter.Route path="/ai-chat" element={<Layout><AiChat /></Layout>} />
                 <ReactRouter.Route path="/notifications" element={<Layout><Notifications /></Layout>} />
                 <ReactRouter.Route path="/settings" element={<Layout><Settings /></Layout>} />
