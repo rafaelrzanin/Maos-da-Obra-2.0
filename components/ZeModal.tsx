@@ -65,7 +65,7 @@ export const ZeModal: React.FC<ZeModalProps> = ({
         <div className="absolute top-0 right-0 w-32 h-32 bg-secondary/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2"></div>
         
         {/* Content wrapper without padding, now just acting as a flex container for header, body, footer */}
-        <div className="relative z-10 flex flex-col flex-1"> 
+        <div className="relative z-10 flex flex-col flex-1 min-h-0"> {/* Added min-h-0 here */}
             {/* Header with its own padding and bottom border */}
             <div className="flex gap-5 py-6 px-6 shrink-0 border-b border-slate-100 dark:border-slate-800">
                 <div className="w-16 h-16 rounded-full p-1 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-800 shadow-lg shrink-0">
@@ -89,14 +89,14 @@ export const ZeModal: React.FC<ZeModalProps> = ({
             
             {/* Scrollable content area (no direct padding here) */}
             {children ? (
-                <div className="flex-1 overflow-y-auto">
+                <div className="flex-1 overflow-y-auto min-h-0"> 
                     {/* Inner div for padding */}
                     <div className="py-4 px-6">
                         {children}
                     </div>
                 </div>
             ) : (
-                <div className={`flex-1 overflow-y-auto`}>
+                <div className={`flex-1 overflow-y-auto min-h-0`}> 
                     {/* Inner div for padding and message box styles */}
                     <div className={`py-4 px-6 p-4 rounded-2xl text-sm leading-relaxed border ${messageBoxBgClass}`}>
                         <p>{message}</p>
@@ -129,4 +129,3 @@ export const ZeModal: React.FC<ZeModalProps> = ({
     </div>
   );
 };
-    
