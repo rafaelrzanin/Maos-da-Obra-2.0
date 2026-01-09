@@ -1431,7 +1431,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
     } finally {
       setLoadingPhoto(false);
     }
-  });
+  };
 
   // =======================================================================
   // CRUD HANDLERS: FILES
