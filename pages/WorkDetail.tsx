@@ -397,7 +397,7 @@ const WorkDetail = () => {
 
   const [showAddPhotoModal, setShowAddPhotoModal] = useState(false);
   const [newPhotoDescription, setNewPhotoDescription] = useState('');
-  const [newPhotoFile, setNewPhotoFile] = useState<File | null>(() => null); // Corrected useState syntax
+  const [newPhotoFile, setNewPhotoFile] = useState<File | null>(null); // Corrected useState syntax
   const [newPhotoType, setNewPhotoType] = useState<'BEFORE' | 'AFTER' | 'PROGRESS'>('PROGRESS');
   const [uploadingPhoto, setLoadingPhoto] = useState(false);
 
@@ -458,7 +458,7 @@ const WorkDetail = () => {
   };
 
   const calculateTotalExpenses = useMemo(() => {
-    // 🔥 FIX CRÍTICO: Excluir despesas de material do total gasto para o cálculo de progresso financeiro principal
+    // 🔥 MODIFICADO: Excluir despesas de material do total gasto para o cálculo de progresso financeiro principal
     // Agora o expense.paidAmount é derivado, o que o torna a soma das parcelas pagas.
     return expenses.filter(expense => expense.category !== ExpenseCategory.MATERIAL).reduce((sum, expense) => sum + (expense.paidAmount || 0), 0);
   }, [expenses]);
@@ -518,7 +518,7 @@ const WorkDetail = () => {
         expenseGroups.push({
           stepName: `${step.orderIndex}. ${step.name}`,
           expenses: groups[step.id].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
-          totalStepAmount: groups[step.id].reduce((sum, exp) => sum + exp.amount, 0),
+          totalStepAmount: groups[step.id].reduce((sum, exp) => sum + (exp.amount || 0), 0), // Use amount here for planned
         });
       }
     });
@@ -528,7 +528,7 @@ const WorkDetail = () => {
       expenseGroups.push({
         stepName: 'Sem Etapa Definida', // Label for expenses not linked to any step
         expenses: groups['no_step'].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
-        totalStepAmount: groups['no_step'].reduce((sum, exp) => sum + exp.amount, 0),
+        totalStepAmount: groups['no_step'].reduce((sum, exp) => sum + (exp.amount || 0), 0),
       });
     }
 
@@ -580,8 +580,8 @@ const WorkDetail = () => {
 
       const stepsWithCorrectedDelay = fetchedSteps.map(step => {
         let currentIsDelayed = false;
-        const stepStartDate = new Date(step.startDate);
-        stepStartDate.setHours(0, 0, 0, 0);
+        // const stepStartDate = new Date(step.startDate); // Not used directly for delay logic
+        // stepStartDate.setHours(0, 0, 0, 0);
         const stepEndDate = new Date(step.endDate);
         stepEndDate.setHours(0, 0, 0, 0);
 
@@ -615,7 +615,7 @@ const WorkDetail = () => {
     } finally {
       setLoading(false);
     }
-  }, [workId, user, navigate, refreshUser]);
+  }, [workId, user, navigate]);
 
   useEffect(() => {
     if (!authLoading && isUserAuthFinished) {
@@ -701,7 +701,7 @@ const WorkDetail = () => {
         message: `Não foi possível atualizar o status da etapa: ${error.message || 'Erro desconhecido'}. Tente novamente.`,
         type: "ERROR",
         confirmText: "Ok",
-        onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false }))
+        onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
       });
     } finally {
       setIsUpdatingStepStatus(false);
@@ -753,6 +753,9 @@ const WorkDetail = () => {
       // isDelayed will be re-calculated in dbService.updateStep (backend logic for consistency)
       await dbService.updateStep({
         ...editStepData!,
+        name: newStepName,
+        startDate: newStepStartDate,
+        endDate: newStepEndDate,
         workId: workId,
       });
       setEditStepData(null);
@@ -1414,7 +1417,7 @@ const WorkDetail = () => {
         type: "ERROR",
         confirmText: "Ok",
         onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
-      }));
+      });
     } finally {
       setLoadingPhoto(false);
     }
@@ -1770,7 +1773,7 @@ const WorkDetail = () => {
                                                 title: "Excluir Etapa",
                                                 message: `Tem certeza que deseja excluir a etapa ${step.name}?`,
                                                 confirmText: "Excluir",
-                                                onConfirm: async () => handleDeleteStep(step.id),
+                                                onConfirm: async (ev) => { ev?.preventDefault(); handleDeleteStep(step.id); },
                                                 onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
                                                 type: "DANGER"
                                             });
@@ -1857,15 +1860,15 @@ const WorkDetail = () => {
                         {group.materials.map(material => {
                            const statusDetails = getEntityStatusDetails('material', material, steps);
                            const progress = material.plannedQty > 0 ? (material.purchasedQty / material.plannedQty) * 100 : 0;
-                           // 🔥 FIX CRÍTICO: Bloqueio de edição para material pago
-                           const isMaterialPaid = material.purchasedQty >= material.plannedQty && material.plannedQty > 0;
+                           // 🔥 FIX CRÍTICO: Bloqueio de edição para material pago (se purchasedQty > 0)
+                           const isMaterialPaid = material.purchasedQty > 0;
 
                            return (
                             <div 
                               key={material.id} 
                               onClick={() => { 
                                 // Only allow opening edit modal if not fully paid, or just view if paid
-                                if (!isMaterialPaid) {
+                                // MODIFICADO: Abertura para edição é sempre permitida, mas campos são desabilitados
                                   setNewMaterialName(material.name);
                                   setNewMaterialBrand(material.brand || ''); // NEW: Pre-populate brand
                                   setNewMaterialPlannedQty(String(material.plannedQty)); // Convert to string for input
@@ -1876,12 +1879,11 @@ const WorkDetail = () => {
                                   setPurchaseQtyInput(''); // Clear temporary purchase inputs
                                   setPurchaseCostInput(''); // Clear temporary purchase inputs
                                   setShowAddMaterialModal(true); 
-                                }
                               }} 
                               className={cx(
                                 surface, 
-                                `p-4 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 ${isMaterialPaid ? 'cursor-default' : 'cursor-pointer hover:scale-[1.005]'} transition-transform border-2 ${statusDetails.borderColor} shadow-lg ${statusDetails.shadowClass}`,
-                                isMaterialPaid ? 'opacity-70' : '' // Dim if paid
+                                `p-4 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 cursor-pointer hover:scale-[1.005] transition-transform border-2 ${statusDetails.borderColor} shadow-lg ${statusDetails.shadowClass}`,
+                                isMaterialPaid ? 'opacity-70' : '' // Dim if any purchase has been made
                               )} 
                               aria-label={`Material ${material.name}`}
                             >
@@ -1907,7 +1909,7 @@ const WorkDetail = () => {
                                                 title: "Excluir Material",
                                                 message: `Tem certeza que deseja excluir o material ${material.name}? Isso também excluirá despesas relacionadas.`,
                                                 confirmText: "Excluir",
-                                                onConfirm: async () => handleDeleteMaterial(material.id),
+                                                onConfirm: async (ev) => { ev?.preventDefault(); handleDeleteMaterial(material.id); },
                                                 onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
                                                 type: "DANGER"
                                             });
@@ -1933,9 +1935,10 @@ const WorkDetail = () => {
       case 'FINANCEIRO':
         const totalPaid = expenses.reduce((sum, exp) => sum + (exp.paidAmount || 0), 0);
         // Calculate outstanding relative to non-material budget
-        const totalNonMaterialExpenses = expenses.filter(e => e.category !== ExpenseCategory.MATERIAL).reduce((sum, exp) => sum + exp.amount, 0); // O amount é o planejado original
+        const totalNonMaterialExpenses = expenses.filter(e => e.category !== ExpenseCategory.MATERIAL).reduce((sum, exp) => sum + (exp.amount || 0), 0); // O amount é o planejado original
         const totalNonMaterialPaid = expenses.filter(e => e.category !== ExpenseCategory.MATERIAL).reduce((sum, exp) => sum + (exp.paidAmount || 0), 0); // paidAmount é derivado da soma das parcelas
-        const budgetBalance = work.budgetPlanned - totalNonMaterialExpenses; // Balanço contra o planejado
+        const budgetBalance = work.budgetPlanned - totalNonMaterialPaid; // Balanço contra o que foi pago
+
 
         return (
           <>
@@ -2004,7 +2007,7 @@ const WorkDetail = () => {
                             <div className="space-y-4">
                                 {group.expenses.map(expense => {
                                     const statusDetails = getEntityStatusDetails('expense', expense, steps); // steps not directly used here, but for consistency
-                                    const valorCombinado = expense.totalAgreed !== undefined ? expense.totalAgreed : expense.amount;
+                                    const valorCombinado = expense.totalAgreed !== undefined ? expense.totalAgreed : (expense.amount || 0);
                                     const valorPago = expense.paidAmount || 0; // paidAmount é DERIVADO
                                     const valorRestante = valorCombinado - valorPago;
                                     const progressPercent = valorCombinado > 0 ? (valorPago / valorCombinado) * 100 : 0;
@@ -2026,7 +2029,7 @@ const WorkDetail = () => {
                                                 setNewExpenseStepId(expense.stepId || 'none');
                                                 setNewExpenseWorkerId(expense.workerId || 'none');
                                                 setNewExpenseSupplierId(expense.supplierId || 'none');
-                                                setNewExpenseTotalAgreed(String(expense.totalAgreed !== undefined ? expense.totalAgreed : expense.amount)); // Set editable totalAgreed
+                                                setNewExpenseTotalAgreed(String(expense.totalAgreed !== undefined ? expense.totalAgreed : (expense.amount || 0))); // Set editable totalAgreed
                                                 setEditExpenseData(expense); 
                                                 setShowAddExpenseModal(true); 
                                             }
@@ -2070,7 +2073,7 @@ const WorkDetail = () => {
                                                             title: "Excluir Despesa",
                                                             message: `Tem certeza que deseja excluir a despesa ${expense.description}?`,
                                                             confirmText: "Excluir",
-                                                            onConfirm: async () => handleDeleteExpense(expense.id),
+                                                            onConfirm: async (ev) => { ev?.preventDefault(); handleDeleteExpense(expense.id); },
                                                             onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
                                                             type: "DANGER"
                                                         });
@@ -2208,7 +2211,7 @@ const WorkDetail = () => {
                                         title: "Excluir Profissional",
                                         message: `Tem certeza que deseja excluir o profissional ${worker.name}?`,
                                         confirmText: "Excluir",
-                                        onConfirm: async () => handleDeleteWorker(worker.id),
+                                        onConfirm: async (ev) => { ev?.preventDefault(); handleDeleteWorker(worker.id); },
                                         onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
                                         type: "DANGER"
                                     });
@@ -2273,7 +2276,7 @@ const WorkDetail = () => {
                                         title: "Excluir Fornecedor",
                                         message: `Tem certeza que deseja excluir o fornecedor ${supplier.name}?`,
                                         confirmText: "Excluir",
-                                        onConfirm: async () => handleDeleteSupplier(supplier.id),
+                                        onConfirm: async (ev) => { ev?.preventDefault(); handleDeleteSupplier(supplier.id); },
                                         onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
                                         type: "DANGER"
                                     });
@@ -2318,7 +2321,7 @@ const WorkDetail = () => {
                                         title: "Excluir Foto",
                                         message: `Tem certeza que deseja excluir esta foto?`,
                                         confirmText: "Excluir",
-                                        onConfirm: async () => handleDeletePhoto(photo.id, photo.url),
+                                        onConfirm: async (ev) => { ev?.preventDefault(); handleDeletePhoto(photo.id, photo.url); },
                                         onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
                                         type: "DANGER"
                                     });
@@ -2366,7 +2369,7 @@ const WorkDetail = () => {
                                         title: "Excluir Documento",
                                         message: `Tem certeza que deseja excluir o documento "${file.name}"?`,
                                         confirmText: "Excluir",
-                                        onConfirm: async () => handleDeleteFile(file.id, file.url),
+                                        onConfirm: async (ev) => { ev?.preventDefault(); handleDeleteFile(file.id, file.url); },
                                         onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
                                         type: "DANGER"
                                     });
@@ -2432,6 +2435,28 @@ const WorkDetail = () => {
                         ))}
                     </div>
                 )}
+                {showContractContentModal && (
+                    <ZeModal
+                        isOpen={showContractContentModal}
+                        title={selectedContractTitle}
+                        message=""
+                        confirmText={copyContractSuccess ? "Copiado!" : "Copiar Texto"}
+                        onConfirm={async (e) => { 
+                            e?.preventDefault();
+                            await navigator.clipboard.writeText(selectedContractContent);
+                            setCopyContractSuccess(true);
+                            setTimeout(() => setCopyContractSuccess(false), 2000);
+                        }}
+                        onCancel={() => setShowContractContentModal(false)}
+                        type="INFO"
+                    >
+                        <textarea 
+                            value={selectedContractContent} 
+                            readOnly 
+                            className="w-full h-80 p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white text-sm resize-none font-mono"
+                        ></textarea>
+                    </ZeModal>
+                )}
             </>
         );
 
@@ -2488,7 +2513,7 @@ const WorkDetail = () => {
                                                     title: "Excluir Checklist",
                                                     message: `Tem certeza que deseja excluir o checklist "${checklist.name}"?`,
                                                     confirmText: "Excluir",
-                                                    onConfirm: async () => handleDeleteChecklist(checklist.id),
+                                                    onConfirm: async (ev) => { ev?.preventDefault(); handleDeleteChecklist(checklist.id); },
                                                     onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
                                                     type: "DANGER"
                                                 });
@@ -2665,7 +2690,7 @@ const WorkDetail = () => {
                 onChange={(e) => setNewMaterialName(e.target.value)}
                 className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
                 required
-                disabled={isEditingExpenseWithPayments} // Disable if material is paid
+                disabled={editMaterialData?.purchasedQty > 0} // Disable if material has purchases
               />
             </div>
             <div>
@@ -2676,7 +2701,7 @@ const WorkDetail = () => {
                 value={newMaterialBrand}
                 onChange={(e) => setNewMaterialBrand(e.target.value)}
                 className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
-                disabled={isEditingExpenseWithPayments} // Disable if material is paid
+                disabled={editMaterialData?.purchasedQty > 0} // Disable if material has purchases
               />
             </div>
             <div>
@@ -2690,7 +2715,7 @@ const WorkDetail = () => {
                 step="any"
                 className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
                 required
-                disabled={isEditingExpenseWithPayments} // Disable if material is paid
+                disabled={editMaterialData?.purchasedQty > 0} // Disable if material has purchases
               />
             </div>
             <div>
@@ -2702,7 +2727,7 @@ const WorkDetail = () => {
                 onChange={(e) => setNewMaterialUnit(e.target.value)}
                 className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
                 required
-                disabled={isEditingExpenseWithPayments} // Disable if material is paid
+                disabled={editMaterialData?.purchasedQty > 0} // Disable if material has purchases
               />
             </div>
             <div>
@@ -2713,7 +2738,7 @@ const WorkDetail = () => {
                 value={newMaterialCategory}
                 onChange={(e) => setNewMaterialCategory(e.target.value)}
                 className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
-                disabled={isEditingExpenseWithPayments} // Disable if material is paid
+                disabled={editMaterialData?.purchasedQty > 0} // Disable if material has purchases
               />
             </div>
             <div>
@@ -2723,7 +2748,7 @@ const WorkDetail = () => {
                 value={newMaterialStepId}
                 onChange={(e) => setNewMaterialStepId(e.target.value)}
                 className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
-                disabled={isEditingExpenseWithPayments} // Disable if material is paid
+                disabled={editMaterialData?.purchasedQty > 0} // Disable if material has purchases
               >
                 <option value="none">Nenhuma</option>
                 {steps.map(step => (
@@ -2746,7 +2771,6 @@ const WorkDetail = () => {
                       step="any"
                       placeholder={`Ex: ${editMaterialData.plannedQty - editMaterialData.purchasedQty}`}
                       className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
-                      disabled={isEditingExpenseWithPayments} // Disable if material is paid
                     />
                   </div>
                   <div>
@@ -2760,7 +2784,6 @@ const WorkDetail = () => {
                       step="0.01"
                       placeholder="Ex: 150.75"
                       className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
-                      disabled={isEditingExpenseWithPayments} // Disable if material is paid
                     />
                   </div>
                 </div>
@@ -2912,13 +2935,13 @@ const WorkDetail = () => {
         >
           <form onSubmit={handleAddPayment} className="space-y-4">
             <p className="text-sm text-slate-700 dark:text-slate-300">
-              Valor Combinado: <span className="font-bold">{formatCurrency(paymentExpenseData.totalAgreed !== undefined ? paymentExpenseData.totalAgreed : paymentExpenseData.amount)}</span>
+              Valor Combinado: <span className="font-bold">{formatCurrency(paymentExpenseData.totalAgreed !== undefined ? paymentExpenseData.totalAgreed : (paymentExpenseData.amount || 0))}</span>
             </p>
             <p className="text-sm text-slate-700 dark:text-slate-300">
               Valor Já Pago: <span className="font-bold">{formatCurrency(paymentExpenseData.paidAmount || 0)}</span>
             </p>
             <p className="text-sm text-slate-700 dark:text-slate-300 mb-4">
-              Valor Restante: <span className="font-bold">{formatCurrency((paymentExpenseData.totalAgreed !== undefined ? paymentExpenseData.totalAgreed : paymentExpenseData.amount) - (paymentExpenseData.paidAmount || 0))}</span>
+              Valor Restante: <span className="font-bold">{formatCurrency((paymentExpenseData.totalAgreed !== undefined ? paymentExpenseData.totalAgreed : (paymentExpenseData.amount || 0)) - (paymentExpenseData.paidAmount || 0))}</span>
             </p>
             <div>
               <label htmlFor="paymentAmount" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Valor do Pagamento (R$)</label>
@@ -3114,7 +3137,7 @@ const WorkDetail = () => {
           isOpen={showAddPhotoModal}
           title="Adicionar Nova Foto"
           message=""
-          confirmText="Upload da Foto"
+          confirmText="Adicionar Foto"
           onConfirm={handleAddPhoto}
           onCancel={() => { setShowAddPhotoModal(false); setNewPhotoFile(null); setNewPhotoDescription(''); setNewPhotoType('PROGRESS'); }}
           type="INFO"
@@ -3122,13 +3145,13 @@ const WorkDetail = () => {
         >
           <form onSubmit={handleAddPhoto} className="space-y-4">
             <div>
-              <label htmlFor="photoFile" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Arquivo de Imagem</label>
+              <label htmlFor="photoFile" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Arquivo da Imagem</label>
               <input
                 type="file"
                 id="photoFile"
                 accept="image/*"
                 onChange={(e) => setNewPhotoFile(e.target.files ? e.target.files[0] : null)}
-                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
+                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-secondary file:text-white hover:file:bg-secondary-dark"
                 required
               />
             </div>
@@ -3143,7 +3166,7 @@ const WorkDetail = () => {
               />
             </div>
             <div>
-              <label htmlFor="photoType" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Tipo da Foto</label>
+              <label htmlFor="photoType" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Tipo</label>
               <select
                 id="photoType"
                 value={newPhotoType}
@@ -3166,7 +3189,7 @@ const WorkDetail = () => {
           isOpen={showAddFileModal}
           title="Adicionar Novo Documento"
           message=""
-          confirmText="Upload do Documento"
+          confirmText="Adicionar Documento"
           onConfirm={handleAddFile}
           onCancel={() => { setShowAddFileModal(false); setNewUploadFile(null); setNewFileName(''); setNewFileCategory(FileCategory.GENERAL); }}
           type="INFO"
@@ -3178,19 +3201,19 @@ const WorkDetail = () => {
               <input
                 type="file"
                 id="uploadFile"
-                accept="/*"
                 onChange={(e) => setNewUploadFile(e.target.files ? e.target.files[0] : null)}
-                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
+                className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-secondary file:text-white hover:file:bg-secondary-dark"
                 required
               />
             </div>
             <div>
-              <label htmlFor="fileName" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Nome do Documento (Opcional, default é o nome do arquivo)</label>
+              <label htmlFor="fileName" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Nome do Documento (Opcional)</label>
               <input
                 type="text"
                 id="fileName"
                 value={newFileName}
                 onChange={(e) => setNewFileName(e.target.value)}
+                placeholder={newUploadFile?.name || "Nome do Documento"}
                 className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
               />
             </div>
@@ -3212,47 +3235,15 @@ const WorkDetail = () => {
         </ZeModal>
       )}
 
-      {/* Contract Content Viewer Modal */}
-      {showContractContentModal && (
-        <ZeModal
-          isOpen={showContractContentModal}
-          title={selectedContractTitle}
-          message="" // Content in children
-          confirmText={copyContractSuccess ? "Copiado!" : "Copiar Texto"}
-          onConfirm={async () => {
-              await navigator.clipboard.writeText(selectedContractContent);
-              setCopyContractSuccess(true);
-              setTimeout(() => setCopyContractSuccess(false), 2000); // Reset after 2 seconds
-          }}
-          onCancel={() => { setShowContractContentModal(false); setCopyContractSuccess(false); }}
-          type="INFO"
-        >
-          <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-lg border border-slate-100 dark:border-slate-700 text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap max-h-96 overflow-auto">
-            {selectedContractContent}
-          </div>
-          {copyContractSuccess && (
-            <p className="text-center text-green-500 text-sm mt-3 animate-in fade-in">
-              <i className="fa-solid fa-check-circle mr-1"></i> Texto copiado para a área de transferência!
-            </p>
-          )}
-        </ZeModal>
-      )}
-
       {/* Add/Edit Checklist Modal */}
       {showAddChecklistModal && (
         <ZeModal
           isOpen={showAddChecklistModal}
           title={editChecklistData ? "Editar Checklist" : "Adicionar Novo Checklist"}
-          message="" // Content in children
+          message=""
           confirmText={editChecklistData ? "Salvar Checklist" : "Adicionar Checklist"}
           onConfirm={editChecklistData ? handleEditChecklist : handleAddChecklist}
-          onCancel={() => { 
-            setShowAddChecklistModal(false); 
-            setEditChecklistData(null); 
-            setNewChecklistName(''); 
-            setNewChecklistCategory(''); 
-            setNewChecklistItems(['']); 
-          }}
+          onCancel={() => { setShowAddChecklistModal(false); setEditChecklistData(null); setNewChecklistItems(['']); setNewChecklistName(''); setNewChecklistCategory(''); }}
           type="INFO"
           isConfirming={zeModal.isConfirming}
         >
@@ -3269,15 +3260,22 @@ const WorkDetail = () => {
               />
             </div>
             <div>
-              <label htmlFor="checklistCategory" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Categoria (Ex: Fundações, Elétrica)</label>
-              <input
-                type="text"
+              <label htmlFor="checklistCategory" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Categoria (Etapa)</label>
+              <select
                 id="checklistCategory"
                 value={newChecklistCategory}
                 onChange={(e) => setNewChecklistCategory(e.target.value)}
                 className="w-full p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
                 required
-              />
+              >
+                <option value="">Selecione a Categoria</option>
+                {/* Dynamically populate categories based on existing steps, plus a general option */}
+                {steps.map(step => (
+                  <option key={step.id} value={step.name}>{step.name}</option>
+                ))}
+                <option value="Geral">Geral</option>
+                <option value="Segurança">Segurança</option>
+              </select>
             </div>
             <div>
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">Itens do Checklist</label>
@@ -3294,45 +3292,29 @@ const WorkDetail = () => {
                     placeholder={`Item ${index + 1}`}
                     className="flex-1 p-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white"
                   />
-                  {newChecklistItems.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const updatedItems = newChecklistItems.filter((_, i) => i !== index);
-                        setNewChecklistItems(updatedItems);
-                      }}
-                      className="p-2 text-red-500 hover:bg-red-500/10 rounded-full"
-                    >
-                      <i className="fa-solid fa-times"></i>
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const updatedItems = newChecklistItems.filter((_, i) => i !== index);
+                      setNewChecklistItems(updatedItems);
+                    }}
+                    className="p-2 text-red-500 hover:bg-red-500/10 rounded-full"
+                    aria-label="Remover item"
+                  >
+                    <i className="fa-solid fa-xmark"></i>
+                  </button>
                 </div>
               ))}
               <button
                 type="button"
                 onClick={() => setNewChecklistItems([...newChecklistItems, ''])}
-                className="w-full py-2 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-sm font-bold rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors mt-2"
+                className="w-full py-2 bg-slate-100 dark:bg-slate-800 text-secondary font-bold rounded-xl hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors mt-2"
+                aria-label="Adicionar novo item ao checklist"
               >
                 <i className="fa-solid fa-plus mr-2"></i> Adicionar Item
               </button>
             </div>
           </form>
-        </ZeModal>
-      )}
-
-      {/* Generic ZeModal for confirmations/errors */}
-      {zeModal.isOpen && (
-        <ZeModal
-          isOpen={zeModal.isOpen}
-          title={zeModal.title}
-          message={zeModal.message}
-          confirmText={zeModal.confirmText}
-          onConfirm={zeModal.onConfirm}
-          onCancel={zeModal.onCancel}
-          type={zeModal.type}
-          isConfirming={zeModal.isConfirming}
-        >
-          {zeModal.children}
         </ZeModal>
       )}
     </div>

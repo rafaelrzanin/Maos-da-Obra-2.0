@@ -534,7 +534,7 @@ export const dbService = {
         options: {
             data: { name }
         }
-    });
+    );
 
     if (authError) throw authError;
     // If user already exists and signed in, just ensure profile and return
@@ -703,6 +703,7 @@ export const dbService = {
   async getWorks(userId: string): Promise<Work[]> {
     // Supabase is guaranteed to be initialized now
     
+    // Fix: Changed Date.24 to Date.now() to correctly get the current timestamp.
     const now = Date.now();
     // Return cache immediately if valid
     if (_dashboardCache.works && (now - _dashboardCache.works.timestamp < CACHE_TTL)) {
@@ -961,6 +962,7 @@ export const dbService = {
         startDateObj.setDate(startDateObj.getDate() + effectiveDefaultDurationDays);
         finalEndDate = startDateObj.toISOString().split('T')[0];
     } else {
+        // Fix: Replace `parsedObj` with `parsedWork` as `parsedObj` is not defined.
         finalEndDate = parsedWork.startDate; // If no duration, end date is start date
     }
 
@@ -1227,15 +1229,34 @@ export const dbService = {
   },
 
   async updateMaterial(material: Material): Promise<Material> {
+    // 🔥 FIX CRÍTICO: Bloqueio de edição para campos importantes de materiais quando já há compras registradas
+    const { data: currentMaterial, error: fetchError } = await supabase.from('materials').select('*').eq('id', material.id).single();
+    if (fetchError || !currentMaterial) throw new Error(`Material with ID ${material.id} not found.`);
+
+    if (currentMaterial.purchased_qty > 0) {
+      // Campos que NÃO podem ser alterados se já houver compras registradas
+      const restrictedFields: (keyof Material)[] = ['name', 'brand', 'plannedQty', 'unit', 'category', 'stepId'];
+      for (const field of restrictedFields) {
+        if (material[field] !== currentMaterial[field.replace(/([A-Z])/g, '_$1').toLowerCase()]) { // Convert camelCase to snake_case for DB field comparison
+          throw new Error(`Não é possível alterar o campo '${field}' de um material que já possui compras registradas.`);
+        }
+      }
+      // purchasedQty e totalCost são derivados de compras, não editáveis diretamente via updateMaterial
+      if (material.purchasedQty !== currentMaterial.purchased_qty || material.totalCost !== currentMaterial.total_cost) {
+        throw new Error("Não é possível alterar 'Quantidade Comprada' ou 'Custo Total' diretamente. Use a função 'registerMaterialPurchase' para isso.");
+      }
+    }
+
+
     const dbMaterial = {
       name: material.name,
       brand: material.brand || '', // FIX: Send empty string if undefined for TEXT NOT NULL.
       planned_qty: material.plannedQty,
-      purchased_qty: material.purchasedQty,
+      // purchased_qty: material.purchasedQty, // REMOVIDO: Não deve ser editado diretamente
       unit: material.unit,
       step_id: material.stepId || null, // FIX: Send null if undefined, assuming step_id is nullable in DB.
       category: material.category || '', // FIX: Send empty string if undefined for TEXT NOT NULL.
-      total_cost: material.totalCost,
+      // total_cost: material.totalCost, // REMOVIDO: Não deve ser editado diretamente
     };
     const { data, error } = await supabase.from('materials').update(dbMaterial).eq('id', material.id).select().single();
     if (error) throw error;
@@ -1247,9 +1268,22 @@ export const dbService = {
 
   async deleteMaterial(materialId: string): Promise<void> {
     // First, find the material to get its workId
-    const { data: materialToDelete, error: fetchError } = await supabase.from('materials').select('work_id').eq('id', materialId).single();
+    const { data: materialToDelete, error: fetchError } = await supabase.from('materials').select('work_id, purchased_qty').eq('id', materialId).single();
     if (fetchError || !materialToDelete) throw new Error("Material not found or error fetching workId.");
     const workId = materialToDelete.work_id;
+    const userId = (await dbService.getCurrentUser())?.id || 'unknown';
+
+    // Log material deletion
+    await _addFinancialHistoryEntry({
+        workId,
+        userId,
+        // expenseId: undefined, // No specific expense directly tied to material deletion itself
+        action: 'delete',
+        description: `Material ID ${materialId} excluído.`,
+        oldValue: materialId,
+        newValue: null,
+        field: 'material_id',
+    });
 
     // Delete any associated expenses
     // MODIFICADO: A exclusão de expenses agora tem cascata para installments e excess
@@ -1259,7 +1293,7 @@ export const dbService = {
         for (const expense of deletedExpenses) {
             await _addFinancialHistoryEntry({
                 workId,
-                userId: (await dbService.getCurrentUser())?.id || 'unknown', // Attempt to get current user ID
+                userId,
                 expenseId: expense.id,
                 action: 'delete',
                 description: `Despesa de material "${expense.description}" (R$${expense.amount}) excluída junto com o material.`,
