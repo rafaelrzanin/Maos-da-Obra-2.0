@@ -360,9 +360,9 @@ const WorkDetail = () => {
   const [newMaterialCategory, setNewMaterialCategory] = useState('');
   const [newMaterialStepId, setNewMaterialStepId] = useState('');
   const [editMaterialData, setEditMaterialData] = useState<Material | null>(null);
-  // NEW: States for material purchase within the edit modal
-  const [currentPurchaseQty, setCurrentPurchaseQty] = useState(''); // Raw string for quantity input
-  const [currentPurchaseCost, setCurrentPurchaseCost] = useState(''); // Raw string for monetary input
+  // NEW: States for material purchase *within* the edit modal (these replace the old currentPurchaseQty/Cost states)
+  const [purchaseQtyInput, setPurchaseQtyInput] = useState(''); 
+  const [purchaseCostInput, setPurchaseCostInput] = useState('');
 
 
   const [showAddExpenseModal, setShowAddExpenseModal] = useState(false);
@@ -917,27 +917,48 @@ const WorkDetail = () => {
 
     setZeModal(prev => ({ ...prev, isConfirming: true }));
     try {
-      // FIX: Use non-null assertion for editMaterialData
+      const qtyToRegister = Number(purchaseQtyInput);
+      const costToRegister = Number(purchaseCostInput);
+
+      // 1. Update the material's descriptive properties
       await dbService.updateMaterial({
-        ...editMaterialData!,
-        workId: workId,
+        ...editMaterialData, // All original data
         name: newMaterialName,
-        brand: newMaterialBrand, // NEW: Pass brand
-        plannedQty: Number(newMaterialPlannedQty), // Quantity is not monetary
+        brand: newMaterialBrand,
+        plannedQty: Number(newMaterialPlannedQty),
         unit: newMaterialUnit,
         category: newMaterialCategory,
         stepId: newMaterialStepId === 'none' ? undefined : newMaterialStepId,
+        // Keep original purchasedQty and totalCost here, dbService.registerMaterialPurchase will update them
+        purchasedQty: editMaterialData.purchasedQty,
+        totalCost: editMaterialData.totalCost,
       });
+
+      // 2. If new purchase quantities are provided, register the purchase
+      if (qtyToRegister > 0 && costToRegister >= 0) {
+        await dbService.registerMaterialPurchase(
+          editMaterialData.id,
+          newMaterialName, // Use potentially updated name
+          newMaterialBrand, // Use potentially updated brand
+          Number(newMaterialPlannedQty), // Use potentially updated plannedQty
+          newMaterialUnit, // Use potentially updated unit
+          qtyToRegister,
+          costToRegister
+        );
+        setPurchaseQtyInput(''); // Clear temporary purchase inputs
+        setPurchaseCostInput('');
+      }
+
       setEditMaterialData(null);
       setShowAddMaterialModal(false); // Close the modal
       await loadWorkData();
     } catch (error) {
-      console.error("Erro ao editar material:", error);
+      console.error("Erro ao editar material ou registrar compra:", error);
       setZeModal(prev => ({
         ...prev,
         isConfirming: false,
-        title: "Erro ao Editar Material",
-        message: "Não foi possível editar o material. Tente novamente.",
+        title: "Erro na Operação",
+        message: "Não foi possível completar a operação. Tente novamente.",
         type: "ERROR",
         confirmText: "Ok",
         onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
@@ -969,42 +990,7 @@ const WorkDetail = () => {
     }
   };
 
-  const handleRegisterMaterialPurchase = async (e: React.FormEvent) => {
-    e.preventDefault(); // Prevent default form submission
-    if (!editMaterialData || !workId || !currentPurchaseQty || !currentPurchaseCost) return;
-
-    setZeModal(prev => ({ ...prev, isConfirming: true }));
-    try {
-      await dbService.registerMaterialPurchase(
-        editMaterialData.id,
-        editMaterialData.name,
-        editMaterialData.brand,
-        editMaterialData.plannedQty,
-        editMaterialData.unit,
-        Number(currentPurchaseQty),
-        Number(currentPurchaseCost) // Direct conversion
-      );
-      setCurrentPurchaseQty('');
-      setCurrentPurchaseCost('');
-      setEditMaterialData(null); // Close the edit modal after purchase
-      setShowAddMaterialModal(false); // Ensure modal closes
-      await loadWorkData();
-    } catch (error) {
-      console.error("Erro ao registrar compra de material:", error);
-      setZeModal(prev => ({
-        ...prev,
-        isConfirming: false,
-        title: "Erro ao Registrar Compra",
-        message: "Não foi possível registrar a compra. Tente novamente.",
-        type: "ERROR",
-        confirmText: "Ok",
-        onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
-      }));
-    } finally {
-      setZeModal(prev => ({ ...prev, isConfirming: false }));
-    }
-  };
-
+  // REMOVED handleRegisterMaterialPurchase as it's now integrated
 
   // =======================================================================
   // CRUD HANDLERS: EXPENSES
@@ -1812,6 +1798,8 @@ const WorkDetail = () => {
                   setNewMaterialUnit('');
                   setNewMaterialCategory('');
                   setNewMaterialStepId('');
+                  setPurchaseQtyInput(''); // Clear temporary purchase inputs
+                  setPurchaseCostInput(''); // Clear temporary purchase inputs
                   setShowAddMaterialModal(true);
                 }}
                 className="px-4 py-2 bg-secondary text-white text-sm font-bold rounded-xl hover:bg-secondary-dark transition-colors flex items-center gap-2"
@@ -1831,6 +1819,8 @@ const WorkDetail = () => {
                       setNewMaterialUnit('');
                       setNewMaterialCategory('');
                       setNewMaterialStepId('');
+                      setPurchaseQtyInput(''); // Clear temporary purchase inputs
+                      setPurchaseCostInput(''); // Clear temporary purchase inputs
                       setShowAddMaterialModal(true);
                     }} className="px-6 py-3 bg-secondary text-white font-bold rounded-xl hover:bg-secondary-dark transition-colors">
                         Adicionar seu primeiro material
@@ -1874,6 +1864,8 @@ const WorkDetail = () => {
                                 setNewMaterialCategory(material.category || '');
                                 setNewMaterialStepId(material.stepId || 'none');
                                 setEditMaterialData(material); 
+                                setPurchaseQtyInput(''); // Clear temporary purchase inputs
+                                setPurchaseCostInput(''); // Clear temporary purchase inputs
                                 setShowAddMaterialModal(true); 
                               }} 
                               className={cx(
@@ -2622,11 +2614,11 @@ const WorkDetail = () => {
           title={editMaterialData ? "Editar Material" : "Adicionar Novo Material"}
           message=""
           confirmText={editMaterialData ? "Salvar Alterações" : "Adicionar Material"}
-          onConfirm={editMaterialData ? handleEditMaterial : handleAddMaterial}
-          onCancel={() => { setShowAddMaterialModal(false); setEditMaterialData(null); setCurrentPurchaseQty(''); setCurrentPurchaseCost(''); }}
+          onConfirm={handleEditMaterial} // This now also handles purchase registration
+          onCancel={() => { setShowAddMaterialModal(false); setEditMaterialData(null); setPurchaseQtyInput(''); setPurchaseCostInput(''); }}
           isConfirming={zeModal.isConfirming}
         >
-          <form onSubmit={editMaterialData ? handleEditMaterial : handleAddMaterial} className="space-y-4">
+          <form onSubmit={handleEditMaterial} className="space-y-4">
             <div>
               <label htmlFor="materialName" className="block text-xs font-bold text-slate-500 uppercase mb-1">Nome do Material</label>
               <input
@@ -2706,41 +2698,59 @@ const WorkDetail = () => {
             </div>
 
             {editMaterialData && (
-              <div className="pt-4 mt-4 border-t border-slate-100 dark:border-slate-700">
-                <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">Registrar Compra</h3>
-                <form onSubmit={handleRegisterMaterialPurchase} className="space-y-4">
+              <>
+                <div className="grid grid-cols-2 gap-4 pt-4 mt-4 border-t border-slate-100 dark:border-slate-700">
                   <div>
-                    <label htmlFor="purchaseQty" className="block text-xs font-bold text-slate-500 uppercase mb-1">Qtd. da Compra</label>
+                    <label htmlFor="currentPurchasedQty" className="block text-xs font-bold text-slate-500 uppercase mb-1">Qtd. Comprada (Total)</label>
                     <input
-                      id="purchaseQty"
+                      id="currentPurchasedQty"
                       type="number"
-                      value={currentPurchaseQty}
-                      onChange={(e) => setCurrentPurchaseQty(e.target.value)}
-                      className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
-                      required
-                      min="0"
-                      step="0.01"
+                      value={editMaterialData.purchasedQty}
+                      className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none"
+                      readOnly // Make this field read-only
                     />
                   </div>
                   <div>
-                    <label htmlFor="purchaseCost" className="block text-xs font-bold text-slate-500 uppercase mb-1">Custo da Compra (R$)</label>
+                    <label htmlFor="currentTotalCost" className="block text-xs font-bold text-slate-500 uppercase mb-1">Custo Total (R$)</label>
                     <input
-                      id="purchaseCost"
-                      type="number" // Reverted to number
-                      value={currentPurchaseCost}
-                      onChange={(e) => setCurrentPurchaseCost(e.target.value)}
-                      className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
-                      required
-                      min="0"
-                      step="0.01"
+                      id="currentTotalCost"
+                      type="number"
+                      value={editMaterialData.totalCost}
+                      className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none"
+                      readOnly // Make this field read-only
                     />
                   </div>
-                  <button type="submit" disabled={zeModal.isConfirming} className="w-full py-3 bg-secondary text-white font-bold rounded-xl hover:bg-secondary-dark transition-colors flex items-center justify-center gap-2">
-                    {zeModal.isConfirming ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-cart-shopping"></i>}
-                    Registrar Compra
-                  </button>
-                </form>
-              </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label htmlFor="purchaseQtyInput" className="block text-xs font-bold text-slate-500 uppercase mb-1">Qtd. Adicional Comprada</label>
+                    <input
+                      id="purchaseQtyInput"
+                      type="number"
+                      value={purchaseQtyInput}
+                      onChange={(e) => setPurchaseQtyInput(e.target.value)}
+                      className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
+                      min="0"
+                      step="0.01"
+                      placeholder="0 para não registrar"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="purchaseCostInput" className="block text-xs font-bold text-slate-500 uppercase mb-1">Custo Desta Compra (R$)</label>
+                    <input
+                      id="purchaseCostInput"
+                      type="number"
+                      value={purchaseCostInput}
+                      onChange={(e) => setPurchaseCostInput(e.target.value)}
+                      className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
+                      min="0"
+                      step="0.01"
+                      placeholder="0.00 para não registrar"
+                    />
+                  </div>
+                </div>
+              </>
             )}
           </form>
         </ZeModal>
