@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, createContext, useContext, useMemo, useCallback } from 'react';
 import { User, PlanType, DBNotification } from '../types.ts';
 import { dbService } from '../services/db.ts';
@@ -20,7 +21,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     localStorage.setItem('maos_theme', theme);
   }, [theme]);
   const toggleTheme = () => setTheme(prev => (prev === 'light' ? 'dark' : 'light'));
-  return <ThemeContext.Provider value={{ theme, toggleTheme }}>{children}</ThemeContext.Provider>;
+  return <ThemeContext.Provider value={{ theme, toggleTheme }}>{children}</AuthContext.Provider>;
 };
 
 // --- Auth Context ---
@@ -190,6 +191,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
 
     // Supabase auth state change listener (deve rodar apenas uma vez para registrar o listener)
+    // FIX: dbService.onAuthChange now directly returns the unsubscribe function.
     const unsubscribe = dbService.onAuthChange(async (userFromDbService: User | null) => {
       if (!mounted) return;
 
@@ -216,7 +218,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     return () => {
       mounted = false;
-      unsubscribe();
+      unsubscribe(); // Now this is correctly calling the unsubscribe function
       console.log("[AuthContext] Main useEffect cleanup: Auth listener unsubscribed.");
     };
   }, []); // CRITICAL FIX: Empty dependency array to ensure this effect runs only once on mount.

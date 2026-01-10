@@ -567,33 +567,36 @@ export const dbService = {
   onAuthChange(callback: (user: User | null) => void) {
     const client = supabase; // Supabase is guaranteed to be initialized now
     
-    const { data: { subscription } } = client.auth.onAuthStateChange(async (_event, session) => {
-      sessionCache = null; // Clear cache on auth state change
-        
+    // Correct way to get the subscription object and its unsubscribe method
+    const { data: { subscription: authStateSubscription } } = client.auth.onAuthStateChange(async (_event, session) => {
+      // The dbService.onAuthChange already handles session and ensures the user profile.
+      // We just receive the final User | null object here.
+      console.log(`[dbService] onAuthChange event received. User: ${session?.user?.id || 'null'}.`);
+
       if (session?.user) {
         const user = await ensureUserProfile(session.user);
         callback(user);
       } else {
-        // Limpa cache ao deslogar
+        // Clear caches on logout
         _dashboardCache.works = null;
         _dashboardCache.stats = {};
         _dashboardCache.summary = {};
         _dashboardCache.notifications = null;
-        _dashboardCache.steps = {}; // NEW: Clear steps cache on logout
-        _dashboardCache.materials = {}; // NEW: Clear materials cache on logout
-        _dashboardCache.expenses = {}; // NEW: Clear expenses cache on logout
-        _dashboardCache.workers = {}; // NEW
-        _dashboardCache.suppliers = {}; // NEW
-        _dashboardCache.photos = {}; // NEW
-        _dashboardCache.files = {}; // NEW
-        _dashboardCache.contracts = null; // NEW
-        _dashboardCache.checklists = {}; // NEW
-        _dashboardCache.pushSubscriptions = {}; // NEW: Clear push subscriptions cache on logout
-        _dashboardCache.financialHistory = {}; // NEW: Clear financial history cache
+        _dashboardCache.steps = {}; 
+        _dashboardCache.materials = {}; 
+        _dashboardCache.expenses = {}; 
+        _dashboardCache.workers = {}; 
+        _dashboardCache.suppliers = {}; 
+        _dashboardCache.photos = {}; 
+        _dashboardCache.files = {}; 
+        _dashboardCache.contracts = null; 
+        _dashboardCache.checklists = {}; 
+        _dashboardCache.pushSubscriptions = {}; 
+        _dashboardCache.financialHistory = {}; 
         callback(null);
       }
     });
-    return () => subscription.unsubscribe();
+    return authStateSubscription.unsubscribe; // Return the unsubscribe function directly
   },
 
   async login(email: string, password?: string): Promise<User | null> { // Explicitly set return type
