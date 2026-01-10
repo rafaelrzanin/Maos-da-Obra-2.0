@@ -4,6 +4,26 @@ import { render, screen } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import WorkDetail from './pages/WorkDetail.tsx'; // Ensure this path is correct based on your file structure
 
+// Add ambient declarations for Jest globals to resolve 'Cannot find name' errors.
+// This is a workaround if @types/jest is not found or configured correctly in the environment.
+declare const jest: {
+  fn: (implementation?: (...args: any[]) => any) => any;
+  mock: (moduleName: string, factory?: () => any, options?: Record<string, any>) => void;
+};
+declare const describe: (name: string, fn: () => void) => void;
+declare const it: (name: string, fn: () => void, timeout?: number) => void;
+declare const beforeEach: (fn: () => void, timeout?: number) => void;
+declare const expect: (value: any) => {
+  toBeInTheDocument: () => any;
+  toHaveBeenCalledWith: (...args: any[]) => any;
+  toHaveBeenCalled: () => any;
+  // Add more specific matchers if needed
+};
+
+// Declare `require` for Node.js global if it's not implicitly available.
+// This is a workaround if @types/node is not found or configured correctly.
+declare const require: (moduleName: string) => any;
+
 // Mock the AuthContext
 jest.mock('./contexts/AuthContext.tsx', () => ({
   useAuth: () => ({
@@ -64,7 +84,7 @@ jest.mock('./services/supabase.ts', () => ({
 describe('WorkDetail', () => {
   beforeEach(() => {
     // Reset mocks before each test
-    // No need for `as any` here as `require` types will be available if `@types/node` is installed.
+    // These `require` calls will now be resolved by the ambient declaration for `require`.
     require('./services/db.ts').dbService.getWorkById.mockClear();
     require('./services/db.ts').dbService.getSteps.mockClear();
     require('./services/db.ts').dbService.getMaterials.mockClear();
@@ -124,7 +144,7 @@ describe('WorkDetail', () => {
 
     // Wait for the loading text to disappear, indicating data has been fetched
     expect(await screen.findByText('Test Work')).toBeInTheDocument();
-    // No need for `as any` here as `require` types will be available if `@types/node` is installed.
+    // These `require` calls will now be resolved by the ambient declaration for `require`.
     expect(require('./services/db.ts').dbService.getWorkById).toHaveBeenCalledWith('test-work-id');
     expect(require('./services/db.ts').dbService.getSteps).toHaveBeenCalledWith('test-work-id');
     expect(require('./services/db.ts').dbService.getMaterials).toHaveBeenCalledWith('test-work-id');

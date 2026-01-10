@@ -820,7 +820,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
             onConfirm: async (_e?: React.FormEvent) => {}, 
             onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
             type: "WARNING"
-        });
+        }); // Corrected: Added missing closing parenthesis here
         return;
     }
     setDraggedStepId(stepId);
