@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import * as ReactRouter from 'react-router-dom';
 import * as XLSX from 'xlsx'; // Keep XLSX import, as reports might use it
@@ -579,10 +578,10 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
     setLoading(true);
     try {
       const fetchedWork = await dbService.getWorkById(workId);
+      // Check if work exists and belongs to the user
       if (!fetchedWork || fetchedWork.userId !== user.id) {
-        // These redirects are handled by the component's main render logic now.
-        setLoading(false);
-        return; // Return void here
+        setWork(null); // Explicitly set work to null if not found or not owned
+        return; // This will trigger the "Obra não encontrada" block after loading is false
       }
       setWork(fetchedWork);
 
@@ -629,6 +628,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         confirmText: "Ok",
         onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false }))
       });
+      setWork(null); // Ensure work is null on error to show not found
       return; // Explicitly return void on error
     } finally {
       setLoading(false);
@@ -727,7 +727,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
       setNewStepName('');
       setNewStepStartDate(new Date().toISOString().split('T')[0]);
       setNewStepEndDate(new Date().toISOString().split('T')[0]);
-      setNewEstimatedDurationDays(''); // NEW
+      setNewEstimatedDurationDays(''); // Clear for new
       await loadWorkData();
     } catch (error: any) {
       console.error("Erro ao adicionar etapa:", error);
@@ -1638,8 +1638,8 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
     return null; // Return null while redirecting
   }
 
-  // If workId is missing or work is null after loading attempt
-  if (!workId || (!work && !loading)) { // If not loading, and work is still null, it failed.
+  // If workId is missing, it's a critical error for this page, redirect to dashboard.
+  if (!workId) {
     navigate('/', { replace: true }); // Redirect to dashboard
     return null; // Return null while redirecting
   }
@@ -1652,6 +1652,27 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
             <p className="text-xl font-bold">Carregando detalhes da obra...</p>
         </div>
     );
+  }
+
+  // NEW: If work is still null AFTER loading has finished, it means the work was not found.
+  // This replaces the problematic redirect.
+  if (!work && !loading) {
+      return (
+          <div className="flex flex-col items-center justify-center min-h-[70vh] p-6 text-center animate-in fade-in">
+              <i className="fa-solid fa-exclamation-circle text-6xl text-red-500 mb-4"></i>
+              <h2 className="text-2xl font-black text-primary dark:text-white mb-2">Obra não encontrada!</h2>
+              <p className="text-slate-500 dark:text-slate-400 max-w-sm mx-auto mb-6">
+                  Parece que esta obra não existe ou você não tem permissão para acessá-la.
+              </p>
+              <button
+                  onClick={() => navigate('/')}
+                  className="px-6 py-3 bg-secondary text-white font-bold rounded-xl hover:bg-secondary-dark transition-colors"
+                  aria-label="Voltar para o Dashboard"
+              >
+                  Voltar ao Dashboard
+              </button>
+          </div>
+      );
   }
 
   // ... rest of the component rendering
@@ -2456,7 +2477,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                   setShowAddPaymentModal(false);
                   setPaymentExpenseData(null);
                   setPaymentAmount('');
-                  setNewPaymentDate(new Date().toISOString().split('T')[0]);
+                  setNewPaymentDate(new Date().toISOString().split('T')[0]); // Default to today
                   await loadWorkData();
                 } catch (error: any) {
                   console.error("Erro ao registrar pagamento:", error);

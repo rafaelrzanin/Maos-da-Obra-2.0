@@ -63,18 +63,18 @@ jest.mock('./services/supabase.ts', () => ({
 describe('WorkDetail', () => {
   beforeEach(() => {
     // Reset mocks before each test
-    // Use `as any` to bypass TypeScript's `require` type checking since Jest handles this in runtime.
-    (require('./services/db.ts').dbService.getWorkById as any).mockClear();
-    (require('./services/db.ts').dbService.getSteps as any).mockClear();
-    (require('./services/db.ts').dbService.getMaterials as any).mockClear();
-    (require('./services/db.ts').dbService.getExpenses as any).mockClear();
-    (require('./services/db.ts').dbService.getWorkers as any).mockClear();
-    (require('./services/db.ts').dbService.getSuppliers as any).mockClear();
-    (require('./services/db.ts').dbService.getPhotos as any).mockClear();
-    (require('./services/db.ts').dbService.getFiles as any).mockClear();
-    (require('./services/db.ts').dbService.getContractTemplates as any).mockClear();
-    (require('./services/db.ts').dbService.getChecklists as any).mockClear();
-    (require('./services/db.ts').dbService.ensureMaterialsForWork as any).mockClear();
+    // No need for `as any` here as `require` types will be available if `@types/node` is installed.
+    require('./services/db.ts').dbService.getWorkById.mockClear();
+    require('./services/db.ts').dbService.getSteps.mockClear();
+    require('./services/db.ts').dbService.getMaterials.mockClear();
+    require('./services/db.ts').dbService.getExpenses.mockClear();
+    require('./services/db.ts').dbService.getWorkers.mockClear();
+    require('./services/db.ts').dbService.getSuppliers.mockClear();
+    require('./services/db.ts').dbService.getPhotos.mockClear();
+    require('./services/db.ts').dbService.getFiles.mockClear();
+    require('./services/db.ts').dbService.getContractTemplates.mockClear();
+    require('./services/db.ts').dbService.getChecklists.mockClear();
+    require('./services/db.ts').dbService.ensureMaterialsForWork.mockClear();
   });
 
   it('renders loading state initially', () => {
@@ -123,6 +123,7 @@ describe('WorkDetail', () => {
 
     // Wait for the loading text to disappear, indicating data has been fetched
     expect(await screen.findByText('Test Work')).toBeInTheDocument();
+    // No need for `as any` here as `require` types will be available if `@types/node` is installed.
     expect(require('./services/db.ts').dbService.getWorkById).toHaveBeenCalledWith('test-work-id');
     expect(require('./services/db.ts').dbService.getSteps).toHaveBeenCalledWith('test-work-id');
     expect(require('./services/db.ts').dbService.getMaterials).toHaveBeenCalledWith('test-work-id');
