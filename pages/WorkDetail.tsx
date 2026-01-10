@@ -94,7 +94,7 @@ const getEntityStatusDetails = (
 
   if (entityType === 'step') {
     const step = entity as Step;
-    
+
     switch (step.status) {
       case StepStatus.COMPLETED:
         statusText = 'Concluído';
@@ -133,10 +133,10 @@ const getEntityStatusDetails = (
   } else if (entityType === 'material') {
     const material = entity as Material;
     const associatedStep = allSteps.find(s => s.id === material.stepId);
-    
+
     // Material Delay Logic: "Quando faltar 3 dias para a etapa iniciar e material não estiver concluído"
     // This logic directly mirrors _getMaterialDerivedStatus in db.ts
-    let isDelayed = false; 
+    let isDelayed = false;
     let materialIsComplete = false;
     let materialIsPartial = false;
     let materialIsPending = false;
@@ -153,14 +153,14 @@ const getEntityStatusDetails = (
 
     if (!materialIsComplete && associatedStep && associatedStep.startDate) {
         const stepStartDate = new Date(associatedStep.startDate);
-        stepStartDate.setHours(0, 0, 0, 0); 
+        stepStartDate.setHours(0, 0, 0, 0);
         const threeDaysFromNow = new Date();
-        threeDaysFromNow.setDate(today.getDate() + 3); 
+        threeDaysFromNow.setDate(today.getDate() + 3);
         threeDaysFromNow.setHours(0, 0, 0, 0);
 
         isDelayed = (stepStartDate <= threeDaysFromNow);
     }
-    
+
     // Determine status based on derived flags
     if (isDelayed && !materialIsComplete) { // Only delayed if not already complete
       statusText = 'Atrasado';
@@ -183,7 +183,7 @@ const getEntityStatusDetails = (
       borderColor = 'border-amber-400 dark:border-amber-700';
       shadowClass = 'shadow-amber-500/20';
       icon = 'fa-hourglass-half';
-    } else if (materialIsPending) { 
+    } else if (materialIsPending) {
       statusText = 'Pendente';
       bgColor = 'bg-slate-400';
       textColor = 'text-slate-700 dark:text-slate-300';
@@ -194,7 +194,7 @@ const getEntityStatusDetails = (
   } else if (entityType === 'expense') {
     // MODIFICADO: Usa o novo ExpenseStatus derivado
     const expense = entity as Expense;
-    
+
     switch (expense.status) {
       case ExpenseStatus.COMPLETED:
         statusText = 'Concluído';
@@ -335,8 +335,8 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
   // NEW: Calculate AI access for tool access
   const isVitalicio = user?.plan === PlanType.VITALICIO;
   const isAiTrialActive = user?.isTrial && trialDaysRemaining !== null && trialDaysRemaining > 0;
-  const hasAiAccess = isVitalicio || isAiTrialActive; 
-  
+  const hasAiAccess = isVitalicio || isAiTrialActive;
+
   const [work, setWork] = useState<Work | null>(null);
   const [steps, setSteps] = useState<Step[]>([]);
   const [materials, setMaterials] = useState<Material[]>([]);
@@ -344,14 +344,14 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
   const [workers, setWorkers] = useState<Worker[]>([]);
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [photos, setPhotos] = useState<WorkPhoto[]>([]);
-  const [files, setFiles] = useState<WorkFile[]>([]); 
-  const [contracts, setContracts] = useState<Contract[]>([]); 
-  const [checklists, setChecklists] = useState<Checklist[]>([]); 
+  const [files, setFiles] = useState<WorkFile[]>([]);
+  const [contracts, setContracts] = useState<Contract[]>([]);
+  const [checklists, setChecklists] = useState<Checklist[]>([]);
 
   const [loading, setLoading] = useState(true);
   // REMOVED: `activeTab` from useState, it's now a prop
-  const [activeSubView, setActiveSubView] = useState<SubView>('NONE'); 
-  
+  const [activeSubView, setActiveSubView] = useState<SubView>('NONE');
+
   // States for Material Filter
   const [materialFilterStepId, setMaterialFilterStepId] = useState('all');
 
@@ -376,7 +376,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
   const [newMaterialStepId, setNewMaterialStepId] = useState('');
   const [editMaterialData, setEditMaterialData] = useState<Material | null>(null);
   // NEW: States for material purchase *within* the edit modal (these replace the old currentPurchaseQty/Cost states)
-  const [purchaseQtyInput, setPurchaseQtyInput] = useState(''); 
+  const [purchaseQtyInput, setPurchaseQtyInput] = useState('');
   // Fixing error: `setNewMaterialCost` is not defined. It should be `setPurchaseCostInput`.
   const [purchaseCostInput, setPurchaseCostInput] = useState('');
 
@@ -386,15 +386,15 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
   const [newExpenseAmount, setNewExpenseAmount] = useState(''); // Raw string for monetary input
   const [newExpenseCategory, setNewExpenseCategory] = useState<ExpenseCategory | string>(ExpenseCategory.OTHER);
   const [newExpenseDate, setNewExpenseDate] = useState(new Date().toISOString().split('T')[0]);
-  const [newExpenseStepId, setNewExpenseStepId] = useState(''); 
+  const [newExpenseStepId, setNewExpenseStepId] = useState('');
   // NEW: States for worker and supplier linking in expense modal
   const [newExpenseWorkerId, setNewExpenseWorkerId] = useState('');
   const [newExpenseSupplierId, setNewExpenseSupplierId] = useState('');
   const [editExpenseData, setEditExpenseData] = useState<Expense | null>(null);
-  const [showAddPaymentModal, setShowAddPaymentModal] = useState(false); 
-  const [paymentExpenseData, setPaymentExpenseData] = useState<Expense | null>(null); 
+  const [showAddPaymentModal, setShowAddPaymentModal] = useState(false);
+  const [paymentExpenseData, setPaymentExpenseData] = useState<Expense | null>(null);
   const [paymentAmount, setPaymentAmount] = useState(''); // Raw string for monetary input
-  const [paymentDate, setNewPaymentDate] = useState(new Date().toISOString().split('T')[0]); 
+  const [paymentDate, setNewPaymentDate] = useState(new Date().toISOString().split('T')[0]);
   // FIX: Renamed `newExpenseTotalAgued` to `newExpenseTotalAgreed`
   const [newExpenseTotalAgreed, setNewExpenseTotalAgreed] = useState<string>(''); // Raw string for monetary input
 
@@ -428,7 +428,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
   const [newUploadFile, setNewUploadFile] = useState<File | null>(null);
   const [uploadingFile, setLoadingFile] = useState(false);
 
-  const [showAddChecklistModal, setShowAddChecklistModal] = useState(false); 
+  const [showAddChecklistModal, setShowAddChecklistModal] = useState(false);
   const [newChecklistName, setNewChecklistName] = useState('');
   const [newChecklistCategory, setNewChecklistCategory] = useState('');
   const [newChecklistItems, setNewChecklistItems] = useState<string[]>(['']);
@@ -451,8 +451,8 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
 
   const goToTab = useCallback((tab: MainTab) => {
     onTabChange(tab); // Use the prop to update activeTab in App.tsx
-    setActiveSubView('NONE'); 
-    setMaterialFilterStepId('all'); 
+    setActiveSubView('NONE');
+    setMaterialFilterStepId('all');
     navigate(`/work/${workId}?tab=${tab}`, { replace: true }); // Update URL for consistent navigation
   }, [workId, navigate, onTabChange]);
 
@@ -538,9 +538,10 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
     });
 
     const expenseGroups: ExpenseStepGroup[] = [];
-    
+
     // Ensure steps are sorted by orderIndex
-    const sortedSteps = [...steps].sort((a, b) => a.orderIndex - b.orderIndex);
+    const sortedSteps = [...steps].
+      sort((a, b) => a.orderIndex - b.orderIndex);
 
     // Add expenses linked to steps, in step order
     sortedSteps.forEach(step => {
@@ -600,7 +601,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
 
       // NEW CRITICAL STEP: Ensure materials are generated if none exist after fetching work and steps
       await dbService.ensureMaterialsForWork(fetchedWork, fetchedSteps);
-      
+
       // After ensuring materials (and potentially generating them),
       // we need to re-fetch the materials to ensure the state is up-to-date.
       const currentMaterials = await dbService.getMaterials(workId);
@@ -676,7 +677,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         newRealDate = new Date().toISOString().split('T')[0]; // Set real completion date
         console.log(`[handleStepStatusChange] Status transition: ${step.status} -> COMPLETED for step ${step.id}. RealDate: ${newRealDate}.`);
     }
-    
+
     try {
       const updatedStepData: Step = {
         ...step, // Spread all existing properties
@@ -687,7 +688,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
 
       // 🔥 CRITICAL: The `dbService.updateStep` will enforce immutability and recalculate `status`
       // based on `realDate` and other dates. We are NOT sending `isDelayed`.
-      await dbService.updateStep(updatedStepData); 
+      await dbService.updateStep(updatedStepData);
       console.log(`[handleStepStatusChange] dbService.updateStep successful for step ${step.id}.`);
       console.log(`[handleStepStatusChange] Data reloaded after status update for step ${step.id}.`);
       await loadWorkData();
@@ -763,7 +764,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         // `status` and `realDate` will be managed by `handleStepStatusChange` for status updates
         // and by the backend's `_calculateStepStatus` for derivation.
         // We ensure `realDate` is preserved here if it exists.
-        realDate: editStepData.realDate, 
+        realDate: editStepData.realDate,
       });
       setEditStepData(null);
       setShowAddStepModal(false); // Close the modal
@@ -818,7 +819,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
             message: "Não é possível reordenar uma etapa que já foi iniciada.",
             confirmText: "Entendido",
             // FIX: Add `_e?: React.FormEvent` to match ZeModalProps.onConfirm signature.
-            onConfirm: async (_e?: React.FormEvent) => {}, 
+            onConfirm: async (_e?: React.FormEvent) => {},
             onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
             type: "WARNING"
         }); // Corrected: Added missing closing parenthesis here
@@ -964,7 +965,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         // purchasedQty and totalCost are derived and handled by registerMaterialPurchase,
         // so we pass the original values here and update them only via purchase registration.
         // dbService.updateMaterial will ignore them anyway for consistency if a purchase exists.
-        purchasedQty: editMaterialData.purchasedQty, 
+        purchasedQty: editMaterialData.purchasedQty,
         totalCost: editMaterialData.totalCost,
       });
 
@@ -1349,7 +1350,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
     try {
       const fileExtension = newPhotoFile.name.split('.').pop();
       const filePath = `${workId}/${Date.now()}.${fileExtension}`;
-      
+
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('work-photos')
         .upload(filePath, newPhotoFile);
@@ -1398,7 +1399,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
       // Extract file path from URL
       const urlParts = photo.url.split('/');
       const filePath = urlParts.slice(urlParts.indexOf(photo.workId)).join('/');
-      
+
       const { error: deleteStorageError } = await supabase.storage
         .from('work-photos')
         .remove([filePath]);
@@ -1437,7 +1438,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
     try {
       const fileExtension = newUploadFile.name.split('.').pop();
       const filePath = `${workId}/files/${Date.now()}-${newFileName}.${fileExtension}`; // Subfolder for files
-      
+
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('work-files')
         .upload(filePath, newUploadFile);
@@ -1489,7 +1490,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
       // Assuming URL format is something like: .../storage/v1/object/public/bucket-name/workId/files/filename.ext
       // We need 'workId/files/filename.ext'
       const filePath = urlParts.slice(urlParts.indexOf(file.workId)).join('/');
-      
+
       const { error: deleteStorageError } = await supabase.storage
         .from('work-files')
         .remove([filePath]);
@@ -1525,7 +1526,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
       setZeModal(prev => ({ ...prev, title: "Campos Obrigatórios", message: "Por favor, preencha o nome do checklist e todos os itens.", type: "ERROR", confirmText: "Ok", onConfirm: async () => {}, onCancel: () => setZeModal(p => ({ ...p, isOpen: false })) }));
       return;
     }
-  
+
     setZeModal(prev => ({ ...prev, isConfirming: true }));
     try {
       await dbService.addChecklist({
@@ -1565,7 +1566,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
       setZeModal(prev => ({ ...prev, title: "Campos Obrigatórios", message: "Por favor, preencha o nome do checklist e todos os itens.", type: "ERROR", confirmText: "Ok", onConfirm: async () => {}, onCancel: () => setZeModal(p => ({ ...p, isOpen: false })) }));
       return;
     }
-  
+
     setZeModal(prev => ({ ...prev, isConfirming: true }));
     try {
       await dbService.updateChecklist({
@@ -1730,8 +1731,79 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
       {/* RENDER ACTIVE TAB CONTENT */}
       {activeTab === 'ETAPAS' && (
         <div className="tab-content animate-in fade-in duration-300">
-          <div className="p-6 text-center text-slate-500">
-            Seção Cronograma em reconstrução segura.
+          <div className="p-4 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-card-default dark:shadow-card-dark-subtle">
+            {steps.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-10 text-center">
+                <i className="fa-solid fa-calendar-times text-6xl text-slate-400 mb-6"></i>
+                <h2 className="text-xl font-black text-primary dark:text-white mb-2">Ainda não existe um cronograma para esta obra.</h2>
+                <p className="text-slate-500 dark:text-slate-400 max-w-sm mx-auto mb-6">
+                  Crie um cronograma seguro com base na estrutura da obra usando o Planejador AI.
+                </p>
+                <button
+                  onClick={() => navigate(`/work/${workId}/ai-planner`)}
+                  className="px-6 py-3 bg-secondary text-white font-bold rounded-xl hover:bg-secondary-dark transition-colors flex items-center gap-2"
+                  aria-label="Criar Cronograma Seguro com AI"
+                >
+                  <i className="fa-solid fa-robot"></i> Criar Cronograma Seguro (AI)
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <h2 className="text-xl font-black text-primary dark:text-white mb-4">Seu Cronograma</h2>
+                {steps.map(step => {
+                  const statusDetails = getEntityStatusDetails('step', step, steps);
+                  return (
+                    <div
+                      key={step.id}
+                      draggable={!step.startDate} // Only allow dragging if step has not started
+                      onDragStart={(e) => handleDragStart(e, step.id)}
+                      onDragOver={(e) => handleDragOver(e, step.id)}
+                      onDragLeave={handleDragLeave}
+                      onDrop={(e) => handleDrop(e, step.id)}
+                      className={cx(
+                        "bg-slate-50 dark:bg-slate-800 p-4 rounded-xl border-l-4",
+                        statusDetails.borderColor, // Use status-specific border
+                        dragOverStepId === step.id ? 'border-r-4 border-dashed border-secondary' : '',
+                        !step.startDate ? 'cursor-grab' : 'cursor-not-allowed opacity-80' // Visual feedback for draggable
+                      )}
+                      aria-labelledby={`step-name-${step.id}`}
+                      aria-describedby={`step-status-${step.id}`}
+                      aria-disabled={!!step.startDate}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <h3 id={`step-name-${step.id}`} className="font-bold text-primary dark:text-white text-lg flex items-center gap-2">
+                          {step.orderIndex}. {step.name}
+                          {!step.startDate && <i className="fa-solid fa-arrows-alt text-slate-400 text-sm opacity-0 group-hover:opacity-100 transition-opacity"></i>}
+                        </h3>
+                        {/* Status Badge (Read-only from backend) */}
+                        <span id={`step-status-${step.id}`} className={cx(
+                          "px-3 py-1 rounded-full text-xs font-bold uppercase",
+                          statusDetails.bgColor,
+                          statusDetails.textColor,
+                          statusDetails.shadowClass
+                        )}>
+                          <i className={`fa-solid ${statusDetails.icon} mr-1`}></i> {statusDetails.statusText}
+                        </span>
+                      </div>
+                      <p className="text-sm text-slate-500 dark:text-slate-400">
+                        Início: {formatDateDisplay(step.startDate)} &bull; Término Previsto: {formatDateDisplay(step.endDate)}
+                      </p>
+                      {step.realDate && (
+                        <p className="text-sm text-green-600 dark:text-green-400 mt-1">
+                          <i className="fa-solid fa-calendar-check mr-1"></i> Concluído em: {formatDateDisplay(step.realDate)}
+                        </p>
+                      )}
+                      {step.status === StepStatus.DELAYED && (
+                        <p className="text-sm text-red-500 dark:text-red-400 mt-1">
+                          <i className="fa-solid fa-exclamation-triangle mr-1"></i> Esta etapa está atrasada!
+                        </p>
+                      )}
+                      {/* Removed the status change button */}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
       )}
