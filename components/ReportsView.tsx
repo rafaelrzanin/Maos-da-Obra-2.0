@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.tsx';
@@ -393,7 +391,7 @@ const ReportsView = () => {
           title="Acesso Premium necessário!"
           message="Os Relatórios Completos são uma funcionalidade exclusiva para assinantes Vitalícios ou durante o período de teste. Tenha a visão total da sua obra agora!"
           confirmText="Ver Planos"
-          onConfirm={async () => navigate('/settings')}
+          onConfirm={async (_e?: React.FormEvent) => navigate('/settings')}
           onCancel={() => { setShowAccessModal(false); navigate(`/work/${workId}?tab=FERRAMENTAS`); }}
           type="WARNING"
           cancelText="Voltar"

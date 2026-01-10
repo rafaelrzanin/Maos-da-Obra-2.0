@@ -1,12 +1,10 @@
-
-
 import React, { useState, useEffect, Suspense, lazy, Fragment } from 'react';
 import * as ReactRouter from 'react-router-dom';
 import { PlanType } from './types.ts';
 import { AuthProvider, ThemeProvider, useAuth, useTheme } from './contexts/AuthContext.tsx';
 // NEW: Import WorkDetailProps for type casting
 // FIX: WorkDetail is now default exported, so its type should be imported separately if needed.
-import type { WorkDetailProps } from './pages/WorkDetail.tsx'; 
+import type { WorkDetailProps, MainTab } from './pages/WorkDetail.tsx'; 
 
 // --- IMPORTAÇÕES ESTÁTICAS (Críticas para velocidade inicial) ---
 import Login from './pages/Login.tsx'; // Keep Login static as it's the entry point for unauthenticated users
@@ -117,17 +115,17 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
 }
 
 // NEW: Bottom Navigation Bar Component
-const BottomNavBar = ({ workId, activeTab, onTabClick }: { workId: string, activeTab: string, onTabClick: (tab: 'ETAPAS' | 'MATERIAIS' | 'FINANCEIRO' | 'FERRAMENTAS') => void }) => {
+const BottomNavBar = ({ workId, activeTab, onTabClick }: { workId: string, activeTab: MainTab, onTabClick: (tab: MainTab) => void }) => {
   const navigate = ReactRouter.useNavigate();
 
-  const navItems = [
+  const navItems: { name: MainTab, label: string, icon: string }[] = [
     { name: 'ETAPAS', label: 'Cronograma', icon: 'fa-list-check' },
     { name: 'MATERIAIS', label: 'Materiais', icon: 'fa-boxes-stacked' },
     { name: 'FINANCEIRO', label: 'Financeiro', icon: 'fa-dollar-sign' },
     { name: 'FERRAMENTAS', label: 'Ferramentas', icon: 'fa-screwdriver-wrench' },
   ];
 
-  const handleNavClick = (tabName: 'ETAPAS' | 'MATERIAIS' | 'FINANCEIRO' | 'FERRAMENTAS') => {
+  const handleNavClick = (tabName: MainTab) => {
     // This will either update the tab if already on WorkDetail, or navigate to WorkDetail with the tab parameter
     navigate(`/work/${workId}?tab=${tabName}`);
     onTabClick(tabName); // Also update local state
@@ -139,7 +137,7 @@ const BottomNavBar = ({ workId, activeTab, onTabClick }: { workId: string, activ
         {navItems.map(item => (
           <button
             key={item.name}
-            onClick={() => handleNavClick(item.name as 'ETAPAS' | 'MATERIAIS' | 'FINANCEIRO' | 'FERRAMENTAS')}
+            onClick={() => handleNavClick(item.name)}
             className={`flex flex-col items-center justify-center flex-1 text-xs font-bold transition-colors ${
               activeTab === item.name ? 'text-secondary' : 'text-slate-500 dark:text-slate-400 hover:text-primary dark:hover:text-white'
             }`}
@@ -163,7 +161,8 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
   const location = ReactRouter.useLocation();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false); // Sidebar state
   // NEW: State to control WorkDetail's active tab when navigated via BottomNavBar
-  const [activeWorkDetailTab, setActiveWorkDetailTab] = useState('ETAPAS'); 
+  // FIX: Explicitly type activeWorkDetailTab as MainTab
+  const [activeWorkDetailTab, setActiveWorkDetailTab] = useState<MainTab>('ETAPAS'); 
 
   // Log Auth State for debugging
   useEffect(() => {
@@ -179,8 +178,9 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
     // NEW: Update activeWorkDetailTab from URL query params
     const params = new URLSearchParams(location.search);
     const tabFromUrl = params.get('tab');
-    if (tabFromUrl) {
-      setActiveWorkDetailTab(tabFromUrl);
+    // FIX: Validate tabFromUrl before casting and setting state
+    if (tabFromUrl && ['ETAPAS', 'MATERIAIS', 'FINANCEIRO', 'FERRAMENTAS'].includes(tabFromUrl)) {
+      setActiveWorkDetailTab(tabFromUrl as MainTab);
     } else {
       setActiveWorkDetailTab('ETAPAS'); // Default if no tab param
     }
@@ -352,7 +352,8 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
 };
 
 const App = () => {
-  const [activeWorkDetailTab, setActiveWorkDetailTab] = useState('ETAPAS'); // Centralized state for WorkDetail tab
+  // FIX: Explicitly type activeWorkDetailTab as MainTab
+  const [activeWorkDetailTab, setActiveWorkDetailTab] = useState<MainTab>('ETAPAS'); // Centralized state for WorkDetail tab
 
   return (
     <ReactRouter.BrowserRouter>

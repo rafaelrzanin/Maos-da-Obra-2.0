@@ -800,7 +800,8 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
             title: "Etapa Iniciada",
             message: "Não é possível reordenar uma etapa que já foi iniciada.",
             confirmText: "Entendido",
-            onConfirm: async () => {}, // FIX: Added a default onConfirm as ZeModal expects it now.
+            // FIX: Add `_e?: React.FormEvent` to match ZeModalProps.onConfirm signature.
+            onConfirm: async (_e?: React.FormEvent) => {}, 
             onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
             type: "WARNING"
         });
@@ -1235,7 +1236,10 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         message: `Não foi possível deletar o profissional: ${error.message || 'Erro desconhecido'}. Tente novamente.`,
         type: "ERROR",
         confirmText: "Ok",
-        onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
+        // FIX: Add `_e?: React.FormEvent` to match ZeModalProps.onConfirm signature.
+        onConfirm: async (_e?: React.FormEvent) => handleDeleteWorker(workerId, workId!),
+        onCancel: () => setZeModal(p => ({ ...p, isOpen: false })),
+        type: "DANGER"
       }));
     } finally {
       setZeModal(prev => ({ ...prev, isConfirming: false }));
@@ -1331,7 +1335,10 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         message: `Não foi possível deletar o fornecedor: ${error.message || 'Erro desconhecido'}. Tente novamente.`,
         type: "ERROR",
         confirmText: "Ok",
-        onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
+        // FIX: Add `_e?: React.FormEvent` to match ZeModalProps.onConfirm signature.
+        onConfirm: async (_e?: React.FormEvent) => handleDeleteSupplier(supplierId, workId!),
+        onCancel: () => setZeModal(p => ({ ...p, isOpen: false })),
+        type: "DANGER"
       }));
     } finally {
       setZeModal(prev => ({ ...prev, isConfirming: false }));
@@ -1674,7 +1681,8 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                         title: "Confirmar Exclusão",
                         message: `Tem certeza que deseja excluir o profissional "${worker.name}"?`,
                         confirmText: "Sim, Excluir",
-                        onConfirm: async () => handleDeleteWorker(worker.id, workId!),
+                        // FIX: Add `_e?: React.FormEvent` to match ZeModalProps.onConfirm signature.
+                        onConfirm: async (_e?: React.FormEvent) => handleDeleteWorker(worker.id, workId!),
                         onCancel: () => setZeModal(p => ({ ...p, isOpen: false })),
                         type: "DANGER"
                       })} className="p-2 text-red-500 hover:text-red-700" aria-label={`Excluir profissional ${worker.name}`}>
@@ -1711,7 +1719,8 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                         title: "Confirmar Exclusão",
                         message: `Tem certeza que deseja excluir o fornecedor "${supplier.name}"?`,
                         confirmText: "Sim, Excluir",
-                        onConfirm: async () => handleDeleteSupplier(supplier.id, workId!),
+                        // FIX: Add `_e?: React.FormEvent` to match ZeModalProps.onConfirm signature.
+                        onConfirm: async (_e?: React.FormEvent) => handleDeleteSupplier(supplier.id, workId!),
                         onCancel: () => setZeModal(p => ({ ...p, isOpen: false })),
                         type: "DANGER"
                       })} className="p-2 text-red-500 hover:text-red-700" aria-label={`Excluir fornecedor ${supplier.name}`}>
@@ -2909,7 +2918,8 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                               title: "Confirmar Exclusão",
                               message: `Tem certeza que deseja excluir a etapa "${step.name}"? Esta ação não pode ser desfeita e excluirá também materiais e despesas vinculadas a ela.`,
                               confirmText: "Sim, Excluir",
-                              onConfirm: async () => handleDeleteStep(step.id, workId!),
+                              // FIX: Add `_e?: React.FormEvent` to match ZeModalProps.onConfirm signature.
+                              onConfirm: async (_e?: React.FormEvent) => handleDeleteStep(step.id, workId!),
                               onCancel: () => setZeModal(p => ({ ...p, isOpen: false })),
                               type: "DANGER"
                             })}
