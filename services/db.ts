@@ -21,21 +21,7 @@ const _dashboardCache: {
     pushSubscriptions: Record<string, { data: PushSubscriptionInfo[], timestamp: number }>;
     financialHistory: Record<string, { data: FinancialHistoryEntry[], timestamp: number }>;
 } = {
-    works: null,
-    stats: {},
-    summary: {},
-    notifications: null,
-    steps: {},
-    materials: {},
-    expenses: {},
-    workers: {},
-    suppliers: {},
-    photos: {},
-    files: {},
-    contracts: null,
-    checklists: {},
-    pushSubscriptions: {},
-    financialHistory: {},
+    works: null, stats: {}, summary: {}, notifications: null, steps: {}, materials: {}, expenses: {}, workers: {}, suppliers: {}, photos: {}, files: {}, contracts: null, checklists: {}, pushSubscriptions: {}, financialHistory: {},
 };
 
 // --- HELPERS ---
@@ -70,20 +56,6 @@ const parseWorkFromDB = (data: any): Work => ({
     hasLeisureArea: data.has_leisure_area || false
 });
 
-const _getMaterialDerivedStatus = (material: Material, associatedStep: Step | undefined, today: Date): 'PENDING' | 'PARTIAL' | 'DELAYED' | 'COMPLETED' => {
-    if (material.plannedQty === 0 || material.purchasedQty >= material.plannedQty) return 'COMPLETED';
-    let isDelayed = false;
-    if (associatedStep && associatedStep.startDate) {
-        const stepStartDate = new Date(associatedStep.startDate);
-        stepStartDate.setHours(0, 0, 0, 0);
-        const threeDaysFromNow = new Date(today);
-        threeDaysFromNow.setDate(today.getDate() + 3);
-        isDelayed = (stepStartDate <= threeDaysFromNow);
-    }
-    if (isDelayed) return 'DELAYED';
-    return material.purchasedQty > 0 ? 'PARTIAL' : 'PENDING';
-};
-
 const _calculateStepStatus = (dbStep: any): StepStatus => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -94,32 +66,20 @@ const _calculateStepStatus = (dbStep: any): StepStatus => {
     return today.getTime() > stepEndDate.getTime() ? StepStatus.DELAYED : StepStatus.IN_PROGRESS;
 };
 
-const parseStepFromDB = (data: any, allMaterials: Material[], allRawSteps: any[]): Step => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    let finalStatus = _calculateStepStatus(data);
-
-    if (finalStatus !== StepStatus.COMPLETED) {
-        const materialsForThisStep = allMaterials.filter(m => m.stepId === data.id);
-        const hasBlocking = materialsForThisStep.some(m => {
-            const raw = allRawSteps.find(s => s.id === m.stepId);
-            const stepObj: any = { startDate: raw.start_date };
-            return _getMaterialDerivedStatus(m, stepObj, today) !== 'COMPLETED';
-        });
-        if (hasBlocking) finalStatus = StepStatus.PENDING;
-    }
-
-    return {
+const parseStepFromDB = (data: any): Step => {
+    const parsedStep: Step = {
         id: data.id,
         workId: data.work_id,
         name: data.name,
         startDate: data.start_date || null,
         endDate: data.end_date || null,
         realDate: data.real_date || null,
-        status: finalStatus,
+        status: StepStatus.PENDING,
         orderIndex: data.order_index,
         estimatedDurationDays: data.estimated_duration_days || undefined,
     };
+    parsedStep.status = _calculateStepStatus(data);
+    return parsedStep;
 };
 
 const parseMaterialFromDB = (data: any): Material => ({
@@ -178,7 +138,7 @@ const getMaterialCategoriesFromStepName = (stepName: string, work: Work): string
     return categories;
 };
 
-// --- AUTH HANDLERS ---
+// --- AUTH SESSION ---
 let sessionCache: { promise: Promise<User | null>, timestamp: number } | null = null;
 const AUTH_CACHE_DURATION = 5000;
 const pendingProfileRequests: Partial<Record<string, Promise<User | null>>> = {};
@@ -211,10 +171,6 @@ const ensureUserProfile = async (authUser: any): Promise<User | null> => {
     return promise;
 };
 
-const _addFinancialHistoryEntry = async (entry: any) => {
-    try { await supabase.from('financial_history').insert({ ...entry, timestamp: new Date().toISOString() }); } catch (e) { console.error(e); }
-};
-
 export const dbService = {
     // --- AUTH ---
     async getCurrentUser(): Promise<User | null> {
@@ -226,6 +182,31 @@ export const dbService = {
         })();
         sessionCache = { promise: newPromise, timestamp: now };
         return newPromise;
+    },
+
+    async login(email: string, password?: string) {
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password: password || '' });
+        if (error) throw error;
+        sessionCache = null;
+        return await ensureUserProfile(data.user);
+    },
+
+    async signup(name: string, email: string, whatsapp: string, password?: string) {
+        const { data: authData, error: authError } = await supabase.auth.signUp({
+            email,
+            password: password || '123456',
+            options: {
+                data: { name }
+            }
+        }); 
+        if (authError) throw authError;
+        sessionCache = null;
+        return await ensureUserProfile(authData.user);
+    },
+
+    async logout() {
+        await supabase.auth.signOut();
+        sessionCache = null;
     },
 
     async syncSession(): Promise<User | null> {
@@ -240,49 +221,27 @@ export const dbService = {
                 const user = await ensureUserProfile(session.user);
                 callback(user);
             } else {
-                _dashboardCache.works = null;
                 callback(null);
             }
         });
         return () => subscription.unsubscribe();
     },
 
-    async login(email: string, password?: string): Promise<User | null> {
-        const { data, error } = await supabase.auth.signInWithPassword({ email, password: password || '' });
-        if (error) throw error;
-        sessionCache = null;
-        return await ensureUserProfile(data.user);
+    isSubscriptionActive(user: User): boolean {
+        if (user.plan === PlanType.VITALICIO) return true;
+        if (user.isTrial) return false;
+        if (!user.subscriptionExpiresAt) return false;
+        return new Date(user.subscriptionExpiresAt) > new Date();
     },
 
-    async signup(name: string, email: string, whatsapp: string, password?: string): Promise<User | null> {
-        const { data: authData, error: authError } = await supabase.auth.signUp({
-            email,
-            password: password || '123456',
-            options: {
-                data: { name }
-            }
-        }); // 🔥 CORREÇÃO: Chave do objeto options fechada corretamente
-
-        if (authError) throw authError;
-        sessionCache = null;
-        return await ensureUserProfile(authData.user);
-    },
-
-    async logout() {
-        await supabase.auth.signOut();
-        sessionCache = null;
-        _dashboardCache.works = null;
+    async updatePlan(userId: string, plan: PlanType): Promise<void> {
+        await supabase.from('profiles').update({ plan }).eq('id', userId);
     },
 
     // --- WORKS ---
     async getWorks(userId: string): Promise<Work[]> {
-        const now = Date.now();
-        if (_dashboardCache.works && (now - _dashboardCache.works.timestamp < CACHE_TTL)) return _dashboardCache.works.data;
         const { data, error } = await supabase.from('works').select('*').eq('user_id', userId).order('created_at', { ascending: false });
-        if (error) return [];
-        const parsed = (data || []).map(parseWorkFromDB);
-        _dashboardCache.works = { data: parsed, timestamp: now };
-        return parsed;
+        return error ? [] : (data || []).map(parseWorkFromDB);
     },
 
     async getWorkById(workId: string): Promise<Work | null> {
@@ -293,13 +252,8 @@ export const dbService = {
 
     // --- STEPS ---
     async getSteps(workId: string): Promise<Step[]> {
-        const [stepsRes, materialsRes] = await Promise.all([
-            supabase.from('steps').select('*').eq('work_id', workId).order('order_index', { ascending: true }),
-            supabase.from('materials').select('*').eq('work_id', workId),
-        ]);
-        if (stepsRes.error || materialsRes.error) return [];
-        const mats = (materialsRes.data || []).map(parseMaterialFromDB);
-        return (stepsRes.data || []).map(raw => parseStepFromDB(raw, mats, stepsRes.data));
+        const { data } = await supabase.from('steps').select('*').eq('work_id', workId).order('order_index', { ascending: true });
+        return (data || []).map(parseStepFromDB);
     },
 
     async addStep(step: any): Promise<Step> {
@@ -307,7 +261,7 @@ export const dbService = {
             work_id: step.workId, name: step.name, start_date: step.startDate, end_date: step.endDate
         }).select().single();
         if (error) throw error;
-        return parseStepFromDB(data, [], []);
+        return parseStepFromDB(data);
     },
 
     async updateStep(step: Step): Promise<Step> {
@@ -315,7 +269,7 @@ export const dbService = {
             name: step.name, start_date: step.startDate, end_date: step.endDate, real_date: step.realDate
         }).eq('id', step.id).select().single();
         if (error) throw error;
-        return parseStepFromDB(data, [], []);
+        return parseStepFromDB(data);
     },
 
     async deleteStep(stepId: string, workId: string): Promise<void> {
@@ -354,10 +308,6 @@ export const dbService = {
             purchased_qty: curr.purchased_qty + qty, total_cost: curr.total_cost + cost
         }).eq('id', materialId).select().single();
         if (error) throw error;
-        await this.addExpense({
-            workId: curr.work_id, description: `Compra ${name}`, amount: cost, quantity: qty,
-            date: new Date().toISOString().split('T')[0], category: ExpenseCategory.MATERIAL, relatedMaterialId: materialId
-        });
         return parseMaterialFromDB(data);
     },
 
@@ -377,10 +327,15 @@ export const dbService = {
             work_id: expense.workId, description: expense.description, amount: expense.amount, category: expense.category, date: expense.date
         }).select().single();
         if (error) throw error;
-        await supabase.from('financial_installments').insert({
-            expense_id: newExpense.id, amount: expense.amount, status: InstallmentStatus.PENDING
-        });
         return parseExpenseFromDB(newExpense);
+    },
+
+    async updateExpense(expense: any): Promise<Expense> {
+        const { data, error } = await supabase.from('expenses').update({
+            description: expense.description, amount: expense.amount
+        }).eq('id', expense.id).select().single();
+        if (error) throw error;
+        return parseExpenseFromDB(data);
     },
 
     async deleteExpense(expenseId: string): Promise<void> {
@@ -511,6 +466,11 @@ export const dbService = {
             }
         }
         if (toInsert.length > 0) await supabase.from('materials').insert(toInsert);
+    },
+
+    async getNotifications(userId: string): Promise<DBNotification[]> {
+        const { data } = await supabase.from('notifications').select('*').eq('user_id', userId).eq('read', false);
+        return (data || []).map(parseNotificationFromDB);
     },
 
     async savePushSubscription(userId: string, sub: any): Promise<void> {
