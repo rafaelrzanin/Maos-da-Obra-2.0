@@ -77,51 +77,6 @@ const parseWorkFromDB = (data: any): Work => ({
     hasLeisureArea: data.has_leisure_area || false
 });
 
-// NEW: Centralized function to calculate StepStatus
-const _calculateStepStatus = (dbStep: any): StepStatus => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0); // Normalize to local midnight
-
-    // If real_date is set, it's completed
-    if (dbStep.real_date) {
-        return StepStatus.COMPLETED;
-    }
-    // If start_date is not set, it's not started
-    if (!dbStep.start_date) {
-        return StepStatus.NOT_STARTED;
-    }
-
-    const stepEndDate = new Date(dbStep.end_date);
-    stepEndDate.setHours(0, 0, 0, 0); // Normalize to local midnight
-
-    // If start_date is set but not completed:
-    // If today is past the planned end_date, it's delayed
-    if (today.getTime() > stepEndDate.getTime()) {
-        return StepStatus.DELAYED;
-    }
-    // Otherwise, it's in progress
-    return StepStatus.IN_PROGRESS;
-};
-
-const parseStepFromDB = (data: any): Step => {
-    // 🔥 CRITICAL: Removed parsing of `status` and `is_delayed` as they are now derived
-    const parsedStep: Step = {
-        id: data.id,
-        workId: data.work_id,
-        name: data.name,
-        startDate: data.start_date || null, // Allow null
-        endDate: data.end_date || null,     // Allow null
-        realDate: data.real_date || null,   // Allow null
-        // status is assigned by _calculateStepStatus after parsing
-        status: StepStatus.NOT_STARTED, // Placeholder, will be overwritten by _calculateStepStatus
-        // isDelayed: data.is_delayed, // REMOVED
-        orderIndex: data.order_index, // NEW: Parse order_index
-        estimatedDurationDays: data.estimated_duration_days || undefined, // NEW: Parse estimated_duration_days
-    };
-    parsedStep.status = _calculateStepStatus(data); // Assign the derived status
-    return parsedStep;
-};
-
 const parseMaterialFromDB = (data: any): Material => ({
     id: data.id,
     workId: data.work_id,
@@ -135,6 +90,111 @@ const parseMaterialFromDB = (data: any): Material => ({
     category: data.category,
     totalCost: Number(data.total_cost || 0) // NEW: Parse total_cost
 });
+
+// NEW: Helper para obter o status derivado de um material
+const _getMaterialDerivedStatus = (material: Material, associatedStep: Step | undefined, today: Date): 'PENDING' | 'PARTIAL' | 'DELAYED' | 'COMPLETED' => {
+    if (material.plannedQty === 0) {
+        return 'COMPLETED'; // Se nada foi planejado, é considerado "completo" para fins de bloqueio
+    }
+    if (material.purchasedQty >= material.plannedQty) {
+        return 'COMPLETED';
+    }
+
+    // Material não está completo. Verificar atraso.
+    let isDelayed = false;
+    if (associatedStep && associatedStep.startDate) {
+        const stepStartDate = new Date(associatedStep.startDate);
+        stepStartDate.setHours(0, 0, 0, 0);
+        
+        const threeDaysFromNow = new Date(today);
+        threeDaysFromNow.setDate(today.getDate() + 3);
+        threeDaysFromNow.setHours(0, 0, 0, 0);
+
+        // Material está atrasado se a etapa associada está para começar (em até 3 dias) ou já começou
+        // e o material ainda não foi totalmente comprado.
+        isDelayed = (stepStartDate <= threeDaysFromNow);
+    }
+
+    if (isDelayed) {
+        return 'DELAYED';
+    } else if (material.purchasedQty > 0) {
+        return 'PARTIAL';
+    } else {
+        return 'PENDING';
+    }
+};
+
+// NEW: Helper para calcular o status do Step baseado SOMENTE em datas
+const _calculateDateBasedStepStatus = (step: Pick<Step, 'startDate' | 'endDate' | 'realDate'>): StepStatus => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (step.realDate) {
+        return StepStatus.COMPLETED;
+    }
+    if (!step.startDate) {
+        return StepStatus.PENDING;
+    }
+    const stepEndDate = new Date(step.endDate as string);
+    stepEndDate.setHours(0, 0, 0, 0);
+    if (today.getTime() > stepEndDate.getTime()) {
+        return StepStatus.DELAYED;
+    }
+    return StepStatus.IN_PROGRESS;
+};
+
+
+// MODIFICADO: parseStepFromDB agora incorpora a lógica de materiais
+const parseStepFromDB = (rawStepData: any, allMaterials: Material[], allRawSteps: any[]): Step => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    let finalStatus = _calculateDateBasedStepStatus({ // Começa com o status baseado em datas
+        startDate: rawStepData.start_date,
+        endDate: rawStepData.end_date,
+        realDate: rawStepData.real_date,
+    });
+
+    // Se a etapa ainda não foi CONCLUIDA por realDate, verifica se materiais estão bloqueando
+    if (finalStatus !== StepStatus.COMPLETED) {
+        const materialsForThisStep = allMaterials.filter(m => m.stepId === rawStepData.id);
+        const hasBlockingMaterials = materialsForThisStep.length > 0 && materialsForThisStep.some(m => {
+            const associatedStepRaw = allRawSteps.find(s => s.id === m.stepId);
+            // Criar um objeto Step temporário para a helper de material
+            const associatedStep: Step = { 
+                id: associatedStepRaw.id, 
+                workId: associatedStepRaw.work_id, 
+                name: associatedStepRaw.name, 
+                startDate: associatedStepRaw.start_date, 
+                endDate: associatedStepRaw.end_date, 
+                realDate: associatedStepRaw.real_date,
+                status: StepStatus.PENDING, // Placeholder
+                orderIndex: associatedStepRaw.order_index,
+            };
+            const materialStatus = _getMaterialDerivedStatus(m, associatedStep, today);
+            return materialStatus !== 'COMPLETED'; // Qualquer material não-completo bloqueia
+        });
+
+        if (hasBlockingMaterials) {
+            // Se materiais estão bloqueando, a etapa não pode estar Em Andamento ou Atrasada.
+            // Ela volta para PENDENTE para indicar que está aguardando recursos.
+            finalStatus = StepStatus.PENDING; 
+        }
+    }
+
+    return {
+        id: rawStepData.id,
+        workId: rawStepData.work_id,
+        name: rawStepData.name,
+        startDate: rawStepData.start_date || null,
+        endDate: rawStepData.end_date || null,
+        realDate: rawStepData.real_date || null,
+        status: finalStatus,
+        orderIndex: rawStepData.order_index,
+        estimatedDurationDays: rawStepData.estimated_duration_days || undefined,
+    };
+};
+
 
 // MODIFICADO: parseExpenseFromDB agora calcula paidAmount e status dinamicamente
 const parseExpenseFromDB = (data: any): Expense => {
@@ -158,7 +218,7 @@ const parseExpenseFromDB = (data: any): Expense => {
         workId: data.work_id,
         description: data.description,
         amount: Number(data.amount || 0),
-        paidAmount: paidAmount, // Derivado
+        paidAmount: paidAmount, // Propriedade DERIVADA
         quantity: Number(data.quantity || 0),
         date: data.date,
         category: data.category,
@@ -167,7 +227,7 @@ const parseExpenseFromDB = (data: any): Expense => {
         workerId: data.worker_id,
         supplierId: data.supplier_id,
         totalAgreed: data.total_agreed ? Number(data.total_agreed) : undefined,
-        status: status, // Derivado
+        status: status, // Propriedade DERIVADA
     };
 };
 
@@ -1036,7 +1096,7 @@ export const dbService = {
         }
 
         // Regenerate materials based on the newly created steps
-        await dbService.regenerateMaterials(parsedWork, createdSteps.map(parseStepFromDB)); // Pass parsed steps
+        await dbService.regenerateMaterials(parsedWork, createdSteps.map(rawStep => parseStepFromDB(rawStep, [], []))); // Pass empty for materials/steps as they are not yet fully loaded
     }
     
     return parsedWork; // Ensure this is always returned
@@ -1138,19 +1198,28 @@ export const dbService = {
   },
 
   // --- STEPS (ETAPAS) ---
+  // MODIFICADO: getSteps agora busca materiais para derivar o status do step
   async getSteps(workId: string): Promise<Step[]> {
     const now = Date.now();
+    // Cache invalidation for steps now depends on materials too, so clear materials cache on step operations
     if (_dashboardCache.steps[workId] && (now - _dashboardCache.steps[workId].timestamp < CACHE_TTL)) {
-      return _dashboardCache.steps[workId].data;
+        return _dashboardCache.steps[workId].data;
     }
 
-    const { data, error } = await supabase.from('steps').select('*').eq('work_id', workId).order('order_index', { ascending: true });
-    if (error) {
-      console.error(`Error fetching steps for work ${workId}:`, error);
-      return [];
-    }
-    // 🔥 CRITICAL: Map to parsed objects, which now include derived status
-    const parsed = (data || []).map(parseStepFromDB);
+    const [stepsRes, materialsRes] = await Promise.all([
+        supabase.from('steps').select('*').eq('work_id', workId).order('order_index', { ascending: true }),
+        supabase.from('materials').select('*').eq('work_id', workId),
+    ]);
+
+    if (stepsRes.error) { console.error(`Error fetching steps for work ${workId}:`, stepsRes.error); return []; }
+    if (materialsRes.error) { console.error(`Error fetching materials for work ${workId}:`, materialsRes.error); return []; }
+
+    const allRawSteps = stepsRes.data || [];
+    const allParsedMaterials = (materialsRes.data || []).map(parseMaterialFromDB);
+    
+    // Agora, parseia cada raw step, passando todos os materiais parsed e todos os raw steps para contexto
+    const parsed = allRawSteps.map(rawStep => parseStepFromDB(rawStep, allParsedMaterials, allRawSteps));
+    
     _dashboardCache.steps[workId] = { data: parsed, timestamp: now };
     return parsed;
   },
@@ -1186,7 +1255,9 @@ export const dbService = {
     _dashboardCache.steps[step.workId] = null; // Invalidate cache
     _dashboardCache.summary[step.workId] = null; // Summary might change
     _dashboardCache.stats[step.workId] = null; // Stats might change
-    return parseStepFromDB(data);
+    // Refetching all steps will ensure correct material derivation
+    const updatedSteps = await dbService.getSteps(step.workId); 
+    return updatedSteps.find(s => s.id === data.id)!;
   },
 
   async updateStep(step: Step): Promise<Step> {
@@ -1205,7 +1276,7 @@ export const dbService = {
         if (currentDbStep.order_index !== step.orderIndex) {
           throw new Error(`Não é possível alterar a ordem da etapa "${currentDbStep.name}" após o início.`);
         }
-        if (currentDbStep.startDate !== null && currentDbStep.startDate !== step.startDate) { // Only block if it was already set
+        if (currentDbStep.start_date !== null && currentDbStep.start_date !== step.startDate) { // Only block if it was already set
             throw new Error(`Não é possível alterar a data de início da etapa "${currentDbStep.name}" após ser definida.`);
         }
     }
@@ -1226,7 +1297,54 @@ export const dbService = {
       throw new Error("A data de conclusão não pode ser anterior à data de início.");
     }
 
+    // NEW: CRITICAL MATERIAL BLOCKING LOGIC for setting realDate
+    if (step.realDate && !currentDbStep.real_date) { // If realDate is being set (transitioning to COMPLETED)
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        // Fetch current materials for the work to check blocking status
+        const { data: allMaterialsRaw, error: materialFetchError } = await supabase.from('materials').select('*').eq('work_id', step.workId);
+        if (materialFetchError) {
+            console.error("Erro ao buscar materiais para validação da etapa:", materialFetchError);
+            throw new Error("Erro ao validar materiais para conclusão da etapa.");
+        }
+        const allParsedMaterials = (allMaterialsRaw || []).map(parseMaterialFromDB);
+
+        // Fetch current raw steps to provide context for material derivation (e.g., associated step's start date)
+        const { data: allStepsRaw, error: stepFetchError } = await supabase.from('steps').select('*').eq('work_id', step.workId);
+        if (stepFetchError) {
+            console.error("Erro ao buscar etapas para validação da etapa:", stepFetchError);
+            throw new Error("Erro ao validar etapas para conclusão da etapa.");
+        }
+        // interimSteps are needed for _getMaterialDerivedStatus which takes a Step object
+        const allInterimSteps: Step[] = (allStepsRaw || []).map(rawStep => ({
+            id: rawStep.id, 
+            workId: rawStep.work_id, 
+            name: rawStep.name, 
+            startDate: rawStep.start_date, 
+            endDate: rawStep.end_date, 
+            realDate: rawStep.real_date,
+            status: StepStatus.PENDING, // Placeholder
+            orderIndex: rawStep.order_index,
+        }));
+
+
+        const materialsForThisStep = allParsedMaterials.filter(m => m.stepId === step.id);
+        const hasBlockingMaterials = materialsForThisStep.length > 0 && materialsForThisStep.some(m => {
+            // Find the associated step *from the current state* (or rawSteps) for material's 3-day rule.
+            const associatedStep = allInterimSteps.find(s => s.id === m.stepId); 
+            const materialStatus = _getMaterialDerivedStatus(m, associatedStep, today);
+            return materialStatus !== 'COMPLETED'; // Any non-completed material blocks
+        });
+
+        if (hasBlockingMaterials) {
+            throw new Error("Não é possível concluir a etapa. Existem materiais pendentes ou não comprados associados a esta etapa.");
+        }
+    }
+
+
     // 4. Conclusão condicionada a checklist (se realDate está sendo definido)
+    // Este bloco agora vem DEPOIS da validação de materiais, mantendo a prioridade correta
     if (step.realDate && !currentDbStep.real_date) { // If realDate is being set (transitioning to COMPLETED)
       const { data: checklists, error: checklistError } = await supabase
         .from('checklists')
@@ -1267,7 +1385,9 @@ export const dbService = {
     _dashboardCache.steps[step.workId] = null; // Invalidate cache
     _dashboardCache.summary[step.workId] = null; // Summary might change
     _dashboardCache.stats[step.workId] = null; // Stats might change
-    return parseStepFromDB(data);
+    // Refetch all steps to ensure derived status is correct
+    const updatedSteps = await dbService.getSteps(step.workId); 
+    return updatedSteps.find(s => s.id === data.id)!;
   },
 
   async deleteStep(stepId: string, workId: string): Promise<void> {
@@ -1286,7 +1406,7 @@ export const dbService = {
     if (deleteStepError) throw deleteStepError;
 
     _dashboardCache.steps[workId] = null; // Invalidate steps cache
-    _dashboardCache.materials[workId] = null; // Materials related to this step
+    _dashboardCache.materials[workId] = null; // Materials related to this step (will be reloaded by getSteps/getMaterials)
     _dashboardCache.expenses[workId] = null; // Expenses related to this step
     _dashboardCache.summary[workId] = null; // Summary might change
     _dashboardCache.stats[workId] = null; // Stats might change
@@ -1325,6 +1445,7 @@ export const dbService = {
     const { data, error } = await supabase.from('materials').insert(dbMaterial).select().single();
     if (error) throw error;
     _dashboardCache.materials[material.workId] = null; // Invalidate cache
+    _dashboardCache.steps[material.workId] = null; // Invalidate steps cache, as material status can affect step status
     _dashboardCache.summary[material.workId] = null; // Summary might change
     return parseMaterialFromDB(data);
   },
@@ -1371,6 +1492,7 @@ export const dbService = {
     const { data, error } = await supabase.from('materials').update(dbMaterial).eq('id', material.id).select().single();
     if (error) throw error;
     _dashboardCache.materials[material.workId] = null; // Invalidate cache
+    _dashboardCache.steps[material.workId] = null; // Invalidate steps cache, as material status can affect step status
     _dashboardCache.summary[material.workId] = null; // Summary might change
     _dashboardCache.expenses[material.workId] = null; // Expenses might be related
     return parseMaterialFromDB(data);
@@ -1417,6 +1539,7 @@ export const dbService = {
     if (deleteMaterialError) throw deleteMaterialError;
 
     _dashboardCache.materials[workId] = null; // Invalidate materials cache
+    _dashboardCache.steps[workId] = null; // Invalidate steps cache, as material status can affect step status
     _dashboardCache.expenses[workId] = null; // Invalidate expenses cache (due to potential deletions)
     _dashboardCache.summary[workId] = null; // Summary might change
   },
@@ -1481,6 +1604,7 @@ export const dbService = {
 
 
     _dashboardCache.materials[currentMaterial.work_id] = null; // Invalidate materials cache
+    _dashboardCache.steps[currentMaterial.work_id] = null; // Invalidate steps cache, as material status can affect step status
     _dashboardCache.expenses[currentMaterial.work_id] = null; // Invalidate expenses cache
     _dashboardCache.summary[currentMaterial.work_id] = null; // Summary might change
     return parseMaterialFromDB(updatedMaterialData);
@@ -1759,6 +1883,7 @@ export const dbService = {
 
     _dashboardCache.expenses[workId] = null; // Invalidate expenses cache
     _dashboardCache.materials[workId] = null; // Invalidate materials cache (if related material was updated)
+    _dashboardCache.steps[workId] = null; // Invalidate steps cache, as material status can affect step status
     _dashboardCache.summary[workId] = null; // Summary might change
     _dashboardCache.stats[workId] = null; // Stats might change due to expense deletion
   },

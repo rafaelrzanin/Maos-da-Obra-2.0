@@ -1,10 +1,11 @@
+
 import React, { useState, useEffect, Suspense, lazy, Fragment } from 'react';
 import * as ReactRouter from 'react-router-dom';
 import { PlanType } from './types.ts';
 import { AuthProvider, ThemeProvider, useAuth, useTheme } from './contexts/AuthContext.tsx';
 // NEW: Import WorkDetailProps for type casting
 // FIX: WorkDetail is now default exported, so its type should be imported separately if needed.
-import type { WorkDetailProps, MainTab } from './pages/WorkDetail.tsx'; 
+import { type WorkDetailProps, type MainTab } from './pages/WorkDetail.tsx'; 
 
 // --- IMPORTAÇÕES ESTÁTICAS (Críticas para velocidade inicial) ---
 import Login from './pages/Login.tsx'; // Keep Login static as it's the entry point for unauthenticated users
@@ -14,7 +15,7 @@ const Dashboard = lazy(() => import('./pages/Dashboard.tsx'));
 const CreateWork = lazy(() => import('./pages/CreateWork.tsx'));
 // MODIFICADO: WorkDetail agora aceitará `activeTab` e `onTabChange` como props
 // FIX: Correctly type the lazy-loaded WorkDetail component
-const WorkDetail = lazy(() => import('./pages/WorkDetail.tsx'));
+const WorkDetail = lazy(() => import('./pages/WorkDetail.tsx') as Promise<{ default: React.ComponentType<WorkDetailProps> }>);
 const Settings = lazy(() => import('./pages/Settings.tsx'));
 const Profile = lazy(() => import('./pages/Profile.tsx'));
 const VideoTutorials = lazy(() => import('./pages/VideoTutorials.tsx'));

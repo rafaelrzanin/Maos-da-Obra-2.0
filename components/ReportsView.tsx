@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.tsx';
@@ -96,10 +97,11 @@ const ReportsView = () => {
   const stepsOverview = useMemo(() => {
     const completed = steps.filter(s => s.status === StepStatus.COMPLETED).length;
     const inProgress = steps.filter(s => s.status === StepStatus.IN_PROGRESS).length;
-    const notStarted = steps.filter(s => s.status === StepStatus.NOT_STARTED).length;
+    // FIX: Use StepStatus.PENDING instead of StepStatus.NOT_STARTED
+    const pending = steps.filter(s => s.status === StepStatus.PENDING).length; 
     // FIX: Use StepStatus.DELAYED for delayed steps
     const delayed = steps.filter(s => s.status === StepStatus.DELAYED).length;
-    return { total: steps.length, completed, inProgress, notStarted, delayed };
+    return { total: steps.length, completed, inProgress, pending, delayed };
   }, [steps]);
 
   const loadReportsData = useCallback(async () => {
@@ -228,7 +230,7 @@ const ReportsView = () => {
                           'bg-slate-100 text-slate-700 dark:bg-slate-700/30 dark:text-slate-400'
                         }`}>
                           {/* FIX: Check step.status directly */}
-                          {step.status === StepStatus.DELAYED ? 'ATRASADA' : step.status === StepStatus.COMPLETED ? 'CONCLUÍDA' : step.status === StepStatus.IN_PROGRESS ? 'EM ANDAMENTO' : 'NÃO INICIADA'}
+                          {step.status === StepStatus.DELAYED ? 'ATRASADA' : step.status === StepStatus.COMPLETED ? 'CONCLUÍDA' : step.status === StepStatus.IN_PROGRESS ? 'EM ANDAMENTO' : 'PENDENTE'}
                         </span>
                       </div>
                     ))

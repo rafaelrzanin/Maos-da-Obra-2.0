@@ -132,14 +132,13 @@ const SegmentedProgressBar = ({ steps }: { steps: Step[] }) => {
   const completed = steps.filter(s => s.status === StepStatus.COMPLETED);
   const inProgress = steps.filter(s => s.status === StepStatus.IN_PROGRESS);
   const delayed = steps.filter(s => s.status === StepStatus.DELAYED);
-  const notStarted = steps.filter(s => s.status === StepStatus.NOT_STARTED);
+  const pending = steps.filter(s => s.status === StepStatus.PENDING); // RENOMEADO: NotStarted para Pending
 
   // Calculate percentages based on the new, mutually exclusive categories
   const completedPct = (completed.length / totalSteps) * 100;
   const inProgressPct = (inProgress.length / totalSteps) * 100;
   const delayedPct = (delayed.length / totalSteps) * 100;
-  const notStartedPct = (notStarted.length / totalSteps) * 100;
-
+  const pendingPct = (pending.length / totalSteps) * 100; // RENOMEADO
 
   return (
     <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-3 mb-2 flex overflow-hidden">
@@ -170,13 +169,13 @@ const SegmentedProgressBar = ({ steps }: { steps: Step[] }) => {
           aria-label={`${delayed.length} etapas atrasadas`}
         ></div>
       )}
-      {/* Not Started segment */}
-      {notStartedPct > 0 && (
+      {/* Pending segment */}
+      {pendingPct > 0 && (
         <div 
-          className="h-full bg-slate-400 dark:bg-slate-600"
-          style={{ width: `${notStartedPct}%` }} 
-          title={`${notStarted.length} Pendente(s)`}
-          aria-label={`${notStarted.length} etapas pendentes`}
+          className="h-full bg-slate-400 dark:bg-slate-600" // RENOMEADO
+          style={{ width: `${pendingPct}%` }} 
+          title={`${pending.length} Pendente(s)`} // RENOMEADO
+          aria-label={`${pending.length} etapas pendentes`} // RENOMEADO
         ></div>
       )}
     </div>
@@ -273,7 +272,7 @@ const Dashboard = () => {
           return;
       }
 
-      // 🔥 CRITICAL: Use the derived status for counting
+      // 🔥 CRITICAL: Use the derived status directly
       const totalSteps = fetchedSteps.length;
       const completedSteps = fetchedSteps.filter(s => s.status === StepStatus.COMPLETED).length;
       const delayedStepsCount = fetchedSteps.filter(s => s.status === StepStatus.DELAYED).length;

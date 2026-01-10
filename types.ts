@@ -59,7 +59,7 @@ export interface Work {
 }
 
 export enum StepStatus {
-  NOT_STARTED = 'NAO_INICIADO',
+  PENDING = 'PENDENTE', // RENOMEADO: De NOT_STARTED para PENDING
   IN_PROGRESS = 'EM_ANDAMENTO',
   COMPLETED = 'CONCLUIDO',
   DELAYED = 'ATRASADO', // NEW: Added DELAYED status
