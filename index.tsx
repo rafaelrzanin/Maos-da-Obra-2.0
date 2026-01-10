@@ -1,7 +1,8 @@
+
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App.tsx';
-import './index.css';
+import './index.css'; // NOVO: Importa o arquivo de estilos principal
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
