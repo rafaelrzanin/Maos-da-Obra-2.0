@@ -1309,7 +1309,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
     }
   };
 
-  const handleDeleteSupplier = async (supplierId: string) => {
+  const handleDeleteSupplier = async (supplierId: string, workId: string): Promise<void> => {
     if (!workId) return;
     setZeModal(prev => ({ ...prev, isConfirming: true }));
     try {
@@ -2606,7 +2606,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                     icon="fa-arrows-rotate"
                     title="Regerar Materiais"
                     description="Atualize lista de materiais baseada no projeto."
-                    onClick={() => ( // Added parentheses for implicit return of an expression
+                    onClick={() =>
                       setZeModal({
                         isOpen: true,
                         title: "Regerar Materiais",
@@ -2625,7 +2625,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                         onCancel: () => setZeModal(p => ({ ...p, isOpen: false })),
                         type: "DANGER"
                       })
-                    )}
+                    }
                   />
                 </div>
               </div>
@@ -2831,7 +2831,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                             title: "Confirmar Exclusão",
                             message: `Tem certeza que deseja excluir o fornecedor "${supplier.name}"? Esta ação é irreversível.`,
                             confirmText: "Sim, Excluir",
-                            onConfirm: async () => handleDeleteSupplier(supplier.id),
+                            onConfirm: async () => handleDeleteSupplier(supplier.id, workId),
                             onCancel: () => setZeModal(p => ({ ...p, isOpen: false })),
                             type: "DANGER"
                           })}
