@@ -69,9 +69,9 @@ export interface Step {
   id: string;
   workId: string;
   name: string;
-  startDate: string; 
-  endDate: string;   
-  realDate?: string;
+  startDate: string | null; // Corrected to allow null
+  endDate: string | null;   // Corrected to allow null
+  realDate: string | null;  // Corrected to allow null (was optional)
   status: StepStatus; // Now a derived field, not directly from DB
   // isDelayed: boolean; // REMOVED: Replaced by DELAYED in StepStatus
   orderIndex: number; // NEW: Added orderIndex for step reordering

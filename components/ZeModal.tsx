@@ -1,4 +1,5 @@
 
+
 import React from 'react';
 import { ZE_AVATAR, ZE_AVATAR_FALLBACK } from '../services/standards.ts';
 
@@ -11,7 +12,8 @@ export interface ZeModalProps {
   type?: 'DANGER' | 'INFO' | 'SUCCESS' | 'WARNING' | 'ERROR';
   // Fix: Allow onConfirm to accept an optional React.FormEvent
   onConfirm?: (e?: React.FormEvent) => Promise<void>; 
-  onCancel: () => void; // Still required as the primary way to close
+  // FIX: Allow onCancel to accept an optional event argument to match onClick signature
+  onCancel: (e?: React.FormEvent) => void; 
   isConfirming?: boolean; // NEW: To disable confirm button during async ops
   // Add children prop explicitly
   children?: React.ReactNode; 
@@ -26,7 +28,8 @@ export const ZeModal: React.FC<ZeModalProps> = ({
   type = 'INFO', // Default to INFO
   // Fix: Changed default onConfirm to accept an optional event argument
   onConfirm = async (_e?: React.FormEvent) => {}, 
-  onCancel,
+  // FIX: Changed default onCancel to accept an optional event argument
+  onCancel = (_e?: React.FormEvent) => {},
   isConfirming = false, // NEW: Default to false
   children // Destructure children
 }) => {
@@ -116,7 +119,7 @@ export const ZeModal: React.FC<ZeModalProps> = ({
                 </button>
                 {!isSimpleAlert && ( // Only show cancel button if it's not a simple alert
                     <button 
-                        onClick={onCancel} 
+                        onClick={(e) => onCancel(e)} // FIX: Pass event to onCancel
                         disabled={isConfirming} // NEW: Disable cancel button too
                         className="w-full py-3 rounded-xl text-slate-500 font-bold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
                     >

@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.tsx';
@@ -98,7 +99,8 @@ const ReportsView = () => {
     const completed = steps.filter(s => s.status === StepStatus.COMPLETED).length;
     const inProgress = steps.filter(s => s.status === StepStatus.IN_PROGRESS).length;
     const notStarted = steps.filter(s => s.status === StepStatus.NOT_STARTED).length;
-    const delayed = steps.filter(s => s.status !== StepStatus.COMPLETED && new Date(s.endDate) < new Date()).length;
+    // FIX: Use StepStatus.DELAYED for delayed steps
+    const delayed = steps.filter(s => s.status === StepStatus.DELAYED).length;
     return { total: steps.length, completed, inProgress, notStarted, delayed };
   }, [steps]);
 
@@ -223,9 +225,12 @@ const ReportsView = () => {
                         <span className={`text-xs font-bold px-2 py-1 rounded-full ${
                           step.status === StepStatus.COMPLETED ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' :
                           step.status === StepStatus.IN_PROGRESS ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' :
+                          // FIX: Use StepStatus.DELAYED for delayed steps
+                          step.status === StepStatus.DELAYED ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' :
                           'bg-slate-100 text-slate-700 dark:bg-slate-700/30 dark:text-slate-400'
                         }`}>
-                          {step.isDelayed ? 'ATRASADA' : step.status === StepStatus.COMPLETED ? 'CONCLUÍDA' : step.status === StepStatus.IN_PROGRESS ? 'EM ANDAMENTO' : 'NÃO INICIADA'}
+                          {/* FIX: Check step.status directly */}
+                          {step.status === StepStatus.DELAYED ? 'ATRASADA' : step.status === StepStatus.COMPLETED ? 'CONCLUÍDA' : step.status === StepStatus.IN_PROGRESS ? 'EM ANDAMENTO' : 'NÃO INICIADA'}
                         </span>
                       </div>
                     ))
@@ -482,4 +487,3 @@ const ReportsView = () => {
 };
 
 export default ReportsView;
-    

@@ -5,7 +5,8 @@ import * as ReactRouter from 'react-router-dom';
 import { PlanType } from './types.ts';
 import { AuthProvider, ThemeProvider, useAuth, useTheme } from './contexts/AuthContext.tsx';
 // NEW: Import WorkDetailProps for type casting
-import { WorkDetailProps } from './pages/WorkDetail.tsx'; 
+// FIX: WorkDetail is now default exported, so its type should be imported separately if needed.
+import type { WorkDetailProps } from './pages/WorkDetail.tsx'; 
 
 // --- IMPORTAÇÕES ESTÁTICAS (Críticas para velocidade inicial) ---
 import Login from './pages/Login.tsx'; // Keep Login static as it's the entry point for unauthenticated users
