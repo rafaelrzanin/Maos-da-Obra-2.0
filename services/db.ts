@@ -627,7 +627,7 @@ export const dbService = {
         email,
         password: password || '123456',
         options: { // FIX: Added `options` wrapper
-            data: { name }
+            data: { name: name } // FIX: Changed `data: { name }` to `data: { name: name }`
         }
     });
 
