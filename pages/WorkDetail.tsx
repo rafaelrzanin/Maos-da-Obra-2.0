@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import * as ReactRouter from 'react-router-dom';
 import * as XLSX from 'xlsx'; // Keep XLSX import, as reports might use it
@@ -2601,31 +2602,10 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                     isLocked={!hasAiAccess} // Locked if no AI access
                     requiresVitalicio={!isAiTrialActive} // Only show vitalicio tag if not on trial
                   />
-                  <ToolCard
-                    icon="fa-arrows-rotate"
-                    title="Regerar Materiais"
-                    description="Atualize lista de materiais baseada no projeto."
-                    onClick={() =>
-                      setZeModal({
-                        isOpen: true,
-                        title: "Regerar Materiais",
-                        message: "Tem certeza que deseja regerar a lista de materiais? Isso removerá a lista atual e criará uma nova baseada nas características da obra e etapas existentes. Esta ação é irreversível.",
-                        confirmText: "Sim, Regerar",
-                        onConfirm: async () => {
-                          try {
-                            await dbService.regenerateMaterials(work!, steps); // Assure work is not null
-                            await loadWorkData();
-                            setZeModal(prev => ({ ...prev, isOpen: false }));
-                          } catch (error: any) {
-                            console.error("Erro ao regerar materiais:", error);
-                            setZeModal(prev => ({ ...prev, title: "Erro", message: `Erro ao regerar materiais: ${error.message}`, type: "ERROR", confirmText: "Ok" }));
-                          }
-                        },
-                        onCancel: () => setZeModal(p => ({ ...p, isOpen: false })),
-                        type: "DANGER"
-                      })
-                    }
-                  />
+                  {/* REMOVIDO: ToolCard "Regerar Materiais" */}
+                  <div className="p-6 text-center text-slate-500">
+                    Conteúdo da obra em carregamento.
+                  </div>
                 </div>
               </div>
             </>
@@ -3202,7 +3182,6 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                 setShowContractContentModal(false);
                 setCopyContractSuccess(false);
                 setSelectedContractContent('');
-                // Fix: Corrected typo from `fetchSelectedContractTitle` to `setSelectedContractTitle`
                 setSelectedContractTitle('');
               }}
               isConfirming={false}
