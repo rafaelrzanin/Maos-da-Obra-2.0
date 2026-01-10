@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import * as ReactRouter from 'react-router-dom';
 import * as XLSX from 'xlsx'; // Keep XLSX import, as reports might use it
@@ -470,6 +468,15 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
     // 🔥 MODIFICADO: Excluir despesas de material do total gasto para o cálculo de progresso financeiro principal
     // Agora o expense.paidAmount é derivado, o que o torna a soma das parcelas pagas.
     return expenses.filter(expense => expense.category !== ExpenseCategory.MATERIAL).reduce((sum, expense) => sum + (expense.paidAmount || 0), 0);
+  }, [expenses]);
+
+  const totalOutstandingExpenses = useMemo(() => {
+    // Sum of (totalAgreed - paidAmount) for all non-completed expenses
+    return expenses.reduce((sum, expense) => {
+      const agreed = expense.totalAgreed !== undefined && expense.totalAgreed !== null ? expense.totalAgreed : expense.amount;
+      const paid = expense.paidAmount || 0;
+      return sum + Math.max(0, agreed - paid);
+    }, 0);
   }, [expenses]);
 
   const budgetUsage = useMemo(() =>
@@ -3101,7 +3108,8 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                                 <button
                                   onClick={() => {
                                     setPaymentExpenseData(expense);
-                                    setPaymentAmount(''); // Clear previous amount
+                                    setPaymentAmount(String(Math.max(0, (expense.totalAgreed || expense.amount) - (expense.paidAmount || 0)))); // Pre-fill with remaining amount
+                                    setNewPaymentDate(new Date().toISOString().split('T')[0]); // Default to today
                                     setShowAddPaymentModal(true);
                                   }}
                                   className="px-3 py-2 bg-green-500 text-white text-xs font-bold rounded-xl hover:bg-green-600 transition-colors"
