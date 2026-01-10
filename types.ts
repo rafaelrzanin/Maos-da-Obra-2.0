@@ -1,4 +1,5 @@
 
+
 export enum PlanType {
   MENSAL = 'MENSAL',
   SEMESTRAL = 'SEMESTRAL',
@@ -61,6 +62,7 @@ export enum StepStatus {
   NOT_STARTED = 'NAO_INICIADO',
   IN_PROGRESS = 'EM_ANDAMENTO',
   COMPLETED = 'CONCLUIDO',
+  DELAYED = 'ATRASADO', // NEW: Added DELAYED status
 }
 
 export interface Step {
@@ -70,9 +72,10 @@ export interface Step {
   startDate: string; 
   endDate: string;   
   realDate?: string;
-  status: StepStatus;
-  isDelayed: boolean;
+  status: StepStatus; // Now a derived field, not directly from DB
+  // isDelayed: boolean; // REMOVED: Replaced by DELAYED in StepStatus
   orderIndex: number; // NEW: Added orderIndex for step reordering
+  estimatedDurationDays?: number; // NEW: Added estimatedDurationDays
 }
 
 export enum ExpenseCategory {

@@ -1,4 +1,5 @@
 
+
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import * as ReactRouter from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.tsx';
@@ -127,13 +128,11 @@ const SegmentedProgressBar = ({ steps }: { steps: Step[] }) => {
   }
 
   const totalSteps = steps.length;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0); // Normalize today's date to midnight
-
+  // Use the derived status directly
   const completed = steps.filter(s => s.status === StepStatus.COMPLETED);
-  const inProgress = steps.filter(s => s.status === StepStatus.IN_PROGRESS && new Date(s.endDate).setHours(0,0,0,0) >= today.getTime());
-  const notStarted = steps.filter(s => s.status === StepStatus.NOT_STARTED && new Date(s.endDate).setHours(0,0,0,0) >= today.getTime()); 
-  const delayed = steps.filter(s => s.status !== StepStatus.COMPLETED && new Date(s.endDate).setHours(0,0,0,0) < today.getTime());
+  const inProgress = steps.filter(s => s.status === StepStatus.IN_PROGRESS);
+  const delayed = steps.filter(s => s.status === StepStatus.DELAYED);
+  const notStarted = steps.filter(s => s.status === StepStatus.NOT_STARTED);
 
   // Calculate percentages based on the new, mutually exclusive categories
   const completedPct = (completed.length / totalSteps) * 100;
@@ -274,23 +273,15 @@ const Dashboard = () => {
           return;
       }
 
-      const today = new Date();
-      today.setHours(0, 0, 0, 0); // Normalize today's date to midnight
-
+      // 🔥 CRITICAL: Use the derived status for counting
       const totalSteps = fetchedSteps.length;
       const completedSteps = fetchedSteps.filter(s => s.status === StepStatus.COMPLETED).length;
-      
-      // Delayed steps are those not completed and whose end date has passed
-      const delayedStepsArray = fetchedSteps.filter(s => s.status !== StepStatus.COMPLETED && new Date(s.endDate).setHours(0,0,0,0) < today.getTime());
-      const delayedStepsCount = delayedStepsArray.length;
-      
-      // In progress steps are those currently in progress and not delayed
-      const inProgressSteps = fetchedSteps.filter(s => 
-        s.status === StepStatus.IN_PROGRESS && !delayedStepsArray.some(d => d.id === s.id)
-      ).length;
+      const delayedStepsCount = fetchedSteps.filter(s => s.status === StepStatus.DELAYED).length;
+      const inProgressSteps = fetchedSteps.filter(s => s.status === StepStatus.IN_PROGRESS).length;
+
 
       const pendingMaterials = fetchedMaterials.filter(m => m.purchasedQty < m.plannedQty).length;
-      const totalSpent = fetchedExpenses.reduce((sum, expense) => sum + expense.amount, 0);
+      const totalSpent = fetchedExpenses.reduce((sum, expense) => sum + (expense.paidAmount || 0), 0); // Use paidAmount
 
       setWorkSummary({
         totalSteps,

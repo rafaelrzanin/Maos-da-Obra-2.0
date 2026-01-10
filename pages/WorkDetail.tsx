@@ -1,4 +1,7 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+
+
+
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import * as ReactRouter from 'react-router-dom';
 import * as XLSX from 'xlsx'; // Keep XLSX import, as reports might use it
 import { useAuth } from '../contexts/AuthContext.tsx';
@@ -550,7 +553,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
     if (!workId || !user?.id) {
       setLoading(false);
       navigate('/', { replace: true }); // Use replace: true for redirects
-      return; // Explicitly return
+      return null; // Explicitly return null
     }
 
     setLoading(true);
@@ -558,7 +561,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
       const fetchedWork = await dbService.getWorkById(workId);
       if (!fetchedWork || fetchedWork.userId !== user.id) {
         navigate('/', { replace: true }); // Use replace: true for redirects
-        return; // Explicitly return
+        return null; // Explicitly return null
       }
       setWork(fetchedWork);
 
@@ -604,9 +607,11 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         confirmText: "Ok",
         onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false }))
       });
+      return null; // Explicitly return null on error
     } finally {
       setLoading(false);
     }
+    return null;
   }, [workId, user, navigate]);
 
   useEffect(() => {
@@ -634,6 +639,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
     console.log(`[handleStepStatusChange] Processing step ID: ${step.id}. Current Step Object:`, { ...step });
     setIsUpdatingStepStatus(true);
 
+    let newStatus: StepStatus;
     let newRealDate: string | undefined = undefined; // Will be mapped to NULL in DB if undefined
 
     // 🔥 CRITICAL: Status is now fully derived from `realDate` and `start/end dates`.
@@ -643,9 +649,11 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
     // If it's anything else, it goes to COMPLETED (and sets realDate).
 
     if (step.status === StepStatus.COMPLETED) {
+        newStatus = StepStatus.NOT_STARTED; // Revert to NOT_STARTED
         newRealDate = undefined; // Clear realDate
         console.log(`[handleStepStatusChange] Status transition: COMPLETED -> NOT_STARTED for step ${step.id}. Clearing RealDate.`);
     } else {
+        newStatus = StepStatus.COMPLETED; // Go to COMPLETED
         newRealDate = new Date().toISOString().split('T')[0]; // Set real completion date
         console.log(`[handleStepStatusChange] Status transition: ${step.status} -> COMPLETED for step ${step.id}. RealDate: ${newRealDate}.`);
     }
@@ -653,7 +661,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
     try {
       const updatedStepData: Step = {
         ...step, // Spread all existing properties
-        // status property will be overwritten by the parseStepFromDB after db update
+        status: newStatus, // Frontend status is for visual feedback before refresh, actual is derived
         realDate: newRealDate, // Explicitly set new realDate (or undefined for null)
       };
 
@@ -1614,6 +1622,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
     }
   };
 
+
   // =======================================================================
   // RENDER LOGIC
   // =======================================================================
@@ -1655,7 +1664,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                       {worker.dailyRate && <p className="text-xs text-secondary">{formatCurrency(worker.dailyRate)}/dia</p>}
                     </div>
                     <div className="flex gap-2">
-                      <button onClick={() => { setEditWorkerData(worker); setNewWorkerName(worker.name); setNewWorkerRole(worker.role); setNewWorkerPhone(worker.phone); setNewWorkerDailyRate(String(worker.dailyRate || '')); setNewWorkerNotes(worker.notes || ''); setShowAddWorkerModal(true); }} className="p-2 text-primary dark:text-white hover:text-secondary" aria-label={`Editar profissional ${worker.name}`}>
+                      <button onClick={() => { setEditWorkerData(worker); setShowAddWorkerModal(true); }} className="p-2 text-primary dark:text-white hover:text-secondary" aria-label={`Editar profissional ${worker.name}`}>
                         <i className="fa-solid fa-edit"></i>
                       </button>
                       <button onClick={() => setZeModal({
@@ -1692,7 +1701,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                       {supplier.email && <p className="text-xs text-slate-400">{supplier.email}</p>}
                     </div>
                     <div className="flex gap-2">
-                      <button onClick={() => { setEditSupplierData(supplier); setNewSupplierName(supplier.name); setNewSupplierCategory(supplier.category); setNewSupplierPhone(supplier.phone); setNewSupplierEmail(supplier.email || ''); setNewSupplierAddress(supplier.address || ''); setNewSupplierNotes(supplier.notes || ''); setShowAddSupplierModal(true); }} className="p-2 text-primary dark:text-white hover:text-secondary" aria-label={`Editar fornecedor ${supplier.name}`}>
+                      <button onClick={() => { setEditSupplierData(supplier); setShowAddSupplierModal(true); }} className="p-2 text-primary dark:text-white hover:text-secondary" aria-label={`Editar fornecedor ${supplier.name}`}>
                         <i className="fa-solid fa-edit"></i>
                       </button>
                       <button onClick={() => setZeModal({
@@ -1751,7 +1760,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
             <ToolSubViewHeader title="Projetos e Documentos" onBack={() => goToSubView('NONE')} onAdd={() => setShowAddFileModal(true)} />
             <div className="space-y-4">
               {files.length === 0 ? (
-                <div className={cx(surface, card, "text-center col-span-full", mutedText)}>Nenhum arquivo cadastrado.</div>
+                <div className={cx(surface, card, "text-center", mutedText)}>Nenhum arquivo cadastrado.</div>
               ) : (
                 files.map(file => (
                   <div key={file.id} className={cx(surface, "flex items-center justify-between p-4 rounded-2xl")}>
@@ -1961,7 +1970,6 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
           </>
         );
     }
-    return null; // Ensure a return value for all cases.
   };
 
   return (
@@ -2258,7 +2266,6 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                 className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
                 required
               >
-                <option value="">Selecione</option>
                 {Object.values(ExpenseCategory).map(category => (
                   <option key={category} value={category}>{category}</option>
                 ))}
@@ -2525,514 +2532,4 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
               <label htmlFor="newSupplierAddress" className="block text-xs font-bold text-slate-500 uppercase mb-1">Endereço (Opcional)</label>
               <input
                 id="newSupplierAddress"
-                type="text"
-                value={newSupplierAddress}
-                onChange={(e) => setNewSupplierAddress(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
-                placeholder="Endereço completo do fornecedor"
-              />
-            </div>
-            <div>
-              <label htmlFor="newSupplierNotes" className="block text-xs font-bold text-slate-500 uppercase mb-1">Observações (Opcional)</label>
-              <textarea
-                id="newSupplierNotes"
-                value={newSupplierNotes}
-                onChange={(e) => setNewSupplierNotes(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
-                placeholder="Detalhes adicionais sobre o fornecedor"
-                rows={3}
-              ></textarea>
-            </div>
-          </div>
-        </ZeModal>
-      )}
-
-      {/* Modals for Add Photo */}
-      {showAddPhotoModal && (
-        <ZeModal
-          isOpen={showAddPhotoModal}
-          title="Adicionar Nova Foto"
-          message=""
-          confirmText="Adicionar Foto"
-          onConfirm={handleAddPhoto}
-          onCancel={() => { setShowAddPhotoModal(false); setNewPhotoDescription(''); setNewPhotoFile(null); setNewPhotoType('PROGRESS'); }}
-          type="INFO"
-          isConfirming={uploadingPhoto}
-        >
-          <div className="space-y-4">
-            <div>
-              <label htmlFor="newPhotoDescription" className="block text-xs font-bold text-slate-500 uppercase mb-1">Descrição da Foto</label>
-              <input
-                id="newPhotoDescription"
-                type="text"
-                value={newPhotoDescription}
-                onChange={(e) => setNewPhotoDescription(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
-                placeholder="Ex: Fundação do bloco A, Cobertura instalada"
-                required
-              />
-            </div>
-            <div>
-              <label htmlFor="newPhotoFile" className="block text-xs font-bold text-slate-500 uppercase mb-1">Arquivo da Foto</label>
-              <input
-                id="newPhotoFile"
-                type="file"
-                accept="image/*"
-                onChange={(e) => setNewPhotoFile(e.target.files ? e.target.files[0] : null)}
-                className="w-full text-primary dark:text-white file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-secondary file:text-white hover:file:bg-secondary-dark transition-all"
-                required
-              />
-            </div>
-            <div>
-              <label htmlFor="newPhotoType" className="block text-xs font-bold text-slate-500 uppercase mb-1">Tipo da Foto</label>
-              <select
-                id="newPhotoType"
-                value={newPhotoType}
-                onChange={(e) => setNewPhotoType(e.target.value as 'BEFORE' | 'AFTER' | 'PROGRESS')}
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
-                required
-              >
-                <option value="PROGRESS">Progresso</option>
-                <option value="BEFORE">Antes</option>
-                <option value="AFTER">Depois</option>
-              </select>
-            </div>
-          </div>
-        </ZeModal>
-      )}
-
-      {/* Modals for Add File */}
-      {showAddFileModal && (
-        <ZeModal
-          isOpen={showAddFileModal}
-          title="Adicionar Novo Arquivo"
-          message=""
-          confirmText="Adicionar Arquivo"
-          onConfirm={handleAddFile}
-          onCancel={() => { setShowAddFileModal(false); setNewFileName(''); setNewFileCategory(FileCategory.GENERAL); setNewUploadFile(null); }}
-          type="INFO"
-          isConfirming={uploadingFile}
-        >
-          <div className="space-y-4">
-            <div>
-              <label htmlFor="newFileName" className="block text-xs font-bold text-slate-500 uppercase mb-1">Nome do Arquivo</label>
-              <input
-                id="newFileName"
-                type="text"
-                value={newFileName}
-                onChange={(e) => setNewFileName(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
-                placeholder="Ex: Planta Baixa, Orçamento Detalhado"
-                required
-              />
-            </div>
-            <div>
-              <label htmlFor="newUploadFile" className="block text-xs font-bold text-slate-500 uppercase mb-1">Arquivo para Upload</label>
-              <input
-                id="newUploadFile"
-                type="file"
-                onChange={(e) => setNewUploadFile(e.target.files ? e.target.files[0] : null)}
-                className="w-full text-primary dark:text-white file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-secondary file:text-white hover:file:bg-secondary-dark transition-all"
-                required
-              />
-            </div>
-            <div>
-              <label htmlFor="newFileCategory" className="block text-xs font-bold text-slate-500 uppercase mb-1">Categoria</label>
-              <select
-                id="newFileCategory"
-                value={newFileCategory}
-                onChange={(e) => setNewFileCategory(e.target.value as FileCategory)}
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
-                required
-              >
-                {Object.values(FileCategory).map(category => (
-                  <option key={category} value={category}>{category}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-        </ZeModal>
-      )}
-
-      {/* Modals for Add/Edit Checklist */}
-      {showAddChecklistModal && (
-        <ZeModal
-          isOpen={showAddChecklistModal}
-          title={editChecklistData ? "Editar Checklist" : "Adicionar Novo Checklist"}
-          message=""
-          confirmText={editChecklistData ? "Salvar Alterações" : "Adicionar Checklist"}
-          onConfirm={editChecklistData ? handleEditChecklist : handleAddChecklist}
-          onCancel={() => { setShowAddChecklistModal(false); setEditChecklistData(null); setNewChecklistName(''); setNewChecklistCategory(''); setNewChecklistItems(['']); }}
-          type="INFO"
-          isConfirming={zeModal.isConfirming}
-        >
-          <div className="space-y-4">
-            <div>
-              <label htmlFor="newChecklistName" className="block text-xs font-bold text-slate-500 uppercase mb-1">Nome do Checklist</label>
-              <input
-                id="newChecklistName"
-                type="text"
-                value={newChecklistName}
-                onChange={(e) => setNewChecklistName(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
-                placeholder="Ex: Fundações - Pré-Concretagem"
-                required
-              />
-            </div>
-            <div>
-              <label htmlFor="newChecklistCategory" className="block text-xs font-bold text-slate-500 uppercase mb-1">Categoria</label>
-              <select
-                id="newChecklistCategory"
-                value={newChecklistCategory}
-                onChange={(e) => setNewChecklistCategory(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
-                required
-              >
-                <option value="">Selecione</option>
-                {[...new Set(CHECKLIST_TEMPLATES.map(t => t.category))].map(category => (
-                  <option key={category} value={category}>{category}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Itens do Checklist</label>
-              {newChecklistItems.map((item, index) => (
-                <div key={index} className="flex items-center gap-2 mb-2">
-                  <input
-                    type="text"
-                    value={item}
-                    onChange={(e) => {
-                      const updatedItems = [...newChecklistItems];
-                      updatedItems[index] = e.target.value;
-                      setNewChecklistItems(updatedItems);
-                    }}
-                    className="flex-1 px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
-                    placeholder={`Item ${index + 1}`}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const updatedItems = newChecklistItems.filter((_, i) => i !== index);
-                      setNewChecklistItems(updatedItems);
-                    }}
-                    className="p-2 text-red-500 hover:text-red-700"
-                  >
-                    <i className="fa-solid fa-trash-alt"></i>
-                  </button>
-                </div>
-              ))}
-              <button
-                type="button"
-                onClick={() => setNewChecklistItems([...newChecklistItems, ''])}
-                className="mt-2 px-4 py-2 bg-slate-200 dark:bg-slate-700 text-primary dark:text-white text-sm font-bold rounded-xl hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors flex items-center gap-2"
-              >
-                <i className="fa-solid fa-plus"></i> Adicionar Item
-              </button>
-            </div>
-          </div>
-        </ZeModal>
-      )}
-
-      {/* Contract Content Viewer Modal */}
-      {showContractContentModal && (
-        <ZeModal
-          isOpen={showContractContentModal}
-          title={selectedContractTitle}
-          message=""
-          confirmText={copyContractSuccess ? "Copiado!" : "Copiar Texto"}
-          onConfirm={async () => {
-            await navigator.clipboard.writeText(selectedContractContent);
-            setCopyContractSuccess(true);
-            setTimeout(() => setCopyContractSuccess(false), 2000);
-          }}
-          onCancel={() => { setShowContractContentModal(false); setCopyContractSuccess(false); }}
-          type="INFO"
-        >
-          <div className="bg-slate-50 dark:bg-slate-800 p-4 rounded-xl border border-slate-100 dark:border-slate-700 max-h-96 overflow-y-auto">
-            <pre className="whitespace-pre-wrap font-mono text-sm text-primary dark:text-white">{selectedContractContent}</pre>
-          </div>
-          {copyContractSuccess && (
-            <p className="text-green-500 text-xs mt-2 text-center animate-in fade-in">Texto copiado para a área de transferência!</p>
-          )}
-        </ZeModal>
-      )}
-
-      {/* Main Tabs Navigation */}
-      <div className="flex justify-around bg-white dark:bg-slate-900 rounded-2xl p-2 shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800 mb-6 print:hidden">
-        <button
-          onClick={() => goToTab('ETAPAS')}
-          className={`flex-1 py-2 rounded-xl text-sm font-bold transition-colors ${activeTab === 'ETAPAS' ? 'bg-secondary text-white shadow-md' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
-          aria-current={activeTab === 'ETAPAS' ? 'page' : undefined}
-        >
-          Etapas
-        </button>
-        <button
-          onClick={() => goToTab('MATERIAIS')}
-          className={`flex-1 py-2 rounded-xl text-sm font-bold transition-colors ${activeTab === 'MATERIAIS' ? 'bg-secondary text-white shadow-md' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
-          aria-current={activeTab === 'MATERIAIS' ? 'page' : undefined}
-        >
-          Materiais
-        </button>
-        <button
-          onClick={() => goToTab('FINANCEIRO')}
-          className={`flex-1 py-2 rounded-xl text-sm font-bold transition-colors ${activeTab === 'FINANCEIRO' ? 'bg-secondary text-white shadow-md' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
-          aria-current={activeTab === 'FINANCEIRO' ? 'page' : undefined}
-        >
-          Financeiro
-        </button>
-        <button
-          onClick={() => goToTab('FERRAMENTAS')}
-          className={`flex-1 py-2 rounded-xl text-sm font-bold transition-colors ${activeTab === 'FERRAMENTAS' ? 'bg-secondary text-white shadow-md' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
-          aria-current={activeTab === 'FERRAMENTAS' ? 'page' : undefined}
-        >
-          Ferramentas
-        </button>
-      </div>
-
-      {/* Content based on activeTab */}
-      {activeTab === 'ETAPAS' && (
-        <div className="space-y-4">
-          <div className="flex justify-end mb-4">
-            <button onClick={() => setShowAddStepModal(true)} className="px-4 py-2 bg-secondary text-white text-sm font-bold rounded-xl hover:bg-secondary-dark transition-colors flex items-center gap-2">
-              <i className="fa-solid fa-plus"></i> Adicionar Etapa
-            </button>
-          </div>
-          {steps.length === 0 ? (
-            <div className={cx(surface, card, "text-center", mutedText)}>Nenhuma etapa cadastrada.</div>
-          ) : (
-            steps.map((step) => {
-              const statusDetails = getEntityStatusDetails('step', step, steps);
-              return (
-                <div 
-                  key={step.id} 
-                  className={cx(surface, `border-2 flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 rounded-2xl cursor-grab transition-all duration-200 ease-in-out`,
-                    statusDetails.borderColor,
-                    dragOverStepId === step.id ? 'bg-secondary/10' : '',
-                    step.startDate ? 'opacity-80' : '' // Dim started steps slightly
-                  )}
-                  draggable={!step.startDate} // Prevent dragging if step has started
-                  onDragStart={(e) => handleDragStart(e, step.id)}
-                  onDragOver={(e) => handleDragOver(e, step.id)}
-                  onDragLeave={handleDragLeave}
-                  onDrop={(e) => handleDrop(e, step.id)}
-                  onDragEnd={() => { setDraggedStepId(null); setDragOverStepId(null); }}
-                  aria-grabbed={draggedStepId === step.id}
-                  aria-disabled={!!step.startDate}
-                >
-                  <div className="flex-1 min-w-0 pr-4">
-                    <p className="text-xs font-black uppercase text-slate-400 dark:text-slate-500 mb-1">
-                      ETAPA {step.orderIndex}
-                    </p>
-                    <h3 className="font-bold text-primary dark:text-white text-lg leading-tight">{step.name}</h3>
-                    <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">
-                        {formatDateDisplay(step.startDate)} - {formatDateDisplay(step.endDate)}
-                        {step.estimatedDurationDays && <span className="ml-2">({step.estimatedDurationDays} dias)</span>}
-                    </p>
-                    {step.realDate && (
-                      <p className="text-xs text-green-600 dark:text-green-400">
-                        <i className="fa-solid fa-calendar-check mr-1"></i> Concluído em: {formatDateDisplay(step.realDate)}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2 mt-3 sm:mt-0 flex-shrink-0">
-                    <button
-                      onClick={() => handleStepStatusChange(step)}
-                      disabled={isUpdatingStepStatus}
-                      className={cx(
-                        "px-4 py-2 rounded-xl text-white text-sm font-bold transition-colors flex items-center gap-2 shadow-md",
-                        statusDetails.bgColor,
-                        `shadow-${statusDetails.bgColor.split('-')[1]}-500/20`, // Dynamic shadow based on color
-                        isUpdatingStepStatus ? 'opacity-70 cursor-not-allowed' : ''
-                      )}
-                      aria-label={`Alterar status da etapa ${step.name}. Status atual: ${statusDetails.statusText}`}
-                    >
-                      {isUpdatingStepStatus ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className={`fa-solid ${statusDetails.icon}`}></i>}
-                      {statusDetails.statusText}
-                    </button>
-                    <button onClick={() => { setEditStepData(step); setNewStepName(step.name); setNewStepStartDate(step.startDate); setNewStepEndDate(step.endDate); setNewEstimatedDurationDays(String(step.estimatedDurationDays || '')); setShowAddStepModal(true); }} className="p-2 text-primary dark:text-white hover:text-secondary" aria-label={`Editar etapa ${step.name}`}>
-                      <i className="fa-solid fa-edit"></i>
-                    </button>
-                    <button onClick={() => setZeModal({
-                      isOpen: true,
-                      title: "Confirmar Exclusão",
-                      message: `Tem certeza que deseja excluir a etapa "${step.name}"? Esta ação não pode ser desfeita.`,
-                      confirmText: "Sim, Excluir",
-                      onConfirm: async () => handleDeleteStep(step.id, workId!),
-                      onCancel: () => setZeModal(p => ({ ...p, isOpen: false })),
-                      type: "DANGER"
-                    })} className="p-2 text-red-500 hover:text-red-700" aria-label={`Excluir etapa ${step.name}`}>
-                      <i className="fa-solid fa-trash-alt"></i>
-                    </button>
-                  </div>
-                </div>
-              );
-            })
-          )}
-        </div>
-      )}
-
-      {activeTab === 'MATERIAIS' && (
-        <div className="space-y-4">
-          <div className="flex justify-between items-center mb-4">
-            <select
-              value={materialFilterStepId}
-              onChange={(e) => setMaterialFilterStepId(e.target.value)}
-              className="px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-primary dark:text-white focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
-              aria-label="Filtrar materiais por etapa"
-            >
-              <option value="all">Todas as Etapas</option>
-              {steps.map(step => (
-                <option key={step.id} value={step.id}>{step.name}</option>
-              ))}
-            </select>
-            <button onClick={() => setShowAddMaterialModal(true)} className="px-4 py-2 bg-secondary text-white text-sm font-bold rounded-xl hover:bg-secondary-dark transition-colors flex items-center gap-2">
-              <i className="fa-solid fa-plus"></i> Adicionar Material
-            </button>
-          </div>
-          {groupedMaterials.length === 0 ? (
-            <div className={cx(surface, card, "text-center", mutedText)}>Nenhum material cadastrado ou encontrado para a etapa selecionada.</div>
-          ) : (
-            groupedMaterials.map(group => (
-              <div key={group.stepId} className="space-y-3">
-                <h3 className="text-lg font-bold text-primary dark:text-white border-b border-slate-200 dark:border-slate-700 pb-2 mb-3">{group.stepName}</h3>
-                {group.materials.map(material => {
-                  const statusDetails = getEntityStatusDetails('material', material, steps);
-                  const progress = material.plannedQty > 0 ? (material.purchasedQty / material.plannedQty) * 100 : 0;
-                  return (
-                    <div key={material.id} className={cx(surface, `border-2 flex items-center justify-between p-4 rounded-2xl`, statusDetails.borderColor)}>
-                      <div className="flex-1 min-w-0 pr-4">
-                        <h4 className="font-bold text-primary dark:text-white text-lg leading-tight">{material.name}</h4>
-                        {material.brand && <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">{material.brand}</p>}
-                        <p className="text-sm text-slate-500 dark:text-slate-400">
-                          {material.purchasedQty} / {material.plannedQty} {material.unit}
-                        </p>
-                        <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-1.5 mt-2">
-                          <div className={cx("h-1.5 rounded-full", statusDetails.bgColor)} style={{ width: `${Math.min(100, progress).toFixed(0)}%` }}></div>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        <span className={cx("px-3 py-1 rounded-xl text-white text-xs font-bold", statusDetails.bgColor)}>
-                          {statusDetails.statusText}
-                        </span>
-                        <button onClick={() => { setEditMaterialData(material); setNewMaterialName(material.name); setNewMaterialBrand(material.brand || ''); setNewMaterialPlannedQty(String(material.plannedQty)); setNewMaterialUnit(material.unit); setNewMaterialCategory(material.category || ''); setNewMaterialStepId(material.stepId || 'none'); setPurchaseQtyInput(''); setPurchaseCostInput(''); setShowAddMaterialModal(true); }} className="p-2 text-primary dark:text-white hover:text-secondary" aria-label={`Editar material ${material.name}`}>
-                          <i className="fa-solid fa-edit"></i>
-                        </button>
-                        <button onClick={() => setZeModal({
-                          isOpen: true,
-                          title: "Confirmar Exclusão",
-                          message: `Tem certeza que deseja excluir o material "${material.name}"? Isso também removerá as despesas relacionadas.`,
-                          confirmText: "Sim, Excluir",
-                          onConfirm: async () => handleDeleteMaterial(material.id),
-                          onCancel: () => setZeModal(p => ({ ...p, isOpen: false })),
-                          type: "DANGER"
-                        })} className="p-2 text-red-500 hover:text-red-700" aria-label={`Excluir material ${material.name}`}>
-                          <i className="fa-solid fa-trash-alt"></i>
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ))
-          )}
-        </div>
-      )}
-
-      {activeTab === 'FINANCEIRO' && (
-        <div className="space-y-4">
-          <div className="flex justify-end mb-4">
-            <button onClick={() => setShowAddExpenseModal(true)} className="px-4 py-2 bg-secondary text-white text-sm font-bold rounded-xl hover:bg-secondary-dark transition-colors flex items-center gap-2">
-              <i className="fa-solid fa-plus"></i> Adicionar Despesa
-            </button>
-          </div>
-          <div className={cx(surface, card, "flex items-center justify-between")}>
-            <p className="text-xl font-bold text-primary dark:text-white">Orçamento Total:</p>
-            <p className="text-xl font-black text-secondary">{formatCurrency(work.budgetPlanned)}</p>
-          </div>
-          <div className={cx(surface, card, "flex items-center justify-between")}>
-            <p className="text-xl font-bold text-primary dark:text-white">Gasto Total:</p>
-            <p className={cx("text-xl font-black", calculateTotalExpenses > work.budgetPlanned ? "text-red-500" : "text-green-500")}>
-              {formatCurrency(calculateTotalExpenses)}
-            </p>
-          </div>
-          <div className={cx(surface, card, "flex items-center justify-between")}>
-            <p className="text-xl font-bold text-primary dark:text-white">Saldo Restante:</p>
-            <p className={cx("text-xl font-black", (work.budgetPlanned - calculateTotalExpenses) < 0 ? "text-red-500" : "text-green-500")}>
-              {formatCurrency(work.budgetPlanned - calculateTotalExpenses)}
-            </p>
-          </div>
-
-          {groupedExpensesByStep.length === 0 ? (
-            <div className={cx(surface, card, "text-center", mutedText)}>Nenhuma despesa cadastrada.</div>
-          ) : (
-            groupedExpensesByStep.map(group => (
-              <div key={group.stepName} className="space-y-3">
-                <h3 className="text-lg font-bold text-primary dark:text-white border-b border-slate-200 dark:border-slate-700 pb-2 mb-3">{group.stepName} ({formatCurrency(group.totalStepAmount)})</h3>
-                {group.expenses.map(expense => {
-                  const statusDetails = getEntityStatusDetails('expense', expense, steps);
-                  return (
-                    <div key={expense.id} className={cx(surface, `border-2 flex items-center justify-between p-4 rounded-2xl`, statusDetails.borderColor)}>
-                      <div className="flex-1 min-w-0 pr-4">
-                        <h4 className="font-bold text-primary dark:text-white text-lg leading-tight">{expense.description}</h4>
-                        <p className="text-sm text-slate-500 dark:text-slate-400">
-                          {formatDateDisplay(expense.date)} - {expense.category}
-                        </p>
-                        {expense.workerId && <p className="text-xs text-slate-400">Profissional: {workers.find(w => w.id === expense.workerId)?.name || 'N/A'}</p>}
-                        {expense.supplierId && <p className="text-xs text-slate-400">Fornecedor: {suppliers.find(s => s.id === expense.supplierId)?.name || 'N/A'}</p>}
-                      </div>
-                      <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                        <p className="text-lg font-bold text-primary dark:text-white">{formatCurrency(expense.amount)}</p>
-                        {expense.totalAgreed !== undefined && expense.totalAgreed !== expense.amount && (
-                           <p className="text-xs text-slate-500 dark:text-slate-400">Total: {formatCurrency(expense.totalAgreed)}</p>
-                        )}
-                        {(expense.paidAmount !== undefined && expense.paidAmount > 0) ? (
-                          <p className={cx("text-xs font-bold", expense.status === ExpenseStatus.OVERPAID ? "text-red-500" : "text-green-500")}>
-                            Pago: {formatCurrency(expense.paidAmount)}
-                          </p>
-                        ) : (
-                          <p className="text-xs font-bold text-slate-500 dark:text-slate-400">Não pago</p>
-                        )}
-                        <div className="flex items-center gap-2 mt-2">
-                          <span className={cx("px-3 py-1 rounded-xl text-white text-xs font-bold", statusDetails.bgColor)}>
-                            {statusDetails.statusText}
-                          </span>
-                          {expense.status !== ExpenseStatus.COMPLETED && expense.status !== ExpenseStatus.OVERPAID && (
-                            <button onClick={() => { setPaymentExpenseData(expense); setPaymentAmount(String((expense.totalAgreed || expense.amount) - (expense.paidAmount || 0))); setShowAddPaymentModal(true); }} className="px-2 py-1 bg-blue-500 text-white text-xs font-bold rounded-lg hover:bg-blue-600 transition-colors" aria-label={`Adicionar pagamento para ${expense.description}`}>
-                              <i className="fa-solid fa-money-bill-wave"></i> Pagar
-                            </button>
-                          )}
-                          <button onClick={() => { setEditExpenseData(expense); setNewExpenseDescription(expense.description); setNewExpenseAmount(String(expense.amount)); setNewExpenseCategory(expense.category); setNewExpenseDate(expense.date); setNewExpenseStepId(expense.stepId || 'none'); setNewExpenseWorkerId(expense.workerId || 'none'); setNewExpenseSupplierId(expense.supplierId || 'none'); setNewExpenseTotalAgreed(String(expense.totalAgreed || '')); setShowAddExpenseModal(true); }} className="p-2 text-primary dark:text-white hover:text-secondary" aria-label={`Editar despesa ${expense.description}`}>
-                            <i className="fa-solid fa-edit"></i>
-                          </button>
-                          <button onClick={() => setZeModal({
-                            isOpen: true,
-                            title: "Confirmar Exclusão",
-                            message: `Tem certeza que deseja excluir a despesa "${expense.description}"? Isso pode afetar o registro de materiais se for uma compra.`,
-                            confirmText: "Sim, Excluir",
-                            onConfirm: async () => handleDeleteExpense(expense.id),
-                            onCancel: () => setZeModal(p => ({ ...p, isOpen: false })),
-                            type: "DANGER"
-                          })} className="p-2 text-red-500 hover:text-red-700" aria-label={`Excluir despesa ${expense.description}`}>
-                            <i className="fa-solid fa-trash-alt"></i>
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ))
-          )}
-        </div>
-      )}
-
-      {activeTab === 'FERRAMENTAS' && (
-        <div className="space-y-4">
-          {renderSubView()}
-        </div>
-      )}
-    </div>
-  );
-};
-
-export default WorkDetail;
+                type="

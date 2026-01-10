@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, Suspense, lazy, Fragment } from 'react';
 import * as ReactRouter from 'react-router-dom';
 import { PlanType } from './types.ts';
@@ -10,16 +11,16 @@ import { WorkDetailProps } from './pages/WorkDetail.tsx';
 import Login from './pages/Login.tsx'; // Keep Login static as it's the entry point for unauthenticated users
 
 // --- Lazy Loading ---
-const Dashboard = lazy(() => import('./pages/Dashboard.tsx').then(module => ({ default: (module as any).default })));
-const CreateWork = lazy(() => import('./pages/CreateWork.tsx').then(module => ({ default: (module as any).default })));
+const Dashboard = lazy(() => import('./pages/Dashboard.tsx'));
+const CreateWork = lazy(() => import('./pages/CreateWork.tsx'));
 // MODIFICADO: WorkDetail agora aceitará `activeTab` e `onTabChange` como props
 // FIX: Correctly type the lazy-loaded WorkDetail component
-const WorkDetail = lazy(() => import('./pages/WorkDetail.tsx').then(module => ({ default: module.default as React.ComponentType<WorkDetailProps> })));
-const Settings = lazy(() => import('./pages/Settings.tsx').then(module => ({ default: (module as any).default })));
-const Profile = lazy(() => import('./pages/Profile.tsx').then(module => ({ default: (module as any).default })));
-const VideoTutorials = lazy(() => import('./pages/VideoTutorials.tsx').then(module => ({ default: (module as any).default })));
-const Checkout = lazy(() => import('./pages/Checkout.tsx').then(module => ({ default: (module as any).default })));
-const AiChat = lazy(() => import('./pages/AiChat.tsx').then(module => ({ default: (module as any).default }))); // Lazy load AiChat page
+const WorkDetail = lazy(() => import('./pages/WorkDetail.tsx'));
+const Settings = lazy(() => import('./pages/Settings.tsx'));
+const Profile = lazy(() => import('./pages/Profile.tsx'));
+const VideoTutorials = lazy(() => import('./pages/VideoTutorials.tsx'));
+const Checkout = lazy(() => import('./pages/Checkout.tsx'));
+const AiChat = lazy(() => import('./pages/AiChat.tsx')); // Lazy load AiChat page
 const Notifications = lazy(() => import('./pages/Notifications.tsx')); // NEW: Lazy load Notifications page
 // NEW: AiWorkPlanner lazy load, as it is a premium feature
 const AiWorkPlanner = lazy(() => import('./pages/AiWorkPlanner.tsx'));
@@ -115,7 +116,7 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
 }
 
 // NEW: Bottom Navigation Bar Component
-const BottomNavBar = ({ workId, activeTab, onTabClick }: { workId: string, activeTab: string, onTabClick: (tab: string) => void }) => {
+const BottomNavBar = ({ workId, activeTab, onTabClick }: { workId: string, activeTab: string, onTabClick: (tab: 'ETAPAS' | 'MATERIAIS' | 'FINANCEIRO' | 'FERRAMENTAS') => void }) => {
   const navigate = ReactRouter.useNavigate();
 
   const navItems = [
@@ -125,7 +126,7 @@ const BottomNavBar = ({ workId, activeTab, onTabClick }: { workId: string, activ
     { name: 'FERRAMENTAS', label: 'Ferramentas', icon: 'fa-screwdriver-wrench' },
   ];
 
-  const handleNavClick = (tabName: string) => {
+  const handleNavClick = (tabName: 'ETAPAS' | 'MATERIAIS' | 'FINANCEIRO' | 'FERRAMENTAS') => {
     // This will either update the tab if already on WorkDetail, or navigate to WorkDetail with the tab parameter
     navigate(`/work/${workId}?tab=${tabName}`);
     onTabClick(tabName); // Also update local state
@@ -137,7 +138,7 @@ const BottomNavBar = ({ workId, activeTab, onTabClick }: { workId: string, activ
         {navItems.map(item => (
           <button
             key={item.name}
-            onClick={() => handleNavClick(item.name)}
+            onClick={() => handleNavClick(item.name as 'ETAPAS' | 'MATERIAIS' | 'FINANCEIRO' | 'FERRAMENTAS')}
             className={`flex flex-col items-center justify-center flex-1 text-xs font-bold transition-colors ${
               activeTab === item.name ? 'text-secondary' : 'text-slate-500 dark:text-slate-400 hover:text-primary dark:hover:text-white'
             }`}

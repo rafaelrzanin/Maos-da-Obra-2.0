@@ -1,9 +1,10 @@
 
+
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext.tsx'; // Use authLoading and isUserAuthFinished
 import * as ReactRouter from 'react-router-dom';
 import { dbService } from '../services/db.ts';
-import { WorkStatus } from '../types.ts';
+import { WorkStatus, StepStatus } from '../types.ts'; // Import StepStatus
 import { WORK_TEMPLATES, ZE_AVATAR, ZE_AVATAR_FALLBACK } from '../services/standards.ts';
 import { aiService } from '../services/ai.ts'; // NEW: Import aiService
 
