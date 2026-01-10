@@ -1,5 +1,4 @@
 
-
 import { PlanType, ExpenseCategory, StepStatus, FileCategory, type User, type Work, type Step, type Material, type Expense, type Worker, type Supplier, type WorkPhoto, type WorkFile, type DBNotification, type PushSubscriptionInfo, type Contract, type Checklist, type ChecklistItem, type FinancialHistoryEntry, InstallmentStatus, ExpenseStatus } from '../types.ts';
 import { WORK_TEMPLATES, FULL_MATERIAL_PACKAGES, CONTRACT_TEMPLATES, CHECKLIST_TEMPLATES } from './standards.ts';
 import { supabase } from './supabase.ts';
@@ -599,15 +598,16 @@ export const dbService = {
     return authStateSubscription.unsubscribe; // Return the unsubscribe function directly
   },
 
-  async login(email: string, password?: string): Promise<User | null> { // Explicitly set return type
+  async login(email: string, password?: string): Promise<boolean> { // Explicitly set return type
     // Supabase is guaranteed to be initialized now
     const { data, error } = await supabase.auth.signInWithPassword({ email, password: password || '' });
     if (error) throw error;
     if (data.user) {
         sessionCache = null; // Invalidate cache
-        return await ensureUserProfile(data.user);
+        await ensureUserProfile(data.user);
+        return true;
     }
-    return null;
+    return false;
   },
 
   async loginSocial(provider: 'google') {
@@ -620,29 +620,38 @@ export const dbService = {
     });
   },
 
-  async signup(name: string, email: string, whatsapp: string, password?: string, cpf?: string): Promise<User | null> { // REMOVED planType parameter
+  async signup(name: string, email: string, whatsapp: string, password?: string, cpf?: string): Promise<boolean> { // REMOVED planType parameter
     // Supabase is guaranteed to be initialized now
     
     const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password: password || '123456',
-        options: {
+        options: { // FIX: Added `options` wrapper
             data: { name }
         }
-    );
+    });
 
     if (authError) throw authError;
     // If user already exists and signed in, just ensure profile and return
     if (!authData.user) { 
-        return this.login(email, password);
+        // FIX: The original was calling `this.login(email, password)` which returns Promise<User|null>
+        // but this `signup` function should return Promise<boolean>.
+        // We'll call login and ensure it creates/updates the profile if not existing, then return true on success.
+        const success = await this.login(email, password);
+        return success;
     }
 
     // CRITICAL: New profile data is handled by ensureUserProfile now.
     // The ensureUserProfile will set plan: null, is_trial: false, subscription_expires_at: null
     // This ensures registration is plan-agnostic.
-
-    sessionCache = null; // Invalidate cache
-    return await ensureUserProfile(authData.user);
+    // The `onAuthChange` listener will catch this new session and call `ensureUserProfile`.
+    // So, we just need to return true if the user object is present.
+    if (authData.user) {
+        sessionCache = null; // Invalidate cache
+        await ensureUserProfile(authData.user); // Ensure profile is created/updated
+        return true;
+    }
+    return false;
   },
 
   async logout() {
@@ -662,7 +671,7 @@ export const dbService = {
     _dashboardCache.photos = {}; // NEW
     _dashboardCache.files = {}; // NEW
     _dashboardCache.contracts = null; // NEW
-    _dashboardCache.checklists = {}; // NEW
+    _dashboardCache.checklists = {}; 
     _dashboardCache.pushSubscriptions = {}; // NEW: Clear push subscriptions cache on logout
     _dashboardCache.financialHistory = {}; // NEW: Clear financial history cache
   },
@@ -1588,7 +1597,7 @@ export const dbService = {
         workId: currentMaterial.work_id,
         userId: (await dbService.getCurrentUser())?.id || 'unknown',
         expenseId: addedExpense.id,
-        action: 'payment', // Tipo de ação é 'payment' porque registra uma compra.
+        action: 'payment', // Tipo de ação é 'payment' porque registra uma uma compra.
         description: `Compra de material "${materialName}" registrada: ${purchasedQtyDelta} ${unit} por ${cost}. Despesa #${addedExpense.id} criada e paga.`,
         field: 'purchased_qty',
         oldValue: currentMaterial.purchased_qty,

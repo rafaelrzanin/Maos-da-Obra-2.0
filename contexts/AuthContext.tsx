@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect, createContext, useContext, useMemo, useCallback } from 'react';
 import { User, PlanType, DBNotification } from '../types.ts';
 import { dbService } from '../services/db.ts';
@@ -274,10 +273,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const u = await dbService.login(email, password);
         
         if (u) {
-            setUser(u);
+            // The `dbService.login` returns a boolean. The actual user object will be set by the onAuthChange listener.
+            // setUser(u); // REMOVED: `u` is boolean, not User.
             await refreshNotifications(); // Refresh notifications on successful login
             // A chamada a requestPushNotificationPermission será feita no Dashboard
-            console.log("[AuthContext] login successful. User:", u ? u.email : 'null');
+            console.log("[AuthContext] login successful."); // Adjusted log
             return true;
         }
         console.log("[AuthContext] login failed. No user returned.");
@@ -317,10 +317,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
         const u = await dbService.signup(name, email, whatsapp, password, cpf); // REMOVED planType argument
         if (u) {
-            setUser(u);
+            // The `dbService.signup` returns a boolean. The actual user object will be set by the onAuthChange listener.
+            // setUser(u); // REMOVED: `u` is boolean, not User.
             await refreshNotifications(); // Refresh notifications on successful signup
             // A chamada a requestPushNotificationPermission será feita no Dashboard
-            console.log("[AuthContext] signup successful. User:", u ? u.email : 'null');
+            console.log("[AuthContext] signup successful."); // Adjusted log
             return true;
         }
         console.log("[AuthContext] signup failed. No user returned.");
