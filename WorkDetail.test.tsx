@@ -1,5 +1,3 @@
-/// <reference types="jest" />
-/// <reference types="node" />
 import { render, screen } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import WorkDetail from './pages/WorkDetail.tsx'; // Ensure this path is correct based on your file structure

@@ -2606,24 +2606,26 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                     icon="fa-arrows-rotate"
                     title="Regerar Materiais"
                     description="Atualize lista de materiais baseada no projeto."
-                    onClick={() => setZeModal({
-                      isOpen: true,
-                      title: "Regerar Materiais",
-                      message: "Tem certeza que deseja regerar a lista de materiais? Isso removerá a lista atual e criará uma nova baseada nas características da obra e etapas existentes. Esta ação é irreversível.",
-                      confirmText: "Sim, Regerar",
-                      onConfirm: async () => {
-                        try {
-                          await dbService.regenerateMaterials(work!, steps); // Assure work is not null
-                          await loadWorkData();
-                          setZeModal(prev => ({ ...prev, isOpen: false }));
-                        } catch (error: any) {
-                          console.error("Erro ao regerar materiais:", error);
-                          setZeModal(prev => ({ ...prev, title: "Erro", message: `Erro ao regerar materiais: ${error.message}`, type: "ERROR", confirmText: "Ok" }));
-                        }
-                      },
-                      onCancel: () => setZeModal(p => ({ ...p, isOpen: false })),
-                      type: "DANGER"
-                    })}
+                    onClick={() => ( // Added parentheses for implicit return of an expression
+                      setZeModal({
+                        isOpen: true,
+                        title: "Regerar Materiais",
+                        message: "Tem certeza que deseja regerar a lista de materiais? Isso removerá a lista atual e criará uma nova baseada nas características da obra e etapas existentes. Esta ação é irreversível.",
+                        confirmText: "Sim, Regerar",
+                        onConfirm: async () => {
+                          try {
+                            await dbService.regenerateMaterials(work!, steps); // Assure work is not null
+                            await loadWorkData();
+                            setZeModal(prev => ({ ...prev, isOpen: false }));
+                          } catch (error: any) {
+                            console.error("Erro ao regerar materiais:", error);
+                            setZeModal(prev => ({ ...prev, title: "Erro", message: `Erro ao regerar materiais: ${error.message}`, type: "ERROR", confirmText: "Ok" }));
+                          }
+                        },
+                        onCancel: () => setZeModal(p => ({ ...p, isOpen: false })),
+                        type: "DANGER"
+                      })
+                    )}
                   />
                 </div>
               </div>
