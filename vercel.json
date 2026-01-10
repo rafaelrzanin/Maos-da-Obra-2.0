@@ -1,10 +1,5 @@
-
 {
   "rewrites": [
-    {
-      "source": "/service-worker.js",
-      "destination": "/service-worker.js"
-    },
     {
       "source": "/api/subscribe-push",
       "destination": "/api/subscribe-push.js"
