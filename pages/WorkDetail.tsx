@@ -566,6 +566,28 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
     return expenseGroups;
   }, [expenses, steps]);
 
+  // NEW: Helper to render material progress bar
+  const renderMaterialProgressBar = (material: Material) => {
+    const progressPct = material.plannedQty > 0
+      ? (material.purchasedQty / material.plannedQty) * 100
+      : (material.purchasedQty > 0 ? 100 : 0); // If planned is 0 but purchased > 0, it's 100%
+
+    const progressBarColor = progressPct === 100 ? 'bg-green-500' : 'bg-secondary';
+
+    return (
+      <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2 mt-1">
+        <div 
+          className={cx("h-full rounded-full", progressBarColor)} 
+          style={{ width: `${progressPct}%` }}
+          aria-valuenow={progressPct}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-label={`Progresso: ${Math.round(progressPct)}%`}
+        ></div>
+      </div>
+    );
+  };
+
   // =======================================================================
   // DATA LOADING
   // =======================================================================
@@ -894,6 +916,41 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
       setLoading(false);
     }
   }, [draggedStepId, steps, workId, loadWorkData, setLoading, setDraggedStepId, setDragOverStepId, setZeModal]);
+
+  // NEW: Handler for generating materials (when empty state button is clicked)
+  const handleGenerateMaterials = useCallback(async () => {
+    if (!work || !steps.length) {
+      setZeModal({
+        isOpen: true,
+        title: "Erro na Geração",
+        message: "Não é possível gerar materiais sem dados da obra ou etapas existentes.",
+        type: "ERROR",
+        confirmText: "Ok",
+        onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
+      });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      // This will delete existing materials and then insert new ones based on work and steps.
+      // This matches the `ensureMaterialsForWork` behavior.
+      await dbService.regenerateMaterials(work, steps);
+      await loadWorkData(); // Reload all data to reflect new materials
+    } catch (error: any) {
+      console.error("Erro ao gerar lista de materiais:", error);
+      setZeModal({
+        isOpen: true,
+        title: "Erro na Geração",
+        message: `Não foi possível gerar a lista de materiais: ${error.message || 'Erro desconhecido'}. Tente novamente.`,
+        type: "ERROR",
+        confirmText: "Ok",
+        onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [work, steps, loadWorkData]);
 
 
   // =======================================================================
@@ -1810,8 +1867,117 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
 
       {activeTab === 'MATERIAIS' && (
         <div className="tab-content animate-in fade-in duration-300">
-          <div className="p-6 text-center text-slate-500">
-            Seção Materiais em reconstrução segura.
+          <div className="p-4 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-card-default dark:shadow-card-dark-subtle">
+            <div className="flex items-center justify-between mb-6 px-2 sm:px-0">
+                <h2 className="text-2xl font-black text-primary dark:text-white">Sua Lista de Materiais</h2>
+                <button
+                    onClick={() => {
+                        setShowAddMaterialModal(true);
+                        setEditMaterialData(null); // Clear edit data when adding new
+                        setNewMaterialName('');
+                        setNewMaterialBrand('');
+                        setNewMaterialPlannedQty('');
+                        setNewMaterialUnit('');
+                        setNewMaterialCategory('');
+                        setNewMaterialStepId('');
+                        setPurchaseQtyInput('');
+                        setPurchaseCostInput('');
+                    }}
+                    className="px-4 py-2 bg-secondary text-white text-sm font-bold rounded-xl hover:bg-secondary-dark transition-colors flex items-center gap-2"
+                    aria-label="Adicionar novo material"
+                >
+                    <i className="fa-solid fa-plus"></i> Novo
+                </button>
+            </div>
+
+            {materials.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-10 text-center">
+                <i className="fa-solid fa-boxes-stacked text-6xl text-slate-400 mb-6"></i>
+                <h2 className="text-xl font-black text-primary dark:text-white mb-2">Ainda não existe uma lista de materiais para esta obra.</h2>
+                <p className="text-slate-500 dark:text-slate-400 max-w-sm mx-auto mb-6">
+                  Gere uma lista segura com base na estrutura da obra.
+                </p>
+                <button
+                  onClick={handleGenerateMaterials}
+                  disabled={loading}
+                  className="px-6 py-3 bg-secondary text-white font-bold rounded-xl hover:bg-secondary-dark transition-colors flex items-center gap-2"
+                  aria-label="Gerar Lista de Materiais (AI)"
+                >
+                  {loading ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-robot"></i>}
+                  {loading ? 'Gerando...' : 'Gerar Lista de Materiais (AI)'}
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                <div className="mb-4">
+                  <label htmlFor="material-step-filter" className="sr-only">Filtrar materiais por etapa</label>
+                  <select
+                    id="material-step-filter"
+                    value={materialFilterStepId}
+                    onChange={(e) => setMaterialFilterStepId(e.target.value)}
+                    className="w-full md:w-auto px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-primary dark:text-white focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
+                    aria-label="Filtrar materiais por etapa"
+                  >
+                    <option value="all">Todas as Etapas</option>
+                    {steps.map(step => (
+                      <option key={step.id} value={step.id}>{step.orderIndex}. {step.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {groupedMaterials.length === 0 ? (
+                  <p className="text-center text-slate-400 py-10 italic">Nenhum material encontrado para o filtro selecionado.</p>
+                ) : (
+                  groupedMaterials.map(group => (
+                    <div key={group.stepId} className="space-y-4">
+                      <h3 className="text-lg font-bold text-primary dark:text-white border-b border-slate-200 dark:border-slate-700 pb-2 mb-4">{group.stepName}</h3>
+                      {group.materials.map(material => {
+                        const statusDetails = getEntityStatusDetails('material', material, steps);
+                        return (
+                          <div key={material.id} className="bg-slate-50 dark:bg-slate-800 p-4 rounded-xl border border-slate-100 dark:border-slate-700">
+                            <div className="flex items-center justify-between mb-2">
+                              <h4 className="font-bold text-primary dark:text-white text-base">{material.name} {material.brand && <span className="text-sm text-slate-500 dark:text-slate-400">({material.brand})</span>}</h4>
+                              <span className={cx(
+                                "px-2 py-0.5 rounded-full text-xs font-bold uppercase",
+                                statusDetails.bgColor,
+                                statusDetails.textColor
+                              )}>
+                                <i className={`fa-solid ${statusDetails.icon} mr-1`}></i> {statusDetails.statusText}
+                              </span>
+                            </div>
+                            <p className="text-sm text-slate-500 dark:text-slate-400">
+                              {material.purchasedQty} / {material.plannedQty} {material.unit} Comprados
+                            </p>
+                            {renderMaterialProgressBar(material)}
+                            <div className="flex justify-between items-center mt-3 pt-3 border-t border-slate-100 dark:border-slate-700">
+                              <p className="text-sm font-bold text-primary dark:text-white">Custo Total: {formatCurrency(material.totalCost || 0)}</p>
+                              <button
+                                onClick={() => {
+                                  setEditMaterialData(material);
+                                  setNewMaterialName(material.name);
+                                  setNewMaterialBrand(material.brand || '');
+                                  setNewMaterialPlannedQty(String(material.plannedQty));
+                                  setNewMaterialUnit(material.unit);
+                                  setNewMaterialCategory(material.category || '');
+                                  setNewMaterialStepId(material.stepId || 'none');
+                                  setPurchaseQtyInput(''); // Reset purchase input for new transaction
+                                  setPurchaseCostInput(''); // Reset purchase input for new transaction
+                                  setShowAddMaterialModal(true);
+                                }}
+                                className="px-3 py-1 bg-primary text-white text-xs font-bold rounded-lg hover:bg-primary-light transition-colors"
+                                aria-label={`Editar material ${material.name} ou registrar compra`}
+                              >
+                                Editar / Comprar
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}
