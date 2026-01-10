@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import * as ReactRouter from 'react-router-dom';
 import * as XLSX from 'xlsx'; // Keep XLSX import, as reports might use it
@@ -3203,6 +3202,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                 setShowContractContentModal(false);
                 setCopyContractSuccess(false);
                 setSelectedContractContent('');
+                // Fix: Corrected typo from `fetchSelectedContractTitle` to `setSelectedContractTitle`
                 setSelectedContractTitle('');
               }}
               isConfirming={false}
