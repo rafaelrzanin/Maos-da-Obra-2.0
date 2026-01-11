@@ -1,13 +1,12 @@
 
 
-
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext.tsx'; // Use authLoading and isUserAuthFinished
 import * as ReactRouter from 'react-router-dom';
 import { dbService } from '../services/db.ts';
 import { WorkStatus, StepStatus } from '../types.ts'; // Import StepStatus
 import { WORK_TEMPLATES, ZE_AVATAR, ZE_AVATAR_FALLBACK } from '../services/standards.ts';
-import { aiService } from '../services/ai.ts'; // NEW: Import aiService
+import { aiService } from '../services/ai.tsx'; // NEW: Import aiService
 
 // Helper para formatar valores monetários (apenas para exibição estática)
 const formatCurrency = (value: number | string | undefined): string => {
