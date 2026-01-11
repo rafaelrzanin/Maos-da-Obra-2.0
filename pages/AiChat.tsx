@@ -31,6 +31,8 @@ const AiChat = () => {
   const isAiTrialActive = user?.isTrial && trialDaysRemaining !== null && trialDaysRemaining > 0;
   const hasAiAccess = isVitalicio || isAiTrialActive;
 
+  const [errorMsg, setErrorMsg] = useState(''); // For local errors like speech recognition
+
   // Initialize SpeechRecognition
   useEffect(() => {
     if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
@@ -53,18 +55,17 @@ const AiChat = () => {
           }
         }
         // Always update recognizedText with the latest interim or final part
-        setRecognizedText(prev => prev + finalTranscript + interimTranscript); // Accumulate recognized text
+        setRecognizedText(finalTranscript + interimTranscript); // Accumulate recognized text
       };
 
       recognition.onend = () => {
-        // When recognition ends (e.g., user clicked stop or browser auto-stopped)
-        // If there's recognized text, move it to aiMessage if not already sent
-        if (recognizedText.trim() && !aiLoading) {
+        console.log("Speech Recognition ended.");
+        // If there's recognized text, move it to aiMessage, then clear recognizedText
+        if (recognizedText.trim()) {
             setAiMessage(recognizedText.trim());
         }
-        setIsListening(false);
-        setRecognizedText('');
-        console.log("Speech Recognition ended.");
+        setIsListening(false); // Ensure listening state is false
+        setRecognizedText(''); // Clear recognized text
       };
 
       recognition.onerror = (event: any /* SpeechRecognitionErrorEvent */) => {
@@ -85,7 +86,7 @@ const AiChat = () => {
         recognitionRef.current.stop();
       }
     };
-  }, [aiLoading, recognizedText]); // Add recognizedText to dependencies to keep onresult updated
+  }, [recognizedText]); // Add recognizedText to dependencies to keep onresult updated
 
 
   // Add initial AI welcome message
@@ -102,14 +103,12 @@ const AiChat = () => {
     }
   }, [messages]);
 
-  const [errorMsg, setErrorMsg] = useState(''); // NEW: For local errors like speech recognition
-
   // handleAiAsk now accepts an optional text parameter for transcribed speech (used for explicit send)
-  const handleAiAsk = async (e?: React.FormEvent, textToProcess?: string) => {
+  const handleAiAsk = async (e?: React.FormEvent) => { // Removed textToProcess parameter, use aiMessage directly
     e?.preventDefault(); // Only prevent default if event object exists
-    const textToSend = textToProcess?.trim() || aiMessage.trim();
+    const textToSend = aiMessage.trim(); // Always use aiMessage state
 
-    if (!textToSend || !hasAiAccess || aiLoading) return;
+    if (!textToSend || !hasAiAccess || aiLoading || isListening) return; // Cannot send if listening or empty/loading
 
     const userMessage: Message = { id: Date.now().toString(), sender: 'user', text: textToSend };
     setMessages(prevMessages => [...prevMessages, userMessage]);
@@ -139,13 +138,8 @@ const AiChat = () => {
 
     if (isListening) {
       recognitionRef.current.stop(); // This will trigger onend
-      // If there is any recognized text when stopping, send it
-      if (recognizedText.trim() || aiMessage.trim()) {
-        handleAiAsk(null, recognizedText.trim() || aiMessage.trim());
-      }
-      setIsListening(false);
-      setRecognizedText(''); // Clear interim text
-      setAiMessage(''); // Clear final input text
+      // REMOVIDO: NENHUM ENVIO AUTOMÁTICO AQUI
+      // O texto transcrito estará em `aiMessage` (via onend) e o usuário deve clicar em enviar
     } else {
       setAiMessage(''); // Clear any existing text before starting
       setRecognizedText(''); // Clear previous recognized text
@@ -239,9 +233,20 @@ const AiChat = () => {
           className={`w-14 text-white rounded-xl flex items-center justify-center shadow-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed
             ${isListening ? 'bg-red-500 hover:bg-red-600 animate-pulse-mic' : 'bg-secondary hover:bg-orange-600'}
           `}
-          aria-label={isListening ? 'Parar gravação de voz e enviar' : 'Iniciar gravação de voz'}
+          aria-label={isListening ? 'Parar gravação de voz' : 'Iniciar gravação de voz'}
         >
           {isListening ? <i className="fa-solid fa-microphone-slash"></i> : <i className="fa-solid fa-microphone"></i>}
+        </button>
+        {/* NEW: Send Button - Always present */}
+        <button
+          type="submit"
+          disabled={aiLoading || !aiMessage.trim() || isListening} // Disable if AI is loading, input is empty, or still listening
+          className={`w-14 text-white rounded-xl flex items-center justify-center shadow-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed
+            ${(!aiMessage.trim() || aiLoading || isListening) ? 'bg-slate-400 dark:bg-slate-700' : 'bg-primary hover:bg-primary-light'}
+          `}
+          aria-label="Enviar mensagem"
+        >
+          <i className="fa-solid fa-paper-plane"></i>
         </button>
       </form>
       {errorMsg && (
