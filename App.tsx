@@ -24,7 +24,8 @@ const AiChat = lazy(() => import('./pages/AiChat.tsx')); // Lazy load AiChat pag
 const Notifications = lazy(() => import('./pages/Notifications.tsx')); // NEW: Lazy load Notifications page
 // NEW: AiWorkPlanner lazy load, as it is a premium feature
 const AiWorkPlanner = lazy(() => import('./pages/AiWorkPlanner.tsx'));
-const ReportsView = lazy(() => import('./components/ReportsView.tsx')); // NEW: Lazy load ReportsView
+// FIX: Changed lazy import to correctly handle named export for ReportsView.
+const ReportsView = lazy(() => import('./components/ReportsView.tsx').then(module => ({ default: module.ReportsView }))); // NEW: Lazy load ReportsView
 
 // --- Componente de Carregamento ---
 const LoadingScreen = () => (
@@ -51,8 +52,6 @@ interface ErrorBoundaryState {
 }
 
 class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  // FIX: Explicitly declare state and props to satisfy a potentially confused TypeScript linter.
-  // This is usually NOT required as they are inherited from React.Component.
   public state: ErrorBoundaryState;
   public props: ErrorBoundaryProps;
 
@@ -62,55 +61,33 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
   }
 
   static getDerivedStateFromError(error: Error): ErrorBoundaryState {
-    // Update state so the next render will show the fallback UI.
     return { hasError: true, error, errorInfo: null };
   }
 
-  // FIX: Explicitly set return type for componentDidCatch
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo): void {
-    // You can also log the error to an error reporting service
     console.error("[ErrorBoundary] Uncaught error:", error, errorInfo);
-    // FIX: Use this.setState to update component state
     this.setState({ errorInfo });
   }
 
-  // FIX: Explicitly set return type for render
   render(): React.ReactNode {
-    // FIX: Use this.state to access component state
     if (this.state.hasError) {
-      // You can render any custom fallback UI
       return (
         <div className="flex flex-col items-center justify-center min-h-screen p-8 bg-danger-light dark:bg-danger-dark text-danger">
           <i className="fa-solid fa-triangle-exclamation text-5xl mb-4"></i>
-          <h1 className="text-2xl font-bold mb-2">Ops! Algo deu errado.</h1>
-          <p className="text-center text-sm mb-4">
-            Parece que houve um erro inesperado. Por favor, tente recarregar a página.
+          <h1 className="text-2xl font-bold mb-2">Ops! Algo inesperado aconteceu.</h1>
+          <p className="text-center text-sm mb-4 text-slate-700 dark:text-slate-300">
+            A aplicação encontrou um problema inesperado e precisa ser reiniciada. Está tudo sob controle.
           </p>
           <button
             onClick={() => window.location.reload()}
-            className="px-6 py-3 bg-danger text-white font-bold rounded-xl hover:bg-danger-dark transition-colors"
+            className="px-6 py-3 bg-secondary text-white font-bold rounded-xl hover:bg-secondary-dark transition-colors"
           >
-            Recarregar Página
+            Tentar novamente
           </button>
-          {this.state.error && (
-            <details className="mt-6 p-4 bg-danger-light/50 border border-danger rounded-lg max-w-lg overflow-auto text-xs text-left">
-              <summary className="font-bold cursor-pointer">Detalhes do Erro</summary>
-              {/* FIX: Use this.state.error to access error object */}
-              <pre className="whitespace-pre-wrap mt-2 break-words">{this.state.error.toString()}</pre>
-              {/* FIX: Use this.state.errorInfo to access errorInfo object */}
-              {this.state.errorInfo?.componentStack && (
-                <div className="mt-2">
-                  <h4 className="font-bold">Component Stack:</h4>
-                  <pre className="whitespace-pre-wrap break-words">{this.state.errorInfo.componentStack}</pre>
-                </div>
-              )}
-            </details>
-          )}
+          {/* Detalhes do erro removidos da UI para uma experiência mais limpa, mas ainda logados no console */}
         </div>
       );
     }
-
-    // FIX: Use this.props.children to access children prop
     return this.props.children;
   }
 }
