@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import * as ReactRouter from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.tsx';
@@ -235,12 +234,18 @@ const Dashboard = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [dashboardError, setDashboardError] = useState<string | null>(null); // NEW: State for general dashboard errors
 
+  // NEW: State for ZeModal component (generic modal for confirmations/errors)
+  const [zeModal, setZeModal] = useState<ZeModalProps & { id?: string, isConfirming?: boolean }>({
+    isOpen: false, title: '', message: '', onCancel: () => { }, isConfirming: false
+  });
+
   // Ref to track notification count changes for data refresh
   const notificationCountRef = useRef(unreadNotificationsCount);
 
   // NEW: FTUE States
   const [showFtue, setShowFtue] = useState(false);
   const [currentFtueStep, setCurrentFtueStep] = useState(0);
+  const [dontShowAgainChecked, setDontShowAgainChecked] = useState(false); // NEW: State for "Não mostrar novamente" checkbox
 
 
   // =======================================================================
@@ -249,9 +254,13 @@ const Dashboard = () => {
 
   const markFtueAsSeen = useCallback(() => {
     localStorage.setItem('seen_app_ftue_guide', 'true');
+    if (dontShowAgainChecked) {
+        localStorage.setItem('dontShowFtueAgain', 'true');
+    }
     setShowFtue(false);
     setCurrentFtueStep(0);
-  }, []);
+    setDontShowAgainChecked(false); // Reset checkbox state
+  }, [dontShowAgainChecked]);
 
   const handleNextFtueStep = useCallback(() => {
     if (currentFtueStep < ftueStepsContent.length - 1) {
@@ -377,10 +386,11 @@ const Dashboard = () => {
 
   // NEW: FTUE Trigger useEffect
   useEffect(() => {
-    // Only show FTUE if user is authenticated, not loading, and hasn't seen it before.
-    if (isUserAuthFinished && !authLoading && !loadingDashboard && user && localStorage.getItem('seen_app_ftue_guide') !== 'true') {
+    // Only show FTUE if user is authenticated, not loading, hasn't seen it before, AND hasn't opted out.
+    if (isUserAuthFinished && !authLoading && !loadingDashboard && user && localStorage.getItem('seen_app_ftue_guide') !== 'true' && localStorage.getItem('dontShowFtueAgain') !== 'true') {
       setShowFtue(true);
       setCurrentFtueStep(0);
+      setDontShowAgainChecked(false); // Reset checkbox state on modal open
     }
   }, [isUserAuthFinished, authLoading, loadingDashboard, user]);
 
@@ -401,11 +411,12 @@ const Dashboard = () => {
   const handleDeleteSelectedWork = async () => {
     if (!selectedWork) return;
 
-    setIsDeletingWork(true);
-    setDeleteError('');
+    // Use zeModal for confirmation
+    setZeModal(prev => ({ ...prev, id: selectedWork.id, isConfirming: true }));
     try {
       await dbService.deleteWork(selectedWork.id);
-      setShowDeleteModal(false);
+      // After successful deletion in dbService, close the modal and reload data
+      setZeModal(prev => ({ ...prev, isOpen: false }));
       
       // After deletion, reload all works to update the list and re-select if possible
       await loadAllWorks(); 
@@ -418,9 +429,20 @@ const Dashboard = () => {
       }
     } catch (error: any) {
       console.error("Erro ao excluir obra:", error);
-      setDeleteError(error.message);
+      // Update zeModal with error details
+      setZeModal(prev => ({
+        ...prev,
+        isConfirming: false,
+        title: "Erro ao Excluir Obra",
+        message: `Não foi possível excluir a obra: ${error.message || 'Erro desconhecido'}.`,
+        type: "ERROR",
+        confirmText: "Ok",
+        onConfirm: () => setZeModal(p => ({ ...p, isOpen: false })),
+        onCancel: () => setZeModal(p => ({ ...p, isOpen: false })) // Ensure onCancel matches signature
+      }));
     } finally {
-      setIsDeletingWork(false);
+      // Ensure confirming state is reset
+      setZeModal(prev => ({ ...prev, isConfirming: false }));
     }
   };
 
@@ -472,13 +494,34 @@ const Dashboard = () => {
           <ZeModal
             isOpen={showFtue}
             title="Mãos da Obra - Guia Rápido"
-            message={ftueStepsContent[currentFtueStep].text}
+            // If it's the first step, pass children. Otherwise, use the message prop.
+            message={currentFtueStep !== 0 ? ftueStepsContent[currentFtueStep].text : ""}
             confirmText={currentFtueStep === ftueStepsContent.length - 1 ? "Entendido!" : "Próximo"}
             cancelText="Pular Tour"
             onConfirm={handleNextFtueStep}
             onCancel={markFtueAsSeen}
             type="INFO"
-          />
+          >
+            {currentFtueStep === 0 && (
+                <>
+                    <p className="text-base text-slate-700 dark:text-slate-300 mb-4">
+                        {ftueStepsContent[currentFtueStep].text}
+                    </p>
+                    <div className="flex items-center mt-4">
+                        <input
+                            id="dontShowAgain"
+                            type="checkbox"
+                            checked={dontShowAgainChecked}
+                            onChange={(e) => setDontShowAgainChecked(e.target.checked)}
+                            className="h-4 w-4 rounded border-slate-300 dark:border-slate-600 text-secondary focus:ring-secondary/50"
+                        />
+                        <label htmlFor="dontShowAgain" className="ml-2 text-sm text-slate-700 dark:text-slate-300">
+                            Não mostrar novamente
+                        </label>
+                    </div>
+                </>
+            )}
+          </ZeModal>
         )}
         {/* Header - Welcome back [user's first name] */}
         <div className="flex justify-between items-end mb-10"> {/* OE #004: Increased margin-bottom */}
@@ -541,13 +584,34 @@ const Dashboard = () => {
         <ZeModal
           isOpen={showFtue}
           title="Mãos da Obra - Guia Rápido"
-          message={ftueStepsContent[currentFtueStep].text}
+          // Conditionally set message or children
+          message={currentFtueStep !== 0 ? ftueStepsContent[currentFtueStep].text : ""}
           confirmText={currentFtueStep === ftueStepsContent.length - 1 ? "Entendido!" : "Próximo"}
           cancelText="Pular Tour"
           onConfirm={handleNextFtueStep}
           onCancel={markFtueAsSeen}
           type="INFO"
-        />
+        >
+          {currentFtueStep === 0 && (
+              <>
+                  <p className="text-base text-slate-700 dark:text-slate-300 mb-4">
+                      {ftueStepsContent[currentFtueStep].text}
+                  </p>
+                  <div className="flex items-center mt-4">
+                      <input
+                          id="dontShowAgain"
+                          type="checkbox"
+                          checked={dontShowAgainChecked}
+                          onChange={(e) => setDontShowAgainChecked(e.target.checked)}
+                          className="h-4 w-4 rounded border-slate-300 dark:border-slate-600 text-secondary focus:ring-secondary/50"
+                      />
+                      <label htmlFor="dontShowAgain" className="ml-2 text-sm text-slate-700 dark:text-slate-300">
+                          Não mostrar novamente
+                      </label>
+                  </div>
+              </>
+          )}
+        </ZeModal>
       )}
 
       {/* Header */}
@@ -601,7 +665,16 @@ const Dashboard = () => {
           ))}
         </select>
         <button
-          onClick={() => setShowDeleteModal(true)}
+          onClick={() => setZeModal({
+            isOpen: true,
+            title: "Confirmar Exclusão",
+            message: `Tem certeza que deseja excluir a obra "${selectedWork?.name}"? Esta ação é irreversível e removerá todos os dados associados.`,
+            type: "DANGER",
+            confirmText: "Sim, Excluir Obra",
+            onConfirm: handleDeleteSelectedWork,
+            onCancel: () => setZeModal(p => ({ ...p, isOpen: false })), // Fix: Ensure onCancel matches signature
+            id: selectedWork?.id // Pass work ID to modal for context
+          })}
           disabled={!selectedWork}
           className="flex-none w-14 h-14 bg-red-500 text-white rounded-xl flex items-center justify-center hover:bg-red-600 transition-colors disabled:opacity-50" /* OE #004: Increased size */
           aria-label={`Excluir obra ${selectedWork?.name || ''}`}
@@ -684,22 +757,19 @@ const Dashboard = () => {
         </>
       )}
 
-      {showDeleteModal && selectedWork && (
+      {/* Delete Confirmation Modal */}
+      {zeModal.isOpen && zeModal.id === selectedWork?.id && ( // Only show if it's the delete modal for the selected work
         <ZeModal
-          isOpen={showDeleteModal}
-          title="Confirmar Exclusão"
-          message={`Tem certeza que deseja excluir a obra "${selectedWork.name}"? Esta ação é irreversível e removerá todos os dados associados.`}
-          confirmText="Sim, Excluir Obra"
-          onConfirm={handleDeleteSelectedWork}
-          onCancel={() => setShowDeleteModal(false)}
-          type="DANGER"
-          isConfirming={isDeletingWork}
+          isOpen={zeModal.isOpen}
+          title={zeModal.title}
+          message={zeModal.message}
+          confirmText={zeModal.confirmText || "Confirmar"}
+          onConfirm={zeModal.onConfirm}
+          onCancel={zeModal.onCancel} // Fix: Ensure onCancel matches signature
+          type={zeModal.type}
+          isConfirming={zeModal.isConfirming}
         >
-          {deleteError && (
-            <div className="mt-4 p-3 bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-700 text-red-700 dark:text-red-300 rounded-xl text-base"> {/* OE #004: Increased text size */}
-              <i className="fa-solid fa-triangle-exclamation mr-2"></i> {deleteError}
-            </div>
-          )}
+          {/* Children can be passed here if additional content is needed in the delete modal */}
         </ZeModal>
       )}
     </div>
