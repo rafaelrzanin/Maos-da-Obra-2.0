@@ -218,7 +218,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
   const navItems = [
     { path: '/', icon: 'fa-home', label: 'Dashboard' },
     { path: '/create', icon: 'fa-plus-circle', label: 'Nova Obra' },
-    { path: '/ai-chat', icon: 'fa-robot', label: 'Zé da Obra AI' },
+    { path: '/ai-chat', icon: 'fa-helmet-safety', label: 'Zé da Obra AI' },
     { path: '/notifications', icon: 'fa-bell', label: 'Alertas', badge: unreadNotificationsCount },
     { path: '/profile', icon: 'fa-user', label: 'Meu Perfil' }, // Added Profile
     { path: '/tutorials', icon: 'fa-video', label: 'Tutoriais em Vídeo' }, // Added Tutorials
@@ -331,7 +331,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
         className="fixed bottom-4 right-4 z-50 w-16 h-16 rounded-full bg-secondary shadow-lg hover:bg-secondary-dark focus:outline-none focus:ring-4 focus:ring-secondary/50 transition-all duration-200 flex items-center justify-center text-3xl text-white md:bottom-8 md:right-8"
         aria-label="Abrir chat do Zé da Obra AI"
       >
-        <i className="fa-solid fa-robot"></i>
+        <i className="fa-solid fa-helmet-safety"></i>
       </button>
 
       {/* NEW: Bottom Navigation Bar */}
