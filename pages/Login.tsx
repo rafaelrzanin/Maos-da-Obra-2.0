@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext.tsx';
 import * as ReactRouter from 'react-router-dom';
@@ -267,7 +268,7 @@ const Login = () => {
                   {mode === 'login' ? 'Bem-vindo de volta' : 'Criar sua Conta'}
               </h2>
               {planParam && mode === 'register' && (
-                <p className="text-center text-amber-400 text-sm mb-4 font-semibold">
+                <p className="text-center text-amber-400 text-base mb-5 font-semibold"> {/* OE #004: Increased text size, margin */}
                   Você está se cadastrando para o plano {planParam.toUpperCase()}. Você poderá confirmá-lo após o cadastro.
                 </p>
               )}
@@ -276,19 +277,19 @@ const Login = () => {
               {mode === 'login' && (
                 <form onSubmit={handleLoginSubmit} className="space-y-4 animate-in fade-in slide-in-from-left-4 duration-300">
                     <input type="email" placeholder="E-mail" value={loginEmail} onChange={handleInputChange} name="email"
-                        className="w-full px-4 py-3 bg-white/10 border border-white/10 rounded-xl text-white outline-none focus:border-amber-500/50" 
+                        className="w-full px-4 py-3 bg-white/10 border border-white/10 rounded-xl text-white outline-none focus:border-amber-500/50 placeholder:text-gray-400 dark:placeholder:text-gray-500" /* OE #004: Added placeholder styling */
                         aria-label="E-mail"
                         autoComplete="username"
                     />
                     
                     <input type="password" placeholder="Senha" value={loginPassword} onChange={handleInputChange} name="password"
-                        className="w-full px-4 py-3 bg-white/10 border border-white/10 rounded-xl text-white outline-none focus:border-amber-500/50" 
+                        className="w-full px-4 py-3 bg-white/10 border border-white/10 rounded-xl text-white outline-none focus:border-amber-500/50 placeholder:text-gray-400 dark:placeholder:text-gray-500" /* OE #004: Added placeholder styling */
                         aria-label="Senha"
                         autoComplete="current-password"
                     />
 
                     <button type="submit" disabled={loading}
-                        className="w-full py-4 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl transition-all shadow-lg shadow-amber-500/20 disabled:opacity-50 flex items-center justify-center gap-2"
+                        className="w-full py-4 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl transition-all shadow-lg shadow-amber-500/20 disabled:opacity-50 flex items-center justify-center gap-2 text-lg" /* OE #004: Increased text size */
                         aria-label="Entrar na sua conta"
                     >
                         {loading && <i className="fa-solid fa-circle-notch fa-spin"></i>}
@@ -316,7 +317,7 @@ const Login = () => {
                         aria-label="Senha" autoComplete="new-password" minLength={6} required />
 
                     <button type="submit" disabled={loading}
-                        className="w-full py-4 bg-secondary hover:bg-orange-600 text-white font-bold rounded-xl transition-all shadow-lg shadow-secondary/20 disabled:opacity-50 flex items-center justify-center gap-2"
+                        className="w-full py-4 bg-secondary hover:bg-orange-600 text-white font-bold rounded-xl transition-all shadow-lg shadow-secondary/20 disabled:opacity-50 flex items-center justify-center gap-2 text-lg" /* OE #004: Increased text size */
                         aria-label="Criar sua conta"
                     >
                         {loading && <i className="fa-solid fa-circle-notch fa-spin"></i>}
@@ -327,19 +328,19 @@ const Login = () => {
 
 
               {errorMsg && (
-                  <div className="mt-6 p-4 bg-red-500/20 border border-red-500/50 text-red-200 rounded-xl text-sm font-bold flex items-center gap-2 animate-in fade-in" role="alert">
+                  <div className="mt-6 p-4 bg-red-500/20 border border-red-500/50 text-red-200 rounded-xl text-base font-bold flex items-center gap-2 animate-in fade-in" role="alert"> {/* OE #004: Increased text size */}
                       <i className="fa-solid fa-triangle-exclamation"></i> {errorMsg}
                   </div>
               )}
 
               <div className="mt-6 flex flex-col gap-4">
-                  <button onClick={() => handleSocialLogin('google')} type="button" disabled={loading} className="w-full py-3 bg-white text-slate-900 font-bold rounded-xl flex items-center justify-center gap-3 hover:bg-slate-100 transition-colors disabled:opacity-50" aria-label="Entrar com Google">
+                  <button onClick={() => handleSocialLogin('google')} type="button" disabled={loading} className="w-full py-3 bg-white text-slate-900 font-bold rounded-xl flex items-center justify-center gap-3 hover:bg-slate-100 transition-colors disabled:opacity-50 text-base" aria-label="Entrar com Google"> {/* OE #004: Increased text size */}
                       <img src="https://www.svgrepo.com/show/475656/google-color.svg" className="w-5 h-5" alt="Google" />
                       Entrar com Google
                   </button>
 
                   {mode === 'login' && (
-                    <div className="flex justify-between items-center text-sm">
+                    <div className="flex justify-between items-center text-base"> {/* OE #004: Increased text size */}
                         <button onClick={() => setMode('register')} className="text-white/70 hover:text-white font-medium" aria-label="Criar nova conta">
                             Criar conta
                         </button>
@@ -349,7 +350,7 @@ const Login = () => {
                     </div>
                   )}
                   {mode === 'register' && (
-                    <div className="flex justify-center text-sm">
+                    <div className="flex justify-center text-base"> {/* OE #004: Increased text size */}
                         <button onClick={() => setMode('login')} className="text-white/70 hover:text-white font-medium" aria-label="Fazer login se já tem conta">
                             Já tem conta? Faça login aqui
                         </button>
@@ -365,18 +366,18 @@ const Login = () => {
               <div className="bg-slate-900 border border-slate-700 p-6 rounded-3xl w-full max-w-sm relative">
                   <button onClick={() => setShowForgotModal(false)} className="absolute top-4 right-4 text-slate-400 hover:text-white" aria-label="Fechar modal de recuperação de senha"><i className="fa-solid fa-xmark text-xl"></i></button>
                   <h3 className="text-xl font-bold text-white mb-2">Recuperar Senha</h3>
-                  <p className="text-slate-400 text-sm mb-4">Digite seu e-mail para receber o link de redefinição.</p>
+                  <p className="text-slate-400 text-base mb-4">Digite seu e-mail para receber o link de redefinição.</p> {/* OE #004: Increased text size */}
                   
                   {forgotStatus === 'SENT' ? (
-                      <div className="bg-green-500/20 border border-green-500/50 text-green-200 p-4 rounded-xl text-center" role="status">
+                      <div className="bg-green-500/20 border border-green-500/50 text-green-200 p-4 rounded-xl text-center text-base" role="status"> {/* OE #004: Increased text size */}
                           <i className="fa-solid fa-check-circle text-2xl mb-2 block"></i>
                           E-mail enviado! Verifique sua caixa de entrada.
                       </div>
                   ) : (
                       <form onSubmit={handleForgotPassword} className="space-y-4">
                           <input type="email" placeholder="Seu e-mail cadastrado" value={forgotEmail} onChange={e => setForgotEmail(e.target.value)}
-                              className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white outline-none focus:border-amber-500" required aria-label="E-mail para recuperação de senha" />
-                          <button type="submit" disabled={forgotStatus === 'SENDING'} className="w-full py-3 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl transition-all" aria-label="Enviar link de redefinição de senha">
+                              className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white outline-none focus:border-amber-500 placeholder:text-gray-400 dark:placeholder:text-gray-500" required aria-label="E-mail para recuperação de senha" /> {/* OE #004: Added placeholder styling */}
+                          <button type="submit" disabled={forgotStatus === 'SENDING'} className="w-full py-3 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl transition-all text-lg" aria-label="Enviar link de redefinição de senha"> {/* OE #004: Increased text size */}
                               {forgotStatus === 'SENDING' ? 'Enviando...' : 'Enviar Link'}
                           </button>
                       </form>
