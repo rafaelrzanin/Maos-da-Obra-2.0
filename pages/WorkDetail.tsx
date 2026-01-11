@@ -726,11 +726,18 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
       setZeModal({
         isOpen: true,
         title: "Erro de Carregamento",
-        message: `Não foi possível carregar os dados da obra: ${error.message || 'Erro desconhecido'}. Verifique sua conexão ou tente novamente.`,
+        message: `Tivemos um problema ao carregar os dados da obra. Por favor, tente novamente.`,
         type: "ERROR",
-        confirmText: "Ok",
-        onConfirm: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false })); navigate('/dashboard');}, // Go to dashboard on confirm
-        onCancel: (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false })); navigate('/dashboard');} // Go to dashboard on cancel
+        confirmText: "Tentar Novamente", // Renamed for better UX
+        onConfirm: async (_e?: React.FormEvent) => {
+            setZeModal(p => ({ ...p, isOpen: false })); 
+            await loadWorkData(); // Retry loading
+        }, 
+        onCancel: async (_e?: React.FormEvent) => {
+            setZeModal(p => ({ ...p, isOpen: false })); 
+            navigate('/dashboard');
+        }, // Go to dashboard on cancel
+        cancelText: "Voltar para Dashboard" // Renamed for better UX
       });
       setWork(null); // Ensure work is null on error to show not found
       return; // Explicitly return void on error
@@ -1018,7 +1025,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
       setZeModal({
         isOpen: true,
         title: "Erro na Geração",
-        message: "Não é possível gerar materiais sem dados da obra ou etapas existentes.",
+        message: "Não é possível gerar materiais sem dados da obra ou etapas existentes. Por favor, cadastre ao menos uma etapa.",
         type: "ERROR",
         confirmText: "Ok",
         onConfirm: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));},
@@ -1063,7 +1070,10 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
 
   const handleAddMaterial = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!workId || !user?.id || !newMaterialName || !newMaterialPlannedQty || !newMaterialUnit) return;
+    if (!workId || !user?.id || !newMaterialName || !newMaterialPlannedQty || !newMaterialUnit) {
+      showToastNotification("Por favor, preencha todos os campos obrigatórios do material.", 'warning');
+      return;
+    }
 
     setZeModal(prev => ({ ...prev, isConfirming: true }));
     try {
@@ -1205,7 +1215,10 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
 
   const handleAddExpense = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!workId || !newExpenseDescription || !newExpenseAmount || !newExpenseDate) return;
+    if (!workId || !newExpenseDescription || !newExpenseAmount || !newExpenseDate) {
+        showToastNotification("Por favor, preencha todos os campos obrigatórios da despesa.", 'warning');
+        return;
+    }
 
     setZeModal(prev => ({ ...prev, isConfirming: true }));
     try {
@@ -1329,7 +1342,10 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
 
   const handleAddWorker = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!workId || !user?.id || !newWorkerName || !newWorkerRole || !newWorkerPhone) return;
+    if (!workId || !user?.id || !newWorkerName || !newWorkerRole || !newWorkerPhone) {
+        showToastNotification("Por favor, preencha todos os campos obrigatórios do trabalhador.", 'warning');
+        return;
+    }
 
     setIsAddingWorker(true); // Set local loading for this action
     setZeModal(prev => ({ ...prev, isConfirming: true }));
@@ -1372,7 +1388,10 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
 
   const handleEditWorker = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editWorkerData || !workId || !user?.id || !newWorkerName || !newWorkerRole || !newWorkerPhone) return;
+    if (!editWorkerData || !workId || !user?.id || !newWorkerName || !newWorkerRole || !newWorkerPhone) {
+        showToastNotification("Por favor, preencha todos os campos obrigatórios do trabalhador.", 'warning');
+        return;
+    }
 
     setIsAddingWorker(true); // Use same loading state for edit
     setZeModal(prev => ({ ...prev, isConfirming: true }));
@@ -1440,7 +1459,10 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
 
   const handleAddSupplier = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!workId || !user?.id || !newSupplierName || !newSupplierCategory || !newSupplierPhone) return;
+    if (!workId || !user?.id || !newSupplierName || !newSupplierCategory || !newSupplierPhone) {
+        showToastNotification("Por favor, preencha todos os campos obrigatórios do fornecedor.", 'warning');
+        return;
+    }
 
     setIsAddingSupplier(true);
     setZeModal(prev => ({ ...prev, isConfirming: true }));
@@ -1485,7 +1507,10 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
 
   const handleEditSupplier = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editSupplierData || !workId || !user?.id || !newSupplierName || !newSupplierCategory || !newSupplierPhone) return;
+    if (!editSupplierData || !workId || !user?.id || !newSupplierName || !newSupplierCategory || !newSupplierPhone) {
+        showToastNotification("Por favor, preencha todos os campos obrigatórios do fornecedor.", 'warning');
+        return;
+    }
 
     setIsAddingSupplier(true); // Use same loading state for edit
     setZeModal(prev => ({ ...prev, isConfirming: true }));
@@ -1554,7 +1579,10 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
 
   const handleAddPhoto = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!workId || !newPhotoDescription || !newPhotoFile) return;
+    if (!workId || !newPhotoDescription || !newPhotoFile) {
+        showToastNotification("Por favor, preencha a descrição e selecione uma foto.", 'warning');
+        return;
+    }
 
     setLoadingPhoto(true);
     setZeModal(prev => ({ ...prev, isConfirming: true }));
@@ -1648,7 +1676,10 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
 
   const handleAddFile = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!workId || !newFileName || !newUploadFile) return;
+    if (!workId || !newFileName || !newUploadFile) {
+        showToastNotification("Por favor, preencha o nome do arquivo e selecione o arquivo para upload.", 'warning');
+        return;
+    }
 
     setLoadingFile(true);
     setZeModal(prev => ({ ...prev, isConfirming: true }));
@@ -1746,7 +1777,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
   const handleAddChecklist = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!workId || !newChecklistName || newChecklistItems.some(item => !item.trim())) {
-      setZeModal(prev => ({ ...prev, title: "Campos Obrigatórios", message: "Por favor, preencha o nome do checklist e todos os itens.", type: "ERROR", confirmText: "Ok", onConfirm: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));}, onCancel: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));} })); // Fix: Ensure onConfirm/onCancel match signature
+      setZeModal(prev => ({ ...prev, title: "Campos Obrigatórios", message: "Por favor, preencha o nome do checklist e todos os itens.", type: "WARNING", confirmText: "Ok", onConfirm: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));}, onCancel: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));} })); // Fix: Ensure onConfirm/onCancel match signature
       return;
     }
 
@@ -1791,7 +1822,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
   const handleEditChecklist = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editChecklistData || !workId || !newChecklistName || newChecklistItems.some(item => !item.trim())) {
-      setZeModal(prev => ({ ...prev, title: "Campos Obrigatórios", message: "Por favor, preencha o nome do checklist e todos os itens.", type: "ERROR", confirmText: "Ok", onConfirm: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));}, onCancel: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));} })); // Fix: Ensure onConfirm/onCancel match signature
+      setZeModal(prev => ({ ...prev, title: "Campos Obrigatórios", message: "Por favor, preencha o nome do checklist e todos os itens.", type: "WARNING", confirmText: "Ok", onConfirm: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));}, onCancel: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));} })); // Fix: Ensure onConfirm/onCancel match signature
       return;
     }
 
@@ -2176,8 +2207,8 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                         setNewMaterialUnit('');
                         setNewMaterialCategory('');
                         setNewMaterialStepId('');
-                        setPurchaseQtyInput('');
-                        setPurchaseCostInput('');
+                        setPurchaseQtyInput(''); // Clear temporary purchase inputs
+                        setPurchaseCostInput(''); // Clear temporary purchase inputs
                     }}
                     className="px-4 py-2 bg-secondary text-white text-sm font-bold rounded-xl hover:bg-secondary-dark transition-colors flex items-center gap-2"
                     aria-label="Adicionar novo material"
@@ -2222,7 +2253,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                 </div>
 
                 {groupedMaterials.length === 0 ? (
-                  <p className="text-center text-slate-400 py-10 italic">Nenhum material encontrado para o filtro selecionado.</p>
+                  <p className="text-center text-slate-400 py-10 italic">Nenhum material encontrado para o filtro selecionado. Tente outro filtro ou adicione novos materiais.</p>
                 ) : (
                   groupedMaterials.map(group => (
                     <div key={group.stepId} className="space-y-4">
@@ -3018,21 +3049,18 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                       value={purchaseCostInput}
                       onChange={(e) => setPurchaseCostInput(e.target.value)}
                       className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
-                      placeholder="Custo total (ex: 150.00)"
+                      placeholder="Custo total da compra"
                       min="0"
-                      step="0.01"
                     />
                   </div>
                 </div>
-                {(Number(purchaseQtyInput) > 0 && Number(purchaseCostInput) <= 0) && (
-                    <p className="text-red-500 text-xs mt-2">Custo deve ser maior que zero para registrar uma compra de material.</p>
-                )}
               </div>
             )}
           </form>
         </ZeModal>
       )}
 
+      {/* ADD/EDIT EXPENSE MODAL */}
       {showAddExpenseModal && (
         <ZeModal
           isOpen={showAddExpenseModal}
@@ -3050,7 +3078,6 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
             setNewExpenseStepId('');
             setNewExpenseWorkerId('');
             setNewExpenseSupplierId('');
-            // FIX: Clear `newExpenseTotalAgreed`
             setNewExpenseTotalAgreed('');
           }}
           isConfirming={zeModal.isConfirming}
@@ -3065,7 +3092,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                 value={newExpenseDescription}
                 onChange={(e) => setNewExpenseDescription(e.target.value)}
                 className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
-                placeholder="Ex: Pagamento Pedreiro João, Compra de Cimento"
+                placeholder="Ex: Compra de Cimento, Diária Pedreiro"
                 required
               />
             </div>
@@ -3077,37 +3104,35 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                 value={newExpenseAmount}
                 onChange={(e) => setNewExpenseAmount(e.target.value)}
                 className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
-                placeholder="Ex: 500.00"
+                placeholder="Ex: 1500.00"
                 min="0"
                 step="0.01"
                 required
-                disabled={editExpenseData?.paidAmount && editExpenseData.paidAmount > 0} // Disable if already paid
-                title={editExpenseData?.paidAmount && editExpenseData.paidAmount > 0 ? "Não editável após pagamento registrado." : undefined} // Tooltip
+                disabled={!!editExpenseData?.paidAmount && editExpenseData.paidAmount > 0 && editExpenseData.category !== ExpenseCategory.MATERIAL} // Disable if paid AND not material
+                title={!!editExpenseData?.paidAmount && editExpenseData.paidAmount > 0 && editExpenseData.category !== ExpenseCategory.MATERIAL ? "Não editável após pagamentos." : undefined}
               />
-              {editExpenseData?.paidAmount && editExpenseData.paidAmount > 0 && <p className="text-xs text-red-500 mt-1">Não é possível alterar o valor de uma despesa que já possui pagamentos.</p>}
+              {!!editExpenseData?.paidAmount && editExpenseData.paidAmount > 0 && editExpenseData.category !== ExpenseCategory.MATERIAL && <p className="text-xs text-red-500 mt-1">Valor não pode ser alterado após pagamentos.</p>}
             </div>
-            {/* NEW: Total Agreed */}
-            <div>
-              <label htmlFor="expense-total-agreed" className="block text-sm font-bold text-primary dark:text-white mb-1">Valor Combinado (R$)</label>
-              <input
-                id="expense-total-agreed"
-                type="number"
-                // FIX: Use `newExpenseTotalAgreed` here
-                value={newExpenseTotalAgreed}
-                // FIX: Set `newExpenseTotalAgreed` on change
-                onChange={(e) => setNewExpenseTotalAgreed(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
-                placeholder="Ex: 500.00 (Opcional, se diferente do valor previsto)"
-                min="0"
-                step="0.01"
-                disabled={editExpenseData?.paidAmount && editExpenseData.paidAmount > 0} // Disable if already paid
-                title={editExpenseData?.paidAmount && editExpenseData.paidAmount > 0 ? "Não editável após pagamento registrado." : undefined} // Tooltip
-              />
-              {editExpenseData?.paidAmount && editExpenseData.paidAmount > 0 && <p className="text-xs text-red-500 mt-1">Não é possível alterar o valor combinado de uma despesa que já possui pagamentos.</p>}
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                Este é o valor total que você combinou pagar. Se não preenchido, será igual ao 'Valor Previsto'.
-              </p>
-            </div>
+            {/* NEW: Total Agreed field (optional, not for materials) */}
+            {newExpenseCategory !== ExpenseCategory.MATERIAL && (
+              <div>
+                <label htmlFor="expense-total-agreed" className="block text-sm font-bold text-primary dark:text-white mb-1">Valor Combinado (R$ - Opcional)</label>
+                <input
+                  id="expense-total-agreed"
+                  type="number"
+                  value={newExpenseTotalAgreed}
+                  onChange={(e) => setNewExpenseTotalAgreed(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
+                  placeholder="Ex: 1450.00 (se negociado)"
+                  min="0"
+                  step="0.01"
+                  disabled={!!editExpenseData?.paidAmount && editExpenseData.paidAmount > 0} // Disable if paid
+                  title={!!editExpenseData?.paidAmount && editExpenseData.paidAmount > 0 ? "Não editável após pagamentos." : undefined}
+                />
+                {!!editExpenseData?.paidAmount && editExpenseData.paidAmount > 0 && <p className="text-xs text-red-500 mt-1">Valor combinado não pode ser alterado após pagamentos.</p>}
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Se diferente do valor previsto, será o valor base para pagamentos.</p>
+              </div>
+            )}
             <div>
               <label htmlFor="expense-category" className="block text-sm font-bold text-primary dark:text-white mb-1">Categoria</label>
               <select
@@ -3116,15 +3141,15 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                 onChange={(e) => setNewExpenseCategory(e.target.value as ExpenseCategory)}
                 className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
                 required
-                disabled={editExpenseData?.paidAmount && editExpenseData.paidAmount > 0} // Disable if already paid
-                title={editExpenseData?.paidAmount && editExpenseData.paidAmount > 0 ? "Não editável após pagamento registrado." : undefined} // Tooltip
+                disabled={!!editExpenseData?.paidAmount && editExpenseData.paidAmount > 0 && editExpenseData.category !== ExpenseCategory.MATERIAL} // Disable if paid AND not material
+                title={!!editExpenseData?.paidAmount && editExpenseData.paidAmount > 0 && editExpenseData.category !== ExpenseCategory.MATERIAL ? "Não editável após pagamentos." : undefined}
               >
-                {Object.values(ExpenseCategory).map(category => (
-                  <option key={category} value={category}>{category}</option>
+                {Object.values(ExpenseCategory).map(cat => (
+                  <option key={cat} value={cat}>{cat}</option>
                 ))}
                 <option value="Outros">Outros</option>
               </select>
-              {editExpenseData?.paidAmount && editExpenseData.paidAmount > 0 && <p className="text-xs text-red-500 mt-1">Não é possível alterar a categoria de uma despesa que já possui pagamentos.</p>}
+              {!!editExpenseData?.paidAmount && editExpenseData.paidAmount > 0 && editExpenseData.category !== ExpenseCategory.MATERIAL && <p className="text-xs text-red-500 mt-1">Categoria não pode ser alterada após pagamentos.</p>}
             </div>
             <div>
               <label htmlFor="expense-date" className="block text-sm font-bold text-primary dark:text-white mb-1">Data</label>
@@ -3135,10 +3160,10 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                 onChange={(e) => setNewExpenseDate(e.target.value)}
                 className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
                 required
-                disabled={editExpenseData?.paidAmount && editExpenseData.paidAmount > 0} // Disable if already paid
-                title={editExpenseData?.paidAmount && editExpenseData.paidAmount > 0 ? "Não editável após pagamento registrado." : undefined} // Tooltip
+                disabled={!!editExpenseData?.paidAmount && editExpenseData.paidAmount > 0} // Disable if paid
+                title={!!editExpenseData?.paidAmount && editExpenseData.paidAmount > 0 ? "Não editável após pagamentos." : undefined}
               />
-              {editExpenseData?.paidAmount && editExpenseData.paidAmount > 0 && <p className="text-xs text-red-500 mt-1">Não é possível alterar a data de uma despesa que já possui pagamentos.</p>}
+              {!!editExpenseData?.paidAmount && editExpenseData.paidAmount > 0 && <p className="text-xs text-red-500 mt-1">Data não pode ser alterada após pagamentos.</p>}
             </div>
             <div>
               <label htmlFor="expense-step" className="block text-sm font-bold text-primary dark:text-white mb-1">Vincular à Etapa (Opcional)</label>
@@ -3154,7 +3179,6 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                 ))}
               </select>
             </div>
-            {/* NEW: Worker and Supplier for Expenses */}
             <div>
               <label htmlFor="expense-worker" className="block text-sm font-bold text-primary dark:text-white mb-1">Vincular a Trabalhador (Opcional)</label>
               <select
@@ -3187,6 +3211,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         </ZeModal>
       )}
 
+      {/* ADD PAYMENT TO EXPENSE MODAL */}
       {showAddPaymentModal && paymentExpenseData && (
         <ZeModal
           isOpen={showAddPaymentModal}
@@ -3194,21 +3219,21 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
           message=""
           confirmText="Registrar Pagamento"
           onConfirm={async (e) => {
-            e?.preventDefault(); // Ensure event is passed if available
-            if (!paymentExpenseData) return;
+            e?.preventDefault();
             setZeModal(prev => ({ ...prev, isConfirming: true }));
             try {
-              await dbService.addPaymentToExpense(
-                paymentExpenseData.id,
-                Number(paymentAmount),
-                paymentDate
-              );
+              if (!paymentExpenseData || !paymentAmount || !paymentDate) {
+                showToastNotification("Preencha o valor e a data do pagamento.", 'warning');
+                setZeModal(prev => ({ ...prev, isConfirming: false }));
+                return;
+              }
+              await dbService.addPaymentToExpense(paymentExpenseData.id, Number(paymentAmount), paymentDate);
               setShowAddPaymentModal(false);
               setPaymentExpenseData(null);
               setPaymentAmount('');
-              setNewPaymentDate(new Date().toISOString().split('T')[0]); // Default to today
+              setNewPaymentDate(new Date().toISOString().split('T')[0]);
               await loadWorkData();
-              showToastNotification(`Pagamento de ${formatCurrency(Number(paymentAmount))} registrado com sucesso!`, 'success');
+              showToastNotification("Pagamento registrado com sucesso!", 'success');
               showFinanceBadge(); // Show badge on finance tab
             } catch (error: any) {
               console.error("Erro ao registrar pagamento:", error);
@@ -3236,7 +3261,13 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
           isConfirming={zeModal.isConfirming}
           type="SUCCESS"
         >
-          <form onSubmit={async (e) => { e.preventDefault(); /* submit is handled by onConfirm */ }} className="space-y-4">
+          <form className="space-y-4">
+            <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">
+              Valor Previsto: {formatCurrency(paymentExpenseData.amount)}<br/>
+              Valor Combinado: {formatCurrency(paymentExpenseData.totalAgreed !== undefined && paymentExpenseData.totalAgreed !== null ? paymentExpenseData.totalAgreed : paymentExpenseData.amount)}<br/>
+              Já Pago: {formatCurrency(paymentExpenseData.paidAmount || 0)}<br/>
+              Restante: {formatCurrency(Math.max(0, (paymentExpenseData.totalAgreed !== undefined && paymentExpenseData.totalAgreed !== null ? paymentExpenseData.totalAgreed : paymentExpenseData.amount) - (paymentExpenseData.paidAmount || 0)))}
+            </p>
             <div>
               <label htmlFor="payment-amount" className="block text-sm font-bold text-primary dark:text-white mb-1">Valor do Pagamento (R$)</label>
               <input
@@ -3245,14 +3276,11 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                 value={paymentAmount}
                 onChange={(e) => setPaymentAmount(e.target.value)}
                 className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
-                placeholder={`Ex: ${formatCurrency( (paymentExpenseData.totalAgreed !== undefined && paymentExpenseData.totalAgreed !== null ? paymentExpenseData.totalAgreed : paymentExpenseData.amount) - (paymentExpenseData.paidAmount || 0) )}`}
+                placeholder="Ex: 500.00"
                 min="0"
                 step="0.01"
                 required
               />
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                Valor restante a pagar: {formatCurrency((paymentExpenseData.totalAgreed !== undefined && paymentExpenseData.totalAgreed !== null ? paymentExpenseData.totalAgreed : paymentExpenseData.amount) - (paymentExpenseData.paidAmount || 0))}
-              </p>
             </div>
             <div>
               <label htmlFor="payment-date" className="block text-sm font-bold text-primary dark:text-white mb-1">Data do Pagamento</label>
@@ -3269,6 +3297,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         </ZeModal>
       )}
 
+      {/* ADD/EDIT WORKER MODAL */}
       {showAddWorkerModal && (
         <ZeModal
           isOpen={showAddWorkerModal}
@@ -3285,7 +3314,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
             setNewWorkerDailyRate('');
             setNewWorkerNotes('');
           }}
-          isConfirming={zeModal.isConfirming || isAddingWorker}
+          isConfirming={zeModal.isConfirming}
           type={editWorkerData ? "INFO" : "SUCCESS"}
         >
           <form onSubmit={editWorkerData ? handleEditWorker : handleAddWorker} className="space-y-4">
@@ -3310,7 +3339,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                 className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
                 required
               >
-                <option value="">Selecione</option>
+                <option value="">Selecione a Função</option>
                 {STANDARD_JOB_ROLES.map(role => (
                   <option key={role} value={role}>{role}</option>
                 ))}
@@ -3322,14 +3351,24 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                 id="worker-phone"
                 type="text"
                 value={newWorkerPhone}
-                onChange={(e) => setNewWorkerPhone(e.target.value)}
+                onChange={(e) => {
+                  let value = e.target.value.replace(/\D/g, '').substring(0, 11);
+                  if (value.length === 11) {
+                    value = value.replace(/^(\d{2})(\d{5})(\d{4})/, "($1) $2-$3");
+                  } else if (value.length > 2) {
+                    value = value.replace(/^(\d{2})(\d)/g, "($1) $2");
+                    value = value.replace(/(\d{5})(\d)/, "$1-$2");
+                  }
+                  setNewWorkerPhone(value);
+                }}
                 className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
-                placeholder="Ex: (99) 99999-9999"
+                placeholder="(DDD) 9XXXX-XXXX"
                 required
+                maxLength={15}
               />
             </div>
             <div>
-              <label htmlFor="worker-daily-rate" className="block text-sm font-bold text-primary dark:text-white mb-1">Valor da Diária (R$)</label>
+              <label htmlFor="worker-daily-rate" className="block text-sm font-bold text-primary dark:text-white mb-1">Diária (R$ - Opcional)</label>
               <input
                 id="worker-daily-rate"
                 type="number"
@@ -3347,15 +3386,16 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                 id="worker-notes"
                 value={newWorkerNotes}
                 onChange={(e) => setNewWorkerNotes(e.target.value)}
-                rows={3}
                 className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
-                placeholder="Informações adicionais sobre o trabalhador"
+                placeholder="Detalhes adicionais sobre o trabalhador"
+                rows={3}
               ></textarea>
             </div>
           </form>
         </ZeModal>
       )}
 
+      {/* ADD/EDIT SUPPLIER MODAL */}
       {showAddSupplierModal && (
         <ZeModal
           isOpen={showAddSupplierModal}
@@ -3373,7 +3413,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
             setNewSupplierAddress('');
             setNewSupplierNotes('');
           }}
-          isConfirming={zeModal.isConfirming || isAddingSupplier}
+          isConfirming={zeModal.isConfirming}
           type={editSupplierData ? "INFO" : "SUCCESS"}
         >
           <form onSubmit={editSupplierData ? handleEditSupplier : handleAddSupplier} className="space-y-4">
@@ -3385,7 +3425,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                 value={newSupplierName}
                 onChange={(e) => setNewSupplierName(e.target.value)}
                 className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
-                placeholder="Ex: Casa do Construtor"
+                placeholder="Ex: Madeireira São João"
                 required
               />
             </div>
@@ -3398,7 +3438,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                 className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
                 required
               >
-                <option value="">Selecione</option>
+                <option value="">Selecione a Categoria</option>
                 {STANDARD_SUPPLIER_CATEGORIES.map(category => (
                   <option key={category} value={category}>{category}</option>
                 ))}
@@ -3410,21 +3450,31 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                 id="supplier-phone"
                 type="text"
                 value={newSupplierPhone}
-                onChange={(e) => setNewSupplierPhone(e.target.value)}
+                onChange={(e) => {
+                  let value = e.target.value.replace(/\D/g, '').substring(0, 11);
+                  if (value.length === 11) {
+                    value = value.replace(/^(\d{2})(\d{5})(\d{4})/, "($1) $2-$3");
+                  } else if (value.length > 2) {
+                    value = value.replace(/^(\d{2})(\d)/g, "($1) $2");
+                    value = value.replace(/(\d{5})(\d)/, "$1-$2");
+                  }
+                  setNewSupplierPhone(value);
+                }}
                 className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
-                placeholder="Ex: (99) 99999-9999"
+                placeholder="(DDD) XXXX-XXXX ou (DDD) 9XXXX-XXXX"
                 required
+                maxLength={15}
               />
             </div>
             <div>
-              <label htmlFor="supplier-email" className="block text-sm font-bold text-primary dark:text-white mb-1">Email (Opcional)</label>
+              <label htmlFor="supplier-email" className="block text-sm font-bold text-primary dark:text-white mb-1">E-mail (Opcional)</label>
               <input
                 id="supplier-email"
                 type="email"
                 value={newSupplierEmail}
                 onChange={(e) => setNewSupplierEmail(e.target.value)}
                 className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
-                placeholder="Ex: contato@fornecedor.com.br"
+                placeholder="contato@fornecedor.com"
               />
             </div>
             <div>
@@ -3435,7 +3485,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                 value={newSupplierAddress}
                 onChange={(e) => setNewSupplierAddress(e.target.value)}
                 className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
-                placeholder="Ex: Rua das Pedras, 456"
+                placeholder="Rua, Número, Bairro, Cidade"
               />
             </div>
             <div>
@@ -3444,57 +3494,54 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                 id="supplier-notes"
                 value={newSupplierNotes}
                 onChange={(e) => setNewSupplierNotes(e.target.value)}
-                rows={3}
                 className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
-                placeholder="Informações adicionais sobre o fornecedor"
+                placeholder="Detalhes adicionais sobre o fornecedor, prazos de entrega"
+                rows={3}
               ></textarea>
             </div>
           </form>
         </ZeModal>
       )}
 
+      {/* ADD PHOTO MODAL */}
       {showAddPhotoModal && (
         <ZeModal
           isOpen={showAddPhotoModal}
           title="Adicionar Nova Foto"
           message=""
-          confirmText="Salvar Foto"
+          confirmText="Upload Foto"
           onConfirm={handleAddPhoto}
-          onCancel={() => {
-            setShowAddPhotoModal(false);
-            setNewPhotoDescription('');
-            setNewPhotoFile(null);
-            setNewPhotoType('PROGRESS');
-          }}
-          isConfirming={uploadingPhoto || zeModal.isConfirming}
+          onCancel={() => { setShowAddPhotoModal(false); setNewPhotoDescription(''); setNewPhotoFile(null); setNewPhotoType('PROGRESS'); }}
+          isConfirming={zeModal.isConfirming}
           type="SUCCESS"
         >
           <form onSubmit={handleAddPhoto} className="space-y-4">
             <div>
-              <label htmlFor="photo-description" className="block text-sm font-bold text-primary dark:text-white mb-1">Descrição</label>
+              <label htmlFor="photo-description" className="block text-sm font-bold text-primary dark:text-white mb-1">Descrição da Foto</label>
               <input
                 id="photo-description"
                 type="text"
                 value={newPhotoDescription}
                 onChange={(e) => setNewPhotoDescription(e.target.value)}
                 className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
-                placeholder="Ex: Fundação da cozinha, Pintura da fachada"
+                placeholder="Ex: Fundação do Muro, Pintura da Sala"
                 required
               />
             </div>
             <div>
-              <label htmlFor="photo-file" className="block text-sm font-bold text-primary dark:text-white mb-1">Arquivo da Imagem</label>
+              <label htmlFor="photo-file" className="block text-sm font-bold text-primary dark:text-white mb-1">Arquivo de Imagem</label>
               <input
                 id="photo-file"
                 type="file"
                 accept="image/*"
                 onChange={(e) => setNewPhotoFile(e.target.files ? e.target.files[0] : null)}
-                className="w-full text-primary dark:text-white file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-secondary file:text-white hover:file:bg-secondary-dark cursor-pointer transition-all"
+                className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-secondary file:text-white hover:file:bg-secondary-dark cursor-pointer"
                 required
               />
+              {newPhotoFile && <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Selecionado: {newPhotoFile.name}</p>}
             </div>
             <div>
-              <label htmlFor="photo-type" className="block text-sm font-bold text-primary dark:text-white mb-1">Tipo de Foto</label>
+              <label htmlFor="photo-type" className="block text-sm font-bold text-primary dark:text-white mb-1">Tipo da Foto</label>
               <select
                 id="photo-type"
                 value={newPhotoType}
@@ -3510,20 +3557,16 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         </ZeModal>
       )}
 
+      {/* ADD FILE MODAL */}
       {showAddFileModal && (
         <ZeModal
           isOpen={showAddFileModal}
           title="Adicionar Novo Arquivo"
           message=""
-          confirmText="Salvar Arquivo"
+          confirmText="Upload Arquivo"
           onConfirm={handleAddFile}
-          onCancel={() => {
-            setShowAddFileModal(false);
-            setNewFileName('');
-            setNewFileCategory(FileCategory.GENERAL);
-            setNewUploadFile(null);
-          }}
-          isConfirming={uploadingFile || zeModal.isConfirming}
+          onCancel={() => { setShowAddFileModal(false); setNewFileName(''); setNewFileCategory(FileCategory.GENERAL); setNewUploadFile(null); }}
+          isConfirming={zeModal.isConfirming}
           type="SUCCESS"
         >
           <form onSubmit={handleAddFile} className="space-y-4">
@@ -3535,7 +3578,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                 value={newFileName}
                 onChange={(e) => setNewFileName(e.target.value)}
                 className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
-                placeholder="Ex: Planta Baixa, Orçamento Gesso"
+                placeholder="Ex: Projeto Elétrico, Orçamento Final"
                 required
               />
             </div>
@@ -3546,62 +3589,68 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                 value={newFileCategory}
                 onChange={(e) => setNewFileCategory(e.target.value as FileCategory)}
                 className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
-                required
               >
-                {Object.values(FileCategory).map(category => (
-                  <option key={category} value={category}>{category}</option>
+                {Object.values(FileCategory).map(cat => (
+                  <option key={cat} value={cat}>{cat}</option>
                 ))}
               </select>
             </div>
             <div>
-              <label htmlFor="upload-file" className="block text-sm font-bold text-primary dark:text-white mb-1">Selecionar Arquivo</label>
+              <label htmlFor="file-upload" className="block text-sm font-bold text-primary dark:text-white mb-1">Selecione o Arquivo</label>
               <input
-                id="upload-file"
+                id="file-upload"
                 type="file"
                 onChange={(e) => setNewUploadFile(e.target.files ? e.target.files[0] : null)}
-                className="w-full text-primary dark:text-white file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-secondary file:text-white hover:file:bg-secondary-dark cursor-pointer transition-all"
+                className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-secondary file:text-white hover:file:bg-secondary-dark cursor-pointer"
                 required
               />
+              {newUploadFile && <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Selecionado: {newUploadFile.name}</p>}
             </div>
           </form>
         </ZeModal>
       )}
 
+      {/* CONTRACT CONTENT VIEWER MODAL */}
       {showContractContentModal && (
         <ZeModal
           isOpen={showContractContentModal}
           title={selectedContractTitle}
           message=""
-          confirmText={copyContractSuccess ? "Copiado!" : "Copiar Texto"}
-          onConfirm={async () => {
-            await navigator.clipboard.writeText(selectedContractContent);
-            setCopyContractSuccess(true);
-            setTimeout(() => setCopyContractSuccess(false), 2000);
+          confirmText="Copiar Texto"
+          onConfirm={async (e) => {
+            e?.preventDefault(); // Pass event here
+            try {
+              await navigator.clipboard.writeText(selectedContractContent);
+              setCopyContractSuccess(true);
+              setTimeout(() => setCopyContractSuccess(false), 2000);
+              showToastNotification("Conteúdo do contrato copiado!", 'success');
+            } catch (err) {
+              console.error("Erro ao copiar contrato:", err);
+              showToastNotification("Falha ao copiar o contrato. Tente manualmente.", 'error');
+            }
           }}
-          onCancel={() => {
-            setShowContractContentModal(false);
-            setCopyContractSuccess(false);
-            setSelectedContractContent('');
-            setSelectedContractTitle('');
-          }}
-          isConfirming={false}
+          onCancel={() => { setShowContractContentModal(false); setSelectedContractContent(''); setSelectedContractTitle(''); setCopyContractSuccess(false); }}
           type="INFO"
+          cancelText="Fechar"
         >
-          <div className="max-h-80 overflow-y-auto bg-slate-50 dark:bg-slate-800 p-4 rounded-xl border border-slate-100 dark:border-slate-700 text-sm text-primary dark:text-white whitespace-pre-wrap">
-            {selectedContractContent}
+          <div className="relative p-4 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 max-h-[60vh] overflow-y-auto">
+            <pre className="whitespace-pre-wrap font-mono text-sm text-primary dark:text-white">
+              {selectedContractContent}
+            </pre>
+            {copyContractSuccess && (
+                <div className="absolute top-2 right-2 px-3 py-1 bg-green-500 text-white text-xs font-bold rounded-lg animate-in fade-in">Copiado!</div>
+            )}
           </div>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">
-            Copie o texto para seu editor e preencha os dados da sua obra e das partes envolvidas.
-          </p>
         </ZeModal>
       )}
 
+      {/* ADD/EDIT CHECKLIST MODAL */}
       {showAddChecklistModal && (
         <ZeModal
           isOpen={showAddChecklistModal}
           title={editChecklistData ? "Editar Checklist" : "Adicionar Novo Checklist"}
           message=""
-          confirmText={editChecklistData ? "Salvar Alterações" : "Adicionar Checklist"}
+          confirmText={editChecklistData ? "Salvar Checklist" : "Adicionar Checklist"}
           onConfirm={editChecklistData ? handleEditChecklist : handleAddChecklist}
           onCancel={() => {
             setShowAddChecklistModal(false);
@@ -3610,7 +3659,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
             setNewChecklistCategory('');
             setNewChecklistItems(['']);
           }}
-          isConfirming={zeModal.isConfirming || isAddingChecklist}
+          isConfirming={zeModal.isConfirming}
           type={editChecklistData ? "INFO" : "SUCCESS"}
         >
           <form onSubmit={editChecklistData ? handleEditChecklist : handleAddChecklist} className="space-y-4">
@@ -3627,7 +3676,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
               />
             </div>
             <div>
-              <label htmlFor="checklist-category" className="block text-sm font-bold text-primary dark:text-white mb-1">Categoria (Vincular à Etapa, opcional)</label>
+              <label htmlFor="checklist-category" className="block text-sm font-bold text-primary dark:text-white mb-1">Categoria (Opcional)</label>
               <select
                 id="checklist-category"
                 value={newChecklistCategory}
@@ -3635,15 +3684,21 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                 className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
               >
                 <option value="">Nenhuma</option>
-                {steps.map(step => ( // Use existing steps as categories
-                  <option key={step.id} value={step.name}>{step.orderIndex}. {step.name}</option>
+                {/* Dynamically generate categories based on work's steps for easier linking */}
+                {steps.map(step => (
+                    <option key={step.id} value={step.name}>{step.name}</option>
+                ))}
+                {/* Also allow general categories from templates */}
+                {CHECKLIST_TEMPLATES.map(template => (
+                  <option key={template.id} value={template.category}>{template.category}</option>
                 ))}
               </select>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Ajuda a organizar e vincular a etapas.</p>
             </div>
             <div>
               <label className="block text-sm font-bold text-primary dark:text-white mb-1">Itens do Checklist</label>
               {newChecklistItems.map((item, index) => (
-                <div key={index} className="flex items-center gap-2 mb-2">
+                <div key={index} className="flex gap-2 items-center mb-2">
                   <input
                     type="text"
                     value={item}
@@ -3652,31 +3707,39 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                       updatedItems[index] = e.target.value;
                       setNewChecklistItems(updatedItems);
                     }}
-                    className="flex-1 px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
+                    className="flex-1 px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
                     placeholder={`Item ${index + 1}`}
                     required
                   />
-                  {newChecklistItems.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => setNewChecklistItems(prev => prev.filter((_, i) => i !== index))}
-                      className="w-10 h-10 bg-red-500 text-white rounded-xl flex items-center justify-center hover:bg-red-600 transition-colors"
-                    >
-                      <i className="fa-solid fa-trash-alt"></i>
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const updatedItems = newChecklistItems.filter((_, i) => i !== index);
+                      setNewChecklistItems(updatedItems.length > 0 ? updatedItems : ['']); // Ensure at least one empty item
+                    }}
+                    className="w-8 h-8 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition-colors"
+                    aria-label={`Remover item ${index + 1}`}
+                  >
+                    <i className="fa-solid fa-trash-alt text-sm"></i>
+                  </button>
                 </div>
               ))}
               <button
                 type="button"
-                onClick={() => setNewChecklistItems(prev => [...prev, ''])}
-                className="w-full py-3 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 font-bold rounded-xl hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors flex items-center justify-center gap-2 mt-2"
+                onClick={() => setNewChecklistItems([...newChecklistItems, ''])}
+                className="mt-2 px-4 py-2 bg-slate-200 dark:bg-slate-700 text-primary dark:text-white text-sm font-bold rounded-xl hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors flex items-center gap-2"
+                aria-label="Adicionar novo item de checklist"
               >
                 <i className="fa-solid fa-plus"></i> Adicionar Item
               </button>
             </div>
           </form>
         </ZeModal>
+      )}
+
+      {/* Confirmation Modal (general purpose) */}
+      {zeModal.isOpen && (
+        <ZeModal {...zeModal} />
       )}
     </div>
   );
