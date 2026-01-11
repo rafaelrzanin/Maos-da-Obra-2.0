@@ -1,4 +1,5 @@
 
+
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import * as ReactRouter from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.tsx';
@@ -52,63 +53,63 @@ const formatCurrency = (value: number | string | undefined): string => {
 const DashboardSkeleton = () => (
   <div className="max-w-4xl mx-auto pb-28 pt-6 px-4 md:px-0 animate-pulse">
     {/* Header */}
-    <div className="flex justify-between items-end mb-8">
-      <div className="space-y-2">
-        <div className="h-3 w-32 bg-slate-200 dark:bg-slate-800 rounded-full"></div>
-        <div className="h-8 w-64 bg-slate-200 dark:bg-slate-800 rounded-xl"></div>
+    <div className="flex justify-between items-end mb-10"> {/* OE #004: Increased margin-bottom */}
+      <div className="space-y-3"> {/* OE #004: Increased space-y */}
+        <div className="h-4 w-36 bg-slate-200 dark:bg-slate-800 rounded-full"></div> {/* OE #004: Increased height, width */}
+        <div className="h-9 w-60 bg-slate-200 dark:bg-slate-800 rounded-xl"></div> {/* OE #004: Increased height, width */}
       </div>
-      <div className="h-10 w-40 bg-slate-200 dark:bg-slate-800 rounded-xl"></div>
+      <div className="h-12 w-44 bg-slate-200 dark:bg-slate-800 rounded-xl"></div> {/* OE #004: Increased height, width */}
     </div>
     
     {/* Ze Tip Skeleton */}
-    <div className={cx(surface, "rounded-3xl p-4 md:p-5 flex items-start gap-4 mb-6")}>
-      <div className="w-12 h-12 rounded-full bg-slate-200 dark:bg-slate-700 shrink-0"></div>
-      <div className="flex-1 space-y-2">
-        <div className="h-4 w-3/4 bg-slate-200 dark:bg-slate-700 rounded-full"></div>
-        <div className="h-4 w-1/2 bg-slate-200 dark:bg-slate-700 rounded-full"></div>
+    <div className={cx(surface, "rounded-3xl p-5 md:p-6 flex items-start gap-4 mb-8")}> {/* OE #004: Increased padding, margin-bottom */}
+      <div className="w-14 h-14 rounded-full bg-slate-200 dark:bg-slate-700 shrink-0"></div> {/* OE #004: Increased size */}
+      <div className="flex-1 space-y-3"> {/* OE #004: Increased space-y */}
+        <div className="h-5 w-4/5 bg-slate-200 dark:bg-slate-700 rounded-full"></div> {/* OE #004: Increased height, width */}
+        <div className="h-5 w-2/3 bg-slate-200 dark:bg-slate-700 rounded-full"></div> {/* OE #004: Increased height, width */}
       </div>
     </div>
 
     {/* Work Selector & Actions */}
-    <div className="flex items-center gap-4 mb-8">
-      <div className="h-12 flex-1 bg-slate-200 dark:bg-slate-800 rounded-xl"></div>
-      <div className="h-12 w-12 bg-slate-200 dark:bg-slate-800 rounded-xl"></div>
+    <div className="flex items-center gap-4 mb-10"> {/* OE #004: Increased margin-bottom */}
+      <div className="h-14 flex-1 bg-slate-200 dark:bg-slate-800 rounded-xl"></div> {/* OE #004: Increased height */}
+      <div className="h-14 w-14 bg-slate-200 dark:bg-slate-800 rounded-xl"></div> {/* OE #004: Increased size */}
     </div>
 
     {/* Daily Summary Skeleton */}
-    <div className={cx(surface, "rounded-3xl p-6 mb-8")}>
-      <div className="h-6 w-1/3 bg-slate-200 dark:bg-slate-800 rounded-lg mb-4"></div>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+    <div className={cx(surface, "rounded-3xl p-7 mb-10")}> {/* OE #004: Increased padding, margin-bottom */}
+      <div className="h-7 w-1/3 bg-slate-200 dark:bg-slate-800 rounded-lg mb-5"></div> {/* OE #004: Increased height, margin-bottom */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4"> {/* OE #004: Increased gap */}
         {[1, 2, 3, 4].map((i) => (
-          <div key={i} className="h-20 bg-slate-100 dark:bg-slate-800 rounded-2xl p-3">
-            <div className="h-4 w-8 bg-slate-200 dark:bg-slate-700 rounded-full mb-2"></div>
-            <div className="h-3 w-16 bg-slate-200 dark:bg-slate-700 rounded-full"></div>
+          <div key={i} className="h-24 bg-slate-100 dark:bg-slate-800 rounded-2xl p-4"> {/* OE #004: Increased height, padding */}
+            <div className="h-5 w-10 bg-slate-200 dark:bg-slate-700 rounded-full mb-3"></div> {/* OE #004: Increased height, width, margin-bottom */}
+            <div className="h-4 w-20 bg-slate-200 dark:bg-slate-700 rounded-full"></div> {/* OE #004: Increased height, width */}
           </div>
         ))}
       </div>
     </div>
     
     {/* Progress Bar Skeleton */}
-    <div className={cx(surface, "rounded-3xl p-6 mb-8")}>
-      <div className="h-6 w-1/4 bg-slate-200 dark:bg-slate-800 rounded-lg mb-4"></div>
-      <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-3 mb-2"></div>
-      <div className="flex justify-between text-xs text-slate-400">
-        <div className="h-3 w-1/5 bg-slate-200 dark:bg-slate-700 rounded-full"></div>
-        <div className="h-3 w-1/5 bg-slate-200 dark:bg-slate-700 rounded-full"></div>
-        <div className="h-3 w-1/5 bg-slate-200 dark:bg-slate-700 rounded-full"></div>
-        <div className="h-3 w-1/5 bg-slate-200 dark:bg-slate-700 rounded-full"></div>
+    <div className={cx(surface, "rounded-3xl p-7 mb-10")}> {/* OE #004: Increased padding, margin-bottom */}
+      <div className="h-7 w-1/4 bg-slate-200 dark:bg-slate-800 rounded-lg mb-5"></div> {/* OE #004: Increased height, margin-bottom */}
+      <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-4 mb-3"></div> {/* OE #004: Increased height, margin-bottom */}
+      <div className="flex justify-between text-sm text-slate-400"> {/* OE #004: Increased text size */}
+        <div className="h-4 w-1/5 bg-slate-200 dark:bg-slate-700 rounded-full"></div> {/* OE #004: Increased height */}
+        <div className="h-4 w-1/5 bg-slate-200 dark:bg-slate-700 rounded-full"></div>
+        <div className="h-4 w-1/5 bg-slate-200 dark:bg-slate-700 rounded-full"></div>
+        <div className="h-4 w-1/5 bg-slate-200 dark:bg-slate-700 rounded-full"></div>
       </div>
     </div>
 
     {/* Budget Overview Skeleton */}
-    <div className={cx(surface, "rounded-3xl p-6 mb-8")}> {/* Added mb-8 for spacing */}
-      <div className="h-6 w-1/4 bg-slate-200 dark:bg-slate-800 rounded-lg mb-4"></div>
-      <div className="h-4 w-full bg-slate-200 dark:bg-slate-700 rounded-full mb-2"></div>
-      <div className="h-4 w-2/3 bg-slate-200 dark:bg-slate-700 rounded-full"></div>
+    <div className={cx(surface, "rounded-3xl p-7 mb-10")}> {/* OE #004: Increased padding, margin-bottom */}
+      <div className="h-7 w-1/4 bg-slate-200 dark:bg-slate-800 rounded-lg mb-5"></div> {/* OE #004: Increased height, margin-bottom */}
+      <div className="h-5 w-full bg-slate-200 dark:bg-slate-700 rounded-full mb-3"></div> {/* OE #004: Increased height, margin-bottom */}
+      <div className="h-5 w-2/3 bg-slate-200 dark:bg-slate-700 rounded-full"></div> {/* OE #004: Increased height */}
     </div>
 
     {/* Access Work Button Skeleton */}
-    <div className="h-14 w-full bg-secondary rounded-2xl"></div> {/* Skeleton for the access button */}
+    <div className="h-16 w-full bg-secondary rounded-2xl"></div> {/* OE #004: Increased height */}
   </div>
 );
 
@@ -120,7 +121,7 @@ const DashboardSkeleton = () => (
 const SegmentedProgressBar = ({ steps }: { steps: Step[] }) => {
   if (!steps || steps.length === 0) {
     return (
-      <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-3 mb-2 flex">
+      <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-4 mb-3 flex"> {/* OE #004: Increased height, margin-bottom */}
         <div className="h-full bg-slate-300 rounded-full" style={{ width: '100%' }}></div>
       </div>
     );
@@ -140,7 +141,7 @@ const SegmentedProgressBar = ({ steps }: { steps: Step[] }) => {
   const pendingPct = (pending.length / totalSteps) * 100; // RENOMEADO
 
   return (
-    <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-3 mb-2 flex overflow-hidden">
+    <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-4 mb-3 flex overflow-hidden"> {/* OE #004: Increased height, margin-bottom */}
       {/* Completed segment */}
       {completedPct > 0 && (
         <div 
@@ -382,14 +383,14 @@ const Dashboard = () => {
     return (
       <div className="max-w-4xl mx-auto pb-28 pt-6 px-4 md:px-0 font-sans animate-in fade-in">
         <div className="flex flex-col items-center justify-center min-h-[70vh] p-6 text-center">
-            <i className="fa-solid fa-cloud-exclamation text-6xl text-slate-400 mb-4"></i>
-            <h2 className="text-2xl font-black text-primary dark:text-white mb-2">Ops! Tivemos um pequeno problema.</h2>
-            <p className="text-slate-500 dark:text-slate-400 max-w-sm mx-auto mb-6">
+            <i className="fa-solid fa-cloud-exclamation text-6xl text-slate-400 mb-6"></i> {/* OE #004: Increased icon size, margin */}
+            <h2 className="text-2xl font-black text-primary dark:text-white mb-3">Ops! Tivemos um pequeno problema.</h2> {/* OE #004: Increased margin */}
+            <p className="text-slate-500 dark:text-slate-400 max-w-sm mx-auto mb-8 text-base"> {/* OE #004: Increased margin, text size */}
                 Algo não saiu como esperado ao carregar suas obras. Por favor, tente novamente.
             </p>
             <button
                 onClick={loadAllWorks}
-                className="px-6 py-3 bg-secondary text-white font-bold rounded-xl hover:bg-secondary-dark transition-colors"
+                className="px-7 py-3 bg-secondary text-white font-bold rounded-xl hover:bg-secondary-dark transition-colors text-lg" /* OE #004: Increased padding, text size */
                 aria-label="Tentar carregar obras novamente"
                 disabled={loadingDashboard}
             >
@@ -406,24 +407,24 @@ const Dashboard = () => {
     return (
       <div className="max-w-4xl mx-auto pb-28 pt-6 px-4 md:px-0 font-sans">
         {/* Header - Welcome back [user's first name] */}
-        <div className="flex justify-between items-end mb-8">
+        <div className="flex justify-between items-end mb-10"> {/* OE #004: Increased margin-bottom */}
           <div>
             <p className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Bem-vindo(a) de volta</p>
             <h1 className="text-3xl font-black text-primary dark:text-white">{user.name.split(' ')[0]}!</h1>
           </div>
-          <button onClick={() => navigate('/create')} className="px-4 py-2 bg-secondary text-white text-sm font-bold rounded-xl hover:bg-secondary-dark transition-colors flex items-center gap-2" aria-label="Criar nova obra">
+          <button onClick={() => navigate('/create')} className="px-5 py-3 bg-secondary text-white text-base font-bold rounded-xl hover:bg-secondary-dark transition-colors flex items-center gap-2" aria-label="Criar nova obra"> {/* OE #004: Increased padding, text size */}
             <i className="fa-solid fa-plus-circle"></i> Nova Obra
           </button>
         </div>
 
         {/* "Create your first work" eye-catching section */}
-        <div className="flex flex-col items-center justify-center min-h-[40vh] bg-gradient-gold rounded-3xl p-8 text-white text-center shadow-lg shadow-amber-500/30 animate-in fade-in zoom-in-95 duration-500">
-          <i className="fa-solid fa-hammer text-6xl mb-4 text-white/90"></i>
-          <h2 className="text-3xl md:text-4xl font-black mb-4">Crie sua primeira obra!</h2>
-          <p className="text-lg mb-8 text-white/80">Transforme suas ideias em realidade com a gestão perfeita.</p>
+        <div className="flex flex-col items-center justify-center min-h-[40vh] bg-gradient-gold rounded-3xl p-10 text-white text-center shadow-lg shadow-amber-500/30 animate-in fade-in zoom-in-95 duration-500"> {/* OE #004: Increased padding */}
+          <i className="fa-solid fa-hammer text-7xl mb-5 text-white/90"></i> {/* OE #004: Increased icon size, margin */}
+          <h2 className="text-4xl md:text-5xl font-black mb-4">Crie sua primeira obra!</h2> {/* OE #004: Increased text sizes */}
+          <p className="text-xl mb-10 text-white/80 max-w-lg">Transforme suas ideias em realidade com a gestão perfeita.</p> {/* OE #004: Increased text size, margin, added max-width */}
           <button 
             onClick={() => navigate('/create')} 
-            className="px-8 py-4 bg-primary text-white font-black rounded-2xl shadow-xl shadow-primary/30 hover:shadow-primary/50 hover:scale-105 transition-all flex items-center justify-center gap-3"
+            className="px-9 py-4 bg-primary text-white font-black rounded-2xl shadow-xl shadow-primary/30 hover:shadow-primary/50 hover:scale-105 transition-all flex items-center justify-center gap-3 text-xl" /* OE #004: Increased padding, text size */
             aria-label="Começar a criar sua primeira obra"
           >
             <i className="fa-solid fa-plus-circle"></i> Começar Nova Obra
@@ -438,14 +439,14 @@ const Dashboard = () => {
     return (
       <div className="max-w-4xl mx-auto pb-28 pt-6 px-4 md:px-0 font-sans animate-in fade-in">
         <div className="flex flex-col items-center justify-center min-h-[50vh] p-6 text-center">
-          <i className="fa-solid fa-cloud-exclamation text-6xl text-slate-400 mb-4"></i>
-          <h2 className="text-2xl font-black text-primary dark:text-white mb-2">Algo não saiu como esperado.</h2>
-          <p className="text-slate-500 dark:text-slate-400 max-w-sm mx-auto mb-6">
+          <i className="fa-solid fa-cloud-exclamation text-6xl text-slate-400 mb-6"></i> {/* OE #004: Increased icon size, margin */}
+          <h2 className="text-2xl font-black text-primary dark:text-white mb-3">Algo não saiu como esperado.</h2> {/* OE #004: Increased margin */}
+          <p className="text-slate-500 dark:text-slate-400 max-w-sm mx-auto mb-8 text-base"> {/* OE #004: Increased margin, text size */}
             Não foi possível carregar os detalhes da obra selecionada. Por favor, tente novamente.
           </p>
           <button
             onClick={loadAllWorks}
-            className="px-6 py-3 bg-secondary text-white font-bold rounded-xl hover:bg-secondary-dark transition-colors"
+            className="px-7 py-3 bg-secondary text-white font-bold rounded-xl hover:bg-secondary-dark transition-colors text-lg" /* OE #004: Increased padding, text size */
             aria-label="Tentar carregar obra novamente"
             disabled={loadingDashboard}
           >
@@ -462,19 +463,19 @@ const Dashboard = () => {
   return (
     <div className="max-w-4xl mx-auto pb-28 pt-6 px-4 md:px-0 font-sans">
       {/* Header */}
-      <div className="flex justify-between items-end mb-8">
+      <div className="flex justify-between items-end mb-10"> {/* OE #004: Increased margin-bottom */}
         <div>
           <p className="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase mb-1">Bem-vindo(a) de volta</p>
           <h1 className="text-3xl font-black text-primary dark:text-white">{user.name.split(' ')[0]}!</h1>
         </div>
-        <button onClick={() => navigate('/create')} className="px-4 py-2 bg-secondary text-white text-sm font-bold rounded-xl hover:bg-secondary-dark transition-colors flex items-center gap-2" aria-label="Criar nova obra">
+        <button onClick={() => navigate('/create')} className="px-5 py-3 bg-secondary text-white text-base font-bold rounded-xl hover:bg-secondary-dark transition-colors flex items-center gap-2" aria-label="Criar nova obra"> {/* OE #004: Increased padding, text size */}
           <i className="fa-solid fa-plus-circle"></i> Nova Obra
         </button>
       </div>
 
       {/* Static Ze Tip (Only shown if works exist) */}
-      <div className={cx(surface, "rounded-3xl p-4 md:p-5 flex items-start gap-4 mb-6 transition-all duration-300 transform animate-in fade-in slide-in-from-top-4")} role="status">
-            <div className="w-12 h-12 rounded-full p-1 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-800 shadow-lg shrink-0">
+      <div className={cx(surface, "rounded-3xl p-5 md:p-6 flex items-start gap-4 mb-8 transition-all duration-300 transform animate-in fade-in slide-in-from-top-4")} role="status"> {/* OE #004: Increased padding, margin-bottom */}
+            <div className="w-14 h-14 rounded-full p-1 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-800 shadow-lg shrink-0"> {/* OE #004: Increased size */}
                 <img 
                 src={ZE_AVATAR} 
                 alt="Zé da Obra" 
@@ -488,15 +489,15 @@ const Dashboard = () => {
                 />
             </div>
             <div className="flex-1">
-                <p className="text-sm font-black uppercase tracking-widest mb-1 text-secondary">Dica do Zé!</p>
-                <p className="text-primary dark:text-white font-bold text-base leading-tight">
+                <p className="text-base font-black uppercase tracking-widest mb-1 text-secondary">Dica do Zé!</p> {/* OE #004: Increased text size */}
+                <p className="text-primary dark:text-white font-bold text-lg leading-tight"> {/* OE #004: Increased text size */}
                   Mantenha sempre o olho no cronograma e no orçamento! Uma boa gestão evita surpresas e prejuízos na obra.
                 </p>
             </div>
         </div>
 
       {/* Work Selector & Delete Action */}
-      <div className="flex items-center gap-3 mb-8">
+      <div className="flex items-center gap-3 mb-10"> {/* OE #004: Increased margin-bottom */}
         {allWorks.length > 1 && (
           <label htmlFor="work-select" className="sr-only">Selecionar Obra</label>
         )}
@@ -504,7 +505,7 @@ const Dashboard = () => {
           id="work-select"
           value={selectedWork?.id || ''}
           onChange={handleWorkSelectChange}
-          className="flex-1 px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-primary dark:text-white focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
+          className="flex-1 px-5 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-primary dark:text-white focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all text-base" /* OE #004: Increased padding, text size */
           aria-label="Selecionar obra para visualizar dashboard"
         >
           {allWorks.map((workOption) => (
@@ -514,47 +515,47 @@ const Dashboard = () => {
         <button
           onClick={() => setShowDeleteModal(true)}
           disabled={!selectedWork}
-          className="flex-none w-12 h-12 bg-red-500 text-white rounded-xl flex items-center justify-center hover:bg-red-600 transition-colors disabled:opacity-50"
+          className="flex-none w-14 h-14 bg-red-500 text-white rounded-xl flex items-center justify-center hover:bg-red-600 transition-colors disabled:opacity-50" /* OE #004: Increased size */
           aria-label={`Excluir obra ${selectedWork?.name || ''}`}
         >
-          <i className="fa-solid fa-trash-alt text-lg"></i>
+          <i className="fa-solid fa-trash-alt text-xl"></i> {/* OE #004: Increased icon size */}
         </button>
       </div>
 
       {selectedWork && workSummary && (
         <>
           {/* Daily Summary Card */}
-          <div className={cx(surface, "rounded-3xl p-6 mb-8")} aria-labelledby="summary-title">
-            <h2 id="summary-title" className="text-xl font-black text-primary dark:text-white mb-4">Resumo da Obra</h2>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-              <div className="bg-slate-50 dark:bg-slate-800 rounded-2xl p-3 flex flex-col items-start border border-slate-100 dark:border-slate-700 shadow-inner">
-                <i className="fa-solid fa-list-check text-xl text-green-500 mb-1"></i>
-                <p className="text-lg font-black text-green-600 leading-none">{workSummary.completedSteps}</p>
-                <p className="text-[9px] font-extrabold tracking-widest uppercase text-slate-500">Etapas Concluídas</p>
+          <div className={cx(surface, "rounded-3xl p-7 mb-10")} aria-labelledby="summary-title"> {/* OE #004: Increased padding, margin-bottom */}
+            <h2 id="summary-title" className="text-xl font-black text-primary dark:text-white mb-5">Resumo da Obra</h2> {/* OE #004: Increased margin-bottom */}
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4"> {/* OE #004: Increased gap */}
+              <div className="bg-slate-50 dark:bg-slate-800 rounded-2xl p-4 flex flex-col items-start border border-slate-100 dark:border-slate-700 shadow-inner"> {/* OE #004: Increased padding */}
+                <i className="fa-solid fa-list-check text-2xl text-green-500 mb-2"></i> {/* OE #004: Increased icon size, margin */}
+                <p className="text-xl font-black text-green-600 leading-none">{workSummary.completedSteps}</p> {/* OE #004: Increased text size */}
+                <p className="text-[10px] font-extrabold tracking-widest uppercase text-slate-500 mt-1">Etapas Concluídas</p> {/* OE #004: Added margin-top */}
               </div>
-              <div className="bg-slate-50 dark:bg-slate-800 rounded-2xl p-3 flex flex-col items-start border border-slate-100 dark:border-slate-700 shadow-inner">
-                <i className="fa-solid fa-hourglass-half text-xl text-amber-500 mb-1"></i>
-                <p className="text-lg font-black text-amber-600 leading-none">{workSummary.inProgressSteps}</p>
-                <p className="text-[9px] font-extrabold tracking-widest uppercase text-slate-500">Etapas Em Andamento</p>
+              <div className="bg-slate-50 dark:bg-slate-800 rounded-2xl p-4 flex flex-col items-start border border-slate-100 dark:border-slate-700 shadow-inner">
+                <i className="fa-solid fa-hourglass-half text-2xl text-amber-500 mb-2"></i>
+                <p className="text-xl font-black text-amber-600 leading-none">{workSummary.inProgressSteps}</p>
+                <p className="text-[10px] font-extrabold tracking-widest uppercase text-slate-500 mt-1">Etapas Em Andamento</p>
               </div>
-              <div className="bg-slate-50 dark:bg-slate-800 rounded-2xl p-3 flex flex-col items-start border border-slate-100 dark:border-slate-700 shadow-inner">
-                <i className="fa-solid fa-triangle-exclamation text-xl text-red-500 mb-1"></i>
-                <p className="text-lg font-black text-red-600 leading-none">{workSummary.delayedSteps}</p>
-                <p className="text-[9px] font-extrabold tracking-widest uppercase text-slate-500">Etapas Atrasadas</p>
+              <div className="bg-slate-50 dark:bg-slate-800 rounded-2xl p-4 flex flex-col items-start border border-slate-100 dark:border-slate-700 shadow-inner">
+                <i className="fa-solid fa-triangle-exclamation text-2xl text-red-500 mb-2"></i>
+                <p className="text-xl font-black text-red-600 leading-none">{workSummary.delayedSteps}</p>
+                <p className="text-[10px] font-extrabold tracking-widest uppercase text-slate-500 mt-1">Etapas Atrasadas</p>
               </div>
-              <div className="bg-slate-50 dark:bg-slate-800 rounded-2xl p-3 flex flex-col items-start border border-slate-100 dark:border-slate-700 shadow-inner">
-                <i className="fa-solid fa-boxes-stacked text-xl text-secondary mb-1"></i>
-                <p className="text-lg font-black text-secondary leading-none">{workSummary.pendingMaterials}</p>
-                <p className="text-[9px] font-extrabold tracking-widest uppercase text-slate-500">Materiais Pendentes</p>
+              <div className="bg-slate-50 dark:bg-slate-800 rounded-2xl p-4 flex flex-col items-start border border-slate-100 dark:border-slate-700 shadow-inner">
+                <i className="fa-solid fa-boxes-stacked text-2xl text-secondary mb-2"></i>
+                <p className="text-xl font-black text-secondary leading-none">{workSummary.pendingMaterials}</p>
+                <p className="text-[10px] font-extrabold tracking-widest uppercase text-slate-500 mt-1">Materiais Pendentes</p>
               </div>
             </div>
           </div>
 
           {/* Cronograma Overview */}
-          <div className={cx(surface, "rounded-3xl p-6 mb-8")}>
-            <h2 className="text-xl font-black text-primary dark:text-white mb-4">Progresso do Cronograma</h2>
+          <div className={cx(surface, "rounded-3xl p-7 mb-10")}> {/* OE #004: Increased padding, margin-bottom */}
+            <h2 className="text-xl font-black text-primary dark:text-white mb-5">Progresso do Cronograma</h2> {/* OE #004: Increased margin-bottom */}
             <SegmentedProgressBar steps={selectedWorkSteps} />
-            <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400 font-medium">
+            <div className="flex justify-between text-sm text-slate-500 dark:text-slate-400 font-medium"> {/* OE #004: Increased text size */}
               <span>Pendente</span>
               <span>Em Andamento</span>
               <span>Atrasada</span>
@@ -563,9 +564,9 @@ const Dashboard = () => {
           </div>
 
           {/* Financeiro Overview */}
-          <div className={cx(surface, "rounded-3xl p-6 mb-8")}>
-            <h2 className="text-xl font-black text-primary dark:text-white mb-4">Orçamento</h2>
-            <div className="flex items-center justify-between text-lg font-bold mb-2">
+          <div className={cx(surface, "rounded-3xl p-7 mb-10")}> {/* OE #004: Increased padding, margin-bottom */}
+            <h2 className="text-xl font-black text-primary dark:text-white mb-5">Orçamento</h2> {/* OE #004: Increased margin-bottom */}
+            <div className="flex items-center justify-between text-lg font-bold mb-3"> {/* OE #004: Increased margin-bottom */}
               <span className="text-slate-700 dark:text-slate-300">Planejado:</span>
               <span className="text-primary dark:text-white">{formatCurrency(workSummary.budgetPlanned)}</span>
             </div>
@@ -575,7 +576,7 @@ const Dashboard = () => {
                 {formatCurrency(workSummary.totalSpent)}
               </span>
             </div>
-            <div className="flex items-center justify-between text-xl font-black pt-4 border-t border-slate-200 dark:border-slate-800 mt-4">
+            <div className="flex items-center justify-between text-2xl font-black pt-5 border-t border-slate-200 dark:border-slate-800 mt-5"> {/* OE #004: Increased padding, margin, text size */}
               <span className="text-primary dark:text-white">Balanço:</span>
               <span className={workSummary.totalSpent > workSummary.budgetPlanned ? 'text-red-500' : 'text-green-600 dark:text-green-400'}>
                 {formatCurrency(workSummary.budgetPlanned - workSummary.totalSpent)}
@@ -587,7 +588,7 @@ const Dashboard = () => {
           <button 
             onClick={() => selectedWork && navigate(`/work/${selectedWork.id}`)} 
             disabled={!selectedWork}
-            className="w-full py-4 bg-gradient-gold text-white font-black rounded-2xl shadow-lg hover:shadow-orange-500/30 hover:scale-105 transition-all flex items-center justify-center gap-3 disabled:opacity-70 disabled:scale-100"
+            className="w-full py-4 bg-gradient-gold text-white font-black rounded-2xl shadow-lg hover:shadow-orange-500/30 hover:scale-105 transition-all flex items-center justify-center gap-3 disabled:opacity-70 disabled:scale-100 text-xl" /* OE #004: Increased padding, text size */
             aria-label={`Acessar obra ${selectedWork?.name || ''}`}
           >
             <i className="fa-solid fa-arrow-right"></i> Acessar Obra
@@ -607,7 +608,7 @@ const Dashboard = () => {
           isConfirming={isDeletingWork}
         >
           {deleteError && (
-            <div className="mt-4 p-3 bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-700 text-red-700 dark:text-red-300 rounded-xl text-sm">
+            <div className="mt-4 p-3 bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-700 text-red-700 dark:text-red-300 rounded-xl text-base"> {/* OE #004: Increased text size */}
               <i className="fa-solid fa-triangle-exclamation mr-2"></i> {deleteError}
             </div>
           )}
