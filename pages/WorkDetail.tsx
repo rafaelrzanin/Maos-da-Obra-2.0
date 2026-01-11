@@ -2665,8 +2665,8 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                                 title: "Excluir Foto",
                                 message: `Tem certeza que deseja excluir esta foto "${photo.description}"?`,
                                 confirmText: "Excluir",
-                                onConfirm: async (e) => {
-                                  e?.preventDefault(); // Pass event here
+                                onConfirm: async (e?: React.FormEvent) => { // Fix: Added optional event
+                                  e?.preventDefault(); 
                                   await handleDeletePhoto(photo);
                                 },
                                 onCancel: async (_e?: React.FormEvent) => {setZeModal(prev => ({ ...prev, isOpen: false }));}, // Fix: Ensure onCancel matches signature
@@ -2726,7 +2726,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                               title: "Excluir Arquivo",
                               message: `Tem certeza que deseja excluir o arquivo "${file.name}"?`,
                               confirmText: "Excluir",
-                              onConfirm: async (e) => {
+                              onConfirm: async (e?: React.FormEvent) => { // Fix: Added optional event
                                 e?.preventDefault();
                                 await handleDeleteFile(file);
                               },
@@ -2765,7 +2765,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
               ) : (
                 <div className="space-y-4">
                   {contracts.map(contract => (
-                    <div key={contract.id} className="bg-slate-50 dark:bg-slate-800 p-4 rounded-xl border border-slate-100 dark:border-slate-700 shadow-sm flex items-center justify-between transition-all duration-300 hover:scale-[1.005] hover:shadow-lg">
+                    <div key={contract.id} className="bg-slate-500/5 dark:bg-slate-800 p-4 rounded-xl border border-slate-100 dark:border-slate-700 shadow-sm flex items-center justify-between transition-all duration-300 hover:scale-[1.005] hover:shadow-lg">
                       <div>
                         <p className="font-bold text-primary dark:text-white text-base">{contract.title}</p>
                         <p className="text-xs text-slate-500 dark:text-slate-400">{contract.category}</p>
@@ -2847,7 +2847,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
           message="" // Message handled by form fields
           confirmText={editStepData ? "Salvar Alterações" : "Adicionar Etapa"}
           onConfirm={editStepData ? handleEditStep : handleAddStep}
-          onCancel={() => {
+          onCancel={(_e?: React.FormEvent) => { // Fix: Added optional event
             setShowAddStepModal(false);
             setEditStepData(null); // Clear edit data on cancel
             setNewStepName('');
@@ -2923,7 +2923,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
           message=""
           confirmText={editMaterialData ? "Salvar e/ou Registrar Compra" : "Adicionar Material"}
           onConfirm={editMaterialData ? handleEditMaterial : handleAddMaterial}
-          onCancel={() => {
+          onCancel={(_e?: React.FormEvent) => { // Fix: Added optional event
             setShowAddMaterialModal(false);
             setEditMaterialData(null);
             setNewMaterialName('');
@@ -3068,7 +3068,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
           message=""
           confirmText={editExpenseData ? "Salvar Alterações" : "Adicionar Despesa"}
           onConfirm={editExpenseData ? handleEditExpense : handleAddExpense}
-          onCancel={() => {
+          onCancel={(_e?: React.FormEvent) => { // Fix: Added optional event
             setShowAddExpenseModal(false);
             setEditExpenseData(null);
             setNewExpenseDescription('');
@@ -3218,7 +3218,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
           title={`Registrar Pagamento para "${paymentExpenseData.description}"`}
           message=""
           confirmText="Registrar Pagamento"
-          onConfirm={async (e) => {
+          onConfirm={async (e?: React.FormEvent) => { // Fix: Added optional event
             e?.preventDefault();
             setZeModal(prev => ({ ...prev, isConfirming: true }));
             try {
@@ -3252,7 +3252,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
               setZeModal(prev => ({ ...prev, isConfirming: false }));
             }
           }}
-          onCancel={() => {
+          onCancel={(_e?: React.FormEvent) => { // Fix: Added optional event
             setShowAddPaymentModal(false);
             setPaymentExpenseData(null);
             setPaymentAmount('');
@@ -3305,7 +3305,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
           message=""
           confirmText={editWorkerData ? "Salvar Alterações" : "Adicionar Trabalhador"}
           onConfirm={editWorkerData ? handleEditWorker : handleAddWorker}
-          onCancel={() => {
+          onCancel={(_e?: React.FormEvent) => { // Fix: Added optional event
             setShowAddWorkerModal(false);
             setEditWorkerData(null);
             setNewWorkerName('');
@@ -3403,7 +3403,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
           message=""
           confirmText={editSupplierData ? "Salvar Alterações" : "Adicionar Fornecedor"}
           onConfirm={editSupplierData ? handleEditSupplier : handleAddSupplier}
-          onCancel={() => {
+          onCancel={(_e?: React.FormEvent) => { // Fix: Added optional event
             setShowAddSupplierModal(false);
             setEditSupplierData(null);
             setNewSupplierName('');
@@ -3511,7 +3511,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
           message=""
           confirmText="Upload Foto"
           onConfirm={handleAddPhoto}
-          onCancel={() => { setShowAddPhotoModal(false); setNewPhotoDescription(''); setNewPhotoFile(null); setNewPhotoType('PROGRESS'); }}
+          onCancel={(_e?: React.FormEvent) => { setShowAddPhotoModal(false); setNewPhotoDescription(''); setNewPhotoFile(null); setNewPhotoType('PROGRESS'); }} // Fix: Added optional event
           isConfirming={zeModal.isConfirming}
           type="SUCCESS"
         >
@@ -3565,7 +3565,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
           message=""
           confirmText="Upload Arquivo"
           onConfirm={handleAddFile}
-          onCancel={() => { setShowAddFileModal(false); setNewFileName(''); setNewFileCategory(FileCategory.GENERAL); setNewUploadFile(null); }}
+          onCancel={(_e?: React.FormEvent) => { setShowAddFileModal(false); setNewFileName(''); setNewFileCategory(FileCategory.GENERAL); setNewUploadFile(null); }} // Fix: Added optional event
           isConfirming={zeModal.isConfirming}
           type="SUCCESS"
         >
@@ -3617,7 +3617,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
           title={selectedContractTitle}
           message=""
           confirmText="Copiar Texto"
-          onConfirm={async (e) => {
+          onConfirm={async (e?: React.FormEvent) => { // Fix: Added optional event
             e?.preventDefault(); // Pass event here
             try {
               await navigator.clipboard.writeText(selectedContractContent);
@@ -3629,11 +3629,11 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
               showToastNotification("Falha ao copiar o contrato. Tente manualmente.", 'error');
             }
           }}
-          onCancel={() => { setShowContractContentModal(false); setSelectedContractContent(''); setSelectedContractTitle(''); setCopyContractSuccess(false); }}
+          onCancel={(_e?: React.FormEvent) => { setShowContractContentModal(false); setSelectedContractContent(''); setSelectedContractTitle(''); setCopyContractSuccess(false); }} // Fix: Added optional event
           type="INFO"
           cancelText="Fechar"
         >
-          <div className="relative p-4 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 max-h-[60vh] overflow-y-auto">
+          <div className="relative p-4 rounded-xl bg-slate-500/5 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 max-h-[60vh] overflow-y-auto">
             <pre className="whitespace-pre-wrap font-mono text-sm text-primary dark:text-white">
               {selectedContractContent}
             </pre>
@@ -3652,7 +3652,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
           message=""
           confirmText={editChecklistData ? "Salvar Checklist" : "Adicionar Checklist"}
           onConfirm={editChecklistData ? handleEditChecklist : handleAddChecklist}
-          onCancel={() => {
+          onCancel={(_e?: React.FormEvent) => { // Fix: Added optional event
             setShowAddChecklistModal(false);
             setEditChecklistData(null);
             setNewChecklistName('');
