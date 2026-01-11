@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.tsx';
-import { aiService } from '../services/ai.ts';
+import { aiService } from '../services/ai.tsx';
 import { PlanType, Work, Step, Material, Expense, StepStatus, ExpenseCategory, ExpenseStatus } from '../types.ts'; // NEW: Import Work, Step, Material, Expense types
 import { ZE_AVATAR, ZE_AVATAR_FALLBACK } from '../services/standards.ts';
 import { dbService } from '../services/db.ts'; // NEW: Import dbService
@@ -398,7 +398,7 @@ const AiChat = () => {
           `}
           aria-label={isListening ? 'Parar gravação de voz' : 'Iniciar gravação de voz'}
         >
-          {isListening ? <i className="fa-solid fa-microphone-slash"></i> : <i className="fa-solid fa-microphone"></i>}
+          <i className="fa-solid fa-microphone-slash"></i> : <i className="fa-solid fa-microphone"></i>}
         </button>
         {/* NEW: Send Button - Always present */}
         <button
