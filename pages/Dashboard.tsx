@@ -4,7 +4,8 @@ import { useAuth } from '../contexts/AuthContext.tsx';
 import { dbService } from '../services/db.ts';
 import { StepStatus, PlanType, WorkStatus, type Work, type DBNotification, type Step, type Material } from '../types.ts';
 import { ZE_AVATAR, ZE_AVATAR_FALLBACK } from '../services/standards.ts';
-import { ZeModal } from '../components/ZeModal.tsx'; 
+// Fix: Import ZeModalProps type
+import { ZeModal, type ZeModalProps } from '../components/ZeModal.tsx'; 
 
 /** =========================
  * UI helpers
@@ -672,7 +673,7 @@ const Dashboard = () => {
             type: "DANGER",
             confirmText: "Sim, Excluir Obra",
             onConfirm: handleDeleteSelectedWork,
-            onCancel: () => setZeModal(p => ({ ...p, isOpen: false })), // Fix: Ensure onCancel matches signature
+            onCancel: () => setZeModal(p => ({ ...p, isOpen: false })),
             id: selectedWork?.id // Pass work ID to modal for context
           })}
           disabled={!selectedWork}
