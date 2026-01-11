@@ -1,424 +1,275 @@
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext.tsx';
-import { aiService } from '../services/ai.ts';
-import { PlanType, Work, Step, Material, Expense, StepStatus, ExpenseCategory, ExpenseStatus } from '../types.ts'; // NEW: Import Work, Step, Material, Expense types
-import { ZE_AVATAR, ZE_AVATAR_FALLBACK } from '../services/standards.ts';
-import { dbService } from '../services/db.ts'; // NEW: Import dbService
+import { GoogleGenAI, Type } from "@google/genai";
+import { Work, AIWorkPlan } from "../types.ts";
 
-interface Message {
-  id: string;
-  sender: 'user' | 'ai';
-  text: string;
+// Helper function to safely get environment variables, checking both process.env and import.meta.env
+const safeGetEnv = (key: string): string | undefined => {
+  let value: string | undefined;
+
+  // Prioriza import.meta.env para ambientes de cliente (Vite)
+  if (typeof import.meta !== 'undefined' && import.meta.env && typeof import.meta.env[key] === 'string') {
+    value = import.meta.env[key];
+    // console.log(`[AI safeGetEnv] Lendo ${key} de import.meta.env. Valor: ${value ? 'CONFIGURADO' : 'UNDEFINED'}`); // Desativado para reduzir logs
+    // FIX: Explicitly check for the string "undefined" which can occur if JSON.stringify(undefined) is used.
+    if (value && value !== 'undefined') return value;
+  } else {
+    // console.log(`[AI safeGetEnv] import.meta.env.${key} não disponível ou não é string.`); // Desativado para reduzir logs
+  }
+  
+  // Fallback to process.env (serverless functions, Node.js)
+  if (typeof process !== 'undefined' && process.env && typeof process.env[key] === 'string') {
+    value = process.env[key];
+    // console.log(`[AI safeGetEnv] Lendo ${key} de process.env. Valor: ${value ? 'CONFIGURADO' : 'UNDEFINED'}`); // Desativado para reduzir logs
+    // FIX: Explicitly check for the string "undefined".
+    if (value && value !== 'undefined') return value;
+  } else {
+    // console.log(`[AI safeGetEnv] process.env.${key} não disponível ou não é string.`); // Desativado para reduzir logs
+  }
+
+  console.warn(`[AI safeGetEnv] Variável de ambiente '${key}' não encontrada em nenhum contexto.`);
+  return undefined;
+};
+
+// Access API_KEY using the safeGetEnv helper
+const apiKey = safeGetEnv('VITE_GOOGLE_API_KEY');
+
+let ai: GoogleGenAI | null = null;
+
+// NEW: Strict check for API key
+if (!apiKey) {
+  console.error("ERRO CRÍTICO: Google GenAI API Key (VITE_GOOGLE_API_KEY) não está configurada.");
+  console.error("Por favor, adicione sua chave de API nas variáveis de ambiente do seu ambiente de deploy (Vercel, etc.) como 'VITE_GOOGLE_API_KEY' ou no seu arquivo .env local.");
+} else {
+  ai = new GoogleGenAI({ apiKey: apiKey });
+  console.log("Google GenAI inicializado com sucesso.");
 }
 
-const AiChat = () => {
-  const { user, trialDaysRemaining, authLoading } = useAuth();
-  const navigate = useNavigate();
-
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [aiMessage, setAiMessage] = useState(''); // User's typed input OR final transcribed speech
-  const [aiLoading, setAiLoading] = useState(false);
-
-  // State for Speech Recognition
-  const [isListening, setIsListening] = useState(false);
-  const [recognizedText, setRecognizedText] = useState(''); // Text from SpeechRecognition during active listening
-  const recognitionRef = useRef<any>(null); // Use any for SpeechRecognition to avoid global type issues
-  const latestRecognizedTextRef = useRef(''); // NEW: Ref to store latest recognizedText
-
-  const chatMessagesRef = useRef<HTMLDivElement>(null);
-
-  const isVitalicio = user?.plan === PlanType.VITALICIO;
-  const isAiTrialActive = user?.isTrial && trialDaysRemaining !== null && trialDaysRemaining > 0;
-  const hasAiAccess = isVitalicio || isAiTrialActive;
-
-  const [errorMsg, setErrorMsg] = useState(''); // For local errors like speech recognition
-
-  // NEW: Work context states
-  const [currentWork, setCurrentWork] = useState<Work | null>(null);
-  const [workSteps, setWorkSteps] = useState<Step[]>([]);
-  const [workMaterials, setWorkMaterials] = useState<Material[]>([]);
-  const [workExpenses, setWorkExpenses] = useState<Expense[]>([]);
-  const [loadingWorkContext, setLoadingWorkContext] = useState(false); // NEW: Loading state for work context
-
-
-  // NEW: Update this ref whenever recognizedText changes
-  useEffect(() => {
-      latestRecognizedTextRef.current = recognizedText;
-  }, [recognizedText]);
-
-  // Initialize SpeechRecognition once
-  useEffect(() => {
-    if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
-      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      const recognition = new SpeechRecognition();
-      recognition.continuous = true; // Keep listening for continuous speech
-      recognition.interimResults = true; // Get interim results
-      recognition.lang = 'pt-BR'; // Set language to Brazilian Portuguese
-
-      recognition.onresult = (event: any /* SpeechRecognitionEvent */) => {
-        let interimTranscript = '';
-        let finalTranscript = '';
-
-        for (let i = event.resultIndex; i < event.results.length; ++i) {
-          const transcript = event.results[i][0].transcript;
-          if (event.results[i].isFinal) {
-            finalTranscript += transcript;
-          } else {
-            interimTranscript += transcript;
-          }
-        }
-        // Always update recognizedText with the latest interim or final part
-        setRecognizedText(finalTranscript + interimTranscript); // Accumulate recognized text
-      };
-
-      recognition.onend = () => {
-        console.log("Speech Recognition ended.");
-        // Use the ref to get the LATEST recognizedText
-        if (latestRecognizedTextRef.current.trim()) {
-            setAiMessage(latestRecognizedTextRef.current.trim());
-        }
-        setIsListening(false); // Ensure listening state is false
-        setRecognizedText(''); // Clear recognized text
-      };
-
-      recognition.onerror = (event: any /* SpeechRecognitionErrorEvent */) => {
-        console.error('Speech recognition error:', event.error);
-        setErrorMsg('Erro na gravação de voz. Tente novamente.');
-        setIsListening(false);
-        setRecognizedText('');
-      };
-
-      recognitionRef.current = recognition;
-    } else {
-      console.warn('Speech Recognition API not supported in this browser.');
-      // Optionally disable microphone button or show a message
-    }
-
-    return () => {
-      if (recognitionRef.current) {
-        recognitionRef.current.stop();
-      }
-    };
-  }, []); // CRITICAL FIX: Empty dependency array
-
-
-  // NEW: Effect to load work context
-  useEffect(() => {
-    const loadContext = async () => {
-      // Only load if user is authenticated and has AI access, and authLoading is false (stable auth state)
-      if (!user?.id || !hasAiAccess || authLoading) { 
-        setLoadingWorkContext(false);
-        return;
-      }
-
-      setLoadingWorkContext(true);
-      const lastSelectedWorkId = localStorage.getItem('lastSelectedWorkId');
+export const aiService = {
+  // NEW: Função para chat conversacional (com respostas potencialmente mais longas)
+  chat: async (message: string, workContext?: string): Promise<string> => { // MODIFIED signature: added workContext
+    if (!ai) {
+      // OFFLINE FALLBACK MODE (Existing logic)
+      const lowerMsg = message.toLowerCase();
       
-      if (lastSelectedWorkId) {
-        try {
-          const workData = await dbService.getWorkById(lastSelectedWorkId);
-          if (workData && workData.userId === user.id) { // Ensure work belongs to user
-            setCurrentWork(workData);
-            const stepsData = await dbService.getSteps(lastSelectedWorkId);
-            setWorkSteps(stepsData);
-            const materialsData = await dbService.getMaterials(lastSelectedWorkId);
-            setWorkMaterials(materialsData);
-            const expensesData = await dbService.getExpenses(lastSelectedWorkId);
-            setWorkExpenses(expensesData);
-            console.log("[AiChat] Work context loaded for:", workData.name);
-          } else {
-            setCurrentWork(null);
-            setWorkSteps([]);
-            setWorkMaterials([]);
-            setWorkExpenses([]);
-            console.log("[AiChat] Last selected work not found or not owned. No work context.");
-          }
-        } catch (err) {
-          console.error("[AiChat] Error loading work context:", err);
-          setCurrentWork(null);
-          setWorkSteps([]);
-          setWorkMaterials([]);
-          setWorkExpenses([]);
-        }
-      } else {
-        setCurrentWork(null);
-        setWorkSteps([]);
-        setWorkMaterials([]);
-        setWorkExpenses([]);
-        console.log("[AiChat] No last selected work in localStorage. No work context.");
+      await new Promise(r => setTimeout(r, 1000)); 
+
+      if (lowerMsg.includes('concreto') || lowerMsg.includes('traço')) {
+          return "Para um concreto bom, estrutural (25 Mpa), a medida segura é 1 lata de cimento, 2 de areia e 3 de brita. Não exagere na água pra não enfraquecer.";
       }
-      setLoadingWorkContext(false);
-    };
+      if (lowerMsg.includes('piso') || lowerMsg.includes('cerâmica')) {
+          return "O segredo do piso é a base nivelada e a argamassa certa. Use AC-III se for porcelanato ou área externa. E respeite a junta que o fabricante pede na caixa.";
+      }
+      if (lowerMsg.includes('tinta') || lowerMsg.includes('pintura')) {
+          return "Antes de pintar, lixe bem e tire o pó. Se a parede for nova, passe selador. Se for repintura com cor escura, talvez precise de mais demãos.";
+      }
 
-    if (!authLoading && user && hasAiAccess) { // Only load context if user is logged in AND has AI access AND auth is not loading
-        loadContext();
-    }
-  }, [user, hasAiAccess, authLoading]); // Re-run if user/access/authLoading changes
-
-
-  // Add initial AI welcome message
-  useEffect(() => {
-    // Only show welcome message if AI access is granted, no messages yet, auth is finished and work context is loaded (or confirmed absent)
-    if (hasAiAccess && messages.length === 0 && !authLoading && !loadingWorkContext) {
-      setMessages([{ id: 'ai-welcome', sender: 'ai', text: 'Opa! Mestre de obras na área. No que posso te ajudar hoje?' }]);
-    }
-  }, [hasAiAccess, messages.length, authLoading, loadingWorkContext]); // Add loadingWorkContext as dependency
-
-
-  // Scroll to bottom of chat messages whenever messages update
-  useEffect(() => {
-    if (chatMessagesRef.current) {
-      chatMessagesRef.current.scrollTop = chatMessagesRef.current.scrollHeight;
-    }
-  }, [messages]);
-
-
-  // NEW: Helper to build work context for AI
-  const buildWorkContext = useCallback(() => {
-    if (!currentWork) {
-      return "Nenhum contexto de obra disponível.";
-    }
-
-    let context = `CONTEXTO DA OBRA (baseado na obra "${currentWork.name}" - Status: ${currentWork.status}):\n`;
-
-    // CRONOGRAMA
-    const totalSteps = workSteps.length;
-    const completedSteps = workSteps.filter(s => s.status === StepStatus.COMPLETED).length;
-    const inProgressSteps = workSteps.filter(s => s.status === StepStatus.IN_PROGRESS).length;
-    const delayedSteps = workSteps.filter(s => s.status === StepStatus.DELAYED).length;
-    const pendingSteps = workSteps.filter(s => s.status === StepStatus.PENDING).length;
-
-    context += `\nCRONOGRAMA:\n`;
-    context += `  Total de Etapas: ${totalSteps}\n`;
-    context += `  Concluídas: ${completedSteps}\n`;
-    context += `  Em Andamento: ${inProgressSteps}\n`;
-    context += `  Atrasadas: ${delayedSteps}\n`;
-    context += `  Pendentes: ${pendingSteps}\n`;
-
-    const nextUpcomingSteps = workSteps.filter(s => s.status === StepStatus.PENDING).slice(0, 3);
-    if (nextUpcomingSteps.length > 0) {
-      context += `  Próximas Etapas Pendentes: ${nextUpcomingSteps.map(s => s.name).join(', ')}\n`;
-    }
-    const currentlyDelayedSteps = workSteps.filter(s => s.status === StepStatus.DELAYED);
-    if (currentlyDelayedSteps.length > 0) {
-      context += `  Etapas Atualmente Atrasadas: ${currentlyDelayedSteps.map(s => s.name).join(', ')}\n`;
-    }
-
-
-    // MATERIAIS
-    const totalPlannedMaterials = workMaterials.reduce((sum, m) => sum + m.plannedQty, 0);
-    const totalPurchasedMaterials = workMaterials.reduce((sum, m) => sum + m.purchasedQty, 0);
-    const pendingMaterials = workMaterials.filter(m => m.plannedQty > 0 && m.purchasedQty < m.plannedQty);
-    const materialShortages = pendingMaterials.filter(m => m.plannedQty > 0 && (m.purchasedQty / m.plannedQty) < 0.5); // Less than 50% purchased
-
-    context += `\nMATERIAIS:\n`;
-    context += `  Total Planejado: ${totalPlannedMaterials}\n`;
-    context += `  Total Comprado: ${totalPurchasedMaterials}\n`;
-    context += `  Materiais Pendentes (quant): ${pendingMaterials.length}\n`;
-    if (materialShortages.length > 0) {
-      context += `  Materiais com Grave Escassez: ${materialShortages.map(m => m.name).join(', ')}\n`;
-    }
-
-
-    // FINANCEIRO
-    const totalBudget = currentWork.budgetPlanned;
-    const totalExpensesAmount = workExpenses.reduce((sum, e) => sum + e.amount, 0); // Total planned amount for all expenses
-    const totalPaidExpenses = workExpenses.reduce((sum, e) => sum + (e.paidAmount || 0), 0); // Total paid amount (all expenses)
-    
-    // Sum only non-material expenses for primary budget tracking
-    const nonMaterialExpenses = workExpenses.filter(e => e.category !== ExpenseCategory.MATERIAL);
-    const nonMaterialPaid = nonMaterialExpenses.reduce((sum, e) => sum + (e.paidAmount || 0), 0);
-    
-    const outstandingExpenses = nonMaterialExpenses.reduce((sum, e) => {
-        const agreed = e.totalAgreed !== undefined && e.totalAgreed !== null ? e.totalAgreed : e.amount;
-        const paid = e.paidAmount || 0;
-        return sum + Math.max(0, agreed - paid);
-    }, 0);
-
-    const overpaidExpenses = workExpenses.filter(e => e.status === ExpenseStatus.OVERPAID);
-
-    context += `\nFINANCEIRO:\n`;
-    context += `  Orçamento Planejado: R$${totalBudget.toFixed(2)}\n`;
-    context += `  Gastos Totais Registrados (Previsto): R$${totalExpensesAmount.toFixed(2)}\n`;
-    context += `  Valor Efetivamente Pago (excluindo despesas de material, para análise de orçamento principal): R$${nonMaterialPaid.toFixed(2)}\n`;
-    context += `  A Pagar (não-materiais): R$${outstandingExpenses.toFixed(2)}\n`;
-    if (overpaidExpenses.length > 0) {
-      context += `  Despesas com Excedente (Prejuízo): R$${overpaidExpenses.reduce((sum, e) => sum + ((e.paidAmount || 0) - (e.totalAgreed !== undefined && e.totalAgreed !== null ? e.totalAgreed : e.amount)), 0).toFixed(2)}\n`;
-    }
-
-    return context;
-  }, [currentWork, workSteps, workMaterials, workExpenses]);
-
-
-  const handleAiAsk = async (e?: React.FormEvent) => {
-    e?.preventDefault(); // Only prevent default if event object exists
-    const textToSend = aiMessage.trim(); // Always use aiMessage state
-
-    if (!textToSend || !hasAiAccess || aiLoading) return;
-
-    const userMessage: Message = { id: Date.now().toString(), sender: 'user', text: textToSend };
-    setMessages(prevMessages => [...prevMessages, userMessage]);
-    setAiLoading(true);
-    setAiMessage(''); // Clear input after sending
-    setRecognizedText(''); // Clear recognized text too
-    setErrorMsg(''); // Clear any previous errors
-
-    // NEW: Build and send work context along with the message
-    let fullPrompt = textToSend;
-    if (currentWork) {
-      const workContext = buildWorkContext();
-      fullPrompt = `${workContext}\n\nPERGUNTA DO USUÁRIO:\n${textToSend}`;
-    } else {
-      fullPrompt = `Nenhum contexto de obra disponível. PERGUNTA DO USUÁRIO:\n${textToSend}`; // Inform AI if no work context
+      return "Estou sem sinal da central agora (sem chave de API). Por favor, configure sua chave de API para o Zé da Obra AI funcionar. Mas estou aqui, pode conferir suas anotações.";
     }
 
     try {
-      // NEW: Pass work context to aiService.chat
-      const response = await aiService.chat(fullPrompt, currentWork ? buildWorkContext() : undefined); 
-      const aiResponse: Message = { id: (Date.now() + 1).toString(), sender: 'ai', text: response };
-      setMessages(prevMessages => [...prevMessages, aiResponse]);
-    } catch (error) {
-      console.error("Error sending message to AI:", error);
-      const errorMessage: Message = { id: (Date.now() + 1).toString(), sender: 'ai', text: 'Tive um problema de conexão aqui. Tenta de novo em um minutinho.' };
-      setMessages(prevMessages => [...prevMessages, errorMessage]);
-    } finally {
-      setAiLoading(false);
-    }
-  };
+      // MODIFIED: contents now accepts the full message, which might already contain the context
+      const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: message, // Message already contains workContext if available
+        config: {
+          systemInstruction: `Você é o Zé da Obra, um mestre de obras e engenheiro experiente e prático. Seu papel é ajudar o usuário a entender a obra.
+            Você entende de obra de verdade, já acompanhou várias obras e sabe explicar para quem não entende nada, de forma simples, direta e humana.
+            Você não usa linguagem acadêmica, jargão técnico pesado, estereótipos de pedreiro ou engenheiro, nem termos complicados sem explicar.
 
-  const toggleListening = () => {
-    if (!recognitionRef.current) {
-        setErrorMsg('API de reconhecimento de voz não suportada.');
-        return;
-    }
+            Sempre explique: o "porquê", as consequências práticas e de forma simples.
 
-    if (isListening) {
-      recognitionRef.current.stop(); // This will trigger onend
-    } else {
-      setAiMessage(''); // Clear any existing text before starting
-      setRecognizedText(''); // Clear previous recognized text
-      recognitionRef.current.start();
-      setIsListening(true);
-      setErrorMsg(''); // Clear error when starting new input
-      console.log("Speech Recognition started.");
-    }
-  };
+            Você entende a sequência lógica de uma obra, a importância do cronograma, a dependência entre etapas, o impacto de atraso em etapas, a relação entre cronograma e materiais, e a relação entre compras e financeiro.
 
-  // NEW: Include loadingWorkContext in the overall loading check
-  if (authLoading || loadingWorkContext) return (
-    <div className="flex items-center justify-center min-h-[70vh] text-primary dark:text-white">
-        <i className="fa-solid fa-circle-notch fa-spin text-3xl"></i>
-    </div>
-  );
+            ${workContext ? `**INSTRUÇÃO CRÍTICA:** Um CONTEXTO DA OBRA foi fornecido no início da sua conversa. Use SOMENTE as informações contidas nesse CONTEXTO para analisar o andamento, materiais e financeiro da obra.
+            Se o CONTEXTO DA OBRA for fornecido, mas for insuficiente para responder à pergunta específica, diga ao usuário que você precisa de mais detalhes sobre o que ele REGISTROU no aplicativo.
+            Não tente adivinhar ou presumir informações que não estão explicitamente no CONTEXTO.
 
-  if (!hasAiAccess) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[70vh] p-6 text-center animate-in fade-in">
-        <div className="w-full max-w-sm bg-gradient-to-br from-slate-900 to-slate-950 rounded-[2.5rem] p-8 shadow-2xl dark:shadow-card-dark-subtle relative overflow-hidden border border-slate-800 group">
-          <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20"></div>
-          <div className="absolute -top-20 -right-20 w-40 h-40 bg-secondary/30 rounded-full blur-3xl animate-pulse"></div>
-          <div className="relative z-10 flex flex-col items-center">
-            <div className="w-28 h-28 rounded-full border-4 border-slate-800 p-1 bg-gradient-gold shadow-[0_0_30px_rgba(217,119,6,0.4)] mb-6 transform hover:scale-105 transition-transform duration-500">
-              <img src={ZE_AVATAR} className="w-full h-full object-cover rounded-full bg-white" onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK} alt="Zé da Obra AI" />
-            </div>
-            <h2 className="text-3xl font-black text-white mb-2 tracking-tight">Zé da Obra <span className="text-secondary">AI</span></h2>
-            <div className="h-1 w-12 bg-secondary rounded-full mb-6"></div>
-            <p className="text-slate-400 text-sm mb-8 leading-relaxed font-medium">Seu engenheiro virtual particular.</p>
-            <button onClick={() => navigate('/settings')} className="w-full py-4 bg-gradient-gold text-white font-black rounded-2xl shadow-lg hover:shadow-orange-500/20 hover:scale-105 transition-all flex items-center justify-center gap-3 group-hover:animate-pulse">
-              <i className="fa-solid fa-crown"></i> Liberar Acesso Vitalício
-            </button>
-            <p className="text-center text-[10px] text-slate-500 dark:text-slate-400 mt-4 flex items-center justify-center gap-1">
-                <i className="fa-solid fa-info-circle"></i> Acesso à IA é exclusivo para assinantes Vitalícios ou em período de trial.
-            </p>
-          </div>
-        </div>
-      </div>
-    );
-  }
+            Com base no CONTEXTO DA OBRA fornecido, você pode:
+            - Analisar andamento: "Pelo que está registrado no cronograma, o progresso é X%..."
+            - Identificar atrasos: "Com base nas datas do cronograma, a etapa Y parece estar atrasada."
+            - Apontar gargalos: "O que chama atenção no contexto é a escassez de material Z, que pode atrasar a etapa W."
+            - Sugerir atenção em etapas críticas: "Recomendo dar uma olhada na etapa A, ela é crucial para o próximo bloco de trabalho."
+            Sempre com tom calmo, construtivo e sem alarmismo.
+            ` : `**INSTRUÇÃO CRÍTICA:** Nenhum CONTEXTO DA OBRA foi fornecido. Se o usuário perguntar sobre o andamento, status ou evolução da obra, você DEVE dizer que precisa de mais informações sobre qual obra ele quer falar ou pedir para ele registrar mais dados no aplicativo para que você possa analisar. Não tente analisar se não há contexto.
+            `}
+            Nunca invente análises ou presuma dados inexistentes. Se faltarem informações, diga que "ainda faltam informações para avaliar isso melhor" ou "com mais registros no app, consigo te ajudar melhor" e incentive o registro de dados.
 
-  return (
-    <div className="flex flex-col h-[80vh] animate-in fade-in">
-      <div className="mb-6">
-        <h1 className="text-3xl font-black text-primary dark:text-white mb-2 tracking-tight">Zé da Obra <span className="text-secondary">AI</span></h1>
-        <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">Seu especialista 24h na palma da mão.</p>
-        {currentWork && (
-          <p className="text-xs text-slate-400 mt-2">Contexto da obra atual: <span className="font-bold">{currentWork.name}</span></p>
-        )}
-        {!currentWork && (
-          <p className="text-xs text-red-400 mt-2"><i className="fa-solid fa-exclamation-triangle mr-1"></i>Nenhuma obra selecionada. O Zé não terá contexto sobre sua obra. Selecione uma no Dashboard.</p>
-        )}
-      </div>
+            Seu objetivo final é fazer o usuário sentir que a obra está sendo acompanhada, que alguém entende o que está acontecendo e que o app evolui junto com a obra, e que você é um aliado real.
+            Responda com no MÁXIMO 200 palavras, a menos que uma explicação mais detalhada seja estritamente necessária para a segurança ou para evitar um grande prejuízo.`,
+          maxOutputTokens: 200, // Limita o tamanho da resposta no chat
+          thinkingConfig: { thinkingBudget: 0 }, // Desabilita o "pensamento" para respostas rápidas e diretas
+        }
+      });
       
-      {/* Chat Messages Area */}
-      <div ref={chatMessagesRef} className="flex-1 bg-white dark:bg-slate-900 rounded-2xl p-4 shadow-inner overflow-y-auto mb-4 border border-slate-200 dark:border-slate-800">
-        {messages.map((msg) => (
-          <div key={msg.id} className={`flex gap-4 mb-6 animate-in fade-in ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-            {msg.sender === 'ai' && (
-              <img src={ZE_AVATAR} className="w-10 h-10 rounded-full border border-slate-200 dark:border-slate-700" onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK} alt="Zé da Obra Avatar" />
-            )}
-            <div className={`p-3 rounded-2xl max-w-[80%] ${
-              msg.sender === 'ai' 
-                ? 'bg-slate-100 dark:bg-slate-800 rounded-tl-none text-slate-700 dark:text-slate-300 shadow-sm dark:shadow-card-dark-subtle' 
-                : 'bg-primary text-white rounded-tr-none shadow-md'
-            }`}>
-              {msg.sender === 'ai' && <p className="font-bold text-secondary mb-1">Zé da Obra</p>}
-              <p className="whitespace-pre-wrap">{msg.text}</p>
-            </div>
-          </div>
-        ))}
-        {aiLoading && (
-          <div className="flex gap-4 mb-6">
-            <img src={ZE_AVATAR} className="w-10 h-10 rounded-full border border-slate-200 dark:border-slate-700" onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK} alt="Zé da Obra Avatar" />
-            <div className="bg-slate-100 dark:bg-slate-800 p-3 rounded-tr-xl rounded-b-xl text-sm shadow-sm dark:shadow-card-dark-subtle flex items-center">
-              <span className="animate-pulse text-secondary">Digitando...</span>
-            </div>
-          </div>
-        )}
-      </div>
+      return response.text || "Não entendi direito. Pode me explicar melhor o que você precisa na obra?";
+    } catch (error) {
+      console.error("Erro na IA:", error);
+      return "Tive um problema de conexão aqui. Tenta de novo em um minutinho.";
+    }
+  },
 
-      {/* Input Bar */}
-      <form onSubmit={handleAiAsk} className="flex gap-2">
-        <input
-          value={isListening ? (recognizedText || 'Ouvindo...') : aiMessage}
-          onChange={(e) => setAiMessage(e.target.value)}
-          placeholder={isListening ? 'Ouvindo...' : 'Pergunte ao Zé...'}
-          className="flex-1 p-4 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-secondary transition-colors text-primary dark:text-white"
-          disabled={aiLoading} // Disable typing only while AI is loading, allow typing during listening
-          aria-label="Caixa de texto para perguntar ao Zé da Obra ou transcrição de voz"
-        />
-        {/* Toggle button for voice input */}
-        <button
-          type="button" // Important: type="button" to prevent form submission
-          onClick={toggleListening}
-          disabled={aiLoading || !('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)}
-          className={`w-14 text-white rounded-xl flex items-center justify-center shadow-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed
-            ${isListening ? 'bg-red-500 hover:bg-red-600 animate-pulse-mic' : 'bg-secondary hover:bg-orange-600'}
-          `}
-          aria-label={isListening ? 'Parar gravação de voz' : 'Iniciar gravação de voz'}
-        >
-          {isListening ? <i className="fa-solid fa-microphone-slash"></i> : <i className="fa-solid fa-microphone"></i>}
-        </button>
-        {/* NEW: Send Button - Always present */}
-        <button
-          type="submit"
-          disabled={aiLoading || !aiMessage.trim()} // Disable if AI is loading or input is empty, NOT by isListening
-          className={`w-14 text-white rounded-xl flex items-center justify-center shadow-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed
-            ${(!aiMessage.trim() || aiLoading) ? 'bg-slate-400 dark:bg-slate-700' : 'bg-primary hover:bg-primary-light'}
-          `}
-          aria-label="Enviar mensagem"
-        >
-          <i className="fa-solid fa-paper-plane"></i>
-        </button>
-      </form>
-      {errorMsg && (
-        <p className="text-red-500 text-sm mt-2 text-center" role="alert">
-          {errorMsg}
-        </p>
-      )}
-    </div>
-  );
+  // NEW: Função para insights curtos e incisivos em contexto de obra
+  // Adaptei para ser mais conciso e adequado para notificações
+  getWorkInsight: async (context: string): Promise<string> => {
+    if (!ai) {
+      // OFFLINE FALLBACK MODE for proactive insights
+      await new Promise(r => setTimeout(r, 500)); // Shorter delay for proactive
+      if (context.includes('material em falta')) return "Material crítico em falta pode parar a obra! Verifique a compra já.";
+      if (context.includes('etapa atrasada')) return "Etapa com prazo estourado! Avalie o status para não perder mais tempo e dinheiro.";
+      if (context.includes('estoque baixo')) return "Nível de estoque baixo. Reabasteça para manter o ritmo da etapa.";
+      if (context.includes('próxima etapa')) return "Próxima etapa chegando. Confirme recursos e equipe para um bom início.";
+      if (context.includes('quase concluída')) return "Etapa quase finalizada! Hora de checar a qualidade e planejar o fechamento.";
+      return "Estou sem conexão para dar a dica, mas a atenção ao cronograma é sempre crucial.";
+    }
+
+    try {
+      const response = await ai.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: context,
+        config: {
+          // System instruction ajustada para respostas curtas e incisivas para notificações
+          systemInstruction: `Você é o Zé da Obra. Você é um mestre de obras e engenheiro experiente. 
+            Seu objetivo: Fornecer uma **única frase (máximo 25 palavras)**, direta, incisiva e acionável, focada em economia, controle de cronograma ou prevenção de prejuízo. Não divague, vá direto ao ponto como um alerta ou dica essencial para ser usada em uma notificação.
+            Seja um parceiro técnico, não um professor. Não use gírias ou informalidades excessivas. Apresente as informações de forma clara e objetiva.`,
+          maxOutputTokens: 50, // Limita o tamanho da resposta
+          thinkingConfig: { thinkingBudget: 0 }, // Desabilita o "pensamento" para respostas rápidas e diretas
+        }
+      });
+      
+      const insight = response.text?.trim();
+      return insight || "Não consegui gerar uma dica agora. Tente novamente.";
+    } catch (error) {
+      console.error("Erro na IA ao gerar Work Insight:", error);
+      return "Ops! O Zé está com problemas de comunicação. Tente novamente mais tarde.";
+    }
+  },
+
+  // NEW: Função para gerar um plano de obra detalhado e análise de risco (Re-adicionada)
+  generateWorkPlanAndRisk: async (work: Work): Promise<AIWorkPlan> => {
+    if (!ai) {
+      // OFFLINE FALLBACK MODE for plan generation
+      await new Promise(r => setTimeout(r, 2000));
+      return {
+        workId: work.id,
+        generalAdvice: "A IA está offline. Não foi possível gerar um plano detalhado. Verifique suas anotações e contatos para gerenciar a obra.",
+        timelineSummary: "Plano offline. Organize suas etapas manualmente.",
+        detailedSteps: [{ orderIndex: 1, name: "Fase 1: Preparação", estimatedDurationDays: 10, notes: "Defina seus materiais." }],
+        potentialRisks: [{ description: "Risco de atraso.", likelihood: "high", mitigation: "A IA está offline." }],
+        materialSuggestions: [{ item: "Cimento", priority: "medium", reason: "Sempre essencial." }],
+      };
+    }
+
+    try {
+      const prompt = `Você é o Zé da Obra AI, um mestre de obras experiente e engenheiro. Gere um plano de obra detalhado e inteligente para o projeto "${work.name}" localizado em "${work.address}".
+        O orçamento planejado é de R$${work.budgetPlanned}, com área de ${work.area}m².
+        Detalhes da construção: ${work.floors} pavimento(s), ${work.bedrooms} quarto(s), ${work.bathrooms} banheiro(s), ${work.kitchens} cozinha(s).
+        Início da obra: ${work.startDate}.
+        
+        Gere um JSON com as seguintes seções, seguindo estritamente o formato AIWorkPlan e focando em um cronograma LÓGICO, NUMÉRICO e GENERALIZADO por etapas, sem detalhar por cômodos (ex: não crie 'Banheiro 1', use 'Instalações Hidráulicas'):
+
+        1. "generalAdvice": Um conselho geral, incisivo e profissional, como um mestre de obras daria, focado em economia e eficiência. (1 frase)
+        2. "timelineSummary": Um resumo conciso da duração e dos marcos principais da obra, considerando os detalhes fornecidos. (2-3 frases)
+        3. "detailedSteps": Uma lista de 5-8 etapas macro da obra, em ordem LÓGICA e NUMÉRICA. Para cada etapa, inclua:
+           - "orderIndex": Número da etapa (1, 2, 3...).
+           - "name": Nome da etapa generalizada (ex: "Fundações", "Instalações Hidráulicas", "Acabamentos Internos"). NÃO detalhe por cômodos (ex: "Hidráulica do Banheiro 1" é PROIBIDO).
+           - "estimatedDurationDays": Duração estimada em dias, considerando a complexidade da obra (área, número de pavimentos, banheiros, cozinhas, etc.).
+           - "notes": Uma dica prática ou observação importante para essa etapa, relacionada à economia, segurança ou qualidade, e que reflita a complexidade dos detalhes da obra (ex: para "Instalações Hidráulicas", mencionar a complexidade devido aos X banheiros e Y cozinhas).
+        4. "potentialRisks": 2-3 riscos potenciais relevantes para a obra, com "description", "likelihood" ('low', 'medium', 'high'), e "mitigation" (como evitar/resolver).
+        5. "materialSuggestions": 2-3 sugestões de materiais chave, com "item", "priority" ('low', 'medium', 'high'), e "reason" (por que é importante).
+        
+        O JSON deve ser formatado estritamente como o tipo AIWorkPlan:
+        interface AIWorkPlan {
+          workId: string;
+          generalAdvice: string;
+          timelineSummary: string;
+          detailedSteps: {
+            orderIndex?: number; 
+            name: string;
+            estimatedDurationDays: number;
+            notes: string;
+          }[];
+          potentialRisks: {
+            description: string;
+            likelihood: 'low' | 'medium' | 'high';
+            mitigation: string;
+          }[];
+          materialSuggestions: {
+            item: string;
+            priority: 'low' | 'medium' | 'high';
+            reason: string;
+          }[];
+        }
+        Certifique-se de que o workId seja '${work.id}'.
+        Apresente SOMENTE o JSON.`;
+
+      const response = await ai.models.generateContent({
+        model: "gemini-3-pro-preview", // Usar modelo mais capaz para planos complexos
+        contents: prompt,
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: { // NEW: Define the schema for structured JSON output
+            type: Type.OBJECT,
+            properties: {
+              workId: { type: Type.STRING },
+              generalAdvice: { type: Type.STRING },
+              timelineSummary: { type: Type.STRING },
+              detailedSteps: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    orderIndex: { type: Type.NUMBER },
+                    name: { type: Type.STRING },
+                    estimatedDurationDays: { type: Type.NUMBER },
+                    notes: { type: Type.STRING },
+                  },
+                  required: ['name', 'estimatedDurationDays', 'notes'],
+                },
+              },
+              potentialRisks: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    description: { type: Type.STRING },
+                    likelihood: { type: Type.STRING, enum: ['low', 'medium', 'high'] },
+                    mitigation: { type: Type.STRING },
+                  },
+                  required: ['description', 'likelihood', 'mitigation'],
+                },
+              },
+              materialSuggestions: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    item: { type: Type.STRING },
+                    priority: { type: Type.STRING, enum: ['low', 'medium', 'high'] },
+                    reason: { type: Type.STRING },
+                  },
+                  required: ['item', 'priority', 'reason'],
+                },
+              },
+            },
+            required: ['workId', 'generalAdvice', 'timelineSummary', 'detailedSteps', 'potentialRisks', 'materialSuggestions'],
+          },
+          temperature: 0.7,
+          maxOutputTokens: 1024,
+          thinkingConfig: { thinkingBudget: 100 }, // Permitir mais "pensamento" para planos complexos
+        }
+      });
+      
+      const jsonStr = response.text?.trim();
+      if (!jsonStr) throw new Error("A IA não retornou um plano válido.");
+
+      const parsedPlan: AIWorkPlan = JSON.parse(jsonStr);
+      // Ensure workId is correctly set as per current work (override if AI gets it wrong)
+      parsedPlan.workId = work.id; 
+      return parsedPlan;
+
+    } catch (error) {
+      console.error("Erro na IA ao gerar plano de obra:", error);
+      throw new Error(`Falha na comunicação com a IA: ${error.message || 'Erro desconhecido.'}`);
+    }
+  }
 };
-
-export default AiChat;
