@@ -475,6 +475,9 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
   const [showFinanceUpdateBadge, setShowFinanceUpdateBadge] = useState(false);
   const financeBadgeTimeoutRef = useRef<number | null>(null);
 
+  // OE #001: State for initial orientation message
+  const [showInitialOrientation, setShowInitialOrientation] = useState(false);
+
 
   // =======================================================================
   // AUXILIARY FUNCTIONS
@@ -719,6 +722,14 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
       setFiles(fetchedFiles);
       setContracts(fetchedContracts);
       setChecklists(fetchedChecklists);
+
+      // OE #001: Check if initial orientation should be shown
+      const hasSeenOrientation = localStorage.getItem(`seen_work_orientation_${workId}`);
+      if (!hasSeenOrientation) {
+        setShowInitialOrientation(true);
+      } else {
+        setShowInitialOrientation(false);
+      }
 
     } catch (error: any) {
       console.error("Erro ao carregar dados da obra:", error);
@@ -2001,6 +2012,37 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
           </p>
         </div>
       </div>
+
+      {/* OE #001: Initial Orientation Message */}
+      {showInitialOrientation && (
+        <div 
+          className={cx(
+            "bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 rounded-2xl p-4 mb-6 flex items-start gap-4 animate-in fade-in slide-in-from-top-4",
+            "shadow-lg shadow-blue-500/10" // Using existing shadow pattern
+          )}
+          role="alert"
+        >
+          <i className="fa-solid fa-info-circle text-2xl mt-0.5 shrink-0"></i>
+          <div className="flex-1">
+            <p className="font-bold text-lg mb-1">Boas-vindas à sua obra!</p>
+            <p className="text-sm">
+              Essa é a sua obra. Aqui você acompanha tudo o que está acontecendo.
+              Normalmente, você começa olhando o andamento geral e depois confere gastos, materiais e prazos.
+            </p>
+            <button
+              onClick={() => {
+                setShowInitialOrientation(false);
+                localStorage.setItem(`seen_work_orientation_${workId}`, 'true');
+              }}
+              className="mt-3 px-4 py-2 bg-blue-500 text-white text-sm font-bold rounded-xl hover:bg-blue-600 transition-colors"
+              aria-label="Entendi! Ocultar mensagem de orientação"
+            >
+              Entendi!
+            </button>
+          </div>
+        </div>
+      )}
+
 
       {/* NAVIGATION TABS (Mobile hidden, shown in desktop and handled by BottomNavBar for mobile) */}
       <div className="hidden md:flex justify-around bg-white dark:bg-slate-900 rounded-2xl p-2 shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800 mb-6">
