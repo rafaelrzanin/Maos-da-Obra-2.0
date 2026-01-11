@@ -466,6 +466,19 @@ const Dashboard = () => {
   if (allWorks.length === 0) {
     return (
       <div className="max-w-4xl mx-auto pb-28 pt-6 px-4 md:px-0 font-sans">
+        {/* FTUE Modal (appears if no works and not seen before) */}
+        {showFtue && (
+          <ZeModal
+            isOpen={showFtue}
+            title="Mãos da Obra - Guia Rápido"
+            message={ftueStepsContent[currentFtueStep].text}
+            confirmText={currentFtueStep === ftueStepsContent.length - 1 ? "Entendido!" : "Próximo"}
+            cancelText="Pular Tour"
+            onConfirm={handleNextFtueStep}
+            onCancel={markFtueAsSeen}
+            type="INFO"
+          />
+        )}
         {/* Header - Welcome back [user's first name] */}
         <div className="flex justify-between items-end mb-10"> {/* OE #004: Increased margin-bottom */}
           <div>
