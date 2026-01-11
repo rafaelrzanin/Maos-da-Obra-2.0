@@ -1,4 +1,3 @@
-
 import { PlanType, ExpenseCategory, StepStatus, FileCategory, type User, type Work, type Step, type Material, type Expense, type Worker, type Supplier, type WorkPhoto, type WorkFile, type DBNotification, type PushSubscriptionInfo, type Contract, type Checklist, type ChecklistItem, type FinancialHistoryEntry, InstallmentStatus, ExpenseStatus } from '../types.ts';
 import { WORK_TEMPLATES, FULL_MATERIAL_PACKAGES, CONTRACT_TEMPLATES, CHECKLIST_TEMPLATES } from './standards.ts';
 import { supabase } from './supabase.ts';
@@ -663,17 +662,17 @@ export const dbService = {
     _dashboardCache.stats = {};
     _dashboardCache.summary = {};
     _dashboardCache.notifications = null;
-    _dashboardCache.steps = {}; // NEW: Clear steps cache on logout
-    _dashboardCache.materials = {}; // NEW: Clear materials cache on logout
-    _dashboardCache.expenses = {}; // NEW: Clear expenses cache on logout
-    _dashboardCache.workers = {}; // NEW
-    _dashboardCache.suppliers = {}; // NEW
-    _dashboardCache.photos = {}; // NEW
-    _dashboardCache.files = {}; // NEW
-    _dashboardCache.contracts = null; // NEW
+    _dashboardCache.steps = {}; 
+    _dashboardCache.materials = {}; 
+    _dashboardCache.expenses = {}; 
+    _dashboardCache.workers = {}; 
+    _dashboardCache.suppliers = {}; 
+    _dashboardCache.photos = {}; 
+    _dashboardCache.files = {}; 
+    _dashboardCache.contracts = null; 
     _dashboardCache.checklists = {}; 
-    _dashboardCache.pushSubscriptions = {}; // NEW: Clear push subscriptions cache on logout
-    _dashboardCache.financialHistory = {}; // NEW: Clear financial history cache
+    _dashboardCache.pushSubscriptions = {}; 
+    _dashboardCache.financialHistory = {}; 
   },
 
   async getUserProfile(userId: string): Promise<User | null> {
@@ -2003,7 +2002,7 @@ export const dbService = {
 
   // --- WORKERS ---
   async getWorkers(workId: string): Promise<Worker[]> {
-    const now = Date.now();
+    const now = Date.Now();
     if (_dashboardCache.workers[workId] && (now - _dashboardCache.workers[workId].timestamp < CACHE_TTL)) {
       return _dashboardCache.workers[workId].data;
     }
@@ -2332,8 +2331,7 @@ export const dbService = {
                 { 
                     user_id: userId, 
                     subscription: subscription, 
-                    endpoint: subscription.endpoint, // Store endpoint for easier lookup
-                    created_at: new Date().toISOString(), // Ensure created_at is set for new records
+                    endpoint: subscription.endpoint // FIX: Explicitly specify endpoint
                 },
                 { onConflict: 'endpoint' } // Update if endpoint already exists
             )
@@ -2343,10 +2341,99 @@ export const dbService = {
             console.error("Error saving push subscription:", error);
             throw error;
         }
-        _dashboardCache.pushSubscriptions[userId] = null; // Invalidate user's push subscriptions cache
-    } catch (error: any) {
-        console.error(`Error saving push subscription for user ${userId}:`, error?.message || error);
-        throw error;
+        // Invalidate cache for push subscriptions
+        delete _dashboardCache.pushSubscriptions[userId];
+    } catch (e: any) {
+        console.error("Exceção ao tentar salvar push subscription:", e);
+        throw e;
     }
   },
+
+  // NEW: Method to delete a push subscription
+  async deletePushSubscription(userId: string, endpoint: string): Promise<void> {
+    try {
+      const { error } = await supabase
+        .from('user_subscriptions')
+        .delete()
+        .eq('user_id', userId)
+        .eq('endpoint', endpoint);
+
+      if (error) {
+        console.error("Error deleting push subscription:", error);
+        throw error;
+      }
+      // Invalidate cache for push subscriptions
+      delete _dashboardCache.pushSubscriptions[userId];
+    } catch (e: any) {
+      console.error("Exceção ao tentar deletar push subscription:", e);
+      throw e;
+    }
+  },
+
+  // NEW: Method to check if a user has an active push subscription
+  async hasActivePushSubscription(userId: string, endpoint: string): Promise<boolean> {
+    // Check cache first
+    const now = Date.now();
+    if (_dashboardCache.pushSubscriptions[userId] && (now - _dashboardCache.pushSubscriptions[userId].timestamp < CACHE_TTL)) {
+      return _dashboardCache.pushSubscriptions[userId].data.some(sub => sub.endpoint === endpoint);
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('user_subscriptions')
+        .select('id, endpoint')
+        .eq('user_id', userId)
+        .eq('endpoint', endpoint)
+        .maybeSingle(); // Use maybeSingle for efficiency
+
+      const hasSubscription = !!data;
+      
+      // Update cache
+      if (!_dashboardCache.pushSubscriptions[userId]) {
+        _dashboardCache.pushSubscriptions[userId] = { data: [], timestamp: now };
+      }
+      // If found, ensure it's in cache. If not, ensure it's removed if it was there.
+      const cachedSubs = _dashboardCache.pushSubscriptions[userId].data;
+      if (hasSubscription && !cachedSubs.some(sub => sub.endpoint === endpoint)) {
+          cachedSubs.push(mapPushSubscriptionFromDB(data)); // Assuming data has full structure
+      } else if (!hasSubscription) {
+          _dashboardCache.pushSubscriptions[userId].data = cachedSubs.filter(sub => sub.endpoint !== endpoint);
+      }
+      _dashboardCache.pushSubscriptions[userId].timestamp = now;
+
+      if (error) {
+        console.error("Error checking active push subscription:", error);
+        return false;
+      }
+      return hasSubscription;
+    } catch (e) {
+      console.error("Exceção ao verificar push subscription ativa:", e);
+      return false;
+    }
+  },
+
+  // --- FINANCIAL HISTORY ---
+  async getFinancialHistory(workId: string): Promise<FinancialHistoryEntry[]> {
+    const now = Date.now();
+    if (_dashboardCache.financialHistory[workId] && (now - _dashboardCache.financialHistory[workId].timestamp < CACHE_TTL)) {
+      return _dashboardCache.financialHistory[workId].data;
+    }
+
+    const { data, error } = await supabase
+        .from('financial_history')
+        .select('*')
+        .eq('work_id', workId)
+        .order('timestamp', { ascending: false });
+
+    if (error) {
+        console.error(`Error fetching financial history for work ${workId}:`, error);
+        return [];
+    }
+    const parsed = (data || []).map(parseFinancialHistoryFromDB);
+    _dashboardCache.financialHistory[workId] = { data: parsed, timestamp: now };
+    return parsed;
+  },
+
+  // Note: addFinancialHistoryEntry is a private helper, not exposed in dbService directly.
+  // It's called internally by other dbService methods.
 };
