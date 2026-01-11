@@ -231,7 +231,7 @@ const CreateWork = () => {
   };
 
   const CounterInput = ({ label, field, icon }: { label: string, field: keyof typeof formData, icon: string }) => (
-      <div className="bg-white dark:bg-slate-800 rounded-2xl border-2 border-slate-200 dark:border-slate-700 p-4 flex flex-col items-center justify-center shadow-sm hover:border-secondary/50 dark:hover:border-secondary/50 transition-colors group"> {/* OE #004: Increased padding */}
+      <div className="bg-white dark:bg-slate-800 rounded-2xl border-2 border-slate-200 dark:border-slate-700 p-4 flex flex-col items-center justify-center shadow-sm group hover:border-secondary/50 dark:hover:border-secondary/50 transition-colors"> {/* OE #004: Increased padding */}
           <div className="text-slate-400 mb-2 group-hover:text-secondary transition-colors text-xl"><i className={`fa-solid ${icon}`}></i></div> {/* OE #004: Increased icon size, margin */}
           <label className="text-xs font-black text-slate-700 dark:text-slate-300 uppercase mb-3 text-center tracking-wider">{label}</label> {/* OE #004: Increased margin */}
           <div className="flex items-center gap-4 w-full justify-center"> {/* OE #004: Increased gap */}
@@ -502,14 +502,11 @@ const CreateWork = () => {
               {[1, 2, 3].map(s => ( // UPDATED progress bar for 3 steps
                   <div 
                     key={s} 
-                    className={cx(
-                      'h-2', 
-                      'rounded-full', 
-                      'transition-all', 
-                      'duration-500', 
-                      s <= currentStep ? 'w-10 bg-secondary' : 'w-3 bg-slate-200 dark:bg-slate-700'
-                    )}
-                  ></div> {/* OE #004: Increased width */}
+                    className={
+                      "h-2 rounded-full transition-all duration-500 " + 
+                      (s <= currentStep ? "w-10 bg-secondary" : "w-3 bg-slate-200 dark:bg-slate-700")
+                    }
+                  ></div>
               ))}
           </div>
           <div className="w-6"></div> {/* Placeholder for alignment */}
