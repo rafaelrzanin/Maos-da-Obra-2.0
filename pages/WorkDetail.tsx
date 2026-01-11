@@ -11,7 +11,9 @@ import { ZeModal, type ZeModalProps } from '../components/ZeModal.tsx';
 
 // --- TYPES FOR VIEW STATE ---
 export type MainTab = 'ETAPAS' | 'MATERIAIS' | 'FINANCEIRO' | 'FERRAMENTAS';
-type SubView = 'NONE' | 'WORKERS' | 'SUPPLIERS' | 'PHOTOS' | 'PROJECTS' | 'CALCULATORS' | 'CONTRACTS' | 'CHECKLIST' | 'AICHAT' | 'REPORTS' | 'AIPLANNER';
+// Adjusted SubView type to only include actual sub-views rendered within WorkDetail.
+// AIPLANNER, REPORTS, AICHAT navigate to different pages.
+type SubView = 'NONE' | 'WORKERS' | 'SUPPLIERS' | 'PHOTOS' | 'FILES' | 'CONTRACTS' | 'CHECKLIST'; 
 
 // Define a type for a single step group inside expenses
 interface ExpenseStepGroup {
@@ -154,7 +156,8 @@ const getEntityStatusDetails = (
     if (!materialIsComplete && associatedStep && associatedStep.startDate) {
         const stepStartDate = new Date(associatedStep.startDate);
         stepStartDate.setHours(0, 0, 0, 0);
-        const threeDaysFromNow = new Date();
+        
+        const threeDaysFromNow = new Date(today);
         threeDaysFromNow.setDate(today.getDate() + 3);
         threeDaysFromNow.setHours(0, 0, 0, 0);
 
@@ -300,9 +303,10 @@ interface ToolSubViewHeaderProps {
   title: string;
   onBack: () => void;
   onAdd?: () => void; // Optional add button
+  loading?: boolean; // NEW: For local loading spinner (e.g., when adding an item)
 }
 
-const ToolSubViewHeader: React.FC<ToolSubViewHeaderProps> = ({ title, onBack, onAdd }) => {
+const ToolSubViewHeader: React.FC<ToolSubViewHeaderProps> = ({ title, onBack, onAdd, loading }) => {
   return (
     <div className="flex items-center justify-between mb-6 px-2 sm:px-0">
       <div className="flex items-center gap-3">
@@ -318,10 +322,12 @@ const ToolSubViewHeader: React.FC<ToolSubViewHeaderProps> = ({ title, onBack, on
       {onAdd && (
         <button
           onClick={onAdd}
-          className="px-4 py-2 bg-secondary text-white text-sm font-bold rounded-xl hover:bg-secondary-dark transition-colors flex items-center gap-2"
+          disabled={loading} // Disable if loading
+          className="px-4 py-2 bg-secondary text-white text-sm font-bold rounded-xl hover:bg-secondary-dark transition-colors flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
           aria-label={`Adicionar novo item em ${title}`}
         >
-          <i className="fa-solid fa-plus"></i> Novo
+          {loading ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-plus"></i>}
+          Novo
         </button>
       )}
     </div>
@@ -418,6 +424,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
   const [newWorkerDailyRate, setNewWorkerDailyRate] = useState(''); // Raw string for monetary input
   const [newWorkerNotes, setNewWorkerNotes] = useState('');
   const [editWorkerData, setEditWorkerData] = useState<Worker | null>(null);
+  const [isAddingWorker, setIsAddingWorker] = useState(false); // NEW: Local loading state
 
   const [showAddSupplierModal, setShowAddSupplierModal] = useState(false);
   const [newSupplierName, setNewSupplierName] = useState('');
@@ -427,6 +434,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
   const [newSupplierAddress, setNewSupplierAddress] = useState('');
   const [newSupplierNotes, setNewSupplierNotes] = useState('');
   const [editSupplierData, setEditSupplierData] = useState<Supplier | null>(null);
+  const [isAddingSupplier, setIsAddingSupplier] = useState(false); // NEW: Local loading state
 
   const [showAddPhotoModal, setShowAddPhotoModal] = useState(false);
   const [newPhotoDescription, setNewPhotoDescription] = useState('');
@@ -445,6 +453,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
   const [newChecklistCategory, setNewChecklistCategory] = useState('');
   const [newChecklistItems, setNewChecklistItems] = useState<string[]>(['']);
   const [editChecklistData, setEditChecklistData] = useState<Checklist | null>(null);
+  const [isAddingChecklist, setIsAddingChecklist] = useState(false); // NEW: Local loading state
 
   const [zeModal, setZeModal] = useState<ZeModalProps & { id?: string, isConfirming?: boolean }>({
     isOpen: false, title: '', message: '', onCancel: () => { }, isConfirming: false
@@ -1242,6 +1251,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
     e.preventDefault();
     if (!workId || !user?.id || !newWorkerName || !newWorkerRole || !newWorkerPhone) return;
 
+    setIsAddingWorker(true); // Set local loading for this action
     setZeModal(prev => ({ ...prev, isConfirming: true }));
     try {
       await dbService.addWorker({
@@ -1272,6 +1282,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
       }));
     } finally {
+      setIsAddingWorker(false); // Clear local loading
       setZeModal(prev => ({ ...prev, isConfirming: false }));
     }
   };
@@ -1280,6 +1291,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
     e.preventDefault();
     if (!editWorkerData || !workId || !user?.id || !newWorkerName || !newWorkerRole || !newWorkerPhone) return;
 
+    setIsAddingWorker(true); // Use same loading state for edit
     setZeModal(prev => ({ ...prev, isConfirming: true }));
     try {
       await dbService.updateWorker({
@@ -1305,6 +1317,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
       }));
     } finally {
+      setIsAddingWorker(false);
       setZeModal(prev => ({ ...prev, isConfirming: false }));
     }
   };
@@ -1340,6 +1353,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
     e.preventDefault();
     if (!workId || !user?.id || !newSupplierName || !newSupplierCategory || !newSupplierPhone) return;
 
+    setIsAddingSupplier(true);
     setZeModal(prev => ({ ...prev, isConfirming: true }));
     try {
       await dbService.addSupplier({
@@ -1372,6 +1386,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
       }));
     } finally {
+      setIsAddingSupplier(false);
       setZeModal(prev => ({ ...prev, isConfirming: false }));
     }
   };
@@ -1380,6 +1395,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
     e.preventDefault();
     if (!editSupplierData || !workId || !user?.id || !newSupplierName || !newSupplierCategory || !newSupplierPhone) return;
 
+    setIsAddingSupplier(true); // Use same loading state for edit
     setZeModal(prev => ({ ...prev, isConfirming: true }));
     try {
       await dbService.updateSupplier({
@@ -1406,6 +1422,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
       }));
     } finally {
+      setIsAddingSupplier(false);
       setZeModal(prev => ({ ...prev, isConfirming: false }));
     }
   };
@@ -1623,6 +1640,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
       return;
     }
 
+    setIsAddingChecklist(true);
     setZeModal(prev => ({ ...prev, isConfirming: true }));
     try {
       await dbService.addChecklist({
@@ -1652,6 +1670,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
       }));
     } finally {
+      setIsAddingChecklist(false);
       setZeModal(prev => ({ ...prev, isConfirming: false }));
     }
   };
@@ -1663,6 +1682,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
       return;
     }
 
+    setIsAddingChecklist(true); // Use same loading state for edit
     setZeModal(prev => ({ ...prev, isConfirming: true }));
     try {
       await dbService.updateChecklist({
@@ -1694,6 +1714,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
       }));
     } finally {
+      setIsAddingChecklist(false);
       setZeModal(prev => ({ ...prev, isConfirming: false }));
     }
   };
@@ -1837,9 +1858,9 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
       </div>
 
       {/* RENDER ACTIVE TAB CONTENT */}
-      {activeTab === 'ETAPAS' && (
+      {activeTab === 'ETAPAS' && activeSubView === 'NONE' && (
         <div className="tab-content animate-in fade-in duration-300">
-          <div className="p-4 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-card-default dark:shadow-card-dark-subtle">
+          <div className={cx(surface, card)}> {/* Use card class for consistent padding/radius */}
             {steps.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-10 text-center">
                 <i className="fa-solid fa-calendar-times text-6xl text-slate-400 mb-6"></i>
@@ -1854,10 +1875,40 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                 >
                   <i className="fa-solid fa-robot"></i> Criar Cronograma Seguro (AI)
                 </button>
+                <button
+                  onClick={() => {
+                    setShowAddStepModal(true);
+                    setEditStepData(null);
+                    setNewStepName('');
+                    setNewStepStartDate(new Date().toISOString().split('T')[0]);
+                    setNewStepEndDate(new Date().toISOString().split('T')[0]);
+                    setNewEstimatedDurationDays('');
+                  }}
+                  className="mt-4 px-6 py-3 bg-primary text-white font-bold rounded-xl hover:bg-primary-light transition-colors flex items-center gap-2"
+                  aria-label="Adicionar primeira etapa manualmente"
+                >
+                  <i className="fa-solid fa-plus-circle"></i> Adicionar Etapa Manualmente
+                </button>
               </div>
             ) : (
               <div className="space-y-4">
-                <h2 className="text-xl font-black text-primary dark:text-white mb-4">Seu Cronograma</h2>
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-2xl font-black text-primary dark:text-white">Seu Cronograma</h2>
+                  <button
+                    onClick={() => {
+                      setShowAddStepModal(true);
+                      setEditStepData(null);
+                      setNewStepName('');
+                      setNewStepStartDate(new Date().toISOString().split('T')[0]);
+                      setNewStepEndDate(new Date().toISOString().split('T')[0]);
+                      setNewEstimatedDurationDays('');
+                    }}
+                    className="px-4 py-2 bg-secondary text-white text-sm font-bold rounded-xl hover:bg-secondary-dark transition-colors flex items-center gap-2"
+                    aria-label="Adicionar nova etapa"
+                  >
+                    <i className="fa-solid fa-plus"></i> Nova
+                  </button>
+                </div>
                 {steps.map(step => {
                   const statusDetails = getEntityStatusDetails('step', step, steps);
                   return (
@@ -1869,7 +1920,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                       onDragLeave={handleDragLeave}
                       onDrop={(e) => handleDrop(e, step.id)}
                       className={cx(
-                        "bg-slate-50 dark:bg-slate-800 p-4 rounded-xl border-l-4 transition-all duration-300",
+                        "bg-slate-50 dark:bg-slate-800 p-4 rounded-xl border-l-4 transition-all duration-300 group",
                         statusDetails.borderColor, // Use status-specific border
                         dragOverStepId === step.id ? 'border-r-4 border-dashed border-secondary scale-[1.01] shadow-lg' : '',
                         !step.startDate ? 'cursor-grab hover:scale-[1.005]' : 'cursor-not-allowed opacity-80' // Visual feedback for draggable
@@ -1919,6 +1970,37 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                           ></div>
                         </div>
                       )}
+                      <div className="flex justify-end items-center mt-3 pt-3 border-t border-slate-100 dark:border-slate-700">
+                        <button
+                          onClick={() => handleStepStatusChange(step)}
+                          disabled={isUpdatingStepStatus}
+                          className={cx(
+                            "px-3 py-1 text-xs font-bold rounded-lg transition-colors flex items-center gap-2",
+                            step.status === StepStatus.COMPLETED 
+                              ? "bg-amber-500 text-white hover:bg-amber-600" 
+                              : "bg-green-500 text-white hover:bg-green-600",
+                            isUpdatingStepStatus && "opacity-70 cursor-not-allowed"
+                          )}
+                          aria-label={step.status === StepStatus.COMPLETED ? "Marcar como pendente" : "Marcar como concluída"}
+                        >
+                          {isUpdatingStepStatus && <i className="fa-solid fa-circle-notch fa-spin"></i>}
+                          {step.status === StepStatus.COMPLETED ? 'Marcar como Pendente' : 'Marcar como Concluída'}
+                        </button>
+                        <button
+                          onClick={() => {
+                            setEditStepData(step);
+                            setNewStepName(step.name);
+                            setNewStepStartDate(step.startDate);
+                            setNewStepEndDate(step.endDate);
+                            setNewEstimatedDurationDays(String(step.estimatedDurationDays || ''));
+                            setShowAddStepModal(true);
+                          }}
+                          className="ml-2 px-3 py-1 bg-primary text-white text-xs font-bold rounded-lg hover:bg-primary-light transition-colors"
+                          aria-label={`Editar etapa ${step.name}`}
+                        >
+                          Editar
+                        </button>
+                      </div>
                     </div>
                   );
                 })}
@@ -1928,9 +2010,9 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         </div>
       )}
 
-      {activeTab === 'MATERIAIS' && (
+      {activeTab === 'MATERIAIS' && activeSubView === 'NONE' && (
         <div className="tab-content animate-in fade-in duration-300">
-          <div className="p-4 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-card-default dark:shadow-card-dark-subtle">
+          <div className={cx(surface, card)}> {/* Use card class for consistent padding/radius */}
             <div className="flex items-center justify-between mb-6 px-2 sm:px-0">
                 <h2 className="text-2xl font-black text-primary dark:text-white">Sua Lista de Materiais</h2>
                 <button
@@ -1966,8 +2048,8 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                   className="px-6 py-3 bg-secondary text-white font-bold rounded-xl hover:bg-secondary-dark transition-colors flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
                   aria-label="Gerar Lista de Materiais (AI)"
                 >
-                  {loading ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-robot"></i>}
-                  {loading ? 'Gerando...' : 'Gerar Lista de Materiais (AI)'}
+                  {zeModal.isConfirming ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-robot"></i>}
+                  {zeModal.isConfirming ? 'Gerando...' : 'Gerar Lista de Materiais (AI)'}
                 </button>
               </div>
             ) : (
@@ -2045,9 +2127,9 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         </div>
       )}
 
-      {activeTab === 'FINANCEIRO' && (
+      {activeTab === 'FINANCEIRO' && activeSubView === 'NONE' && (
         <div className="tab-content animate-in fade-in duration-300">
-          <div className="p-4 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-card-default dark:shadow-card-dark-subtle">
+          <div className={cx(surface, card)}> {/* Use card class for consistent padding/radius */}
             <h2 className="text-2xl font-black text-primary dark:text-white mb-6">Visão Geral Financeira</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
                 <div className={cx(surface, "p-5 rounded-2xl flex flex-col items-start")}>
@@ -2172,11 +2254,35 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         </div>
       )}
 
-      {activeTab === 'FERRAMENTAS' && (
+      {activeTab === 'FERRAMENTAS' && activeSubView === 'NONE' && (
         <div className="tab-content animate-in fade-in duration-300">
-            <div className="p-4 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-card-default dark:shadow-card-dark-subtle">
+            <div className={cx(surface, card)}> {/* Use card class for consistent padding/radius */}
                 <h2 className="text-2xl font-black text-primary dark:text-white mb-6">Ferramentas da Obra</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <ToolCard
+                        icon="fa-people-group"
+                        title="Sua Equipe"
+                        description="Gerencie seus trabalhadores e prestadores de serviço."
+                        onClick={() => goToSubView('WORKERS')}
+                    />
+                    <ToolCard
+                        icon="fa-truck-fast"
+                        title="Seus Fornecedores"
+                        description="Cadastre e organize seus contatos de materiais e serviços."
+                        onClick={() => goToSubView('SUPPLIERS')}
+                    />
+                    <ToolCard
+                        icon="fa-camera"
+                        title="Fotos da Obra"
+                        description="Documente o progresso com fotos organizadas por data e tipo."
+                        onClick={() => goToSubView('PHOTOS')}
+                    />
+                    <ToolCard
+                        icon="fa-file-alt"
+                        title="Arquivos da Obra"
+                        description="Guarde plantas, orçamentos, contratos e outros documentos importantes."
+                        onClick={() => goToSubView('FILES')}
+                    />
                     <ToolCard
                         icon="fa-file-contract"
                         title="Contratos & Recibos"
@@ -2194,8 +2300,8 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                         title="Relatórios de Obra"
                         description="Acompanhe o desempenho financeiro e de cronograma com relatórios detalhados."
                         onClick={() => navigate(`/work/${workId}/reports`)}
-                        isLocked={!hasAiAccess} // Access to reports linked to AI Access
-                        requiresVitalicio={true} // Reports is a premium feature
+                        isLocked={!hasAiAccess} 
+                        requiresVitalicio={true} 
                     />
                     <ToolCard
                         icon="fa-robot"
@@ -2205,8 +2311,349 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                         isLocked={!hasAiAccess}
                         requiresVitalicio={true}
                     />
+                    <ToolCard
+                        icon="fa-comment-dots"
+                        title="Zé da Obra AI Chat"
+                        description="Seu engenheiro virtual particular para tirar dúvidas em tempo real."
+                        onClick={() => navigate('/ai-chat')} // AI Chat is a global tool, not specific to a work, so navigate to global AI chat
+                        isLocked={!hasAiAccess}
+                        requiresVitalicio={true}
+                    />
                 </div>
             </div>
+        </div>
+      )}
+
+      {/* Render sub-views for FERRAMENTAS tab */}
+      {activeSubView !== 'NONE' && (
+        <div className="tab-content animate-in fade-in duration-300">
+          {activeSubView === 'WORKERS' && (
+            <div className={cx(surface, card)}>
+              <ToolSubViewHeader 
+                title="Sua Equipe" 
+                onBack={() => goToSubView('NONE')} 
+                onAdd={() => { 
+                  setShowAddWorkerModal(true); 
+                  setEditWorkerData(null); 
+                  setNewWorkerName(''); 
+                  setNewWorkerRole(''); 
+                  setNewWorkerPhone(''); 
+                  setNewWorkerDailyRate(''); 
+                  setNewWorkerNotes(''); 
+                }}
+                loading={isAddingWorker} // Show spinner on add button if adding
+              />
+              {workers.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-10 text-center">
+                  <i className="fa-solid fa-hard-hat text-6xl text-slate-400 mb-6"></i>
+                  <h3 className="text-xl font-black text-primary dark:text-white mb-2">Nenhum trabalhador cadastrado.</h3>
+                  <p className="text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
+                    Adicione sua equipe para gerenciar diárias e pagamentos.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {workers.map(worker => (
+                    <div key={worker.id} className="bg-slate-50 dark:bg-slate-800 p-4 rounded-xl border border-slate-100 dark:border-slate-700 transition-all duration-300 hover:scale-[1.005] hover:shadow-lg">
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="font-bold text-primary dark:text-white text-base">{worker.name}</h4>
+                        <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-blue-500 text-white">{worker.role}</span>
+                      </div>
+                      <p className="text-sm text-slate-500 dark:text-slate-400">
+                        Tel: {worker.phone} {worker.dailyRate ? ` • Diária: ${formatCurrency(worker.dailyRate)}` : ''}
+                      </p>
+                      {worker.notes && <p className="text-xs text-slate-400 mt-1">{worker.notes}</p>}
+                      <div className="flex justify-end items-center mt-3 pt-3 border-t border-slate-100 dark:border-slate-700">
+                        <button
+                          onClick={() => {
+                            setEditWorkerData(worker);
+                            setNewWorkerName(worker.name);
+                            setNewWorkerRole(worker.role);
+                            setNewWorkerPhone(worker.phone);
+                            setNewWorkerDailyRate(String(worker.dailyRate || ''));
+                            setNewWorkerNotes(worker.notes || '');
+                            setShowAddWorkerModal(true);
+                          }}
+                          className="px-3 py-1 bg-primary text-white text-xs font-bold rounded-lg hover:bg-primary-light transition-colors"
+                          aria-label={`Editar trabalhador ${worker.name}`}
+                        >
+                          Editar
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeSubView === 'SUPPLIERS' && (
+            <div className={cx(surface, card)}>
+              <ToolSubViewHeader 
+                title="Seus Fornecedores" 
+                onBack={() => goToSubView('NONE')} 
+                onAdd={() => { 
+                  setShowAddSupplierModal(true); 
+                  setEditSupplierData(null); 
+                  setNewSupplierName(''); 
+                  setNewSupplierCategory(''); 
+                  setNewSupplierPhone(''); 
+                  setNewSupplierEmail(''); 
+                  setNewSupplierAddress(''); 
+                  setNewSupplierNotes(''); 
+                }}
+                loading={isAddingSupplier} // Show spinner on add button if adding
+              />
+              {suppliers.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-10 text-center">
+                  <i className="fa-solid fa-truck-fast text-6xl text-slate-400 mb-6"></i>
+                  <h3 className="text-xl font-black text-primary dark:text-white mb-2">Nenhum fornecedor cadastrado.</h3>
+                  <p className="text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
+                    Organize seus contatos para cotações e compras.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {suppliers.map(supplier => (
+                    <div key={supplier.id} className="bg-slate-50 dark:bg-slate-800 p-4 rounded-xl border border-slate-100 dark:border-slate-700 transition-all duration-300 hover:scale-[1.005] hover:shadow-lg">
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="font-bold text-primary dark:text-white text-base">{supplier.name}</h4>
+                        <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-indigo-500 text-white">{supplier.category}</span>
+                      </div>
+                      <p className="text-sm text-slate-500 dark:text-slate-400">
+                        Tel: {supplier.phone} {supplier.email && ` • Email: ${supplier.email}`}
+                      </p>
+                      {supplier.address && <p className="text-xs text-slate-400 mt-1">{supplier.address}</p>}
+                      {supplier.notes && <p className="text-xs text-slate-400 mt-1">{supplier.notes}</p>}
+                      <div className="flex justify-end items-center mt-3 pt-3 border-t border-slate-100 dark:border-slate-700">
+                        <button
+                          onClick={() => {
+                            setEditSupplierData(supplier);
+                            setNewSupplierName(supplier.name);
+                            setNewSupplierCategory(supplier.category);
+                            setNewSupplierPhone(supplier.phone);
+                            setNewSupplierEmail(supplier.email || '');
+                            setNewSupplierAddress(supplier.address || '');
+                            setNewSupplierNotes(supplier.notes || '');
+                            setShowAddSupplierModal(true);
+                          }}
+                          className="px-3 py-1 bg-primary text-white text-xs font-bold rounded-lg hover:bg-primary-light transition-colors"
+                          aria-label={`Editar fornecedor ${supplier.name}`}
+                        >
+                          Editar
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeSubView === 'PHOTOS' && (
+            <div className={cx(surface, card)}>
+              <ToolSubViewHeader
+                title="Suas Fotos da Obra"
+                onBack={() => goToSubView('NONE')}
+                onAdd={() => setShowAddPhotoModal(true)}
+                loading={uploadingPhoto}
+              />
+              {photos.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-10 text-center">
+                  <i className="fa-solid fa-camera text-6xl text-slate-400 mb-6"></i>
+                  <h3 className="text-xl font-black text-primary dark:text-white mb-2">Nenhuma foto ainda.</h3>
+                  <p className="text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
+                    Registre o progresso e os momentos importantes da sua obra.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  {photos.map(photo => (
+                    <div key={photo.id} className="bg-slate-50 dark:bg-slate-800 rounded-xl overflow-hidden border border-slate-100 dark:border-slate-700 shadow-sm transition-all duration-300 hover:scale-[1.005] hover:shadow-lg">
+                      <img src={photo.url} alt={photo.description} className="w-full h-32 object-cover" loading="lazy" />
+                      <div className="p-3">
+                        <p className="font-bold text-primary dark:text-white text-sm truncate">{photo.description}</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{formatDateDisplay(photo.date)} - {photo.type}</p>
+                        <div className="flex justify-end mt-2">
+                          <button
+                            onClick={() => {
+                              // Confirm delete
+                              setZeModal({
+                                isOpen: true,
+                                title: "Excluir Foto",
+                                message: `Tem certeza que deseja excluir esta foto "${photo.description}"?`,
+                                confirmText: "Excluir",
+                                onConfirm: async (e) => {
+                                  e?.preventDefault(); // Pass event here
+                                  await handleDeletePhoto(photo);
+                                },
+                                onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
+                                isConfirming: zeModal.isConfirming,
+                                type: "DANGER"
+                              });
+                            }}
+                            className="text-red-500 hover:text-red-600 text-sm p-1"
+                            aria-label={`Excluir foto ${photo.description}`}
+                          >
+                            <i className="fa-solid fa-trash-alt"></i>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeSubView === 'FILES' && (
+            <div className={cx(surface, card)}>
+              <ToolSubViewHeader
+                title="Seus Arquivos da Obra"
+                onBack={() => goToSubView('NONE')}
+                onAdd={() => setShowAddFileModal(true)}
+                loading={uploadingFile}
+              />
+              {files.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-10 text-center">
+                  <i className="fa-solid fa-file-alt text-6xl text-slate-400 mb-6"></i>
+                  <h3 className="text-xl font-black text-primary dark:text-white mb-2">Nenhum arquivo ainda.</h3>
+                  <p className="text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
+                    Organize plantas, documentos e orçamentos importantes.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {files.map(file => (
+                    <div key={file.id} className="bg-slate-50 dark:bg-slate-800 p-4 rounded-xl border border-slate-100 dark:border-slate-700 shadow-sm flex items-center justify-between transition-all duration-300 hover:scale-[1.005] hover:shadow-lg">
+                      <div className="flex items-center gap-4">
+                        <i className="fa-solid fa-file text-2xl text-secondary"></i>
+                        <div>
+                          <p className="font-bold text-primary dark:text-white text-base">{file.name}</p>
+                          <p className="text-xs text-slate-500 dark:text-slate-400">{file.category} - {formatDateDisplay(file.date)}</p>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <a href={file.url} target="_blank" rel="noopener noreferrer" className="text-primary dark:text-white hover:text-secondary p-1" aria-label={`Visualizar arquivo ${file.name}`}>
+                          <i className="fa-solid fa-eye"></i>
+                        </a>
+                        <button
+                          onClick={() => {
+                            setZeModal({
+                              isOpen: true,
+                              title: "Excluir Arquivo",
+                              message: `Tem certeza que deseja excluir o arquivo "${file.name}"?`,
+                              confirmText: "Excluir",
+                              onConfirm: async (e) => {
+                                e?.preventDefault();
+                                await handleDeleteFile(file);
+                              },
+                              onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
+                              isConfirming: zeModal.isConfirming,
+                              type: "DANGER"
+                            });
+                          }}
+                          className="text-red-500 hover:text-red-600 p-1"
+                          aria-label={`Excluir arquivo ${file.name}`}
+                        >
+                          <i className="fa-solid fa-trash-alt"></i>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeSubView === 'CONTRACTS' && (
+            <div className={cx(surface, card)}>
+              <ToolSubViewHeader
+                title="Contratos & Recibos"
+                onBack={() => goToSubView('NONE')}
+              />
+              {contracts.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-10 text-center">
+                  <i className="fa-solid fa-file-contract text-6xl text-slate-400 mb-6"></i>
+                  <h3 className="text-xl font-black text-primary dark:text-white mb-2">Nenhum modelo de contrato disponível.</h3>
+                  <p className="text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
+                    Entre em contato com o suporte para adicionar modelos.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {contracts.map(contract => (
+                    <div key={contract.id} className="bg-slate-50 dark:bg-slate-800 p-4 rounded-xl border border-slate-100 dark:border-slate-700 shadow-sm flex items-center justify-between transition-all duration-300 hover:scale-[1.005] hover:shadow-lg">
+                      <div>
+                        <p className="font-bold text-primary dark:text-white text-base">{contract.title}</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400">{contract.category}</p>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setSelectedContractContent(contract.contentTemplate);
+                          setSelectedContractTitle(contract.title);
+                          setShowContractContentModal(true);
+                        }}
+                        className="px-3 py-1 bg-secondary text-white text-xs font-bold rounded-lg hover:bg-secondary-dark transition-colors"
+                        aria-label={`Visualizar contrato ${contract.title}`}
+                      >
+                        Visualizar
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeSubView === 'CHECKLIST' && (
+            <div className={cx(surface, card)}>
+              <ToolSubViewHeader
+                title="Seus Checklists"
+                onBack={() => goToSubView('NONE')}
+                onAdd={() => { setShowAddChecklistModal(true); setEditChecklistData(null); setNewChecklistName(''); setNewChecklistCategory(''); setNewChecklistItems(['']); }}
+                loading={isAddingChecklist}
+              />
+              {checklists.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-10 text-center">
+                  <i className="fa-solid fa-list-check text-6xl text-slate-400 mb-6"></i>
+                  <h3 className="text-xl font-black text-primary dark:text-white mb-2">Nenhum checklist criado.</h3>
+                  <p className="text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
+                    Crie listas de verificação para não esquecer de nada importante.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {checklists.map(checklist => (
+                    <div key={checklist.id} className="bg-slate-50 dark:bg-slate-800 p-4 rounded-xl border border-slate-100 dark:border-slate-700 shadow-sm transition-all duration-300 hover:scale-[1.005] hover:shadow-lg">
+                      <div className="flex items-center justify-between mb-2">
+                        <h4 className="font-bold text-primary dark:text-white text-base">{checklist.name}</h4>
+                        <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-lime-500 text-white">{checklist.category}</span>
+                      </div>
+                      <p className="text-sm text-slate-500 dark:text-slate-400">
+                        {checklist.items.filter(item => item.checked).length} / {checklist.items.length} itens concluídos
+                      </p>
+                      <div className="flex justify-end items-center mt-3 pt-3 border-t border-slate-100 dark:border-slate-700">
+                        <button
+                          onClick={() => {
+                            setEditChecklistData(checklist);
+                            setNewChecklistName(checklist.name);
+                            setNewChecklistCategory(checklist.category);
+                            setNewChecklistItems(checklist.items.map(item => item.text));
+                            setShowAddChecklistModal(true);
+                          }}
+                          className="px-3 py-1 bg-primary text-white text-xs font-bold rounded-lg hover:bg-primary-light transition-colors"
+                          aria-label={`Editar checklist ${checklist.name}`}
+                        >
+                          Editar
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -2667,7 +3114,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
             setNewWorkerDailyRate('');
             setNewWorkerNotes('');
           }}
-          isConfirming={zeModal.isConfirming}
+          isConfirming={zeModal.isConfirming || isAddingWorker}
           type={editWorkerData ? "INFO" : "SUCCESS"}
         >
           <form onSubmit={editWorkerData ? handleEditWorker : handleAddWorker} className="space-y-4">
@@ -2755,7 +3202,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
             setNewSupplierAddress('');
             setNewSupplierNotes('');
           }}
-          isConfirming={zeModal.isConfirming}
+          isConfirming={zeModal.isConfirming || isAddingSupplier}
           type={editSupplierData ? "INFO" : "SUCCESS"}
         >
           <form onSubmit={editSupplierData ? handleEditSupplier : handleAddSupplier} className="space-y-4">
@@ -2848,7 +3295,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
             setNewPhotoFile(null);
             setNewPhotoType('PROGRESS');
           }}
-          isConfirming={uploadingPhoto}
+          isConfirming={uploadingPhoto || zeModal.isConfirming}
           type="SUCCESS"
         >
           <form onSubmit={handleAddPhoto} className="space-y-4">
@@ -2905,7 +3352,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
             setNewFileCategory(FileCategory.GENERAL);
             setNewUploadFile(null);
           }}
-          isConfirming={uploadingFile}
+          isConfirming={uploadingFile || zeModal.isConfirming}
           type="SUCCESS"
         >
           <form onSubmit={handleAddFile} className="space-y-4">
@@ -2992,7 +3439,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
             setNewChecklistCategory('');
             setNewChecklistItems(['']);
           }}
-          isConfirming={zeModal.isConfirming}
+          isConfirming={zeModal.isConfirming || isAddingChecklist}
           type={editChecklistData ? "INFO" : "SUCCESS"}
         >
           <form onSubmit={editChecklistData ? handleEditChecklist : handleAddChecklist} className="space-y-4">
