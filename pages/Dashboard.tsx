@@ -377,6 +377,7 @@ const Dashboard = () => {
 
   // NEW: FTUE Trigger useEffect
   useEffect(() => {
+    // Only show FTUE if user is authenticated, not loading, and hasn't seen it before.
     if (isUserAuthFinished && !authLoading && !loadingDashboard && user && localStorage.getItem('seen_app_ftue_guide') !== 'true') {
       setShowFtue(true);
       setCurrentFtueStep(0);
