@@ -588,7 +588,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
     return (
       <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2 mt-1">
         <div 
-          className={cx("h-full rounded-full", progressBarColor)} 
+          className={cx("h-full rounded-full", progressBarColor, "transition-all duration-500")} 
           style={{ width: `${progressPct}%` }}
           aria-valuenow={progressPct}
           aria-valuemin={0}
@@ -610,7 +610,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
     return (
         <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2 mt-1">
             <div
-                className={cx("h-full rounded-full", isOverpaid ? 'bg-red-500' : progressBarColor)}
+                className={cx("h-full rounded-full", isOverpaid ? 'bg-red-500' : progressBarColor, "transition-all duration-500")}
                 style={{ width: `${Math.min(100, progressPct)}%` }} // Cap at 100% visually
                 aria-valuenow={progressPct}
                 aria-valuemin={0}
@@ -964,24 +964,29 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
       return;
     }
 
-    setLoading(true);
+    setLoading(true); // General loading for the page
+    setZeModal(prev => ({ ...prev, isConfirming: true })); // Activates modal spinner if modal is open. If not, this state is just internal.
+
     try {
       // This will delete existing materials and then insert new ones based on work and steps.
       // This matches the `ensureMaterialsForWork` behavior.
       await dbService.regenerateMaterials(work, steps);
       await loadWorkData(); // Reload all data to reflect new materials
+      setZeModal(prev => ({ ...prev, isOpen: false })); // Close modal if it was open
     } catch (error: any) {
       console.error("Erro ao gerar lista de materiais:", error);
-      setZeModal({
-        isOpen: true,
+      setZeModal(prev => ({
+        ...prev,
+        isConfirming: false,
         title: "Erro na Geração",
         message: `Não foi possível gerar a lista de materiais: ${error.message || 'Erro desconhecido'}. Tente novamente.`,
         type: "ERROR",
         confirmText: "Ok",
         onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
-      });
+      }));
     } finally {
-      setLoading(false);
+      setLoading(false); // Deactivate general page loading
+      setZeModal(prev => ({ ...prev, isConfirming: false })); // Deactivate modal spinner
     }
   }, [work, steps, loadWorkData]);
 
@@ -1864,10 +1869,10 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                       onDragLeave={handleDragLeave}
                       onDrop={(e) => handleDrop(e, step.id)}
                       className={cx(
-                        "bg-slate-50 dark:bg-slate-800 p-4 rounded-xl border-l-4",
+                        "bg-slate-50 dark:bg-slate-800 p-4 rounded-xl border-l-4 transition-all duration-300",
                         statusDetails.borderColor, // Use status-specific border
-                        dragOverStepId === step.id ? 'border-r-4 border-dashed border-secondary' : '',
-                        !step.startDate ? 'cursor-grab' : 'cursor-not-allowed opacity-80' // Visual feedback for draggable
+                        dragOverStepId === step.id ? 'border-r-4 border-dashed border-secondary scale-[1.01] shadow-lg' : '',
+                        !step.startDate ? 'cursor-grab hover:scale-[1.005]' : 'cursor-not-allowed opacity-80' // Visual feedback for draggable
                       )}
                       aria-labelledby={`step-name-${step.id}`}
                       aria-describedby={`step-status-${step.id}`}
@@ -1876,7 +1881,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                       <div className="flex items-center justify-between mb-2">
                         <h3 id={`step-name-${step.id}`} className="font-bold text-primary dark:text-white text-lg flex items-center gap-2">
                           {step.orderIndex}. {step.name}
-                          {!step.startDate && <i className="fa-solid fa-arrows-alt text-slate-400 text-sm opacity-0 group-hover:opacity-100 transition-opacity"></i>}
+                          {!step.startDate && <i className="fa-solid fa-arrows-alt-v text-slate-400 text-sm opacity-0 group-hover:opacity-100 transition-opacity"></i>}
                         </h3>
                         {/* Status Badge (Read-only from backend) */}
                         <span id={`step-status-${step.id}`} className={cx(
@@ -1905,7 +1910,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                       {steps.length > 0 && ( 
                         <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2 mt-3">
                           <div 
-                            className="h-full rounded-full bg-secondary" 
+                            className="h-full rounded-full bg-secondary transition-all duration-500" 
                             style={{ width: `${calculateStepProgress(step.id)}%` }}
                             aria-valuenow={calculateStepProgress(step.id)}
                             aria-valuemin={0}
@@ -1958,7 +1963,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                 <button
                   onClick={handleGenerateMaterials}
                   disabled={loading}
-                  className="px-6 py-3 bg-secondary text-white font-bold rounded-xl hover:bg-secondary-dark transition-colors flex items-center gap-2"
+                  className="px-6 py-3 bg-secondary text-white font-bold rounded-xl hover:bg-secondary-dark transition-colors flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
                   aria-label="Gerar Lista de Materiais (AI)"
                 >
                   {loading ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-robot"></i>}
@@ -1992,7 +1997,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                       {group.materials.map(material => {
                         const statusDetails = getEntityStatusDetails('material', material, steps);
                         return (
-                          <div key={material.id} className="bg-slate-50 dark:bg-slate-800 p-4 rounded-xl border border-slate-100 dark:border-slate-700">
+                          <div key={material.id} className="bg-slate-50 dark:bg-slate-800 p-4 rounded-xl border border-slate-100 dark:border-slate-700 transition-all duration-300 hover:scale-[1.005] hover:shadow-lg">
                             <div className="flex items-center justify-between mb-2">
                               <h4 className="font-bold text-primary dark:text-white text-base">{material.name} {material.brand && <span className="text-sm text-slate-500 dark:text-slate-400">({material.brand})</span>}</h4>
                               <span className={cx(
@@ -2100,7 +2105,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                                 const remaining = Math.max(0, agreed - (expense.paidAmount || 0));
 
                                 return (
-                                    <div key={expense.id} className="bg-slate-50 dark:bg-slate-800 p-4 rounded-xl border border-slate-100 dark:border-slate-700">
+                                    <div key={expense.id} className="bg-slate-50 dark:bg-slate-800 p-4 rounded-xl border border-slate-100 dark:border-slate-700 transition-all duration-300 hover:scale-[1.005] hover:shadow-lg">
                                         <div className="flex items-center justify-between mb-2">
                                             <h4 className="font-bold text-primary dark:text-white text-base">{expense.description}</h4>
                                             <span className={cx(
