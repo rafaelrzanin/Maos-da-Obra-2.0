@@ -47,7 +47,8 @@ export const useAuth = () => {
   const context = useContext(AuthContext);
   if (!context) {
     // Em desenvolvimento, lança um erro claro.
-    if (import.meta.env.MODE !== 'production') {
+    // FIX CRÍTICO: Usar import.meta.env.DEV para garantir que o erro só seja lançado em modo dev.
+    if (import.meta.env.DEV) {
       throw new Error('useAuth must be used within an AuthProvider');
     }
     // Em produção, retorna um objeto seguro (fallback) para evitar crashes.
