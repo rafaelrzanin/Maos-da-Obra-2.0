@@ -1,9 +1,10 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import * as XLSX from 'xlsx'; // Keep XLSX import for Excel export functionality
 import { useAuth } from '../contexts/AuthContext.tsx';
 import { dbService } from '../services/db.ts';
-import { StepStatus, PlanType, type Work, type Step, type Material, type Expense } from '../types.ts';
+import { StepStatus, PlanType, type Work, type Step, type Material, type Expense, ExpenseStatus } from '../types.ts';
 import { ZeModal } from './ZeModal.tsx';
 
 /** =========================
@@ -18,7 +19,7 @@ const surface =
 const card = "rounded-3xl p-6 lg:p-8";
 const mutedText = "text-slate-500 dark:text-slate-400";
 
-const formatDateDisplay = (dateStr: string) => {
+const formatDateDisplay = (dateStr: string | null) => {
   if (!dateStr) return '--/--';
   if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
     const [, month, day] = dateStr.split('-');
@@ -31,6 +32,7 @@ const formatDateDisplay = (dateStr: string) => {
   }
 };
 
+// Helper para formatar valores monetários
 const formatCurrency = (value: number | string | undefined): string => {
   if (value === undefined || value === null || isNaN(Number(value))) {
     return 'R$ 0,00';
@@ -43,9 +45,85 @@ const formatCurrency = (value: number | string | undefined): string => {
   });
 };
 
-type ReportTab = 'CRONOGRAMA' | 'MATERIAIS' | 'FINANCEIRO';
+const getExpenseStatusDetails = (
+  expense: Expense
+): { statusText: string; bgColor: string; textColor: string; icon: string } => {
+  let statusText = '';
+  let bgColor = 'bg-slate-400';
+  let textColor = 'text-white';
+  let icon = 'fa-hourglass-start';
 
-const ReportsView = () => {
+  switch (expense.status) {
+    case ExpenseStatus.COMPLETED:
+      statusText = 'Concluído';
+      bgColor = 'bg-green-500';
+      icon = 'fa-check';
+      break;
+    case ExpenseStatus.PARTIAL:
+      statusText = 'Parcial';
+      bgColor = 'bg-amber-500';
+      icon = 'fa-hourglass-half';
+      break;
+    case ExpenseStatus.PENDING:
+      statusText = 'Pendente';
+      bgColor = 'bg-slate-500';
+      icon = 'fa-hourglass-start';
+      break;
+    case ExpenseStatus.OVERPAID:
+      statusText = 'Prejuízo';
+      bgColor = 'bg-red-500';
+      icon = 'fa-sack-xmark';
+      break;
+    default:
+      statusText = 'Desconhecido';
+      bgColor = 'bg-slate-500';
+      icon = 'fa-question';
+      break;
+  }
+  return { statusText, bgColor, textColor, icon };
+};
+
+const getStepStatusDetails = (
+  step: Step
+): { statusText: string; bgColor: string; textColor: string; icon: string } => {
+  let statusText = '';
+  let bgColor = 'bg-slate-400';
+  let textColor = 'text-white';
+  let icon = 'fa-hourglass-start';
+
+  switch (step.status) {
+    case StepStatus.COMPLETED:
+      statusText = 'Concluído';
+      bgColor = 'bg-green-500';
+      icon = 'fa-check';
+      break;
+    case StepStatus.IN_PROGRESS:
+      statusText = 'Em Andamento';
+      bgColor = 'bg-amber-500';
+      icon = 'fa-hourglass-half';
+      break;
+    case StepStatus.DELAYED:
+      statusText = 'Atrasado';
+      bgColor = 'bg-red-500';
+      icon = 'fa-exclamation-triangle';
+      break;
+    case StepStatus.PENDING:
+    default:
+      statusText = 'Pendente';
+      bgColor = 'bg-slate-500';
+      icon = 'fa-hourglass-start';
+      break;
+  }
+  return { statusText, bgColor, textColor, icon };
+};
+
+
+/** =========================
+ * ReportsView Component
+ * ========================= */
+
+// Export the component with a named export as per App.tsx's lazy import
+export const ReportsView: React.FC = () => {
   const { id: workId } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user, authLoading, isUserAuthFinished, trialDaysRemaining } = useAuth();
@@ -54,60 +132,21 @@ const ReportsView = () => {
   const [steps, setSteps] = useState<Step[]>([]);
   const [materials, setMaterials] = useState<Material[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
+
   const [loadingReports, setLoadingReports] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
   const [showAccessModal, setShowAccessModal] = useState(false);
-  const [activeReportTab, setActiveReportTab] = useState<ReportTab>('CRONOGRAMA'); // NEW: State for report tabs
+  const [showErrorModal, setShowErrorModal] = useState(false);
 
-  // States for Collapsible Sections
-  const [isStepsDetailsExpanded, setIsStepsDetailsExpanded] = useState(false);
-  const [isMaterialsDetailsExpanded, setIsMaterialsDetailsExpanded] = useState(false);
-  const [isExpensesDetailsExpanded, setIsExpensesDetailsExpanded] = useState(false);
-
-  // States for Material Filter (same as WorkDetail)
-  const [materialFilterStepId, setMaterialFilterStepId] = useState('all');
-
+  const [activeReportTab, setActiveReportTab] = useState<'summary' | 'steps' | 'materials' | 'expenses'>('summary');
 
   const isVitalicio = user?.plan === PlanType.VITALICIO;
   const isAiTrialActive = user?.isTrial && trialDaysRemaining !== null && trialDaysRemaining > 0;
-  const hasAccess = isVitalicio || isAiTrialActive; // Still using this for overall tool access
+  const hasAiAccess = isVitalicio || isAiTrialActive;
 
-  // Memoized calculations for reports
-  const totalExpenses = useMemo(() => expenses.reduce((sum, exp) => sum + exp.amount, 0), [expenses]);
-  const totalPaidExpenses = useMemo(() => expenses.reduce((sum, exp) => sum + (exp.paidAmount || 0), 0), [expenses]);
-  const totalOutstandingExpenses = useMemo(() => totalExpenses - totalPaidExpenses, [totalExpenses, totalPaidExpenses]);
-  const budgetBalance = useMemo(() => work ? work.budgetPlanned - totalExpenses : 0, [work, totalExpenses]);
-
-  // Materials Overview (calculated on all materials, regardless of filter for the summary)
-  const materialsOverview = useMemo(() => {
-    const planned = materials.reduce((sum, m) => sum + m.plannedQty, 0);
-    const purchased = materials.reduce((sum, m) => sum + m.purchasedQty, 0);
-    const cost = materials.reduce((sum, m) => sum + (m.totalCost || 0), 0);
-    const pending = materials.filter(m => m.purchasedQty < m.plannedQty).length;
-    return { planned, purchased, cost, pending };
-  }, [materials]);
-
-  // Filtered materials for display in the "Materiais" tab's detail section
-  const filteredMaterialsForDisplay = useMemo(() => {
-    return materialFilterStepId === 'all'
-      ? materials
-      : materials.filter(m => m.stepId === materialFilterStepId);
-  }, [materials, materialFilterStepId]);
-
-  const stepsOverview = useMemo(() => {
-    const completed = steps.filter(s => s.status === StepStatus.COMPLETED).length;
-    const inProgress = steps.filter(s => s.status === StepStatus.IN_PROGRESS).length;
-    // FIX: Use StepStatus.PENDING instead of StepStatus.NOT_STARTED
-    const pending = steps.filter(s => s.status === StepStatus.PENDING).length; 
-    // FIX: Use StepStatus.DELAYED for delayed steps
-    const delayed = steps.filter(s => s.status === StepStatus.DELAYED).length;
-    return { total: steps.length, completed, inProgress, pending, delayed };
-  }, [steps]);
-
-  const loadReportsData = useCallback(async () => {
+  const loadReportData = useCallback(async () => {
     if (!workId || !user?.id) {
       setLoadingReports(false);
-      navigate('/');
       return;
     }
 
@@ -117,12 +156,12 @@ const ReportsView = () => {
     try {
       const fetchedWork = await dbService.getWorkById(workId);
       if (!fetchedWork || fetchedWork.userId !== user.id) {
-        navigate('/');
+        navigate('/'); // Redirect if work not found or not owned
         return;
       }
       setWork(fetchedWork);
 
-      if (!hasAccess) {
+      if (!hasAiAccess) {
         setShowAccessModal(true);
         setLoadingReports(false);
         return;
@@ -134,32 +173,58 @@ const ReportsView = () => {
         dbService.getExpenses(workId),
       ]);
 
-      setSteps(fetchedSteps);
+      setSteps(fetchedSteps.sort((a, b) => a.orderIndex - b.orderIndex));
       setMaterials(fetchedMaterials);
       setExpenses(fetchedExpenses);
 
     } catch (error: any) {
       console.error("Erro ao carregar dados para relatórios:", error);
-      setErrorMsg(`Erro ao carregar os dados para os relatórios: ${error.message || 'Erro desconhecido.'}`);
+      setErrorMsg(`Não foi possível carregar os dados para os relatórios: ${error.message || 'Erro desconhecido.'}`);
+      setShowErrorModal(true);
     } finally {
       setLoadingReports(false);
     }
-  }, [workId, user, navigate, hasAccess]);
+  }, [workId, user, navigate, hasAiAccess]);
 
   useEffect(() => {
     if (!isUserAuthFinished || authLoading) return;
-    loadReportsData();
-  }, [isUserAuthFinished, authLoading, loadReportsData]);
+    loadReportData();
+  }, [loadReportData, isUserAuthFinished, authLoading]);
 
-  const handlePrint = () => {
-    window.print();
-  };
+  // Calculations for Summary
+  const summaryData = useMemo(() => {
+    const totalStepsCount = steps.length;
+    const completedStepsCount = steps.filter(s => s.status === StepStatus.COMPLETED).length;
+    const inProgressStepsCount = steps.filter(s => s.status === StepStatus.IN_PROGRESS).length;
+    const delayedStepsCount = steps.filter(s => s.status === StepStatus.DELAYED).length;
 
-  const handleExport = (format: 'PDF' | 'Excel') => {
-    console.log(`Exporting ${format} report for work ${work?.name}`);
-    alert(`Funcionalidade de exportação para ${format} em desenvolvimento!`);
-    // In a real app, this would trigger server-side generation or client-side library like jsPDF/SheetJS
-  };
+    const totalPlannedMaterials = materials.reduce((sum, m) => sum + m.plannedQty, 0);
+    const totalPurchasedMaterials = materials.reduce((sum, m) => sum + m.purchasedQty, 0);
+    const pendingMaterialsCount = materials.filter(m => m.purchasedQty < m.plannedQty).length;
+    const totalMaterialCost = materials.reduce((sum, m) => sum + (m.totalCost || 0), 0);
+
+    const totalExpensesAmount = expenses.reduce((sum, e) => sum + e.amount, 0);
+    const totalPaidExpenses = expenses.reduce((sum, e) => sum + (e.paidAmount || 0), 0);
+    const totalOutstandingExpenses = expenses.reduce((sum, e) => sum + ((e.totalAgreed || e.amount) - (e.paidAmount || 0)), 0);
+
+    const overallProgress = totalStepsCount > 0 ? (completedStepsCount / totalStepsCount) * 100 : 0;
+    const budgetUsage = work && work.budgetPlanned > 0 ? (totalPaidExpenses / work.budgetPlanned) * 100 : 0;
+
+    return {
+      overallProgress,
+      totalStepsCount,
+      completedStepsCount,
+      inProgressStepsCount,
+      delayedStepsCount,
+      pendingMaterialsCount,
+      totalMaterialCost,
+      totalExpensesAmount,
+      totalPaidExpenses,
+      totalOutstandingExpenses,
+      budgetUsage,
+      budgetPlanned: work?.budgetPlanned || 0,
+    };
+  }, [work, steps, materials, expenses]);
 
   if (authLoading || !isUserAuthFinished) {
     return (
@@ -173,317 +238,315 @@ const ReportsView = () => {
     return null; // Should be handled by Layout redirect
   }
 
-  const renderReportContent = (tab: ReportTab) => {
-    if (!work) return null; // Should not happen if data is loaded
-
-    switch (tab) {
-      case 'CRONOGRAMA':
-        return (
-          <>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-              <div className="bg-slate-50 dark:bg-slate-800 rounded-2xl p-3 flex flex-col items-start border border-slate-100 dark:border-slate-700 shadow-inner">
-                <i className="fa-solid fa-layer-group text-xl text-primary mb-1"></i>
-                <p className="text-lg font-black text-primary leading-none">{stepsOverview.total}</p>
-                <p className="text-[9px] font-extrabold tracking-widest uppercase text-slate-500">Total de Etapas</p>
-              </div>
-              <div className="bg-slate-50 dark:bg-slate-800 rounded-2xl p-3 flex flex-col items-start border border-slate-100 dark:border-slate-700 shadow-inner">
-                <i className="fa-solid fa-list-check text-xl text-green-500 mb-1"></i>
-                <p className="text-lg font-black text-green-600 leading-none">{stepsOverview.completed}</p>
-                <p className="text-[9px] font-extrabold tracking-widest uppercase text-slate-500">Concluídas</p>
-              </div>
-              <div className="bg-slate-50 dark:bg-slate-800 rounded-2xl p-3 flex flex-col items-start border border-slate-100 dark:border-slate-700 shadow-inner">
-                <i className="fa-solid fa-hourglass-half text-xl text-amber-500 mb-1"></i>
-                <p className="text-lg font-black text-amber-600 leading-none">{stepsOverview.inProgress}</p>
-                <p className="text-[9px] font-extrabold tracking-widest uppercase text-slate-500">Em Andamento</p>
-              </div>
-              <div className="bg-slate-50 dark:bg-slate-800 rounded-2xl p-3 flex flex-col items-start border border-slate-100 dark:border-slate-700 shadow-inner">
-                <i className="fa-solid fa-triangle-exclamation text-xl text-red-500 mb-1"></i>
-                <p className="text-lg font-black text-red-600 leading-none">{stepsOverview.delayed}</p>
-                <p className="text-[9px] font-extrabold tracking-widest uppercase text-slate-500">Atrasadas</p>
-              </div>
-            </div>
-
-            <div className="mt-8">
-              <div className="flex items-center justify-between mb-3 cursor-pointer" onClick={() => setIsStepsDetailsExpanded(!isStepsDetailsExpanded)} aria-expanded={isStepsDetailsExpanded}>
-                <h3 className="text-lg font-bold text-primary dark:text-white">Detalhes das Etapas</h3>
-                <i className={`fa-solid ${isStepsDetailsExpanded ? 'fa-chevron-up' : 'fa-chevron-down'} text-slate-500`}></i>
-              </div>
-              {isStepsDetailsExpanded && (
-                <div className="space-y-3 animate-in fade-in duration-300">
-                  {steps.length === 0 ? (
-                    <p className={mutedText}>Nenhuma etapa cadastrada.</p>
-                  ) : (
-                    steps.map(step => (
-                      <div key={step.id} className="bg-slate-50 dark:bg-slate-800 p-3 rounded-lg border border-slate-100 dark:border-slate-700 flex justify-between items-center">
-                        <div>
-                          <p className="font-bold text-primary dark:text-white">{step.name}</p>
-                          <p className="text-xs text-slate-500 dark:text-slate-400">
-                            {formatDateDisplay(step.startDate)} - {formatDateDisplay(step.endDate)}
-                            {step.realDate && <span className="ml-2 text-green-600 dark:text-green-400">(Concluído em: {formatDateDisplay(step.realDate)})</span>}
-                          </p>
-                        </div>
-                        <span className={`text-xs font-bold px-2 py-1 rounded-full ${
-                          step.status === StepStatus.COMPLETED ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' :
-                          step.status === StepStatus.IN_PROGRESS ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' :
-                          // FIX: Use StepStatus.DELAYED for delayed steps
-                          step.status === StepStatus.DELAYED ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' :
-                          'bg-slate-100 text-slate-700 dark:bg-slate-700/30 dark:text-slate-400'
-                        }`}>
-                          {/* FIX: Check step.status directly */}
-                          {step.status === StepStatus.DELAYED ? 'ATRASADA' : step.status === StepStatus.COMPLETED ? 'CONCLUÍDA' : step.status === StepStatus.IN_PROGRESS ? 'EM ANDAMENTO' : 'PENDENTE'}
-                        </span>
-                      </div>
-                    ))
-                  )}
-                </div>
-              )}
-            </div>
-          </>
-        );
-
-      case 'MATERIAIS':
-        return (
-          <>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-              <div className="bg-slate-50 dark:bg-slate-800 rounded-2xl p-3 flex flex-col items-start border border-slate-100 dark:border-slate-700 shadow-inner">
-                <i className="fa-solid fa-boxes-stacked text-xl text-primary mb-1"></i>
-                <p className="text-lg font-black text-primary leading-none">{materials.length}</p>
-                <p className="text-[9px] font-extrabold tracking-widest uppercase text-slate-500">Total de Materiais</p>
-              </div>
-              <div className="bg-slate-50 dark:bg-slate-800 rounded-2xl p-3 flex flex-col items-start border border-slate-100 dark:border-slate-700 shadow-inner">
-                <i className="fa-solid fa-cart-flatbed text-xl text-green-500 mb-1"></i>
-                <p className="text-lg font-black text-green-600 leading-none">{materialsOverview.purchased}</p>
-                <p className="text-[9px] font-extrabold tracking-widest uppercase text-slate-500">Qtd. Comprada</p>
-              </div>
-              <div className="bg-slate-50 dark:bg-slate-800 rounded-2xl p-3 flex flex-col items-start border border-slate-100 dark:border-slate-700 shadow-inner">
-                <i className="fa-solid fa-hourglass-empty text-xl text-amber-500 mb-1"></i>
-                <p className="text-lg font-black text-amber-600 leading-none">{materialsOverview.pending}</p>
-                <p className="text-[9px] font-extrabold tracking-widest uppercase text-slate-500">Itens Pendentes</p>
-              </div>
-              <div className="bg-slate-50 dark:bg-slate-800 rounded-2xl p-3 flex flex-col items-start border border-slate-100 dark:border-slate-700 shadow-inner">
-                <i className="fa-solid fa-money-bill-wave text-xl text-primary mb-1"></i>
-                <p className="text-lg font-black text-primary leading-none">{formatCurrency(materialsOverview.cost)}</p>
-                <p className="text-[9px] font-extrabold tracking-widest uppercase text-slate-500">Custo Total</p>
-              </div>
-            </div>
-
-            <div className="mt-8">
-              <div className="flex items-center justify-between mb-3 cursor-pointer" onClick={() => setIsMaterialsDetailsExpanded(!isMaterialsDetailsExpanded)} aria-expanded={isMaterialsDetailsExpanded}>
-                <h3 className="text-lg font-bold text-primary dark:text-white">Detalhes dos Materiais</h3>
-                <i className={`fa-solid ${isMaterialsDetailsExpanded ? 'fa-chevron-up' : 'fa-chevron-down'} text-slate-500`}></i>
-              </div>
-              {isMaterialsDetailsExpanded && (
-                <div className="animate-in fade-in duration-300">
-                  <div className="mb-4">
-                    <label htmlFor="material-step-filter" className="sr-only">Filtrar por etapa</label>
-                    <select
-                      id="material-step-filter"
-                      value={materialFilterStepId}
-                      onChange={(e) => setMaterialFilterStepId(e.target.value)}
-                      className="w-full md:w-auto px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-primary dark:text-white focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
-                      aria-label="Filtrar materiais por etapa"
-                    >
-                      <option value="all">Todas as Etapas</option>
-                      {steps.map(step => (
-                        <option key={step.id} value={step.id}>{step.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="space-y-3">
-                    {filteredMaterialsForDisplay.length === 0 ? (
-                      <p className={mutedText}>Nenhum material cadastrado para esta etapa.</p>
-                    ) : (
-                      filteredMaterialsForDisplay.map(material => (
-                        <div key={material.id} className="bg-slate-50 dark:bg-slate-800 p-3 rounded-lg border border-slate-100 dark:border-slate-700 flex justify-between items-center">
-                          <div>
-                            <p className="font-bold text-primary dark:text-white">{material.name}</p>
-                            <p className="text-xs text-slate-500 dark:text-slate-400">
-                              {material.brand && `${material.brand} - `}
-                              Planejado: {material.plannedQty} {material.unit} / Comprado: {material.purchasedQty} {material.unit}
-                            </p>
-                          </div>
-                          <span className="text-sm font-bold text-primary dark:text-white">{formatCurrency(material.totalCost || 0)}</span>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-          </>
-        );
-
-      case 'FINANCEIRO':
-        return (
-          <>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-              <div className={cx(surface, "p-5 rounded-2xl flex flex-col items-start")}>
-                <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">Orçamento Planejado</p>
-                <h3 className="text-xl font-bold text-primary dark:text-white">{formatCurrency(work.budgetPlanned)}</h3>
-              </div>
-              <div className={cx(surface, "p-5 rounded-2xl flex flex-col items-start")}>
-                <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">Gasto Total</p>
-                <h3 className={`text-xl font-bold ${totalExpenses > work.budgetPlanned ? 'text-red-500' : 'text-green-600 dark:text-green-400'}`}>{formatCurrency(totalExpenses)}</h3>
-              </div>
-              <div className={cx(surface, "p-5 rounded-2xl flex flex-col items-start")}>
-                <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">Balanço</p>
-                <h3 className={`text-xl font-bold ${budgetBalance < 0 ? 'text-red-500' : 'text-green-600 dark:text-green-400'}`}>{formatCurrency(budgetBalance)}</h3>
-              </div>
-            </div>
-
-            <div className="mt-8">
-              <div className="flex items-center justify-between mb-3 cursor-pointer" onClick={() => setIsExpensesDetailsExpanded(!isExpensesDetailsExpanded)} aria-expanded={isExpensesDetailsExpanded}>
-                <h3 className="text-lg font-bold text-primary dark:text-white">Detalhes das Despesas</h3>
-                <i className={`fa-solid ${isExpensesDetailsExpanded ? 'fa-chevron-up' : 'fa-chevron-down'} text-slate-500`}></i>
-              </div>
-              {isExpensesDetailsExpanded && (
-                <div className="space-y-3 animate-in fade-in duration-300">
-                  {expenses.length === 0 ? (
-                    <p className={mutedText}>Nenhuma despesa cadastrada.</p>
-                  ) : (
-                    expenses.map(expense => (
-                      <div key={expense.id} className="bg-slate-50 dark:bg-slate-800 p-3 rounded-lg border border-slate-100 dark:border-slate-700 flex justify-between items-center">
-                        <div>
-                          <p className="font-bold text-primary dark:text-white">{expense.description}</p>
-                          <p className="text-xs text-slate-500 dark:text-slate-400">
-                            {formatDateDisplay(expense.date)} - {expense.category}
-                            {expense.stepId && ` (Etapa: ${steps.find(s => s.id === expense.stepId)?.name || 'N/A'})`}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-sm font-bold text-primary dark:text-white">{formatCurrency(expense.amount)}</p>
-                          <p className={`text-xs ${ (expense.paidAmount || 0) >= expense.amount ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-400'}`}>
-                            Pago: {formatCurrency(expense.paidAmount || 0)}
-                          </p>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-              )}
-            </div>
-          </>
-        );
-
-      default:
-        return null;
-    }
+  // Handle loading and access checks
+  if (loadingReports) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[70vh] text-primary dark:text-white animate-in fade-in">
+        <i className="fa-solid fa-chart-pie fa-spin text-4xl mb-4 text-secondary"></i>
+        <p className="text-xl font-bold">Gerando relatórios...</p>
+      </div>
+    );
   }
 
+  if (showAccessModal) {
+    return (
+      <ZeModal
+        isOpen={showAccessModal}
+        title="Acesso Premium necessário!"
+        message="Os Relatórios Detalhados são uma funcionalidade exclusiva para assinantes Vitalícios ou durante o período de teste. Melhore sua gestão de obras agora!"
+        confirmText="Ver Planos"
+        onConfirm={async (_e?: React.FormEvent) => navigate('/settings')}
+        onCancel={async (_e?: React.FormEvent) => { setShowAccessModal(false); navigate(`/work/${workId}`); }}
+        type="WARNING"
+        cancelText="Voltar"
+      >
+        <div className="mt-4 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl text-xs text-slate-700 dark:text-slate-300 shadow-inner border border-slate-100 dark:border-slate-700">
+          <p>Seu período de teste pode ter expirado ou você precisa de um plano Vitalício para acessar esta ferramenta.</p>
+        </div>
+      </ZeModal>
+    );
+  }
+
+  if (showErrorModal) {
+    return (
+      <ZeModal
+        isOpen={showErrorModal}
+        title="Erro ao Carregar Relatórios"
+        message={errorMsg || "Não foi possível carregar os relatórios. Tente novamente mais tarde."}
+        confirmText="Tentar Novamente"
+        onConfirm={async (_e?: React.FormEvent) => { setShowErrorModal(false); await loadReportData(); }}
+        onCancel={async (_e?: React.FormEvent) => { setShowErrorModal(false); navigate(`/work/${workId}`); }}
+        type="ERROR"
+        cancelText="Voltar para Obra"
+      />
+    );
+  }
+
+  if (!work) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[70vh] p-6 text-center animate-in fade-in">
+        <i className="fa-solid fa-exclamation-circle text-6xl text-red-500 mb-4"></i>
+        <h2 className="text-2xl font-black text-primary dark:text-white mb-2">Obra não encontrada!</h2>
+        <p className="text-slate-500 dark:text-slate-400 max-w-sm mx-auto mb-6">
+          Parece que esta obra não existe ou você não tem permissão para acessá-la.
+        </p>
+        <button
+          onClick={() => navigate('/')}
+          className="px-6 py-3 bg-secondary text-white font-bold rounded-xl hover:bg-secondary-dark transition-colors"
+          aria-label="Voltar ao Dashboard"
+        >
+          Voltar ao Dashboard
+        </button>
+      </div>
+    );
+  }
+
+  // Functions to handle exports
+  const exportToExcel = (data: any[], fileName: string, sheetName: string) => {
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+    XLSX.writeFile(wb, `${fileName}.xlsx`);
+  };
+
+  const generatePdf = (title: string, content: string) => {
+    // This is a placeholder for actual PDF generation logic.
+    // In a real app, you might use a library like jsPDF or send to a serverless function.
+    alert(`Gerando PDF para: ${title}\nConteúdo (simplificado):\n${content.substring(0, 200)}...`);
+    console.log(`Simulating PDF generation for: ${title}`, content);
+  };
 
   return (
-    <div className="max-w-4xl mx-auto pb-12 pt-4 px-2 sm:px-4 md:px-0 font-sans print:p-0 print:m-0 print:max-w-full">
-      <div className="flex items-center gap-4 mb-6 px-2 sm:px-0 print:hidden">
+    <div className="max-w-4xl mx-auto pb-12 pt-4 px-2 sm:px-4 md:px-0 font-sans">
+      <div className="flex items-center gap-4 mb-6 px-2 sm:px-0">
         <button
-          onClick={() => navigate(`/work/${workId}?tab=FERRAMENTAS`)} // Navigate back to tools tab
+          onClick={() => navigate(`/work/${workId}`)}
           className="text-slate-400 hover:text-primary dark:hover:text-white transition-colors p-2 -ml-2"
-          aria-label="Voltar para ferramentas da obra"
+          aria-label="Voltar para detalhes da obra"
         >
           <i className="fa-solid fa-arrow-left text-xl"></i>
         </button>
         <div>
           <h1 className="text-3xl font-black text-primary dark:text-white mb-1 tracking-tight">Relatórios da Obra</h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">Obra: {work?.name || 'Carregando...'}</p>
+          <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">Obra: {work.name}</p>
         </div>
       </div>
 
-      {showAccessModal && (
-        <ZeModal
-          isOpen={showAccessModal}
-          title="Acesso Premium necessário!"
-          message="Os Relatórios Completos são uma funcionalidade exclusiva para assinantes Vitalícios ou durante o período de teste. Tenha a visão total da sua obra agora!"
-          confirmText="Ver Planos"
-          onConfirm={async (_e?: React.FormEvent) => navigate('/settings')}
-          onCancel={() => { setShowAccessModal(false); navigate(`/work/${workId}?tab=FERRAMENTAS`); }}
-          type="WARNING"
-          cancelText="Voltar"
+      <div className="flex justify-around bg-white dark:bg-slate-900 rounded-2xl p-2 shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800 mb-6">
+        <button
+          onClick={() => setActiveReportTab('summary')}
+          className={`flex-1 py-2 rounded-xl text-sm font-bold transition-colors ${activeReportTab === 'summary' ? 'bg-secondary text-white shadow-md' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
         >
-          <div className="mt-4 p-3 bg-slate-50 dark:bg-slate-800 rounded-xl text-xs text-slate-700 dark:text-slate-300 shadow-inner border border-slate-100 dark:border-slate-700">
-            <p>Seu período de teste pode ter expirado ou você precisa de um plano Vitalício para acessar esta ferramenta.</p>
-          </div>
-        </ZeModal>
-      )}
+          Resumo
+        </button>
+        <button
+          onClick={() => setActiveReportTab('steps')}
+          className={`flex-1 py-2 rounded-xl text-sm font-bold transition-colors ${activeReportTab === 'steps' ? 'bg-secondary text-white shadow-md' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+        >
+          Cronograma
+        </button>
+        <button
+          onClick={() => setActiveReportTab('materials')}
+          className={`flex-1 py-2 rounded-xl text-sm font-bold transition-colors ${activeReportTab === 'materials' ? 'bg-secondary text-white shadow-md' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+        >
+          Materiais
+        </button>
+        <button
+          onClick={() => setActiveReportTab('expenses')}
+          className={`flex-1 py-2 rounded-xl text-sm font-bold transition-colors ${activeReportTab === 'expenses' ? 'bg-secondary text-white shadow-md' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+        >
+          Financeiro
+        </button>
+      </div>
 
-      {loadingReports && (
-        <div className="flex flex-col items-center justify-center min-h-[50vh] p-6 text-center animate-in fade-in duration-500">
-          <div className="relative mb-8">
-            <div className="w-28 h-28 rounded-full border-4 border-slate-800 flex items-center justify-center relative z-10 bg-slate-900">
-              <i className="fa-solid fa-chart-line text-4xl text-secondary"></i>
-            </div>
-            <div className="absolute inset-0 rounded-full border-4 border-t-secondary border-r-secondary border-b-transparent border-l-transparent animate-spin"></div>
-          </div>
-          <h2 className="text-2xl font-black text-primary dark:text-white mb-2 animate-pulse">
-            Preparando seus relatórios...
-          </h2>
-          <p className="text-slate-400 text-sm max-w-xs mx-auto">
-            Isso pode levar alguns segundos dependendo da quantidade de dados.
-          </p>
-        </div>
-      )}
-
-      {errorMsg && (
-        <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-900 text-red-600 dark:text-red-400 rounded-xl text-sm font-bold flex items-center gap-2 animate-in fade-in" role="alert">
-          <i className="fa-solid fa-triangle-exclamation"></i> {errorMsg}
-        </div>
-      )}
-
-      {!loadingReports && !errorMsg && work && (
-        <div className="space-y-6 animate-in fade-in duration-300">
-          <div className="flex justify-end gap-3 mb-6 print:hidden">
-            <button
-              onClick={handlePrint}
-              className="px-4 py-2 bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 text-sm font-bold rounded-xl hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors flex items-center gap-2"
-              aria-label="Imprimir relatório"
-            >
-              <i className="fa-solid fa-print"></i> Imprimir
-            </button>
-            <button
-              onClick={() => handleExport('PDF')}
-              className="px-4 py-2 bg-red-500 text-white text-sm font-bold rounded-xl hover:bg-red-600 transition-colors flex items-center gap-2"
-              aria-label="Exportar para PDF"
-            >
-              <i className="fa-solid fa-file-pdf"></i> PDF
-            </button>
-            <button
-              onClick={() => handleExport('Excel')}
-              className="px-4 py-2 bg-green-600 text-white text-sm font-bold rounded-xl hover:bg-green-700 transition-colors flex items-center gap-2"
-              aria-label="Exportar para Excel"
-            >
-              <i className="fa-solid fa-file-excel"></i> Excel
-            </button>
-          </div>
-
-          {/* Report Tabs */}
-          <div className="flex justify-around bg-white dark:bg-slate-900 rounded-2xl p-2 shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800 mb-6 print:hidden">
-            <button
-              onClick={() => setActiveReportTab('CRONOGRAMA')}
-              className={`flex-1 py-2 rounded-xl text-sm font-bold transition-colors ${activeReportTab === 'CRONOGRAMA' ? 'bg-secondary text-white shadow-md' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
-            >
-              Cronograma
-            </button>
-            <button
-              onClick={() => setActiveReportTab('MATERIAIS')}
-              className={`flex-1 py-2 rounded-xl text-sm font-bold transition-colors ${activeReportTab === 'MATERIAIS' ? 'bg-secondary text-white shadow-md' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
-            >
-              Materiais
-            </button>
-            <button
-              onClick={() => setActiveReportTab('FINANCEIRO')}
-              className={`flex-1 py-2 rounded-xl text-sm font-bold transition-colors ${activeReportTab === 'FINANCEIRO' ? 'bg-secondary text-white shadow-md' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
-            >
-              Financeiro
-            </button>
-          </div>
-
-          {/* Report Content */}
+      {activeReportTab === 'summary' && (
+        <div className="tab-content animate-in fade-in duration-300">
           <div className={cx(surface, card)}>
-            <h2 className="sr-only">{activeReportTab} Report Overview</h2> {/* Accessible title */}
-            {renderReportContent(activeReportTab)}
+            <h2 className="text-xl font-black text-primary dark:text-white mb-4">Resumo Geral da Obra</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700">
+                <p className="text-sm text-slate-500 dark:text-slate-400">Progresso Geral</p>
+                <p className="text-2xl font-bold text-secondary">{summaryData.overallProgress.toFixed(1)}%</p>
+              </div>
+              <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700">
+                <p className="text-sm text-slate-500 dark:text-slate-400">Etapas Concluídas</p>
+                <p className="text-2xl font-bold text-green-500">{summaryData.completedStepsCount}/{summaryData.totalStepsCount}</p>
+              </div>
+              <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700">
+                <p className="text-sm text-slate-500 dark:text-slate-400">Materiais Pendentes</p>
+                <p className="text-2xl font-bold text-amber-500">{summaryData.pendingMaterialsCount}</p>
+              </div>
+              <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-xl border border-slate-100 dark:border-slate-700">
+                <p className="text-sm text-slate-500 dark:text-slate-400">Gasto Total</p>
+                <p className={`text-2xl font-bold ${summaryData.totalPaidExpenses > summaryData.budgetPlanned ? 'text-red-500' : 'text-green-500'}`}>{formatCurrency(summaryData.totalPaidExpenses)}</p>
+              </div>
+            </div>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                onClick={() => generatePdf('Resumo Geral da Obra', JSON.stringify(summaryData, null, 2))}
+                className="px-4 py-2 bg-slate-200 dark:bg-slate-700 text-primary dark:text-white text-sm font-bold rounded-xl hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors flex items-center gap-2"
+                aria-label="Exportar resumo para PDF"
+              >
+                <i className="fa-solid fa-file-pdf"></i> PDF
+              </button>
+              <button
+                onClick={() => exportToExcel([summaryData], `Resumo_Obra_${work.name}`, 'Resumo')}
+                className="px-4 py-2 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 text-sm font-bold rounded-xl hover:bg-green-200 dark:hover:bg-green-800 transition-colors flex items-center gap-2"
+                aria-label="Exportar resumo para Excel"
+              >
+                <i className="fa-solid fa-file-excel"></i> Excel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeReportTab === 'steps' && (
+        <div className="tab-content animate-in fade-in duration-300">
+          <div className={cx(surface, card)}>
+            <h2 className="text-xl font-black text-primary dark:text-white mb-4">Relatório de Cronograma</h2>
+            {steps.length === 0 ? (
+              <p className="text-center text-slate-400 py-10 italic">Nenhuma etapa cadastrada.</p>
+            ) : (
+              <div className="space-y-3">
+                {steps.map(step => {
+                  const statusDetails = getStepStatusDetails(step);
+                  return (
+                    <div key={step.id} className="bg-slate-50 dark:bg-slate-800 p-4 rounded-xl border border-slate-100 dark:border-slate-700 flex items-center justify-between">
+                      <div>
+                        <h3 className="font-bold text-primary dark:text-white text-base">{step.orderIndex}. {step.name}</h3>
+                        <p className="text-sm text-slate-500 dark:text-slate-400">Início: {formatDateDisplay(step.startDate)} - Término Previsto: {formatDateDisplay(step.endDate)}</p>
+                      </div>
+                      <span className={cx(
+                        "px-2 py-0.5 rounded-full text-xs font-bold uppercase",
+                        statusDetails.bgColor,
+                        statusDetails.textColor
+                      )}>
+                        <i className={`fa-solid ${statusDetails.icon} mr-1`}></i> {statusDetails.statusText}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                onClick={() => generatePdf('Relatório de Cronograma', JSON.stringify(steps, null, 2))}
+                className="px-4 py-2 bg-slate-200 dark:bg-slate-700 text-primary dark:text-white text-sm font-bold rounded-xl hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors flex items-center gap-2"
+                aria-label="Exportar cronograma para PDF"
+              >
+                <i className="fa-solid fa-file-pdf"></i> PDF
+              </button>
+              <button
+                onClick={() => exportToExcel(steps.map(s => ({ ...s, status: s.status, startDate: formatDateDisplay(s.startDate), endDate: formatDateDisplay(s.endDate) })), `Cronograma_Obra_${work.name}`, 'Cronograma')}
+                className="px-4 py-2 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 text-sm font-bold rounded-xl hover:bg-green-200 dark:hover:bg-green-800 transition-colors flex items-center gap-2"
+                aria-label="Exportar cronograma para Excel"
+              >
+                <i className="fa-solid fa-file-excel"></i> Excel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeReportTab === 'materials' && (
+        <div className="tab-content animate-in fade-in duration-300">
+          <div className={cx(surface, card)}>
+            <h2 className="text-xl font-black text-primary dark:text-white mb-4">Relatório de Materiais</h2>
+            {materials.length === 0 ? (
+              <p className="text-center text-slate-400 py-10 italic">Nenhum material cadastrado.</p>
+            ) : (
+              <div className="space-y-3">
+                {materials.map(material => (
+                  <div key={material.id} className="bg-slate-50 dark:bg-slate-800 p-4 rounded-xl border border-slate-100 dark:border-slate-700">
+                    <h3 className="font-bold text-primary dark:text-white text-base">{material.name} ({material.brand || 's/marca'})</h3>
+                    <p className="text-sm text-slate-500 dark:text-slate-400">
+                      Planejado: {material.plannedQty} {material.unit} | Comprado: {material.purchasedQty} {material.unit} | Custo: {formatCurrency(material.totalCost || 0)}
+                    </p>
+                    {material.stepId && (
+                      <p className="text-xs text-slate-400">Etapa: {steps.find(s => s.id === material.stepId)?.name || 'N/A'}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                onClick={() => generatePdf('Relatório de Materiais', JSON.stringify(materials, null, 2))}
+                className="px-4 py-2 bg-slate-200 dark:bg-slate-700 text-primary dark:text-white text-sm font-bold rounded-xl hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors flex items-center gap-2"
+                aria-label="Exportar materiais para PDF"
+              >
+                <i className="fa-solid fa-file-pdf"></i> PDF
+              </button>
+              <button
+                onClick={() => exportToExcel(materials.map(m => ({ ...m, totalCost: formatCurrency(m.totalCost || 0) })), `Materiais_Obra_${work.name}`, 'Materiais')}
+                className="px-4 py-2 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 text-sm font-bold rounded-xl hover:bg-green-200 dark:hover:bg-green-800 transition-colors flex items-center gap-2"
+                aria-label="Exportar materiais para Excel"
+              >
+                <i className="fa-solid fa-file-excel"></i> Excel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeReportTab === 'expenses' && (
+        <div className="tab-content animate-in fade-in duration-300">
+          <div className={cx(surface, card)}>
+            <h2 className="text-xl font-black text-primary dark:text-white mb-4">Relatório Financeiro</h2>
+            {expenses.length === 0 ? (
+              <p className="text-center text-slate-400 py-10 italic">Nenhuma despesa cadastrada.</p>
+            ) : (
+              <div className="space-y-3">
+                {expenses.map(expense => {
+                  const statusDetails = getExpenseStatusDetails(expense);
+                  const agreedAmount = expense.totalAgreed !== undefined && expense.totalAgreed !== null ? expense.totalAgreed : expense.amount;
+                  return (
+                    <div key={expense.id} className="bg-slate-50 dark:bg-slate-800 p-4 rounded-xl border border-slate-100 dark:border-slate-700 flex items-center justify-between">
+                      <div>
+                        <h3 className="font-bold text-primary dark:text-white text-base">{expense.description}</h3>
+                        <p className="text-sm text-slate-500 dark:text-slate-400">
+                          Previsto: {formatCurrency(expense.amount)} | Combinado: {formatCurrency(agreedAmount)} | Pago: {formatCurrency(expense.paidAmount || 0)}
+                        </p>
+                        <p className="text-xs text-slate-400">Data: {formatDateDisplay(expense.date)} | Categoria: {expense.category}</p>
+                      </div>
+                      <span className={cx(
+                        "px-2 py-0.5 rounded-full text-xs font-bold uppercase",
+                        statusDetails.bgColor,
+                        statusDetails.textColor
+                      )}>
+                        <i className={`fa-solid ${statusDetails.icon} mr-1`}></i> {statusDetails.statusText}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                onClick={() => generatePdf('Relatório Financeiro', JSON.stringify(expenses, null, 2))}
+                className="px-4 py-2 bg-slate-200 dark:bg-slate-700 text-primary dark:text-white text-sm font-bold rounded-xl hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors flex items-center gap-2"
+                aria-label="Exportar financeiro para PDF"
+              >
+                <i className="fa-solid fa-file-pdf"></i> PDF
+              </button>
+              <button
+                onClick={() => exportToExcel(expenses.map(e => ({
+                    ...e,
+                    amount: formatCurrency(e.amount),
+                    paidAmount: formatCurrency(e.paidAmount || 0),
+                    totalAgreed: formatCurrency(e.totalAgreed),
+                    date: formatDateDisplay(e.date)
+                })), `Financeiro_Obra_${work.name}`, 'Financeiro')}
+                className="px-4 py-2 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 text-sm font-bold rounded-xl hover:bg-green-200 dark:hover:bg-green-800 transition-colors flex items-center gap-2"
+                aria-label="Exportar financeiro para Excel"
+              >
+                <i className="fa-solid fa-file-excel"></i> Excel
+              </button>
+            </div>
           </div>
         </div>
       )}
     </div>
   );
 };
-
-export default ReportsView;
