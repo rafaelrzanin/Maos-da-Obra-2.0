@@ -38,7 +38,7 @@ const LoadingScreen = () => (
             <i className="fa-solid fa-helmet-safety"></i>
         </div>
     </div>
-    <p className="mt-4 text-slate-400 text-sm font-bold animate-pulse">Carregando...</p>
+    <p className="mt-4 text-slate-400 text-base font-bold animate-pulse">Carregando...</p> {/* OE #004: Increased text size to base */}
   </div>
 );
 
@@ -75,14 +75,14 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
     if (this.state.hasError) {
       return (
         <div className="flex flex-col items-center justify-center min-h-screen p-8 bg-danger-light dark:bg-danger-dark text-danger">
-          <i className="fa-solid fa-triangle-exclamation text-5xl mb-4"></i>
-          <h1 className="text-2xl font-bold mb-2">Ops! Algo inesperado aconteceu.</h1>
-          <p className="text-center text-sm mb-4 text-slate-700 dark:text-slate-300">
+          <i className="fa-solid fa-triangle-exclamation text-6xl mb-6"></i> {/* OE #004: Increased icon size, margin */}
+          <h1 className="text-3xl font-bold mb-3">Ops! Algo inesperado aconteceu.</h1> {/* OE #004: Increased text size, margin */}
+          <p className="text-center text-base mb-6 text-slate-700 dark:text-slate-300 max-w-sm"> {/* OE #004: Increased text size, margin, added max-width */}
             A aplicação encontrou um problema inesperado e precisa ser reiniciada. Está tudo sob controle.
           </p>
           <button
             onClick={() => window.location.reload()}
-            className="px-6 py-3 bg-secondary text-white font-bold rounded-xl hover:bg-secondary-dark transition-colors"
+            className="px-7 py-3 bg-secondary text-white font-bold rounded-xl hover:bg-secondary-dark transition-colors text-lg" /* OE #004: Increased padding, text size */
           >
             Tentar novamente
           </button>
@@ -118,7 +118,7 @@ const BottomNavBar = ({ workId, activeTab, onTabClick }: { workId: string, activ
           <button
             key={item.name}
             onClick={() => handleNavClick(item.name)}
-            className={`flex flex-col items-center justify-center flex-1 text-xs font-bold transition-colors ${
+            className={`flex flex-col items-center justify-center flex-1 text-xs font-bold transition-colors pt-2 ${ /* OE #004: Added pt-2 for better icon/text spacing */
               activeTab === item.name ? 'text-secondary' : 'text-slate-500 dark:text-slate-400 hover:text-primary dark:hover:text-white'
             }`}
             aria-current={activeTab === item.name ? 'page' : undefined}
