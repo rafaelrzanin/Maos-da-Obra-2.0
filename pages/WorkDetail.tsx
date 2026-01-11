@@ -5,7 +5,7 @@ import * as XLSX from 'xlsx'; // Keep XLSX import, as reports might use it
 import { useAuth } from '../contexts/AuthContext.tsx';
 import { dbService } from '../services/db.ts';
 import { supabase } from '../services/supabase.ts';
-import { StepStatus, FileCategory, ExpenseCategory, ExpenseStatus, type Work, type Worker, type Supplier, type Material, type Step, type Expense, type WorkPhoto, type WorkFile, type Contract, type Checklist, type ChecklistItem, PlanType } from '../types.ts';
+import { StepStatus, FileCategory, ExpenseCategory, ExpenseStatus, WorkStatus, type Work, type Worker, type Supplier, type Material, type Step, type Expense, type WorkPhoto, type WorkFile, type Contract, type Checklist, type ChecklistItem, PlanType } from '../types.ts';
 import { STANDARD_JOB_ROLES, STANDARD_SUPPLIER_CATEGORIES, ZE_AVATAR, ZE_AVATAR_FALLBACK, CONTRACT_TEMPLATES, CHECKLIST_TEMPLATES } from '../services/standards.ts';
 import { ZeModal, type ZeModalProps } from '../components/ZeModal.tsx';
 
@@ -66,7 +66,7 @@ const formatCurrency = (value: number | string | undefined): string => {
   });
 };
 
-// NEW: Type for status details
+// NEW: Type for status details for Steps, Materials, Expenses
 interface StatusDetails {
   statusText: string;
   bgColor: string; // For status button/badge background
@@ -99,7 +99,7 @@ const getEntityStatusDetails = (
       case StepStatus.COMPLETED:
         statusText = 'Concluído';
         bgColor = 'bg-green-500';
-        textColor = 'text-green-600 dark:text-green-400';
+        textColor = 'text-white'; // Always white for badges
         borderColor = 'border-green-400 dark:border-green-700';
         shadowClass = 'shadow-green-500/20';
         icon = 'fa-check';
@@ -107,7 +107,7 @@ const getEntityStatusDetails = (
       case StepStatus.IN_PROGRESS:
         statusText = 'Em Andamento';
         bgColor = 'bg-amber-500';
-        textColor = 'text-amber-600 dark:text-amber-400';
+        textColor = 'text-white';
         borderColor = 'border-amber-400 dark:border-amber-700';
         shadowClass = 'shadow-amber-500/20';
         icon = 'fa-hourglass-half';
@@ -115,7 +115,7 @@ const getEntityStatusDetails = (
       case StepStatus.DELAYED: // Now a direct status
         statusText = 'Atrasado';
         bgColor = 'bg-red-500';
-        textColor = 'text-red-600 dark:text-red-400';
+        textColor = 'text-white';
         borderColor = 'border-red-400 dark:border-red-700';
         shadowClass = 'shadow-red-500/20';
         icon = 'fa-exclamation-triangle';
@@ -123,10 +123,10 @@ const getEntityStatusDetails = (
       case StepStatus.PENDING: // RENOMEADO: De NOT_STARTED para PENDING
       default:
         statusText = 'Pendente';
-        bgColor = 'bg-slate-400';
-        textColor = 'text-slate-700 dark:text-slate-300';
-        borderColor = 'border-slate-200 dark:border-slate-700';
-        shadowClass = 'shadow-slate-400/20';
+        bgColor = 'bg-slate-500'; // Darker gray for pending to stand out
+        textColor = 'text-white';
+        borderColor = 'border-slate-300 dark:border-slate-700';
+        shadowClass = 'shadow-slate-500/20';
         icon = 'fa-hourglass-start';
         break;
     }
@@ -165,30 +165,30 @@ const getEntityStatusDetails = (
     if (isDelayed && !materialIsComplete) { // Only delayed if not already complete
       statusText = 'Atrasado';
       bgColor = 'bg-red-500';
-      textColor = 'text-red-600 dark:text-red-400';
+      textColor = 'text-white';
       borderColor = 'border-red-400 dark:border-red-700';
       shadowClass = 'shadow-red-500/20';
       icon = 'fa-exclamation-triangle';
     } else if (materialIsComplete) {
       statusText = 'Concluído';
       bgColor = 'bg-green-500';
-      textColor = 'text-green-600 dark:text-green-400';
+      textColor = 'text-white';
       borderColor = 'border-green-400 dark:border-green-700';
       shadowClass = 'shadow-green-500/20';
       icon = 'fa-check';
     } else if (materialIsPartial) {
       statusText = 'Parcial';
       bgColor = 'bg-amber-500';
-      textColor = 'text-amber-600 dark:text-amber-400';
+      textColor = 'text-white';
       borderColor = 'border-amber-400 dark:border-amber-700';
       shadowClass = 'shadow-amber-500/20';
       icon = 'fa-hourglass-half';
     } else if (materialIsPending) {
       statusText = 'Pendente';
-      bgColor = 'bg-slate-400';
-      textColor = 'text-slate-700 dark:text-slate-300';
-      borderColor = 'border-slate-200 dark:border-slate-700';
-      shadowClass = 'shadow-slate-400/20';
+      bgColor = 'bg-slate-500';
+      textColor = 'text-white';
+      borderColor = 'border-slate-300 dark:border-slate-700';
+      shadowClass = 'shadow-slate-500/20';
       icon = 'fa-hourglass-start';
     }
   } else if (entityType === 'expense') {
@@ -199,7 +199,7 @@ const getEntityStatusDetails = (
       case ExpenseStatus.COMPLETED:
         statusText = 'Concluído';
         bgColor = 'bg-green-500';
-        textColor = 'text-green-600 dark:text-green-400';
+        textColor = 'text-white';
         borderColor = 'border-green-400 dark:border-green-700';
         shadowClass = 'shadow-green-500/20';
         icon = 'fa-check';
@@ -207,33 +207,33 @@ const getEntityStatusDetails = (
       case ExpenseStatus.PARTIAL:
         statusText = 'Parcial';
         bgColor = 'bg-amber-500';
-        textColor = 'text-amber-600 dark:text-amber-400';
+        textColor = 'text-white';
         borderColor = 'border-amber-400 dark:border-amber-700';
         shadowClass = 'shadow-amber-500/20';
         icon = 'fa-hourglass-half';
         break;
       case ExpenseStatus.PENDING:
         statusText = 'Pendente';
-        bgColor = 'bg-slate-400';
-        textColor = 'text-slate-700 dark:text-slate-300';
-        borderColor = 'border-slate-200 dark:border-slate-700';
-        shadowClass = 'shadow-slate-400/20';
+        bgColor = 'bg-slate-500';
+        textColor = 'text-white';
+        borderColor = 'border-slate-300 dark:border-slate-700';
+        shadowClass = 'shadow-slate-500/20';
         icon = 'fa-hourglass-start';
         break;
       case ExpenseStatus.OVERPAID:
         statusText = 'Prejuízo'; // NOVO STATUS
         bgColor = 'bg-red-500';
-        textColor = 'text-red-600 dark:text-red-400';
+        textColor = 'text-white';
         borderColor = 'border-red-400 dark:border-red-700';
         shadowClass = 'shadow-red-500/20';
         icon = 'fa-sack-xmark'; // Ícone para prejuízo
         break;
       default:
         statusText = 'Desconhecido';
-        bgColor = 'bg-slate-400';
-        textColor = 'text-slate-700 dark:text-slate-300';
-        borderColor = 'border-slate-200 dark:border-slate-700';
-        shadowClass = 'shadow-slate-400/20';
+        bgColor = 'bg-slate-500';
+        textColor = 'text-white';
+        borderColor = 'border-slate-300 dark:border-slate-700';
+        shadowClass = 'shadow-slate-500/20';
         icon = 'fa-question';
         break;
     }
@@ -241,6 +241,18 @@ const getEntityStatusDetails = (
 
   return { statusText, bgColor, textColor, borderColor, shadowClass, icon };
 };
+
+// NEW: Helper for WorkStatus colors
+const getWorkStatusDetails = (status: WorkStatus): { text: string; bgColor: string; textColor: string } => {
+  switch (status) {
+    case WorkStatus.COMPLETED: return { text: 'Concluída', bgColor: 'bg-green-500', textColor: 'text-white' };
+    case WorkStatus.IN_PROGRESS: return { text: 'Em Andamento', bgColor: 'bg-amber-500', textColor: 'text-white' };
+    case WorkStatus.PAUSED: return { text: 'Pausada', bgColor: 'bg-blue-500', textColor: 'text-white' };
+    case WorkStatus.PLANNING: return { text: 'Planejamento', bgColor: 'bg-slate-500', textColor: 'text-white' };
+    default: return { text: 'Desconhecido', bgColor: 'bg-slate-400', textColor: 'text-white' };
+  }
+};
+
 
 // NEW: ToolCard Component
 interface ToolCardProps {
@@ -467,16 +479,15 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
     return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   };
 
-  const calculateStepProgress = (stepId: string): number => {
+  const calculateStepProgress = useCallback((stepId: string): number => {
     const totalMaterialsForStep = materials.filter(m => m.stepId === stepId);
-    if (totalMaterialsForStep.length === 0) return 0;
+    if (totalMaterialsForStep.length === 0) return 0; // No materials, no progress
 
     const totalPlannedQty = totalMaterialsForStep.reduce((sum, m) => sum + m.plannedQty, 0);
     const totalPurchasedQty = totalMaterialsForStep.reduce((sum, m) => sum + m.purchasedQty, 0);
 
-    // Fix: Use totalPurchasedQty instead of undefined purchasedQty
-    return totalPlannedQty > 0 ? (totalPurchasedQty / totalPlannedQty) * 100 : 0;
-  };
+    return totalPlannedQty > 0 ? (totalPurchasedQty / totalPlannedQty) * 100 : (totalPurchasedQty > 0 ? 100 : 0); // If planned is 0 but purchased > 0, consider it 100%
+  }, [materials]);
 
   const calculateTotalExpenses = useMemo(() => {
     // 🔥 MODIFICADO: Excluir despesas de material do total gasto para o cálculo de progresso financeiro principal
@@ -1763,7 +1774,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
   // ... rest of the component rendering
   return (
     <div className="max-w-4xl mx-auto pb-12 pt-6 px-4 md:px-0 font-sans">
-      {/* HEADER */}
+      {/* HEADER PREMIUM */}
       <div className="flex items-center gap-4 mb-6 px-2 sm:px-0">
         <button
           onClick={() => navigate('/')}
@@ -1773,7 +1784,19 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
           <i className="fa-solid fa-arrow-left text-xl"></i>
         </button>
         <div>
-          <h1 className="text-3xl font-black text-primary dark:text-white mb-1 tracking-tight">{work?.name}</h1>
+          <h1 className="text-3xl font-black text-primary dark:text-white mb-1 tracking-tight flex items-center gap-3">
+            {work?.name}
+            {work?.status && (
+              <span className={cx(
+                "px-3 py-1 rounded-full text-xs font-bold uppercase",
+                getWorkStatusDetails(work.status).bgColor,
+                getWorkStatusDetails(work.status).textColor,
+                getWorkStatusDetails(work.status).bgColor.replace('bg-', 'shadow-') + '/20' // Dynamic shadow color
+              )}>
+                {getWorkStatusDetails(work.status).text}
+              </span>
+            )}
+          </h1>
           <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">
             {work?.address} • {work?.area}m² • Início: {formatDateDisplay(work?.startDate || null)}
           </p>
@@ -1878,7 +1901,19 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                           <i className="fa-solid fa-exclamation-triangle mr-1"></i> Esta etapa está atrasada!
                         </p>
                       )}
-                      {/* Removed the status change button */}
+                      {/* NEW: Step progress bar based on material completion */}
+                      {steps.length > 0 && ( 
+                        <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2 mt-3">
+                          <div 
+                            className="h-full rounded-full bg-secondary" 
+                            style={{ width: `${calculateStepProgress(step.id)}%` }}
+                            aria-valuenow={calculateStepProgress(step.id)}
+                            aria-valuemin={0}
+                            aria-valuemax={100}
+                            aria-label={`Progresso da etapa: ${Math.round(calculateStepProgress(step.id))}%`}
+                          ></div>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
