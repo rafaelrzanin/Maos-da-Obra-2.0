@@ -68,6 +68,34 @@ const formatCurrency = (value: number | string | undefined): string => {
   });
 };
 
+// NEW: Helper para formatar um número para exibição em um input (e.g., "1.250.000,00")
+const formatInputReal = (rawNumericString: string | number): string => {
+  if (rawNumericString === undefined || rawNumericString === null || rawNumericString === '') return '';
+  const num = parseFloat(String(rawNumericString).replace(',', '.')); // Handle internal comma from manual input
+  if (isNaN(num)) return '';
+  return num.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
+
+// NEW: Helper para parsear uma string formatada (e.g., "1.250.000,00") para um número puro em string (e.g., "1250000.00")
+const parseInputReal = (displayString: string): string => {
+  if (!displayString) return '';
+
+  let cleaned = displayString.replace(/[^0-9,]/g, '');
+
+  const parts = cleaned.split(',');
+  if (parts.length > 2) {
+    cleaned = parts.slice(0, -1).join('') + ',' + parts[parts.length - 1];
+  }
+  
+  cleaned = cleaned.replace(',', '.');
+  
+  // Try to parse to float and then back to string to ensure a valid number format
+  const num = parseFloat(cleaned);
+  if (isNaN(num)) return '';
+
+  return num.toFixed(2); // Keep two decimal places for consistency
+};
+
 // NEW: Type for status details for Steps, Materials, Expenses
 interface StatusDetails {
   statusText: string;
@@ -1350,13 +1378,13 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
   // NEW: Function to handle payment confirmation
   const handlePaymentConfirmation = useCallback(async (e?: React.FormEvent) => {
     e?.preventDefault();
-    if (!paymentExpenseData || !paymentAmount || Number(paymentAmount) <= 0) {
+    if (!paymentExpenseData || !paymentAmount || Number(parseInputReal(paymentAmount)) <= 0) {
       showToastNotification("Valor de pagamento inválido.", 'warning');
       return;
     }
     setZeModal(prev => ({ ...prev, isConfirming: true }));
     try {
-      await dbService.addPaymentToExpense(paymentExpenseData.id, Number(paymentAmount), paymentDate);
+      await dbService.addPaymentToExpense(paymentExpenseData.id, Number(parseInputReal(paymentAmount)), paymentDate);
       setShowAddPaymentModal(false);
       setPaymentAmount('');
       setNewPaymentDate(new Date().toISOString().split('T')[0]);
@@ -1401,7 +1429,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         name: newWorkerName,
         role: newWorkerRole,
         phone: newWorkerPhone,
-        dailyRate: Number(newWorkerDailyRate) || undefined,
+        dailyRate: Number(parseInputReal(newWorkerDailyRate)) || undefined,
         notes: newWorkerNotes || undefined,
       });
       setShowAddWorkerModal(false);
@@ -1446,7 +1474,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         name: newWorkerName,
         role: newWorkerRole,
         phone: newWorkerPhone,
-        dailyRate: Number(newWorkerDailyRate) || undefined,
+        dailyRate: Number(parseInputReal(newWorkerDailyRate)) || undefined,
         notes: newWorkerNotes || undefined,
       });
       setEditWorkerData(null);
@@ -2364,7 +2392,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                                   setNewMaterialCategory(material.category || '');
                                   setNewMaterialStepId(material.stepId || 'none');
                                   setPurchaseQtyInput(''); // Reset purchase input for new transaction
-                                  setPurchaseCostInput(''); // Reset purchase input for new transaction
+                                  setPurchaseCostInput(formatInputReal(0)); // Reset and format for new transaction
                                   setShowAddMaterialModal(true);
                                 }}
                                 className="px-3 py-1 bg-primary text-white text-base font-bold rounded-lg hover:bg-primary-light transition-colors" /* OE #004: Increased text size */
@@ -2411,7 +2439,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                         setShowAddExpenseModal(true);
                         setEditExpenseData(null); // Clear edit data when adding new
                         setNewExpenseDescription('');
-                        setNewExpenseAmount('');
+                        setNewExpenseAmount(formatInputReal(0));
                         setNewExpenseCategory(ExpenseCategory.OTHER);
                         setNewExpenseDate(new Date().toISOString().split('T')[0]);
                         setNewExpenseStepId('');
@@ -2472,7 +2500,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                                                     <button
                                                         onClick={() => {
                                                             setPaymentExpenseData(expense);
-                                                            setPaymentAmount(String(remaining)); // Pre-fill with remaining amount
+                                                            setPaymentAmount(formatInputReal(remaining)); // Pre-fill with remaining amount and format
                                                             setShowAddPaymentModal(true);
                                                         }}
                                                         className="px-3 py-1 bg-secondary text-white text-base font-bold rounded-lg hover:bg-secondary-dark transition-colors" /* OE #004: Increased text size */
@@ -2485,13 +2513,13 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                                                     onClick={() => {
                                                         setEditExpenseData(expense);
                                                         setNewExpenseDescription(expense.description);
-                                                        setNewExpenseAmount(String(expense.amount));
+                                                        setNewExpenseAmount(formatInputReal(expense.amount));
                                                         setNewExpenseCategory(expense.category as ExpenseCategory);
                                                         setNewExpenseDate(expense.date);
                                                         setNewExpenseStepId(expense.stepId || 'none');
                                                         setNewExpenseWorkerId(expense.workerId || 'none');
                                                         setNewExpenseSupplierId(expense.supplierId || 'none');
-                                                        setNewExpenseTotalAgreed(expense.totalAgreed !== undefined && expense.totalAgreed !== null ? String(expense.totalAgreed) : '');
+                                                        setNewExpenseTotalAgreed(expense.totalAgreed !== undefined && expense.totalAgreed !== null ? formatInputReal(expense.totalAgreed) : '');
                                                         setShowAddExpenseModal(true);
                                                     }}
                                                     className="px-3 py-1 bg-primary text-white text-base font-bold rounded-lg hover:bg-primary-light transition-colors" /* OE #004: Increased text size */
@@ -2596,7 +2624,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                   setNewWorkerName(''); 
                   setNewWorkerRole(''); 
                   setNewWorkerPhone(''); 
-                  setNewWorkerDailyRate(''); 
+                  setNewWorkerDailyRate(formatInputReal(0)); 
                   setNewWorkerNotes(''); 
                 }}
                 loading={isAddingWorker} // Show spinner on add button if adding
@@ -2628,7 +2656,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                             setNewWorkerName(worker.name);
                             setNewWorkerRole(worker.role);
                             setNewWorkerPhone(worker.phone);
-                            setNewWorkerDailyRate(String(worker.dailyRate || ''));
+                            setNewWorkerDailyRate(formatInputReal(worker.dailyRate || 0));
                             setNewWorkerNotes(worker.notes || '');
                             setShowAddWorkerModal(true);
                           }}
@@ -3169,15 +3197,16 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                 <div>
                   <label htmlFor="purchaseCost" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Custo Total da Compra (R$)</label>
                   <input
-                    type="number"
+                    type="text" // Changed to text for formatting
                     id="purchaseCost"
-                    value={purchaseCostInput}
-                    onChange={(e) => setPurchaseCostInput(e.target.value)}
+                    value={formatInputReal(purchaseCostInput)}
+                    onFocus={(e) => e.target.value = parseInputReal(e.target.value)}
+                    onBlur={(e) => setPurchaseCostInput(parseInputReal(e.target.value))}
+                    onChange={(e) => setPurchaseCostInput(parseInputReal(e.target.value))}
                     placeholder="Custo da compra"
-                    min="0"
-                    step="0.01"
                     className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
                     aria-label="Custo total da compra"
+                    inputMode="decimal" // Suggest numeric keyboard
                   />
                 </div>
               </div>
@@ -3217,36 +3246,38 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
             <div>
               <label htmlFor="expenseAmount" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Valor Previsto (R$)</label>
               <input
-                type="number"
+                type="text" // Changed to text for formatting
                 id="expenseAmount"
-                value={newExpenseAmount}
-                onChange={(e) => setNewExpenseAmount(e.target.value)}
+                value={formatInputReal(newExpenseAmount)}
+                onFocus={(e) => e.target.value = parseInputReal(e.target.value)}
+                onBlur={(e) => setNewExpenseAmount(parseInputReal(e.target.value))}
+                onChange={(e) => setNewExpenseAmount(parseInputReal(e.target.value))}
                 placeholder="Ex: 500.00"
-                min="0"
-                step="0.01"
                 className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
                 required
                 aria-label="Valor previsto da despesa"
                 // Disable if expense already has payments
                 disabled={!!editExpenseData?.paidAmount && editExpenseData.paidAmount > 0}
                 title={!!editExpenseData?.paidAmount && editExpenseData.paidAmount > 0 ? "Valor não editável após pagamentos." : undefined}
+                inputMode="decimal"
               />
             </div>
             <div>
               <label htmlFor="expenseTotalAgreed" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Valor Combinado (R$ - Opcional)</label>
               <input
-                type="number"
+                type="text" // Changed to text for formatting
                 id="expenseTotalAgreed"
-                value={newExpenseTotalAgreed}
-                onChange={(e) => setNewExpenseTotalAgreed(e.target.value)}
+                value={formatInputReal(newExpenseTotalAgreed)}
+                onFocus={(e) => e.target.value = parseInputReal(e.target.value)}
+                onBlur={(e) => setNewExpenseTotalAgreed(parseInputReal(e.target.value))}
+                onChange={(e) => setNewExpenseTotalAgreed(parseInputReal(e.target.value))}
                 placeholder="Valor final combinado (se diferente do previsto)"
-                min="0"
-                step="0.01"
                 className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
                 aria-label="Valor total combinado para pagamento"
                  // Disable if expense already has payments
                 disabled={!!editExpenseData?.paidAmount && editExpenseData.paidAmount > 0}
                 title={!!editExpenseData?.paidAmount && editExpenseData.paidAmount > 0 ? "Valor não editável após pagamentos." : undefined}
+                inputMode="decimal"
               />
             </div>
             <div>
@@ -3350,16 +3381,17 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
             <div>
               <label htmlFor="paymentAmount" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Valor a Pagar (R$)</label>
               <input
-                type="number"
+                type="text" // Changed to text for formatting
                 id="paymentAmount"
-                value={paymentAmount}
-                onChange={(e) => setPaymentAmount(e.target.value)}
+                value={formatInputReal(paymentAmount)}
+                onFocus={(e) => e.target.value = parseInputReal(e.target.value)}
+                onBlur={(e) => setPaymentAmount(parseInputReal(e.target.value))}
+                onChange={(e) => setPaymentAmount(parseInputReal(e.target.value))}
                 placeholder="0.00"
-                min="0.01"
-                step="0.01"
                 className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
                 required
                 aria-label="Valor a pagar"
+                inputMode="decimal"
               />
             </div>
             <div>
@@ -3438,15 +3470,16 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
             <div>
               <label htmlFor="workerDailyRate" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Diária (R$ - Opcional)</label>
               <input
-                type="number"
+                type="text" // Changed to text for formatting
                 id="workerDailyRate"
-                value={newWorkerDailyRate}
-                onChange={(e) => setNewWorkerDailyRate(e.target.value)}
+                value={formatInputReal(newWorkerDailyRate)}
+                onFocus={(e) => e.target.value = parseInputReal(e.target.value)}
+                onBlur={(e) => setNewWorkerDailyRate(parseInputReal(e.target.value))}
+                onChange={(e) => setNewWorkerDailyRate(parseInputReal(e.target.value))}
                 placeholder="Ex: 150.00"
-                min="0"
-                step="0.01"
                 className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
                 aria-label="Diária do trabalhador"
+                inputMode="decimal"
               />
             </div>
             <div>
