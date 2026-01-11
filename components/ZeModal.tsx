@@ -1,5 +1,4 @@
 
-
 import React from 'react';
 import { ZE_AVATAR, ZE_AVATAR_FALLBACK } from '../services/standards.ts';
 
@@ -11,7 +10,7 @@ export interface ZeModalProps {
   cancelText?: string; // Made optional
   type?: 'DANGER' | 'INFO' | 'SUCCESS' | 'WARNING' | 'ERROR';
   // Fix: Allow onConfirm to accept an optional React.FormEvent
-  onConfirm?: (e?: React.FormEvent) => Promise<void>; 
+  onConfirm?: (e?: React.FormEvent) => Promise<void> | void; // Allow void return for sync functions
   // FIX: Allow onCancel to accept an optional event argument to match onClick signature
   onCancel: (e?: React.FormEvent) => void; 
   isConfirming?: boolean; // NEW: To disable confirm button during async ops
@@ -111,7 +110,7 @@ export const ZeModal: React.FC<ZeModalProps> = ({
             <div className="flex flex-col gap-3 pt-6 px-6 shrink-0 border-t border-slate-100 dark:border-slate-800">
                 <button 
                     // Fix: Pass an optional event object to primaryButtonHandler
-                    onClick={(e) => primaryButtonHandler(e)} 
+                    onClick={(e) => { e?.preventDefault(); primaryButtonHandler(e); }} 
                     disabled={isConfirming} // NEW: Disable button while confirming
                     className={`w-full py-4 rounded-xl text-white font-bold transition-all shadow-lg active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2 ${isDangerOrWarning ? 'bg-danger hover:bg-red-700 shadow-red-500/20' : 'bg-primary hover:bg-slate-800 shadow-slate-500/20'}`}
                 >
@@ -119,7 +118,7 @@ export const ZeModal: React.FC<ZeModalProps> = ({
                 </button>
                 {!isSimpleAlert && ( // Only show cancel button if it's not a simple alert
                     <button 
-                        onClick={(e) => onCancel(e)} // FIX: Pass event to onCancel
+                        onClick={(e) => { e?.preventDefault(); onCancel(e); }} // FIX: Pass event to onCancel
                         disabled={isConfirming} // NEW: Disable cancel button too
                         className="w-full py-3 rounded-xl text-slate-500 font-bold hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
                     >
