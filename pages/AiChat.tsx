@@ -398,7 +398,13 @@ const AiChat = () => {
           `}
           aria-label={isListening ? 'Parar gravação de voz' : 'Iniciar gravação de voz'}
         >
-          <i className="fa-solid fa-microphone-slash"></i> : <i className="fa-solid fa-microphone"></i>}
+          {
+            isListening ? (
+              <i className="fa-solid fa-microphone-slash"></i>
+            ) : (
+              <i className="fa-solid fa-microphone"></i>
+            )
+          }
         </button>
         {/* NEW: Send Button - Always present */}
         <button
