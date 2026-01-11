@@ -357,10 +357,10 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
   );
 };
 
-const App = () => {
-  // FIX: Explicitly type activeWorkDetailTab as MainTab
+// NEW: Component to manage routing content based on authentication state
+const AppRouterContent = () => {
   const [activeWorkDetailTab, setActiveWorkDetailTab] = useState<MainTab>('ETAPAS'); // Centralized state for WorkDetail tab
-  const { user, authLoading, isUserAuthFinished } = useAuth(); // Get auth state here
+  const { user, authLoading, isUserAuthFinished } = useAuth(); // Get auth state here, now within AuthProvider
 
   if (authLoading || !isUserAuthFinished) {
     return <LoadingScreen />;
@@ -403,6 +403,24 @@ const App = () => {
       </ReactRouter.Routes>
     );
   }
+};
+
+const App = () => {
+  return (
+    <ReactRouter.BrowserRouter>
+      <ThemeProvider>
+        <AuthProvider>
+          <ErrorBoundary>
+            {/* Global Suspense for all routes, as requested in the final architectural correction. */}
+            {/* This ensures lazy-loaded components are handled from the top level. */}
+            <Suspense fallback={<LoadingScreen />}>
+              <AppRouterContent /> {/* Now all routing logic is encapsulated here */}
+            </Suspense>
+          </ErrorBoundary>
+        </AuthProvider>
+      </ThemeProvider>
+    </ReactRouter.BrowserRouter>
+  );
 };
 
 export default App;
