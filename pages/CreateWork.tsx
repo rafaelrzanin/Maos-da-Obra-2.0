@@ -22,8 +22,8 @@ const formatCurrency = (value: number | string | undefined): string => {
   });
 };
 
-// REMOVED: cleanMonetaryInput, formatMonetaryDisplay, formatMonetaryValueForDB
-// Removed as per user request to simplify monetary input.
+// NEW: UI helper
+const cx = (...c: Array<string | false | undefined>) => c.filter(Boolean).join(' ');
 
 
 const CreateWork = () => {
@@ -296,7 +296,7 @@ const CreateWork = () => {
                         aria-invalid={!!formErrors.area}
                         aria-describedby={formErrors.area ? "area-error" : undefined}
                     />
-                    {formErrors.area && <p id="area-error" className="text-red-500 text-sm mt-1">{formErrors.area}</p>} {/* OE #004: Increased text size */}
+                    {formErrors.area && <p id="area-error" className="text-red-500 text-sm mt-1">{formErrors.area}</p>} /* OE #004: Increased text size */
                 </div>
               </div>
 
@@ -500,7 +500,16 @@ const CreateWork = () => {
           </button>
           <div className="flex gap-3" role="progressbar" aria-valuenow={currentStep} aria-valuemin={1} aria-valuemax={totalSteps}> {/* OE #004: Increased gap */}
               {[1, 2, 3].map(s => ( // UPDATED progress bar for 3 steps
-                  <div key={s} className={`h-2 rounded-full transition-all duration-500 ${s <= currentStep ? 'w-10 bg-secondary' : 'w-3 bg-slate-200 dark:bg-slate-700'}`}></div> {/* OE #004: Increased width */}
+                  <div 
+                    key={s} 
+                    className={cx(
+                      'h-2', 
+                      'rounded-full', 
+                      'transition-all', 
+                      'duration-500', 
+                      s <= currentStep ? 'w-10 bg-secondary' : 'w-3 bg-slate-200 dark:bg-slate-700'
+                    )}
+                  ></div> {/* OE #004: Increased width */}
               ))}
           </div>
           <div className="w-6"></div> {/* Placeholder for alignment */}
