@@ -312,7 +312,7 @@ const ToolSubViewHeader: React.FC<ToolSubViewHeaderProps> = ({ title, onBack, on
       <div className="flex items-center gap-3">
         <button
           onClick={onBack}
-          className="text-slate-400 hover:text-primary dark:hover:text-white transition-colors p-2 -ml-2"
+          className="text-slate-400 hover:text-primary dark:hover:text-white transition-colors p-2 -ml-2 text-xl" /* OE #004: Increased text size */
           aria-label={`Voltar para ${title}`}
         >
           <i className="fa-solid fa-arrow-left text-xl"></i>
@@ -323,7 +323,7 @@ const ToolSubViewHeader: React.FC<ToolSubViewHeaderProps> = ({ title, onBack, on
         <button
           onClick={onAdd}
           disabled={loading} // Disable if loading
-          className="px-4 py-2 bg-secondary text-white text-sm font-bold rounded-xl hover:bg-secondary-dark transition-colors flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+          className="px-4 py-2 bg-secondary text-white text-base font-bold rounded-xl hover:bg-secondary-dark transition-colors flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed" /* OE #004: Increased text size */
           aria-label={`Adicionar novo item em ${title}`}
         >
           {loading ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-plus"></i>}
@@ -1347,6 +1347,40 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
     }
   };
 
+  // NEW: Function to handle payment confirmation
+  const handlePaymentConfirmation = useCallback(async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (!paymentExpenseData || !paymentAmount || Number(paymentAmount) <= 0) {
+      showToastNotification("Valor de pagamento inválido.", 'warning');
+      return;
+    }
+    setZeModal(prev => ({ ...prev, isConfirming: true }));
+    try {
+      await dbService.addPaymentToExpense(paymentExpenseData.id, Number(paymentAmount), paymentDate);
+      setShowAddPaymentModal(false);
+      setPaymentAmount('');
+      setNewPaymentDate(new Date().toISOString().split('T')[0]);
+      await loadWorkData();
+      showToastNotification("Pagamento registrado com sucesso!", 'success');
+      showFinanceBadge();
+    } catch (error: any) {
+      console.error("Erro ao registrar pagamento:", error);
+      showToastNotification(`Erro ao registrar pagamento: ${error.message || 'Erro desconhecido'}.`, 'error');
+      setZeModal(prev => ({
+        ...prev,
+        isConfirming: false,
+        title: "Erro ao Registrar Pagamento",
+        message: `Não foi possível registrar o pagamento: ${error.message || 'Erro desconhecido'}. Tente novamente.`,
+        type: "ERROR",
+        confirmText: "Ok",
+        onConfirm: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));},
+        onCancel: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));}
+      }));
+    } finally {
+      setZeModal(prev => ({ ...prev, isConfirming: false }));
+    }
+  }, [paymentExpenseData, paymentAmount, paymentDate, showToastNotification, loadWorkData, showFinanceBadge]);
+
   // =======================================================================
   // CRUD HANDLERS: WORKERS
   // =======================================================================
@@ -1808,7 +1842,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
       setShowAddChecklistModal(false);
       setNewChecklistName('');
       setNewChecklistCategory('');
-      setNewChecklistItems(['']);
+      setNewChecklistItems(['']); // Start with one empty item
       await loadWorkData();
       showToastNotification("Checklist adicionado com sucesso!", 'success');
     } catch (error: any) {
@@ -1942,14 +1976,14 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
   if (!work && !loading) {
       return (
           <div className="flex flex-col items-center justify-center min-h-[70vh] p-6 text-center animate-in fade-in">
-              <i className="fa-solid fa-exclamation-circle text-6xl text-red-500 mb-4"></i>
-              <h2 className="text-2xl font-black text-primary dark:text-white mb-2">Obra não encontrada!</h2>
-              <p className="text-slate-500 dark:text-slate-400 max-w-sm mx-auto mb-6">
+              <i className="fa-solid fa-exclamation-circle text-6xl mb-6 text-red-500"></i> {/* OE #004: Increased icon size, margin */}
+              <h2 className="text-2xl font-black text-primary dark:text-white mb-3">Obra não encontrada!</h2> {/* OE #004: Increased margin */}
+              <p className="text-slate-500 dark:text-slate-400 max-w-sm mx-auto mb-8 text-base"> {/* OE #004: Increased margin, text size */}
                   Parece que esta obra não existe ou você não tem permissão para acessá-la.
               </p>
               <button
                   onClick={() => navigate('/')}
-                  className="px-6 py-3 bg-secondary text-white font-bold rounded-xl hover:bg-secondary-dark transition-colors"
+                  className="px-7 py-3 bg-secondary text-white font-bold rounded-xl hover:bg-secondary-dark transition-colors text-lg" /* OE #004: Increased padding, text size */
                   aria-label="Voltar ao Dashboard"
               >
                   Voltar ao Dashboard
@@ -1979,7 +2013,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
             toastType === 'error' ? 'fa-exclamation-circle' :
             'fa-triangle-exclamation'
           )}></i>
-          <span className="font-bold">{toastMessage}</span>
+          <span className="font-bold text-base">{toastMessage}</span> {/* OE #004: Increased text size */}
         </div>
       )}
 
@@ -1988,7 +2022,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
       <div className="flex items-center gap-4 mb-6 px-2 sm:px-0">
         <button
           onClick={() => navigate('/')}
-          className="text-slate-400 hover:text-primary dark:hover:text-white transition-colors p-2 -ml-2"
+          className="text-slate-400 hover:text-primary dark:hover:text-white transition-colors p-2 -ml-2 text-xl" /* OE #004: Increased text size */
           aria-label="Voltar para Dashboard"
         >
           <i className="fa-solid fa-arrow-left text-xl"></i>
@@ -2007,7 +2041,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
               </span>
             )}
           </h1>
-          <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">
+          <p className="text-base text-slate-500 dark:text-slate-400 font-medium"> {/* OE #004: Increased text size */}
             {work?.address} • {work?.area}m² • Início: {formatDateDisplay(work?.startDate || null)}
           </p>
         </div>
@@ -2017,15 +2051,15 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
       {showInitialOrientation && (
         <div 
           className={cx(
-            "bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 rounded-2xl p-4 mb-6 flex items-start gap-4 animate-in fade-in slide-in-from-top-4",
+            "bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-200 dark:border-blue-800 rounded-2xl p-5 mb-6 flex items-start gap-4 animate-in fade-in slide-in-from-top-4", /* OE #004: Increased padding */
             "shadow-lg shadow-blue-500/10" // Using existing shadow pattern
           )}
           role="alert"
         >
           <i className="fa-solid fa-info-circle text-2xl mt-0.5 shrink-0"></i>
           <div className="flex-1">
-            <p className="font-bold text-lg mb-1">Boas-vindas à sua obra!</p>
-            <p className="text-sm">
+            <p className="font-bold text-xl mb-2">Boas-vindas à sua obra!</p> {/* OE #004: Increased text size, margin */}
+            <p className="text-base"> {/* OE #004: Increased text size */}
               Essa é a sua obra. Aqui você acompanha tudo o que está acontecendo.
               Normalmente, você começa olhando o andamento geral e depois confere gastos, materiais e prazos.
             </p>
@@ -2034,7 +2068,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                 setShowInitialOrientation(false);
                 localStorage.setItem(`seen_work_orientation_${workId}`, 'true');
               }}
-              className="mt-3 px-4 py-2 bg-blue-500 text-white text-sm font-bold rounded-xl hover:bg-blue-600 transition-colors"
+              className="mt-4 px-5 py-2.5 bg-blue-500 text-white text-base font-bold rounded-xl hover:bg-blue-600 transition-colors" /* OE #004: Increased padding, text size, margin */
               aria-label="Entendi! Ocultar mensagem de orientação"
             >
               Entendi!
@@ -2048,19 +2082,19 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
       <div className="hidden md:flex justify-around bg-white dark:bg-slate-900 rounded-2xl p-2 shadow-sm dark:shadow-card-dark-subtle border border-slate-200 dark:border-slate-800 mb-6">
         <button
           onClick={() => goToTab('ETAPAS')}
-          className={`flex-1 py-2 rounded-xl text-sm font-bold transition-colors ${activeTab === 'ETAPAS' ? 'bg-secondary text-white shadow-md' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+          className={`flex-1 py-2 rounded-xl text-base font-bold transition-colors ${activeTab === 'ETAPAS' ? 'bg-secondary text-white shadow-md' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}`} /* OE #004: Increased text size */
         >
           Cronograma
         </button>
         <button
           onClick={() => goToTab('MATERIAIS')}
-          className={`flex-1 py-2 rounded-xl text-sm font-bold transition-colors ${activeTab === 'MATERIAIS' ? 'bg-secondary text-white shadow-md' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+          className={`flex-1 py-2 rounded-xl text-base font-bold transition-colors ${activeTab === 'MATERIAIS' ? 'bg-secondary text-white shadow-md' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
         >
           Materiais
         </button>
         <button
           onClick={() => goToTab('FINANCEIRO')}
-          className={`relative flex-1 py-2 rounded-xl text-sm font-bold transition-colors ${activeTab === 'FINANCEIRO' ? 'bg-secondary text-white shadow-md' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+          className={`relative flex-1 py-2 rounded-xl text-base font-bold transition-colors ${activeTab === 'FINANCEIRO' ? 'bg-secondary text-white shadow-md' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
         >
           Financeiro
           {showFinanceUpdateBadge && (
@@ -2071,7 +2105,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         </button>
         <button
           onClick={() => goToTab('FERRAMENTAS')}
-          className={`flex-1 py-2 rounded-xl text-sm font-bold transition-colors ${activeTab === 'FERRAMENTAS' ? 'bg-secondary text-white shadow-md' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+          className={`flex-1 py-2 rounded-xl text-base font-bold transition-colors ${activeTab === 'FERRAMENTAS' ? 'bg-secondary text-white shadow-md' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
         >
           Ferramentas
         </button>
@@ -2083,14 +2117,14 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
           <div className={cx(surface, card)}> {/* Use card class for consistent padding/radius */}
             {steps.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-10 text-center">
-                <i className="fa-solid fa-calendar-times text-6xl text-slate-400 mb-6"></i>
-                <h2 className="text-xl font-black text-primary dark:text-white mb-2">Ainda não existe um cronograma para esta obra.</h2>
-                <p className="text-slate-500 dark:text-slate-400 max-w-sm mx-auto mb-6">
+                <i className="fa-solid fa-calendar-times text-7xl text-slate-400 mb-6"></i> {/* OE #004: Increased icon size, margin */}
+                <h2 className="text-2xl font-black text-primary dark:text-white mb-3">Ainda não existe um cronograma para esta obra.</h2> {/* OE #004: Increased margin */}
+                <p className="text-slate-500 dark:text-slate-400 max-w-sm mx-auto mb-6 text-base"> {/* OE #004: Increased text size */}
                   Crie um cronograma seguro com base na estrutura da obra usando o Planejador AI.
                 </p>
                 <button
                   onClick={() => navigate(`/work/${workId}/ai-planner`)}
-                  className="px-6 py-3 bg-secondary text-white font-bold rounded-xl hover:bg-secondary-dark transition-colors flex items-center gap-2"
+                  className="px-6 py-3 bg-secondary text-white text-base font-bold rounded-xl hover:bg-secondary-dark transition-colors flex items-center gap-2" /* OE #004: Increased padding, text size */
                   aria-label="Criar Cronograma Seguro com AI"
                 >
                   <i className="fa-solid fa-robot"></i> Criar Cronograma Seguro (AI)
@@ -2104,14 +2138,14 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                     setNewStepEndDate(new Date().toISOString().split('T')[0]);
                     setNewEstimatedDurationDays('');
                   }}
-                  className="mt-4 px-6 py-3 bg-primary text-white font-bold rounded-xl hover:bg-primary-light transition-colors flex items-center gap-2"
+                  className="mt-4 px-6 py-3 bg-primary text-white text-base font-bold rounded-xl hover:bg-primary-light transition-colors flex items-center gap-2" /* OE #004: Increased padding, text size */
                   aria-label="Adicionar primeira etapa manualmente"
                 >
                   <i className="fa-solid fa-plus-circle"></i> Adicionar Etapa Manualmente
                 </button>
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-5"> {/* OE #004: Increased space-y */}
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="text-2xl font-black text-primary dark:text-white">Seu Cronograma</h2>
                   <button
@@ -2123,7 +2157,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                       setNewStepEndDate(new Date().toISOString().split('T')[0]);
                       setNewEstimatedDurationDays('');
                     }}
-                    className="px-4 py-2 bg-secondary text-white text-sm font-bold rounded-xl hover:bg-secondary-dark transition-colors flex items-center gap-2"
+                    className="px-4 py-2 bg-secondary text-white text-base font-bold rounded-xl hover:bg-secondary-dark transition-colors flex items-center gap-2" /* OE #004: Increased text size */
                     aria-label="Adicionar nova etapa"
                   >
                     <i className="fa-solid fa-plus"></i> Nova
@@ -2158,7 +2192,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                         </h3>
                         {/* Status Badge (Read-only from backend) */}
                         <span id={`step-status-${step.id}`} className={cx(
-                          "px-3 py-1 rounded-full text-xs font-bold uppercase",
+                          "px-3 py-1 rounded-full text-sm font-bold uppercase", /* OE #004: Increased text size */
                           statusDetails.bgColor,
                           statusDetails.textColor,
                           statusDetails.shadowClass
@@ -2166,16 +2200,16 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                           <i className={`fa-solid ${statusDetails.icon} mr-1`}></i> {statusDetails.statusText}
                         </span>
                       </div>
-                      <p className="text-sm text-slate-500 dark:text-slate-400">
+                      <p className="text-base text-slate-500 dark:text-slate-400"> {/* OE #004: Increased text size */}
                         Início: {formatDateDisplay(step.startDate)} &bull; Término Previsto: {formatDateDisplay(step.endDate)}
                       </p>
                       {step.realDate && (
-                        <p className="text-sm text-green-600 dark:text-green-400 mt-1">
+                        <p className="text-base text-green-600 dark:text-green-400 mt-1"> {/* OE #004: Increased text size */}
                           <i className="fa-solid fa-calendar-check mr-1"></i> Concluído em: {formatDateDisplay(step.realDate)}
                         </p>
                       )}
                       {step.status === StepStatus.DELAYED && (
-                        <p className="text-sm text-red-500 dark:text-red-400 mt-1">
+                        <p className="text-base text-red-500 dark:text-red-400 mt-1"> {/* OE #004: Increased text size */}
                           <i className="fa-solid fa-exclamation-triangle mr-1"></i> Esta etapa está atrasada!
                         </p>
                       )}
@@ -2197,7 +2231,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                           onClick={() => handleStepStatusChange(step)}
                           disabled={isUpdatingStepStatus}
                           className={cx(
-                            "px-3 py-1 text-xs font-bold rounded-lg transition-colors flex items-center gap-2",
+                            "px-4 py-2 text-sm font-bold rounded-lg transition-colors flex items-center gap-2", /* OE #004: Increased padding, text size */
                             step.status === StepStatus.COMPLETED 
                               ? "bg-amber-500 text-white hover:bg-amber-600" 
                               : "bg-green-500 text-white hover:bg-green-600",
@@ -2219,7 +2253,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                           }}
                           disabled={!!step.startDate} // NEW: Disable edit if step started
                           title={!!step.startDate ? "Etapa iniciada, não editável." : "Editar detalhes da etapa"} // NEW: Tooltip
-                          className="ml-2 px-3 py-1 bg-primary text-white text-xs font-bold rounded-lg hover:bg-primary-light transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="ml-2 px-4 py-2 bg-primary text-white text-sm font-bold rounded-lg hover:bg-primary-light transition-colors disabled:opacity-50 disabled:cursor-not-allowed" /* OE #004: Increased padding, text size */
                           aria-label={`Editar etapa ${step.name}`}
                         >
                           Editar
@@ -2252,7 +2286,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                         setPurchaseQtyInput(''); // Clear temporary purchase inputs
                         setPurchaseCostInput(''); // Clear temporary purchase inputs
                     }}
-                    className="px-4 py-2 bg-secondary text-white text-sm font-bold rounded-xl hover:bg-secondary-dark transition-colors flex items-center gap-2"
+                    className="px-4 py-2 bg-secondary text-white text-base font-bold rounded-xl hover:bg-secondary-dark transition-colors flex items-center gap-2" /* OE #004: Increased text size */
                     aria-label="Adicionar novo material"
                 >
                     <i className="fa-solid fa-plus"></i> Novo
@@ -2261,15 +2295,15 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
 
             {materials.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-10 text-center">
-                <i className="fa-solid fa-boxes-stacked text-6xl text-slate-400 mb-6"></i>
-                <h2 className="text-xl font-black text-primary dark:text-white mb-2">Ainda não existe uma lista de materiais para esta obra.</h2>
-                <p className="text-slate-500 dark:text-slate-400 max-w-sm mx-auto mb-6">
+                <i className="fa-solid fa-boxes-stacked text-7xl text-slate-400 mb-6"></i> {/* OE #004: Increased icon size, margin */}
+                <h2 className="text-2xl font-black text-primary dark:text-white mb-3">Ainda não existe uma lista de materiais para esta obra.</h2> {/* OE #004: Increased margin */}
+                <p className="text-slate-500 dark:text-slate-400 max-w-sm mx-auto mb-6 text-base"> {/* OE #004: Increased text size */}
                   Gere uma lista segura com base na estrutura da obra.
                 </p>
                 <button
                   onClick={handleGenerateMaterials}
                   disabled={loading}
-                  className="px-6 py-3 bg-secondary text-white font-bold rounded-xl hover:bg-secondary-dark transition-colors flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+                  className="px-6 py-3 bg-secondary text-white text-base font-bold rounded-xl hover:bg-secondary-dark transition-colors flex items-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed" /* OE #004: Increased padding, text size */
                   aria-label="Gerar Lista de Materiais (AI)"
                 >
                   {zeModal.isConfirming ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-robot"></i>}
@@ -2284,7 +2318,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                     id="material-step-filter"
                     value={materialFilterStepId}
                     onChange={(e) => setMaterialFilterStepId(e.target.value)}
-                    className="w-full md:w-auto px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-primary dark:text-white focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
+                    className="w-full md:w-auto px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-primary dark:text-white focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all text-base" /* OE #004: Increased text size */
                     aria-label="Filtrar materiais por etapa"
                   >
                     <option value="all">Todas as Etapas</option>
@@ -2295,10 +2329,10 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                 </div>
 
                 {groupedMaterials.length === 0 ? (
-                  <p className="text-center text-slate-400 py-10 italic">Nenhum material encontrado para o filtro selecionado. Tente outro filtro ou adicione novos materiais.</p>
+                  <p className="text-center text-slate-400 py-10 italic text-base">Nenhum material encontrado para o filtro selecionado. Tente outro filtro ou adicione novos materiais.</p> /* OE #004: Increased text size */
                 ) : (
                   groupedMaterials.map(group => (
-                    <div key={group.stepId} className="space-y-4">
+                    <div key={group.stepId} className="space-y-5"> {/* OE #004: Increased space-y */}
                       <h3 className="text-lg font-bold text-primary dark:text-white border-b border-slate-200 dark:border-slate-700 pb-2 mb-4">{group.stepName}</h3>
                       {group.materials.map(material => {
                         const statusDetails = getEntityStatusDetails('material', material, steps);
@@ -2314,12 +2348,12 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                                 <i className={`fa-solid ${statusDetails.icon} mr-1`}></i> {statusDetails.statusText}
                               </span>
                             </div>
-                            <p className="text-sm text-slate-500 dark:text-slate-400">
+                            <p className="text-base text-slate-500 dark:text-slate-400"> {/* OE #004: Increased text size */}
                               {material.purchasedQty} / {material.plannedQty} {material.unit} Comprados
                             </p>
                             {renderMaterialProgressBar(material)}
-                            <div className="flex justify-between items-center mt-3 pt-3 border-t border-slate-100 dark:border-slate-700">
-                              <p className="text-sm font-bold text-primary dark:text-white">Custo Total: {formatCurrency(material.totalCost || 0)}</p>
+                            <p className="text-base font-bold text-primary dark:text-white mt-3">Custo Total: {formatCurrency(material.totalCost || 0)}</p> {/* OE #004: Increased text size */}
+                            <div className="flex justify-end items-center mt-3 pt-3 border-t border-slate-100 dark:border-slate-700">
                               <button
                                 onClick={() => {
                                   setEditMaterialData(material);
@@ -2333,7 +2367,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                                   setPurchaseCostInput(''); // Reset purchase input for new transaction
                                   setShowAddMaterialModal(true);
                                 }}
-                                className="px-3 py-1 bg-primary text-white text-xs font-bold rounded-lg hover:bg-primary-light transition-colors"
+                                className="px-3 py-1 bg-primary text-white text-base font-bold rounded-lg hover:bg-primary-light transition-colors" /* OE #004: Increased text size */
                                 aria-label={`Editar material ${material.name} ou registrar compra`}
                               >
                                 Editar / Comprar
@@ -2355,17 +2389,17 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         <div className="tab-content animate-in fade-in duration-300">
           <div className={cx(surface, card)}> {/* Use card class for consistent padding/radius */}
             <h2 className="text-2xl font-black text-primary dark:text-white mb-6">Visão Geral Financeira</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8"> {/* OE #004: Increased gap */}
                 <div className={cx(surface, "p-5 rounded-2xl flex flex-col items-start")}>
-                    <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">Orçamento Planejado</p>
+                    <p className="text-base text-slate-500 dark:text-slate-400 mb-1">Orçamento Planejado</p> {/* OE #004: Increased text size */}
                     <h3 className="text-xl font-bold text-primary dark:text-white">{formatCurrency(work?.budgetPlanned || 0)}</h3>
                 </div>
                 <div className={cx(surface, "p-5 rounded-2xl flex flex-col items-start")}>
-                    <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">Gasto Total</p>
+                    <p className="text-base text-slate-500 dark:text-slate-400 mb-1">Gasto Total</p> {/* OE #004: Increased text size */}
                     <h3 className={`text-xl font-bold ${calculateTotalExpenses > (work?.budgetPlanned || 0) ? 'text-red-500' : 'text-green-600 dark:text-green-400'}`}>{formatCurrency(calculateTotalExpenses)}</h3>
                 </div>
                 <div className={cx(surface, "p-5 rounded-2xl flex flex-col items-start")}>
-                    <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">Balanço</p>
+                    <p className="text-base text-slate-500 dark:text-slate-400 mb-1">Balanço</p> {/* OE #004: Increased text size */}
                     <h3 className={`text-xl font-bold ${budgetUsage < 100 ? 'text-green-600 dark:text-green-400' : 'text-red-500'}`}>{formatCurrency((work?.budgetPlanned || 0) - calculateTotalExpenses)}</h3>
                 </div>
             </div>
@@ -2385,7 +2419,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                         setNewExpenseSupplierId('');
                         setNewExpenseTotalAgreed('');
                     }}
-                    className="px-4 py-2 bg-secondary text-white text-sm font-bold rounded-xl hover:bg-secondary-dark transition-colors flex items-center gap-2"
+                    className="px-4 py-2 bg-secondary text-white text-base font-bold rounded-xl hover:bg-secondary-dark transition-colors flex items-center gap-2" /* OE #004: Increased text size */
                     aria-label="Adicionar nova despesa"
                 >
                     <i className="fa-solid fa-plus"></i> Nova
@@ -2394,16 +2428,16 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
 
             {expenses.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-10 text-center">
-                    <i className="fa-solid fa-receipt text-6xl text-slate-400 mb-6"></i>
-                    <h2 className="text-xl font-black text-primary dark:text-white mb-2">Nenhuma despesa registrada ainda.</h2>
-                    <p className="text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
+                    <i className="fa-solid fa-receipt text-7xl text-slate-400 mb-6"></i> {/* OE #004: Increased icon size, margin */}
+                    <h2 className="text-2xl font-black text-primary dark:text-white mb-3">Nenhuma despesa registrada ainda.</h2> {/* OE #004: Increased margin */}
+                    <p className="text-slate-500 dark:text-slate-400 max-w-sm mx-auto text-base"> {/* OE #004: Increased text size */}
                         Comece a registrar seus gastos para ter controle total do financeiro da sua obra.
                     </p>
                 </div>
             ) : (
                 <div className="space-y-6">
                     {groupedExpensesByStep.map(group => (
-                        <div key={group.stepName} className="space-y-4">
+                        <div key={group.stepName} className="space-y-5"> {/* OE #004: Increased space-y */}
                             <h3 className="text-lg font-bold text-primary dark:text-white border-b border-slate-200 dark:border-slate-700 pb-2 mb-4">{group.stepName}</h3>
                             {group.expenses.map(expense => {
                                 const statusDetails = getEntityStatusDetails('expense', expense, steps);
@@ -2422,17 +2456,17 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                                                 <i className={`fa-solid ${statusDetails.icon} mr-1`}></i> {statusDetails.statusText}
                                             </span>
                                         </div>
-                                        <p className="text-sm text-slate-500 dark:text-slate-400">
+                                        <p className="text-base text-slate-500 dark:text-slate-400"> {/* OE #004: Increased text size */}
                                             Previsto: {formatCurrency(expense.amount)}
                                             {agreed !== expense.amount && ` (Combinado: ${formatCurrency(agreed)})`}
                                         </p>
-                                        <p className="text-sm text-slate-500 dark:text-slate-400">
+                                        <p className="text-base text-slate-500 dark:text-slate-400"> {/* OE #004: Increased text size */}
                                             Pago: {formatCurrency(expense.paidAmount || 0)}
                                             {remaining > 0 && <span className="ml-2 text-red-500">(Falta: {formatCurrency(remaining)})</span>}
                                         </p>
                                         {renderExpenseProgressBar(expense)}
                                         <div className="flex justify-between items-center mt-3 pt-3 border-t border-slate-100 dark:border-slate-700">
-                                            <p className="text-sm font-bold text-primary dark:text-white">Categoria: {expense.category}</p>
+                                            <p className="text-base font-bold text-primary dark:text-white">Categoria: {expense.category}</p> {/* OE #004: Increased text size */}
                                             <div className="flex gap-2">
                                                 {expense.status !== ExpenseStatus.COMPLETED && expense.status !== ExpenseStatus.OVERPAID && (
                                                     <button
@@ -2441,7 +2475,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                                                             setPaymentAmount(String(remaining)); // Pre-fill with remaining amount
                                                             setShowAddPaymentModal(true);
                                                         }}
-                                                        className="px-3 py-1 bg-secondary text-white text-xs font-bold rounded-lg hover:bg-secondary-dark transition-colors"
+                                                        className="px-3 py-1 bg-secondary text-white text-base font-bold rounded-lg hover:bg-secondary-dark transition-colors" /* OE #004: Increased text size */
                                                         aria-label={`Registrar pagamento para ${expense.description}`}
                                                     >
                                                         Pagar
@@ -2460,7 +2494,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                                                         setNewExpenseTotalAgreed(expense.totalAgreed !== undefined && expense.totalAgreed !== null ? String(expense.totalAgreed) : '');
                                                         setShowAddExpenseModal(true);
                                                     }}
-                                                    className="px-3 py-1 bg-primary text-white text-xs font-bold rounded-lg hover:bg-primary-light transition-colors"
+                                                    className="px-3 py-1 bg-primary text-white text-base font-bold rounded-lg hover:bg-primary-light transition-colors" /* OE #004: Increased text size */
                                                     aria-label={`Editar despesa ${expense.description}`}
                                                 >
                                                     Editar
@@ -2569,24 +2603,24 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
               />
               {workers.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-10 text-center">
-                  <i className="fa-solid fa-hard-hat text-6xl text-slate-400 mb-6"></i>
-                  <h3 className="text-xl font-black text-primary dark:text-white mb-2">Nenhum trabalhador cadastrado.</h3>
-                  <p className="text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
+                  <i className="fa-solid fa-hard-hat text-7xl text-slate-400 mb-6"></i> {/* OE #004: Increased icon size, margin */}
+                  <h3 className="text-2xl font-black text-primary dark:text-white mb-3">Nenhum trabalhador cadastrado.</h3> {/* OE #004: Increased margin */}
+                  <p className="text-slate-500 dark:text-slate-400 max-w-sm mx-auto text-base"> {/* OE #004: Increased text size */}
                     Adicione sua equipe para gerenciar diárias e pagamentos.
                   </p>
                 </div>
               ) : (
-                <div className="space-y-4">
+                <div className="space-y-5"> {/* OE #004: Increased space-y */}
                   {workers.map(worker => (
                     <div key={worker.id} className="bg-slate-50 dark:bg-slate-800 p-4 rounded-xl border border-slate-100 dark:border-slate-700 transition-all duration-300 hover:scale-[1.005] hover:shadow-lg">
                       <div className="flex items-center justify-between mb-2">
                         <h4 className="font-bold text-primary dark:text-white text-base">{worker.name}</h4>
                         <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-blue-500 text-white">{worker.role}</span>
                       </div>
-                      <p className="text-sm text-slate-500 dark:text-slate-400">
+                      <p className="text-base text-slate-500 dark:text-slate-400"> {/* OE #004: Increased text size */}
                         Tel: {worker.phone} {worker.dailyRate ? ` • Diária: ${formatCurrency(worker.dailyRate)}` : ''}
                       </p>
-                      {worker.notes && <p className="text-xs text-slate-400 mt-1">{worker.notes}</p>}
+                      {worker.notes && <p className="text-sm text-slate-400 mt-1">{worker.notes}</p>} {/* OE #004: Increased text size */}
                       <div className="flex justify-end items-center mt-3 pt-3 border-t border-slate-100 dark:border-slate-700">
                         <button
                           onClick={() => {
@@ -2598,10 +2632,25 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                             setNewWorkerNotes(worker.notes || '');
                             setShowAddWorkerModal(true);
                           }}
-                          className="px-3 py-1 bg-primary text-white text-xs font-bold rounded-lg hover:bg-primary-light transition-colors"
+                          className="px-3 py-1 bg-primary text-white text-base font-bold rounded-lg hover:bg-primary-light transition-colors" /* OE #004: Increased text size */
                           aria-label={`Editar trabalhador ${worker.name}`}
                         >
                           Editar
+                        </button>
+                        <button
+                          onClick={() => setZeModal({
+                            isOpen: true,
+                            title: `Excluir ${worker.name}?`,
+                            message: `Tem certeza que deseja excluir o trabalhador ${worker.name}?`,
+                            type: 'DANGER',
+                            confirmText: 'Sim, Excluir',
+                            onConfirm: async (_e?: React.FormEvent) => handleDeleteWorker(worker.id),
+                            onCancel: async (_e?: React.FormEvent) => setZeModal(p => ({ ...p, isOpen: false })),
+                          })}
+                          className="ml-2 px-3 py-1 bg-red-500 text-white text-base font-bold rounded-lg hover:bg-red-600 transition-colors"
+                          aria-label={`Excluir trabalhador ${worker.name}`}
+                        >
+                          Excluir
                         </button>
                       </div>
                     </div>
@@ -2630,25 +2679,25 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
               />
               {suppliers.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-10 text-center">
-                  <i className="fa-solid fa-truck-fast text-6xl text-slate-400 mb-6"></i>
-                  <h3 className="text-xl font-black text-primary dark:text-white mb-2">Nenhum fornecedor cadastrado.</h3>
-                  <p className="text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
-                    Organize seus contatos para cotações e compras.
+                  <i className="fa-solid fa-truck-fast text-7xl text-slate-400 mb-6"></i> {/* OE #004: Increased icon size, margin */}
+                  <h3 className="text-2xl font-black text-primary dark:text-white mb-3">Nenhum fornecedor cadastrado.</h3> {/* OE #004: Increased margin */}
+                  <p className="text-slate-500 dark:text-slate-400 max-w-sm mx-auto text-base"> {/* OE #004: Increased text size */}
+                    Adicione seus fornecedores de materiais e serviços.
                   </p>
                 </div>
               ) : (
-                <div className="space-y-4">
+                <div className="space-y-5"> {/* OE #004: Increased space-y */}
                   {suppliers.map(supplier => (
                     <div key={supplier.id} className="bg-slate-50 dark:bg-slate-800 p-4 rounded-xl border border-slate-100 dark:border-slate-700 transition-all duration-300 hover:scale-[1.005] hover:shadow-lg">
                       <div className="flex items-center justify-between mb-2">
                         <h4 className="font-bold text-primary dark:text-white text-base">{supplier.name}</h4>
-                        <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-indigo-500 text-white">{supplier.category}</span>
+                        <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-purple-500 text-white">{supplier.category}</span>
                       </div>
-                      <p className="text-sm text-slate-500 dark:text-slate-400">
+                      <p className="text-base text-slate-500 dark:text-slate-400"> {/* OE #004: Increased text size */}
                         Tel: {supplier.phone} {supplier.email && ` • Email: ${supplier.email}`}
                       </p>
-                      {supplier.address && <p className="text-xs text-slate-400 mt-1">{supplier.address}</p>}
-                      {supplier.notes && <p className="text-xs text-slate-400 mt-1">{supplier.notes}</p>}
+                      {supplier.address && <p className="text-sm text-slate-400 mt-1">Endereço: {supplier.address}</p>} {/* OE #004: Increased text size */}
+                      {supplier.notes && <p className="text-sm text-slate-400 mt-1">{supplier.notes}</p>} {/* OE #004: Increased text size */}
                       <div className="flex justify-end items-center mt-3 pt-3 border-t border-slate-100 dark:border-slate-700">
                         <button
                           onClick={() => {
@@ -2661,10 +2710,25 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                             setNewSupplierNotes(supplier.notes || '');
                             setShowAddSupplierModal(true);
                           }}
-                          className="px-3 py-1 bg-primary text-white text-xs font-bold rounded-lg hover:bg-primary-light transition-colors"
+                          className="px-3 py-1 bg-primary text-white text-base font-bold rounded-lg hover:bg-primary-light transition-colors" /* OE #004: Increased text size */
                           aria-label={`Editar fornecedor ${supplier.name}`}
                         >
                           Editar
+                        </button>
+                        <button
+                          onClick={() => setZeModal({
+                            isOpen: true,
+                            title: `Excluir ${supplier.name}?`,
+                            message: `Tem certeza que deseja excluir o fornecedor ${supplier.name}?`,
+                            type: 'DANGER',
+                            confirmText: 'Sim, Excluir',
+                            onConfirm: async (_e?: React.FormEvent) => handleDeleteSupplier(supplier.id, workId),
+                            onCancel: async (_e?: React.FormEvent) => setZeModal(p => ({ ...p, isOpen: false })),
+                          })}
+                          className="ml-2 px-3 py-1 bg-red-500 text-white text-base font-bold rounded-lg hover:bg-red-600 transition-colors"
+                          aria-label={`Excluir fornecedor ${supplier.name}`}
+                        >
+                          Excluir
                         </button>
                       </div>
                     </div>
@@ -2676,50 +2740,48 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
 
           {activeSubView === 'PHOTOS' && (
             <div className={cx(surface, card)}>
-              <ToolSubViewHeader
-                title="Suas Fotos da Obra"
-                onBack={() => goToSubView('NONE')}
+              <ToolSubViewHeader 
+                title="Fotos da Obra" 
+                onBack={() => goToSubView('NONE')} 
                 onAdd={() => setShowAddPhotoModal(true)}
-                loading={uploadingPhoto}
+                loading={uploadingPhoto} // Show spinner on add button if uploading
               />
               {photos.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-10 text-center">
-                  <i className="fa-solid fa-camera text-6xl text-slate-400 mb-6"></i>
-                  <h3 className="text-xl font-black text-primary dark:text-white mb-2">Nenhuma foto ainda.</h3>
-                  <p className="text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
-                    Registre o progresso e os momentos importantes da sua obra.
+                  <i className="fa-solid fa-camera-retro text-7xl text-slate-400 mb-6"></i> {/* OE #004: Increased icon size, margin */}
+                  <h3 className="text-2xl font-black text-primary dark:text-white mb-3">Nenhuma foto adicionada.</h3> {/* OE #004: Increased margin */}
+                  <p className="text-slate-500 dark:text-slate-400 max-w-sm mx-auto text-base"> {/* OE #004: Increased text size */}
+                    Registre cada etapa da sua obra.
                   </p>
                 </div>
               ) : (
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-5"> {/* OE #004: Increased gap */}
                   {photos.map(photo => (
-                    <div key={photo.id} className="bg-slate-50 dark:bg-slate-800 rounded-xl overflow-hidden border border-slate-100 dark:border-slate-700 shadow-sm transition-all duration-300 hover:scale-[1.005] hover:shadow-lg">
-                      <img src={photo.url} alt={photo.description} className="w-full h-32 object-cover" loading="lazy" />
+                    <div key={photo.id} className="bg-slate-50 dark:bg-slate-800 rounded-xl overflow-hidden border border-slate-100 dark:border-slate-700 shadow-md">
+                      <img src={photo.url} alt={photo.description} className="w-full h-48 object-cover" />
                       <div className="p-3">
-                        <p className="font-bold text-primary dark:text-white text-sm truncate">{photo.description}</p>
-                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{formatDateDisplay(photo.date)} - {photo.type}</p>
-                        <div className="flex justify-end mt-2">
+                        <p className="font-bold text-primary dark:text-white text-base mb-1">{photo.description}</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-2">
+                          <i className="fa-regular fa-calendar"></i> {formatDateDisplay(photo.date)}
+                          <span className="px-2 py-0.5 rounded-full text-xs font-bold uppercase bg-blue-500/10 text-blue-600">
+                            {photo.type}
+                          </span>
+                        </p>
+                        <div className="flex justify-end mt-3 pt-3 border-t border-slate-100 dark:border-slate-700">
                           <button
-                            onClick={() => {
-                              // Confirm delete
-                              setZeModal({
-                                isOpen: true,
-                                title: "Excluir Foto",
-                                message: `Tem certeza que deseja excluir esta foto "${photo.description}"?`,
-                                confirmText: "Excluir",
-                                onConfirm: async (e?: React.FormEvent) => { // Fix: Added optional event
-                                  e?.preventDefault(); 
-                                  await handleDeletePhoto(photo);
-                                },
-                                onCancel: async (_e?: React.FormEvent) => {setZeModal(prev => ({ ...prev, isOpen: false }));}, // Fix: Ensure onCancel matches signature
-                                isConfirming: zeModal.isConfirming,
-                                type: "DANGER"
-                              });
-                            }}
-                            className="text-red-500 hover:text-red-600 text-sm p-1"
+                            onClick={() => setZeModal({
+                              isOpen: true,
+                              title: `Excluir Foto?`,
+                              message: `Tem certeza que deseja excluir esta foto (${photo.description})?`,
+                              type: 'DANGER',
+                              confirmText: 'Sim, Excluir',
+                              onConfirm: async (_e?: React.FormEvent) => handleDeletePhoto(photo),
+                              onCancel: async (_e?: React.FormEvent) => setZeModal(p => ({ ...p, isOpen: false })),
+                            })}
+                            className="px-3 py-1 bg-red-500 text-white text-sm font-bold rounded-lg hover:bg-red-600 transition-colors" /* OE #004: Increased text size */
                             aria-label={`Excluir foto ${photo.description}`}
                           >
-                            <i className="fa-solid fa-trash-alt"></i>
+                            Excluir
                           </button>
                         </div>
                       </div>
@@ -2732,57 +2794,49 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
 
           {activeSubView === 'FILES' && (
             <div className={cx(surface, card)}>
-              <ToolSubViewHeader
-                title="Seus Arquivos da Obra"
-                onBack={() => goToSubView('NONE')}
+              <ToolSubViewHeader 
+                title="Arquivos da Obra" 
+                onBack={() => goToSubView('NONE')} 
                 onAdd={() => setShowAddFileModal(true)}
-                loading={uploadingFile}
+                loading={uploadingFile} // Show spinner on add button if uploading
               />
               {files.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-10 text-center">
-                  <i className="fa-solid fa-file-alt text-6xl text-slate-400 mb-6"></i>
-                  <h3 className="text-xl font-black text-primary dark:text-white mb-2">Nenhum arquivo ainda.</h3>
-                  <p className="text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
-                    Organize plantas, documentos e orçamentos importantes.
+                  <i className="fa-solid fa-folder-open text-7xl text-slate-400 mb-6"></i> {/* OE #004: Increased icon size, margin */}
+                  <h3 className="text-2xl font-black text-primary dark:text-white mb-3">Nenhum arquivo adicionado.</h3> {/* OE #004: Increased margin */}
+                  <p className="text-slate-500 dark:text-slate-400 max-w-sm mx-auto text-base"> {/* OE #004: Increased text size */}
+                    Organize todos os documentos da sua obra em um só lugar.
                   </p>
                 </div>
               ) : (
-                <div className="space-y-4">
+                <div className="space-y-4"> {/* OE #004: Increased space-y */}
                   {files.map(file => (
-                    <div key={file.id} className="bg-slate-50 dark:bg-slate-800 p-4 rounded-xl border border-slate-100 dark:border-slate-700 shadow-sm flex items-center justify-between transition-all duration-300 hover:scale-[1.005] hover:shadow-lg">
-                      <div className="flex items-center gap-4">
-                        <i className="fa-solid fa-file text-2xl text-secondary"></i>
-                        <div>
-                          <p className="font-bold text-primary dark:text-white text-base">{file.name}</p>
-                          <p className="text-xs text-slate-500 dark:text-slate-400">{file.category} - {formatDateDisplay(file.date)}</p>
-                        </div>
+                    <div key={file.id} className="bg-slate-50 dark:bg-slate-800 p-4 rounded-xl border border-slate-100 dark:border-slate-700 flex items-start gap-4 shadow-md">
+                      <div className="w-10 h-10 flex items-center justify-center text-secondary text-2xl shrink-0">
+                        <i className="fa-solid fa-file-alt"></i>
                       </div>
-                      <div className="flex gap-2">
-                        <a href={file.url} target="_blank" rel="noopener noreferrer" className="text-primary dark:text-white hover:text-secondary p-1" aria-label={`Visualizar arquivo ${file.name}`}>
-                          <i className="fa-solid fa-eye"></i>
-                        </a>
-                        <button
-                          onClick={() => {
-                            setZeModal({
-                              isOpen: true,
-                              title: "Excluir Arquivo",
-                              message: `Tem certeza que deseja excluir o arquivo "${file.name}"?`,
-                              confirmText: "Excluir",
-                              onConfirm: async (e?: React.FormEvent) => { // Fix: Added optional event
-                                e?.preventDefault();
-                                await handleDeleteFile(file);
-                              },
-                              onCancel: async (_e?: React.FormEvent) => {setZeModal(prev => ({ ...prev, isOpen: false }));}, // Fix: Ensure onCancel matches signature
-                              isConfirming: zeModal.isConfirming,
-                              type: "DANGER"
-                            });
-                          }}
-                          className="text-red-500 hover:text-red-600 p-1"
-                          aria-label={`Excluir arquivo ${file.name}`}
-                        >
-                          <i className="fa-solid fa-trash-alt"></i>
-                        </button>
+                      <div className="flex-1">
+                        <a href={file.url} target="_blank" rel="noopener noreferrer" className="font-bold text-primary dark:text-white text-base hover:text-secondary transition-colors block leading-tight">{file.name}</a>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-2">
+                          <span><i className="fa-regular fa-calendar mr-1"></i> {formatDateDisplay(file.date)}</span>
+                          <span><i className="fa-solid fa-tag mr-1"></i> {file.category}</span>
+                        </p>
                       </div>
+                      <button
+                        onClick={() => setZeModal({
+                          isOpen: true,
+                          title: `Excluir Arquivo?`,
+                          message: `Tem certeza que deseja excluir o arquivo ${file.name}?`,
+                          type: 'DANGER',
+                          confirmText: 'Sim, Excluir',
+                          onConfirm: async (_e?: React.FormEvent) => handleDeleteFile(file),
+                          onCancel: async (_e?: React.FormEvent) => setZeModal(p => ({ ...p, isOpen: false })),
+                        })}
+                        className="px-3 py-1 bg-red-500 text-white text-sm font-bold rounded-lg hover:bg-red-600 transition-colors shrink-0" /* OE #004: Increased text size */
+                        aria-label={`Excluir arquivo ${file.name}`}
+                      >
+                        Excluir
+                      </button>
                     </div>
                   ))}
                 </div>
@@ -2792,72 +2846,93 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
 
           {activeSubView === 'CONTRACTS' && (
             <div className={cx(surface, card)}>
-              <ToolSubViewHeader
-                title="Contratos & Recibos"
+              <ToolSubViewHeader 
+                title="Contratos & Recibos" 
                 onBack={() => goToSubView('NONE')}
               />
-              {contracts.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-10 text-center">
-                  <i className="fa-solid fa-file-contract text-6xl text-slate-400 mb-6"></i>
-                  <h3 className="text-xl font-black text-primary dark:text-white mb-2">Nenhum modelo de contrato disponível.</h3>
-                  <p className="text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
-                    Entre em contato com o suporte para adicionar modelos.
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {contracts.map(contract => (
-                    <div key={contract.id} className="bg-slate-500/5 dark:bg-slate-800 p-4 rounded-xl border border-slate-100 dark:border-slate-700 shadow-sm flex items-center justify-between transition-all duration-300 hover:scale-[1.005] hover:shadow-lg">
-                      <div>
-                        <p className="font-bold text-primary dark:text-white text-base">{contract.title}</p>
-                        <p className="text-xs text-slate-500 dark:text-slate-400">{contract.category}</p>
-                      </div>
-                      <button
-                        onClick={() => {
-                          setSelectedContractContent(contract.contentTemplate);
-                          setSelectedContractTitle(contract.title);
-                          setShowContractContentModal(true);
-                        }}
-                        className="px-3 py-1 bg-secondary text-white text-xs font-bold rounded-lg hover:bg-secondary-dark transition-colors"
-                        aria-label={`Visualizar contrato ${contract.title}`}
-                      >
-                        Visualizar
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <p className="text-slate-500 dark:text-slate-400 max-w-sm mx-auto mb-6 text-base"> {/* OE #004: Increased text size */}
+                Escolha um modelo e gere documentos personalizados para sua obra.
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {CONTRACT_TEMPLATES.map(contract => (
+                  <button
+                    key={contract.id}
+                    onClick={() => {
+                      setSelectedContractTitle(contract.title);
+                      setSelectedContractContent(contract.contentTemplate);
+                      setShowContractContentModal(true);
+                      setCopyContractSuccess(false); // Reset copy status
+                    }}
+                    className="p-4 rounded-2xl border-2 border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-left shadow-sm hover:border-secondary/50 transition-colors"
+                  >
+                    <i className="fa-solid fa-file-contract text-2xl text-secondary mr-3"></i>
+                    <h3 className="font-bold text-primary dark:text-white text-base">{contract.title}</h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Categoria: {contract.category}</p>
+                  </button>
+                ))}
+              </div>
             </div>
           )}
 
           {activeSubView === 'CHECKLIST' && (
             <div className={cx(surface, card)}>
-              <ToolSubViewHeader
-                title="Seus Checklists"
-                onBack={() => goToSubView('NONE')}
-                onAdd={() => { setShowAddChecklistModal(true); setEditChecklistData(null); setNewChecklistName(''); setNewChecklistCategory(''); setNewChecklistItems(['']); }}
+              <ToolSubViewHeader 
+                title="Checklists Inteligentes" 
+                onBack={() => goToSubView('NONE')} 
+                onAdd={() => {
+                  setShowAddChecklistModal(true);
+                  setEditChecklistData(null); // Clear edit data
+                  setNewChecklistName('');
+                  setNewChecklistCategory('');
+                  setNewChecklistItems(['']); // Start with one empty item
+                }}
                 loading={isAddingChecklist}
               />
               {checklists.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-10 text-center">
-                  <i className="fa-solid fa-list-check text-6xl text-slate-400 mb-6"></i>
-                  <h3 className="text-xl font-black text-primary dark:text-white mb-2">Nenhum checklist criado.</h3>
-                  <p className="text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
-                    Crie listas de verificação para não esquecer de nada importante.
+                  <i className="fa-solid fa-list-check text-7xl text-slate-400 mb-6"></i> {/* OE #004: Increased icon size, margin */}
+                  <h3 className="text-2xl font-black text-primary dark:text-white mb-3">Nenhum checklist cadastrado.</h3> {/* OE #004: Increased margin */}
+                  <p className="text-slate-500 dark:text-slate-400 max-w-sm mx-auto text-base"> {/* OE #004: Increased text size */}
+                    Crie listas de verificação para garantir a qualidade em cada etapa.
                   </p>
+                  <button
+                    onClick={() => {
+                      setShowAddChecklistModal(true);
+                      setEditChecklistData(null);
+                      setNewChecklistName('');
+                      setNewChecklistCategory('');
+                      setNewChecklistItems(['']);
+                    }}
+                    className="mt-4 px-6 py-3 bg-secondary text-white text-base font-bold rounded-xl hover:bg-secondary-dark transition-colors flex items-center gap-2" /* OE #004: Increased padding, text size */
+                    aria-label="Adicionar primeiro checklist"
+                  >
+                    <i className="fa-solid fa-plus-circle"></i> Criar Checklist
+                  </button>
                 </div>
               ) : (
-                <div className="space-y-4">
+                <div className="space-y-6">
                   {checklists.map(checklist => (
-                    <div key={checklist.id} className="bg-slate-50 dark:bg-slate-800 p-4 rounded-xl border border-slate-100 dark:border-slate-700 shadow-sm transition-all duration-300 hover:scale-[1.005] hover:shadow-lg">
-                      <div className="flex items-center justify-between mb-2">
-                        <h4 className="font-bold text-primary dark:text-white text-base">{checklist.name}</h4>
-                        <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-lime-500 text-white">{checklist.category}</span>
+                    <div key={checklist.id} className="bg-slate-50 dark:bg-slate-800 p-4 rounded-xl border border-slate-100 dark:border-slate-700 shadow-md">
+                      <div className="flex items-center justify-between mb-3">
+                        <h3 className="font-bold text-primary dark:text-white text-lg">{checklist.name}</h3>
+                        <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-green-500/10 text-green-600 dark:text-green-400">{checklist.category}</span>
                       </div>
-                      <p className="text-sm text-slate-500 dark:text-slate-400">
-                        {checklist.items.filter(item => item.checked).length} / {checklist.items.length} itens concluídos
-                      </p>
-                      <div className="flex justify-end items-center mt-3 pt-3 border-t border-slate-100 dark:border-slate-700">
+                      <ul className="space-y-2">
+                        {checklist.items.map((item, itemIndex) => (
+                          <li key={item.id || itemIndex} className="flex items-start text-sm text-slate-700 dark:text-slate-300">
+                            <input
+                              type="checkbox"
+                              checked={item.checked}
+                              // Read-only on this view, actual update happens in a modal or dedicated page
+                              onChange={() => {}} 
+                              disabled 
+                              className="h-4 w-4 rounded border-slate-300 dark:border-slate-600 text-secondary focus:ring-secondary/50 mt-1 mr-3"
+                            />
+                            {item.text}
+                          </li>
+                        ))}
+                      </ul>
+                      <div className="flex justify-end items-center mt-4 pt-4 border-t border-slate-100 dark:border-slate-700">
                         <button
                           onClick={() => {
                             setEditChecklistData(checklist);
@@ -2866,10 +2941,25 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                             setNewChecklistItems(checklist.items.map(item => item.text));
                             setShowAddChecklistModal(true);
                           }}
-                          className="px-3 py-1 bg-primary text-white text-xs font-bold rounded-lg hover:bg-primary-light transition-colors"
+                          className="px-3 py-1 bg-primary text-white text-base font-bold rounded-lg hover:bg-primary-light transition-colors"
                           aria-label={`Editar checklist ${checklist.name}`}
                         >
                           Editar
+                        </button>
+                        <button
+                          onClick={() => setZeModal({
+                            isOpen: true,
+                            title: `Excluir Checklist?`,
+                            message: `Tem certeza que deseja excluir o checklist ${checklist.name}?`,
+                            type: 'DANGER',
+                            confirmText: 'Sim, Excluir',
+                            onConfirm: async (_e?: React.FormEvent) => handleDeleteChecklist(checklist.id),
+                            onCancel: async (_e?: React.FormEvent) => setZeModal(p => ({ ...p, isOpen: false })),
+                          })}
+                          className="ml-2 px-3 py-1 bg-red-500 text-white text-base font-bold rounded-lg hover:bg-red-600 transition-colors"
+                          aria-label={`Excluir checklist ${checklist.name}`}
+                        >
+                          Excluir
                         </button>
                       </div>
                     </div>
@@ -2881,183 +2971,177 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         </div>
       )}
 
-      {/* ADD/EDIT STEP MODAL */}
+      {/* --- MODALS --- */}
+
+      {/* Add/Edit Step Modal */}
       {showAddStepModal && (
         <ZeModal
           isOpen={showAddStepModal}
           title={editStepData ? "Editar Etapa" : "Adicionar Nova Etapa"}
-          message="" // Message handled by form fields
+          message="" // Empty message because content is in children
           confirmText={editStepData ? "Salvar Alterações" : "Adicionar Etapa"}
           onConfirm={editStepData ? handleEditStep : handleAddStep}
-          onCancel={(_e?: React.FormEvent) => { // Fix: Added optional event
-            setShowAddStepModal(false);
-            setEditStepData(null); // Clear edit data on cancel
-            setNewStepName('');
-            setNewStepStartDate(new Date().toISOString().split('T')[0]);
-            setNewStepEndDate(new Date().toISOString().split('T')[0]);
-            setNewEstimatedDurationDays(''); // Clear for new
-          }}
+          onCancel={() => { setShowAddStepModal(false); setEditStepData(null); setNewEstimatedDurationDays(''); }}
+          type="INFO"
           isConfirming={zeModal.isConfirming}
-          type={editStepData ? "INFO" : "SUCCESS"}
         >
           <form onSubmit={editStepData ? handleEditStep : handleAddStep} className="space-y-4">
             <div>
-              <label htmlFor="step-name" className="block text-sm font-bold text-primary dark:text-white mb-1">Nome da Etapa</label>
+              <label htmlFor="stepName" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Nome da Etapa</label>
               <input
-                id="step-name"
                 type="text"
+                id="stepName"
                 value={newStepName}
                 onChange={(e) => setNewStepName(e.target.value)}
+                placeholder="Ex: Fundações, Instalações Elétricas"
                 className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
-                placeholder="Ex: Fundações, Pintura Final"
                 required
-                disabled={!!editStepData?.startDate} // Disable name edit if step started
-                title={!!editStepData?.startDate ? "Não é possível alterar o nome de uma etapa iniciada." : undefined} // Tooltip
+                aria-label="Nome da etapa"
+                // Disable name field if step has started
+                disabled={!!editStepData?.startDate}
+                title={!!editStepData?.startDate ? "Nome não editável para etapas iniciadas" : undefined}
               />
-              {editStepData?.startDate && <p className="text-xs text-red-500 mt-1">Não é possível alterar o nome de uma etapa iniciada.</p>}
             </div>
             <div>
-              <label htmlFor="step-start-date" className="block text-sm font-bold text-primary dark:text-white mb-1">Data de Início</label>
+              <label htmlFor="estimatedDurationDays" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Duração Estimada (dias)</label>
               <input
-                id="step-start-date"
+                type="number"
+                id="estimatedDurationDays"
+                value={newEstimatedDurationDays}
+                onChange={(e) => setNewEstimatedDurationDays(e.target.value)}
+                placeholder="Ex: 7, 30"
+                min="1"
+                className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
+                aria-label="Duração estimada em dias"
+              />
+            </div>
+            <div>
+              <label htmlFor="stepStartDate" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Data de Início (Opcional)</label>
+              <input
                 type="date"
+                id="stepStartDate"
                 value={newStepStartDate || ''}
                 onChange={(e) => setNewStepStartDate(e.target.value)}
                 className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
-                disabled={!!editStepData?.startDate} // Disable start date edit if step started
-                title={!!editStepData?.startDate ? "Não é possível alterar a data de início de uma etapa iniciada." : undefined} // Tooltip
+                aria-label="Data de início da etapa"
+                // Disable start date field if it's already set
+                disabled={!!editStepData?.startDate}
+                title={!!editStepData?.startDate ? "Data de início não editável para etapas já iniciadas" : undefined}
               />
-              {editStepData?.startDate && <p className="text-xs text-red-500 mt-1">Não é possível alterar a data de início de uma etapa iniciada.</p>}
             </div>
             <div>
-              <label htmlFor="step-end-date" className="block text-sm font-bold text-primary dark:text-white mb-1">Data de Término Prevista</label>
+              <label htmlFor="stepEndDate" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Data de Término (Opcional)</label>
               <input
-                id="step-end-date"
                 type="date"
+                id="stepEndDate"
                 value={newStepEndDate || ''}
                 onChange={(e) => setNewStepEndDate(e.target.value)}
                 className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
-                required={!!newStepStartDate} // Required if start date is set
+                aria-label="Data de término da etapa"
               />
             </div>
-            {/* NEW: Estimated Duration Days */}
-            <div>
-              <label htmlFor="estimated-duration-days" className="block text-sm font-bold text-primary dark:text-white mb-1">Duração Estimada (dias)</label>
-              <input
-                id="estimated-duration-days"
-                type="number"
-                value={newEstimatedDurationDays}
-                onChange={(e) => setNewEstimatedDurationDays(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
-                placeholder="Ex: 15"
-                min="1"
-              />
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">A duração ajuda a recalcular as datas se o plano for alterado.</p>
-            </div>
+            {/* The modal's internal buttons will handle form submission */}
+            <button type="submit" hidden></button> 
           </form>
         </ZeModal>
       )}
 
+      {/* Add/Edit Material Modal */}
       {showAddMaterialModal && (
         <ZeModal
           isOpen={showAddMaterialModal}
-          title={editMaterialData ? "Editar Material / Registrar Compra" : "Adicionar Novo Material"}
+          title={editMaterialData ? "Editar Material ou Registrar Compra" : "Adicionar Novo Material"}
           message=""
-          confirmText={editMaterialData ? "Salvar e/ou Registrar Compra" : "Adicionar Material"}
+          confirmText={editMaterialData ? "Salvar / Registrar" : "Adicionar Material"}
           onConfirm={editMaterialData ? handleEditMaterial : handleAddMaterial}
-          onCancel={(_e?: React.FormEvent) => { // Fix: Added optional event
-            setShowAddMaterialModal(false);
-            setEditMaterialData(null);
-            setNewMaterialName('');
-            setNewMaterialBrand('');
-            setNewMaterialPlannedQty('');
-            setNewMaterialUnit('');
-            setNewMaterialCategory('');
-            setNewMaterialStepId('');
-            setPurchaseQtyInput(''); // Clear temporary purchase inputs
-            setPurchaseCostInput(''); // Clear temporary purchase inputs
-          }}
+          onCancel={() => { setShowAddMaterialModal(false); setEditMaterialData(null); setPurchaseQtyInput(''); setPurchaseCostInput(''); }}
+          type="INFO"
           isConfirming={zeModal.isConfirming}
-          type={editMaterialData ? "INFO" : "SUCCESS"}
         >
           <form onSubmit={editMaterialData ? handleEditMaterial : handleAddMaterial} className="space-y-4">
-            {/* Editable fields */}
             <div>
-              <label htmlFor="material-name" className="block text-sm font-bold text-primary dark:text-white mb-1">Nome do Material</label>
+              <label htmlFor="materialName" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Nome do Material</label>
               <input
-                id="material-name"
                 type="text"
+                id="materialName"
                 value={newMaterialName}
                 onChange={(e) => setNewMaterialName(e.target.value)}
+                placeholder="Ex: Cimento, Tijolo, Piso"
                 className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
-                placeholder="Ex: Cimento CP-II"
                 required
-                disabled={!!editMaterialData?.purchasedQty && editMaterialData.purchasedQty > 0} // NEW: Disable if purchased
-                title={!!editMaterialData?.purchasedQty && editMaterialData.purchasedQty > 0 ? "Não editável após compra registrada." : undefined} // NEW: Tooltip
+                aria-label="Nome do material"
+                disabled={!!editMaterialData?.purchasedQty && editMaterialData.purchasedQty > 0}
+                title={!!editMaterialData?.purchasedQty && editMaterialData.purchasedQty > 0 ? "Campo não editável após a primeira compra." : undefined}
               />
             </div>
             <div>
-              <label htmlFor="material-brand" className="block text-sm font-bold text-primary dark:text-white mb-1">Marca (Opcional)</label>
+              <label htmlFor="materialBrand" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Marca (Opcional)</label>
               <input
-                id="material-brand"
                 type="text"
+                id="materialBrand"
                 value={newMaterialBrand}
                 onChange={(e) => setNewMaterialBrand(e.target.value)}
+                placeholder="Ex: Votorantim, Portobello"
                 className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
-                placeholder="Ex: Votorantim, Quartzolit"
-                disabled={!!editMaterialData?.purchasedQty && editMaterialData.purchasedQty > 0} // NEW: Disable if purchased
-                title={!!editMaterialData?.purchasedQty && editMaterialData.purchasedQty > 0 ? "Não editável após compra registrada." : undefined} // NEW: Tooltip
+                aria-label="Marca do material"
+                disabled={!!editMaterialData?.purchasedQty && editMaterialData.purchasedQty > 0}
+                title={!!editMaterialData?.purchasedQty && editMaterialData.purchasedQty > 0 ? "Campo não editável após a primeira compra." : undefined}
               />
             </div>
             <div>
-              <label htmlFor="material-planned-qty" className="block text-sm font-bold text-primary dark:text-white mb-1">Qtd. Planejada</label>
+              <label htmlFor="materialPlannedQty" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Quantidade Planejada</label>
               <input
-                id="material-planned-qty"
                 type="number"
+                id="materialPlannedQty"
                 value={newMaterialPlannedQty}
                 onChange={(e) => setNewMaterialPlannedQty(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
-                placeholder="Ex: 50"
+                placeholder="Ex: 50, 1000"
                 min="0"
+                step="0.01"
+                className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
                 required
-                disabled={!!editMaterialData?.purchasedQty && editMaterialData.purchasedQty > 0} // NEW: Disable if purchased
-                title={!!editMaterialData?.purchasedQty && editMaterialData.purchasedQty > 0 ? "Não editável após compra registrada." : undefined} // NEW: Tooltip
+                aria-label="Quantidade planejada do material"
+                disabled={!!editMaterialData?.purchasedQty && editMaterialData.purchasedQty > 0}
+                title={!!editMaterialData?.purchasedQty && editMaterialData.purchasedQty > 0 ? "Campo não editável após a primeira compra." : undefined}
               />
             </div>
             <div>
-              <label htmlFor="material-unit" className="block text-sm font-bold text-primary dark:text-white mb-1">Unidade de Medida</label>
+              <label htmlFor="materialUnit" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Unidade</label>
               <input
-                id="material-unit"
                 type="text"
+                id="materialUnit"
                 value={newMaterialUnit}
                 onChange={(e) => setNewMaterialUnit(e.target.value)}
+                placeholder="Ex: saco, m², barra"
                 className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
-                placeholder="Ex: Sacos, M², Litros"
                 required
-                disabled={!!editMaterialData?.purchasedQty && editMaterialData.purchasedQty > 0} // NEW: Disable if purchased
-                title={!!editMaterialData?.purchasedQty && editMaterialData.purchasedQty > 0 ? "Não editável após compra registrada." : undefined} // NEW: Tooltip
+                aria-label="Unidade de medida do material"
+                disabled={!!editMaterialData?.purchasedQty && editMaterialData.purchasedQty > 0}
+                title={!!editMaterialData?.purchasedQty && editMaterialData.purchasedQty > 0 ? "Campo não editável após a primeira compra." : undefined}
               />
             </div>
             <div>
-              <label htmlFor="material-category" className="block text-sm font-bold text-primary dark:text-white mb-1">Categoria (Opcional)</label>
+              <label htmlFor="materialCategory" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Categoria (Opcional)</label>
               <input
-                id="material-category"
                 type="text"
+                id="materialCategory"
                 value={newMaterialCategory}
                 onChange={(e) => setNewMaterialCategory(e.target.value)}
+                placeholder="Ex: Hidráulica, Elétrica"
                 className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
-                placeholder="Ex: Elétrica, Hidráulica, Acabamento"
-                disabled={!!editMaterialData?.purchasedQty && editMaterialData.purchasedQty > 0} // NEW: Disable if purchased
-                title={!!editMaterialData?.purchasedQty && editMaterialData.purchasedQty > 0 ? "Não editável após compra registrada." : undefined} // NEW: Tooltip
+                aria-label="Categoria do material"
+                disabled={!!editMaterialData?.purchasedQty && editMaterialData.purchasedQty > 0}
+                title={!!editMaterialData?.purchasedQty && editMaterialData.purchasedQty > 0 ? "Campo não editável após a primeira compra." : undefined}
               />
             </div>
             <div>
-              <label htmlFor="material-step" className="block text-sm font-bold text-primary dark:text-white mb-1">Vincular à Etapa (Opcional)</label>
+              <label htmlFor="materialStepId" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Etapa Relacionada (Opcional)</label>
               <select
-                id="material-step"
+                id="materialStepId"
                 value={newMaterialStepId}
                 onChange={(e) => setNewMaterialStepId(e.target.value)}
                 className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
+                aria-label="Etapa relacionada ao material"
               >
                 <option value="none">Nenhuma</option>
                 {steps.map(step => (
@@ -3065,44 +3149,46 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                 ))}
               </select>
             </div>
-
-            {/* Purchase Registration fields (only for editing existing material) */}
             {editMaterialData && (
-              <div className="pt-4 mt-4 border-t border-slate-200 dark:border-slate-700">
-                <h3 className="text-sm font-bold text-primary dark:text-white mb-3">Registrar Compra</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label htmlFor="purchase-qty" className="block text-xs font-bold text-slate-500 uppercase mb-1">Qtd. Comprada</label>
-                    <input
-                      id="purchase-qty"
-                      type="number"
-                      value={purchaseQtyInput}
-                      onChange={(e) => setPurchaseQtyInput(e.target.value)}
-                      className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
-                      placeholder="Qtd. da compra"
-                      min="0"
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="purchase-cost" className="block text-xs font-bold text-slate-500 uppercase mb-1">Custo Total (R$)</label>
-                    <input
-                      id="purchase-cost"
-                      type="number"
-                      value={purchaseCostInput}
-                      onChange={(e) => setPurchaseCostInput(e.target.value)}
-                      className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
-                      placeholder="Custo total da compra"
-                      min="0"
-                    />
-                  </div>
+              <div className="pt-4 border-t border-slate-200 dark:border-slate-700 space-y-4">
+                <h3 className="text-sm font-bold text-slate-700 dark:text-slate-300 uppercase tracking-widest">Registrar Nova Compra</h3>
+                <div>
+                  <label htmlFor="purchaseQty" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Quantidade Comprada</label>
+                  <input
+                    type="number"
+                    id="purchaseQty"
+                    value={purchaseQtyInput}
+                    onChange={(e) => setPurchaseQtyInput(e.target.value)}
+                    placeholder="Quantidade comprada"
+                    min="0"
+                    step="0.01"
+                    className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
+                    aria-label="Quantidade de material comprada"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="purchaseCost" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Custo Total da Compra (R$)</label>
+                  <input
+                    type="number"
+                    id="purchaseCost"
+                    value={purchaseCostInput}
+                    onChange={(e) => setPurchaseCostInput(e.target.value)}
+                    placeholder="Custo da compra"
+                    min="0"
+                    step="0.01"
+                    className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
+                    aria-label="Custo total da compra"
+                  />
                 </div>
               </div>
             )}
+            {/* The modal's internal buttons will handle form submission */}
+            <button type="submit" hidden></button>
           </form>
         </ZeModal>
       )}
 
-      {/* ADD/EDIT EXPENSE MODAL */}
+      {/* Add/Edit Expense Modal */}
       {showAddExpenseModal && (
         <ZeModal
           isOpen={showAddExpenseModal}
@@ -3110,110 +3196,101 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
           message=""
           confirmText={editExpenseData ? "Salvar Alterações" : "Adicionar Despesa"}
           onConfirm={editExpenseData ? handleEditExpense : handleAddExpense}
-          onCancel={(_e?: React.FormEvent) => { // Fix: Added optional event
-            setShowAddExpenseModal(false);
-            setEditExpenseData(null);
-            setNewExpenseDescription('');
-            setNewExpenseAmount('');
-            setNewExpenseCategory(ExpenseCategory.OTHER);
-            setNewExpenseDate(new Date().toISOString().split('T')[0]);
-            setNewExpenseStepId('');
-            setNewExpenseWorkerId('');
-            setNewExpenseSupplierId('');
-            setNewExpenseTotalAgreed('');
-          }}
+          onCancel={() => { setShowAddExpenseModal(false); setEditExpenseData(null); setNewExpenseTotalAgreed(''); }}
+          type="INFO"
           isConfirming={zeModal.isConfirming}
-          type={editExpenseData ? "INFO" : "SUCCESS"}
         >
           <form onSubmit={editExpenseData ? handleEditExpense : handleAddExpense} className="space-y-4">
             <div>
-              <label htmlFor="expense-description" className="block text-sm font-bold text-primary dark:text-white mb-1">Descrição</label>
+              <label htmlFor="expenseDescription" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Descrição</label>
               <input
-                id="expense-description"
                 type="text"
+                id="expenseDescription"
                 value={newExpenseDescription}
                 onChange={(e) => setNewExpenseDescription(e.target.value)}
+                placeholder="Ex: Pagamento pedreiro, Aluguel de máquina"
                 className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
-                placeholder="Ex: Compra de Cimento, Diária Pedreiro"
                 required
+                aria-label="Descrição da despesa"
               />
             </div>
             <div>
-              <label htmlFor="expense-amount" className="block text-sm font-bold text-primary dark:text-white mb-1">Valor Previsto (R$)</label>
+              <label htmlFor="expenseAmount" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Valor Previsto (R$)</label>
               <input
-                id="expense-amount"
                 type="number"
+                id="expenseAmount"
                 value={newExpenseAmount}
                 onChange={(e) => setNewExpenseAmount(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
-                placeholder="Ex: 1500.00"
+                placeholder="Ex: 500.00"
                 min="0"
                 step="0.01"
-                required
-                disabled={!!editExpenseData?.paidAmount && editExpenseData.paidAmount > 0 && editExpenseData.category !== ExpenseCategory.MATERIAL} // Disable if paid AND not material
-                title={!!editExpenseData?.paidAmount && editExpenseData.paidAmount > 0 && editExpenseData.category !== ExpenseCategory.MATERIAL ? "Não editável após pagamentos." : undefined}
-              />
-              {!!editExpenseData?.paidAmount && editExpenseData.paidAmount > 0 && editExpenseData.category !== ExpenseCategory.MATERIAL && <p className="text-xs text-red-500 mt-1">Valor não pode ser alterado após pagamentos.</p>}
-            </div>
-            {/* NEW: Total Agreed field (optional, not for materials) */}
-            {newExpenseCategory !== ExpenseCategory.MATERIAL && (
-              <div>
-                <label htmlFor="expense-total-agreed" className="block text-sm font-bold text-primary dark:text-white mb-1">Valor Combinado (R$ - Opcional)</label>
-                <input
-                  id="expense-total-agreed"
-                  type="number"
-                  value={newExpenseTotalAgreed}
-                  onChange={(e) => setNewExpenseTotalAgreed(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
-                  placeholder="Ex: 1450.00 (se negociado)"
-                  min="0"
-                  step="0.01"
-                  disabled={!!editExpenseData?.paidAmount && editExpenseData.paidAmount > 0} // Disable if paid
-                  title={!!editExpenseData?.paidAmount && editExpenseData.paidAmount > 0 ? "Não editável após pagamentos." : undefined}
-                />
-                {!!editExpenseData?.paidAmount && editExpenseData.paidAmount > 0 && <p className="text-xs text-red-500 mt-1">Valor combinado não pode ser alterado após pagamentos.</p>}
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Se diferente do valor previsto, será o valor base para pagamentos.</p>
-              </div>
-            )}
-            <div>
-              <label htmlFor="expense-category" className="block text-sm font-bold text-primary dark:text-white mb-1">Categoria</label>
-              <select
-                id="expense-category"
-                value={newExpenseCategory}
-                onChange={(e) => setNewExpenseCategory(e.target.value as ExpenseCategory)}
                 className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
                 required
-                disabled={!!editExpenseData?.paidAmount && editExpenseData.paidAmount > 0 && editExpenseData.category !== ExpenseCategory.MATERIAL} // Disable if paid AND not material
-                title={!!editExpenseData?.paidAmount && editExpenseData.paidAmount > 0 && editExpenseData.category !== ExpenseCategory.MATERIAL ? "Não editável após pagamentos." : undefined}
+                aria-label="Valor previsto da despesa"
+                // Disable if expense already has payments
+                disabled={!!editExpenseData?.paidAmount && editExpenseData.paidAmount > 0}
+                title={!!editExpenseData?.paidAmount && editExpenseData.paidAmount > 0 ? "Valor não editável após pagamentos." : undefined}
+              />
+            </div>
+            <div>
+              <label htmlFor="expenseTotalAgreed" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Valor Combinado (R$ - Opcional)</label>
+              <input
+                type="number"
+                id="expenseTotalAgreed"
+                value={newExpenseTotalAgreed}
+                onChange={(e) => setNewExpenseTotalAgreed(e.target.value)}
+                placeholder="Valor final combinado (se diferente do previsto)"
+                min="0"
+                step="0.01"
+                className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
+                aria-label="Valor total combinado para pagamento"
+                 // Disable if expense already has payments
+                disabled={!!editExpenseData?.paidAmount && editExpenseData.paidAmount > 0}
+                title={!!editExpenseData?.paidAmount && editExpenseData.paidAmount > 0 ? "Valor não editável após pagamentos." : undefined}
+              />
+            </div>
+            <div>
+              <label htmlFor="expenseCategory" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Categoria</label>
+              <select
+                id="expenseCategory"
+                value={newExpenseCategory}
+                onChange={(e) => setNewExpenseCategory(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
+                required
+                aria-label="Categoria da despesa"
+                 // Disable if expense already has payments
+                disabled={!!editExpenseData?.paidAmount && editExpenseData.paidAmount > 0}
+                title={!!editExpenseData?.paidAmount && editExpenseData.paidAmount > 0 ? "Categoria não editável após pagamentos." : undefined}
               >
                 {Object.values(ExpenseCategory).map(cat => (
                   <option key={cat} value={cat}>{cat}</option>
                 ))}
-                <option value="Outros">Outros</option>
+                <option value="Outro">Outro</option> {/* Added for flexibility */}
               </select>
-              {!!editExpenseData?.paidAmount && editExpenseData.paidAmount > 0 && editExpenseData.category !== ExpenseCategory.MATERIAL && <p className="text-xs text-red-500 mt-1">Categoria não pode ser alterada após pagamentos.</p>}
             </div>
             <div>
-              <label htmlFor="expense-date" className="block text-sm font-bold text-primary dark:text-white mb-1">Data</label>
+              <label htmlFor="expenseDate" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Data</label>
               <input
-                id="expense-date"
                 type="date"
+                id="expenseDate"
                 value={newExpenseDate}
                 onChange={(e) => setNewExpenseDate(e.target.value)}
                 className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
                 required
-                disabled={!!editExpenseData?.paidAmount && editExpenseData.paidAmount > 0} // Disable if paid
-                title={!!editExpenseData?.paidAmount && editExpenseData.paidAmount > 0 ? "Não editável após pagamentos." : undefined}
+                aria-label="Data da despesa"
+                 // Disable if expense already has payments
+                disabled={!!editExpenseData?.paidAmount && editExpenseData.paidAmount > 0}
+                title={!!editExpenseData?.paidAmount && editExpenseData.paidAmount > 0 ? "Data não editável após pagamentos." : undefined}
               />
-              {!!editExpenseData?.paidAmount && editExpenseData.paidAmount > 0 && <p className="text-xs text-red-500 mt-1">Data não pode ser alterada após pagamentos.</p>}
             </div>
             <div>
-              <label htmlFor="expense-step" className="block text-sm font-bold text-primary dark:text-white mb-1">Vincular à Etapa (Opcional)</label>
+              <label htmlFor="expenseStepId" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Etapa Relacionada (Opcional)</label>
               <select
-                id="expense-step"
+                id="expenseStepId"
                 value={newExpenseStepId}
                 onChange={(e) => setNewExpenseStepId(e.target.value)}
                 className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
+                aria-label="Etapa relacionada à despesa"
               >
                 <option value="none">Nenhuma</option>
                 {steps.map(step => (
@@ -3221,125 +3298,89 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                 ))}
               </select>
             </div>
+            {/* Worker and Supplier linking */}
             <div>
-              <label htmlFor="expense-worker" className="block text-sm font-bold text-primary dark:text-white mb-1">Vincular a Trabalhador (Opcional)</label>
-              <select
-                id="expense-worker"
-                value={newExpenseWorkerId}
-                onChange={(e) => setNewExpenseWorkerId(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
-              >
-                <option value="none">Nenhum</option>
-                {workers.map(worker => (
-                  <option key={worker.id} value={worker.id}>{worker.name}</option>
-                ))}
-              </select>
+                <label htmlFor="expenseWorkerId" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Trabalhador (Opcional)</label>
+                <select
+                    id="expenseWorkerId"
+                    value={newExpenseWorkerId}
+                    onChange={(e) => setNewExpenseWorkerId(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
+                    aria-label="Trabalhador relacionado à despesa"
+                >
+                    <option value="none">Nenhum</option>
+                    {workers.map(worker => (
+                        <option key={worker.id} value={worker.id}>{worker.name}</option>
+                    ))}
+                </select>
             </div>
             <div>
-              <label htmlFor="expense-supplier" className="block text-sm font-bold text-primary dark:text-white mb-1">Vincular a Fornecedor (Opcional)</label>
-              <select
-                id="expense-supplier"
-                value={newExpenseSupplierId}
-                onChange={(e) => setNewExpenseSupplierId(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
-              >
-                <option value="none">Nenhum</option>
-                {suppliers.map(supplier => (
-                  <option key={supplier.id} value={supplier.id}>{supplier.name}</option>
-                ))}
-              </select>
+                <label htmlFor="expenseSupplierId" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Fornecedor (Opcional)</label>
+                <select
+                    id="expenseSupplierId"
+                    value={newExpenseSupplierId}
+                    onChange={(e) => setNewExpenseSupplierId(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
+                    aria-label="Fornecedor relacionado à despesa"
+                >
+                    <option value="none">Nenhum</option>
+                    {suppliers.map(supplier => (
+                        <option key={supplier.id} value={supplier.id}>{supplier.name}</option>
+                    ))}
+                </select>
             </div>
+            <button type="submit" hidden></button>
           </form>
         </ZeModal>
       )}
 
-      {/* ADD PAYMENT TO EXPENSE MODAL */}
+      {/* Add Payment Modal (for partial payments) */}
       {showAddPaymentModal && paymentExpenseData && (
         <ZeModal
           isOpen={showAddPaymentModal}
           title={`Registrar Pagamento para "${paymentExpenseData.description}"`}
           message=""
           confirmText="Registrar Pagamento"
-          onConfirm={async (e?: React.FormEvent) => { // Fix: Added optional event
-            e?.preventDefault();
-            setZeModal(prev => ({ ...prev, isConfirming: true }));
-            try {
-              if (!paymentExpenseData || !paymentAmount || !paymentDate) {
-                showToastNotification("Preencha o valor e a data do pagamento.", 'warning');
-                setZeModal(prev => ({ ...prev, isConfirming: false }));
-                return;
-              }
-              await dbService.addPaymentToExpense(paymentExpenseData.id, Number(paymentAmount), paymentDate);
-              setShowAddPaymentModal(false);
-              setPaymentExpenseData(null);
-              setPaymentAmount('');
-              setNewPaymentDate(new Date().toISOString().split('T')[0]);
-              await loadWorkData();
-              showToastNotification("Pagamento registrado com sucesso!", 'success');
-              showFinanceBadge(); // Show badge on finance tab
-            } catch (error: any) {
-              console.error("Erro ao registrar pagamento:", error);
-              showToastNotification(`Erro ao registrar pagamento: ${error.message || 'Erro desconhecido'}.`, 'error');
-              setZeModal(prev => ({
-                ...prev,
-                isConfirming: false,
-                title: "Erro ao Registrar Pagamento",
-                message: `Não foi possível registrar o pagamento: ${error.message || 'Erro desconhecido'}. Tente novamente.`,
-                type: "ERROR",
-                confirmText: "Ok",
-                onConfirm: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));},
-                onCancel: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));} // Fix: Ensure onCancel matches signature
-              }));
-            } finally {
-              setZeModal(prev => ({ ...prev, isConfirming: false }));
-            }
-          }}
-          onCancel={(_e?: React.FormEvent) => { // Fix: Added optional event
-            setShowAddPaymentModal(false);
-            setPaymentExpenseData(null);
-            setPaymentAmount('');
-            setNewPaymentDate(new Date().toISOString().split('T')[0]);
-          }}
+          onConfirm={handlePaymentConfirmation}
+          onCancel={() => { setShowAddPaymentModal(false); setPaymentExpenseData(null); setPaymentAmount(''); setNewPaymentDate(new Date().toISOString().split('T')[0]); }}
+          type="INFO"
           isConfirming={zeModal.isConfirming}
-          type="SUCCESS"
         >
-          <form className="space-y-4">
-            <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">
-              Valor Previsto: {formatCurrency(paymentExpenseData.amount)}<br/>
-              Valor Combinado: {formatCurrency(paymentExpenseData.totalAgreed !== undefined && paymentExpenseData.totalAgreed !== null ? paymentExpenseData.totalAgreed : paymentExpenseData.amount)}<br/>
-              Já Pago: {formatCurrency(paymentExpenseData.paidAmount || 0)}<br/>
-              Restante: {formatCurrency(Math.max(0, (paymentExpenseData.totalAgreed !== undefined && paymentExpenseData.totalAgreed !== null ? paymentExpenseData.totalAgreed : paymentExpenseData.amount) - (paymentExpenseData.paidAmount || 0)))}
-            </p>
+          <form onSubmit={handlePaymentConfirmation} className="space-y-4"> {/* Dummy submit */}
             <div>
-              <label htmlFor="payment-amount" className="block text-sm font-bold text-primary dark:text-white mb-1">Valor do Pagamento (R$)</label>
+              <label htmlFor="paymentAmount" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Valor a Pagar (R$)</label>
               <input
-                id="payment-amount"
                 type="number"
+                id="paymentAmount"
                 value={paymentAmount}
                 onChange={(e) => setPaymentAmount(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
-                placeholder="Ex: 500.00"
-                min="0"
+                placeholder="0.00"
+                min="0.01"
                 step="0.01"
+                className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
                 required
+                aria-label="Valor a pagar"
               />
             </div>
             <div>
-              <label htmlFor="payment-date" className="block text-sm font-bold text-primary dark:text-white mb-1">Data do Pagamento</label>
+              <label htmlFor="paymentDate" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Data do Pagamento</label>
               <input
-                id="payment-date"
                 type="date"
+                id="paymentDate"
                 value={paymentDate}
                 onChange={(e) => setNewPaymentDate(e.target.value)}
                 className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
                 required
+                aria-label="Data do pagamento"
               />
             </div>
+            {/* Hidden submit to enable Enter key press in modal */}
+            <button type="submit" hidden></button>
           </form>
         </ZeModal>
       )}
 
-      {/* ADD/EDIT WORKER MODAL */}
+      {/* Add/Edit Worker Modal */}
       {showAddWorkerModal && (
         <ZeModal
           isOpen={showAddWorkerModal}
@@ -3347,39 +3388,33 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
           message=""
           confirmText={editWorkerData ? "Salvar Alterações" : "Adicionar Trabalhador"}
           onConfirm={editWorkerData ? handleEditWorker : handleAddWorker}
-          onCancel={(_e?: React.FormEvent) => { // Fix: Added optional event
-            setShowAddWorkerModal(false);
-            setEditWorkerData(null);
-            setNewWorkerName('');
-            setNewWorkerRole('');
-            setNewWorkerPhone('');
-            setNewWorkerDailyRate('');
-            setNewWorkerNotes('');
-          }}
+          onCancel={() => { setShowAddWorkerModal(false); setEditWorkerData(null); }}
+          type="INFO"
           isConfirming={zeModal.isConfirming}
-          type={editWorkerData ? "INFO" : "SUCCESS"}
         >
           <form onSubmit={editWorkerData ? handleEditWorker : handleAddWorker} className="space-y-4">
             <div>
-              <label htmlFor="worker-name" className="block text-sm font-bold text-primary dark:text-white mb-1">Nome Completo</label>
+              <label htmlFor="workerName" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Nome</label>
               <input
-                id="worker-name"
                 type="text"
+                id="workerName"
                 value={newWorkerName}
                 onChange={(e) => setNewWorkerName(e.target.value)}
+                placeholder="Nome completo do trabalhador"
                 className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
-                placeholder="Ex: João da Silva"
                 required
+                aria-label="Nome do trabalhador"
               />
             </div>
             <div>
-              <label htmlFor="worker-role" className="block text-sm font-bold text-primary dark:text-white mb-1">Função</label>
+              <label htmlFor="workerRole" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Função</label>
               <select
-                id="worker-role"
+                id="workerRole"
                 value={newWorkerRole}
                 onChange={(e) => setNewWorkerRole(e.target.value)}
                 className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
                 required
+                aria-label="Função do trabalhador"
               >
                 <option value="">Selecione a Função</option>
                 {STANDARD_JOB_ROLES.map(role => (
@@ -3388,56 +3423,50 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
               </select>
             </div>
             <div>
-              <label htmlFor="worker-phone" className="block text-sm font-bold text-primary dark:text-white mb-1">Telefone (WhatsApp)</label>
+              <label htmlFor="workerPhone" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Telefone (WhatsApp)</label>
               <input
-                id="worker-phone"
-                type="text"
+                type="tel"
+                id="workerPhone"
                 value={newWorkerPhone}
-                onChange={(e) => {
-                  let value = e.target.value.replace(/\D/g, '').substring(0, 11);
-                  if (value.length === 11) {
-                    value = value.replace(/^(\d{2})(\d{5})(\d{4})/, "($1) $2-$3");
-                  } else if (value.length > 2) {
-                    value = value.replace(/^(\d{2})(\d)/g, "($1) $2");
-                    value = value.replace(/(\d{5})(\d)/, "$1-$2");
-                  }
-                  setNewWorkerPhone(value);
-                }}
-                className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
+                onChange={(e) => setNewWorkerPhone(e.target.value)}
                 placeholder="(DDD) 9XXXX-XXXX"
+                className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
                 required
-                maxLength={15}
+                aria-label="Telefone do trabalhador"
               />
             </div>
             <div>
-              <label htmlFor="worker-daily-rate" className="block text-sm font-bold text-primary dark:text-white mb-1">Diária (R$ - Opcional)</label>
+              <label htmlFor="workerDailyRate" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Diária (R$ - Opcional)</label>
               <input
-                id="worker-daily-rate"
                 type="number"
+                id="workerDailyRate"
                 value={newWorkerDailyRate}
                 onChange={(e) => setNewWorkerDailyRate(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
                 placeholder="Ex: 150.00"
                 min="0"
                 step="0.01"
+                className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
+                aria-label="Diária do trabalhador"
               />
             </div>
             <div>
-              <label htmlFor="worker-notes" className="block text-sm font-bold text-primary dark:text-white mb-1">Observações (Opcional)</label>
+              <label htmlFor="workerNotes" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Observações (Opcional)</label>
               <textarea
-                id="worker-notes"
+                id="workerNotes"
                 value={newWorkerNotes}
                 onChange={(e) => setNewWorkerNotes(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
-                placeholder="Detalhes adicionais sobre o trabalhador"
+                placeholder="Detalhes sobre o trabalhador ou acordo"
                 rows={3}
+                className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
+                aria-label="Observações sobre o trabalhador"
               ></textarea>
             </div>
+            <button type="submit" hidden></button>
           </form>
         </ZeModal>
       )}
 
-      {/* ADD/EDIT SUPPLIER MODAL */}
+      {/* Add/Edit Supplier Modal */}
       {showAddSupplierModal && (
         <ZeModal
           isOpen={showAddSupplierModal}
@@ -3445,40 +3474,33 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
           message=""
           confirmText={editSupplierData ? "Salvar Alterações" : "Adicionar Fornecedor"}
           onConfirm={editSupplierData ? handleEditSupplier : handleAddSupplier}
-          onCancel={(_e?: React.FormEvent) => { // Fix: Added optional event
-            setShowAddSupplierModal(false);
-            setEditSupplierData(null);
-            setNewSupplierName('');
-            setNewSupplierCategory('');
-            setNewSupplierPhone('');
-            setNewSupplierEmail('');
-            setNewSupplierAddress('');
-            setNewSupplierNotes('');
-          }}
+          onCancel={() => { setShowAddSupplierModal(false); setEditSupplierData(null); }}
+          type="INFO"
           isConfirming={zeModal.isConfirming}
-          type={editSupplierData ? "INFO" : "SUCCESS"}
         >
           <form onSubmit={editSupplierData ? handleEditSupplier : handleAddSupplier} className="space-y-4">
             <div>
-              <label htmlFor="supplier-name" className="block text-sm font-bold text-primary dark:text-white mb-1">Nome do Fornecedor</label>
+              <label htmlFor="supplierName" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Nome do Fornecedor</label>
               <input
-                id="supplier-name"
                 type="text"
+                id="supplierName"
                 value={newSupplierName}
                 onChange={(e) => setNewSupplierName(e.target.value)}
+                placeholder="Ex: Cimentos da Silva, Materiais Express"
                 className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
-                placeholder="Ex: Madeireira São João"
                 required
+                aria-label="Nome do fornecedor"
               />
             </div>
             <div>
-              <label htmlFor="supplier-category" className="block text-sm font-bold text-primary dark:text-white mb-1">Categoria</label>
+              <label htmlFor="supplierCategory" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Categoria</label>
               <select
-                id="supplier-category"
+                id="supplierCategory"
                 value={newSupplierCategory}
                 onChange={(e) => setNewSupplierCategory(e.target.value)}
                 className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
                 required
+                aria-label="Categoria do fornecedor"
               >
                 <option value="">Selecione a Categoria</option>
                 {STANDARD_SUPPLIER_CATEGORIES.map(category => (
@@ -3487,260 +3509,252 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
               </select>
             </div>
             <div>
-              <label htmlFor="supplier-phone" className="block text-sm font-bold text-primary dark:text-white mb-1">Telefone</label>
+              <label htmlFor="supplierPhone" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Telefone (WhatsApp)</label>
               <input
-                id="supplier-phone"
-                type="text"
+                type="tel"
+                id="supplierPhone"
                 value={newSupplierPhone}
-                onChange={(e) => {
-                  let value = e.target.value.replace(/\D/g, '').substring(0, 11);
-                  if (value.length === 11) {
-                    value = value.replace(/^(\d{2})(\d{5})(\d{4})/, "($1) $2-$3");
-                  } else if (value.length > 2) {
-                    value = value.replace(/^(\d{2})(\d)/g, "($1) $2");
-                    value = value.replace(/(\d{5})(\d)/, "$1-$2");
-                  }
-                  setNewSupplierPhone(value);
-                }}
+                onChange={(e) => setNewSupplierPhone(e.target.value)}
+                placeholder="(DDD) 9XXXX-XXXX"
                 className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
-                placeholder="(DDD) XXXX-XXXX ou (DDD) 9XXXX-XXXX"
                 required
-                maxLength={15}
+                aria-label="Telefone do fornecedor"
               />
             </div>
             <div>
-              <label htmlFor="supplier-email" className="block text-sm font-bold text-primary dark:text-white mb-1">E-mail (Opcional)</label>
+              <label htmlFor="supplierEmail" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">E-mail (Opcional)</label>
               <input
-                id="supplier-email"
                 type="email"
+                id="supplierEmail"
                 value={newSupplierEmail}
                 onChange={(e) => setNewSupplierEmail(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
                 placeholder="contato@fornecedor.com"
+                className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
+                aria-label="E-mail do fornecedor"
               />
             </div>
             <div>
-              <label htmlFor="supplier-address" className="block text-sm font-bold text-primary dark:text-white mb-1">Endereço (Opcional)</label>
+              <label htmlFor="supplierAddress" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Endereço (Opcional)</label>
               <input
-                id="supplier-address"
                 type="text"
+                id="supplierAddress"
                 value={newSupplierAddress}
                 onChange={(e) => setNewSupplierAddress(e.target.value)}
+                placeholder="Endereço completo ou bairro"
                 className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
-                placeholder="Rua, Número, Bairro, Cidade"
+                aria-label="Endereço do fornecedor"
               />
             </div>
             <div>
-              <label htmlFor="supplier-notes" className="block text-sm font-bold text-primary dark:text-white mb-1">Observações (Opcional)</label>
+              <label htmlFor="supplierNotes" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Observações (Opcional)</label>
               <textarea
-                id="supplier-notes"
+                id="supplierNotes"
                 value={newSupplierNotes}
                 onChange={(e) => setNewSupplierNotes(e.target.value)}
-                className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
-                placeholder="Detalhes adicionais sobre o fornecedor, prazos de entrega"
+                placeholder="Detalhes de contato, promoções, etc."
                 rows={3}
+                className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
+                aria-label="Observações sobre o fornecedor"
               ></textarea>
             </div>
+            <button type="submit" hidden></button>
           </form>
         </ZeModal>
       )}
 
-      {/* ADD PHOTO MODAL */}
+      {/* Add Photo Modal */}
       {showAddPhotoModal && (
         <ZeModal
           isOpen={showAddPhotoModal}
           title="Adicionar Nova Foto"
           message=""
-          confirmText="Upload Foto"
+          confirmText="Fazer Upload"
           onConfirm={handleAddPhoto}
-          onCancel={(_e?: React.FormEvent) => { setShowAddPhotoModal(false); setNewPhotoDescription(''); setNewPhotoFile(null); setNewPhotoType('PROGRESS'); }} // Fix: Added optional event
+          onCancel={() => { setShowAddPhotoModal(false); setNewPhotoFile(null); setNewPhotoDescription(''); setNewPhotoType('PROGRESS'); }}
+          type="INFO"
           isConfirming={zeModal.isConfirming}
-          type="SUCCESS"
         >
           <form onSubmit={handleAddPhoto} className="space-y-4">
             <div>
-              <label htmlFor="photo-description" className="block text-sm font-bold text-primary dark:text-white mb-1">Descrição da Foto</label>
+              <label htmlFor="photoDescription" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Descrição</label>
               <input
-                id="photo-description"
                 type="text"
+                id="photoDescription"
                 value={newPhotoDescription}
                 onChange={(e) => setNewPhotoDescription(e.target.value)}
+                placeholder="Ex: Obra em 01/01/2024, Fundação etapa 1"
                 className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
-                placeholder="Ex: Fundação do Muro, Pintura da Sala"
                 required
+                aria-label="Descrição da foto"
               />
             </div>
             <div>
-              <label htmlFor="photo-file" className="block text-sm font-bold text-primary dark:text-white mb-1">Arquivo de Imagem</label>
-              <input
-                id="photo-file"
-                type="file"
-                accept="image/*"
-                onChange={(e) => setNewPhotoFile(e.target.files ? e.target.files[0] : null)}
-                className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-secondary file:text-white hover:file:bg-secondary-dark cursor-pointer"
-                required
-              />
-              {newPhotoFile && <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Selecionado: {newPhotoFile.name}</p>}
-            </div>
-            <div>
-              <label htmlFor="photo-type" className="block text-sm font-bold text-primary dark:text-white mb-1">Tipo da Foto</label>
+              <label htmlFor="photoType" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Tipo</label>
               <select
-                id="photo-type"
+                id="photoType"
                 value={newPhotoType}
                 onChange={(e) => setNewPhotoType(e.target.value as 'BEFORE' | 'AFTER' | 'PROGRESS')}
                 className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
+                required
+                aria-label="Tipo de foto"
               >
                 <option value="PROGRESS">Progresso</option>
                 <option value="BEFORE">Antes</option>
                 <option value="AFTER">Depois</option>
               </select>
             </div>
+            <div>
+              <label htmlFor="photoFile" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Arquivo da Foto</label>
+              <input
+                type="file"
+                id="photoFile"
+                accept="image/*"
+                onChange={(e) => setNewPhotoFile(e.target.files ? e.target.files[0] : null)}
+                className="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-secondary file:text-white hover:file:bg-secondary-dark"
+                required
+                aria-label="Selecionar arquivo de foto"
+              />
+            </div>
+            <button type="submit" hidden></button>
           </form>
         </ZeModal>
       )}
 
-      {/* ADD FILE MODAL */}
+      {/* Add File Modal */}
       {showAddFileModal && (
         <ZeModal
           isOpen={showAddFileModal}
           title="Adicionar Novo Arquivo"
           message=""
-          confirmText="Upload Arquivo"
+          confirmText="Fazer Upload"
           onConfirm={handleAddFile}
-          onCancel={(_e?: React.FormEvent) => { setShowAddFileModal(false); setNewFileName(''); setNewFileCategory(FileCategory.GENERAL); setNewUploadFile(null); }} // Fix: Added optional event
+          onCancel={() => { setShowAddFileModal(false); setNewUploadFile(null); setNewFileName(''); setNewFileCategory(FileCategory.GENERAL); }}
+          type="INFO"
           isConfirming={zeModal.isConfirming}
-          type="SUCCESS"
         >
           <form onSubmit={handleAddFile} className="space-y-4">
             <div>
-              <label htmlFor="file-name" className="block text-sm font-bold text-primary dark:text-white mb-1">Nome do Arquivo</label>
+              <label htmlFor="fileName" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Nome do Arquivo</label>
               <input
-                id="file-name"
                 type="text"
+                id="fileName"
                 value={newFileName}
                 onChange={(e) => setNewFileName(e.target.value)}
+                placeholder="Ex: Planta Baixa, Orçamento Final"
                 className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
-                placeholder="Ex: Projeto Elétrico, Orçamento Final"
                 required
+                aria-label="Nome do arquivo"
               />
             </div>
             <div>
-              <label htmlFor="file-category" className="block text-sm font-bold text-primary dark:text-white mb-1">Categoria</label>
+              <label htmlFor="fileCategory" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Categoria</label>
               <select
-                id="file-category"
+                id="fileCategory"
                 value={newFileCategory}
                 onChange={(e) => setNewFileCategory(e.target.value as FileCategory)}
                 className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
+                required
+                aria-label="Categoria do arquivo"
               >
-                {Object.values(FileCategory).map(cat => (
-                  <option key={cat} value={cat}>{cat}</option>
+                {Object.values(FileCategory).map(category => (
+                  <option key={category} value={category}>{category}</option>
                 ))}
               </select>
             </div>
             <div>
-              <label htmlFor="file-upload" className="block text-sm font-bold text-primary dark:text-white mb-1">Selecione o Arquivo</label>
+              <label htmlFor="uploadFile" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Arquivo para Upload</label>
               <input
-                id="file-upload"
                 type="file"
+                id="uploadFile"
                 onChange={(e) => setNewUploadFile(e.target.files ? e.target.files[0] : null)}
-                className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-secondary file:text-white hover:file:bg-secondary-dark cursor-pointer"
+                className="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-secondary file:text-white hover:file:bg-secondary-dark"
                 required
+                aria-label="Selecionar arquivo para upload"
               />
-              {newUploadFile && <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Selecionado: {newUploadFile.name}</p>}
             </div>
+            <button type="submit" hidden></button>
           </form>
         </ZeModal>
       )}
 
-      {/* CONTRACT CONTENT VIEWER MODAL */}
+      {/* Contract Content Viewer Modal */}
       {showContractContentModal && (
         <ZeModal
           isOpen={showContractContentModal}
           title={selectedContractTitle}
-          message=""
+          message="" // Content passed as children
           confirmText="Copiar Texto"
-          onConfirm={async (e?: React.FormEvent) => { // Fix: Added optional event
-            e?.preventDefault(); // Pass event here
-            try {
-              await navigator.clipboard.writeText(selectedContractContent);
-              setCopyContractSuccess(true);
-              setTimeout(() => setCopyContractSuccess(false), 2000);
-              showToastNotification("Conteúdo do contrato copiado!", 'success');
-            } catch (err) {
-              console.error("Erro ao copiar contrato:", err);
-              showToastNotification("Falha ao copiar o contrato. Tente manualmente.", 'error');
-            }
+          onConfirm={async (_e?: React.FormEvent) => {
+            await navigator.clipboard.writeText(selectedContractContent);
+            setCopyContractSuccess(true);
+            setTimeout(() => setCopyContractSuccess(false), 2000);
+            showToastNotification("Conteúdo copiado para a área de transferência!", 'success');
           }}
-          onCancel={(_e?: React.FormEvent) => { setShowContractContentModal(false); setSelectedContractContent(''); setSelectedContractTitle(''); setCopyContractSuccess(false); }} // Fix: Added optional event
+          onCancel={() => setShowContractContentModal(false)}
           type="INFO"
           cancelText="Fechar"
         >
-          <div className="relative p-4 rounded-xl bg-slate-500/5 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 max-h-[60vh] overflow-y-auto">
-            <pre className="whitespace-pre-wrap font-mono text-sm text-primary dark:text-white">
-              {selectedContractContent}
-            </pre>
-            {copyContractSuccess && (
-                <div className="absolute top-2 right-2 px-3 py-1 bg-green-500 text-white text-xs font-bold rounded-lg animate-in fade-in">Copiado!</div>
-            )}
+          {copyContractSuccess && (
+            <div className="p-3 bg-green-500/20 text-green-700 dark:text-green-300 rounded-xl mb-4 text-sm font-bold text-center animate-in fade-in">
+              <i className="fa-solid fa-check-circle mr-2"></i> Copiado!
+            </div>
+          )}
+          <div className="bg-slate-100 dark:bg-slate-800 p-4 rounded-xl border border-slate-200 dark:border-slate-700 max-h-96 overflow-y-auto whitespace-pre-wrap text-sm text-slate-700 dark:text-slate-300 font-mono">
+            {selectedContractContent}
           </div>
         </ZeModal>
       )}
 
-      {/* ADD/EDIT CHECKLIST MODAL */}
+      {/* Add/Edit Checklist Modal */}
       {showAddChecklistModal && (
         <ZeModal
           isOpen={showAddChecklistModal}
-          title={editChecklistData ? "Editar Checklist" : "Adicionar Novo Checklist"}
+          title={editChecklistData ? "Editar Checklist" : "Criar Novo Checklist"}
           message=""
-          confirmText={editChecklistData ? "Salvar Checklist" : "Adicionar Checklist"}
+          confirmText={editChecklistData ? "Salvar Alterações" : "Criar Checklist"}
           onConfirm={editChecklistData ? handleEditChecklist : handleAddChecklist}
-          onCancel={(_e?: React.FormEvent) => { // Fix: Added optional event
-            setShowAddChecklistModal(false);
-            setEditChecklistData(null);
-            setNewChecklistName('');
-            setNewChecklistCategory('');
-            setNewChecklistItems(['']);
-          }}
+          onCancel={() => { setShowAddChecklistModal(false); setEditChecklistData(null); setNewChecklistName(''); setNewChecklistCategory(''); setNewChecklistItems(['']); }}
+          type="INFO"
           isConfirming={zeModal.isConfirming}
-          type={editChecklistData ? "INFO" : "SUCCESS"}
         >
           <form onSubmit={editChecklistData ? handleEditChecklist : handleAddChecklist} className="space-y-4">
             <div>
-              <label htmlFor="checklist-name" className="block text-sm font-bold text-primary dark:text-white mb-1">Nome do Checklist</label>
+              <label htmlFor="checklistName" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Nome do Checklist</label>
               <input
-                id="checklist-name"
                 type="text"
+                id="checklistName"
                 value={newChecklistName}
                 onChange={(e) => setNewChecklistName(e.target.value)}
+                placeholder="Ex: Pré-Concretagem de Laje"
                 className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
-                placeholder="Ex: Fundações - Pré-Concretagem"
                 required
+                aria-label="Nome do checklist"
               />
             </div>
             <div>
-              <label htmlFor="checklist-category" className="block text-sm font-bold text-primary dark:text-white mb-1">Categoria (Opcional)</label>
+              <label htmlFor="checklistCategory" className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Categoria (Opcional)</label>
               <select
-                id="checklist-category"
+                id="checklistCategory"
                 value={newChecklistCategory}
                 onChange={(e) => setNewChecklistCategory(e.target.value)}
                 className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
+                aria-label="Categoria do checklist"
               >
-                <option value="">Nenhuma</option>
-                {/* Dynamically generate categories based on work's steps for easier linking */}
+                <option value="">Geral</option>
+                {/* Dynamically populate with relevant step names from current work */}
                 {steps.map(step => (
-                    <option key={step.id} value={step.name}>{step.name}</option>
+                  <option key={step.id} value={step.name}>{step.name}</option>
                 ))}
-                {/* Also allow general categories from templates */}
-                {CHECKLIST_TEMPLATES.map(template => (
-                  <option key={template.id} value={template.category}>{template.category}</option>
-                ))}
+                {/* Add standard categories if needed */}
+                <option value="Segurança">Segurança</option>
+                <option value="Limpeza">Limpeza</option>
+                <option value="Outro">Outro</option>
               </select>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Ajuda a organizar e vincular a etapas.</p>
             </div>
-            <div>
-              <label className="block text-sm font-bold text-primary dark:text-white mb-1">Itens do Checklist</label>
+            <div className="space-y-2">
+              <label className="block text-sm font-bold text-slate-700 dark:text-slate-300 mb-1">Itens do Checklist</label>
               {newChecklistItems.map((item, index) => (
-                <div key={index} className="flex gap-2 items-center mb-2">
+                <div key={index} className="flex items-center gap-2">
                   <input
                     type="text"
                     value={item}
@@ -3749,39 +3763,38 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                       updatedItems[index] = e.target.value;
                       setNewChecklistItems(updatedItems);
                     }}
-                    className="flex-1 px-4 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
                     placeholder={`Item ${index + 1}`}
+                    className="flex-1 px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
                     required
+                    aria-label={`Item ${index + 1} do checklist`}
                   />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const updatedItems = newChecklistItems.filter((_, i) => i !== index);
-                      setNewChecklistItems(updatedItems.length > 0 ? updatedItems : ['']); // Ensure at least one empty item
-                    }}
-                    className="w-8 h-8 rounded-full bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition-colors"
-                    aria-label={`Remover item ${index + 1}`}
-                  >
-                    <i className="fa-solid fa-trash-alt text-sm"></i>
-                  </button>
+                  {newChecklistItems.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const updatedItems = newChecklistItems.filter((_, i) => i !== index);
+                        setNewChecklistItems(updatedItems);
+                      }}
+                      className="text-red-500 hover:text-red-700 p-2"
+                      aria-label={`Remover item ${index + 1}`}
+                    >
+                      <i className="fa-solid fa-trash"></i>
+                    </button>
+                  )}
                 </div>
               ))}
               <button
                 type="button"
                 onClick={() => setNewChecklistItems([...newChecklistItems, ''])}
-                className="mt-2 px-4 py-2 bg-slate-200 dark:bg-slate-700 text-primary dark:text-white text-sm font-bold rounded-xl hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors flex items-center gap-2"
-                aria-label="Adicionar novo item de checklist"
+                className="w-full py-2 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 font-bold rounded-xl hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors flex items-center justify-center gap-2"
+                aria-label="Adicionar novo item ao checklist"
               >
                 <i className="fa-solid fa-plus"></i> Adicionar Item
               </button>
             </div>
+            <button type="submit" hidden></button>
           </form>
         </ZeModal>
-      )}
-
-      {/* Confirmation Modal (general purpose) */}
-      {zeModal.isOpen && (
-        <ZeModal {...zeModal} />
       )}
     </div>
   );
