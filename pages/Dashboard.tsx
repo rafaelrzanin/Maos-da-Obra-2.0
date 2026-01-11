@@ -1,5 +1,4 @@
 
-
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import * as ReactRouter from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.tsx';
@@ -206,6 +205,7 @@ const Dashboard = () => {
   const [isDeletingWork, setIsDeletingWork] = useState(false);
   const [deleteError, setDeleteError] = useState('');
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [dashboardError, setDashboardError] = useState<string | null>(null); // NEW: State for general dashboard errors
 
   // Ref to track notification count changes for data refresh
   const notificationCountRef = useRef(unreadNotificationsCount);
@@ -221,6 +221,7 @@ const Dashboard = () => {
     }
 
     setLoadingDashboard(true);
+    setDashboardError(null); // Clear previous errors
     try {
       const fetchedWorks = await dbService.getWorks(user.id);
       setAllWorks(fetchedWorks);
@@ -243,12 +244,13 @@ const Dashboard = () => {
         requestPushNotificationPermission();
       }
 
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erro ao carregar todas as obras:", error);
       setAllWorks([]);
       setSelectedWork(null);
       setWorkSummary(null);
       setSelectedWorkSteps([]);
+      setDashboardError(`Não foi possível carregar suas obras: ${error.message || 'Erro desconhecido'}.`); // Set user-friendly error
     } finally {
       setLoadingDashboard(false);
     }
@@ -256,6 +258,7 @@ const Dashboard = () => {
 
   const loadSelectedWorkData = useCallback(async (workId: string) => {
     setLoadingDashboard(true);
+    setDashboardError(null); // Clear previous errors
     try {
       const [fetchedSteps, fetchedMaterials, fetchedExpenses, fetchedWork] = await Promise.all([
         dbService.getSteps(workId),
@@ -269,6 +272,7 @@ const Dashboard = () => {
           localStorage.setItem('lastSelectedWorkId', fetchedWork.id); // Save last selected work
       } else {
           // Should not happen if workId came from loadAllWorks, but for safety
+          setDashboardError("A obra selecionada não foi encontrada ou houve um erro ao carregá-la.");
           return;
       }
 
@@ -293,10 +297,11 @@ const Dashboard = () => {
       });
       setSelectedWorkSteps(fetchedSteps);
 
-    } catch (error) {
+    } catch (error: any) {
       console.error(`Erro ao carregar dados da obra ${workId}:`, error);
       setWorkSummary(null);
       setSelectedWorkSteps([]);
+      setDashboardError(`Não foi possível carregar os detalhes da obra: ${error.message || 'Erro desconhecido'}.`);
     } finally {
       setLoadingDashboard(false);
     }
@@ -370,6 +375,30 @@ const Dashboard = () => {
   if (!user) {
     console.log("[Dashboard] No user after auth finished. Redirecting to /login.");
     return <ReactRouter.Navigate to="/login" replace />;
+  }
+
+  // NEW: Display general dashboard error if present
+  if (dashboardError) {
+    return (
+      <div className="max-w-4xl mx-auto pb-28 pt-6 px-4 md:px-0 font-sans animate-in fade-in">
+        <div className="flex flex-col items-center justify-center min-h-[70vh] p-6 text-center">
+            <i className="fa-solid fa-exclamation-circle text-6xl text-red-500 mb-4"></i>
+            <h2 className="text-2xl font-black text-primary dark:text-white mb-2">Erro ao Carregar Dashboard!</h2>
+            <p className="text-slate-500 dark:text-slate-400 max-w-sm mx-auto mb-6">
+                {dashboardError}
+            </p>
+            <button
+                onClick={loadAllWorks}
+                className="px-6 py-3 bg-secondary text-white font-bold rounded-xl hover:bg-secondary-dark transition-colors"
+                aria-label="Tentar carregar obras novamente"
+                disabled={loadingDashboard}
+            >
+                {loadingDashboard ? <i className="fa-solid fa-circle-notch fa-spin mr-2"></i> : null}
+                Tentar Novamente
+            </button>
+        </div>
+      </div>
+    );
   }
 
   // No Works State - Redesigned
