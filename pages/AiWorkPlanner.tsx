@@ -29,6 +29,7 @@ const AiWorkPlanner = () => {
   const [loadingPlan, setLoadingPlan] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
   const [showAiAccessModal, setShowAiAccessModal] = useState(false);
+  const [showGenerationErrorModal, setShowGenerationErrorModal] = useState(false); // NEW: State for generation errors
 
   const isVitalicio = user?.plan === PlanType.VITALICIO;
   const isAiTrialActive = user?.isTrial && trialDaysRemaining !== null && trialDaysRemaining > 0;
@@ -61,6 +62,7 @@ const AiWorkPlanner = () => {
     } catch (error: any) {
       console.error("Erro ao gerar plano da IA:", error);
       setErrorMsg(`Não foi possível gerar o plano inteligente: ${error.message || 'Erro desconhecido.'}`);
+      setShowGenerationErrorModal(true); // Show modal for generation errors
     } finally {
       setLoadingPlan(false);
     }
@@ -97,6 +99,7 @@ const AiWorkPlanner = () => {
       } catch (error: any) {
         console.error("Erro ao carregar dados da obra ou plano AI:", error);
         setErrorMsg(`Erro ao carregar dados da obra: ${error.message || 'Erro desconhecido.'}`);
+        setShowGenerationErrorModal(true); // Show modal for initial load errors
         setLoadingPlan(false);
       }
     };
@@ -138,8 +141,8 @@ const AiWorkPlanner = () => {
           title="Acesso Premium necessário!"
           message="O Planejamento Inteligente AI é uma funcionalidade exclusiva para assinantes Vitalícios ou durante o período de teste. Melhore sua gestão de obras agora!"
           confirmText="Ver Planos"
-          onConfirm={async () => navigate('/settings')}
-          onCancel={() => { setShowAiAccessModal(false); navigate(`/work/${workId}`); }}
+          onConfirm={async (_e?: React.FormEvent) => navigate('/settings')}
+          onCancel={async (_e?: React.FormEvent) => { setShowAiAccessModal(false); navigate(`/work/${workId}`); }}
           type="WARNING"
           cancelText="Voltar"
         >
@@ -147,6 +150,19 @@ const AiWorkPlanner = () => {
             <p>Seu período de teste pode ter expirado ou você precisa de um plano Vitalício para acessar esta ferramenta.</p>
           </div>
         </ZeModal>
+      )}
+
+      {showGenerationErrorModal && (
+        <ZeModal
+          isOpen={showGenerationErrorModal}
+          title="Erro ao Gerar Plano"
+          message={errorMsg || "Não foi possível gerar o plano inteligente. Tente novamente mais tarde ou verifique sua conexão."}
+          confirmText="Tentar Novamente"
+          onConfirm={async (_e?: React.FormEvent) => { setShowGenerationErrorModal(false); await generatePlan(); }}
+          onCancel={async (_e?: React.FormEvent) => { setShowGenerationErrorModal(false); navigate(`/work/${workId}`); }}
+          type="ERROR"
+          cancelText="Voltar para Obra"
+        />
       )}
 
       {loadingPlan && (
@@ -166,11 +182,12 @@ const AiWorkPlanner = () => {
         </div>
       )}
 
-      {errorMsg && (
+      {/* NEW: Removed direct errorMsg display here, as it's handled by showGenerationErrorModal */}
+      {/* errorMsg && (
         <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-900 text-red-600 dark:text-red-400 rounded-xl text-sm font-bold flex items-center gap-2 animate-in fade-in" role="alert">
           <i className="fa-solid fa-triangle-exclamation"></i> {errorMsg}
         </div>
-      )}
+      )*/}
 
       {aiPlan && !loadingPlan && (
         <div className="space-y-6 animate-in fade-in duration-500">
