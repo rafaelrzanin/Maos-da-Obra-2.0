@@ -3,8 +3,9 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.tsx';
 import { aiService } from '../services/ai.ts';
-import { PlanType } from '../types.ts';
+import { PlanType, Work, Step, Material, Expense, StepStatus, ExpenseCategory, ExpenseStatus } from '../types.ts'; // NEW: Import Work, Step, Material, Expense types
 import { ZE_AVATAR, ZE_AVATAR_FALLBACK } from '../services/standards.ts';
+import { dbService } from '../services/db.ts'; // NEW: Import dbService
 
 interface Message {
   id: string;
@@ -33,6 +34,14 @@ const AiChat = () => {
   const hasAiAccess = isVitalicio || isAiTrialActive;
 
   const [errorMsg, setErrorMsg] = useState(''); // For local errors like speech recognition
+
+  // NEW: Work context states
+  const [currentWork, setCurrentWork] = useState<Work | null>(null);
+  const [workSteps, setWorkSteps] = useState<Step[]>([]);
+  const [workMaterials, setWorkMaterials] = useState<Material[]>([]);
+  const [workExpenses, setWorkExpenses] = useState<Expense[]>([]);
+  const [loadingWorkContext, setLoadingWorkContext] = useState(false); // NEW: Loading state for work context
+
 
   // NEW: Update this ref whenever recognizedText changes
   useEffect(() => {
@@ -95,12 +104,68 @@ const AiChat = () => {
   }, []); // CRITICAL FIX: Empty dependency array
 
 
+  // NEW: Effect to load work context
+  useEffect(() => {
+    const loadContext = async () => {
+      // Only load if user is authenticated and has AI access, and authLoading is false (stable auth state)
+      if (!user?.id || !hasAiAccess || authLoading) { 
+        setLoadingWorkContext(false);
+        return;
+      }
+
+      setLoadingWorkContext(true);
+      const lastSelectedWorkId = localStorage.getItem('lastSelectedWorkId');
+      
+      if (lastSelectedWorkId) {
+        try {
+          const workData = await dbService.getWorkById(lastSelectedWorkId);
+          if (workData && workData.userId === user.id) { // Ensure work belongs to user
+            setCurrentWork(workData);
+            const stepsData = await dbService.getSteps(lastSelectedWorkId);
+            setWorkSteps(stepsData);
+            const materialsData = await dbService.getMaterials(lastSelectedWorkId);
+            setWorkMaterials(materialsData);
+            const expensesData = await dbService.getExpenses(lastSelectedWorkId);
+            setWorkExpenses(expensesData);
+            console.log("[AiChat] Work context loaded for:", workData.name);
+          } else {
+            setCurrentWork(null);
+            setWorkSteps([]);
+            setWorkMaterials([]);
+            setWorkExpenses([]);
+            console.log("[AiChat] Last selected work not found or not owned. No work context.");
+          }
+        } catch (err) {
+          console.error("[AiChat] Error loading work context:", err);
+          setCurrentWork(null);
+          setWorkSteps([]);
+          setWorkMaterials([]);
+          setWorkExpenses([]);
+        }
+      } else {
+        setCurrentWork(null);
+        setWorkSteps([]);
+        setWorkMaterials([]);
+        setWorkExpenses([]);
+        console.log("[AiChat] No last selected work in localStorage. No work context.");
+      }
+      setLoadingWorkContext(false);
+    };
+
+    if (!authLoading && user && hasAiAccess) { // Only load context if user is logged in AND has AI access AND auth is not loading
+        loadContext();
+    }
+  }, [user, hasAiAccess, authLoading]); // Re-run if user/access/authLoading changes
+
+
   // Add initial AI welcome message
   useEffect(() => {
-    if (hasAiAccess && messages.length === 0 && !authLoading) {
+    // Only show welcome message if AI access is granted, no messages yet, auth is finished and work context is loaded (or confirmed absent)
+    if (hasAiAccess && messages.length === 0 && !authLoading && !loadingWorkContext) {
       setMessages([{ id: 'ai-welcome', sender: 'ai', text: 'Opa! Mestre de obras na área. No que posso te ajudar hoje?' }]);
     }
-  }, [hasAiAccess, messages.length, authLoading]);
+  }, [hasAiAccess, messages.length, authLoading, loadingWorkContext]); // Add loadingWorkContext as dependency
+
 
   // Scroll to bottom of chat messages whenever messages update
   useEffect(() => {
@@ -108,6 +173,84 @@ const AiChat = () => {
       chatMessagesRef.current.scrollTop = chatMessagesRef.current.scrollHeight;
     }
   }, [messages]);
+
+
+  // NEW: Helper to build work context for AI
+  const buildWorkContext = useCallback(() => {
+    if (!currentWork) {
+      return "Nenhum contexto de obra disponível.";
+    }
+
+    let context = `CONTEXTO DA OBRA (baseado na obra "${currentWork.name}" - Status: ${currentWork.status}):\n`;
+
+    // CRONOGRAMA
+    const totalSteps = workSteps.length;
+    const completedSteps = workSteps.filter(s => s.status === StepStatus.COMPLETED).length;
+    const inProgressSteps = workSteps.filter(s => s.status === StepStatus.IN_PROGRESS).length;
+    const delayedSteps = workSteps.filter(s => s.status === StepStatus.DELAYED).length;
+    const pendingSteps = workSteps.filter(s => s.status === StepStatus.PENDING).length;
+
+    context += `\nCRONOGRAMA:\n`;
+    context += `  Total de Etapas: ${totalSteps}\n`;
+    context += `  Concluídas: ${completedSteps}\n`;
+    context += `  Em Andamento: ${inProgressSteps}\n`;
+    context += `  Atrasadas: ${delayedSteps}\n`;
+    context += `  Pendentes: ${pendingSteps}\n`;
+
+    const nextUpcomingSteps = workSteps.filter(s => s.status === StepStatus.PENDING).slice(0, 3);
+    if (nextUpcomingSteps.length > 0) {
+      context += `  Próximas Etapas Pendentes: ${nextUpcomingSteps.map(s => s.name).join(', ')}\n`;
+    }
+    const currentlyDelayedSteps = workSteps.filter(s => s.status === StepStatus.DELAYED);
+    if (currentlyDelayedSteps.length > 0) {
+      context += `  Etapas Atualmente Atrasadas: ${currentlyDelayedSteps.map(s => s.name).join(', ')}\n`;
+    }
+
+
+    // MATERIAIS
+    const totalPlannedMaterials = workMaterials.reduce((sum, m) => sum + m.plannedQty, 0);
+    const totalPurchasedMaterials = workMaterials.reduce((sum, m) => sum + m.purchasedQty, 0);
+    const pendingMaterials = workMaterials.filter(m => m.plannedQty > 0 && m.purchasedQty < m.plannedQty);
+    const materialShortages = pendingMaterials.filter(m => m.plannedQty > 0 && (m.purchasedQty / m.plannedQty) < 0.5); // Less than 50% purchased
+
+    context += `\nMATERIAIS:\n`;
+    context += `  Total Planejado: ${totalPlannedMaterials}\n`;
+    context += `  Total Comprado: ${totalPurchasedMaterials}\n`;
+    context += `  Materiais Pendentes (quant): ${pendingMaterials.length}\n`;
+    if (materialShortages.length > 0) {
+      context += `  Materiais com Grave Escassez: ${materialShortages.map(m => m.name).join(', ')}\n`;
+    }
+
+
+    // FINANCEIRO
+    const totalBudget = currentWork.budgetPlanned;
+    const totalExpensesAmount = workExpenses.reduce((sum, e) => sum + e.amount, 0); // Total planned amount for all expenses
+    const totalPaidExpenses = workExpenses.reduce((sum, e) => sum + (e.paidAmount || 0), 0); // Total paid amount (all expenses)
+    
+    // Sum only non-material expenses for primary budget tracking
+    const nonMaterialExpenses = workExpenses.filter(e => e.category !== ExpenseCategory.MATERIAL);
+    const nonMaterialPaid = nonMaterialExpenses.reduce((sum, e) => sum + (e.paidAmount || 0), 0);
+    
+    const outstandingExpenses = nonMaterialExpenses.reduce((sum, e) => {
+        const agreed = e.totalAgreed !== undefined && e.totalAgreed !== null ? e.totalAgreed : e.amount;
+        const paid = e.paidAmount || 0;
+        return sum + Math.max(0, agreed - paid);
+    }, 0);
+
+    const overpaidExpenses = workExpenses.filter(e => e.status === ExpenseStatus.OVERPAID);
+
+    context += `\nFINANCEIRO:\n`;
+    context += `  Orçamento Planejado: R$${totalBudget.toFixed(2)}\n`;
+    context += `  Gastos Totais Registrados (Previsto): R$${totalExpensesAmount.toFixed(2)}\n`;
+    context += `  Valor Efetivamente Pago (excluindo despesas de material, para análise de orçamento principal): R$${nonMaterialPaid.toFixed(2)}\n`;
+    context += `  A Pagar (não-materiais): R$${outstandingExpenses.toFixed(2)}\n`;
+    if (overpaidExpenses.length > 0) {
+      context += `  Despesas com Excedente (Prejuízo): R$${overpaidExpenses.reduce((sum, e) => sum + ((e.paidAmount || 0) - (e.totalAgreed !== undefined && e.totalAgreed !== null ? e.totalAgreed : e.amount)), 0).toFixed(2)}\n`;
+    }
+
+    return context;
+  }, [currentWork, workSteps, workMaterials, workExpenses]);
+
 
   const handleAiAsk = async (e?: React.FormEvent) => {
     e?.preventDefault(); // Only prevent default if event object exists
@@ -122,8 +265,18 @@ const AiChat = () => {
     setRecognizedText(''); // Clear recognized text too
     setErrorMsg(''); // Clear any previous errors
 
+    // NEW: Build and send work context along with the message
+    let fullPrompt = textToSend;
+    if (currentWork) {
+      const workContext = buildWorkContext();
+      fullPrompt = `${workContext}\n\nPERGUNTA DO USUÁRIO:\n${textToSend}`;
+    } else {
+      fullPrompt = `Nenhum contexto de obra disponível. PERGUNTA DO USUÁRIO:\n${textToSend}`; // Inform AI if no work context
+    }
+
     try {
-      const response = await aiService.chat(userMessage.text);
+      // NEW: Pass work context to aiService.chat
+      const response = await aiService.chat(fullPrompt, currentWork ? buildWorkContext() : undefined); 
       const aiResponse: Message = { id: (Date.now() + 1).toString(), sender: 'ai', text: response };
       setMessages(prevMessages => [...prevMessages, aiResponse]);
     } catch (error) {
@@ -153,7 +306,8 @@ const AiChat = () => {
     }
   };
 
-  if (authLoading) return (
+  // NEW: Include loadingWorkContext in the overall loading check
+  if (authLoading || loadingWorkContext) return (
     <div className="flex items-center justify-center min-h-[70vh] text-primary dark:text-white">
         <i className="fa-solid fa-circle-notch fa-spin text-3xl"></i>
     </div>
@@ -189,6 +343,12 @@ const AiChat = () => {
       <div className="mb-6">
         <h1 className="text-3xl font-black text-primary dark:text-white mb-2 tracking-tight">Zé da Obra <span className="text-secondary">AI</span></h1>
         <p className="text-slate-500 dark:text-slate-400 text-sm font-medium">Seu especialista 24h na palma da mão.</p>
+        {currentWork && (
+          <p className="text-xs text-slate-400 mt-2">Contexto da obra atual: <span className="font-bold">{currentWork.name}</span></p>
+        )}
+        {!currentWork && (
+          <p className="text-xs text-red-400 mt-2"><i className="fa-solid fa-exclamation-triangle mr-1"></i>Nenhuma obra selecionada. O Zé não terá contexto sobre sua obra. Selecione uma no Dashboard.</p>
+        )}
       </div>
       
       {/* Chat Messages Area */}
