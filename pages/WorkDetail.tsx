@@ -1124,6 +1124,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         quantity: 1, // Default to 1 for generic expenses
         date: newExpenseDate,
         category: newExpenseCategory,
+        relatedMaterialId: undefined, // Manually added expenses don't have relatedMaterialId
         stepId: newExpenseStepId === 'none' ? undefined : newExpenseStepId,
         workerId: newExpenseWorkerId === 'none' ? undefined : newExpenseWorkerId,
         supplierId: newExpenseSupplierId === 'none' ? undefined : newExpenseSupplierId,
