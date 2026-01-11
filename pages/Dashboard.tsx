@@ -250,7 +250,7 @@ const Dashboard = () => {
       setSelectedWork(null);
       setWorkSummary(null);
       setSelectedWorkSteps([]);
-      setDashboardError(`Não foi possível carregar suas obras: ${error.message || 'Erro desconhecido'}.`); // Set user-friendly error
+      setDashboardError(`Não foi possível carregar suas obras. Por favor, tente novamente.`); // Set user-friendly error
     } finally {
       setLoadingDashboard(false);
     }
@@ -301,7 +301,7 @@ const Dashboard = () => {
       console.error(`Erro ao carregar dados da obra ${workId}:`, error);
       setWorkSummary(null);
       setSelectedWorkSteps([]);
-      setDashboardError(`Não foi possível carregar os detalhes da obra: ${error.message || 'Erro desconhecido'}.`);
+      setDashboardError(`Algo não saiu como esperado ao carregar os detalhes da obra: ${error.message || 'Erro desconhecido'}.`);
     } finally {
       setLoadingDashboard(false);
     }
@@ -382,10 +382,10 @@ const Dashboard = () => {
     return (
       <div className="max-w-4xl mx-auto pb-28 pt-6 px-4 md:px-0 font-sans animate-in fade-in">
         <div className="flex flex-col items-center justify-center min-h-[70vh] p-6 text-center">
-            <i className="fa-solid fa-exclamation-circle text-6xl text-red-500 mb-4"></i>
-            <h2 className="text-2xl font-black text-primary dark:text-white mb-2">Erro ao Carregar Dashboard!</h2>
+            <i className="fa-solid fa-cloud-exclamation text-6xl text-slate-400 mb-4"></i>
+            <h2 className="text-2xl font-black text-primary dark:text-white mb-2">Ops! Tivemos um pequeno problema.</h2>
             <p className="text-slate-500 dark:text-slate-400 max-w-sm mx-auto mb-6">
-                {dashboardError}
+                Algo não saiu como esperado ao carregar suas obras. Por favor, tente novamente.
             </p>
             <button
                 onClick={loadAllWorks}
@@ -428,6 +428,31 @@ const Dashboard = () => {
           >
             <i className="fa-solid fa-plus-circle"></i> Começar Nova Obra
           </button>
+        </div>
+      </div>
+    );
+  }
+
+  // NEW: Fallback for when work is available but selectedWork/workSummary is not loaded (after filter change, etc.)
+  if (allWorks.length > 0 && (!selectedWork || !workSummary)) {
+    return (
+      <div className="max-w-4xl mx-auto pb-28 pt-6 px-4 md:px-0 font-sans animate-in fade-in">
+        <div className="flex flex-col items-center justify-center min-h-[50vh] p-6 text-center">
+          <i className="fa-solid fa-cloud-exclamation text-6xl text-slate-400 mb-4"></i>
+          <h2 className="text-2xl font-black text-primary dark:text-white mb-2">Algo não saiu como esperado.</h2>
+          <p className="text-slate-500 dark:text-slate-400 max-w-sm mx-auto mb-6">
+            Não foi possível carregar os detalhes da obra selecionada. Por favor, tente novamente.
+          </p>
+          <button
+            onClick={loadAllWorks}
+            className="px-6 py-3 bg-secondary text-white font-bold rounded-xl hover:bg-secondary-dark transition-colors"
+            aria-label="Tentar carregar obra novamente"
+            disabled={loadingDashboard}
+          >
+            {loadingDashboard ? <i className="fa-solid fa-circle-notch fa-spin mr-2"></i> : null}
+            Tentar Novamente
+          </button>
+          {/* Removed button to return to Dashboard, as loadAllWorks is the primary recovery mechanism here. */}
         </div>
       </div>
     );
