@@ -1,9 +1,10 @@
 
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.tsx';
 import { dbService } from '../services/db.ts';
-import { aiService } from '../services/ai.ts';
+import { aiService } from '../services/ai.tsx';
 import { Work, AIWorkPlan, PlanType } from '../types.ts';
 import { ZE_AVATAR, ZE_AVATAR_FALLBACK } from '../services/standards.ts';
 import { ZeModal } from '../components/ZeModal.tsx';
