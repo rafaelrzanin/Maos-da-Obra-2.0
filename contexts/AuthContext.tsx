@@ -20,7 +20,7 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     localStorage.setItem('maos_theme', theme);
   }, [theme]);
   const toggleTheme = () => setTheme(prev => (prev === 'light' ? 'dark' : 'light'));
-  return <ThemeContext.Provider value={{ theme, toggleTheme }}>{children}</ThemeContext.Provider>;
+  return <ThemeContext.Provider value={{ theme, toggleTheme }}>{children}</AuthContext.Provider>;
 };
 
 // --- Auth Context ---
@@ -393,7 +393,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const logout = () => {
+  const logout = async () => { // Make it async
     console.log("[AuthContext] logout called.");
     // 1. Immediately update local state to reflect logout and trigger loading state
     setUser(null); 
@@ -403,10 +403,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.removeItem('hasPromptedPushOnce'); // Clear push notification prompt status on logout
     setPushSubscriptionStatus('idle'); // Reset push status on logout
 
-    // 2. Perform the actual backend logout, which will trigger onAuthChange listener
-    dbService.logout();
+    // 2. Perform the actual backend logout, and await it
+    await dbService.logout();
     
-    console.log("[AuthContext] logout initiated. Auth states reset to loading/null.");
+    // 3. AFTER dbService.logout() has completed (and onAuthChange should have fired)
+    // Ensure final states are set, in case onAuthChange had a subtle race condition or was missed
+    // This is a failsafe. If onAuthChange did its job, these are redundant but harmless.
+    setAuthLoading(false); 
+    setIsUserAuthFinished(true); 
+
+    console.log("[AuthContext] logout initiated and completed. Auth states reset to loading/null and then final states confirmed.");
   };
 
   const updatePlan = async (plan: PlanType) => {
