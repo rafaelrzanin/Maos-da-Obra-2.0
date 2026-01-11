@@ -1,5 +1,5 @@
 
-import { GoogleGenAI } from "@google/genai"; // Removed Type as it's no longer used
+import { GoogleGenAI, Type } from "@google/genai"; // Removed Type as it's no longer used
 import { Work, AIWorkPlan } from "../types.ts"; // Re-added AIWorkPlan
 
 // Helper function to safely get environment variables, checking both process.env and import.meta.env
@@ -72,8 +72,24 @@ export const aiService = {
         contents: message,
         config: {
           // System instruction ajustada para concisão no chat
-          systemInstruction: "Seu nome é Zé da Obra. Você é um mestre de obras e engenheiro experiente. Seu objetivo é dar conselhos diretos e incisivos sobre economia, cronograma e segurança na obra, sempre focado em evitar prejuízos. Use linguagem clara, prática e profissional. Responda com no MÁXIMO 100 palavras, a menos que uma explicação mais detalhada seja estritamente necessária para a segurança ou para evitar um grande prejuízo. Seja um parceiro técnico, não um professor. Não use gírias ou informalidades excessivas. Apresente as informações de forma clara e objetiva.",
-          maxOutputTokens: 100, // Limita o tamanho da resposta no chat
+          systemInstruction: `Você é o Zé da Obra, um mestre de obras e engenheiro experiente e prático. Seu papel é ajudar o usuário a entender a obra.
+            Você entende de obra de verdade, já acompanhou várias obras e sabe explicar para quem não entende nada, de forma simples, direta e humana.
+            Você não usa linguagem acadêmica, jargão técnico pesado, estereótipos de pedreiro ou engenheiro, nem termos complicados sem explicar.
+
+            Sempre explique: o "porquê", as consequências práticas e de forma simples.
+
+            Você entende a sequência lógica de uma obra, a importância do cronograma, a dependência entre etapas, o impacto de atraso em etapas, a relação entre cronograma e materiais, e a relação entre compras e financeiro.
+
+            Quando o usuário perguntar sobre o andamento, status ou evolução da obra:
+            1. Deixe claro que sua análise precisa dos dados que o usuário registra no aplicativo (etapas, datas, materiais, compras, gastos).
+            2. Se o usuário fornecer esses dados na pergunta (ex: "Minha etapa 'Fundações' está atrasada, o que faço?"), analise com base nisso.
+            3. Se o usuário perguntar de forma genérica ("Como está o andamento da minha obra?"), diga que você precisa de mais informações do app para avaliar melhor, e peça para ele detalhar.
+            4. Ofereça conselhos gerais e construtivos sobre como ele pode usar os dados do app para identificar atrasos, gargalos, e sugerir ajustes, sempre com um tom calmo e sem alarmismo.
+            5. Nunca invente ou presuma dados inexistentes.
+
+            Seu objetivo final é fazer o usuário sentir que a obra está sendo acompanhada, que alguém entende o que está acontecendo e que o app evolui junto com a obra, e que você é um aliado real.
+            Responda com no MÁXIMO 200 palavras, a menos que uma explicação mais detalhada seja estritamente necessária para a segurança ou para evitar um grande prejuízo.`,
+          maxOutputTokens: 200, // Limita o tamanho da resposta no chat
           thinkingConfig: { thinkingBudget: 0 }, // Desabilita o "pensamento" para respostas rápidas e diretas
         }
       });
@@ -105,7 +121,9 @@ export const aiService = {
         contents: context,
         config: {
           // System instruction ajustada para respostas curtas e incisivas para notificações
-          systemInstruction: "Seu nome é Zé da Obra. Você é um mestre de obras e engenheiro experiente. \n\n**Seu objetivo:** Fornecer uma **única frase (máximo 25 palavras)**, direta, incisiva e acionável, focada em economia, controle de cronograma ou prevenção de prejuízo. Não divague, vá direto ao ponto como um alerta ou dica essencial para ser usada em uma notificação.\n\n**Exemplos de tom:**\n- 'Material XYZ em falta para a etapa ABC. Compre agora para evitar atrasos!'\n- 'Etapa X atrasada há 5 dias. Revise o cronograma urgente!'\n- 'Estoque de cimento baixo. Recomendo comprar mais 5 sacos para a próxima semana.'\n- 'Próxima etapa: Fundações. Não pule a impermeabilização do baldrame para evitar umidade futura.'\n- 'Etapa de pintura quase no fim. Faça a vistoria final antes de liberar o pagamento.'",
+          systemInstruction: `Você é o Zé da Obra. Você é um mestre de obras e engenheiro experiente. 
+            Seu objetivo: Fornecer uma **única frase (máximo 25 palavras)**, direta, incisiva e acionável, focada em economia, controle de cronograma ou prevenção de prejuízo. Não divague, vá direto ao ponto como um alerta ou dica essencial para ser usada em uma notificação.
+            Seja um parceiro técnico, não um professor. Não use gírias ou informalidades excessivas. Apresente as informações de forma clara e objetiva.`,
           maxOutputTokens: 50, // Limita o tamanho da resposta
           thinkingConfig: { thinkingBudget: 0 }, // Desabilita o "pensamento" para respostas rápidas e diretas
         }
@@ -182,6 +200,52 @@ export const aiService = {
         contents: prompt,
         config: {
           responseMimeType: "application/json",
+          responseSchema: { // NEW: Define the schema for structured JSON output
+            type: Type.OBJECT,
+            properties: {
+              workId: { type: Type.STRING },
+              generalAdvice: { type: Type.STRING },
+              timelineSummary: { type: Type.STRING },
+              detailedSteps: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    orderIndex: { type: Type.NUMBER },
+                    name: { type: Type.STRING },
+                    estimatedDurationDays: { type: Type.NUMBER },
+                    notes: { type: Type.STRING },
+                  },
+                  required: ['name', 'estimatedDurationDays', 'notes'],
+                },
+              },
+              potentialRisks: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    description: { type: Type.STRING },
+                    likelihood: { type: Type.STRING, enum: ['low', 'medium', 'high'] },
+                    mitigation: { type: Type.STRING },
+                  },
+                  required: ['description', 'likelihood', 'mitigation'],
+                },
+              },
+              materialSuggestions: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    item: { type: Type.STRING },
+                    priority: { type: Type.STRING, enum: ['low', 'medium', 'high'] },
+                    reason: { type: Type.STRING },
+                  },
+                  required: ['item', 'priority', 'reason'],
+                },
+              },
+            },
+            required: ['workId', 'generalAdvice', 'timelineSummary', 'detailedSteps', 'potentialRisks', 'materialSuggestions'],
+          },
           temperature: 0.7,
           maxOutputTokens: 1024,
           thinkingConfig: { thinkingBudget: 100 }, // Permitir mais "pensamento" para planos complexos
