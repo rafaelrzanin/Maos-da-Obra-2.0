@@ -42,8 +42,36 @@ interface AuthContextType {
   pushSubscriptionStatus: 'idle' | 'prompting' | 'granted' | 'denied' | 'error'; // NEW: Status of push notifications
 }
 
-const AuthContext = createContext<AuthContextType>(null!);
-export const useAuth = () => useContext(AuthContext);
+const AuthContext = createContext<AuthContextType | null>(null); // CRITICAL FIX: Allow null initially
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    // Em desenvolvimento, lança um erro claro.
+    if (import.meta.env.MODE !== 'production') {
+      throw new Error('useAuth must be used within an AuthProvider');
+    }
+    // Em produção, retorna um objeto seguro (fallback) para evitar crashes.
+    console.error('AuthContext used outside AuthProvider in production. Returning fallback values.');
+    return {
+      user: null,
+      authLoading: false,
+      isUserAuthFinished: true, // Assume finished to avoid infinite loading
+      login: async () => false,
+      signup: async () => false,
+      logout: () => {},
+      updatePlan: async () => {},
+      refreshUser: async () => {},
+      isSubscriptionValid: false,
+      isNewAccount: true,
+      trialDaysRemaining: null,
+      unreadNotificationsCount: 0,
+      refreshNotifications: async () => {},
+      requestPushNotificationPermission: async () => {},
+      pushSubscriptionStatus: 'idle',
+    };
+  }
+  return context;
+};
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
