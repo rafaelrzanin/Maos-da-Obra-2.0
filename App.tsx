@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, Suspense, lazy, Fragment } from 'react';
 import * as ReactRouter from 'react-router-dom';
 import { PlanType } from './types.ts';
@@ -23,7 +22,8 @@ const Checkout = lazy(() => import('./pages/Checkout.tsx'));
 const AiChat = lazy(() => import('./pages/AiChat.tsx')); // Lazy load AiChat page
 const Notifications = lazy(() => import('./pages/Notifications.tsx')); // NEW: Lazy load Notifications page
 // NEW: AiWorkPlanner lazy load, as it is a premium feature
-const AiWorkPlanner = lazy(() => import('./pages/AiWorkPlanner.tsx'));
+// Fix: Explicitly map module.default to default for lazy loading.
+const AiWorkPlanner = lazy(() => import('./pages/AiWorkPlanner.tsx').then(module => ({ default: module.default })));
 // FIX: Changed lazy import to correctly handle named export for ReportsView.
 const ReportsView = lazy(() => import('./components/ReportsView.tsx').then(module => ({ default: module.ReportsView }))); // NEW: Lazy load ReportsView
 
@@ -31,7 +31,7 @@ const ReportsView = lazy(() => import('./components/ReportsView.tsx').then(modul
 const LoadingScreen = () => (
   <div className="h-screen w-full flex flex-col items-center justify-center bg-surface dark:bg-slate-950 transition-colors">
     <div className="relative">
-        <div className="w-16 h-16 border-4 border-slate-200 dark:border-slate-800 border-t-secondary rounded-full animate-spin"></div>
+        <div className="w-16 h-16 border-4 border-slate-200 dark:bg-slate-800 border-t-secondary rounded-full animate-spin"></div>
         <div className="absolute inset-0 flex items-center justify-center text-xs font-bold text-secondary">
             <i className="fa-solid fa-helmet-safety"></i>
         </div>
@@ -317,9 +317,8 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
 
       {/* Main Content Area */}
       <main className={`p-4 max-w-7xl mx-auto ${isWorkDetailPage ? 'pb-20' : ''}`}> {/* Added pb-20 to main content if WorkDetail */}
-        <Suspense fallback={<LoadingScreen />}>
-          {children}
-        </Suspense>
+        {/* Suspense is now at the global level below */}
+        {children}
       </main>
 
       {/* NEW: Bottom Navigation Bar */}
