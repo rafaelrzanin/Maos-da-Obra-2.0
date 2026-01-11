@@ -86,7 +86,7 @@ const getEntityStatusDetails = (
 ): StatusDetails => {
   let statusText = '';
   let bgColor = 'bg-slate-400'; // Default gray for pending/not started
-  let textColor = 'text-slate-700 dark:text-slate-300';
+  let textColor = 'text-white'; // Always white for badges
   let borderColor = 'border-slate-200 dark:border-slate-700';
   let shadowClass = 'shadow-slate-400/20'; // Custom shadow for status (using /20 opacity suffix)
   let icon = 'fa-hourglass-start';
@@ -465,10 +465,47 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
   const [selectedContractTitle, setSelectedContractTitle] = useState('');
   const [copyContractSuccess, setCopyContractSuccess] = useState(false);
 
+  // NEW: Global Toast State for general feedback
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [toastType, setToastType] = useState<'success' | 'error' | 'warning'>('success');
+  const toastTimeoutRef = useRef<number | null>(null);
+
+  // NEW: State for "Atualizado automaticamente" badge on Financeiro tab
+  const [showFinanceUpdateBadge, setShowFinanceUpdateBadge] = useState(false);
+  const financeBadgeTimeoutRef = useRef<number | null>(null);
+
 
   // =======================================================================
   // AUXILIARY FUNCTIONS
   // =======================================================================
+
+  // NEW: Function to show a toast message
+  const showToastNotification = useCallback((message: string, type: 'success' | 'error' | 'warning' = 'success') => {
+    if (toastTimeoutRef.current) {
+      clearTimeout(toastTimeoutRef.current);
+    }
+    setToastMessage(message);
+    setToastType(type);
+    setShowToast(true);
+    toastTimeoutRef.current = setTimeout(() => {
+      setShowToast(false);
+      toastTimeoutRef.current = null;
+    }, 3000) as unknown as number; // Type assertion for setTimeout return type
+  }, []);
+
+  // NEW: Function to show finance update badge
+  const showFinanceBadge = useCallback(() => {
+    if (financeBadgeTimeoutRef.current) {
+      clearTimeout(financeBadgeTimeoutRef.current);
+    }
+    setShowFinanceUpdateBadge(true);
+    financeBadgeTimeoutRef.current = setTimeout(() => {
+      setShowFinanceUpdateBadge(false);
+      financeBadgeTimeoutRef.current = null;
+    }, 2000) as unknown as number; // Type assertion for setTimeout return type
+  }, []);
+
 
   const goToTab = useCallback((tab: MainTab) => {
     onTabChange(tab); // Use the prop to update activeTab in App.tsx
@@ -692,7 +729,9 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         message: "Não foi possível carregar os dados da obra. Verifique sua conexão ou tente novamente.",
         type: "ERROR",
         confirmText: "Ok",
-        onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false }))
+        // FIX: Ensure `onConfirm` and `onCancel` can take an optional event
+        onConfirm: async (_e?: React.FormEvent) => {setZeModal(prev => ({ ...prev, isOpen: false }));}, 
+        onCancel: (_e?: React.FormEvent) => setZeModal(prev => ({ ...prev, isOpen: false }))
       });
       setWork(null); // Ensure work is null on error to show not found
       return; // Explicitly return void on error
@@ -756,21 +795,24 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
       console.log(`[handleStepStatusChange] dbService.updateStep successful for step ${step.id}.`);
       console.log(`[handleStepStatusChange] Data reloaded after status update for step ${step.id}.`);
       await loadWorkData();
+      showToastNotification(`Status da etapa "${step.name}" atualizado para ${newRealDate ? 'Concluído' : 'Pendente'}.`, 'success');
     } catch (error: any) {
       console.error(`[handleStepStatusChange] Erro ao alterar status da etapa ${step.id}:`, error);
+      showToastNotification(`Erro ao atualizar status da etapa: ${error.message || 'Erro desconhecido'}.`, 'error');
       setZeModal({
         isOpen: true,
         title: "Erro ao Atualizar Status",
         message: `Não foi possível atualizar o status da etapa: ${error.message || 'Erro desconhecido'}. Tente novamente.`,
         type: "ERROR",
         confirmText: "Ok",
-        onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
+        onConfirm: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));},
+        onCancel: (_e?: React.FormEvent) => setZeModal(p => ({ ...p, isOpen: false }))
       });
     } finally {
       setIsUpdatingStepStatus(false);
       console.log(`[handleStepStatusChange] Finalized status update for step ${step.id}. isUpdatingStepStatus set to false.`);
     }
-  }, [loadWorkData, isUpdatingStepStatus]);
+  }, [loadWorkData, isUpdatingStepStatus, showToastNotification]);
 
   const handleAddStep = async (e: React.FormEvent) => {
     e.preventDefault(); // Prevent default form submission
@@ -795,8 +837,10 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
       setNewStepEndDate(new Date().toISOString().split('T')[0]);
       setNewEstimatedDurationDays(''); // Clear for new
       await loadWorkData();
+      showToastNotification(`Etapa "${newStepName}" adicionada com sucesso!`, 'success');
     } catch (error: any) {
       console.error("Erro ao adicionar etapa:", error);
+      showToastNotification(`Erro ao adicionar etapa: ${error.message || 'Erro desconhecido'}.`, 'error');
       setZeModal(prev => ({
         ...prev,
         isConfirming: false,
@@ -804,7 +848,8 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         message: `Não foi possível adicionar a etapa: ${error.message || 'Erro desconhecido'}. Tente novamente.`,
         type: "ERROR",
         confirmText: "Ok",
-        onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
+        onConfirm: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));},
+        onCancel: (_e?: React.FormEvent) => setZeModal(p => ({ ...p, isOpen: false }))
       }));
     } finally {
       setZeModal(prev => ({ ...prev, isConfirming: false }));
@@ -833,8 +878,10 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
       setEditStepData(null);
       setShowAddStepModal(false); // Close the modal
       await loadWorkData();
+      showToastNotification(`Etapa "${newStepName}" atualizada com sucesso!`, 'success');
     } catch (error: any) {
       console.error("Erro ao editar etapa:", error);
+      showToastNotification(`Erro ao editar etapa: ${error.message || 'Erro desconhecido'}.`, 'error');
       setZeModal(prev => ({
         ...prev,
         isConfirming: false,
@@ -842,7 +889,8 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         message: `Não foi possível editar a etapa: ${error.message || 'Erro desconhecido'}. Tente novamente.`,
         type: "ERROR",
         confirmText: "Ok",
-        onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
+        onConfirm: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));},
+        onCancel: (_e?: React.FormEvent) => setZeModal(p => ({ ...p, isOpen: false }))
       }));
     } finally {
       setZeModal(prev => ({ ...prev, isConfirming: false }));
@@ -856,8 +904,10 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
       await dbService.deleteStep(stepId, workId); // Backend will throw error if step is started
       await loadWorkData();
       setZeModal(prev => ({ ...prev, isOpen: false })); // Close the modal after successful deletion
+      showToastNotification("Etapa excluída com sucesso!", 'success');
     } catch (error: any) {
       console.error("Erro ao deletar etapa:", error);
+      showToastNotification(`Erro ao deletar etapa: ${error.message || 'Erro desconhecido'}.`, 'error');
       setZeModal(prev => ({
         ...prev,
         isConfirming: false,
@@ -865,7 +915,8 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         message: `Não foi possível deletar a etapa: ${error.message || 'Erro desconhecido'}. Tente novamente.`,
         type: "ERROR",
         confirmText: "Ok",
-        onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
+        onConfirm: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));},
+        onCancel: (_e?: React.FormEvent) => setZeModal(p => ({ ...p, isOpen: false }))
       }));
     } finally {
       setZeModal(prev => ({ ...prev, isConfirming: false }));
@@ -883,8 +934,8 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
             message: "Não é possível reordenar uma etapa que já foi iniciada.",
             confirmText: "Entendido",
             // FIX: Add `_e?: React.FormEvent` to match ZeModalProps.onConfirm signature.
-            onConfirm: async (_e?: React.FormEvent) => {},
-            onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
+            onConfirm: async (_e?: React.FormEvent) => {setZeModal(prev => ({ ...prev, isOpen: false }));},
+            onCancel: (_e?: React.FormEvent) => setZeModal(prev => ({ ...prev, isOpen: false })),
             type: "WARNING"
         }); // Corrected: Added missing closing parenthesis here
         return;
@@ -942,22 +993,25 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
       // Send updates to the database in parallel
       await Promise.all(updatedSteps.map(step => dbService.updateStep(step))); // Backend will validate immutability
       await loadWorkData(); // Refresh data to ensure consistency
+      showToastNotification("Etapas reordenadas com sucesso!", 'success');
     } catch (error: any) {
       console.error("Erro ao reordenar etapas:", error);
+      showToastNotification(`Erro ao reordenar etapas: ${error.message || 'Erro desconhecido'}.`, 'error');
       setZeModal({
         isOpen: true,
         title: "Erro ao Reordenar Etapas",
         message: `Não foi possível reordenar as etapas: ${error.message || 'Erro desconhecido'}. Tente novamente.`,
         type: "ERROR",
         confirmText: "Ok",
-        onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
+        onConfirm: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));},
+        onCancel: (_e?: React.FormEvent) => setZeModal(p => ({ ...p, isOpen: false }))
       });
     } finally {
       setDraggedStepId(null);
       setDragOverStepId(null);
       setLoading(false);
     }
-  }, [draggedStepId, steps, workId, loadWorkData, setLoading, setDraggedStepId, setDragOverStepId, setZeModal]);
+  }, [draggedStepId, steps, workId, loadWorkData, setLoading, setDraggedStepId, setDragOverStepId, setZeModal, showToastNotification]);
 
   // NEW: Handler for generating materials (when empty state button is clicked)
   const handleGenerateMaterials = useCallback(async () => {
@@ -968,7 +1022,8 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         message: "Não é possível gerar materiais sem dados da obra ou etapas existentes.",
         type: "ERROR",
         confirmText: "Ok",
-        onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
+        onConfirm: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));},
+        onCancel: (_e?: React.FormEvent) => setZeModal(p => ({ ...p, isOpen: false }))
       });
       return;
     }
@@ -982,8 +1037,10 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
       await dbService.regenerateMaterials(work, steps);
       await loadWorkData(); // Reload all data to reflect new materials
       setZeModal(prev => ({ ...prev, isOpen: false })); // Close modal if it was open
+      showToastNotification("Lista de materiais gerada com sucesso!", 'success');
     } catch (error: any) {
       console.error("Erro ao gerar lista de materiais:", error);
+      showToastNotification(`Erro ao gerar materiais: ${error.message || 'Erro desconhecido'}.`, 'error');
       setZeModal(prev => ({
         ...prev,
         isConfirming: false,
@@ -991,13 +1048,14 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         message: `Não foi possível gerar a lista de materiais: ${error.message || 'Erro desconhecido'}. Tente novamente.`,
         type: "ERROR",
         confirmText: "Ok",
-        onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
+        onConfirm: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));},
+        onCancel: (_e?: React.FormEvent) => setZeModal(p => ({ ...p, isOpen: false }))
       }));
     } finally {
       setLoading(false); // Deactivate general page loading
       setZeModal(prev => ({ ...prev, isConfirming: false })); // Deactivate modal spinner
     }
-  }, [work, steps, loadWorkData]);
+  }, [work, steps, loadWorkData, showToastNotification]);
 
 
   // =======================================================================
@@ -1031,8 +1089,10 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
       setPurchaseQtyInput(''); // Clear temporary purchase inputs
       setPurchaseCostInput(''); // Clear temporary purchase inputs
       await loadWorkData();
+      showToastNotification(`Material "${newMaterialName}" adicionado com sucesso!`, 'success');
     } catch (error: any) {
       console.error("Erro ao adicionar material:", error);
+      showToastNotification(`Erro ao adicionar material: ${error.message || 'Erro desconhecido'}.`, 'error');
       setZeModal(prev => ({
         ...prev,
         isConfirming: false,
@@ -1040,7 +1100,8 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         message: `Não foi possível adicionar o material: ${error.message || 'Erro desconhecido'}. Tente novamente.`,
         type: "ERROR",
         confirmText: "Ok",
-        onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
+        onConfirm: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));},
+        onCancel: (_e?: React.FormEvent) => setZeModal(p => ({ ...p, isOpen: false }))
       }));
     } finally {
       setZeModal(prev => ({ ...prev, isConfirming: false }));
@@ -1091,8 +1152,11 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
       setEditMaterialData(null);
       setShowAddMaterialModal(false); // Close the modal
       await loadWorkData();
+      showToastNotification(`Material "${newMaterialName}" atualizado e/ou compra registrada com sucesso!`, 'success');
+      showFinanceBadge(); // Show badge on finance tab
     } catch (error: any) {
       console.error("Erro ao editar material ou registrar compra:", error);
+      showToastNotification(`Erro na operação de material: ${error.message || 'Erro desconhecido'}.`, 'error');
       setZeModal(prev => ({
         ...prev,
         isConfirming: false,
@@ -1100,7 +1164,8 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         message: `Não foi possível completar a operação: ${error.message || 'Erro desconhecido'}. Tente novamente.`,
         type: "ERROR",
         confirmText: "Ok",
-        onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
+        onConfirm: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));},
+        onCancel: (_e?: React.FormEvent) => setZeModal(p => ({ ...p, isOpen: false }))
       }));
     } finally {
       setZeModal(prev => ({ ...prev, isConfirming: false }));
@@ -1113,8 +1178,11 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
       await dbService.deleteMaterial(materialId);
       await loadWorkData();
       setZeModal(prev => ({ ...prev, isOpen: false })); // Close the modal after successful deletion
+      showToastNotification("Material excluído com sucesso!", 'success');
+      showFinanceBadge(); // Show badge on finance tab
     } catch (error: any) {
       console.error("Erro ao deletar material:", error);
+      showToastNotification(`Erro ao deletar material: ${error.message || 'Erro desconhecido'}.`, 'error');
       setZeModal(prev => ({
         ...prev,
         isConfirming: false,
@@ -1122,7 +1190,8 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         message: `Não foi possível deletar o material: ${error.message || 'Erro desconhecido'}. Tente novamente.`,
         type: "ERROR",
         confirmText: "Ok",
-        onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
+        onConfirm: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));},
+        onCancel: (_e?: React.FormEvent) => setZeModal(p => ({ ...p, isOpen: false }))
       }));
     } finally {
       setZeModal(prev => ({ ...prev, isConfirming: false }));
@@ -1168,8 +1237,11 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
       // FIX: Clear `newExpenseTotalAgreed`
       setNewExpenseTotalAgreed(''); // Clear new expense total agreed
       await loadWorkData();
+      showToastNotification(`Despesa "${newExpenseDescription}" adicionada com sucesso!`, 'success');
+      showFinanceBadge(); // Show badge on finance tab
     } catch (error: any) {
       console.error("Erro ao adicionar despesa:", error);
+      showToastNotification(`Erro ao adicionar despesa: ${error.message || 'Erro desconhecido'}.`, 'error');
       setZeModal(prev => ({
         ...prev,
         isConfirming: false,
@@ -1177,7 +1249,8 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         message: `Não foi possível adicionar a despesa: ${error.message || 'Erro desconhecido'}. Tente novamente.`,
         type: "ERROR",
         confirmText: "Ok",
-        onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
+        onConfirm: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));},
+        onCancel: (_e?: React.FormEvent) => setZeModal(p => ({ ...p, isOpen: false }))
       }));
     } finally {
       setZeModal(prev => ({ ...prev, isConfirming: false }));
@@ -1205,8 +1278,11 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
       setEditExpenseData(null);
       setShowAddExpenseModal(false);
       await loadWorkData();
+      showToastNotification(`Despesa "${newExpenseDescription}" atualizada com sucesso!`, 'success');
+      showFinanceBadge(); // Show badge on finance tab
     } catch (error: any) {
       console.error("Erro ao editar despesa:", error);
+      showToastNotification(`Erro ao editar despesa: ${error.message || 'Erro desconhecido'}.`, 'error');
       setZeModal(prev => ({
         ...prev,
         isConfirming: false,
@@ -1214,7 +1290,8 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         message: `Não foi possível editar a despesa: ${error.message || 'Erro desconhecido'}. Tente novamente.`,
         type: "ERROR",
         confirmText: "Ok",
-        onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
+        onConfirm: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));},
+        onCancel: (_e?: React.FormEvent) => setZeModal(p => ({ ...p, isOpen: false }))
       }));
     } finally {
       setZeModal(prev => ({ ...prev, isConfirming: false }));
@@ -1227,8 +1304,11 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
       await dbService.deleteExpense(expenseId);
       await loadWorkData();
       setZeModal(prev => ({ ...prev, isOpen: false }));
+      showToastNotification("Despesa excluída com sucesso!", 'success');
+      showFinanceBadge(); // Show badge on finance tab
     } catch (error: any) {
       console.error("Erro ao deletar despesa:", error);
+      showToastNotification(`Erro ao deletar despesa: ${error.message || 'Erro desconhecido'}.`, 'error');
       setZeModal(prev => ({
         ...prev,
         isConfirming: false,
@@ -1236,7 +1316,8 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         message: `Não foi possível deletar a despesa: ${error.message || 'Erro desconhecido'}. Tente novamente.`,
         type: "ERROR",
         confirmText: "Ok",
-        onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
+        onConfirm: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));},
+        onCancel: (_e?: React.FormEvent) => setZeModal(p => ({ ...p, isOpen: false }))
       }));
     } finally {
       setZeModal(prev => ({ ...prev, isConfirming: false }));
@@ -1270,8 +1351,10 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
       setNewWorkerDailyRate('');
       setNewWorkerNotes('');
       await loadWorkData();
+      showToastNotification(`Trabalhador "${newWorkerName}" adicionado com sucesso!`, 'success');
     } catch (error: any) {
       console.error("Erro ao adicionar trabalhador:", error);
+      showToastNotification(`Erro ao adicionar trabalhador: ${error.message || 'Erro desconhecido'}.`, 'error');
       setZeModal(prev => ({
         ...prev,
         isConfirming: false,
@@ -1279,7 +1362,8 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         message: `Não foi possível adicionar o trabalhador: ${error.message || 'Erro desconhecido'}. Tente novamente.`,
         type: "ERROR",
         confirmText: "Ok",
-        onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
+        onConfirm: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));},
+        onCancel: (_e?: React.FormEvent) => setZeModal(p => ({ ...p, isOpen: false }))
       }));
     } finally {
       setIsAddingWorker(false); // Clear local loading
@@ -1305,8 +1389,10 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
       setEditWorkerData(null);
       setShowAddWorkerModal(false);
       await loadWorkData();
+      showToastNotification(`Trabalhador "${newWorkerName}" atualizado com sucesso!`, 'success');
     } catch (error: any) {
       console.error("Erro ao editar trabalhador:", error);
+      showToastNotification(`Erro ao editar trabalhador: ${error.message || 'Erro desconhecido'}.`, 'error');
       setZeModal(prev => ({
         ...prev,
         isConfirming: false,
@@ -1314,7 +1400,8 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         message: `Não foi possível editar o trabalhador: ${error.message || 'Erro desconhecido'}. Tente novamente.`,
         type: "ERROR",
         confirmText: "Ok",
-        onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
+        onConfirm: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));},
+        onCancel: (_e?: React.FormEvent) => setZeModal(p => ({ ...p, isOpen: false }))
       }));
     } finally {
       setIsAddingWorker(false);
@@ -1329,8 +1416,10 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
       await dbService.deleteWorker(workerId, workId);
       await loadWorkData();
       setZeModal(prev => ({ ...prev, isOpen: false }));
+      showToastNotification("Trabalhador excluído com sucesso!", 'success');
     } catch (error: any) {
       console.error("Erro ao deletar trabalhador:", error);
+      showToastNotification(`Erro ao deletar trabalhador: ${error.message || 'Erro desconhecido'}.`, 'error');
       setZeModal(prev => ({
         ...prev,
         isConfirming: false,
@@ -1338,7 +1427,8 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         message: `Não foi possível deletar o trabalhador: ${error.message || 'Erro desconhecido'}. Tente novamente.`,
         type: "ERROR",
         confirmText: "Ok",
-        onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
+        onConfirm: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));},
+        onCancel: (_e?: React.FormEvent) => setZeModal(p => ({ ...p, isOpen: false }))
       }));
     } finally {
       setZeModal(prev => ({ ...prev, isConfirming: false }));
@@ -1374,8 +1464,10 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
       setNewSupplierAddress('');
       setNewSupplierNotes('');
       await loadWorkData();
+      showToastNotification(`Fornecedor "${newSupplierName}" adicionado com sucesso!`, 'success');
     } catch (error: any) {
       console.error("Erro ao adicionar fornecedor:", error);
+      showToastNotification(`Erro ao adicionar fornecedor: ${error.message || 'Erro desconhecido'}.`, 'error');
       setZeModal(prev => ({
         ...prev,
         isConfirming: false,
@@ -1383,7 +1475,8 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         message: `Não foi possível adicionar o fornecedor: ${error.message || 'Erro desconhecido'}. Tente novamente.`,
         type: "ERROR",
         confirmText: "Ok",
-        onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
+        onConfirm: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));},
+        onCancel: (_e?: React.FormEvent) => setZeModal(p => ({ ...p, isOpen: false }))
       }));
     } finally {
       setIsAddingSupplier(false);
@@ -1410,8 +1503,10 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
       setEditSupplierData(null);
       setShowAddSupplierModal(false);
       await loadWorkData();
+      showToastNotification(`Fornecedor "${newSupplierName}" atualizado com sucesso!`, 'success');
     } catch (error: any) {
       console.error("Erro ao editar fornecedor:", error);
+      showToastNotification(`Erro ao editar fornecedor: ${error.message || 'Erro desconhecido'}.`, 'error');
       setZeModal(prev => ({
         ...prev,
         isConfirming: false,
@@ -1419,7 +1514,8 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         message: `Não foi possível editar o fornecedor: ${error.message || 'Erro desconhecido'}. Tente novamente.`,
         type: "ERROR",
         confirmText: "Ok",
-        onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
+        onConfirm: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));},
+        onCancel: (_e?: React.FormEvent) => setZeModal(p => ({ ...p, isOpen: false }))
       }));
     } finally {
       setIsAddingSupplier(false);
@@ -1434,8 +1530,10 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
       await dbService.deleteSupplier(supplierId, workId);
       await loadWorkData();
       setZeModal(prev => ({ ...prev, isOpen: false }));
+      showToastNotification("Fornecedor excluído com sucesso!", 'success');
     } catch (error: any) {
       console.error("Erro ao deletar fornecedor:", error);
+      showToastNotification(`Erro ao deletar fornecedor: ${error.message || 'Erro desconhecido'}.`, 'error');
       setZeModal(prev => ({
         ...prev,
         isConfirming: false,
@@ -1443,7 +1541,8 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         message: `Não foi possível deletar o fornecedor: ${error.message || 'Erro desconhecido'}. Tente novamente.`,
         type: "ERROR",
         confirmText: "Ok",
-        onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
+        onConfirm: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));},
+        onCancel: (_e?: React.FormEvent) => setZeModal(p => ({ ...p, isOpen: false }))
       }));
     } finally {
       setZeModal(prev => ({ ...prev, isConfirming: false }));
@@ -1489,8 +1588,10 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
       setNewPhotoFile(null);
       setNewPhotoType('PROGRESS');
       await loadWorkData();
+      showToastNotification("Foto adicionada com sucesso!", 'success');
     } catch (error: any) {
       console.error("Erro ao adicionar foto:", error);
+      showToastNotification(`Erro ao adicionar foto: ${error.message || 'Erro desconhecido'}.`, 'error');
       setZeModal(prev => ({
         ...prev,
         isConfirming: false,
@@ -1498,7 +1599,8 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         message: `Não foi possível adicionar a foto: ${error.message || 'Erro desconhecido'}. Tente novamente.`,
         type: "ERROR",
         confirmText: "Ok",
-        onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
+        onConfirm: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));},
+        onCancel: (_e?: React.FormEvent) => setZeModal(p => ({ ...p, isOpen: false }))
       }));
     } finally {
       setLoadingPhoto(false);
@@ -1522,8 +1624,10 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
       await dbService.deletePhoto(photo.id);
       await loadWorkData();
       setZeModal(prev => ({ ...prev, isOpen: false }));
+      showToastNotification("Foto excluída com sucesso!", 'success');
     } catch (error: any) {
       console.error("Erro ao deletar foto:", error);
+      showToastNotification(`Erro ao deletar foto: ${error.message || 'Erro desconhecido'}.`, 'error');
       setZeModal(prev => ({
         ...prev,
         isConfirming: false,
@@ -1531,7 +1635,8 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         message: `Não foi possível deletar a foto: ${error.message || 'Erro desconhecido'}. Tente novamente.`,
         type: "ERROR",
         confirmText: "Ok",
-        onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
+        onConfirm: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));},
+        onCancel: (_e?: React.FormEvent) => setZeModal(p => ({ ...p, isOpen: false }))
       }));
     } finally {
       setZeModal(prev => ({ ...prev, isConfirming: false }));
@@ -1578,8 +1683,10 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
       setNewFileCategory(FileCategory.GENERAL);
       setNewUploadFile(null);
       await loadWorkData();
+      showToastNotification("Arquivo adicionado com sucesso!", 'success');
     } catch (error: any) {
       console.error("Erro ao adicionar arquivo:", error);
+      showToastNotification(`Erro ao adicionar arquivo: ${error.message || 'Erro desconhecido'}.`, 'error');
       setZeModal(prev => ({
         ...prev,
         isConfirming: false,
@@ -1587,7 +1694,8 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         message: `Não foi possível adicionar o arquivo: ${error.message || 'Erro desconhecido'}. Tente novamente.`,
         type: "ERROR",
         confirmText: "Ok",
-        onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
+        onConfirm: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));},
+        onCancel: (_e?: React.FormEvent) => setZeModal(p => ({ ...p, isOpen: false }))
       }));
     } finally {
       setLoadingFile(false);
@@ -1613,8 +1721,10 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
       await dbService.deleteFile(file.id);
       await loadWorkData();
       setZeModal(prev => ({ ...prev, isOpen: false }));
+      showToastNotification("Arquivo excluído com sucesso!", 'success');
     } catch (error: any) {
       console.error("Erro ao deletar arquivo:", error);
+      showToastNotification(`Erro ao deletar arquivo: ${error.message || 'Erro desconhecido'}.`, 'error');
       setZeModal(prev => ({
         ...prev,
         isConfirming: false,
@@ -1622,7 +1732,8 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         message: `Não foi possível deletar o arquivo: ${error.message || 'Erro desconhecido'}. Tente novamente.`,
         type: "ERROR",
         confirmText: "Ok",
-        onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
+        onConfirm: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));},
+        onCancel: (_e?: React.FormEvent) => setZeModal(p => ({ ...p, isOpen: false }))
       }));
     } finally {
       setZeModal(prev => ({ ...prev, isConfirming: false }));
@@ -1636,7 +1747,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
   const handleAddChecklist = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!workId || !newChecklistName || newChecklistItems.some(item => !item.trim())) {
-      setZeModal(prev => ({ ...prev, title: "Campos Obrigatórios", message: "Por favor, preencha o nome do checklist e todos os itens.", type: "ERROR", confirmText: "Ok", onConfirm: async () => {}, onCancel: () => setZeModal(p => ({ ...p, isOpen: false })) }));
+      setZeModal(prev => ({ ...prev, title: "Campos Obrigatórios", message: "Por favor, preencha o nome do checklist e todos os itens.", type: "ERROR", confirmText: "Ok", onConfirm: async (_e?: React.FormEvent) => {}, onCancel: (_e?: React.FormEvent) => setZeModal(p => ({ ...p, isOpen: false })) }));
       return;
     }
 
@@ -1658,8 +1769,10 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
       setNewChecklistCategory('');
       setNewChecklistItems(['']);
       await loadWorkData();
+      showToastNotification("Checklist adicionado com sucesso!", 'success');
     } catch (error: any) {
       console.error("Erro ao adicionar checklist:", error);
+      showToastNotification(`Erro ao adicionar checklist: ${error.message || 'Erro desconhecido'}.`, 'error');
       setZeModal(prev => ({
         ...prev,
         isConfirming: false,
@@ -1667,7 +1780,8 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         message: `Não foi possível adicionar o checklist: ${error.message || 'Erro desconhecido'}. Tente novamente.`,
         type: "ERROR",
         confirmText: "Ok",
-        onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
+        onConfirm: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));},
+        onCancel: (_e?: React.FormEvent) => setZeModal(p => ({ ...p, isOpen: false }))
       }));
     } finally {
       setIsAddingChecklist(false);
@@ -1678,7 +1792,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
   const handleEditChecklist = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editChecklistData || !workId || !newChecklistName || newChecklistItems.some(item => !item.trim())) {
-      setZeModal(prev => ({ ...prev, title: "Campos Obrigatórios", message: "Por favor, preencha o nome do checklist e todos os itens.", type: "ERROR", confirmText: "Ok", onConfirm: async () => {}, onCancel: () => setZeModal(p => ({ ...p, isOpen: false })) }));
+      setZeModal(prev => ({ ...prev, title: "Campos Obrigatórios", message: "Por favor, preencha o nome do checklist e todos os itens.", type: "ERROR", confirmText: "Ok", onConfirm: async (_e?: React.FormEvent) => {}, onCancel: (_e?: React.FormEvent) => setZeModal(p => ({ ...p, isOpen: false })) }));
       return;
     }
 
@@ -1702,8 +1816,10 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
       setEditChecklistData(null);
       setShowAddChecklistModal(false);
       await loadWorkData();
+      showToastNotification("Checklist atualizado com sucesso!", 'success');
     } catch (error: any) {
       console.error("Erro ao editar checklist:", error);
+      showToastNotification(`Erro ao editar checklist: ${error.message || 'Erro desconhecido'}.`, 'error');
       setZeModal(prev => ({
         ...prev,
         isConfirming: false,
@@ -1711,7 +1827,8 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         message: `Não foi possível editar o checklist: ${error.message || 'Erro desconhecido'}. Tente novamente.`,
         type: "ERROR",
         confirmText: "Ok",
-        onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
+        onConfirm: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));},
+        onCancel: (_e?: React.FormEvent) => setZeModal(p => ({ ...p, isOpen: false }))
       }));
     } finally {
       setIsAddingChecklist(false);
@@ -1725,8 +1842,10 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
       await dbService.deleteChecklist(checklistId);
       await loadWorkData();
       setZeModal(prev => ({ ...prev, isOpen: false }));
+      showToastNotification("Checklist excluído com sucesso!", 'success');
     } catch (error: any) {
       console.error("Erro ao deletar checklist:", error);
+      showToastNotification(`Erro ao deletar checklist: ${error.message || 'Erro desconhecido'}.`, 'error');
       setZeModal(prev => ({
         ...prev,
         isConfirming: false,
@@ -1734,7 +1853,8 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         message: `Não foi possível deletar o checklist: ${error.message || 'Erro desconhecido'}. Tente novamente.`,
         type: "ERROR",
         confirmText: "Ok",
-        onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
+        onConfirm: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));},
+        onCancel: (_e?: React.FormEvent) => setZeModal(p => ({ ...p, isOpen: false }))
       }));
     } finally {
       setZeModal(prev => ({ ...prev, isConfirming: false }));
@@ -1800,6 +1920,29 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
   // ... rest of the component rendering
   return (
     <div className="max-w-4xl mx-auto pb-12 pt-6 px-4 md:px-0 font-sans">
+      {/* NEW: Global Toast Notification */}
+      {showToast && (
+        <div 
+          className={cx(
+            "fixed top-4 left-1/2 -translate-x-1/2 z-[1001] px-5 py-3 rounded-xl shadow-xl flex items-center gap-3 animate-in fade-in slide-in-from-top-8 duration-300",
+            toastType === 'success' ? 'bg-green-500 text-white' :
+            toastType === 'error' ? 'bg-red-500 text-white' :
+            'bg-amber-500 text-white'
+          )}
+          role="status"
+          aria-live="polite"
+        >
+          <i className={cx(
+            "fa-solid",
+            toastType === 'success' ? 'fa-check-circle' :
+            toastType === 'error' ? 'fa-exclamation-circle' :
+            'fa-triangle-exclamation'
+          )}></i>
+          <span className="font-bold">{toastMessage}</span>
+        </div>
+      )}
+
+
       {/* HEADER PREMIUM */}
       <div className="flex items-center gap-4 mb-6 px-2 sm:px-0">
         <button
@@ -1845,9 +1988,14 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         </button>
         <button
           onClick={() => goToTab('FINANCEIRO')}
-          className={`flex-1 py-2 rounded-xl text-sm font-bold transition-colors ${activeTab === 'FINANCEIRO' ? 'bg-secondary text-white shadow-md' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
+          className={`relative flex-1 py-2 rounded-xl text-sm font-bold transition-colors ${activeTab === 'FINANCEIRO' ? 'bg-secondary text-white shadow-md' : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}`}
         >
           Financeiro
+          {showFinanceUpdateBadge && (
+            <span className="absolute -top-2 -right-2 bg-green-500 text-white text-[10px] font-bold w-auto px-2 py-0.5 rounded-full flex items-center justify-center leading-none shadow-lg animate-pulse">
+              Atualizado!
+            </span>
+          )}
         </button>
         <button
           onClick={() => goToTab('FERRAMENTAS')}
@@ -1911,10 +2059,11 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                 </div>
                 {steps.map(step => {
                   const statusDetails = getEntityStatusDetails('step', step, steps);
+                  const isDraggable = !step.startDate; // NEW: Explicit boolean for readability
                   return (
                     <div
                       key={step.id}
-                      draggable={!step.startDate} // Only allow dragging if step has not started
+                      draggable={isDraggable} // Only allow dragging if step has not started
                       onDragStart={(e) => handleDragStart(e, step.id)}
                       onDragOver={(e) => handleDragOver(e, step.id)}
                       onDragLeave={handleDragLeave}
@@ -1923,11 +2072,12 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                         "bg-slate-50 dark:bg-slate-800 p-4 rounded-xl border-l-4 transition-all duration-300 group",
                         statusDetails.borderColor, // Use status-specific border
                         dragOverStepId === step.id ? 'border-r-4 border-dashed border-secondary scale-[1.01] shadow-lg' : '',
-                        !step.startDate ? 'cursor-grab hover:scale-[1.005]' : 'cursor-not-allowed opacity-80' // Visual feedback for draggable
+                        isDraggable ? 'cursor-grab hover:scale-[1.005]' : 'cursor-not-allowed opacity-80', // Visual feedback for draggable
                       )}
                       aria-labelledby={`step-name-${step.id}`}
                       aria-describedby={`step-status-${step.id}`}
                       aria-disabled={!!step.startDate}
+                      title={isDraggable ? "Arraste para reordenar" : "Etapa iniciada, não reordenável."} // NEW: Tooltip for reorder
                     >
                       <div className="flex items-center justify-between mb-2">
                         <h3 id={`step-name-${step.id}`} className="font-bold text-primary dark:text-white text-lg flex items-center gap-2">
@@ -1995,7 +2145,9 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                             setNewEstimatedDurationDays(String(step.estimatedDurationDays || ''));
                             setShowAddStepModal(true);
                           }}
-                          className="ml-2 px-3 py-1 bg-primary text-white text-xs font-bold rounded-lg hover:bg-primary-light transition-colors"
+                          disabled={!!step.startDate} // NEW: Disable edit if step started
+                          title={!!step.startDate ? "Etapa iniciada, não editável." : "Editar detalhes da etapa"} // NEW: Tooltip
+                          className="ml-2 px-3 py-1 bg-primary text-white text-xs font-bold rounded-lg hover:bg-primary-light transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                           aria-label={`Editar etapa ${step.name}`}
                         >
                           Editar
@@ -2487,7 +2639,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                                   e?.preventDefault(); // Pass event here
                                   await handleDeletePhoto(photo);
                                 },
-                                onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
+                                onCancel: (_e?: React.FormEvent) => setZeModal(prev => ({ ...prev, isOpen: false })),
                                 isConfirming: zeModal.isConfirming,
                                 type: "DANGER"
                               });
@@ -2548,7 +2700,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                                 e?.preventDefault();
                                 await handleDeleteFile(file);
                               },
-                              onCancel: () => setZeModal(prev => ({ ...prev, isOpen: false })),
+                              onCancel: (_e?: React.FormEvent) => setZeModal(prev => ({ ...prev, isOpen: false })),
                               isConfirming: zeModal.isConfirming,
                               type: "DANGER"
                             });
@@ -2688,6 +2840,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                 placeholder="Ex: Fundações, Pintura Final"
                 required
                 disabled={!!editStepData?.startDate} // Disable name edit if step started
+                title={!!editStepData?.startDate ? "Não é possível alterar o nome de uma etapa iniciada." : undefined} // Tooltip
               />
               {editStepData?.startDate && <p className="text-xs text-red-500 mt-1">Não é possível alterar o nome de uma etapa iniciada.</p>}
             </div>
@@ -2700,6 +2853,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                 onChange={(e) => setNewStepStartDate(e.target.value)}
                 className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
                 disabled={!!editStepData?.startDate} // Disable start date edit if step started
+                title={!!editStepData?.startDate ? "Não é possível alterar a data de início de uma etapa iniciada." : undefined} // Tooltip
               />
               {editStepData?.startDate && <p className="text-xs text-red-500 mt-1">Não é possível alterar a data de início de uma etapa iniciada.</p>}
             </div>
@@ -2766,6 +2920,8 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                 className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
                 placeholder="Ex: Cimento CP-II"
                 required
+                disabled={!!editMaterialData?.purchasedQty && editMaterialData.purchasedQty > 0} // NEW: Disable if purchased
+                title={!!editMaterialData?.purchasedQty && editMaterialData.purchasedQty > 0 ? "Não editável após compra registrada." : undefined} // NEW: Tooltip
               />
             </div>
             <div>
@@ -2777,6 +2933,8 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                 onChange={(e) => setNewMaterialBrand(e.target.value)}
                 className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
                 placeholder="Ex: Votorantim, Quartzolit"
+                disabled={!!editMaterialData?.purchasedQty && editMaterialData.purchasedQty > 0} // NEW: Disable if purchased
+                title={!!editMaterialData?.purchasedQty && editMaterialData.purchasedQty > 0 ? "Não editável após compra registrada." : undefined} // NEW: Tooltip
               />
             </div>
             <div>
@@ -2790,6 +2948,8 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                 placeholder="Ex: 50"
                 min="0"
                 required
+                disabled={!!editMaterialData?.purchasedQty && editMaterialData.purchasedQty > 0} // NEW: Disable if purchased
+                title={!!editMaterialData?.purchasedQty && editMaterialData.purchasedQty > 0 ? "Não editável após compra registrada." : undefined} // NEW: Tooltip
               />
             </div>
             <div>
@@ -2802,6 +2962,8 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                 className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
                 placeholder="Ex: Sacos, M², Litros"
                 required
+                disabled={!!editMaterialData?.purchasedQty && editMaterialData.purchasedQty > 0} // NEW: Disable if purchased
+                title={!!editMaterialData?.purchasedQty && editMaterialData.purchasedQty > 0 ? "Não editável após compra registrada." : undefined} // NEW: Tooltip
               />
             </div>
             <div>
@@ -2813,6 +2975,8 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                 onChange={(e) => setNewMaterialCategory(e.target.value)}
                 className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
                 placeholder="Ex: Elétrica, Hidráulica, Acabamento"
+                disabled={!!editMaterialData?.purchasedQty && editMaterialData.purchasedQty > 0} // NEW: Disable if purchased
+                title={!!editMaterialData?.purchasedQty && editMaterialData.purchasedQty > 0 ? "Não editável após compra registrada." : undefined} // NEW: Tooltip
               />
             </div>
             <div>
@@ -2919,6 +3083,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                 step="0.01"
                 required
                 disabled={editExpenseData?.paidAmount && editExpenseData.paidAmount > 0} // Disable if already paid
+                title={editExpenseData?.paidAmount && editExpenseData.paidAmount > 0 ? "Não editável após pagamento registrado." : undefined} // Tooltip
               />
               {editExpenseData?.paidAmount && editExpenseData.paidAmount > 0 && <p className="text-xs text-red-500 mt-1">Não é possível alterar o valor de uma despesa que já possui pagamentos.</p>}
             </div>
@@ -2937,6 +3102,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                 min="0"
                 step="0.01"
                 disabled={editExpenseData?.paidAmount && editExpenseData.paidAmount > 0} // Disable if already paid
+                title={editExpenseData?.paidAmount && editExpenseData.paidAmount > 0 ? "Não editável após pagamento registrado." : undefined} // Tooltip
               />
               {editExpenseData?.paidAmount && editExpenseData.paidAmount > 0 && <p className="text-xs text-red-500 mt-1">Não é possível alterar o valor combinado de uma despesa que já possui pagamentos.</p>}
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
@@ -2952,6 +3118,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                 className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
                 required
                 disabled={editExpenseData?.paidAmount && editExpenseData.paidAmount > 0} // Disable if already paid
+                title={editExpenseData?.paidAmount && editExpenseData.paidAmount > 0 ? "Não editável após pagamento registrado." : undefined} // Tooltip
               >
                 {Object.values(ExpenseCategory).map(category => (
                   <option key={category} value={category}>{category}</option>
@@ -2970,6 +3137,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                 className="w-full px-4 py-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
                 required
                 disabled={editExpenseData?.paidAmount && editExpenseData.paidAmount > 0} // Disable if already paid
+                title={editExpenseData?.paidAmount && editExpenseData.paidAmount > 0 ? "Não editável após pagamento registrado." : undefined} // Tooltip
               />
               {editExpenseData?.paidAmount && editExpenseData.paidAmount > 0 && <p className="text-xs text-red-500 mt-1">Não é possível alterar a data de uma despesa que já possui pagamentos.</p>}
             </div>
@@ -3041,8 +3209,11 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
               setPaymentAmount('');
               setNewPaymentDate(new Date().toISOString().split('T')[0]); // Default to today
               await loadWorkData();
+              showToastNotification(`Pagamento de ${formatCurrency(Number(paymentAmount))} registrado com sucesso!`, 'success');
+              showFinanceBadge(); // Show badge on finance tab
             } catch (error: any) {
               console.error("Erro ao registrar pagamento:", error);
+              showToastNotification(`Erro ao registrar pagamento: ${error.message || 'Erro desconhecido'}.`, 'error');
               setZeModal(prev => ({
                 ...prev,
                 isConfirming: false,
@@ -3050,7 +3221,8 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                 message: `Não foi possível registrar o pagamento: ${error.message || 'Erro desconhecido'}. Tente novamente.`,
                 type: "ERROR",
                 confirmText: "Ok",
-                onCancel: () => setZeModal(p => ({ ...p, isOpen: false }))
+                onConfirm: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));},
+                onCancel: (_e?: React.FormEvent) => setZeModal(p => ({ ...p, isOpen: false }))
               }));
             } finally {
               setZeModal(prev => ({ ...prev, isConfirming: false }));
