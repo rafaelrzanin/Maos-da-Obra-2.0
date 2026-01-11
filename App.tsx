@@ -23,9 +23,11 @@ const AiChat = lazy(() => import('./pages/AiChat.tsx')); // Lazy load AiChat pag
 const Notifications = lazy(() => import('./pages/Notifications.tsx')); // NEW: Lazy load Notifications page
 // NEW: AiWorkPlanner lazy load, as it is a premium feature
 // Fix: Explicitly map module.default to default for lazy loading.
-const AiWorkPlanner = lazy(() => import('./pages/AiWorkPlanner.tsx').then(module => ({ default: module.default })));
+const AiWorkPlanner = lazy(() => import('./pages/AiWorkPlanner.tsx'));
 // FIX: Changed lazy import to correctly handle named export for ReportsView.
 const ReportsView = lazy(() => import('./components/ReportsView.tsx').then(module => ({ default: module.ReportsView }))); // NEW: Lazy load ReportsView
+// OE #003: Lazy load HelpFAQ page
+const HelpFAQ = lazy(() => import('./pages/HelpFAQ.tsx'));
 
 // --- Componente de Carregamento ---
 const LoadingScreen = () => (
@@ -220,6 +222,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
     { path: '/profile', icon: 'fa-user', label: 'Meu Perfil' }, // Added Profile
     { path: '/tutorials', icon: 'fa-video', label: 'Tutoriais em Vídeo' }, // Added Tutorials
     { path: '/settings', icon: 'fa-gear', label: 'Configurações' },
+    { path: '/help', icon: 'fa-question-circle', label: 'Ajuda e Dúvidas' }, // OE #003: Added HelpFAQ link
   ];
 
   // Determine if current route is a WorkDetail page (to show bottom nav)
@@ -374,6 +377,8 @@ const AppRouterContent = () => {
         <ReactRouter.Route path="/work/:id/ai-planner" element={<Layout><AiWorkPlanner /></Layout>} />
         {/* NEW: Route for ReportsView */}
         <ReactRouter.Route path="/work/:id/reports" element={<Layout><ReportsView /></Layout>} />
+        {/* OE #003: Route for HelpFAQ */}
+        <ReactRouter.Route path="/help" element={<Layout><HelpFAQ /></Layout>} />
         {/* Wildcard route to redirect any unmatched path to dashboard for logged-in users */}
         <ReactRouter.Route path="*" element={<ReactRouter.Navigate to="/" replace />} />
       </ReactRouter.Routes>
