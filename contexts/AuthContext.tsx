@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, createContext, useContext, useMemo, useCallback, useRef } from 'react';
 import { User, PlanType, DBNotification } from '../types.ts';
 import { dbService } from '../services/db.ts';
@@ -232,8 +233,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setUnreadNotificationsCount(0); // Limpa notificações no logout
           setPushSubscriptionStatus('idle'); // Reset push status on logout
         }
-        setIsUserAuthFinished(true); // Garante que auth esteja marcado como finished após qualquer evento
-        setAuthLoading(false); // Ensure loading is off after auth change handling
+        // Always set these to false/true at the end of onAuthChange to signify auth state is stable.
+        setAuthLoading(false); 
+        setIsUserAuthFinished(true); 
         console.log("[AuthContext - onAuthChange] Auth change handler finished. authLoading=false, isUserAuthFinished=true.");
       }
     });
@@ -364,14 +366,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = () => {
     console.log("[AuthContext] logout called.");
-    dbService.logout();
-    setUser(null); // Clear user immediately
+    // 1. Immediately update local state to reflect logout and trigger loading state
+    setUser(null); 
+    setAuthLoading(true); 
+    setIsUserAuthFinished(false);
     setUnreadNotificationsCount(0); // Clear notifications on logout
-    localStorage.removeItem('hasPromptedPushOnce'); // NEW: Clear push notification prompt status on logout
+    localStorage.removeItem('hasPromptedPushOnce'); // Clear push notification prompt status on logout
     setPushSubscriptionStatus('idle'); // Reset push status on logout
-    setAuthLoading(false); // Explicitly set to false after logout operation
-    setIsUserAuthFinished(true); // Still ready, just no user.
-    console.log("[AuthContext] logout finished. Auth states reset.");
+
+    // 2. Perform the actual backend logout, which will trigger onAuthChange listener
+    dbService.logout();
+    
+    console.log("[AuthContext] logout initiated. Auth states reset to loading/null.");
   };
 
   const updatePlan = async (plan: PlanType) => {
