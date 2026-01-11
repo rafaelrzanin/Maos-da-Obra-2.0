@@ -231,13 +231,13 @@ const CreateWork = () => {
   };
 
   const CounterInput = ({ label, field, icon }: { label: string, field: keyof typeof formData, icon: string }) => (
-      <div className="bg-white dark:bg-slate-800 rounded-2xl border-2 border-slate-200 dark:border-slate-700 p-3 flex flex-col items-center justify-center shadow-sm hover:border-secondary/50 dark:hover:border-secondary/50 transition-colors group">
-          <div className="text-slate-400 mb-1 group-hover:text-secondary transition-colors text-lg"><i className={`fa-solid ${icon}`}></i></div>
-          <label className="text-[10px] font-black text-slate-700 dark:text-slate-300 uppercase mb-2 text-center tracking-wider">{label}</label>
-          <div className="flex items-center gap-3 w-full justify-center">
-              <button type="button" onClick={() => handleCounter(field, false)} className="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-200 font-bold hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors flex items-center justify-center" aria-label={`Diminuir ${label.toLowerCase()}`}>-</button>
-              <span className="min-w-[1.5rem] text-center font-black text-primary dark:text-white text-xl">{formData[field as keyof typeof formData]}</span>
-              <button type="button" onClick={() => handleCounter(field, true)} className="w-8 h-8 rounded-lg bg-primary text-white font-bold hover:bg-primary-light transition-colors shadow-md shadow-primary/20 flex items-center justify-center" aria-label={`Aumentar ${label.toLowerCase()}`}>+</button>
+      <div className="bg-white dark:bg-slate-800 rounded-2xl border-2 border-slate-200 dark:border-slate-700 p-4 flex flex-col items-center justify-center shadow-sm hover:border-secondary/50 dark:hover:border-secondary/50 transition-colors group"> {/* OE #004: Increased padding */}
+          <div className="text-slate-400 mb-2 group-hover:text-secondary transition-colors text-xl"><i className={`fa-solid ${icon}`}></i></div> {/* OE #004: Increased icon size, margin */}
+          <label className="text-xs font-black text-slate-700 dark:text-slate-300 uppercase mb-3 text-center tracking-wider">{label}</label> {/* OE #004: Increased margin */}
+          <div className="flex items-center gap-4 w-full justify-center"> {/* OE #004: Increased gap */}
+              <button type="button" onClick={() => handleCounter(field, false)} className="w-9 h-9 rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-200 font-bold hover:bg-slate-200 dark:hover:bg-slate-600 transition-colors flex items-center justify-center text-lg" aria-label={`Diminuir ${label.toLowerCase()}`}>-</button> {/* OE #004: Increased size, text size */}
+              <span className="min-w-[1.5rem] text-center font-black text-primary dark:text-white text-2xl">{formData[field as keyof typeof formData]}</span> {/* OE #004: Increased text size */}
+              <button type="button" onClick={() => handleCounter(field, true)} className="w-9 h-9 rounded-lg bg-primary text-white font-bold hover:bg-primary-light transition-colors shadow-md shadow-primary/20 flex items-center justify-center text-lg" aria-label={`Aumentar ${label.toLowerCase()}`}>+</button> {/* OE #004: Increased size, text size */}
           </div>
       </div>
   );
@@ -248,12 +248,12 @@ const CreateWork = () => {
       case 1:
         return (
           <>
-            <h2 className="text-3xl font-black text-primary dark:text-white mb-2 tracking-tight text-center">Crie sua Obra!</h2>
-            <p className="text-slate-500 dark:text-slate-400 max-w-sm mx-auto text-center mb-8">
+            <h2 className="text-3xl font-black text-primary dark:text-white mb-3 tracking-tight text-center">Crie sua Obra!</h2> {/* OE #004: Increased margin */}
+            <p className="text-slate-500 dark:text-slate-400 max-w-sm mx-auto text-center mb-10 text-base"> {/* OE #004: Increased margin, text size */}
               Primeiros passos para o seu projeto de sucesso.
             </p>
 
-            <div className="space-y-5">
+            <div className="space-y-6"> {/* OE #004: Increased space-y */}
               <div className="bg-white dark:bg-slate-800 rounded-2xl border-2 border-slate-200 dark:border-slate-700 p-4 flex items-center gap-4 shadow-sm group hover:border-secondary/50 dark:hover:border-secondary/50 transition-colors">
                 <div className="w-10 h-10 flex items-center justify-center text-secondary text-2xl">
                     <i className="fa-solid fa-signature"></i>
@@ -267,12 +267,12 @@ const CreateWork = () => {
                         value={formData.name}
                         onChange={handleChange}
                         placeholder="Ex: Reforma da Cozinha, Casa da Praia"
-                        className={`w-full bg-transparent text-primary dark:text-white outline-none text-base ${formErrors.name ? 'border-red-500' : ''}`}
+                        className={`w-full bg-transparent text-primary dark:text-white outline-none text-base placeholder:text-gray-400 dark:placeholder:text-gray-500 ${formErrors.name ? 'border-red-500' : ''}`} /* OE #004: Added placeholder styling */
                         required
                         aria-invalid={!!formErrors.name}
                         aria-describedby={formErrors.name ? "name-error" : undefined}
                     />
-                    {formErrors.name && <p id="name-error" className="text-red-500 text-xs mt-1">{formErrors.name}</p>}
+                    {formErrors.name && <p id="name-error" className="text-red-500 text-sm mt-1">{formErrors.name}</p>} {/* OE #004: Increased text size */}
                 </div>
               </div>
 
@@ -291,12 +291,12 @@ const CreateWork = () => {
                         placeholder="100"
                         min="0"
                         step="0.01"
-                        className={`w-full bg-transparent text-primary dark:text-white outline-none text-base ${formErrors.area ? 'border-red-500' : ''}`}
+                        className={`w-full bg-transparent text-primary dark:text-white outline-none text-base placeholder:text-gray-400 dark:placeholder:text-gray-500 ${formErrors.area ? 'border-red-500' : ''}`} /* OE #004: Added placeholder styling */
                         required
                         aria-invalid={!!formErrors.area}
                         aria-describedby={formErrors.area ? "area-error" : undefined}
                     />
-                    {formErrors.area && <p id="area-error" className="text-red-500 text-xs mt-1">{formErrors.area}</p>}
+                    {formErrors.area && <p id="area-error" className="text-red-500 text-sm mt-1">{formErrors.area}</p>} {/* OE #004: Increased text size */}
                 </div>
               </div>
 
@@ -313,14 +313,14 @@ const CreateWork = () => {
                         value={formData.budgetPlanned} 
                         onChange={handleChange}
                         placeholder="50000.00"
-                        className={`w-full bg-transparent text-primary dark:text-white outline-none text-base ${formErrors.budgetPlanned ? 'border-red-500' : ''}`}
+                        className={`w-full bg-transparent text-primary dark:text-white outline-none text-base placeholder:text-gray-400 dark:placeholder:text-gray-500 ${formErrors.budgetPlanned ? 'border-red-500' : ''}`} /* OE #004: Added placeholder styling */
                         required
                         aria-invalid={!!formErrors.budgetPlanned}
                         aria-describedby={formErrors.budgetPlanned ? "budgetPlanned-error" : undefined}
                         min="0"
                         step="0.01"
                     />
-                    {formErrors.budgetPlanned && <p id="budgetPlanned-error" className="text-red-500 text-xs mt-1">{formErrors.budgetPlanned}</p>}
+                    {formErrors.budgetPlanned && <p id="budgetPlanned-error" className="text-red-500 text-sm mt-1">{formErrors.budgetPlanned}</p>} {/* OE #004: Increased text size */}
                 </div>
               </div>
 
@@ -337,7 +337,7 @@ const CreateWork = () => {
                         value={formData.address}
                         onChange={handleChange}
                         placeholder="Ex: Rua das Flores, 123"
-                        className="w-full bg-transparent text-primary dark:text-white outline-none text-base"
+                        className="w-full bg-transparent text-primary dark:text-white outline-none text-base placeholder:text-gray-400 dark:placeholder:text-gray-500" /* OE #004: Added placeholder styling */
                     />
                 </div>
               </div>
@@ -347,35 +347,35 @@ const CreateWork = () => {
       case 2:
         return (
           <>
-            <h2 className="text-3xl font-black text-primary dark:text-white mb-2 tracking-tight text-center">Tipo de Obra e Início</h2>
-            <p className="text-slate-500 dark:text-slate-400 max-w-sm mx-auto text-center mb-8">
+            <h2 className="text-3xl font-black text-primary dark:text-white mb-3 tracking-tight text-center">Tipo de Obra e Início</h2> {/* OE #004: Increased margin */}
+            <p className="text-slate-500 dark:text-slate-400 max-w-sm mx-auto text-center mb-10 text-base"> {/* OE #004: Increased margin, text size */}
               Selecione o tipo de projeto e a data de início.
             </p>
 
-            <div className="space-y-6">
+            <div className="space-y-6"> {/* OE #004: Increased space-y */}
               <div>
                 <label className="block text-sm font-bold text-slate-500 uppercase mb-3">Tipo de Obra <span className="text-red-500">*</span></label>
                 <div className="grid grid-cols-2 gap-4">
                   <button
                     type="button"
                     onClick={() => handleCategorySelect('CONSTRUCTION')}
-                    className={`flex flex-col items-center justify-center p-5 rounded-2xl border-2 transition-all shadow-md ${workCategory === 'CONSTRUCTION' ? 'border-secondary bg-secondary/10' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-secondary/50'}`}
+                    className={`flex flex-col items-center justify-center p-6 rounded-2xl border-2 transition-all shadow-md ${workCategory === 'CONSTRUCTION' ? 'border-secondary bg-secondary/10' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-secondary/50'}`} /* OE #004: Increased padding */
                     aria-pressed={workCategory === 'CONSTRUCTION'}
                   >
-                    <i className="fa-solid fa-house-chimney text-4xl mb-3 text-primary dark:text-white"></i>
-                    <span className="font-black text-primary dark:text-white text-base">Construção</span>
+                    <i className="fa-solid fa-house-chimney text-4xl mb-4 text-primary dark:text-white"></i> {/* OE #004: Increased margin */}
+                    <span className="font-black text-primary dark:text-white text-lg">Construção</span> {/* OE #004: Increased text size */}
                   </button>
                   <button
                     type="button"
                     onClick={() => handleCategorySelect('RENOVATION')}
-                    className={`flex flex-col items-center justify-center p-5 rounded-2xl border-2 transition-all shadow-md ${workCategory === 'RENOVATION' ? 'border-secondary bg-secondary/10' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-secondary/50'}`}
+                    className={`flex flex-col items-center justify-center p-6 rounded-2xl border-2 transition-all shadow-md ${workCategory === 'RENOVATION' ? 'border-secondary bg-secondary/10' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-secondary/50'}`} /* OE #004: Increased padding */
                     aria-pressed={workCategory === 'RENOVATION'}
                   >
-                    <i className="fa-solid fa-screwdriver-wrench text-4xl mb-3 text-primary dark:text-white"></i>
-                    <span className="font-black text-primary dark:text-white text-base">Reforma</span>
+                    <i className="fa-solid fa-screwdriver-wrench text-4xl mb-4 text-primary dark:text-white"></i> {/* OE #004: Increased margin */}
+                    <span className="font-black text-primary dark:text-white text-lg">Reforma</span> {/* OE #004: Increased text size */}
                   </button>
                 </div>
-                {formErrors.workCategory && <p className="text-red-500 text-xs mt-1">{formErrors.workCategory}</p>}
+                {formErrors.workCategory && <p className="text-red-500 text-sm mt-1">{formErrors.workCategory}</p>} {/* OE #004: Increased text size */}
               </div>
 
               <div className="bg-white dark:bg-slate-800 rounded-2xl border-2 border-slate-200 dark:border-slate-700 p-4 flex items-center gap-4 shadow-sm group hover:border-secondary/50 dark:hover:border-secondary/50 transition-colors">
@@ -390,12 +390,12 @@ const CreateWork = () => {
                         name="startDate"
                         value={formData.startDate}
                         onChange={handleChange}
-                        className={`w-full bg-transparent text-primary dark:text-white outline-none text-base ${formErrors.startDate ? 'border-red-500' : ''}`}
+                        className={`w-full bg-transparent text-primary dark:text-white outline-none text-base placeholder:text-gray-400 dark:placeholder:text-gray-500 ${formErrors.startDate ? 'border-red-500' : ''}`} /* OE #004: Added placeholder styling */
                         required
                         aria-invalid={!!formErrors.startDate}
                         aria-describedby={formErrors.startDate ? "startDate-error" : undefined}
                     />
-                    {formErrors.startDate && <p id="startDate-error" className="text-red-500 text-xs mt-1">{formErrors.startDate}</p>}
+                    {formErrors.startDate && <p id="startDate-error" className="text-red-500 text-sm mt-1">{formErrors.startDate}</p>} {/* OE #004: Increased text size */}
                 </div>
               </div>
             </div>
@@ -404,16 +404,16 @@ const CreateWork = () => {
       case 3: // NEW Step 3
         return (
           <>
-            <h2 className="text-3xl font-black text-primary dark:text-white mb-2 tracking-tight text-center">Detalhes do Projeto</h2>
-            <p className="text-slate-500 dark:text-slate-400 max-w-sm mx-auto text-center mb-8">
+            <h2 className="text-3xl font-black text-primary dark:text-white mb-3 tracking-tight text-center">Detalhes do Projeto</h2> {/* OE #004: Increased margin */}
+            <p className="text-slate-500 dark:text-slate-400 max-w-sm mx-auto text-center mb-10 text-base"> {/* OE #004: Increased margin, text size */}
               Selecione o tipo específico e adicione detalhes para o Zé da Obra planejar tudo.
             </p>
 
-            <div className="space-y-6">
+            <div className="space-y-6"> {/* OE #004: Increased space-y */}
               {workCategory && (
                 <div>
                   <label htmlFor="selectedTemplateId" className="block text-sm font-bold text-slate-500 uppercase mb-3">Tipo Específico <span className="text-red-500">*</span></label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4"> {/* OE #004: Increased gap */}
                     {WORK_TEMPLATES.filter(t => 
                       workCategory === 'CONSTRUCTION' ? t.id === 'CONSTRUCAO' : t.id !== 'CONSTRUCAO'
                     ).map(template => (
@@ -424,21 +424,21 @@ const CreateWork = () => {
                         className={`flex items-center p-4 rounded-2xl border-2 transition-all text-left shadow-sm ${selectedTemplateId === template.id ? 'border-secondary bg-secondary/10' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-secondary/50'}`}
                         aria-pressed={selectedTemplateId === template.id}
                       >
-                        <i className={`fa-solid ${template.icon} text-2xl mr-3 text-primary dark:text-white`}></i>
+                        <i className={`fa-solid ${template.icon} text-2xl mr-4 text-primary dark:text-white`}></i> {/* OE #004: Increased margin */}
                         <div>
-                          <p className="font-bold text-primary dark:text-white text-sm">{template.label}</p>
-                          <p className="text-xs text-slate-500 dark:text-slate-400">{template.description}</p>
+                          <p className="font-bold text-primary dark:text-white text-base">{template.label}</p>
+                          <p className="text-sm text-slate-500 dark:text-slate-400">{template.description}</p> {/* OE #004: Increased text size */}
                         </div>
                       </button>
                     ))}
                   </div>
-                  {formErrors.selectedTemplate && <p className="text-red-500 text-xs mt-1">{formErrors.selectedTemplate}</p>}
+                  {formErrors.selectedTemplate && <p className="text-red-500 text-sm mt-1">{formErrors.selectedTemplate}</p>} {/* OE #004: Increased text size */}
                 </div>
               )}
 
               {needsDetailedInputs && (
-                <div className="mt-6 pt-4 border-t border-slate-200 dark:border-slate-700">
-                    <h3 className="text-lg font-bold text-primary dark:text-white mb-4">Detalhes Adicionais</h3>
+                <div className="mt-8 pt-5 border-t border-slate-200 dark:border-slate-700"> {/* OE #004: Increased margin-top, padding-top */}
+                    <h3 className="text-xl font-bold text-primary dark:text-white mb-5">Detalhes Adicionais</h3> {/* OE #004: Increased text size, margin */}
                     <div className="grid grid-cols-2 gap-4">
                         <CounterInput label="Nº de Pavimentos" field="floors" icon="fa-layer-group" />
                         <CounterInput label="Nº de Banheiros" field="bathrooms" icon="fa-toilet" />
@@ -446,9 +446,9 @@ const CreateWork = () => {
                         <CounterInput label="Nº de Quartos" field="bedrooms" icon="fa-bed" />
                         <CounterInput label="Nº de Salas" field="livingRooms" icon="fa-couch" />
                         {/* Leisure area is a checkbox, not a counter */}
-                        <div className="bg-white dark:bg-slate-800 rounded-2xl border-2 border-slate-200 dark:border-slate-700 p-3 flex flex-col items-center justify-center shadow-sm hover:border-secondary/50 dark:hover:border-secondary/50 transition-colors group">
-                            <div className="text-slate-400 mb-1 group-hover:text-secondary transition-colors text-lg"><i className="fa-solid fa-swimming-pool"></i></div>
-                            <label htmlFor="hasLeisureArea" className="text-[10px] font-black text-slate-700 dark:text-slate-300 uppercase mb-2 text-center tracking-wider cursor-pointer">Área de Lazer</label>
+                        <div className="bg-white dark:bg-slate-800 rounded-2xl border-2 border-slate-200 dark:border-slate-700 p-4 flex flex-col items-center justify-center shadow-sm hover:border-secondary/50 dark:hover:border-secondary/50 transition-colors group"> {/* OE #004: Increased padding */}
+                            <div className="text-slate-400 mb-2 group-hover:text-secondary transition-colors text-xl"><i className="fa-solid fa-swimming-pool"></i></div> {/* OE #004: Increased icon size, margin */}
+                            <label htmlFor="hasLeisureArea" className="text-xs font-black text-slate-700 dark:text-slate-300 uppercase mb-3 text-center tracking-wider cursor-pointer">Área de Lazer</label> {/* OE #004: Increased margin */}
                             <input
                                 type="checkbox"
                                 id="hasLeisureArea"
@@ -472,7 +472,8 @@ const CreateWork = () => {
 
   // If AuthContext is still loading, show a simple spinner.
   // This prevents the CreateWork form from flashing prematurely before auth state is known.
-  if (!isUserAuthFinished || authLoading) { // Updated condition
+  // OE #004: Ensured loading screen is robust and centered.
+  if (!isUserAuthFinished || authLoading) { 
     return (
         <div className="flex items-center justify-center min-h-[80vh] text-primary dark:text-white">
             <i className="fa-solid fa-circle-notch fa-spin text-3xl"></i>
@@ -492,14 +493,14 @@ const CreateWork = () => {
                 setFormErrors({}); 
                 setGeneralError(''); 
             }} 
-            className="text-slate-400 hover:text-primary dark:hover:text-white transition-colors p-2 -ml-2"
+            className="text-slate-400 hover:text-primary dark:hover:text-white transition-colors p-2 -ml-2 text-xl" /* OE #004: Increased text size */
             aria-label={currentStep === 1 ? "Voltar ao Dashboard" : "Voltar à etapa anterior"}
           >
             <i className="fa-solid fa-arrow-left text-xl"></i>
           </button>
-          <div className="flex gap-2" role="progressbar" aria-valuenow={currentStep} aria-valuemin={1} aria-valuemax={totalSteps}>
+          <div className="flex gap-3" role="progressbar" aria-valuenow={currentStep} aria-valuemin={1} aria-valuemax={totalSteps}> {/* OE #004: Increased gap */}
               {[1, 2, 3].map(s => ( // UPDATED progress bar for 3 steps
-                  <div key={s} className={`h-2 rounded-full transition-all duration-500 ${s <= currentStep ? 'w-8 bg-secondary' : 'w-2 bg-slate-200 dark:bg-slate-700'}`}></div>
+                  <div key={s} className={`h-2 rounded-full transition-all duration-500 ${s <= currentStep ? 'w-10 bg-secondary' : 'w-3 bg-slate-200 dark:bg-slate-700'}`}></div> {/* OE #004: Increased width */}
               ))}
           </div>
           <div className="w-6"></div> {/* Placeholder for alignment */}
@@ -507,18 +508,18 @@ const CreateWork = () => {
 
       <form onSubmit={handleSubmit}>
           {generalError && (
-              <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-900 text-red-600 dark:text-red-400 rounded-xl text-sm font-bold flex items-center gap-2 animate-in fade-in" role="alert">
+              <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-900 text-red-600 dark:text-red-400 rounded-xl text-base font-bold flex items-center gap-2 animate-in fade-in" role="alert"> {/* OE #004: Increased text size */}
                   <i className="fa-solid fa-triangle-exclamation"></i> {generalError}
               </div>
           )}
           {renderStepContent()}
           
-          <div className="mt-8 flex justify-center"> {/* Centralize the button */}
+          <div className="mt-10 flex justify-center"> {/* OE #004: Increased margin-top */}
               {currentStep < totalSteps ? (
                   <button 
                     type="button" 
                     onClick={() => { if(validateStep(currentStep)) setCurrentStep(prev => prev + 1); setGeneralError(''); }} 
-                    className="px-8 py-4 bg-secondary text-white font-bold rounded-2xl shadow-lg hover:bg-orange-600 transition-all flex items-center gap-3"
+                    className="px-9 py-4 bg-secondary text-white font-bold rounded-2xl shadow-lg hover:bg-orange-600 transition-all flex items-center gap-3 text-xl" /* OE #004: Increased padding, text size */
                     aria-label="Próxima etapa do formulário"
                   >
                       Próximo <i className="fa-solid fa-arrow-right"></i>
@@ -527,7 +528,7 @@ const CreateWork = () => {
                   <button 
                     type="submit" 
                     disabled={loading} 
-                    className="px-8 py-4 bg-gradient-gold text-white font-black rounded-2xl shadow-lg hover:shadow-amber-500/30 hover:scale-105 transition-all flex items-center justify-center gap-3 disabled:opacity-70 disabled:scale-100"
+                    className="px-9 py-4 bg-gradient-gold text-white font-black rounded-2xl shadow-lg hover:shadow-amber-500/30 hover:scale-105 transition-all flex items-center justify-center gap-3 disabled:opacity-70 disabled:scale-100 text-xl" /* OE #004: Increased padding, text size */
                     aria-label={loading ? 'Gerando obra' : 'Criar obra'}
                   >
                       {loading ? 'Gerando...' : 'Criar Obra'} {loading ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-check"></i>}
