@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, Suspense, lazy, Fragment } from 'react';
 import * as ReactRouter from 'react-router-dom';
 import { PlanType } from './types.ts';
@@ -323,6 +324,15 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
         {/* Suspense is now at the global level below */}
         {children}
       </main>
+
+      {/* NEW: Floating Zé da Obra AI Button */}
+      <button
+        onClick={() => navigate('/ai-chat')}
+        className="fixed bottom-4 right-4 z-50 w-16 h-16 rounded-full bg-secondary shadow-lg hover:bg-secondary-dark focus:outline-none focus:ring-4 focus:ring-secondary/50 transition-all duration-200 flex items-center justify-center text-3xl text-white md:bottom-8 md:right-8"
+        aria-label="Abrir chat do Zé da Obra AI"
+      >
+        <i className="fa-solid fa-robot"></i>
+      </button>
 
       {/* NEW: Bottom Navigation Bar */}
       {isWorkDetailPage && workIdForBottomNav && (
