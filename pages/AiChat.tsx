@@ -20,10 +20,11 @@ const AiChat = () => {
   const [aiMessage, setAiMessage] = useState(''); // User's typed input OR final transcribed speech
   const [aiLoading, setAiLoading] = useState(false);
 
-  // NEW: State for Speech Recognition
+  // State for Speech Recognition
   const [isListening, setIsListening] = useState(false);
   const [recognizedText, setRecognizedText] = useState(''); // Text from SpeechRecognition during active listening
   const recognitionRef = useRef<any>(null); // Use any for SpeechRecognition to avoid global type issues
+  const latestRecognizedTextRef = useRef(''); // NEW: Ref to store latest recognizedText
 
   const chatMessagesRef = useRef<HTMLDivElement>(null);
 
@@ -33,7 +34,12 @@ const AiChat = () => {
 
   const [errorMsg, setErrorMsg] = useState(''); // For local errors like speech recognition
 
-  // Initialize SpeechRecognition
+  // NEW: Update this ref whenever recognizedText changes
+  useEffect(() => {
+      latestRecognizedTextRef.current = recognizedText;
+  }, [recognizedText]);
+
+  // Initialize SpeechRecognition once
   useEffect(() => {
     if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
       const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -60,9 +66,9 @@ const AiChat = () => {
 
       recognition.onend = () => {
         console.log("Speech Recognition ended.");
-        // If there's recognized text, move it to aiMessage, then clear recognizedText
-        if (recognizedText.trim()) {
-            setAiMessage(recognizedText.trim());
+        // Use the ref to get the LATEST recognizedText
+        if (latestRecognizedTextRef.current.trim()) {
+            setAiMessage(latestRecognizedTextRef.current.trim());
         }
         setIsListening(false); // Ensure listening state is false
         setRecognizedText(''); // Clear recognized text
@@ -86,7 +92,7 @@ const AiChat = () => {
         recognitionRef.current.stop();
       }
     };
-  }, [recognizedText]); // Add recognizedText to dependencies to keep onresult updated
+  }, []); // CRITICAL FIX: Empty dependency array
 
 
   // Add initial AI welcome message
@@ -103,12 +109,11 @@ const AiChat = () => {
     }
   }, [messages]);
 
-  // handleAiAsk now accepts an optional text parameter for transcribed speech (used for explicit send)
-  const handleAiAsk = async (e?: React.FormEvent) => { // Removed textToProcess parameter, use aiMessage directly
+  const handleAiAsk = async (e?: React.FormEvent) => {
     e?.preventDefault(); // Only prevent default if event object exists
     const textToSend = aiMessage.trim(); // Always use aiMessage state
 
-    if (!textToSend || !hasAiAccess || aiLoading) return; // Cannot send if empty/loading. isListening doesn't prevent sending.
+    if (!textToSend || !hasAiAccess || aiLoading) return;
 
     const userMessage: Message = { id: Date.now().toString(), sender: 'user', text: textToSend };
     setMessages(prevMessages => [...prevMessages, userMessage]);
@@ -138,7 +143,6 @@ const AiChat = () => {
 
     if (isListening) {
       recognitionRef.current.stop(); // This will trigger onend
-      // The recognized text will be moved to aiMessage by onend. User must click send.
     } else {
       setAiMessage(''); // Clear any existing text before starting
       setRecognizedText(''); // Clear previous recognized text
