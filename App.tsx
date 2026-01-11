@@ -340,7 +340,9 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
 
       {/* Main Content Area */}
       <main className={`p-4 max-w-7xl mx-auto ${isWorkDetailPage ? 'pb-20' : ''}`}> {/* Added pb-20 to main content if WorkDetail */}
-        {children}
+        <Suspense fallback={<LoadingScreen />}>
+          {children}
+        </Suspense>
       </main>
 
       {/* NEW: Bottom Navigation Bar */}
@@ -364,35 +366,35 @@ const App = () => {
       <ThemeProvider>
         <AuthProvider>
           <ErrorBoundary>
-            <Suspense fallback={<LoadingScreen />}>
-              <ReactRouter.Routes>
-                {/* Public Routes */}
-                <ReactRouter.Route path="/login" element={<Login />} />
-                {/* <ReactRouter.Route path="/register" element={<Register />} /> REMOVED: Register absorbed into Login */}
-                
-                {/* Protected Routes - Wrapped by Layout */}
-                {/* FIX: Pass components as children to Layout, not as an element prop's value */}
-                <ReactRouter.Route path="/" element={<Layout><Dashboard /></Layout>} />
-                <ReactRouter.Route path="/create" element={<Layout><CreateWork /></Layout>} />
-                {/* Modified WorkDetail route to include optional 'tab' parameter */}
-                <ReactRouter.Route 
-                  path="/work/:id" 
-                  element={<Layout><WorkDetail activeTab={activeWorkDetailTab} onTabChange={setActiveWorkDetailTab} /></Layout>} 
-                />
-                <ReactRouter.Route path="/ai-chat" element={<Layout><AiChat /></Layout>} />
-                <ReactRouter.Route path="/notifications" element={<Layout><Notifications /></Layout>} />
-                <ReactRouter.Route path="/settings" element={<Layout><Settings /></Layout>} />
-                <ReactRouter.Route path="/profile" element={<Layout><Profile /></Layout>} />
-                <ReactRouter.Route path="/tutorials" element={<Layout><VideoTutorials /></Layout>} />
-                <ReactRouter.Route path="/checkout" element={<Layout><Checkout /></Layout>} /> 
-                {/* NEW: Route for AI Planner */}
-                <ReactRouter.Route path="/work/:id/ai-planner" element={<Layout><AiWorkPlanner /></Layout>} />
-                {/* NEW: Route for ReportsView */}
-                <ReactRouter.Route path="/work/:id/reports" element={<Layout><ReportsView /></Layout>} />
-                
-                <ReactRouter.Route path="*" element={<ReactRouter.Navigate to="/login" replace />} /> {/* Redirects to login if route not found */}
-              </ReactRouter.Routes>
-            </Suspense>
+            {/* Removed global Suspense from here */}
+            <ReactRouter.Routes>
+              {/* Public Routes */}
+              <ReactRouter.Route path="/login" element={<Login />} />
+              {/* <ReactRouter.Route path="/register" element={<Register />} /> REMOVED: Register absorbed into Login */}
+              
+              {/* Protected Routes - Wrapped by Layout. Suspense is now inside Layout. */}
+              {/* FIX: Pass components as children to Layout, not as an element prop's value */}
+              <ReactRouter.Route path="/" element={<Layout><Dashboard /></Layout>} />
+              <ReactRouter.Route path="/create" element={<Layout><CreateWork /></Layout>} />
+              {/* Modified WorkDetail route to include optional 'tab' parameter */}
+              <ReactRouter.Route 
+                path="/work/:id" 
+                element={<Layout><WorkDetail activeTab={activeWorkDetailTab} onTabChange={setActiveWorkDetailTab} /></Layout>} 
+              />
+              <ReactRouter.Route path="/ai-chat" element={<Layout><AiChat /></Layout>} />
+              <ReactRouter.Route path="/notifications" element={<Layout><Notifications /></Layout>} />
+              <ReactRouter.Route path="/settings" element={<Layout><Settings /></Layout>} />
+              <ReactRouter.Route path="/profile" element={<Layout><Profile /></Layout>} />
+              <ReactRouter.Route path="/tutorials" element={<Layout><VideoTutorials /></Layout>} />
+              <ReactRouter.Route path="/checkout" element={<Layout><Checkout /></Layout>} /> 
+              {/* NEW: Route for AI Planner */}
+              <ReactRouter.Route path="/work/:id/ai-planner" element={<Layout><AiWorkPlanner /></Layout>} />
+              {/* NEW: Route for ReportsView */}
+              <ReactRouter.Route path="/work/:id/reports" element={<Layout><ReportsView /></Layout>} />
+              
+              <ReactRouter.Route path="*" element={<ReactRouter.Navigate to="/login" replace />} /> {/* Redirects to login if route not found */}
+            </ReactRouter.Routes>
+            {/* Removed global Suspense from here */}
           </ErrorBoundary>
         </AuthProvider>
       </ThemeProvider>
