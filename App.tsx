@@ -197,21 +197,24 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
           if (planParam) {
               updatePlan(planParam).then(() => {
                   alert("Pagamento confirmado! Plano atualizado com sucesso.");
+                  // Clear query params after processing
                   navigate(location.pathname, { replace: true });
               });
           } else {
+              // Clear query params even if no planParam, if just a generic success
               navigate(location.pathname, { replace: true });
           }
       }
   }, [location.search, user, updatePlan, navigate, location.pathname]);
 
   // Use isUserAuthFinished for the initial loading screen
+  // This is the critical guard to prevent rendering children if auth state is not known
   if (!isUserAuthFinished || authLoading) {
     console.log("[App - Layout] Displaying LoadingScreen due to auth state.");
     return <LoadingScreen />; 
   }
   
-  // If no user, redirect to login.
+  // If no user, redirect to login. This happens after initial auth check is finished.
   if (!user) {
     console.log("[App - Layout] No user, redirecting to /login.");
     return <ReactRouter.Navigate to="/login" replace />;
