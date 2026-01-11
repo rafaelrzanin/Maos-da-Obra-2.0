@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.tsx';
@@ -167,4 +168,113 @@ const AiWorkPlanner = () => {
       {loadingPlan && (
         <div className="flex flex-col items-center justify-center min-h-[50vh] p-6 text-center animate-in fade-in duration-500">
           <div className="relative mb-8">
-            <div className="w-28 h-28 rounded-full border-4 border-slate-80
+            <div className="w-28 h-28 rounded-full border-4 border-slate-800 p-1 bg-gradient-gold shadow-[0_0_30px_rgba(217,119,6,0.4)]">
+              <img src={ZE_AVATAR} className="w-full h-full object-cover rounded-full bg-white animate-float" onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK} alt="Zé da Obra AI" />
+            </div>
+            <div className="w-16 h-16 rounded-full bg-slate-200 dark:bg-slate-700 absolute inset-0 m-auto animate-ping-slow"></div> {/* Slow ping effect */}
+          </div>
+          <h2 className="text-2xl font-black text-primary dark:text-white mb-2">Zé da Obra AI está planejando...</h2>
+          <p className="text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
+            Isso pode levar alguns segundos, pois estou analisando os detalhes da sua obra e as melhores práticas de engenharia.
+          </p>
+        </div>
+      )}
+
+      {aiPlan && !loadingPlan && (
+        <div className="animate-in fade-in duration-500">
+          {/* General Advice */}
+          <div className={cx(surface, card, "mb-6")}>
+            <div className="flex items-start gap-4 mb-4">
+              <div className="w-12 h-12 rounded-full p-1 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-800 shadow-lg shrink-0">
+                <img src={ZE_AVATAR} alt="Zé da Obra AI" className="w-full h-full object-cover rounded-full border-2 border-white dark:border-slate-800" onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK} />
+              </div>
+              <div>
+                <p className="text-sm font-black uppercase tracking-widest text-secondary">Conselho do Zé!</p>
+                <p className="text-primary dark:text-white font-bold text-lg leading-tight">{aiPlan.generalAdvice}</p>
+              </div>
+            </div>
+            <p className="text-slate-500 dark:text-slate-400 text-sm">{aiPlan.timelineSummary}</p>
+          </div>
+
+          {/* Detailed Steps */}
+          <div className={cx(surface, card, "mb-6")}>
+            <h2 className="text-xl font-black text-primary dark:text-white mb-4 flex items-center gap-2">
+              <i className="fa-solid fa-list-ol text-secondary"></i> Cronograma Detalhado (Sugestão)
+            </h2>
+            <div className="space-y-4">
+              {aiPlan.detailedSteps.map((step, index) => (
+                <div key={index} className="bg-slate-50 dark:bg-slate-800 p-4 rounded-xl border border-slate-100 dark:border-slate-700">
+                  <h3 className="font-bold text-primary dark:text-white text-base mb-1">
+                    {step.orderIndex}. {step.name}
+                  </h3>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">
+                    <i className="fa-regular fa-clock mr-1"></i> Duração Estimada: {step.estimatedDurationDays} dias
+                  </p>
+                  <p className="text-xs text-slate-400 mt-2">{step.notes}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Potential Risks */}
+          <div className={cx(surface, card, "mb-6")}>
+            <h2 className="text-xl font-black text-primary dark:text-white mb-4 flex items-center gap-2">
+              <i className="fa-solid fa-triangle-exclamation text-danger"></i> Riscos Potenciais
+            </h2>
+            <div className="space-y-4">
+              {aiPlan.potentialRisks.map((risk, index) => (
+                <div key={index} className="bg-slate-50 dark:bg-slate-800 p-4 rounded-xl border border-slate-100 dark:border-slate-700">
+                  <div className="flex items-center justify-between mb-1">
+                    <h3 className="font-bold text-primary dark:text-white text-base">{risk.description}</h3>
+                    <span className={cx(
+                      "px-2 py-0.5 rounded-full text-xs font-bold uppercase",
+                      getRiskClass(risk.likelihood)
+                    )}>
+                      {risk.likelihood === 'low' ? 'Baixo' : risk.likelihood === 'medium' ? 'Médio' : 'Alto'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Mitigação: {risk.mitigation}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Material Suggestions */}
+          <div className={cx(surface, card, "mb-6")}>
+            <h2 className="text-xl font-black text-primary dark:text-white mb-4 flex items-center gap-2">
+              <i className="fa-solid fa-boxes-stacked text-secondary"></i> Sugestões de Materiais
+            </h2>
+            <div className="space-y-4">
+              {aiPlan.materialSuggestions.map((material, index) => (
+                <div key={index} className="bg-slate-50 dark:bg-slate-800 p-4 rounded-xl border border-slate-100 dark:border-slate-700">
+                  <div className="flex items-center justify-between mb-1">
+                    <h3 className="font-bold text-primary dark:text-white text-base">{material.item}</h3>
+                    <span className={cx(
+                      "px-2 py-0.5 rounded-full text-xs font-bold uppercase",
+                      material.priority === 'low' ? 'bg-slate-400/10 text-slate-600 dark:text-slate-400' :
+                      material.priority === 'medium' ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400' :
+                      'bg-red-500/10 text-red-600 dark:text-red-400'
+                    )}>
+                      Prioridade: {material.priority === 'low' ? 'Baixa' : material.priority === 'medium' ? 'Média' : 'Alta'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Motivo: {material.reason}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+          
+          <button
+            onClick={() => navigate(`/work/${workId}`)}
+            className="w-full py-4 bg-gradient-gold text-white font-black rounded-2xl shadow-lg hover:shadow-orange-500/30 hover:scale-105 transition-all flex items-center justify-center gap-3"
+            aria-label="Voltar para a obra"
+          >
+            <i className="fa-solid fa-arrow-left"></i> Voltar para a Obra
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default AiWorkPlanner;
