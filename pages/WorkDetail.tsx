@@ -588,6 +588,28 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
     );
   };
 
+  // NEW: Helper to render expense progress bar
+  const renderExpenseProgressBar = (expense: Expense) => {
+    const agreedAmount = expense.totalAgreed !== undefined && expense.totalAgreed !== null ? expense.totalAgreed : expense.amount;
+    const paidAmount = expense.paidAmount || 0;
+    const progressPct = agreedAmount > 0 ? (paidAmount / agreedAmount) * 100 : (paidAmount > 0 ? 100 : 0);
+    const progressBarColor = progressPct >= 100 ? 'bg-green-500' : 'bg-secondary';
+    const isOverpaid = expense.status === ExpenseStatus.OVERPAID;
+
+    return (
+        <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2 mt-1">
+            <div
+                className={cx("h-full rounded-full", isOverpaid ? 'bg-red-500' : progressBarColor)}
+                style={{ width: `${Math.min(100, progressPct)}%` }} // Cap at 100% visually
+                aria-valuenow={progressPct}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-label={`Progresso de pagamento: ${Math.round(progressPct)}%`}
+            ></div>
+        </div>
+    );
+  };
+
   // =======================================================================
   // DATA LOADING
   // =======================================================================
@@ -1984,17 +2006,166 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
 
       {activeTab === 'FINANCEIRO' && (
         <div className="tab-content animate-in fade-in duration-300">
-          <div className="p-6 text-center text-slate-500">
-            Seção Financeiro em reconstrução segura.
+          <div className="p-4 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-card-default dark:shadow-card-dark-subtle">
+            <h2 className="text-2xl font-black text-primary dark:text-white mb-6">Visão Geral Financeira</h2>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                <div className={cx(surface, "p-5 rounded-2xl flex flex-col items-start")}>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">Orçamento Planejado</p>
+                    <h3 className="text-xl font-bold text-primary dark:text-white">{formatCurrency(work?.budgetPlanned || 0)}</h3>
+                </div>
+                <div className={cx(surface, "p-5 rounded-2xl flex flex-col items-start")}>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">Gasto Total</p>
+                    <h3 className={`text-xl font-bold ${calculateTotalExpenses > (work?.budgetPlanned || 0) ? 'text-red-500' : 'text-green-600 dark:text-green-400'}`}>{formatCurrency(calculateTotalExpenses)}</h3>
+                </div>
+                <div className={cx(surface, "p-5 rounded-2xl flex flex-col items-start")}>
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mb-1">Balanço</p>
+                    <h3 className={`text-xl font-bold ${budgetUsage < 100 ? 'text-green-600 dark:text-green-400' : 'text-red-500'}`}>{formatCurrency((work?.budgetPlanned || 0) - calculateTotalExpenses)}</h3>
+                </div>
+            </div>
+
+            <div className="flex items-center justify-between mb-6 px-2 sm:px-0">
+                <h2 className="text-2xl font-black text-primary dark:text-white">Suas Despesas</h2>
+                <button
+                    onClick={() => {
+                        setShowAddExpenseModal(true);
+                        setEditExpenseData(null); // Clear edit data when adding new
+                        setNewExpenseDescription('');
+                        setNewExpenseAmount('');
+                        setNewExpenseCategory(ExpenseCategory.OTHER);
+                        setNewExpenseDate(new Date().toISOString().split('T')[0]);
+                        setNewExpenseStepId('');
+                        setNewExpenseWorkerId('');
+                        setNewExpenseSupplierId('');
+                        setNewExpenseTotalAgreed('');
+                    }}
+                    className="px-4 py-2 bg-secondary text-white text-sm font-bold rounded-xl hover:bg-secondary-dark transition-colors flex items-center gap-2"
+                    aria-label="Adicionar nova despesa"
+                >
+                    <i className="fa-solid fa-plus"></i> Nova
+                </button>
+            </div>
+
+            {expenses.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-10 text-center">
+                    <i className="fa-solid fa-receipt text-6xl text-slate-400 mb-6"></i>
+                    <h2 className="text-xl font-black text-primary dark:text-white mb-2">Nenhuma despesa registrada ainda.</h2>
+                    <p className="text-slate-500 dark:text-slate-400 max-w-sm mx-auto">
+                        Comece a registrar seus gastos para ter controle total do financeiro da sua obra.
+                    </p>
+                </div>
+            ) : (
+                <div className="space-y-6">
+                    {groupedExpensesByStep.map(group => (
+                        <div key={group.stepName} className="space-y-4">
+                            <h3 className="text-lg font-bold text-primary dark:text-white border-b border-slate-200 dark:border-slate-700 pb-2 mb-4">{group.stepName}</h3>
+                            {group.expenses.map(expense => {
+                                const statusDetails = getEntityStatusDetails('expense', expense, steps);
+                                const agreed = expense.totalAgreed !== undefined && expense.totalAgreed !== null ? expense.totalAgreed : expense.amount;
+                                const remaining = Math.max(0, agreed - (expense.paidAmount || 0));
+
+                                return (
+                                    <div key={expense.id} className="bg-slate-50 dark:bg-slate-800 p-4 rounded-xl border border-slate-100 dark:border-slate-700">
+                                        <div className="flex items-center justify-between mb-2">
+                                            <h4 className="font-bold text-primary dark:text-white text-base">{expense.description}</h4>
+                                            <span className={cx(
+                                                "px-2 py-0.5 rounded-full text-xs font-bold uppercase",
+                                                statusDetails.bgColor,
+                                                statusDetails.textColor
+                                            )}>
+                                                <i className={`fa-solid ${statusDetails.icon} mr-1`}></i> {statusDetails.statusText}
+                                            </span>
+                                        </div>
+                                        <p className="text-sm text-slate-500 dark:text-slate-400">
+                                            Previsto: {formatCurrency(expense.amount)}
+                                            {agreed !== expense.amount && ` (Combinado: ${formatCurrency(agreed)})`}
+                                        </p>
+                                        <p className="text-sm text-slate-500 dark:text-slate-400">
+                                            Pago: {formatCurrency(expense.paidAmount || 0)}
+                                            {remaining > 0 && <span className="ml-2 text-red-500">(Falta: {formatCurrency(remaining)})</span>}
+                                        </p>
+                                        {renderExpenseProgressBar(expense)}
+                                        <div className="flex justify-between items-center mt-3 pt-3 border-t border-slate-100 dark:border-slate-700">
+                                            <p className="text-sm font-bold text-primary dark:text-white">Categoria: {expense.category}</p>
+                                            <div className="flex gap-2">
+                                                {expense.status !== ExpenseStatus.COMPLETED && expense.status !== ExpenseStatus.OVERPAID && (
+                                                    <button
+                                                        onClick={() => {
+                                                            setPaymentExpenseData(expense);
+                                                            setPaymentAmount(String(remaining)); // Pre-fill with remaining amount
+                                                            setShowAddPaymentModal(true);
+                                                        }}
+                                                        className="px-3 py-1 bg-secondary text-white text-xs font-bold rounded-lg hover:bg-secondary-dark transition-colors"
+                                                        aria-label={`Registrar pagamento para ${expense.description}`}
+                                                    >
+                                                        Pagar
+                                                    </button>
+                                                )}
+                                                <button
+                                                    onClick={() => {
+                                                        setEditExpenseData(expense);
+                                                        setNewExpenseDescription(expense.description);
+                                                        setNewExpenseAmount(String(expense.amount));
+                                                        setNewExpenseCategory(expense.category as ExpenseCategory);
+                                                        setNewExpenseDate(expense.date);
+                                                        setNewExpenseStepId(expense.stepId || 'none');
+                                                        setNewExpenseWorkerId(expense.workerId || 'none');
+                                                        setNewExpenseSupplierId(expense.supplierId || 'none');
+                                                        setNewExpenseTotalAgreed(expense.totalAgreed !== undefined && expense.totalAgreed !== null ? String(expense.totalAgreed) : '');
+                                                        setShowAddExpenseModal(true);
+                                                    }}
+                                                    className="px-3 py-1 bg-primary text-white text-xs font-bold rounded-lg hover:bg-primary-light transition-colors"
+                                                    aria-label={`Editar despesa ${expense.description}`}
+                                                >
+                                                    Editar
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    ))}
+                </div>
+            )}
           </div>
         </div>
       )}
 
       {activeTab === 'FERRAMENTAS' && (
         <div className="tab-content animate-in fade-in duration-300">
-          <div className="p-6 text-center text-slate-500">
-            Seção Ferramentas em reconstrução segura.
-          </div>
+            <div className="p-4 rounded-3xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-card-default dark:shadow-card-dark-subtle">
+                <h2 className="text-2xl font-black text-primary dark:text-white mb-6">Ferramentas da Obra</h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <ToolCard
+                        icon="fa-file-contract"
+                        title="Contratos & Recibos"
+                        description="Gere contratos e recibos para sua equipe e fornecedores em segundos."
+                        onClick={() => goToSubView('CONTRACTS')}
+                    />
+                    <ToolCard
+                        icon="fa-list-check"
+                        title="Checklists Inteligentes"
+                        description="Listas de verificação para cada etapa, garantindo que nada seja esquecido."
+                        onClick={() => goToSubView('CHECKLIST')}
+                    />
+                    <ToolCard
+                        icon="fa-chart-line"
+                        title="Relatórios de Obra"
+                        description="Acompanhe o desempenho financeiro e de cronograma com relatórios detalhados."
+                        onClick={() => navigate(`/work/${workId}/reports`)}
+                        isLocked={!hasAiAccess} // Access to reports linked to AI Access
+                        requiresVitalicio={true} // Reports is a premium feature
+                    />
+                    <ToolCard
+                        icon="fa-robot"
+                        title="Plano Inteligente IA"
+                        description="Deixe a IA planejar cronogramas, materiais e riscos da sua obra em segundos."
+                        onClick={() => navigate(`/work/${workId}/ai-planner`)}
+                        isLocked={!hasAiAccess}
+                        requiresVitalicio={true}
+                    />
+                </div>
+            </div>
         </div>
       )}
 
