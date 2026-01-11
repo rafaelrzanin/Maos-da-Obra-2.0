@@ -720,18 +720,17 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
       setContracts(fetchedContracts);
       setChecklists(fetchedChecklists);
 
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erro ao carregar dados da obra:", error);
-      // Optionally show a user-friendly error message
+      // Show ZeModal for loading error
       setZeModal({
         isOpen: true,
         title: "Erro de Carregamento",
-        message: "Não foi possível carregar os dados da obra. Verifique sua conexão ou tente novamente.",
+        message: `Não foi possível carregar os dados da obra: ${error.message || 'Erro desconhecido'}. Verifique sua conexão ou tente novamente.`,
         type: "ERROR",
         confirmText: "Ok",
-        // FIX: Ensure `onConfirm` and `onCancel` can take an optional event
-        onConfirm: async (_e?: React.FormEvent) => {setZeModal(prev => ({ ...prev, isOpen: false }));}, 
-        onCancel: (_e?: React.FormEvent) => setZeModal(prev => ({ ...prev, isOpen: false }))
+        onConfirm: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false })); navigate('/dashboard');}, // Go to dashboard on confirm
+        onCancel: (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false })); navigate('/dashboard');} // Go to dashboard on cancel
       });
       setWork(null); // Ensure work is null on error to show not found
       return; // Explicitly return void on error
@@ -806,7 +805,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         type: "ERROR",
         confirmText: "Ok",
         onConfirm: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));},
-        onCancel: (_e?: React.FormEvent) => setZeModal(p => ({ ...p, isOpen: false }))
+        onCancel: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));} // Fix: Ensure onCancel matches signature
       });
     } finally {
       setIsUpdatingStepStatus(false);
@@ -849,7 +848,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         type: "ERROR",
         confirmText: "Ok",
         onConfirm: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));},
-        onCancel: (_e?: React.FormEvent) => setZeModal(p => ({ ...p, isOpen: false }))
+        onCancel: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));} // Fix: Ensure onCancel matches signature
       }));
     } finally {
       setZeModal(prev => ({ ...prev, isConfirming: false }));
@@ -890,7 +889,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         type: "ERROR",
         confirmText: "Ok",
         onConfirm: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));},
-        onCancel: (_e?: React.FormEvent) => setZeModal(p => ({ ...p, isOpen: false }))
+        onCancel: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));} // Fix: Ensure onCancel matches signature
       }));
     } finally {
       setZeModal(prev => ({ ...prev, isConfirming: false }));
@@ -916,7 +915,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         type: "ERROR",
         confirmText: "Ok",
         onConfirm: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));},
-        onCancel: (_e?: React.FormEvent) => setZeModal(p => ({ ...p, isOpen: false }))
+        onCancel: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));} // Fix: Ensure onCancel matches signature
       }));
     } finally {
       setZeModal(prev => ({ ...prev, isConfirming: false }));
@@ -935,7 +934,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
             confirmText: "Entendido",
             // FIX: Add `_e?: React.FormEvent` to match ZeModalProps.onConfirm signature.
             onConfirm: async (_e?: React.FormEvent) => {setZeModal(prev => ({ ...prev, isOpen: false }));},
-            onCancel: (_e?: React.FormEvent) => setZeModal(prev => ({ ...prev, isOpen: false })),
+            onCancel: async (_e?: React.FormEvent) => {setZeModal(prev => ({ ...prev, isOpen: false }));}, // Fix: Ensure onCancel matches signature
             type: "WARNING"
         }); // Corrected: Added missing closing parenthesis here
         return;
@@ -1004,7 +1003,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         type: "ERROR",
         confirmText: "Ok",
         onConfirm: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));},
-        onCancel: (_e?: React.FormEvent) => setZeModal(p => ({ ...p, isOpen: false }))
+        onCancel: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));} // Fix: Ensure onCancel matches signature
       });
     } finally {
       setDraggedStepId(null);
@@ -1023,7 +1022,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         type: "ERROR",
         confirmText: "Ok",
         onConfirm: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));},
-        onCancel: (_e?: React.FormEvent) => setZeModal(p => ({ ...p, isOpen: false }))
+        onCancel: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));} // Fix: Ensure onCancel matches signature
       });
       return;
     }
@@ -1049,7 +1048,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         type: "ERROR",
         confirmText: "Ok",
         onConfirm: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));},
-        onCancel: (_e?: React.FormEvent) => setZeModal(p => ({ ...p, isOpen: false }))
+        onCancel: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));} // Fix: Ensure onCancel matches signature
       }));
     } finally {
       setLoading(false); // Deactivate general page loading
@@ -1101,7 +1100,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         type: "ERROR",
         confirmText: "Ok",
         onConfirm: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));},
-        onCancel: (_e?: React.FormEvent) => setZeModal(p => ({ ...p, isOpen: false }))
+        onCancel: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));} // Fix: Ensure onCancel matches signature
       }));
     } finally {
       setZeModal(prev => ({ ...prev, isConfirming: false }));
@@ -1165,7 +1164,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         type: "ERROR",
         confirmText: "Ok",
         onConfirm: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));},
-        onCancel: (_e?: React.FormEvent) => setZeModal(p => ({ ...p, isOpen: false }))
+        onCancel: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));} // Fix: Ensure onCancel matches signature
       }));
     } finally {
       setZeModal(prev => ({ ...prev, isConfirming: false }));
@@ -1191,7 +1190,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         type: "ERROR",
         confirmText: "Ok",
         onConfirm: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));},
-        onCancel: (_e?: React.FormEvent) => setZeModal(p => ({ ...p, isOpen: false }))
+        onCancel: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));} // Fix: Ensure onCancel matches signature
       }));
     } finally {
       setZeModal(prev => ({ ...prev, isConfirming: false }));
@@ -1250,7 +1249,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         type: "ERROR",
         confirmText: "Ok",
         onConfirm: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));},
-        onCancel: (_e?: React.FormEvent) => setZeModal(p => ({ ...p, isOpen: false }))
+        onCancel: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));} // Fix: Ensure onCancel matches signature
       }));
     } finally {
       setZeModal(prev => ({ ...prev, isConfirming: false }));
@@ -1291,7 +1290,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         type: "ERROR",
         confirmText: "Ok",
         onConfirm: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));},
-        onCancel: (_e?: React.FormEvent) => setZeModal(p => ({ ...p, isOpen: false }))
+        onCancel: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));} // Fix: Ensure onCancel matches signature
       }));
     } finally {
       setZeModal(prev => ({ ...prev, isConfirming: false }));
@@ -1317,7 +1316,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         type: "ERROR",
         confirmText: "Ok",
         onConfirm: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));},
-        onCancel: (_e?: React.FormEvent) => setZeModal(p => ({ ...p, isOpen: false }))
+        onCancel: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));} // Fix: Ensure onCancel matches signature
       }));
     } finally {
       setZeModal(prev => ({ ...prev, isConfirming: false }));
@@ -1363,7 +1362,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         type: "ERROR",
         confirmText: "Ok",
         onConfirm: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));},
-        onCancel: (_e?: React.FormEvent) => setZeModal(p => ({ ...p, isOpen: false }))
+        onCancel: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));} // Fix: Ensure onCancel matches signature
       }));
     } finally {
       setIsAddingWorker(false); // Clear local loading
@@ -1401,7 +1400,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         type: "ERROR",
         confirmText: "Ok",
         onConfirm: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));},
-        onCancel: (_e?: React.FormEvent) => setZeModal(p => ({ ...p, isOpen: false }))
+        onCancel: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));} // Fix: Ensure onCancel matches signature
       }));
     } finally {
       setIsAddingWorker(false);
@@ -1428,7 +1427,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         type: "ERROR",
         confirmText: "Ok",
         onConfirm: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));},
-        onCancel: (_e?: React.FormEvent) => setZeModal(p => ({ ...p, isOpen: false }))
+        onCancel: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));} // Fix: Ensure onCancel matches signature
       }));
     } finally {
       setZeModal(prev => ({ ...prev, isConfirming: false }));
@@ -1476,7 +1475,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         type: "ERROR",
         confirmText: "Ok",
         onConfirm: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));},
-        onCancel: (_e?: React.FormEvent) => setZeModal(p => ({ ...p, isOpen: false }))
+        onCancel: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));} // Fix: Ensure onCancel matches signature
       }));
     } finally {
       setIsAddingSupplier(false);
@@ -1515,7 +1514,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         type: "ERROR",
         confirmText: "Ok",
         onConfirm: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));},
-        onCancel: (_e?: React.FormEvent) => setZeModal(p => ({ ...p, isOpen: false }))
+        onCancel: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));} // Fix: Ensure onCancel matches signature
       }));
     } finally {
       setIsAddingSupplier(false);
@@ -1542,7 +1541,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         type: "ERROR",
         confirmText: "Ok",
         onConfirm: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));},
-        onCancel: (_e?: React.FormEvent) => setZeModal(p => ({ ...p, isOpen: false }))
+        onCancel: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));} // Fix: Ensure onCancel matches signature
       }));
     } finally {
       setZeModal(prev => ({ ...prev, isConfirming: false }));
@@ -1600,7 +1599,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         type: "ERROR",
         confirmText: "Ok",
         onConfirm: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));},
-        onCancel: (_e?: React.FormEvent) => setZeModal(p => ({ ...p, isOpen: false }))
+        onCancel: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));} // Fix: Ensure onCancel matches signature
       }));
     } finally {
       setLoadingPhoto(false);
@@ -1636,7 +1635,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         type: "ERROR",
         confirmText: "Ok",
         onConfirm: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));},
-        onCancel: (_e?: React.FormEvent) => setZeModal(p => ({ ...p, isOpen: false }))
+        onCancel: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));} // Fix: Ensure onCancel matches signature
       }));
     } finally {
       setZeModal(prev => ({ ...prev, isConfirming: false }));
@@ -1695,7 +1694,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         type: "ERROR",
         confirmText: "Ok",
         onConfirm: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));},
-        onCancel: (_e?: React.FormEvent) => setZeModal(p => ({ ...p, isOpen: false }))
+        onCancel: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));} // Fix: Ensure onCancel matches signature
       }));
     } finally {
       setLoadingFile(false);
@@ -1733,7 +1732,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         type: "ERROR",
         confirmText: "Ok",
         onConfirm: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));},
-        onCancel: (_e?: React.FormEvent) => setZeModal(p => ({ ...p, isOpen: false }))
+        onCancel: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));} // Fix: Ensure onCancel matches signature
       }));
     } finally {
       setZeModal(prev => ({ ...prev, isConfirming: false }));
@@ -1747,7 +1746,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
   const handleAddChecklist = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!workId || !newChecklistName || newChecklistItems.some(item => !item.trim())) {
-      setZeModal(prev => ({ ...prev, title: "Campos Obrigatórios", message: "Por favor, preencha o nome do checklist e todos os itens.", type: "ERROR", confirmText: "Ok", onConfirm: async (_e?: React.FormEvent) => {}, onCancel: (_e?: React.FormEvent) => setZeModal(p => ({ ...p, isOpen: false })) }));
+      setZeModal(prev => ({ ...prev, title: "Campos Obrigatórios", message: "Por favor, preencha o nome do checklist e todos os itens.", type: "ERROR", confirmText: "Ok", onConfirm: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));}, onCancel: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));} })); // Fix: Ensure onConfirm/onCancel match signature
       return;
     }
 
@@ -1781,7 +1780,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         type: "ERROR",
         confirmText: "Ok",
         onConfirm: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));},
-        onCancel: (_e?: React.FormEvent) => setZeModal(p => ({ ...p, isOpen: false }))
+        onCancel: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));} // Fix: Ensure onCancel matches signature
       }));
     } finally {
       setIsAddingChecklist(false);
@@ -1792,7 +1791,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
   const handleEditChecklist = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editChecklistData || !workId || !newChecklistName || newChecklistItems.some(item => !item.trim())) {
-      setZeModal(prev => ({ ...prev, title: "Campos Obrigatórios", message: "Por favor, preencha o nome do checklist e todos os itens.", type: "ERROR", confirmText: "Ok", onConfirm: async (_e?: React.FormEvent) => {}, onCancel: (_e?: React.FormEvent) => setZeModal(p => ({ ...p, isOpen: false })) }));
+      setZeModal(prev => ({ ...prev, title: "Campos Obrigatórios", message: "Por favor, preencha o nome do checklist e todos os itens.", type: "ERROR", confirmText: "Ok", onConfirm: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));}, onCancel: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));} })); // Fix: Ensure onConfirm/onCancel match signature
       return;
     }
 
@@ -1828,7 +1827,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         type: "ERROR",
         confirmText: "Ok",
         onConfirm: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));},
-        onCancel: (_e?: React.FormEvent) => setZeModal(p => ({ ...p, isOpen: false }))
+        onCancel: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));} // Fix: Ensure onCancel matches signature
       }));
     } finally {
       setIsAddingChecklist(false);
@@ -1854,7 +1853,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
         type: "ERROR",
         confirmText: "Ok",
         onConfirm: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));},
-        onCancel: (_e?: React.FormEvent) => setZeModal(p => ({ ...p, isOpen: false }))
+        onCancel: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));} // Fix: Ensure onCancel matches signature
       }));
     } finally {
       setZeModal(prev => ({ ...prev, isConfirming: false }));
@@ -2639,7 +2638,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                                   e?.preventDefault(); // Pass event here
                                   await handleDeletePhoto(photo);
                                 },
-                                onCancel: (_e?: React.FormEvent) => setZeModal(prev => ({ ...prev, isOpen: false })),
+                                onCancel: async (_e?: React.FormEvent) => {setZeModal(prev => ({ ...prev, isOpen: false }));}, // Fix: Ensure onCancel matches signature
                                 isConfirming: zeModal.isConfirming,
                                 type: "DANGER"
                               });
@@ -2700,7 +2699,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                                 e?.preventDefault();
                                 await handleDeleteFile(file);
                               },
-                              onCancel: (_e?: React.FormEvent) => setZeModal(prev => ({ ...prev, isOpen: false })),
+                              onCancel: async (_e?: React.FormEvent) => {setZeModal(prev => ({ ...prev, isOpen: false }));}, // Fix: Ensure onCancel matches signature
                               isConfirming: zeModal.isConfirming,
                               type: "DANGER"
                             });
@@ -3222,7 +3221,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }) => {
                 type: "ERROR",
                 confirmText: "Ok",
                 onConfirm: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));},
-                onCancel: (_e?: React.FormEvent) => setZeModal(p => ({ ...p, isOpen: false }))
+                onCancel: async (_e?: React.FormEvent) => {setZeModal(p => ({ ...p, isOpen: false }));} // Fix: Ensure onCancel matches signature
               }));
             } finally {
               setZeModal(prev => ({ ...prev, isConfirming: false }));
