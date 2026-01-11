@@ -181,6 +181,34 @@ const SegmentedProgressBar = ({ steps }: { steps: Step[] }) => {
   );
 };
 
+// OE-006: Re-added for "Segurança Percebida"
+const getWorkStatusDetails = (status: WorkStatus): { text: string; bgColor: string; textColor: string } => {
+  switch (status) {
+    case WorkStatus.COMPLETED: return { text: 'Concluída', bgColor: 'bg-green-500', textColor: 'text-white' };
+    case WorkStatus.IN_PROGRESS: return { text: 'Em Andamento', bgColor: 'bg-amber-500', textColor: 'text-white' };
+    case WorkStatus.PAUSED: return { text: 'Pausada', bgColor: 'bg-blue-500', textColor: 'text-white' };
+    case WorkStatus.PLANNING: return { text: 'Planejamento', bgColor: 'bg-slate-500', textColor: 'text-white' };
+    default: return { text: 'Desconhecido', bgColor: 'bg-slate-400', textColor: 'text-white' };
+  }
+};
+
+
+// NEW: FTUE steps content
+const ftueStepsContent = [
+  { text: "Eu sou o Zé da Obra. Vou te mostrar como começar e como o app funciona. Depois, sempre que precisar, estarei por aqui." }, // Step 1 - Apresentação
+  { text: "O primeiro passo é criar a sua primeira obra. É a partir dela que todo o resto se organiza." }, // Step 2 - Como Começar
+  { text: "Cadastre a obra e coloque as informações principais. Não precisa estar tudo perfeito agora, isso pode ser ajustado depois." }, // Step 3 - Cadastro da Obra
+  { text: "Depois de criar a obra, o app gera um cronograma inicial com as etapas mais comuns. Ele serve como ponto de partida." }, // Step 4 - Cronograma Inicial
+  { text: "Esse cronograma não substitui o responsável técnico. Engenheiro, arquiteto ou mestre de obras vão te ajudar a ajustar datas, etapas e sequência. Aqui você pode editar, criar ou excluir etapas para deixar tudo fiel à sua obra." }, // Step 5 - Importante Sobre o Cronograma
+  { text: "Com o cronograma, o app sugere materiais para cada etapa. Confira com o responsável técnico, ajuste quantidades, marcas e inclua novos itens se precisar." }, // Step 6 - Materiais
+  { text: "As compras de materiais entram automaticamente no financeiro. Outros gastos, como mão de obra, taxas e documentos, você pode lançar manualmente." }, // Step 7 - Financeiro
+  { text: "Você também pode cadastrar sua equipe e fornecedores, guardar contatos e falar direto pelo WhatsApp." }, // Step 8 - Controle e Equipe
+  { text: "O painel principal ajuda a acompanhar prazos, gastos e andamento da obra. Tudo fica organizado em um só lugar." }, // Step 9 - Acompanhamento
+  { text: "Se surgir qualquer dúvida, no menu principal você encontra a área de Dúvidas, vídeos explicativos e pode falar comigo quando quiser." }, // Step 10 - Ajuda Disponível
+  { text: "Pronto. Agora você já sabe como funciona. E sempre que precisar, é só me chamar." }, // Step 11 - Encerramento
+];
+
+
 const Dashboard = () => {
   const { user, authLoading, isUserAuthFinished, isSubscriptionValid, unreadNotificationsCount, requestPushNotificationPermission, pushSubscriptionStatus } = useAuth();
   const navigate = ReactRouter.useNavigate();
@@ -209,6 +237,30 @@ const Dashboard = () => {
 
   // Ref to track notification count changes for data refresh
   const notificationCountRef = useRef(unreadNotificationsCount);
+
+  // NEW: FTUE States
+  const [showFtue, setShowFtue] = useState(false);
+  const [currentFtueStep, setCurrentFtueStep] = useState(0);
+
+
+  // =======================================================================
+  // AUXILIARY FUNCTIONS
+  // =======================================================================
+
+  const markFtueAsSeen = useCallback(() => {
+    localStorage.setItem('seen_app_ftue_guide', 'true');
+    setShowFtue(false);
+    setCurrentFtueStep(0);
+  }, []);
+
+  const handleNextFtueStep = useCallback(() => {
+    if (currentFtueStep < ftueStepsContent.length - 1) {
+      setCurrentFtueStep(prev => prev + 1);
+    } else {
+      markFtueAsSeen(); // Last step, mark as seen and close
+    }
+  }, [currentFtueStep, markFtueAsSeen]);
+
 
   // =======================================================================
   // DATA LOADING
@@ -322,6 +374,15 @@ const Dashboard = () => {
           }
       }
   }, [unreadNotificationsCount, selectedWork, loadSelectedWorkData, loadAllWorks]);
+
+  // NEW: FTUE Trigger useEffect
+  useEffect(() => {
+    if (isUserAuthFinished && !authLoading && !loadingDashboard && user && localStorage.getItem('seen_app_ftue_guide') !== 'true') {
+      setShowFtue(true);
+      setCurrentFtueStep(0);
+    }
+  }, [isUserAuthFinished, authLoading, loadingDashboard, user]);
+
 
   // =======================================================================
   // HANDLERS
@@ -461,6 +522,20 @@ const Dashboard = () => {
   // Main Dashboard Content
   return (
     <div className="max-w-4xl mx-auto pb-28 pt-6 px-4 md:px-0 font-sans">
+      {/* FTUE Modal */}
+      {showFtue && (
+        <ZeModal
+          isOpen={showFtue}
+          title="Mãos da Obra - Guia Rápido"
+          message={ftueStepsContent[currentFtueStep].text}
+          confirmText={currentFtueStep === ftueStepsContent.length - 1 ? "Entendido!" : "Próximo"}
+          cancelText="Pular Tour"
+          onConfirm={handleNextFtueStep}
+          onCancel={markFtueAsSeen}
+          type="INFO"
+        />
+      )}
+
       {/* Header */}
       <div className="flex justify-between items-end mb-10"> {/* OE #004: Increased margin-bottom */}
         <div>
