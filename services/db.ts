@@ -2002,7 +2002,8 @@ export const dbService = {
 
   // --- WORKERS ---
   async getWorkers(workId: string): Promise<Worker[]> {
-    const now = Date.Now();
+    // Fix: Changed Date.Now() to Date.now() for correct timestamp retrieval.
+    const now = Date.now();
     if (_dashboardCache.workers[workId] && (now - _dashboardCache.workers[workId].timestamp < CACHE_TTL)) {
       return _dashboardCache.workers[workId].data;
     }
