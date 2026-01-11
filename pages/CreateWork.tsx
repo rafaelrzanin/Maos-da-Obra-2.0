@@ -1,5 +1,6 @@
 
 
+
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext.tsx'; // Use authLoading and isUserAuthFinished
 import * as ReactRouter from 'react-router-dom';
@@ -151,13 +152,15 @@ const CreateWork = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user) return;
+    if (!user) {
+        setGeneralError("Usuário não autenticado. Por favor, faça login novamente.");
+        return;
+    }
     
     // Valida o passo final antes de realmente submeter
     if (!validateStep(totalSteps)) return; 
 
     setLoading(true);
-    // REMOVED: setGenerationMode(true);
     setGeneralError(''); // Clear general error antes da submissão
 
     // Timeout safety
@@ -213,16 +216,14 @@ const CreateWork = () => {
         navigate(`/work/${newWork.id}`);
     } catch (error: any) {
         console.error("Erro CREATE:", error);
-        // REMOVED: setGenerationMode(false);
         setLoading(false);
-        // REMOVED: setGenStep(0);
         
         if (error.message === 'TIMEOUT' || error.message?.includes('Supabase off')) {
-            setGeneralError("Erro de conexão ou Banco de Dados não configurado. Verifique se você criou as tabelas no Supabase.");
+            setGeneralError("Erro de conexão. Não foi possível criar sua obra agora. Tente novamente.");
         } else if (error.message?.includes('permission denied')) {
             setGeneralError("Erro de Permissão. Verifique se você está logado corretamente.");
         } else {
-            setGeneralError(`Erro ao salvar: ${error.message}`);
+            setGeneralError(`Algo não saiu como esperado: ${error.message}. Tente novamente.`);
         }
     } finally {
         setLoading(false);
