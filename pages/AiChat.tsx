@@ -108,7 +108,7 @@ const AiChat = () => {
     e?.preventDefault(); // Only prevent default if event object exists
     const textToSend = aiMessage.trim(); // Always use aiMessage state
 
-    if (!textToSend || !hasAiAccess || aiLoading || isListening) return; // Cannot send if listening or empty/loading
+    if (!textToSend || !hasAiAccess || aiLoading) return; // Cannot send if empty/loading. isListening doesn't prevent sending.
 
     const userMessage: Message = { id: Date.now().toString(), sender: 'user', text: textToSend };
     setMessages(prevMessages => [...prevMessages, userMessage]);
@@ -138,8 +138,7 @@ const AiChat = () => {
 
     if (isListening) {
       recognitionRef.current.stop(); // This will trigger onend
-      // REMOVIDO: NENHUM ENVIO AUTOMÁTICO AQUI
-      // O texto transcrito estará em `aiMessage` (via onend) e o usuário deve clicar em enviar
+      // The recognized text will be moved to aiMessage by onend. User must click send.
     } else {
       setAiMessage(''); // Clear any existing text before starting
       setRecognizedText(''); // Clear previous recognized text
@@ -222,7 +221,7 @@ const AiChat = () => {
           onChange={(e) => setAiMessage(e.target.value)}
           placeholder={isListening ? 'Ouvindo...' : 'Pergunte ao Zé...'}
           className="flex-1 p-4 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 outline-none focus:border-secondary transition-colors text-primary dark:text-white"
-          disabled={aiLoading || isListening} // Disable typing while AI is loading or listening
+          disabled={aiLoading} // Disable typing only while AI is loading, allow typing during listening
           aria-label="Caixa de texto para perguntar ao Zé da Obra ou transcrição de voz"
         />
         {/* Toggle button for voice input */}
@@ -240,9 +239,9 @@ const AiChat = () => {
         {/* NEW: Send Button - Always present */}
         <button
           type="submit"
-          disabled={aiLoading || !aiMessage.trim() || isListening} // Disable if AI is loading, input is empty, or still listening
+          disabled={aiLoading || !aiMessage.trim()} // Disable if AI is loading or input is empty, NOT by isListening
           className={`w-14 text-white rounded-xl flex items-center justify-center shadow-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed
-            ${(!aiMessage.trim() || aiLoading || isListening) ? 'bg-slate-400 dark:bg-slate-700' : 'bg-primary hover:bg-primary-light'}
+            ${(!aiMessage.trim() || aiLoading) ? 'bg-slate-400 dark:bg-slate-700' : 'bg-primary hover:bg-primary-light'}
           `}
           aria-label="Enviar mensagem"
         >
