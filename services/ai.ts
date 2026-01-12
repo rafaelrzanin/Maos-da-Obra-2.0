@@ -1,4 +1,3 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
 import { Work, AIWorkPlan } from "../types.ts";
 
@@ -36,12 +35,16 @@ const apiKey = safeGetEnv('VITE_GOOGLE_API_KEY');
 let ai: GoogleGenAI | null = null;
 
 // NEW: Strict check for API key
-if (!apiKey) {
-  console.error("ERRO CRÍTICO: Google GenAI API Key (VITE_GOOGLE_API_KEY) não está configurada.");
-  console.error("Por favor, adicione sua chave de API nas variáveis de ambiente do seu ambiente de deploy (Vercel, etc.) como 'VITE_GOOGLE_API_KEY' ou no seu arquivo .env local.");
+if (!apiKey || apiKey === 'undefined') { // Explicitly check for 'undefined' string
+  console.error("ERRO CRÍTICO: Google GenAI API Key (VITE_GOOGLE_API_KEY) não está configurada ou é inválida. A funcionalidade de IA estará desativada.");
 } else {
-  ai = new GoogleGenAI({ apiKey: apiKey });
-  console.log("Google GenAI inicializado com sucesso.");
+  try {
+    ai = new GoogleGenAI({ apiKey: apiKey });
+    console.log("Google GenAI inicializado com sucesso.");
+  } catch (e) {
+    console.error("ERRO ao inicializar Google GenAI com a chave fornecida:", e);
+    ai = null; // Ensure ai is null if initialization fails
+  }
 }
 
 export const aiService = {
