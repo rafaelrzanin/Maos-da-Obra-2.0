@@ -3448,21 +3448,9 @@ export const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }
             </ZeModal>
           )}
 
-          {/* Delete Confirmation Modal for Checklists */}
-          {zeModal.isOpen && zeModal.id && zeModal.type === 'DANGER' && (
-            <ZeModal {...zeModal} onConfirm={async (_e?: React.FormEvent) => {
-              if (zeModal.id) {
-                await handleDeleteChecklist(zeModal.id);
-                setZeModal(p => ({ ...p, isOpen: false }));
-              }
-            }} />
-          )}
-        </div>
-      );
-    };
-
-
-  // Initial loading screen for work detail page (auth, initial work data)
+       // ... dentro do seu componente principal WorkDetail
+const WorkDetail = () => {
+  // 1. Primeiro coloque as verificações de carregamento (Loading)
   if (!isUserAuthFinished || authLoading || loadingInitialWork) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[80vh] text-primary dark:text-white animate-in fade-in">
@@ -3472,6 +3460,23 @@ export const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }
     );
   }
 
+  // 2. Só depois você define funções internas ou o return principal
+  return (
+    <div className="...">
+      {/* ... todo o seu conteúdo anterior ... */}
+      
+      {/* O trecho final que você postou ficaria aqui dentro */}
+      {zeModal.isOpen && zeModal.id && zeModal.type === 'DANGER' && (
+        <ZeModal {...zeModal} onConfirm={async (_e?: React.FormEvent) => {
+          if (zeModal.id) {
+            await handleDeleteChecklist(zeModal.id);
+            setZeModal(p => ({ ...p, isOpen: false }));
+          }
+        }} />
+      )}
+    </div>
+  ); // Este ; encerra o return
+}; // Este } encerra o componente WorkDetail
   // Handle case where work is not found or user doesn't have permission
   if (workError || !work) {
     return (
