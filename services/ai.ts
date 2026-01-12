@@ -1,3 +1,10 @@
+// CRITICAL PRODUCTION FIX: Explicitly disable AI functionality in the browser environment.
+// This prevents "An API Key must be set when running in a browser" errors that cause white screens in production.
+if (typeof window !== 'undefined') {
+  console.error("CRITICAL: AI functionality is explicitly disabled in the browser environment to avoid API Key errors.");
+  throw new Error('IA DESABILITADA NO BROWSER');
+}
+
 import { GoogleGenAI, Type } from "@google/genai";
 import { Work, AIWorkPlan } from "../types.ts";
 
