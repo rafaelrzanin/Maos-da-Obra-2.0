@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import * as ReactRouter from 'react-router-dom';
 import * as XLSX from 'xlsx'; // Keep XLSX import, as reports might use it
@@ -499,12 +500,12 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }): Reac
   const [toastType, setToastType] = useState<'success' | 'error' | 'warning'>('success');
   const toastTimeoutRef = useRef<number | null>(null);
 
-  // NEW: State for "Atualizado automaticamente" badge on Financeiro tab
-  const [showFinanceUpdateBadge, setShowFinanceUpdateBadge] = useState(false);
-  const financeBadgeTimeoutRef = useRef<number | null>(null);
+  // REMOVED: State for "Atualizado automaticamente" badge on Financeiro tab
+  // const [showFinanceUpdateBadge, setShowFinanceUpdateBadge] = useState(false);
+  // const financeBadgeTimeoutRef = useRef<number | null>(null);
 
-  // OE #001: State for initial orientation message
-  const [showInitialOrientation, setShowInitialOrientation] = useState(false);
+  // REMOVED: OE #001: State for initial orientation message
+  // const [showInitialOrientation, setShowInitialOrientation] = useState(false);
 
 
   // =======================================================================
@@ -525,17 +526,17 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }): Reac
     }, 3000) as unknown as number; // Type assertion for setTimeout return type
   }, []);
 
-  // NEW: Function to show finance update badge
-  const showFinanceBadge = useCallback(() => {
-    if (financeBadgeTimeoutRef.current) {
-      clearTimeout(financeBadgeTimeoutRef.current);
-    }
-    setShowFinanceUpdateBadge(true);
-    financeBadgeTimeoutRef.current = setTimeout(() => {
-      setShowFinanceUpdateBadge(false);
-      financeBadgeTimeoutRef.current = null;
-    }, 2000) as unknown as number; // Type assertion for setTimeout return type
-  }, []);
+  // REMOVED: Function to show finance update badge
+  // const showFinanceBadge = useCallback(() => {
+  //   if (financeBadgeTimeoutRef.current) {
+  //     clearTimeout(financeBadgeTimeoutRef.current);
+  //   }
+  //   setShowFinanceUpdateBadge(true);
+  //   financeBadgeTimeoutRef.current = setTimeout(() => {
+  //     setShowFinanceUpdateBadge(false);
+  //     financeBadgeTimeoutRef.current = null;
+  //   }, 2000) as unknown as number; // Type assertion for setTimeout return type
+  // }, []);
 
 
   const goToTab = useCallback((tab: MainTab) => {
@@ -751,13 +752,13 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }): Reac
       setContracts(fetchedContracts);
       setChecklists(fetchedChecklists);
 
-      // OE #001: Check if initial orientation should be shown
-      const hasSeenOrientation = localStorage.getItem(`seen_work_orientation_${workId}`);
-      if (!hasSeenOrientation) {
-        setShowInitialOrientation(true);
-      } else {
-        setShowInitialOrientation(false);
-      }
+      // REMOVED: OE #001: Check if initial orientation should be shown
+      // const hasSeenOrientation = localStorage.getItem(`seen_work_orientation_${workId}`);
+      // if (!hasSeenOrientation) {
+      //   setShowInitialOrientation(true);
+      // } else {
+      //   setShowInitialOrientation(false);
+      // }
 
     } catch (error: any) {
       console.error("Erro ao carregar dados da obra:", error);
@@ -1154,7 +1155,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }): Reac
       setPurchaseCostInput('');
       await loadWorkData();
       showToastNotification("Compra de material registrada com sucesso!", 'success');
-      showFinanceBadge(); // Show badge on finance tab
+      // REMOVED: showFinanceBadge(); // Show badge on finance tab
     } catch (error: any) {
       console.error("Erro ao registrar compra de material:", error);
       showToastNotification(`Erro ao registrar compra: ${error.message || 'Erro desconhecido'}.`, 'error');
@@ -1180,7 +1181,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }): Reac
       setZeModal(prev => ({ ...prev, isOpen: false }));
       await loadWorkData();
       showToastNotification(`Material "${materialName}" excluído com sucesso!`, 'success');
-      showFinanceBadge(); // Show badge on finance tab
+      // REMOVED: showFinanceBadge(); // Show badge on finance tab
     } catch (error: any) {
       console.error("Erro ao excluir material:", error);
       showToastNotification(`Erro ao excluir material: ${error.message || 'Erro desconhecido'}.`, 'error');
@@ -1241,7 +1242,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }): Reac
       setNewExpenseTotalAgreed('');
       await loadWorkData();
       showToastNotification(`Despesa "${newExpenseDescription}" adicionada com sucesso!`, 'success');
-      showFinanceBadge(); // Show badge on finance tab
+      // REMOVED: showFinanceBadge(); // Show badge on finance tab
     } catch (error: any) {
       console.error("Erro ao adicionar despesa:", error);
       showToastNotification(`Erro ao adicionar despesa: ${error.message || 'Erro desconhecido'}.`, 'error');
@@ -1292,7 +1293,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }): Reac
       await loadWorkData();
       // OE-006: Replaced specific success message with generic "Informações salvas."
       showToastNotification("Informações salvas.", 'success');
-      showFinanceBadge(); // Show badge on finance tab
+      // REMOVED: showFinanceBadge(); // Show badge on finance tab
     } catch (error: any) {
       console.error("Erro ao editar despesa:", error);
       showToastNotification(`Erro ao editar despesa: ${error.message || 'Erro desconhecido'}.`, 'error');
@@ -1318,7 +1319,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }): Reac
       setZeModal(prev => ({ ...prev, isOpen: false }));
       await loadWorkData();
       showToastNotification(`Despesa "${expenseDescription}" excluída com sucesso!`, 'success');
-      showFinanceBadge(); // Show badge on finance tab
+      // REMOVED: showFinanceBadge(); // Show badge on finance tab
     } catch (error: any) {
       console.error("Erro ao excluir despesa:", error);
       showToastNotification(`Erro ao excluir despesa: ${error.message || 'Erro desconhecido'}.`, 'error');
@@ -1354,7 +1355,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }): Reac
       setNewPaymentDate(new Date().toISOString().split('T')[0]);
       await loadWorkData();
       showToastNotification(`Pagamento de ${formatCurrency(amount)} registrado com sucesso!`, 'success');
-      showFinanceBadge(); // Show badge on finance tab
+      // REMOVED: showFinanceBadge(); // Show badge on finance tab
     } catch (error: any) {
       console.error("Erro ao adicionar pagamento:", error);
       showToastNotification(`Erro ao adicionar pagamento: ${error.message || 'Erro desconhecido'}.`, 'error');
@@ -2013,24 +2014,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }): Reac
         {zeModal.children}
       </ZeModal>
 
-      {/* Initial Orientation Modal (OE #001) */}
-      {showInitialOrientation && (
-          <ZeModal
-              isOpen={showInitialOrientation}
-              title="Bem-vindo à Sua Obra!"
-              message="Tudo o que você registrar aqui fica guardado."
-              confirmText="Entendido!"
-              onConfirm={async () => {
-                  localStorage.setItem(`seen_work_orientation_${workId}`, 'true');
-                  setShowInitialOrientation(false);
-              }}
-              onCancel={async () => {
-                  localStorage.setItem(`seen_work_orientation_${workId}`, 'true');
-                  setShowInitialOrientation(false);
-              }}
-              type="INFO"
-          />
-      )}
+      {/* REMOVED: Initial Orientation Modal (OE #001) */}
 
       {/* Header */}
       <div className="flex items-center gap-4 mb-6 px-2 sm:px-0">
@@ -2079,9 +2063,9 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }): Reac
           role="tab"
         >
           <i className="fa-solid fa-dollar-sign mr-2"></i> Financeiro
-          {showFinanceUpdateBadge && (
+          {/* REMOVED: showFinanceUpdateBadge && (
             <span className="absolute -top-2 -right-2 bg-green-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full animate-pulse">Atualizado!</span>
-          )}
+          )*/}
         </button>
         <button
           onClick={() => goToTab('FERRAMENTAS')}
