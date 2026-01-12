@@ -158,66 +158,61 @@ const Profile = () => {
                     value={whatsapp}
                     onChange={(e) => setWhatsapp(e.target.value)}
                     className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
-                    aria-label="Número de WhatsApp"
+                    aria-label="WhatsApp"
                 />
             </div>
 
-            <div className="pt-4 border-t border-slate-100 dark:border-slate-800">
-                <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">Alterar Senha</h3>
-                <div className="p-3 mb-4 bg-slate-50 dark:bg-slate-800/50 rounded-xl border border-slate-100 dark:border-slate-700 text-xs text-slate-500">
-                    <i className="fa-solid fa-info-circle mr-2"></i>
-                    A senha é protegida pelo sistema de autenticação e não fica visível.
+            <div className="pt-6 border-t border-slate-100 dark:border-slate-800 space-y-4"> {/* OE #004: Added pt-6 */}
+                <h3 className="text-lg font-bold text-primary dark:text-white">Alterar Senha</h3>
+                
+                {/* REMOVED: "Proteja sua senha..." message as per OE-1 */}
+                
+                <div>
+                    <label htmlFor="password" className="block text-xs font-bold text-slate-500 uppercase mb-1">Nova Senha</label>
+                    <input 
+                        id="password"
+                        type="password" 
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
+                        placeholder="Deixe em branco para não alterar"
+                        aria-label="Nova Senha"
+                        autoComplete="new-password"
+                    />
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <label htmlFor="newPassword" className="block text-xs font-bold text-slate-500 uppercase mb-1">Nova Senha</label>
-                        <input 
-                            id="newPassword"
-                            type="password" 
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
-                            placeholder="Deixe em branco para manter"
-                            className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
-                            aria-label="Nova Senha"
-                            autoComplete="new-password"
-                        />
-                    </div>
-                    <div>
-                        <label htmlFor="confirmNewPassword" className="block text-xs font-bold text-slate-500 uppercase mb-1">Confirmar Senha</label>
-                        <input 
-                            id="confirmNewPassword"
-                            type="password" 
-                            value={confirmPassword}
-                            onChange={(e) => setConfirmPassword(e.target.value)}
-                            placeholder="Repita a nova senha"
-                            className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
-                            aria-label="Confirmar Nova Senha"
-                            autoComplete="new-password"
-                        />
-                    </div>
+                <div>
+                    <label htmlFor="confirmPassword" className="block text-xs font-bold text-slate-500 uppercase mb-1">Confirmar Nova Senha</label>
+                    <input 
+                        id="confirmPassword"
+                        type="password" 
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-primary dark:text-white outline-none focus:ring-2 focus:ring-secondary/20 focus:border-secondary transition-all"
+                        placeholder="Deixe em branco para não alterar"
+                        aria-label="Confirmar Nova Senha"
+                        autoComplete="new-password"
+                    />
                 </div>
             </div>
 
+            {successMsg && (
+                <div className="p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-900 text-green-600 dark:text-green-400 rounded-xl text-base font-bold flex items-center gap-2 animate-in fade-in" role="status">
+                    <i className="fa-solid fa-check-circle"></i> {successMsg}
+                </div>
+            )}
             {errorMsg && (
-                <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-900 text-red-600 dark:text-red-400 rounded-xl text-sm font-bold flex items-center gap-2 animate-in fade-in" role="alert">
+                <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900 text-red-600 dark:text-red-400 rounded-xl text-base font-bold flex items-center gap-2 animate-in fade-in" role="alert">
                     <i className="fa-solid fa-triangle-exclamation"></i> {errorMsg}
                 </div>
             )}
-            
-            {successMsg && (
-            <div className="p-4 bg-green-100 dark:bg-green-900/30 border border-green-200 dark:border-900 text-green-700 dark:text-green-300 rounded-xl flex items-center gap-2 animate-in fade-in">
-                <i className="fa-solid fa-check-circle"></i> {successMsg}
-            </div>
-            )}
 
             <button 
-            type="submit" 
-            disabled={loading}
-            className="w-full py-4 bg-primary hover:bg-primary-dark text-white font-bold rounded-xl shadow-lg shadow-primary/20 transition-all disabled:opacity-70 flex items-center justify-center gap-2"
-            aria-label="Salvar alterações do perfil"
+                type="submit"
+                disabled={loading}
+                className="w-full py-4 bg-primary hover:bg-slate-800 text-white font-bold rounded-2xl shadow-lg shadow-primary/20 transition-all flex items-center justify-center gap-3 disabled:opacity-70 disabled:cursor-not-allowed"
+                aria-label="Salvar Alterações do Perfil"
             >
-            {loading ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-save"></i>}
-            {loading ? 'Salvando...' : 'Salvar Alterações'}
+                {loading ? <i className="fa-solid fa-circle-notch fa-spin"></i> : <i className="fa-solid fa-save"></i>} Salvar Alterações
             </button>
         </form>
       </div>
