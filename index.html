@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="pt-BR">
   <head>
@@ -57,6 +56,9 @@
         return false; // Prevent default browser error handling
       };
 
+      // CRITICAL PRODUCTION FIX: Service Worker disabled due to "unsupported MIME type" error.
+      // This block MUST remain commented out until the underlying service-worker.js hosting issue is resolved.
+      /*
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
            // PWA Service Worker registration
@@ -69,6 +71,8 @@
              });
         });
       }
+      */
+      console.warn("CRITICAL FIX: Service Worker registration is currently DISABLED due to production build errors.");
     </script>
   </body>
 </html>
