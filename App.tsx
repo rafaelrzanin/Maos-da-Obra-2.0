@@ -3,9 +3,8 @@ import React, { useState, useEffect, Suspense, lazy, Fragment } from 'react';
 import * as ReactRouter from 'react-router-dom';
 import { PlanType } from './types.ts';
 import { AuthProvider, ThemeProvider, useAuth, useTheme } from './contexts/AuthContext.tsx';
-// NEW: Import WorkDetailProps for type casting
-// FIX: WorkDetail is now default exported, so its type should be imported separately if needed.
 import { type WorkDetailProps, type MainTab } from './pages/WorkDetail.tsx'; 
+import { ZE_AVATAR, ZE_AVATAR_FALLBACK } from './services/standards.ts'; // Import ZE_AVATAR
 
 // --- IMPORTAÇÕES ESTÁTICAS (Críticas para velocidade inicial) ---
 import Login from './pages/Login.tsx'; // Keep Login static as it's the entry point for unauthenticated users
@@ -225,14 +224,15 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
 
   // Define navigation items for the sidebar
   const navItems = [
-    { path: '/', icon: 'fa-home', label: 'Dashboard' },
-    { path: '/create', icon: 'fa-plus-circle', label: 'Nova Obra' },
-    { path: '/ai-chat', icon: 'fa-helmet-safety', label: 'Zé da Obra AI' },
-    { path: '/notifications', icon: 'fa-bell', label: 'Alertas', badge: unreadNotificationsCount },
-    { path: '/profile', icon: 'fa-user', label: 'Meu Perfil' }, // Added Profile
-    { path: '/tutorials', icon: 'fa-video', label: 'Tutoriais em Vídeo' }, // Added Tutorials
-    { path: '/settings', icon: 'fa-gear', label: 'Configurações' },
-    { path: '/help', icon: 'fa-question-circle', label: 'Ajuda e Dúvidas' }, // OE #003: Added HelpFAQ link
+    { type: 'link', path: '/', icon: 'fa-home', label: 'Dashboard' },
+    { type: 'link', path: '/create', icon: 'fa-plus-circle', label: 'Nova Obra' },
+    // Zé da Obra AI chat button is now in the header
+    { type: 'link', path: '/notifications', icon: 'fa-bell', label: 'Alertas', badge: unreadNotificationsCount },
+    { type: 'link', path: '/profile', icon: 'fa-user', label: 'Meu Perfil' }, // Added Profile
+    { type: 'link', path: '/tutorials', icon: 'fa-video', label: 'Tutoriais em Vídeo' }, // Added Tutorials
+    { type: 'link', path: '/settings', icon: 'fa-gear', label: 'Configurações' },
+    { type: 'link', path: '/help', icon: 'fa-question-circle', label: 'Ajuda e Dúvidas' }, // OE #003: Added HelpFAQ link
+    { type: 'action', icon: theme === 'dark' ? 'fa-sun' : 'fa-moon', label: `Tema ${theme === 'dark' ? 'Claro' : 'Escuro'}`, action: toggleTheme }, // Theme toggle moved
   ];
 
   // Determine if current route is a WorkDetail page (to show bottom nav)
@@ -248,8 +248,13 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
           <i className="fa-solid fa-bars"></i>
         </button>
         <h1 className="text-xl font-bold absolute left-1/2 -translate-x-1/2">MÃOS DA OBRA</h1>
-        <button onClick={toggleTheme} className="text-xl p-2 -mr-2" aria-label="Alternar tema">
-          {theme === 'dark' ? <i className="fa-solid fa-sun"></i> : <i className="fa-solid fa-moon"></i>}
+        {/* NEW: Zé da Obra AI Button - replaces theme toggle in header */}
+        <button 
+          onClick={() => navigate('/ai-chat')}
+          className="w-10 h-10 rounded-full border-2 border-slate-700 p-0.5 bg-white flex items-center justify-center shrink-0 overflow-hidden -mr-2"
+          aria-label="Abrir chat do Zé da Obra AI"
+        >
+          <img src={ZE_AVATAR} className="w-full h-full object-cover rounded-full" onError={(e) => e.currentTarget.src = ZE_AVATAR_FALLBACK} alt="Zé da Obra AI" />
         </button>
       </header>
       
@@ -272,14 +277,20 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
           <nav className="flex-1 space-y-2">
             {navItems.map(item => (
               <button 
-                key={item.path} 
-                onClick={() => { navigate(item.path); setIsSidebarOpen(false); }}
-                // Fix for Vercel build error: concatenate string and dynamic part
+                key={item.path || item.label} 
+                onClick={() => { 
+                  if (item.type === 'link') {
+                    navigate(item.path as string); 
+                  } else if (item.type === 'action') {
+                    (item.action as () => void)(); // Call the action
+                  }
+                  setIsSidebarOpen(false); 
+                }}
                 className={
                   "flex items-center gap-4 w-full py-3 px-4 rounded-xl text-left font-bold transition-colors " +
-                  (location.pathname === item.path ? 'bg-secondary/20 text-secondary' : 'text-slate-200 hover:bg-slate-800')
+                  (item.type === 'link' && location.pathname === item.path ? 'bg-secondary/20 text-secondary' : 'text-slate-200 hover:bg-slate-800')
                 }
-                aria-current={location.pathname === item.path ? 'page' : undefined}
+                aria-current={item.type === 'link' && location.pathname === item.path ? 'page' : undefined}
               >
                 <div className="relative text-lg w-6 flex justify-center">
                   <i className={`fa-solid ${item.icon}`}></i>
@@ -334,14 +345,7 @@ const Layout = ({ children }: { children: React.ReactNode }) => {
         {children}
       </main>
 
-      {/* NEW: Floating Zé da Obra AI Button */}
-      <button
-        onClick={() => navigate('/ai-chat')}
-        className="fixed bottom-4 right-4 z-50 w-16 h-16 rounded-full bg-secondary shadow-lg hover:bg-secondary-dark focus:outline-none focus:ring-4 focus:ring-secondary/50 transition-all duration-200 flex items-center justify-center text-3xl text-white md:bottom-8 md:right-8"
-        aria-label="Abrir chat do Zé da Obra AI"
-      >
-        <i className="fa-solid fa-helmet-safety"></i>
-      </button>
+      {/* REMOVED: Floating Zé da Obra AI Button (moved to header) */}
 
       {/* NEW: Bottom Navigation Bar */}
       {isWorkDetailPage && workIdForBottomNav && (
