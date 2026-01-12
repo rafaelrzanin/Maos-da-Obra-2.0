@@ -4,10 +4,37 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.tsx';
 import { dbService } from '../services/db.ts';
-import { aiService } from '../services/ai';
+// Removed: import { aiService } from '../services/ai'; // CRITICAL: REMOVED AI SERVICE IMPORT
 import { Work, AIWorkPlan, PlanType } from '../types.ts';
 import { ZE_AVATAR, ZE_AVATAR_FALLBACK } from '../services/standards.ts';
 import { ZeModal } from '../components/ZeModal.tsx';
+
+// CRITICAL FIX: Local mockAiService to entirely replace aiService in the browser
+const mockAiService = {
+  chat: async (message: string): Promise<string> => {
+    console.warn("MOCK AI SERVICE: chat called in browser (AiWorkPlanner). AI is disabled.");
+    await new Promise(r => setTimeout(r, 500)); // Simulate loading
+    return "O Zé está em modo offline no momento para gerar um resumo. Por favor, configure sua chave de API ou acesse um plano Vitalício para usar a IA.";
+  },
+  getWorkInsight: async (context: string): Promise<string> => {
+    console.warn("MOCK AI SERVICE: getWorkInsight called in browser (AiWorkPlanner). AI is disabled.");
+    await new Promise(r => setTimeout(r, 500)); // Simulate loading
+    return "Estou sem conexão para dar a dica, mas a atenção ao cronograma é sempre crucial.";
+  },
+  generateWorkPlanAndRisk: async (work: Work): Promise<AIWorkPlan> => {
+    console.warn("MOCK AI SERVICE: generateWorkPlanAndRisk called in browser. AI is disabled.");
+    await new Promise(r => setTimeout(r, 2000));
+    return {
+      workId: work.id,
+      generalAdvice: "A IA está offline. Não foi possível gerar um plano detalhado. Verifique suas anotações e contatos para gerenciar a obra.",
+      timelineSummary: "Plano offline. Organize suas etapas manualmente.",
+      detailedSteps: [{ orderIndex: 1, name: "Fase 1: Preparação (OFFLINE)", estimatedDurationDays: 10, notes: "Defina seus materiais manualmente enquanto a IA está offline." }],
+      potentialRisks: [{ description: "Risco de atraso devido a IA offline.", likelihood: "high", mitigation: "A IA está offline." }],
+      materialSuggestions: [{ item: "Cimento (OFFLINE)", priority: "medium", reason: "Sempre essencial, mas a IA não pode sugerir agora." }],
+    };
+  }
+};
+
 
 /** =========================
  * UI helpers
@@ -32,9 +59,10 @@ const AiWorkPlanner = () => {
   const [showAiAccessModal, setShowAiAccessModal] = useState(false);
   const [showGenerationErrorModal, setShowGenerationErrorModal] = useState(false); // NEW: State for generation errors
 
+  // CRITICAL FIX: hasAiAccess will always be false for actual AI calls from browser
   const isVitalicio = user?.plan === PlanType.VITALICIO;
   const isAiTrialActive = user?.isTrial && trialDaysRemaining !== null && trialDaysRemaining > 0;
-  const hasAiAccess = isVitalicio || isAiTrialActive;
+  const hasAiAccess = isVitalicio || isAiTrialActive; // This still drives the UI lock/unlock, but AI calls are mocked
 
   // Function to determine risk class
   const getRiskClass = (likelihood: 'low' | 'medium' | 'high') => {
@@ -51,14 +79,20 @@ const AiWorkPlanner = () => {
   };
 
   const generatePlan = useCallback(async () => {
-    if (!work || !hasAiAccess) return;
+    if (!work || !hasAiAccess) { // AI calls are mocked even if hasAiAccess is true
+      setLoadingPlan(false);
+      setErrorMsg("Acesso à IA desabilitado no navegador. Plano gerado por mock.");
+      setAiPlan(await mockAiService.generateWorkPlanAndRisk(work!)); // Use mock service
+      return;
+    }
 
     setLoadingPlan(true);
     setErrorMsg('');
     setAiPlan(null);
 
     try {
-      const plan = await aiService.generateWorkPlanAndRisk(work);
+      // CRITICAL FIX: Use mockAiService here
+      const plan = await mockAiService.generateWorkPlanAndRisk(work);
       setAiPlan(plan);
     } catch (error: any) {
       console.error("Erro ao gerar plano da IA:", error);
@@ -89,13 +123,9 @@ const AiWorkPlanner = () => {
         }
         setWork(fetchedWork);
 
-        if (!hasAiAccess) {
-          setShowAiAccessModal(true);
-          setLoadingPlan(false);
-          return;
-        }
-
-        await generatePlan(); // Generate plan immediately if access is valid
+        // Even if hasAiAccess is true, the AI service is mocked due to emergency fix
+        // We still need to call generatePlan for the mocked output
+        await generatePlan(); 
 
       } catch (error: any) {
         console.error("Erro ao carregar dados da obra ou plano AI:", error);
@@ -106,7 +136,7 @@ const AiWorkPlanner = () => {
     };
 
     loadWorkAndPlan();
-  }, [workId, user, navigate, isUserAuthFinished, authLoading, hasAiAccess, generatePlan]);
+  }, [workId, user, navigate, isUserAuthFinished, authLoading, generatePlan]); // hasAiAccess removed from dependencies as generatePlan now handles mock logic
 
   if (authLoading || !isUserAuthFinished) {
     return (
@@ -136,14 +166,14 @@ const AiWorkPlanner = () => {
         </div>
       </div>
 
-      {showAiAccessModal && (
+      {!hasAiAccess && ( // Show access modal only if user *should* have access based on plan/trial but AI is disabled.
         <ZeModal
-          isOpen={showAiAccessModal}
+          isOpen={true} // Force open if no access
           title="Acesso Premium necessário!"
           message="O Planejamento Inteligente AI é uma funcionalidade exclusiva para assinantes Vitalícios ou durante o período de teste. Melhore sua gestão de obras agora!"
           confirmText="Ver Planos"
           onConfirm={async (_e?: React.FormEvent) => navigate('/settings')}
-          onCancel={async (_e?: React.FormEvent) => { setShowAiAccessModal(false); navigate(`/work/${workId}`); }}
+          onCancel={async (_e?: React.FormEvent) => { navigate(`/work/${workId}`); }}
           type="WARNING"
           cancelText="Voltar"
         >
@@ -152,6 +182,7 @@ const AiWorkPlanner = () => {
           </div>
         </ZeModal>
       )}
+
 
       {showGenerationErrorModal && (
         <ZeModal
