@@ -11,24 +11,33 @@ import { type WorkDetailProps, type MainTab } from './pages/WorkDetail.tsx';
 import Login from './pages/Login.tsx'; // Keep Login static as it's the entry point for unauthenticated users
 
 // --- Lazy Loading ---
-const Dashboard = lazy(() => import('./pages/Dashboard.tsx'));
-const CreateWork = lazy(() => import('./pages/CreateWork.tsx'));
+// Fix: Explicitly map module.default to default for lazy loading.
+const Dashboard = lazy(() => import('./pages/Dashboard.tsx').then(module => ({ default: module.default })));
+// Fix: Explicitly map module.default to default for lazy loading.
+const CreateWork = lazy(() => import('./pages/CreateWork.tsx').then(module => ({ default: module.default })));
 // MODIFICADO: WorkDetail agora aceitará `activeTab` e `onTabChange` como props
 // FIX: Correctly type the lazy-loaded WorkDetail component
-const WorkDetail = lazy(() => import('./pages/WorkDetail.tsx') as Promise<{ default: React.ComponentType<WorkDetailProps> }>);
-const Settings = lazy(() => import('./pages/Settings.tsx'));
-const Profile = lazy(() => import('./pages/Profile.tsx'));
-const VideoTutorials = lazy(() => import('./pages/VideoTutorials.tsx'));
-const Checkout = lazy(() => import('./pages/Checkout.tsx'));
-const AiChat = lazy(() => import('./pages/AiChat.tsx')); // Lazy load AiChat page
-const Notifications = lazy(() => import('./pages/Notifications.tsx')); // NEW: Lazy load Notifications page
+const WorkDetail = lazy(() => import('./pages/WorkDetail.tsx').then(module => ({ default: module.default as React.ComponentType<WorkDetailProps> })));
+// Fix: Explicitly map module.default to default for lazy loading.
+const Settings = lazy(() => import('./pages/Settings.tsx').then(module => ({ default: module.default })));
+// Fix: Explicitly map module.default to default for lazy loading.
+const Profile = lazy(() => import('./pages/Profile.tsx').then(module => ({ default: module.default })));
+// Fix: Explicitly map module.default to default for lazy loading.
+const VideoTutorials = lazy(() => import('./pages/VideoTutorials.tsx').then(module => ({ default: module.default })));
+// Fix: Explicitly map module.default to default for lazy loading.
+const Checkout = lazy(() => import('./pages/Checkout.tsx').then(module => ({ default: module.default })));
+// Fix: Explicitly map module.default to default for lazy loading.
+const AiChat = lazy(() => import('./pages/AiChat.tsx').then(module => ({ default: module.default }))); // Lazy load AiChat page
+// Fix: Explicitly map module.default to default for lazy loading.
+const Notifications = lazy(() => import('./pages/Notifications.tsx').then(module => ({ default: module.default }))); // NEW: Lazy load Notifications page
 // NEW: AiWorkPlanner lazy load, as it is a premium feature
 // Fix: Explicitly map module.default to default for lazy loading.
-const AiWorkPlanner = lazy(() => import('./pages/AiWorkPlanner.tsx'));
+const AiWorkPlanner = lazy(() => import('./pages/AiWorkPlanner.tsx').then(module => ({ default: module.default })));
 // FIX: Changed lazy import to correctly handle named export for ReportsView.
 const ReportsView = lazy(() => import('./components/ReportsView.tsx').then(module => ({ default: module.ReportsView }))); // NEW: Lazy load ReportsView
 // OE #003: Lazy load HelpFAQ page
-const HelpFAQ = lazy(() => import('./pages/HelpFAQ.tsx'));
+// Fix: Explicitly map module.default to default for lazy loading.
+const HelpFAQ = lazy(() => import('./pages/HelpFAQ.tsx').then(module => ({ default: module.default })));
 
 // --- Componente de Carregamento ---
 const LoadingScreen = () => (
@@ -360,6 +369,7 @@ const AppRouterContent = () => {
     // User is NOT authenticated -> Render public routes
     return (
       <ReactRouter.Routes>
+        {/* Fix: Login is imported directly and should not be lazy-loaded, so no .then() needed. */}
         <ReactRouter.Route path="/login" element={<Login />} />
         {/* Wildcard route to redirect any unmatched path to login */}
         <ReactRouter.Route path="*" element={<ReactRouter.Navigate to="/login" replace />} />
