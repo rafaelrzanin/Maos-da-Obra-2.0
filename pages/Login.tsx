@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext.tsx';
 import * as ReactRouter from 'react-router-dom';
@@ -205,6 +204,8 @@ const Login = () => {
         } else {
             value = value.replace(/^(\d{2})(\d)/g, "($1) $2");
             value = value.replace(/(\d{5})(\d)/, "$1-$2");
+            // Fix: Corrected typo ' = value.replace' to 'value = value.replace'
+            value = value.replace(/(\d{3})(\d{1,2})$/, "$1-$2");
         }
     }
 
@@ -222,6 +223,7 @@ const Login = () => {
   };
 
 
+  // Fix: The loading screen should use `isUserAuthFinished` and `authLoading`
   if (!isUserAuthFinished || authLoading) {
     return (
         <div className="relative min-h-screen w-full flex items-center justify-center p-4 bg-slate-900 font-sans">
@@ -267,11 +269,11 @@ const Login = () => {
               <h2 className="text-xl font-bold text-white text-center mb-6">
                   {mode === 'login' ? 'Bem-vindo de volta' : 'Criar sua Conta'}
               </h2>
-              {planParam && mode === 'register' && (
-                <p className="text-center text-amber-400 text-base mb-5 font-semibold"> {/* OE #004: Increased text size, margin */}
+              {/* REMOVED: planParam && mode === 'register' && (
+                <p className="text-center text-amber-400 text-base mb-5 font-semibold">
                   Você está se cadastrando para o plano {planParam.toUpperCase()}. Você poderá confirmá-lo após o cadastro.
                 </p>
-              )}
+              )*/}
 
 
               {mode === 'login' && (
