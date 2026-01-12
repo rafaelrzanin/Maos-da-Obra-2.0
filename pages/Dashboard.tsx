@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import * as ReactRouter from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext.tsx';
@@ -626,28 +627,7 @@ const Dashboard = () => {
         </button>
       </div>
 
-      {/* Static Ze Tip (Only shown if works exist) */}
-      <div className={cx(surface, "rounded-3xl p-5 md:p-6 flex items-start gap-4 mb-8 transition-all duration-300 transform animate-in fade-in slide-in-from-top-4")} role="status"> {/* OE #004: Increased padding, margin-bottom */}
-            <div className="w-14 h-14 rounded-full p-1 bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-700 dark:to-slate-800 shadow-lg shrink-0"> {/* OE #004: Increased size */}
-                <img 
-                src={ZE_AVATAR} 
-                alt="Zé da Obra" 
-                className="w-full h-full object-cover rounded-full border-2 border-white dark:border-slate-800"
-                onError={(e) => { 
-                    const target = e.currentTarget;
-                    if (target.src !== ZE_AVATAR_FALLBACK) {
-                        target.src = ZE_AVATAR_FALLBACK;
-                    }
-                }}
-                />
-            </div>
-            <div className="flex-1">
-                <p className="text-base font-black uppercase tracking-widest mb-1 text-secondary">Dica do Zé!</p> {/* OE #004: Increased text size */}
-                <p className="text-primary dark:text-white font-bold text-lg leading-tight"> {/* OE #004: Increased text size */}
-                  Mantenha sempre o olho no cronograma e no orçamento! Uma boa gestão evita surpresas e prejuízos na obra.
-                </p>
-            </div>
-        </div>
+      {/* REMOVED: Static Ze Tip (Only shown if works exist) */}
 
       {/* Work Selector & Delete Action */}
       <div className="flex items-center gap-3 mb-10"> {/* OE #004: Increased margin-bottom */}
@@ -674,7 +654,7 @@ const Dashboard = () => {
             confirmText: "Sim, Excluir Obra",
             onConfirm: handleDeleteSelectedWork,
             onCancel: () => setZeModal(p => ({ ...p, isOpen: false })),
-            id: selectedWork?.id // Pass work ID to modal for context
+            id: selectedWork?.id
           })}
           disabled={!selectedWork}
           className="flex-none w-14 h-14 bg-red-500 text-white rounded-xl flex items-center justify-center hover:bg-red-600 transition-colors disabled:opacity-50" /* OE #004: Increased size */
