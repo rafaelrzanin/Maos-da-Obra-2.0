@@ -1,8 +1,7 @@
 
-
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import * as ReactRouter from 'react-router-dom';
-import * as XLSX from 'xlsx'; // Keep XLSX import, as reports might use it
+import * as XLSX from 'xlsx'; // Keep XLSX import for Excel export functionality
 import { useAuth } from '../contexts/AuthContext.tsx';
 import { dbService } from '../services/db.ts';
 import { supabase } from '../services/supabase.ts';
@@ -385,18 +384,43 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }): Reac
   const hasAiAccess = isVitalicio || isAiTrialActive;
 
   const [work, setWork] = useState<Work | null>(null);
-  const [steps, setSteps] = useState<Step[]>([]);
-  const [materials, setMaterials] = useState<Material[]>([]);
-  const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [workers, setWorkers] = useState<Worker[]>([]);
-  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
-  const [photos, setPhotos] = useState<WorkPhoto[]>([]);
-  const [files, setFiles] = useState<WorkFile[]>([]);
-  const [contracts, setContracts] = useState<Contract[]>([]);
-  const [checklists, setChecklists] = useState<Checklist[]>([]);
+  const [loadingInitialWork, setLoadingInitialWork] = useState(true); // NEW: For initial work data load
+  const [workError, setWorkError] = useState(''); // NEW: For initial work data errors
 
-  const [loading, setLoading] = useState(true);
-  // REMOVED: `activeTab` from useState, it's now a prop
+  const [steps, setSteps] = useState<Step[]>([]);
+  const [loadingSteps, setLoadingSteps] = useState(false); // NEW: Tab-specific loading
+
+  const [materials, setMaterials] = useState<Material[]>([]);
+  const [loadingMaterials, setLoadingMaterials] = useState(false); // NEW: Tab-specific loading
+
+  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [loadingExpenses, setLoadingExpenses] = useState(false); // NEW: Tab-specific loading
+  
+  // NEW: Separate loading states for Tools sub-views
+  const [workers, setWorkers] = useState<Worker[]>([]);
+  const [loadingWorkers, setLoadingWorkers] = useState(false);
+
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+  const [loadingSuppliers, setLoadingSuppliers] = useState(false);
+
+  const [photos, setPhotos] = useState<WorkPhoto[]>([]);
+  const [loadingPhotos, setLoadingPhotos] = useState(false);
+
+  const [files, setFiles] = useState<WorkFile[]>([]);
+  const [loadingFiles, setLoadingFiles] = useState(false);
+
+  const [contracts, setContracts] = useState<Contract[]>([]);
+  const [loadingContracts, setLoadingContracts] = useState(false);
+
+  const [checklists, setChecklists] = useState<Checklist[]>([]);
+  const [loadingChecklists, setLoadingChecklists] = useState(false);
+
+  // Fix: Declare showAiAccessModal state here
+  const [showAiAccessModal, setShowAiAccessModal] = useState(false);
+
+
+  // Removed global `loading` state, using specific ones now.
+  // const [loading, setLoading] = useState(true); 
   const [activeSubView, setActiveSubView] = useState<SubView>('NONE');
 
   // States for Material Filter
@@ -703,99 +727,251 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }): Reac
   // DATA LOADING
   // =======================================================================
 
-  const loadWorkData = useCallback(async (): Promise<void> => { // Explicitly set return type to void
+  // NEW: Refactored load functions for performance perceived.
+  // 1. Initial Work Load (fastest possible)
+  const _fetchInitialWorkAndAccess = useCallback(async (): Promise<void> => {
     if (!workId || !user?.id) {
-      // These redirects are handled by the component's main render logic now.
-      setLoading(false);
-      return; // Return void here
+      setWork(null);
+      setLoadingInitialWork(false);
+      return;
     }
 
-    setLoading(true);
+    setLoadingInitialWork(true);
+    setWorkError('');
+
     try {
       const fetchedWork = await dbService.getWorkById(workId);
-      // Check if work exists and belongs to the user
       if (!fetchedWork || fetchedWork.userId !== user.id) {
-        setWork(null); // Explicitly set work to null if not found or not owned
-        return; // This will trigger the "Obra não encontrada" block after loading is false
+        setWork(null);
+        setWorkError("Obra não encontrada ou sem permissão.");
+        // Redirect to dashboard if work not found or not owned
+        navigate('/dashboard', { replace: true }); 
+        return;
       }
       setWork(fetchedWork);
 
-      const [fetchedSteps, fetchedMaterials, fetchedExpenses, fetchedWorkers, fetchedSuppliers, fetchedPhotos, fetchedFiles, fetchedContracts, fetchedChecklists] = await Promise.all([
-        dbService.getSteps(workId),
-        dbService.getMaterials(workId),
-        dbService.getExpenses(workId),
-        dbService.getWorkers(workId),
-        dbService.getSuppliers(workId),
-        dbService.getPhotos(workId),
-        dbService.getFiles(workId),
-        dbService.getContractTemplates(), // Contracts are global
-        dbService.getChecklists(workId),
-      ]);
-
-      // NEW CRITICAL STEP: Ensure materials are generated if none exist after fetching work and steps
-      await dbService.ensureMaterialsForWork(fetchedWork, fetchedSteps);
-
-      // After ensuring materials (and potentially generating them),
-      // we need to re-fetch the materials to ensure the state is up-to-date.
-      const currentMaterials = await dbService.getMaterials(workId);
-      setMaterials(currentMaterials);
-
-      // 🔥 CRITICAL: Steps no longer store `isDelayed` explicitly in DB. Status is derived.
-      // The `dbService.getSteps` now returns steps with `status` already calculated.
-      setSteps(fetchedSteps.sort((a, b) => a.orderIndex - b.orderIndex)); // Ensure sorted by orderIndex
-
-      setExpenses(fetchedExpenses);
-      setWorkers(fetchedWorkers);
-      setSuppliers(fetchedSuppliers);
-      setPhotos(fetchedPhotos);
-      setFiles(fetchedFiles);
-      setContracts(fetchedContracts);
-      setChecklists(fetchedChecklists);
-
-      // REMOVED: OE #001: Check if initial orientation should be shown
-      // const hasSeenOrientation = localStorage.getItem(`seen_work_orientation_${workId}`);
-      // if (!hasSeenOrientation) {
-      //   setShowInitialOrientation(true);
-      // } else {
-      //   setShowInitialOrientation(false);
-      // }
-
+      if (!hasAiAccess) {
+        setShowAiAccessModal(true);
+        // Do NOT set workError here, as access modal takes precedence
+      }
     } catch (error: any) {
-      console.error("Erro ao carregar dados da obra:", error);
-      // Show ZeModal for loading error
-      setZeModal({
-        isOpen: true,
-        title: "Erro de Carregamento",
-        message: `Tivemos um problema ao carregar os dados da obra. Por favor, tente novamente.`,
-        type: "ERROR",
-        confirmText: "Tentar Novamente", // Renamed for better UX
-        onConfirm: async (_e?: React.FormEvent) => {
-            setZeModal(p => ({ ...p, isOpen: false })); 
-            await loadWorkData(); // Retry loading
-        }, 
-        onCancel: async (_e?: React.FormEvent) => {
-            setZeModal(p => ({ ...p, isOpen: false })); 
-            navigate('/dashboard');
-        }, // Go to dashboard on cancel
-        cancelText: "Voltar para Dashboard" // Renamed for better UX
-      });
-      setWork(null); // Ensure work is null on error to show not found
-      return; // Explicitly return void on error
+      console.error("Erro ao carregar dados iniciais da obra:", error);
+      setWork(null);
+      setWorkError(`Erro ao carregar obra: ${error.message || 'Erro desconhecido.'}`);
     } finally {
-      setLoading(false);
+      setLoadingInitialWork(false);
     }
-  }, [workId, user, navigate]);
+  }, [workId, user, navigate, hasAiAccess]);
+
+  // 2. Tab-specific data loads
+  const _fetchStepsData = useCallback(async () => {
+    if (!workId || !user?.id || !work) return; // Ensure basic work info is loaded
+    setLoadingSteps(true);
+    try {
+      const fetchedSteps = await dbService.getSteps(workId);
+      setSteps(fetchedSteps.sort((a, b) => a.orderIndex - b.orderIndex));
+      // Ensure materials are generated if needed, but not block initial render.
+      // This is now called during initial work load in CreateWork, so not needed here.
+      // await dbService.ensureMaterialsForWork(work, fetchedSteps); 
+    } catch (error: any) {
+      console.error("Erro ao carregar etapas:", error);
+      showToastNotification(`Erro ao carregar etapas: ${error.message}`, 'error');
+    } finally {
+      setLoadingSteps(false);
+    }
+  }, [workId, user, work, showToastNotification]);
+
+  const _fetchMaterialsData = useCallback(async () => {
+    if (!workId || !user?.id) return;
+    setLoadingMaterials(true);
+    try {
+      const fetchedMaterials = await dbService.getMaterials(workId);
+      setMaterials(fetchedMaterials);
+    } catch (error: any) {
+      console.error("Erro ao carregar materiais:", error);
+      showToastNotification(`Erro ao carregar materiais: ${error.message}`, 'error');
+    } finally {
+      setLoadingMaterials(false);
+    }
+  }, [workId, user, showToastNotification]);
+
+  const _fetchExpensesData = useCallback(async () => {
+    if (!workId || !user?.id) return;
+    setLoadingExpenses(true);
+    try {
+      const fetchedExpenses = await dbService.getExpenses(workId);
+      setExpenses(fetchedExpenses);
+    } catch (error: any) {
+      console.error("Erro ao carregar despesas:", error);
+      showToastNotification(`Erro ao carregar despesas: ${error.message}`, 'error');
+    } finally {
+      setLoadingExpenses(false);
+    }
+  }, [workId, user, showToastNotification]);
+
+  const _fetchWorkersData = useCallback(async () => {
+    if (!workId || !user?.id) return;
+    setLoadingWorkers(true);
+    try {
+      const fetchedWorkers = await dbService.getWorkers(workId);
+      setWorkers(fetchedWorkers);
+    } catch (error: any) {
+      console.error("Erro ao carregar funcionários:", error);
+      showToastNotification(`Erro ao carregar funcionários: ${error.message}`, 'error');
+    } finally {
+      setLoadingWorkers(false);
+    }
+  }, [workId, user, showToastNotification]);
+
+  const _fetchSuppliersData = useCallback(async () => {
+    if (!workId || !user?.id) return;
+    setLoadingSuppliers(true);
+    try {
+      const fetchedSuppliers = await dbService.getSuppliers(workId);
+      setSuppliers(fetchedSuppliers);
+    } catch (error: any) {
+      console.error("Erro ao carregar fornecedores:", error);
+      showToastNotification(`Erro ao carregar fornecedores: ${error.message}`, 'error');
+    } finally {
+      setLoadingSuppliers(false);
+    }
+  }, [workId, user, showToastNotification]);
+
+  const _fetchPhotosData = useCallback(async () => {
+    if (!workId || !user?.id) return;
+    setLoadingPhotos(true);
+    try {
+      const fetchedPhotos = await dbService.getPhotos(workId);
+      setPhotos(fetchedPhotos);
+    } catch (error: any) {
+      console.error("Erro ao carregar fotos:", error);
+      showToastNotification(`Erro ao carregar fotos: ${error.message}`, 'error');
+    } finally {
+      setLoadingPhotos(false);
+    }
+  }, [workId, user, showToastNotification]);
+
+  const _fetchFilesData = useCallback(async () => {
+    if (!workId || !user?.id) return;
+    setLoadingFiles(true);
+    try {
+      const fetchedFiles = await dbService.getFiles(workId);
+      setFiles(fetchedFiles);
+    } catch (error: any) {
+      console.error("Erro ao carregar arquivos:", error);
+      showToastNotification(`Erro ao carregar arquivos: ${error.message}`, 'error');
+    } finally {
+      setLoadingFiles(false);
+    }
+  }, [workId, user, showToastNotification]);
+
+  const _fetchContractsData = useCallback(async () => {
+    // Contracts are global, no workId dependency
+    setLoadingContracts(true);
+    try {
+      const fetchedContracts = await dbService.getContractTemplates();
+      setContracts(fetchedContracts);
+    } catch (error: any) {
+      console.error("Erro ao carregar contratos:", error);
+      showToastNotification(`Erro ao carregar contratos: ${error.message}`, 'error');
+    } finally {
+      setLoadingContracts(false);
+    }
+  }, [showToastNotification]);
+
+  const _fetchChecklistsData = useCallback(async () => {
+    if (!workId || !user?.id) return;
+    setLoadingChecklists(true);
+    try {
+      const fetchedChecklists = await dbService.getChecklists(workId);
+      setChecklists(fetchedChecklists);
+    } catch (error: any) {
+      console.error("Erro ao carregar checklists:", error);
+      showToastNotification(`Erro ao carregar checklists: ${error.message}`, 'error');
+    } finally {
+      setLoadingChecklists(false);
+    }
+  }, [workId, user, showToastNotification]);
+
+
+  // 3. Main Effects for initial data load and tab changes
+  useEffect(() => {
+    if (!authLoading && isUserAuthFinished && !work && !loadingInitialWork) {
+      _fetchInitialWorkAndAccess();
+    }
+  }, [authLoading, isUserAuthFinished, work, loadingInitialWork, _fetchInitialWorkAndAccess]);
 
   useEffect(() => {
-    if (!authLoading && isUserAuthFinished) {
-      loadWorkData();
-      // Read initial tab from URL on first load
-      const tabFromUrl = searchParams.get('tab') as MainTab;
-      if (tabFromUrl && ['ETAPAS', 'MATERIAIS', 'FINANCEIRO', 'FERRAMENTAS'].includes(tabFromUrl)) {
-        onTabChange(tabFromUrl); // Update parent state from URL
-      }
+    // Update activeTab from URL on first load or URL change
+    const tabFromUrl = searchParams.get('tab') as MainTab;
+    if (tabFromUrl && ['ETAPAS', 'MATERIAIS', 'FINANCEIRO', 'FERRAMENTAS'].includes(tabFromUrl)) {
+      onTabChange(tabFromUrl);
     }
-  }, [authLoading, isUserAuthFinished, loadWorkData, searchParams, onTabChange]);
+  }, [searchParams, onTabChange]);
+
+
+  // Effects to trigger tab-specific data loads
+  useEffect(() => {
+    if (activeTab === 'ETAPAS' && work && !loadingSteps && steps.length === 0) {
+      _fetchStepsData();
+    }
+  }, [activeTab, work, loadingSteps, steps.length, _fetchStepsData]);
+
+  useEffect(() => {
+    if (activeTab === 'MATERIAIS' && work && !loadingMaterials && materials.length === 0) {
+      _fetchMaterialsData();
+    }
+  }, [activeTab, work, loadingMaterials, materials.length, _fetchMaterialsData]);
+
+  useEffect(() => {
+    if (activeTab === 'FINANCEIRO' && work && !loadingExpenses && expenses.length === 0) {
+      _fetchExpensesData();
+    }
+  }, [activeTab, work, loadingExpenses, expenses.length, _fetchExpensesData]);
+
+  // For the 'FERRAMENTAS' tab, load sub-view data when activeSubView changes
+  useEffect(() => {
+    if (activeTab === 'FERRAMENTAS' && work) {
+        if (activeSubView === 'WORKERS' && !loadingWorkers && workers.length === 0) {
+            _fetchWorkersData();
+        } else if (activeSubView === 'SUPPLIERS' && !loadingSuppliers && suppliers.length === 0) {
+            _fetchSuppliersData();
+        } else if (activeSubView === 'PHOTOS' && !loadingPhotos && photos.length === 0) {
+            _fetchPhotosData();
+        } else if (activeSubView === 'FILES' && !loadingFiles && files.length === 0) {
+            _fetchFilesData();
+        } else if (activeSubView === 'CONTRACTS' && !loadingContracts && contracts.length === 0) {
+            _fetchContractsData();
+        } else if (activeSubView === 'CHECKLIST' && !loadingChecklists && checklists.length === 0) {
+            _fetchChecklistsData();
+        }
+    }
+  }, [activeTab, work, activeSubView, loadingWorkers, workers.length, _fetchWorkersData,
+      loadingSuppliers, suppliers.length, _fetchSuppliersData,
+      loadingPhotos, photos.length, _fetchPhotosData,
+      loadingFiles, files.length, _fetchFilesData,
+      loadingContracts, contracts.length, _fetchContractsData,
+      loadingChecklists, checklists.length, _fetchChecklistsData
+  ]);
+
+  // Consolidated reload function to call after any CRUD operation
+  const _reloadAllWorkData = useCallback(async () => {
+      // Reload everything that might have changed
+      if (workId) {
+          await Promise.all([
+              _fetchStepsData(),
+              _fetchMaterialsData(),
+              _fetchExpensesData(),
+              _fetchWorkersData(),
+              _fetchSuppliersData(),
+              _fetchPhotosData(),
+              _fetchFilesData(),
+              _fetchContractsData(),
+              _fetchChecklistsData()
+          ]);
+      }
+  }, [workId, _fetchStepsData, _fetchMaterialsData, _fetchExpensesData, _fetchWorkersData, _fetchSuppliersData, _fetchPhotosData, _fetchFilesData, _fetchContractsData, _fetchChecklistsData]);
+
 
   // =======================================================================
   // CRUD HANDLERS: STEPS
@@ -840,7 +1016,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }): Reac
       await dbService.updateStep(updatedStepData);
       console.log(`[handleStepStatusChange] dbService.updateStep successful for step ${step.id}.`);
       console.log(`[handleStepStatusChange] Data reloaded after status update for step ${step.id}.`);
-      await loadWorkData();
+      await _reloadAllWorkData(); // Use the consolidated reload
       // OE-006: Replaced specific success message with generic "Informações salvas."
       showToastNotification("Informações salvas.", 'success');
     } catch (error: any) {
@@ -859,7 +1035,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }): Reac
       setIsUpdatingStepStatus(false);
       console.log(`[handleStepStatusChange] Finalized status update for step ${step.id}. isUpdatingStepStatus set to false.`);
     }
-  }, [loadWorkData, isUpdatingStepStatus, showToastNotification]);
+  }, [_reloadAllWorkData, isUpdatingStepStatus, showToastNotification]);
 
   const handleAddStep = async (e: React.FormEvent) => {
     e.preventDefault(); // Prevent default form submission
@@ -883,7 +1059,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }): Reac
       setNewStepStartDate(new Date().toISOString().split('T')[0]);
       setNewStepEndDate(new Date().toISOString().split('T')[0]);
       setNewEstimatedDurationDays(''); // Clear for new
-      await loadWorkData();
+      await _reloadAllWorkData(); // Use the consolidated reload
       showToastNotification(`Etapa "${newStepName}" adicionada com sucesso!`, 'success');
     } catch (error: any) {
       console.error("Erro ao adicionar etapa:", error);
@@ -924,7 +1100,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }): Reac
       });
       setEditStepData(null);
       setShowAddStepModal(false); // Close the modal
-      await loadWorkData();
+      await _reloadAllWorkData(); // Use the consolidated reload
       // OE-006: Replaced specific success message with generic "Informações salvas."
       showToastNotification("Informações salvas.", 'success');
     } catch (error: any) {
@@ -950,7 +1126,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }): Reac
     try {
       await dbService.deleteStep(stepId, workId!);
       setZeModal(prev => ({ ...prev, isOpen: false }));
-      await loadWorkData();
+      await _reloadAllWorkData(); // Use the consolidated reload
       showToastNotification(`Etapa "${stepName}" excluída com sucesso!`, 'success');
     } catch (error: any) {
       console.error("Erro ao excluir etapa:", error);
@@ -1018,20 +1194,20 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }): Reac
       orderIndex: index + 1,
     }));
 
-    setLoading(true); // Indicate loading while reordering
+    // setLoading(true); // Indicate loading while reordering
     try {
       // Send updates to DB
       for (const step of updatedSteps) {
         // 🔥 CRITICAL: Only update orderIndex, ensure other derived fields are untouched
         await dbService.updateStep({ ...step, orderIndex: step.orderIndex });
       }
-      await loadWorkData(); // Reload all data to ensure consistency
+      await _reloadAllWorkData(); // Use the consolidated reload
       showToastNotification("Ordem das etapas atualizada!", 'success');
     } catch (error: any) {
       console.error("Erro ao reordenar etapas:", error);
       showToastNotification(`Erro ao reordenar etapas: ${error.message || 'Erro desconhecido'}.`, 'error');
     } finally {
-      setLoading(false);
+      // setLoading(false);
       setDraggedStepId(null);
     }
   };
@@ -1064,7 +1240,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }): Reac
       setNewMaterialUnit('');
       setNewMaterialCategory('');
       setNewMaterialStepId('');
-      await loadWorkData();
+      await _reloadAllWorkData(); // Use the consolidated reload
       showToastNotification(`Material "${newMaterialName}" adicionado com sucesso!`, 'success');
     } catch (error: any) {
       console.error("Erro ao adicionar material:", error);
@@ -1102,7 +1278,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }): Reac
       });
       setEditMaterialData(null);
       setShowAddMaterialModal(false);
-      await loadWorkData();
+      await _reloadAllWorkData(); // Use the consolidated reload
       // OE-006: Replaced specific success message with generic "Informações salvas."
       showToastNotification("Informações salvas.", 'success');
     } catch (error: any) {
@@ -1153,7 +1329,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }): Reac
       setShowAddMaterialModal(false);
       setPurchaseQtyInput('');
       setPurchaseCostInput('');
-      await loadWorkData();
+      await _reloadAllWorkData(); // Use the consolidated reload
       showToastNotification("Compra de material registrada com sucesso!", 'success');
       // REMOVED: showFinanceBadge(); // Show badge on finance tab
     } catch (error: any) {
@@ -1179,7 +1355,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }): Reac
     try {
       await dbService.deleteMaterial(materialId);
       setZeModal(prev => ({ ...prev, isOpen: false }));
-      await loadWorkData();
+      await _reloadAllWorkData(); // Use the consolidated reload
       showToastNotification(`Material "${materialName}" excluído com sucesso!`, 'success');
       // REMOVED: showFinanceBadge(); // Show badge on finance tab
     } catch (error: any) {
@@ -1240,7 +1416,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }): Reac
       setNewExpenseWorkerId('');
       setNewExpenseSupplierId('');
       setNewExpenseTotalAgreed('');
-      await loadWorkData();
+      await _reloadAllWorkData(); // Use the consolidated reload
       showToastNotification(`Despesa "${newExpenseDescription}" adicionada com sucesso!`, 'success');
       // REMOVED: showFinanceBadge(); // Show badge on finance tab
     } catch (error: any) {
@@ -1290,7 +1466,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }): Reac
       });
       setEditExpenseData(null);
       setShowAddExpenseModal(false);
-      await loadWorkData();
+      await _reloadAllWorkData(); // Use the consolidated reload
       // OE-006: Replaced specific success message with generic "Informações salvas."
       showToastNotification("Informações salvas.", 'success');
       // REMOVED: showFinanceBadge(); // Show badge on finance tab
@@ -1317,7 +1493,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }): Reac
     try {
       await dbService.deleteExpense(expenseId);
       setZeModal(prev => ({ ...prev, isOpen: false }));
-      await loadWorkData();
+      await _reloadAllWorkData(); // Use the consolidated reload
       showToastNotification(`Despesa "${expenseDescription}" excluída com sucesso!`, 'success');
       // REMOVED: showFinanceBadge(); // Show badge on finance tab
     } catch (error: any) {
@@ -1353,7 +1529,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }): Reac
       setShowAddPaymentModal(false);
       setPaymentAmount('');
       setNewPaymentDate(new Date().toISOString().split('T')[0]);
-      await loadWorkData();
+      await _reloadAllWorkData(); // Use the consolidated reload
       showToastNotification(`Pagamento de ${formatCurrency(amount)} registrado com sucesso!`, 'success');
       // REMOVED: showFinanceBadge(); // Show badge on finance tab
     } catch (error: any) {
@@ -1400,7 +1576,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }): Reac
       setNewWorkerPhone('');
       setNewWorkerDailyRate('');
       setNewWorkerNotes('');
-      await loadWorkData();
+      await _reloadAllWorkData(); // Use the consolidated reload
       showToastNotification(`Funcionário "${newWorkerName}" adicionado com sucesso!`, 'success');
     } catch (error: any) {
       console.error("Erro ao adicionar funcionário:", error);
@@ -1435,7 +1611,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }): Reac
       });
       setEditWorkerData(null);
       setShowAddWorkerModal(false);
-      await loadWorkData();
+      await _reloadAllWorkData(); // Use the consolidated reload
       // OE-006: Replaced specific success message with generic "Informações salvas."
       showToastNotification("Informações salvas.", 'success');
     } catch (error: any) {
@@ -1460,7 +1636,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }): Reac
     try {
       await dbService.deleteWorker(workerId, workId!);
       setZeModal(prev => ({ ...prev, isOpen: false }));
-      await loadWorkData();
+      await _reloadAllWorkData(); // Use the consolidated reload
       showToastNotification(`Funcionário "${workerName}" excluído com sucesso!`, 'success');
     } catch (error: any) {
       console.error("Erro ao excluir funcionário:", error);
@@ -1507,7 +1683,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }): Reac
       setNewSupplierEmail('');
       setNewSupplierAddress('');
       setNewSupplierNotes('');
-      await loadWorkData();
+      await _reloadAllWorkData(); // Use the consolidated reload
       showToastNotification(`Fornecedor "${newSupplierName}" adicionado com sucesso!`, 'success');
     } catch (error: any) {
       console.error("Erro ao adicionar fornecedor:", error);
@@ -1543,7 +1719,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }): Reac
       });
       setEditSupplierData(null);
       setShowAddSupplierModal(false);
-      await loadWorkData();
+      await _reloadAllWorkData(); // Use the consolidated reload
       // OE-006: Replaced specific success message with generic "Informações salvas."
       showToastNotification("Informações salvas.", 'success');
     } catch (error: any) {
@@ -1568,7 +1744,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }): Reac
     try {
       await dbService.deleteSupplier(supplierId, workId!);
       setZeModal(prev => ({ ...prev, isOpen: false }));
-      await loadWorkData();
+      await _reloadAllWorkData(); // Use the consolidated reload
       showToastNotification(`Fornecedor "${supplierName}" excluído com sucesso!`, 'success');
     } catch (error: any) {
       console.error("Erro ao excluir fornecedor:", error);
@@ -1630,7 +1806,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }): Reac
       setNewPhotoDescription('');
       setNewPhotoFile(null);
       setNewPhotoType('PROGRESS');
-      await loadWorkData();
+      await _reloadAllWorkData(); // Use the consolidated reload
       showToastNotification("Foto adicionada com sucesso!", 'success');
     } catch (error: any) {
       console.error("Erro ao adicionar foto:", error);
@@ -1663,7 +1839,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }): Reac
       // 2. Delete record from DB
       await dbService.deletePhoto(photoId);
       setZeModal(prev => ({ ...prev, isOpen: false }));
-      await loadWorkData();
+      await _reloadAllWorkData(); // Use the consolidated reload
       showToastNotification(`Foto "${photoDescription}" excluída com sucesso!`, 'success');
     } catch (error: any) {
       console.error("Erro ao excluir foto:", error);
@@ -1725,7 +1901,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }): Reac
       setNewFileName('');
       setNewFileCategory(FileCategory.GENERAL);
       setNewUploadFile(null);
-      await loadWorkData();
+      await _reloadAllWorkData(); // Use the consolidated reload
       showToastNotification(`Arquivo "${newFileName}" adicionado com sucesso!`, 'success');
     } catch (error: any) {
       console.error("Erro ao adicionar arquivo:", error);
@@ -1758,7 +1934,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }): Reac
       // 2. Delete record from DB
       await dbService.deleteFile(fileId);
       setZeModal(prev => ({ ...prev, isOpen: false }));
-      await loadWorkData();
+      await _reloadAllWorkData(); // Use the consolidated reload
       showToastNotification(`Arquivo "${fileName}" excluído com sucesso!`, 'success');
     } catch (error: any) {
       console.error("Erro ao excluir arquivo:", error);
@@ -1806,7 +1982,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }): Reac
   };
 
   const handleChecklistItemToggle = async (checklistId: string, itemId: string, isChecked: boolean) => {
-    setLoading(true); // General loading for checklist toggle
+    // setLoading(true); // General loading for checklist toggle
     try {
       const updatedChecklists = checklists.map(cl =>
         cl.id === checklistId
@@ -1822,13 +1998,13 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }): Reac
       if (!targetChecklist) throw new Error("Checklist não encontrada para atualização.");
 
       await dbService.updateChecklist(targetChecklist);
-      await loadWorkData();
+      await _reloadAllWorkData(); // Use the consolidated reload
       showToastNotification("Item da checklist atualizado!", 'success');
     } catch (error: any) {
       console.error("Erro ao alterar item da checklist:", error);
       showToastNotification(`Erro ao atualizar checklist: ${error.message || 'Erro desconhecido'}.`, 'error');
     } finally {
-      setLoading(false);
+      // setLoading(false);
     }
   };
 
@@ -1854,7 +2030,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }): Reac
       setNewChecklistName('');
       setNewChecklistCategory('');
       setNewChecklistItems(['']); // Reset to one empty item
-      await loadWorkData();
+      await _reloadAllWorkData(); // Use the consolidated reload
       showToastNotification(`Checklist "${newChecklistName}" adicionada com sucesso!`, 'success');
     } catch (error: any) {
       console.error("Erro ao adicionar checklist:", error);
@@ -1896,7 +2072,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }): Reac
       });
       setEditChecklistData(null);
       setShowAddChecklistModal(false);
-      await loadWorkData();
+      await _reloadAllWorkData(); // Use the consolidated reload
       // OE-006: Replaced specific success message with generic "Informações salvas."
       showToastNotification("Informações salvas.", 'success');
     } catch (error: any) {
@@ -1921,7 +2097,7 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }): Reac
     try {
       await dbService.deleteChecklist(checklistId);
       setZeModal(prev => ({ ...prev, isOpen: false }));
-      await loadWorkData();
+      await _reloadAllWorkData(); // Use the consolidated reload
       showToastNotification(`Checklist "${checklistName}" excluída com sucesso!`, 'success');
     } catch (error: any) {
       console.error("Erro ao excluir checklist:", error);
@@ -1946,17 +2122,17 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }): Reac
   // =======================================================================
 
   // Render initial loading state
-  if (!isUserAuthFinished || authLoading || loading) {
+  if (!isUserAuthFinished || authLoading || loadingInitialWork) { // Use loadingInitialWork here
     return (
       <div className="flex flex-col items-center justify-center min-h-[80vh] text-primary dark:text-white">
         <i className="fa-solid fa-circle-notch fa-spin text-3xl mb-4"></i>
-        <p className="text-lg">Carregando detalhes da obra...</p>
+        <p className="text-lg">Carregando obra...</p>
       </div>
     );
   }
 
-  // Handle work not found / not owned
-  if (!work) {
+  // Handle work not found / not owned (after initial load is complete)
+  if (!work) { // `work` is null only if an error or not found
     return (
       <div className="flex flex-col items-center justify-center min-h-[70vh] p-6 text-center animate-in fade-in">
         <i className="fa-solid fa-exclamation-circle text-6xl text-red-500 mb-4"></i>
@@ -2093,7 +2269,11 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }): Reac
             </button>
           </div>
 
-          {steps.length === 0 ? (
+          {loadingSteps ? ( // NEW: Show loader for steps
+            <div className="text-center text-slate-400 py-10 italic text-lg flex items-center justify-center gap-2">
+                <i className="fa-solid fa-circle-notch fa-spin text-xl"></i> Carregando etapas...
+            </div>
+          ) : steps.length === 0 ? (
             <div className="text-center text-slate-400 py-10 italic text-lg">
               Nenhuma etapa cadastrada ainda. Comece adicionando a primeira!
             </div>
@@ -2283,7 +2463,11 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }): Reac
             </select>
           </div>
 
-          {groupedMaterials.length === 0 ? (
+          {loadingMaterials ? ( // NEW: Show loader for materials
+             <div className="text-center text-slate-400 py-10 italic text-lg flex items-center justify-center gap-2">
+                <i className="fa-solid fa-circle-notch fa-spin text-xl"></i> Carregando materiais...
+            </div>
+          ) : groupedMaterials.length === 0 ? (
             <div className="text-center text-slate-400 py-10 italic text-lg">
               {materialFilterStepId === 'all' ? 'Nenhum material cadastrado ainda.' : 'Nenhum material para esta etapa.'}
             </div>
@@ -2543,7 +2727,11 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }): Reac
           </div>
 
 
-          {groupedExpensesByStep.length === 0 ? (
+          {loadingExpenses ? ( // NEW: Show loader for expenses
+            <div className="text-center text-slate-400 py-10 italic text-lg flex items-center justify-center gap-2">
+                <i className="fa-solid fa-circle-notch fa-spin text-xl"></i> Carregando despesas...
+            </div>
+          ) : groupedExpensesByStep.length === 0 ? (
             <div className="text-center text-slate-400 py-10 italic text-lg">
               Nenhuma despesa cadastrada ainda.
             </div>
@@ -2895,7 +3083,11 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }): Reac
           {activeSubView === 'WORKERS' && (
             <div className="animate-in fade-in duration-300">
               <ToolSubViewHeader title="Funcionários" onBack={() => goToSubView('NONE')} onAdd={() => { setShowAddWorkerModal(true); setNewWorkerName(''); setNewWorkerRole(''); setNewWorkerPhone(''); setNewWorkerDailyRate(''); setNewWorkerNotes(''); setEditWorkerData(null); }} loading={isAddingWorker}/>
-              {workers.length === 0 ? (
+              {loadingWorkers ? (
+                <div className="text-center text-slate-400 py-10 italic text-lg flex items-center justify-center gap-2">
+                    <i className="fa-solid fa-circle-notch fa-spin text-xl"></i> Carregando funcionários...
+                </div>
+              ) : workers.length === 0 ? (
                 <div className="text-center text-slate-400 py-10 italic text-lg">
                   Nenhum funcionário cadastrado.
                 </div>
@@ -3032,7 +3224,11 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }): Reac
           {activeSubView === 'SUPPLIERS' && (
             <div className="animate-in fade-in duration-300">
               <ToolSubViewHeader title="Fornecedores" onBack={() => goToSubView('NONE')} onAdd={() => { setShowAddSupplierModal(true); setNewSupplierName(''); setNewSupplierCategory(''); setNewSupplierPhone(''); setNewSupplierEmail(''); setNewSupplierAddress(''); setNewSupplierNotes(''); setEditSupplierData(null); }} loading={isAddingSupplier}/>
-              {suppliers.length === 0 ? (
+              {loadingSuppliers ? (
+                <div className="text-center text-slate-400 py-10 italic text-lg flex items-center justify-center gap-2">
+                    <i className="fa-solid fa-circle-notch fa-spin text-xl"></i> Carregando fornecedores...
+                </div>
+              ) : suppliers.length === 0 ? (
                 <div className="text-center text-slate-400 py-10 italic text-lg">
                   Nenhum fornecedor cadastrado.
                 </div>
@@ -3182,7 +3378,11 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }): Reac
           {activeSubView === 'PHOTOS' && (
             <div className="animate-in fade-in duration-300">
               <ToolSubViewHeader title="Fotos da Obra" onBack={() => goToSubView('NONE')} onAdd={() => { setShowAddPhotoModal(true); setNewPhotoDescription(''); setNewPhotoFile(null); setNewPhotoType('PROGRESS'); }} loading={uploadingPhoto}/>
-              {photos.length === 0 ? (
+              {loadingPhotos ? (
+                <div className="text-center text-slate-400 py-10 italic text-lg flex items-center justify-center gap-2">
+                    <i className="fa-solid fa-circle-notch fa-spin text-xl"></i> Carregando fotos...
+                </div>
+              ) : photos.length === 0 ? (
                 <div className="text-center text-slate-400 py-10 italic text-lg">
                   Nenhuma foto cadastrada.
                 </div>
@@ -3281,7 +3481,11 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }): Reac
           {activeSubView === 'FILES' && (
             <div className="animate-in fade-in duration-300">
               <ToolSubViewHeader title="Arquivos da Obra" onBack={() => goToSubView('NONE')} onAdd={() => { setShowAddFileModal(true); setNewFileName(''); setNewFileCategory(FileCategory.GENERAL); setNewUploadFile(null); }} loading={uploadingFile}/>
-              {files.length === 0 ? (
+              {loadingFiles ? (
+                <div className="text-center text-slate-400 py-10 italic text-lg flex items-center justify-center gap-2">
+                    <i className="fa-solid fa-circle-notch fa-spin text-xl"></i> Carregando arquivos...
+                </div>
+              ) : files.length === 0 ? (
                 <div className="text-center text-slate-400 py-10 italic text-lg">
                   Nenhum arquivo cadastrado.
                 </div>
@@ -3383,7 +3587,11 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }): Reac
           {activeSubView === 'CONTRACTS' && (
             <div className="animate-in fade-in duration-300">
               <ToolSubViewHeader title="Gerador de Contratos" onBack={() => goToSubView('NONE')} />
-              {contracts.length === 0 ? (
+              {loadingContracts ? (
+                <div className="text-center text-slate-400 py-10 italic text-lg flex items-center justify-center gap-2">
+                    <i className="fa-solid fa-circle-notch fa-spin text-xl"></i> Carregando contratos...
+                </div>
+              ) : contracts.length === 0 ? (
                 <div className="text-center text-slate-400 py-10 italic text-lg">
                   Nenhum modelo de contrato disponível.
                 </div>
@@ -3440,7 +3648,11 @@ const WorkDetail: React.FC<WorkDetailProps> = ({ activeTab, onTabChange }): Reac
           {activeSubView === 'CHECKLIST' && (
             <div className="animate-in fade-in duration-300">
               <ToolSubViewHeader title="Checklists da Obra" onBack={() => goToSubView('NONE')} onAdd={() => { setShowAddChecklistModal(true); setNewChecklistName(''); setNewChecklistCategory(''); setNewChecklistItems(['']); setEditChecklistData(null); }} loading={isAddingChecklist}/>
-              {checklists.length === 0 ? (
+              {loadingChecklists ? (
+                <div className="text-center text-slate-400 py-10 italic text-lg flex items-center justify-center gap-2">
+                    <i className="fa-solid fa-circle-notch fa-spin text-xl"></i> Carregando checklists...
+                </div>
+              ) : checklists.length === 0 ? (
                 <div className="text-center text-slate-400 py-10 italic text-lg">
                   Nenhuma checklist cadastrada.
                 </div>
