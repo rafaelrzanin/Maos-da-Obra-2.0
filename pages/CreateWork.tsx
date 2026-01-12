@@ -1,12 +1,38 @@
 
-
 import React, { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext.tsx'; // Use authLoading and isUserAuthFinished
 import * as ReactRouter from 'react-router-dom';
 import { dbService } from '../services/db.ts';
 import { WorkStatus, StepStatus } from '../types.ts'; // Import StepStatus
 import { WORK_TEMPLATES, ZE_AVATAR, ZE_AVATAR_FALLBACK } from '../services/standards.ts';
-import { aiService } from '../services/ai'; // NEW: Import aiService
+// Removed: import { aiService } from '../services/ai'; // CRITICAL: REMOVED AI SERVICE IMPORT
+
+// CRITICAL FIX: Local mockAiService to entirely replace aiService in the browser
+const mockAiService = {
+  chat: async (message: string): Promise<string> => {
+    console.warn("MOCK AI SERVICE: chat called in browser (CreateWork). AI is disabled.");
+    await new Promise(r => setTimeout(r, 500)); // Simulate loading
+    return "O Zé está em modo offline no momento para gerar um resumo. Por favor, configure sua chave de API ou acesse um plano Vitalício para usar a IA.";
+  },
+  getWorkInsight: async (context: string): Promise<string> => {
+    console.warn("MOCK AI SERVICE: getWorkInsight called in browser (CreateWork). AI is disabled.");
+    await new Promise(r => setTimeout(r, 500)); // Simulate loading
+    return "Estou sem conexão para dar a dica, mas a atenção ao cronograma é sempre crucial.";
+  },
+  generateWorkPlanAndRisk: async (work: any): Promise<any> => { // Returns any to match expected object
+    console.warn("MOCK AI SERVICE: generateWorkPlanAndRisk called in browser (CreateWork). AI is disabled.");
+    await new Promise(r => setTimeout(r, 2000));
+    return {
+      workId: work.id,
+      generalAdvice: "A IA está offline. Não foi possível gerar um plano detalhado. Verifique suas anotações e contatos para gerenciar a obra.",
+      timelineSummary: "Plano offline. Organize suas etapas manualmente.",
+      detailedSteps: [{ orderIndex: 1, name: "Fase 1: Preparação (OFFLINE)", estimatedDurationDays: 10, notes: "Defina seus materiais manualmente enquanto a IA está offline." }],
+      potentialRisks: [{ description: "Risco de atraso devido a IA offline.", likelihood: "high", mitigation: "A IA está offline." }],
+      materialSuggestions: [{ item: "Cimento (OFFLINE)", priority: "medium", reason: "Sempre essencial, mas a IA não pode sugerir agora." }],
+    };
+  }
+};
+
 
 // Helper para formatar valores monetários (apenas para exibição estática)
 const formatCurrency = (value: number | string | undefined): string => {
@@ -194,14 +220,15 @@ const CreateWork = () => {
         // NEW: Generate an AI notification for the new work plan summary
         try {
             const aiPlanSummaryPrompt = `Gere um resumo da timeline e dos principais marcos para a obra "${newWork.name}", com ${newWork.area}m², ${newWork.floors} pavimentos, ${newWork.bathrooms} banheiros e ${newWork.kitchens} cozinhas, com início em ${newWork.startDate} e orçamento de R$ ${newWork.budgetPlanned}. Foque nos pontos mais importantes e na duração total estimada.`;
-            const aiPlanSummary = await aiService.chat(aiPlanSummaryPrompt); // Using chat for a slightly longer summary
+            // CRITICAL FIX: Use mockAiService here
+            const aiPlanSummary = await mockAiService.chat(aiPlanSummaryPrompt); // Using chat for a slightly longer summary
             
             // Fix: Call dbService.addNotification with an object conforming to Omit<DBNotification, 'id'>
             await dbService.addNotification({
                 userId: user.id,
                 workId: newWork.id,
-                title: `Plano Inteligente para Obra: ${newWork.name}!`,
-                message: aiPlanSummary,
+                title: `Plano Inteligente para Obra: ${newWork.name}! (AI OFFLINE)`,
+                message: aiPlanSummary, // Will contain the mock message
                 date: new Date().toISOString(),
                 read: false,
                 type: 'SUCCESS',
@@ -361,7 +388,7 @@ const CreateWork = () => {
                     className={`flex flex-col items-center justify-center p-6 rounded-2xl border-2 transition-all shadow-md ${workCategory === 'CONSTRUCTION' ? 'border-secondary bg-secondary/10' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-secondary/50'}`} /* OE #004: Increased padding */
                     aria-pressed={workCategory === 'CONSTRUCTION'}
                   >
-                    <i className="fa-solid fa-house-chimney text-4xl mb-4 text-primary dark:text-white"></i> {/* OE #004: Increased margin */}
+                    <i className="fa-solid fa-house-chimney text-4xl mb-4 text-primary dark:text-white"></i> {/* OE #004: Increased icon size, margin */}
                     <span className="font-black text-primary dark:text-white text-lg">Construção</span> {/* OE #004: Increased text size */}
                   </button>
                   <button
@@ -370,7 +397,7 @@ const CreateWork = () => {
                     className={`flex flex-col items-center justify-center p-6 rounded-2xl border-2 transition-all shadow-md ${workCategory === 'RENOVATION' ? 'border-secondary bg-secondary/10' : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:border-secondary/50'}`} /* OE #004: Increased padding */
                     aria-pressed={workCategory === 'RENOVATION'}
                   >
-                    <i className="fa-solid fa-screwdriver-wrench text-4xl mb-4 text-primary dark:text-white"></i> {/* OE #004: Increased margin */}
+                    <i className="fa-solid fa-screwdriver-wrench text-4xl mb-4 text-primary dark:text-white"></i> {/* OE #004: Increased icon size, margin */}
                     <span className="font-black text-primary dark:text-white text-lg">Reforma</span> {/* OE #004: Increased text size */}
                   </button>
                 </div>
